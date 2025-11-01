@@ -29,13 +29,12 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff>=0.14.1",
-    "pytest>=7.0",
     "build>=1.0",
     "twine>=4.0",
 ]
 
 [project.urls]
-Homepage = "https://github.com/GAIK-project/toolkit-shared-components"
+Homepage = "https://gaik.ai/"
 Repository = "https://github.com/GAIK-project/toolkit-shared-components"
 Documentation = "https://github.com/GAIK-project/toolkit-shared-components/tree/main/gaik-py"
 Issues = "https://github.com/GAIK-project/toolkit-shared-components/issues"
@@ -57,8 +56,3 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 ignore = []
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_functions = ["test_*"]
