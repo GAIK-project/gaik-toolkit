@@ -1,85 +1,145 @@
-# Toolkit Shared Components
+# GAIK - General AI Kit
 
-One place where we share Python and TypeScript components for every team project.
+**Shared Python components for AI/ML projects**
 
-## Why not copy/paste?
+A modular toolkit providing production-ready AI/ML utilities. Currently featuring dynamic schema extraction with OpenAI's structured outputs.
 
-- Single source of truth: bug fixes and improvements land once and flow to every project.
-- Versioned releases: each project can pin or upgrade confidently.
-- Easier maintenance: imports, docs, and tests travel together.
-- Ready-to-install packages: no manual syncing or cherry-picking.
+---
 
-## Install packages
-
-- Python: `pip install "git+https://github.com/GAIK-project/toolkit-shared-components.git#subdirectory=gaik-py"`
-- TypeScript: `pnpm add github:GAIK-project/toolkit-shared-components`
-
-Use `@v0.2.0` to pin a specific version (e.g. `pip install git+…@v0.2.0#subdirectory=gaik-py`).
-
-## Need to publish a component?
-
-- Follow the step-by-step deployment guide in `deployment.md`.
-- TL;DR: add your component, run tests, bump the version, tag a release, and update release notes.
-
-## Repository Contents
-
-- `gaik-py`: shared Python components and tests
-- `gaik-ts`: shared TypeScript components and tests
-- `gaik-demo`: Docker app with both packages preinstalled for demos
-
-## Release Cheat Sheet
-
-1. Make sure `main` is up to date and tests pass.
-2. Update the version files.
-3. `git commit` and `git tag vX.Y.Z`.
-4. `git push origin main --tags`.
-5. Open GitHub `Releases`, pick the tag, and add highlights.
-
-GitHub automatically provides zip/tarball downloads and supports attaching binaries to the release [[1]](#references).
-
-## Using Components in Projects
-
-- Keep dependencies pinned in `requirements.txt` / `package.json`.
-- When a new release drops, bump the version and review the release notes.
-- Fixes should land here first, then propagate via version bumps.
-
-## Example: Python Whisper Transcription Component
-
-1. Install the shared package:
+## 📦 Quick Install
 
 ```bash
-pip install "git+https://github.com/GAIK-project/toolkit-shared-components.git#subdirectory=gaik-py"
+# From Test PyPI (current)
+pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ gaik
+
+# From PyPI (coming soon)
+# pip install gaik
 ```
 
-2. Add the shared helper in `gaik-py/src/gaik/audio/whisper.py` (dependency pinned in `gaik-py/requirements.txt`):
+---
+
+## 🚀 Quick Start
 
 ```python
-from functools import lru_cache
-from pathlib import Path
+from gaik.schema import SchemaExtractor
 
-import whisper
-
-
-@lru_cache(maxsize=1)
-def _load_model(model_name: str = "base") -> whisper.Whisper:
-    return whisper.load_model(model_name)
-
-
-def transcribe_audio(audio_path: str | Path, model_name: str | None = None) -> str:
-    audio_path = Path(audio_path)
-    model = _load_model(model_name or "base")
-    result = model.transcribe(str(audio_path))
-    return result["text"].strip()
+extractor = SchemaExtractor("Extract name and age from text")
+result = extractor.extract_one("Alice is 25 years old")
+print(result)
+# {'name': 'Alice', 'age': 25}
 ```
 
-3. Consume it in any project:
+**Full documentation:** [gaik-py/README.md](gaik-py/README.md)
+
+---
+
+## 🌟 Features
+
+### `gaik.schema` - Dynamic Schema Extraction
+
+Extract structured data from unstructured text using OpenAI's structured outputs:
 
 ```python
-from gaik.audio.whisper import transcribe_audio
+from gaik.schema import dynamic_extraction_workflow
 
-print(transcribe_audio("samples/meeting.wav"))
+description = """
+Extract from invoices:
+- Invoice number
+- Total amount in USD
+- Vendor name
+"""
+
+documents = [
+    "Invoice #12345 from Acme Corp. Total: $1,500",
+    "INV-67890, Vendor: TechCo, Amount: $2,750"
+]
+
+results = dynamic_extraction_workflow(description, documents)
 ```
 
-## References
+**Benefits:**
+- ✅ Guaranteed structure (API-enforced)
+- ✅ Type-safe with Pydantic
+- ✅ No code generation or `eval()`
+- ✅ Cost-effective
+- ✅ Clean, minimal dependencies
 
-1. <a name="references"></a>GitHub Docs: About releases. https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases
+---
+
+## 📁 Repository Structure
+
+```
+toolkit-shared-components/
+├── gaik-py/              # Python package
+│   ├── src/gaik/
+│   │   └── schema/       # Dynamic schema extraction
+│   ├── pyproject.toml
+│   └── README.md
+├── examples/             # Usage examples
+├── docs/                 # Documentation
+│   └── PUBLISHING.md     # PyPI publishing guide
+└── .github/workflows/    # CI/CD automation
+```
+
+---
+
+## 🔧 For Contributors
+
+### Publishing New Versions
+
+See detailed guide: [docs/PUBLISHING.md](docs/PUBLISHING.md)
+
+**Quick workflow:**
+
+1. Update version in `pyproject.toml` and `__init__.py`
+2. Commit changes
+3. Create and push tag: `git tag v0.2.0 && git push origin v0.2.0`
+4. GitHub Actions automatically publishes to Test PyPI
+
+### Local Development
+
+```bash
+# Clone and install
+git clone https://github.com/GAIK-project/toolkit-shared-components.git
+cd toolkit-shared-components/gaik-py
+pip install -e ".[dev]"
+
+# Build and test
+python -m build
+twine check dist/*
+```
+
+---
+
+## 📋 Version History
+
+- **v0.1.1** (Current) - Updated OpenAI API, improved docs
+- **v0.1.0** - Initial release with dynamic schema extraction
+
+---
+
+## ⚠️ Requirements
+
+The `gaik.schema` module requires an OpenAI API key:
+
+```bash
+export OPENAI_API_KEY='sk-...'
+```
+
+Get your key: https://platform.openai.com/api-keys
+
+---
+
+## 🔗 Resources
+
+- **Package (Test PyPI)**: https://test.pypi.org/project/gaik/
+- **Documentation**: [gaik-py/README.md](gaik-py/README.md)
+- **Publishing Guide**: [docs/PUBLISHING.md](docs/PUBLISHING.md)
+- **Issues**: https://github.com/GAIK-project/toolkit-shared-components/issues
+- **OpenAI Docs**: https://platform.openai.com/docs/guides/structured-outputs
+
+---
+
+## 📄 License
+
+MIT - see [LICENSE](LICENSE) for details
