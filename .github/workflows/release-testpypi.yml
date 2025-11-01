@@ -1,0 +1,53 @@
+name: Publish to Test PyPI
+
+on:
+  workflow_dispatch:  # Allow manual trigger
+  push:
+    tags:
+      - 'v*.*.*'  # Trigger on version tags like v0.1.0
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+
+    - name: Build package
+      working-directory: gaik-py
+      run: python -m build
+
+    - name: Check package
+      working-directory: gaik-py
+      run: twine check dist/*
+
+    - name: Publish to Test PyPI
+      working-directory: gaik-py
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+      run: |
+        twine upload --repository-url https://test.pypi.org/legacy/ --skip-existing dist/*
+
+    - name: Test installation from Test PyPI
+      run: |
+        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ gaik
+        python -c "from gaik.schema import SchemaExtractor; print('✓ Package imported successfully')"
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist-package
+        path: gaik-py/dist/
+        retention-days: 7

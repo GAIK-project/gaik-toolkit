@@ -22,11 +22,8 @@ Extract structured data from unstructured text using dynamically created schemas
 ## Installation
 
 ```bash
-# From Test PyPI
-pip install -i https://test.pypi.org/simple/ gaik
-
-# From production PyPI (when available)
-pip install gaik
+# Install from Test PyPI
+pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ gaik
 ```
 
 ## Quick Start

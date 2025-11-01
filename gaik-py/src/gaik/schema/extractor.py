@@ -60,17 +60,17 @@ def _parse_user_requirements(
     Returns:
         Parsed extraction requirements with field specifications
     """
-    client = _get_openai_client(client)
+    openai_client = _get_openai_client(client)
 
-    response = client.beta.chat.completions.parse(
-        model="gpt-4o",
-        messages=[
+    response = openai_client.responses.parse(
+        model="gpt-4.1",
+        input=[
             {"role": "user", "content": user_description},
         ],
-        response_format=ExtractionRequirements,
+        text_format=ExtractionRequirements,
     )
 
-    return response.choices[0].message.parsed
+    return response.output_parsed
 
 
 def _extract_from_document(
@@ -88,17 +88,17 @@ def _extract_from_document(
     Returns:
         Extracted data as a Pydantic model instance
     """
-    client = _get_openai_client(client)
+    openai_client = _get_openai_client(client)
 
-    response = client.beta.chat.completions.parse(
-        model="gpt-4o",
-        messages=[
+    response = openai_client.responses.parse(
+        model="gpt-4.1",
+        input=[
             {"role": "user", "content": document_text},
         ],
-        response_format=extraction_model,
+        text_format=extraction_model,
     )
 
-    return response.choices[0].message.parsed
+    return response.output_parsed
 
 
 class SchemaExtractor:

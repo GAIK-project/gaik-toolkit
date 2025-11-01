@@ -1,0 +1,39 @@
+# Environment variables
+.env*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# UV package manager
+uv.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+.venv
+venv/
