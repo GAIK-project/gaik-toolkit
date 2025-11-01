@@ -5,7 +5,6 @@ This script tests the basic functionality without making actual API calls.
 
 from gaik.schema import (
     SchemaExtractor,
-    dynamic_extraction_workflow,
     FieldSpec,
     ExtractionRequirements,
     create_extraction_model,
