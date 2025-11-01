@@ -127,7 +127,7 @@ schema = InvoiceModel.model_json_schema()
 instance = InvoiceModel(invoice_number="INV-123", amount=1500.00)
 ```
 
-**💡 More Examples:** Check out the [examples directory](../examples/) for more use cases and patterns.
+**💡 More Examples:** Check out the [examples directory](https://github.com/GAIK-project/toolkit-shared-components/tree/main/examples) for more use cases and patterns.
 
 ## API Overview
 
