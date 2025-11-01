@@ -122,7 +122,10 @@ See detailed guide: [docs/PUBLISHING.md](docs/PUBLISHING.md)
 # Clone and install
 git clone https://github.com/GAIK-project/toolkit-shared-components.git
 cd toolkit-shared-components/gaik-py
-pip install -e ".[dev]"
+pip install -e .
+
+# Optional: include linting/publishing tooling
+pip install -e .[dev]
 
 # Build and test
 python -m build
@@ -146,17 +149,18 @@ The `gaik.extract` module requires an OpenAI API key:
 export OPENAI_API_KEY='sk-...'
 ```
 
-Get your key: https://platform.openai.com/api-keys
+Get your key: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 
 ---
 
 ## 🔗 Resources
 
-- **Package (Test PyPI)**: https://test.pypi.org/project/gaik/
+- **Package (Test PyPI)**: [test.pypi.org/project/gaik](https://test.pypi.org/project/gaik/)
 - **Documentation**: [gaik-py/README.md](gaik-py/README.md)
 - **Publishing Guide**: [docs/PUBLISHING.md](docs/PUBLISHING.md)
-- **Issues**: https://github.com/GAIK-project/toolkit-shared-components/issues
-- **OpenAI Docs**: https://platform.openai.com/docs/guides/structured-outputs
+- **Cheatsheet (FI)**: [docs/gaik-toolkit-cheatsheet.md](docs/gaik-toolkit-cheatsheet.md)
+- **Issues**: [github.com/GAIK-project/toolkit-shared-components/issues](https://github.com/GAIK-project/toolkit-shared-components/issues)
+- **OpenAI Docs**: [OpenAI structured outputs guide](https://platform.openai.com/docs/guides/structured-outputs)
 
 ---
 
