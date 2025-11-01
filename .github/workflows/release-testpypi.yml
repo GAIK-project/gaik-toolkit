@@ -42,8 +42,100 @@ jobs:
 
     - name: Test installation from Test PyPI
       run: |
+        # Install from Test PyPI
         pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ gaik
-        python -c "from gaik.extract import SchemaExtractor; print('✓ Package imported successfully')"
+
+        # Run comprehensive automated test
+        python -c "
+        import sys
+        import pkgutil
+        import importlib
+        
+        print('Testing GAIK package installation...\n')
+        
+        # Test main package
+        import gaik
+        print(f'✓ Main package imported successfully (version: {gaik.__version__})')
+        
+        # Discover and test all submodules
+        print('\nDiscovering and testing all submodules:')
+        modules_found = []
+        for importer, modname, ispkg in pkgutil.walk_packages(
+            path=gaik.__path__,
+            prefix='gaik.',
+            onerror=lambda x: None
+        ):
+            try:
+                # Skip private/internal modules
+                if any(part.startswith('_') and part != '__init__' for part in modname.split('.')):
+                    continue
+                    
+                mod = importlib.import_module(modname)
+                modules_found.append(modname)
+                print(f'  ✓ {modname}')
+                
+                # Test public API of each module
+                if hasattr(mod, '__all__'):
+                    for item in mod.__all__:
+                        if not hasattr(mod, item):
+                            print(f'    ✗ ERROR: {item} listed in __all__ but not found!')
+                            sys.exit(1)
+                    print(f'    - {len(mod.__all__)} public API items verified')
+                    
+            except Exception as e:
+                print(f'  ✗ ERROR importing {modname}: {e}')
+                sys.exit(1)
+        
+        if not modules_found:
+            print('✗ ERROR: No modules found in gaik package!')
+            sys.exit(1)
+        
+        print(f'\n✓ Successfully tested {len(modules_found)} modules')
+        
+        # Run specific functionality tests for known modules
+        print('\nTesting specific functionality:')
+        
+        # Test extract module if it exists
+        try:
+            from gaik.extract import (
+                SchemaExtractor,
+                dynamic_extraction_workflow,
+                FieldSpec,
+                ExtractionRequirements,
+                create_extraction_model,
+                sanitize_model_name,
+            )
+            
+            # Test basic functionality without API calls
+            req = ExtractionRequirements(
+                use_case_name='Test',
+                fields=[
+                    FieldSpec(
+                        field_name='test_field',
+                        field_type='str',
+                        description='Test',
+                        required=True
+                    )
+                ]
+            )
+            
+            # Test model creation
+            model = create_extraction_model(req)
+            assert model.__name__ == 'Test_Extraction', 'Model name mismatch'
+            
+            # Test sanitization
+            assert sanitize_model_name('Test! Name') == 'Test_Name', 'Sanitization failed'
+            
+            print('  ✓ gaik.extract functionality tests passed')
+            
+        except ImportError:
+            print('  - gaik.extract not found (skipped)')
+        except Exception as e:
+            print(f'  ✗ ERROR testing gaik.extract: {e}')
+            sys.exit(1)
+        
+        print('\n✅ All tests passed successfully!')
+        "
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
