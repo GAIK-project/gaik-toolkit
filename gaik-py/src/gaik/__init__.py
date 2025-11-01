@@ -13,8 +13,11 @@ Example:
     >>> results = extractor.extract(documents)
 """
 
-__version__ = "0.1.1"
-__author__ = "GAIK Project"
-__license__ = "MIT"
+import importlib.metadata
 
-__all__ = ["__version__", "__author__", "__license__"]
+try:
+    __version__ = importlib.metadata.version("gaik")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "0.0.0.dev"
+
+__all__ = ["__version__"]
