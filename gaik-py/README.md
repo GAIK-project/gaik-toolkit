@@ -131,13 +131,13 @@ instance = InvoiceModel(invoice_number="INV-123", amount=1500.00)
 
 ## API Overview
 
-| Function/Class | Purpose |
-|----------------|---------|
+| Function/Class                  | Purpose                                               |
+| ------------------------------- | ----------------------------------------------------- |
 | `dynamic_extraction_workflow()` | One-shot extraction from natural language description |
-| `SchemaExtractor` | Reusable extractor for multiple document batches |
-| `create_extraction_model()` | Generate Pydantic model from field specifications |
-| `FieldSpec` | Define a single extraction field |
-| `ExtractionRequirements` | Collection of field specifications |
+| `SchemaExtractor`               | Reusable extractor for multiple document batches      |
+| `create_extraction_model()`     | Generate Pydantic model from field specifications     |
+| `FieldSpec`                     | Define a single extraction field                      |
+| `ExtractionRequirements`        | Collection of field specifications                    |
 
 See docstrings for detailed parameter information.
 
