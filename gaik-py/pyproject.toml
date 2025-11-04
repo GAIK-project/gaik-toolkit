@@ -8,7 +8,7 @@ license = { file = "LICENSE" }
 authors = [
     { name = "GAIK Project" }
 ]
-keywords = ["ai", "ml", "openai", "structured-outputs", "pydantic", "schema", "extraction"]
+keywords = ["ai", "ml", "langchain", "openai", "anthropic", "google", "structured-outputs", "pydantic", "schema", "extraction"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -22,8 +22,11 @@ classifiers = [
 ]
 
 dependencies = [
-    "openai>=2.5.0",
     "pydantic>=2.12.3",
+    "langchain-core>=1.0.3",
+    "langchain-openai>=1.0.2",
+    "langchain-anthropic>=1.0.1",
+    "langchain-google-genai>=3.0.1",
 ]
 
 [project.optional-dependencies]

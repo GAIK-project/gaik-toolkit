@@ -2,22 +2,20 @@
 
 **Reusable AI/ML components for Python**
 
-GAIK is a modular toolkit providing production-ready AI/ML utilities. Currently featuring dynamic schema extraction with OpenAI's structured outputs.
-
-> **⚠️ Requirements:** This package requires an [OpenAI API key](https://platform.openai.com/api-keys). Set it as an environment variable: `export OPENAI_API_KEY='sk-...'`
+Multi-provider AI toolkit for structured data extraction. Supports OpenAI, Anthropic Claude, Google Gemini, and Azure OpenAI.
 
 ## Features
 
 ### 🔍 Dynamic Data Extraction (`gaik.extract`)
 
-Extract structured data from unstructured text using dynamically created schemas:
+Extract structured data from unstructured text using LangChain's structured outputs:
 
-- ✅ **Guaranteed structure** - OpenAI API enforces exact schema compliance
-- ✅ **Type-safe** - Full Pydantic validation, no parsing errors
-- ✅ **No code generation** - Uses Pydantic's `create_model()`, no `eval()` needed
-- ✅ **Cost-effective** - Minimal API calls and tokens
-- ✅ **Simple & clean** - Easy to understand codebase, minimal dependencies
-- ✅ **Clear errors** - Helpful error messages guide you when setup is needed
+- ✅ **Multi-provider** - OpenAI, Anthropic, Azure, Google - easy switching
+- ✅ **Guaranteed structure** - API-enforced schema compliance
+- ✅ **Type-safe** - Full Pydantic validation
+- ✅ **No code generation** - Uses Pydantic's `create_model()`, no `eval()`
+- ✅ **Cost-effective** - Minimal API calls
+- ✅ **Simple & clean** - Easy to understand, minimal dependencies
 
 ## Installation
 
@@ -28,43 +26,82 @@ pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/
 
 ## Quick Start
 
-### 1. Set up your OpenAI API key
+### 1. Set up your provider API key
 
+**OpenAI (default):**
 ```bash
-# Get your API key from: https://platform.openai.com/api-keys
-export OPENAI_API_KEY='sk-...'
+export OPENAI_API_KEY='sk-...'  # Get from: https://platform.openai.com/api-keys
+```
+
+**Anthropic:**
+```bash
+export ANTHROPIC_API_KEY='sk-ant-...'  # Get from: https://console.anthropic.com
+```
+
+**Google:**
+```bash
+export GOOGLE_API_KEY='...'  # Get from: https://ai.google.dev
+```
+
+**Azure OpenAI:**
+```bash
+export AZURE_OPENAI_API_KEY='...'
+export AZURE_OPENAI_ENDPOINT='https://your-resource.openai.azure.com/'
 ```
 
 ### 2. Simple Extraction
 
 ```python
+from gaik.extract import SchemaExtractor
+
+# Using default OpenAI provider
+extractor = SchemaExtractor("Extract name and age from text")
+result = extractor.extract_one("Alice is 25 years old")
+print(result)
+# {'name': 'Alice', 'age': 25}
+
+# Switch to Anthropic Claude
+extractor = SchemaExtractor(
+    "Extract name and age from text",
+    provider="anthropic"
+)
+
+# Use Google Gemini
+extractor = SchemaExtractor(
+    "Extract name and age from text",
+    provider="google"
+)
+```
+
+### 3. Batch Extraction
+
+```python
 from gaik.extract import dynamic_extraction_workflow
 
-# Describe what you want to extract in natural language
 description = """
 Extract from invoices:
 - Invoice number
-- Date
 - Total amount in USD
 - Vendor name
 """
 
-# Your documents
 documents = [
-    "Invoice #12345\nDate: 2024-01-15\nVendor: Acme Corp\nTotal: $1,500.00",
-    "INV-67890\n2024-02-20\nSupplier: TechCo\nAmount: 2,750 USD"
+    "Invoice #12345 from Acme Corp. Total: $1,500",
+    "INV-67890, Supplier: TechCo, Amount: $2,750"
 ]
 
-# Extract structured data
-results = dynamic_extraction_workflow(description, documents)
+# Use any provider
+results = dynamic_extraction_workflow(
+    description,
+    documents,
+    provider="openai"  # or "anthropic", "google", "azure"
+)
 
-# Results are dictionaries with guaranteed structure
 for result in results:
-    print(f"Invoice: {result['invoice_number']}")
-    print(f"Amount: ${result['total_amount']}")
+    print(f"Invoice: {result['invoice_number']}, Amount: ${result['total_amount']}")
 ```
 
-### Reusable Extractor (Recommended for Multiple Batches)
+### 4. Reusable Extractor (Recommended)
 
 ```python
 from gaik.extract import SchemaExtractor
@@ -76,38 +113,31 @@ Extract from project reports:
 - Lead institution
 - Total funding in euros
 - List of partner countries
-- Status (ongoing or completed)
 """)
 
-# Reuse for multiple document batches
+# Reuse for multiple batches
 batch1_results = extractor.extract(documents_batch1)
 batch2_results = extractor.extract(documents_batch2)
 
 # Inspect the schema
-print(f"Extracting fields: {extractor.field_names}")
-# Output: ['project_title', 'lead_institution', 'total_funding', ...]
-
-# Access the generated Pydantic model
-pydantic_model = extractor.model
-json_schema = extractor.model.model_json_schema()
-print(json_schema)
+print(f"Fields: {extractor.field_names}")
+# ['project_title', 'lead_institution', 'total_funding', 'partner_countries']
 ```
 
-### 3. Schema-Only Generation (No Extraction)
+### 5. Schema-Only Generation
 
-Sometimes you just want to generate a Pydantic schema without extracting data:
+Generate Pydantic schemas without extraction:
 
 ```python
 from gaik.extract import FieldSpec, ExtractionRequirements, create_extraction_model
 
-# Define fields manually
 requirements = ExtractionRequirements(
     use_case_name="Invoice",
     fields=[
         FieldSpec(
             field_name="invoice_number",
             field_type="str",
-            description="The invoice identifier",
+            description="Invoice identifier",
             required=True
         ),
         FieldSpec(
@@ -119,32 +149,45 @@ requirements = ExtractionRequirements(
     ]
 )
 
-# Create the Pydantic model
+# Create Pydantic model
 InvoiceModel = create_extraction_model(requirements)
-
-# Use it however you want
 schema = InvoiceModel.model_json_schema()
-instance = InvoiceModel(invoice_number="INV-123", amount=1500.00)
 ```
 
-**💡 More Examples:** Check out the [examples directory](https://github.com/GAIK-project/toolkit-shared-components/tree/main/examples) for more use cases and patterns.
-
-## API Overview
+## API Reference
 
 | Function/Class                  | Purpose                                               |
 | ------------------------------- | ----------------------------------------------------- |
-| `dynamic_extraction_workflow()` | One-shot extraction from natural language description |
-| `SchemaExtractor`               | Reusable extractor for multiple document batches      |
+| `SchemaExtractor`               | Reusable extractor with provider selection            |
+| `dynamic_extraction_workflow()` | One-shot extraction from natural language             |
 | `create_extraction_model()`     | Generate Pydantic model from field specifications     |
 | `FieldSpec`                     | Define a single extraction field                      |
 | `ExtractionRequirements`        | Collection of field specifications                    |
 
-See docstrings for detailed parameter information.
+### Provider Parameters
+
+```python
+SchemaExtractor(
+    description: str,
+    provider: str = "openai",           # "openai", "anthropic", "google", "azure"
+    model: str | None = None,           # Optional: override default model
+    api_key: str | None = None,         # Optional: override env variable
+    client: BaseChatModel | None = None # Optional: custom LangChain client
+)
+```
+
+## Default Models
+
+- OpenAI: `gpt-4.1`
+- Anthropic: `claude-sonnet-4-5-20250929`
+- Google: `gemini-2.5-flash-latest`
+- Azure: `gpt-4.1`
 
 ## Resources
 
 - [GitHub Repository](https://github.com/GAIK-project/toolkit-shared-components)
-- [OpenAI Structured Outputs Guide](https://platform.openai.com/docs/guides/structured-outputs)
+- [Examples Directory](https://github.com/GAIK-project/toolkit-shared-components/tree/main/examples)
+- [LangChain Documentation](https://python.langchain.com/docs/how_to/structured_output/)
 - [Pydantic Documentation](https://docs.pydantic.dev/)
 
 ## License

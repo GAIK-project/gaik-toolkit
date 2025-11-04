@@ -108,8 +108,7 @@ def test_schema_extractor_init():
     # We can't test actual extraction without an API key and making real calls
     # But we can test that the class can be imported and has the right structure
 
-    import os
-    from openai import OpenAI
+    from langchain_openai import ChatOpenAI
 
     requirements = ExtractionRequirements(
         use_case_name="Test",
@@ -124,7 +123,7 @@ def test_schema_extractor_init():
     )
 
     # Create a mock client with a fake API key (won't make actual calls)
-    fake_client = OpenAI(api_key="sk-fake-key-for-testing")
+    fake_client = ChatOpenAI(api_key="sk-fake-key-for-testing", model="gpt-4.1")
 
     # Initialize with pre-made requirements and mock client (no API call)
     extractor = SchemaExtractor("", client=fake_client, requirements=requirements)
@@ -151,8 +150,14 @@ def main():
     print("All tests passed!")
     print("=" * 60)
     print("\nThe gaik package is working correctly from Test PyPI.")
-    print("\nTo test actual extraction (requires OpenAI API key):")
+    print("\nTo test actual extraction (requires API key):")
+    print("  # OpenAI (default)")
     print("  export OPENAI_API_KEY='your-key'")
+    print("  # Anthropic")
+    print("  export ANTHROPIC_API_KEY='your-key'")
+    print("  # Google")
+    print("  export GOOGLE_API_KEY='your-key'")
+    print("\nExample:")
     print("  python -c \"from gaik.extract import SchemaExtractor; ...")
     print("\nInstallation command:")
     print("  pip install -i https://test.pypi.org/simple/ \\")

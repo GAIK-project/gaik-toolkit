@@ -2,7 +2,7 @@
 
 **Shared Python components for AI/ML projects**
 
-A modular toolkit providing production-ready AI/ML utilities. Currently featuring dynamic schema extraction with OpenAI's structured outputs.
+A modular toolkit providing production-ready AI/ML utilities. Currently featuring dynamic schema extraction with multi-provider LLM support (OpenAI, Anthropic, Azure, Google) using LangChain's structured outputs.
 
 ---
 
@@ -25,10 +25,24 @@ pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/
 ```python
 from gaik.extract import SchemaExtractor
 
+# Using default OpenAI provider
 extractor = SchemaExtractor("Extract name and age from text")
 results = extractor.extract(["Alice is 25 years old"])
 print(results[0])
 # {'name': 'Alice', 'age': 25}
+
+# Using Anthropic Claude
+extractor = SchemaExtractor(
+    "Extract name and age from text",
+    provider="anthropic"
+)
+
+# Using Google Gemini
+extractor = SchemaExtractor(
+    "Extract name and age from text",
+    provider="google",
+    model="gemini-1.5-pro"
+)
 ```
 
 ### Generate Schema Only (No Extraction)
@@ -56,10 +70,10 @@ pydantic_model = extractor.model
 
 ### `gaik.extract` - Dynamic Schema Extraction
 
-Extract structured data from unstructured text using OpenAI's structured outputs:
+Extract structured data from unstructured text using LangChain's structured outputs with multi-provider support:
 
 ```python
-from gaik.schema import dynamic_extraction_workflow
+from gaik.extract import dynamic_extraction_workflow
 
 description = """
 Extract from invoices:
@@ -73,16 +87,25 @@ documents = [
     "INV-67890, Vendor: TechCo, Amount: $2,750"
 ]
 
+# Default OpenAI
 results = dynamic_extraction_workflow(description, documents)
+
+# Or use Anthropic Claude
+results = dynamic_extraction_workflow(
+    description,
+    documents,
+    provider="anthropic"
+)
 ```
 
 **Benefits:**
 
+- ✅ Multi-provider support (OpenAI, Anthropic, Azure, Google)
 - ✅ Guaranteed structure (API-enforced)
 - ✅ Type-safe with Pydantic
 - ✅ No code generation or `eval()`
 - ✅ Cost-effective
-- ✅ Clean, minimal dependencies
+- ✅ Clean, extensible architecture
 
 ---
 
@@ -92,6 +115,7 @@ results = dynamic_extraction_workflow(description, documents)
 toolkit-shared-components/
 ├── gaik-py/              # Python package
 │   ├── src/gaik/
+│   │   ├── providers/    # Multi-provider LLM interface
 │   │   └── extract/      # Dynamic schema extraction
 │   ├── pyproject.toml
 │   └── README.md
@@ -104,6 +128,103 @@ toolkit-shared-components/
 ---
 
 ## 🔧 For Contributors
+
+### Developer Guide: Add New LLM Provider
+
+GAIK uses a shared `gaik.providers` module that all library components can use. Adding a new provider is straightforward:
+
+**1. Create provider class**
+
+File: `gaik-py/src/gaik/providers/yourprovider.py`
+
+```python
+from langchain_yourprovider import ChatYourProvider
+from .base import LLMProvider
+
+class YourProviderProvider(LLMProvider):
+    @property
+    def default_model(self) -> str:
+        return "your-default-model-name"
+
+    def create_chat_model(self, model=None, api_key=None, **kwargs):
+        return ChatYourProvider(
+            model=model or self.default_model,
+            api_key=api_key,
+            **kwargs
+        )
+```
+
+**2. Add dependency**
+
+File: `gaik-py/pyproject.toml`
+
+```toml
+dependencies = [
+    ...
+    "langchain-yourprovider>=x.x.x",
+]
+```
+
+**3. Register provider**
+
+File: `gaik-py/src/gaik/providers/__init__.py`
+
+```python
+from .yourprovider import YourProviderProvider
+
+PROVIDERS = {
+    ...
+    "yourprovider": YourProviderProvider(),
+}
+```
+
+**4. Use it**
+
+```python
+from gaik.extract import SchemaExtractor
+
+extractor = SchemaExtractor(
+    "Extract name and age",
+    provider="yourprovider"
+)
+```
+
+Done! The provider is now available to all GAIK modules (extract, future modules, etc.)
+
+### Developer Guide: Testing Your Changes
+
+**Local development with uv (recommended):**
+
+```bash
+cd gaik-py
+
+# Create virtual environment
+uv venv
+
+# Install package in editable mode
+uv pip install -e .
+
+# Run tests (no API calls needed)
+uv run python ../examples/test_gaik_installation.py
+
+# Test with real API (requires API key)
+uv run python ../examples/test_real_extraction.py
+
+# Build package
+uv pip install build
+uv run python -m build
+
+# Check package
+uv pip install twine
+uv run twine check dist/*
+```
+
+**Testing checklist:**
+- ✅ All imports work
+- ✅ Provider registry contains your new provider
+- ✅ Package builds without errors
+- ✅ Twine check passes
+- ✅ Real extraction works (if API key available)
 
 ### Publishing New Versions
 
@@ -143,13 +264,40 @@ twine check dist/*
 
 ## ⚠️ Requirements
 
-The `gaik.extract` module requires an OpenAI API key:
+The `gaik.extract` module requires an API key for your chosen provider:
 
+**OpenAI (default):**
 ```bash
 export OPENAI_API_KEY='sk-...'
 ```
-
 Get your key: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+
+**Anthropic:**
+```bash
+export ANTHROPIC_API_KEY='sk-ant-...'
+```
+Get your key: [console.anthropic.com](https://console.anthropic.com)
+
+**Google:**
+```bash
+export GOOGLE_API_KEY='...'
+```
+Get your key: [ai.google.dev](https://ai.google.dev)
+
+**Azure OpenAI:**
+```bash
+export AZURE_OPENAI_API_KEY='...'
+export AZURE_OPENAI_ENDPOINT='https://your-resource.openai.azure.com/'
+```
+
+Alternatively, pass API keys directly to the extractor:
+```python
+extractor = SchemaExtractor(
+    "Extract name and age",
+    provider="anthropic",
+    api_key="your-api-key"
+)
+```
 
 ---
 

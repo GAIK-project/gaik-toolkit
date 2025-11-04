@@ -24,27 +24,59 @@ pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/
 ```python
 from gaik.extract import SchemaExtractor
 
-prompt = "Extract the customer name and age from text"
-extractor = SchemaExtractor(prompt)
+# Default OpenAI provider
+extractor = SchemaExtractor("Extract customer name and age from text")
 result = extractor.extract(["Alice is 25 years old."])
 print(result[0])
 # {'name': 'Alice', 'age': 25}
+
+# Switch to Anthropic Claude
+extractor = SchemaExtractor(
+    "Extract customer name and age from text",
+    provider="anthropic"
+)
+
+# Or Google Gemini
+extractor = SchemaExtractor(
+    "Extract customer name and age from text",
+    provider="google"
+)
 ```
 
-- You can call the library directly from your code without extra wiring.
-- `SchemaExtractor` builds the schema automatically and returns clean Python objects.
-- Further examples live in [gaik-py/README.md](../gaik-py/README.md) and the [`examples/`](../examples/) directory if you want to explore additional workflows.
+- Multi-provider support: OpenAI, Anthropic, Google, Azure
+- `SchemaExtractor` builds the schema automatically and returns clean Python objects
+- Easy provider switching with single parameter
+- Further examples live in [gaik-py/README.md](../gaik-py/README.md) and the [`examples/`](../examples/) directory
 
 ## Environment variables
 
-- The library relies on OpenAI, so we need the `OPENAI_API_KEY` environment variable.
-- Example in PowerShell:
+- The library supports multiple LLM providers - choose which one to use by setting the appropriate API key:
 
-  ```powershell
-  $Env:OPENAI_API_KEY = "sk-..."
-  ```
+**OpenAI (default):**
+```powershell
+# PowerShell
+$Env:OPENAI_API_KEY = "sk-..."
+# Bash/Linux/Mac
+export OPENAI_API_KEY='sk-...'
+```
 
-- In the future we can bootstrap the client with Azure OpenAI keys (or similar) so end users do not have to manage the raw OpenAI key themselves.
+**Anthropic:**
+```powershell
+$Env:ANTHROPIC_API_KEY = "sk-ant-..."
+export ANTHROPIC_API_KEY='sk-ant-...'
+```
+
+**Google:**
+```powershell
+$Env:GOOGLE_API_KEY = "..."
+export GOOGLE_API_KEY='...'
+```
+
+**Azure OpenAI:**
+```powershell
+$Env:AZURE_OPENAI_API_KEY = "..."
+$Env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
+```
 
 ## Local development
 
@@ -58,9 +90,10 @@ print(result[0])
 
 ## Executive summary
 
-- Easy to install and invoke just like familiar third-party Python libraries.
-- Requires only a single environment variable (the OpenAI key).
-- Release automation is in place; promotion to the official PyPI feed is the next step.
+- Easy to install and invoke just like familiar third-party Python libraries
+- Multi-provider support (OpenAI, Anthropic, Google, Azure) - choose what works best for you
+- Requires only one API key for your chosen provider
+- Release automation is in place; promotion to the official PyPI feed is the next step
 
 ## View toward JavaScript/Node.js
 

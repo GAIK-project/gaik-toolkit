@@ -1,4 +1,4 @@
-"""Test gaik with real OpenAI API calls."""
+"""Test gaik with real LLM API calls (OpenAI, Anthropic, Google)."""
 
 import json
 import os
@@ -12,8 +12,8 @@ from gaik.extract import SchemaExtractor, dynamic_extraction_workflow
 
 
 def test_simple_extraction():
-    """Test simple extraction with SchemaExtractor."""
-    print("Test 1: Simple person extraction")
+    """Test simple extraction with SchemaExtractor (default OpenAI)."""
+    print("Test 1: Simple person extraction (OpenAI)")
     print("-" * 60)
 
     extractor = SchemaExtractor("""
@@ -24,6 +24,62 @@ def test_simple_extraction():
     """)
 
     doc = "John Doe is 32 years old and lives in Helsinki."
+
+    result = extractor.extract_one(doc)
+    print(f"Input: {doc}")
+    print(f"Result: {result}")
+    print()
+
+
+def test_anthropic_extraction():
+    """Test extraction with Anthropic Claude."""
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        print("Test 1b: Anthropic extraction - SKIPPED (no API key)")
+        print("-" * 60)
+        return
+
+    print("Test 1b: Simple extraction (Anthropic Claude)")
+    print("-" * 60)
+
+    extractor = SchemaExtractor(
+        """
+        Extract from the text:
+        - Person's name
+        - Age (as number)
+        - City where they live
+        """,
+        provider="anthropic"
+    )
+
+    doc = "Jane Smith is 28 years old and lives in London."
+
+    result = extractor.extract_one(doc)
+    print(f"Input: {doc}")
+    print(f"Result: {result}")
+    print()
+
+
+def test_google_extraction():
+    """Test extraction with Google Gemini."""
+    if not os.getenv("GOOGLE_API_KEY"):
+        print("Test 1c: Google extraction - SKIPPED (no API key)")
+        print("-" * 60)
+        return
+
+    print("Test 1c: Simple extraction (Google Gemini)")
+    print("-" * 60)
+
+    extractor = SchemaExtractor(
+        """
+        Extract from the text:
+        - Person's name
+        - Age (as number)
+        - City where they live
+        """,
+        provider="google"
+    )
+
+    doc = "Bob Johnson is 45 years old and lives in Tokyo."
 
     result = extractor.extract_one(doc)
     print(f"Input: {doc}")
@@ -110,22 +166,39 @@ def test_schema_preview():
 
 
 if __name__ == "__main__":
-    # Check if API key is set
-    if not os.getenv("OPENAI_API_KEY"):
-        print("ERROR: OPENAI_API_KEY not found in environment variables!")
-        print("Please set it in .env file or export it:")
+    # Check if at least one API key is set
+    has_openai = bool(os.getenv("OPENAI_API_KEY"))
+    has_anthropic = bool(os.getenv("ANTHROPIC_API_KEY"))
+    has_google = bool(os.getenv("GOOGLE_API_KEY"))
+
+    if not any([has_openai, has_anthropic, has_google]):
+        print("ERROR: No API keys found in environment variables!")
+        print("Please set at least one in .env file or export it:")
         print("  export OPENAI_API_KEY='sk-...'")
+        print("  export ANTHROPIC_API_KEY='sk-ant-...'")
+        print("  export GOOGLE_API_KEY='...'")
         exit(1)
 
-    print("Testing gaik with real OpenAI API calls...")
+    print("Testing gaik with real LLM API calls...")
     print("=" * 60)
+    print(f"Available providers:")
+    if has_openai:
+        print("  ✓ OpenAI")
+    if has_anthropic:
+        print("  ✓ Anthropic")
+    if has_google:
+        print("  ✓ Google")
     print()
 
     try:
-        test_simple_extraction()
-        test_workflow()
-        test_multiple_documents()
-        test_schema_preview()
+        if has_openai:
+            test_simple_extraction()
+        test_anthropic_extraction()
+        test_google_extraction()
+        if has_openai:
+            test_workflow()
+            test_multiple_documents()
+            test_schema_preview()
 
         print("\n" + "=" * 60)
         print("All tests completed successfully!")

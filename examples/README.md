@@ -1,38 +1,50 @@
 # GAIK Examples
 
-This directory contains example scripts demonstrating various use cases of the GAIK library.
+Example scripts demonstrating GAIK library usage with multiple LLM providers.
 
 ## Available Examples
 
 ### 1. `test_gaik_installation.py`
-Tests basic functionality without making API calls. Perfect for:
+**Quick test without API calls** - Perfect for:
 - Verifying installation
 - Understanding the API structure
-- Testing without an OpenAI API key
+- Testing provider registry and LangChain integration
 
-**Run it:**
 ```bash
 python test_gaik_installation.py
 ```
 
 ### 2. `test_real_extraction.py`
-Demonstrates real extraction with OpenAI API calls. Shows:
-- Simple extraction with `SchemaExtractor`
-- Using `dynamic_extraction_workflow`
-- Batch processing multiple documents
+**Real multi-provider extraction** - Demonstrates:
+- Simple extraction with OpenAI, Anthropic, Google
+- Batch processing with `dynamic_extraction_workflow`
+- Provider switching
 
-**Requirements:**
-- OpenAI API key in environment or `.env` file
-- `python-dotenv` package
+**Setup:**
 
-**Run it:**
+Choose your provider(s) and set API key:
+
 ```bash
-# Set your API key
+# OpenAI (default)
 export OPENAI_API_KEY='sk-...'
 
-# Run the example
+# Anthropic Claude
+export ANTHROPIC_API_KEY='sk-ant-...'
+
+# Google Gemini
+export GOOGLE_API_KEY='...'
+
+# Azure OpenAI
+export AZURE_OPENAI_API_KEY='...'
+export AZURE_OPENAI_ENDPOINT='https://your-resource.openai.azure.com/'
+```
+
+**Run:**
+```bash
 python test_real_extraction.py
 ```
+
+The script automatically detects available API keys and runs tests for those providers.
 
 ## More Information
 

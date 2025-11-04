@@ -2,15 +2,25 @@
 
 GAIK provides modular, production-ready tools for common AI/ML tasks including:
 - Dynamic data extraction with structured outputs
+- Multi-provider LLM support (OpenAI, Anthropic, Azure, Google)
 - And more modules coming soon...
 
 Available modules:
-    - gaik.extract: Dynamic data extraction with OpenAI structured outputs
+    - gaik.extract: Dynamic data extraction with LangChain structured outputs
+    - gaik.providers: Multi-provider LLM interface (OpenAI, Anthropic, Azure, Google)
 
 Example:
     >>> from gaik.extract import SchemaExtractor
+    >>>
+    >>> # Using default OpenAI provider
     >>> extractor = SchemaExtractor("Extract title and date from articles")
     >>> results = extractor.extract(documents)
+    >>>
+    >>> # Using Anthropic Claude
+    >>> extractor = SchemaExtractor(
+    ...     "Extract name and age",
+    ...     provider="anthropic"
+    ... )
 """
 
 import importlib.metadata
