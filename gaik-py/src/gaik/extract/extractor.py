@@ -173,9 +173,7 @@ class SchemaExtractor:
         elif user_description is not None:
             self.requirements = _parse_user_requirements(user_description, self.client)
         else:
-            raise ValueError(
-                "Either 'user_description' or 'requirements' must be provided"
-            )
+            raise ValueError("Either 'user_description' or 'requirements' must be provided")
 
         self.model = create_extraction_model(self.requirements)
 

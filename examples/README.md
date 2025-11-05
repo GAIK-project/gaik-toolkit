@@ -58,6 +58,7 @@ python examples/03_real_world_use_cases.py
 **Best for:** First-time users, quick overview
 
 Learn the basics in 5 examples:
+
 - ✅ Basic extraction with natural language descriptions
 - ✅ Batch processing multiple documents
 - ✅ Schema inspection (without API calls)
@@ -75,6 +76,7 @@ python examples/01_getting_started.py
 **Best for:** Understanding schemas, integration
 
 Deep dive into Pydantic schemas:
+
 - ✅ Inspect generated Pydantic models
 - ✅ Export to JSON Schema format
 - ✅ Use Pydantic validation features
@@ -92,6 +94,7 @@ python examples/02_pydantic_schemas.py
 **Best for:** Practical applications, production ideas
 
 Real-world business scenarios:
+
 - 📄 **Invoice Processing** - Automated accounting
 - 💬 **Customer Feedback** - Sentiment analysis
 - 👤 **Resume Parsing** - Recruitment automation
@@ -110,6 +113,7 @@ python examples/03_real_world_use_cases.py
 **Best for:** Anthropic Claude provider demo, modular examples
 
 Simple, modular demonstrations:
+
 - ✅ Basic extraction with Anthropic
 - ✅ Custom model selection (Claude Opus)
 - ✅ Schema inspection

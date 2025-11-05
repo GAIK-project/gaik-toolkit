@@ -7,19 +7,19 @@ It guarantees that LLM responses match your Pydantic schema exactly.
 SchemaExtractor parameters:
     user_description: str | None = None
         Natural language description of what to extract (required if requirements not provided)
-    
+
     provider: "openai" | "anthropic" | "google" | "azure" = "openai"
         LLM provider to use
-    
+
     model: str | None = None
         Model name (uses provider default if not specified)
-    
+
     api_key: str | None = None
         API key (uses environment variable if not specified)
-    
+
     client: BaseChatModel | None = None
         Custom LangChain client (overrides provider/model/api_key)
-    
+
     requirements: ExtractionRequirements | None = None
         Pre-defined schema (skips LLM parsing if provided)
 """
@@ -129,9 +129,9 @@ def demo_batch():
 def demo_custom_requirements():
     print("\n6. Custom Requirements")
     print("-" * 40)
-    
+
     from gaik.extract import ExtractionRequirements, FieldSpec
-    
+
     # Define your own schema instead of natural language
     # Skips LLM parsing = faster & cheaper
     requirements = ExtractionRequirements(
@@ -151,16 +151,13 @@ def demo_custom_requirements():
             ),
         ],
     )
-    
+
     # Pass requirements directly - skips LLM parsing step
     # No user_description needed when requirements provided
-    extractor = SchemaExtractor(
-        provider="anthropic",
-        requirements=requirements
-    )
-    
+    extractor = SchemaExtractor(provider="anthropic", requirements=requirements)
+
     print(f"Fields: {extractor.field_names}")
-    
+
     # Still uses with_structured_output() for extraction
     result = extractor.extract_one("Invoice #INV-001, amount: $1,500")
     print(f"Result: {result}")
