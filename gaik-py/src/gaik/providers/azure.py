@@ -5,7 +5,7 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import AzureChatOpenAI
 
-from .base import LLMProvider
+from .base import LLMProvider, _build_model_kwargs
 
 
 class AzureProvider(LLMProvider):
@@ -56,8 +56,9 @@ class AzureProvider(LLMProvider):
             ...     api_key="your-api-key"
             ... )
         """
-        return AzureChatOpenAI(
+        model_kwargs = _build_model_kwargs(
             model=model or self.default_model,
             api_key=api_key,
-            **kwargs,
+            **kwargs
         )
+        return AzureChatOpenAI(**model_kwargs)

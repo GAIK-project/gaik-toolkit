@@ -5,7 +5,7 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from .base import LLMProvider
+from .base import LLMProvider, _build_model_kwargs
 
 
 class GoogleProvider(LLMProvider):
@@ -45,8 +45,9 @@ class GoogleProvider(LLMProvider):
             >>> provider = GoogleProvider()
             >>> model = provider.create_chat_model(model="gemini-1.5-pro", temperature=0.7)
         """
-        return ChatGoogleGenerativeAI(
+        model_kwargs = _build_model_kwargs(
             model=model or self.default_model,
             api_key=api_key,
-            **kwargs,
+            **kwargs
         )
+        return ChatGoogleGenerativeAI(**model_kwargs)

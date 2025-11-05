@@ -6,6 +6,30 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 
 
+def _build_model_kwargs(
+    model: str,
+    api_key: str | None = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Build kwargs dict for LangChain model initialization.
+
+    Only includes api_key if explicitly provided (not None), allowing
+    LangChain models to fall back to environment variables.
+
+    Args:
+        model: Model name to use
+        api_key: Optional API key. If None, not included in kwargs.
+        **kwargs: Additional model parameters
+
+    Returns:
+        dict: Keyword arguments for model initialization
+    """
+    model_kwargs = {"model": model, **kwargs}
+    if api_key is not None:
+        model_kwargs["api_key"] = api_key
+    return model_kwargs
+
+
 class LLMProvider(ABC):
     """Abstract base class for LLM providers.
 

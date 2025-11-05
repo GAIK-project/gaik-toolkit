@@ -5,7 +5,7 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
-from .base import LLMProvider
+from .base import LLMProvider, _build_model_kwargs
 
 
 class OpenAIProvider(LLMProvider):
@@ -45,8 +45,9 @@ class OpenAIProvider(LLMProvider):
             >>> provider = OpenAIProvider()
             >>> model = provider.create_chat_model(model="gpt-4o", temperature=0.7)
         """
-        return ChatOpenAI(
+        model_kwargs = _build_model_kwargs(
             model=model or self.default_model,
             api_key=api_key,
-            **kwargs,
+            **kwargs
         )
+        return ChatOpenAI(**model_kwargs)

@@ -102,7 +102,7 @@ twine check dist/*
 
 # Test import
 pip install dist/gaik-*.whl
-python -c "from gaik.schema import SchemaExtractor; print('OK')"
+python -c "from gaik.extract import SchemaExtractor; print('OK')"
 ```
 
 ---
@@ -120,7 +120,7 @@ pip uninstall gaik -y
 pip install gaik
 
 # Verify
-python -c "from gaik.schema import SchemaExtractor; print('Success!')"
+python -c "from gaik.extract import SchemaExtractor; print('Success!')"
 ```
 
 ---

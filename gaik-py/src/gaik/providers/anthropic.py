@@ -5,7 +5,7 @@ from typing import Any
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
 
-from .base import LLMProvider
+from .base import LLMProvider, _build_model_kwargs
 
 
 class AnthropicProvider(LLMProvider):
@@ -45,8 +45,9 @@ class AnthropicProvider(LLMProvider):
             >>> provider = AnthropicProvider()
             >>> model = provider.create_chat_model(model="claude-3-5-sonnet-20241022", temperature=0.7)
         """
-        return ChatAnthropic(
+        model_kwargs = _build_model_kwargs(
             model=model or self.default_model,
             api_key=api_key,
-            **kwargs,
+            **kwargs
         )
+        return ChatAnthropic(**model_kwargs)
