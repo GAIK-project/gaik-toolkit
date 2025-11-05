@@ -19,9 +19,8 @@ ANTHROPIC_API_KEY=sk-ant-...
 GOOGLE_API_KEY=...
 
 # Azure OpenAI
-AZURE_API_KEY=...
-AZURE_API_BASE=https://your-resource.openai.azure.com/
-AZURE_DEPLOYMENT=gpt-4  # Optional: your deployment name
+AZURE_OPENAI_API_KEY=...
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 ```
 
 **Note:** You only need one API key to get started. The examples will work with any available provider.
@@ -108,7 +107,7 @@ python examples/03_real_world_use_cases.py
 
 ---
 
-### � [demo_anthropic.py](demo_anthropic.py)
+### 🤖 [demo_anthropic.py](demo_anthropic.py)
 
 **Best for:** Anthropic Claude provider demo, modular examples
 
@@ -194,7 +193,7 @@ extractor = SchemaExtractor(
     provider="azure",
     api_key="...",
     azure_endpoint="...",
-    azure_deployment="gpt-4"
+    azure_deployment="gpt-4"  # Your Azure deployment name
 )
 ```
 
@@ -341,7 +340,7 @@ batch2_results = extractor.extract(batch2)
 
 ### API Key Not Found
 
-```
+```text
 ERROR: No API keys found!
 ```
 
@@ -353,21 +352,26 @@ OPENAI_API_KEY=sk-...
 
 ### Azure Configuration Error
 
-```
+```text
 Azure extraction failed: ...
 ```
 
 **Solution:** Ensure you have all required Azure variables:
 
 ```bash
-AZURE_API_KEY=...
-AZURE_API_BASE=https://your-resource.openai.azure.com/
-AZURE_DEPLOYMENT=gpt-4  # Your deployment name
+AZURE_OPENAI_API_KEY=...
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+```
+
+Then pass your Azure deployment name when creating the extractor:
+
+```python
+SchemaExtractor(..., provider="azure", azure_deployment="gpt-4")
 ```
 
 ### Import Error
 
-```
+```text
 ModuleNotFoundError: No module named 'gaik'
 ```
 
@@ -407,4 +411,4 @@ pip install -e .
 
 ---
 
-**Happy extracting! 🚀**
+Happy extracting! 🚀

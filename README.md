@@ -133,13 +133,14 @@ toolkit-shared-components/
 
 GAIK uses a shared `gaik.providers` module that all library components can use. Adding a new provider is straightforward:
 
-**1. Create provider class**
+#### 1. Create provider class
 
 File: `gaik-py/src/gaik/providers/yourprovider.py`
 
 ```python
 from langchain_yourprovider import ChatYourProvider
-from .base import LLMProvider
+from .base import LLMProvider, _build_model_kwargs
+
 
 class YourProviderProvider(LLMProvider):
     @property
@@ -147,14 +148,12 @@ class YourProviderProvider(LLMProvider):
         return "your-default-model-name"
 
     def create_chat_model(self, model=None, api_key=None, **kwargs):
-        return ChatYourProvider(
-            model=model or self.default_model,
-            api_key=api_key,
-            **kwargs
-        )
+        model_name = model or self.default_model
+        model_kwargs = _build_model_kwargs(model_name, api_key=api_key, **kwargs)
+        return ChatYourProvider(**model_kwargs)
 ```
 
-**2. Add dependency**
+#### 2. Add dependency
 
 File: `gaik-py/pyproject.toml`
 
@@ -165,7 +164,7 @@ dependencies = [
 ]
 ```
 
-**3. Register provider**
+#### 3. Register provider
 
 File: `gaik-py/src/gaik/providers/__init__.py`
 
@@ -178,7 +177,7 @@ PROVIDERS = {
 }
 ```
 
-**4. Use it**
+#### 4. Use it
 
 ```python
 from gaik.extract import SchemaExtractor
@@ -233,10 +232,10 @@ See detailed guide: [docs/PUBLISHING.md](docs/PUBLISHING.md)
 
 **Quick workflow:**
 
-1. Update version in `pyproject.toml` and `__init__.py`
+1. Update version in `pyproject.toml`
 2. Commit changes
-3. Create and push tag: `git tag v0.2.0 && git push origin v0.2.0`
-4. GitHub Actions automatically publishes to Test PyPI
+3. Create and push matching tag: `git tag v<new-version> && git push origin v<new-version>`
+4. GitHub Actions builds and publishes to Test PyPI
 
 ### Local Development
 
@@ -253,15 +252,6 @@ pip install -e .[dev]
 python -m build
 twine check dist/*
 ```
-
----
-
-## 📋 Version History
-
-- **v0.1.1** (Current) - Updated OpenAI API, improved docs
-- **v0.1.0** - Initial release with dynamic schema extraction
-
----
 
 ## ⚠️ Requirements
 

@@ -65,18 +65,18 @@ jobs:
 
 ```bash
 # 1. Update version in gaik-py/pyproject.toml
-# Edit: version = "0.2.4"
+# Example: version = "0.3.0" (replace with the desired release number)
 
 # 2. Commit changes
 git add gaik-py/pyproject.toml
-git commit -m "Bump version to 0.2.4"
+git commit -m "Bump version to <new-version>"
 
 # 3. Validate version match (recommended)
-python gaik-py/tests/validate_version.py v0.2.4
+python gaik-py/tests/validate_version.py v<new-version>
 
 # 4. Create tag and push
-git tag v0.2.4
-git push origin main v0.2.4
+git tag v<new-version>
+git push origin main v<new-version>
 
 # 5. GitHub Actions validates and publishes automatically
 ```
@@ -128,18 +128,6 @@ pip install gaik
 python -c "from gaik.extract import SchemaExtractor; print('Success!')"
 ```
 
----
-
-## 🐛 Common Issues
-
-| Issue                 | Solution                                   |
-| --------------------- | ------------------------------------------ |
-| "File already exists" | Bump version (PyPI versions are permanent) |
-| "Invalid credentials" | Check `PYPI_API_TOKEN` in GitHub Secrets   |
-| "Package name taken"  | Choose different name in `pyproject.toml`  |
-
----
-
 ## 📋 Manual Publish (Emergency)
 
 If GitHub Actions fails:
@@ -159,11 +147,11 @@ twine upload dist/*
 1. ✅ Update version in `pyproject.toml`
 2. ✅ Test locally
 3. ✅ Commit changes
-4. ✅ Create git tag (`v0.2.0`)
+4. ✅ Create git tag (`vX.Y.Z`)
 5. ✅ Push tag to GitHub
 6. ✅ Verify GitHub Actions succeeds
 7. ✅ Test installation from PyPI
-8. ✅ Create GitHub Release (optional - via GitHub UI or `gh release create v0.2.0 --title "Title" --notes "Notes"`)
+8. ✅ Create GitHub Release (optional - via GitHub UI or `gh release create vX.Y.Z --title "Title" --notes "Notes"`)
 
 ---
 
