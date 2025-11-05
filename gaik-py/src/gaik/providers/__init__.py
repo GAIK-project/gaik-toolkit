@@ -7,7 +7,7 @@ Available providers:
 - openai: OpenAI GPT models (default: gpt-4.1)
 - anthropic: Anthropic Claude models (default: claude-sonnet-4-5-20250929)
 - azure: Azure OpenAI models (default: gpt-4.1)
-- google: Google Gemini models (default: gemini-2.5-flash-latest)
+- google: Google Gemini models (default: gemini-2.5-flash)
 
 Example:
     >>> from gaik.providers import get_provider

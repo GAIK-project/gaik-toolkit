@@ -20,9 +20,9 @@ class GoogleProvider(LLMProvider):
         """Return Google's default model.
 
         Returns:
-            str: "gemini-2.5-flash-latest" (Gemini 2.5)
+            str: "gemini-2.5-flash" (Gemini 2.5)
         """
-        return "gemini-2.5-flash-latest"
+        return "gemini-2.5-flash"
 
     def create_chat_model(
         self,
@@ -33,8 +33,8 @@ class GoogleProvider(LLMProvider):
         """Create Google chat model instance.
 
         Args:
-            model: Model name (e.g., "gemini-2.5-flash-latest", "gemini-2.5-flash").
-                   Defaults to "gemini-2.5-flash-latest".
+            model: Model name (e.g., "gemini-2.5-flash", "gemini-2.5-flash").
+                   Defaults to "gemini-2.5-flash".
             api_key: Google API key. If None, uses GOOGLE_API_KEY environment variable.
             **kwargs: Additional parameters passed to ChatGoogleGenerativeAI
                 (e.g., temperature, max_tokens).
