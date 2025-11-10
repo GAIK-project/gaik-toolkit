@@ -69,15 +69,30 @@ extractor = SchemaExtractor("Extract name and age", provider="anthropic")  # or 
 
 Requires: `pip install gaik[vision]`
 
+Set environment variables first:
+```bash
+# For Azure OpenAI
+export AZURE_API_KEY='...'
+export AZURE_ENDPOINT='https://your-resource.openai.azure.com/'
+export AZURE_DEPLOYMENT='gpt-4o'  # Your deployment name
+
+# OR for OpenAI
+export OPENAI_API_KEY='sk-...'
+```
+
+Then convert:
 ```python
 from gaik.parsers import VisionParser, get_openai_config
 
-# Configure (Azure or OpenAI)
-config = get_openai_config(use_azure=True)  # or use_azure=False
+# Configure
+config = get_openai_config(use_azure=True)  # or use_azure=False for OpenAI
 parser = VisionParser(config)
 
-# Convert PDF
-markdown = parser.parse_pdf("invoice.pdf", clean_output=True)
+# Convert PDF (returns list of pages as Markdown strings)
+pages = parser.convert_pdf("invoice.pdf", clean_output=True)
+
+# Combine into single document
+markdown = "\n\n".join(pages)
 print(markdown)
 ```
 
