@@ -69,10 +69,10 @@ extractor = SchemaExtractor("Extract name and age", provider="anthropic")  # or 
 
 Requires: `pip install gaik[vision]`
 
-Set environment variables first:
+Set environment variables:
 ```bash
-# For Azure OpenAI
-export AZURE_API_KEY='...'
+# For Azure OpenAI (all 3 required)
+export AZURE_API_KEY='your-api-key'
 export AZURE_ENDPOINT='https://your-resource.openai.azure.com/'
 export AZURE_DEPLOYMENT='gpt-4o'  # Your deployment name
 
@@ -80,21 +80,28 @@ export AZURE_DEPLOYMENT='gpt-4o'  # Your deployment name
 export OPENAI_API_KEY='sk-...'
 ```
 
+> **Note:** If using `.env` file, ensure all three Azure variables are set.
+
 Then convert:
 ```python
 from gaik.parsers import VisionParser, get_openai_config
 
-# Configure
+# Configure (automatically reads environment variables)
 config = get_openai_config(use_azure=True)  # or use_azure=False for OpenAI
 parser = VisionParser(config)
 
-# Convert PDF (returns list of pages as Markdown strings)
+# Convert PDF (returns list of Markdown pages)
 pages = parser.convert_pdf("invoice.pdf", clean_output=True)
 
-# Combine into single document
+# Join into single document
 markdown = "\n\n".join(pages)
 print(markdown)
 ```
+
+**Common errors:**
+
+- `ValueError: Azure endpoint is required` → Check that `AZURE_ENDPOINT` is set
+- `ValueError: Azure deployment is required` → Check that `AZURE_DEPLOYMENT` is set
 
 ### Batch Extraction
 
