@@ -38,86 +38,36 @@ pip install gaik[vision]
 ### 3. Run Examples
 
 ```bash
-# Extraction demo
-python examples/demo_anthropic.py
+# Extraction demos
+python examples/extract/demo_anthropic.py
 
 # Vision demos (requires gaik[vision])
-python examples/demo_vision_simple.py
-python examples/demo_vision_parser.py invoice.pdf
+python examples/vision/demo_vision_simple.py
+python examples/vision/demo_vision_parser.py invoice.pdf
 ```
 
 ---
 
-## Examples
+## Example Categories
 
-### 🤖 [demo_anthropic.py](demo_anthropic.py)
+### 📦 [Extract](extract/) - Structured Data Extraction
 
-**Best for:** Anthropic Claude provider demo, modular examples
+Extract structured data from text using LLM providers.
 
-Simple, modular demonstrations:
+- `demo_anthropic.py` - Full extraction demo with multiple patterns
 
-- ✅ Basic extraction with Anthropic
-- ✅ Custom model selection (Claude Opus)
-- ✅ Schema inspection
-- ✅ Custom LangChain client
-- ✅ Batch extraction
-- ✅ Pre-defined requirements (skip LLM parsing)
-
-**Note:** Uses LangChain's `with_structured_output()` under the hood.
-
-```bash
-python examples/demo_anthropic.py
-```
+[→ See extract examples](extract/)
 
 ---
 
-### 🖼️ [demo_vision_simple.py](demo_vision_simple.py)
+### 🖼️ [Vision](vision/) - PDF to Markdown
 
-**Best for:** PDF to Markdown conversion with vision models
+Convert PDF documents to Markdown using vision models.
 
-Convert PDF documents to structured Markdown using OpenAI vision models:
+- `demo_vision_simple.py` - Basic PDF conversion
+- `demo_vision_parser.py` - Advanced CLI tool
 
-- ✅ Simple API for PDF processing
-- ✅ Works with OpenAI or Azure OpenAI
-- ✅ Automatic image rendering
-- ✅ Multi-page document support
-- ✅ Table-aware conversion
-
-**Requirements:** `pip install gaik[vision]`
-
-```bash
-python examples/demo_vision_simple.py
-```
-
----
-
-### 🔧 [demo_vision_parser.py](demo_vision_parser.py)
-
-**Best for:** Advanced PDF processing with CLI
-
-Full-featured CLI tool for PDF to Markdown conversion:
-
-- ✅ Command-line interface
-- ✅ Custom prompt support
-- ✅ DPI and quality control
-- ✅ Multi-page cleanup options
-- ✅ Poppler path configuration
-
-**Usage:**
-
-```bash
-# Convert a PDF
-python examples/demo_vision_parser.py invoice.pdf
-
-# Custom output path
-python examples/demo_vision_parser.py invoice.pdf --output result.md
-
-# Use standard OpenAI (not Azure)
-python examples/demo_vision_parser.py invoice.pdf --openai
-
-# Skip cleanup for multi-page docs
-python examples/demo_vision_parser.py invoice.pdf --no-clean
-```
+[→ See vision examples](vision/)
 
 ---
 

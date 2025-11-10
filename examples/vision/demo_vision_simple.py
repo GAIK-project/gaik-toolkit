@@ -34,7 +34,7 @@ def main() -> None:
 
     # Initialize parser (defaults to Azure OpenAI, or set use_azure=False for OpenAI)
     print("🔧 Initializing VisionParser...")
-    config = get_openai_config(use_azure=False)  # or use_azure=False for OpenAI
+    config = get_openai_config(use_azure=True)  # or use_azure=False for OpenAI
     parser = VisionParser(config)
 
     # Convert PDF to Markdown
