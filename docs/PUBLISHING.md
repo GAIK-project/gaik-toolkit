@@ -83,6 +83,8 @@ git push origin main v<new-version>
 
 **Note:** GitHub Actions will fail if git tag doesn't match `pyproject.toml` version.
 
+**If build fails:** Delete tag (`git tag -d vX.Y.Z && git push origin :refs/tags/vX.Y.Z`), fix issue, commit, and re-tag. Or manually trigger workflow from GitHub Actions tab.
+
 ### Version Numbering (SemVer)
 
 - **MAJOR.MINOR.PATCH** (e.g., `1.2.3`)
