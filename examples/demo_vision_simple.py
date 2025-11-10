@@ -15,7 +15,7 @@ def main() -> None:
     """Convert a sample PDF to Markdown using VisionParser."""
 
     # Check if test PDF exists
-    pdf_path = Path(__file__).parent / "sample_invoice.pdf"
+    pdf_path = Path(__file__).parent / "WEF-page-10.pdf"
 
     if not pdf_path.exists():
         print("⚠️  No sample PDF found.")
