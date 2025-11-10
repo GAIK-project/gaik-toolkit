@@ -17,6 +17,15 @@ Extract structured data from unstructured text using LangChain's structured outp
 - ✅ **Cost-effective** - Minimal API calls
 - ✅ **Simple & clean** - Easy to understand, minimal dependencies
 
+### 🖼️ Vision PDF Parsing (`gaik.parsers`)
+
+Convert PDF pages to Markdown with OpenAI or Azure OpenAI vision models:
+
+- ✅ **Single API surface** - Works with standard OpenAI or Azure deployments
+- ✅ **Optional extras** - Install with `pip install gaik[vision]`
+- ✅ **CLI ready** - Use `parser.py` demo for quick conversions
+- ✅ **Table-aware** - Keeps multi-page tables intact with optional cleanup
+
 ## Installation
 
 ```bash

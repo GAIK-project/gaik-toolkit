@@ -8,6 +8,7 @@ GAIK provides modular, production-ready tools for common AI/ML tasks including:
 Available modules:
     - gaik.extract: Dynamic data extraction with LangChain structured outputs
     - gaik.providers: Multi-provider LLM interface (OpenAI, Anthropic, Azure, Google)
+    - gaik.parsers: Vision-enabled PDF to Markdown parsing utilities
 
 Example:
     >>> from gaik.extract import SchemaExtractor

@@ -35,6 +35,12 @@ dev = [
     "build>=1.0",
     "twine>=4.0",
 ]
+vision = [
+    "openai>=1.40.0",
+    "pdf2image>=1.17.0",
+    "pillow>=10.0.0",
+    "python-dotenv>=1.0.0",
+]
 
 [project.urls]
 Homepage = "https://gaik.ai/"
