@@ -2,26 +2,24 @@
 
 ## What is it?
 
-- GAIK Toolkit is our Python library (currently internal, aiming for a wider release) that bundles AI tooling similar to public packages such as `openai`.
-- The package can be installed from Test PyPI today and dropped into any project with a single command.
-- Once installed, all functionality lives locally in your codebase—no external API service dependency for the library itself.
+- GAIK Toolkit is a Python library for AI/ML development with multi-provider LLM support
+- Available on PyPI - install and use immediately in any project
+- All functionality runs locally in your codebase—no external service dependency
 
 ## How do I install it?
 
 ```bash
-# Current install from Test PyPI
-pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ gaik
+# Install from PyPI
+pip install gaik
 
 # Or with uv (faster alternative)
-uv pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ gaik
+uv pip install gaik
 
-# Future official PyPI release
-# pip install gaik
-# uv pip install gaik
+# With optional vision parser support
+pip install gaik[vision]
 ```
 
-- Installation works exactly like any other Python package.
-- When we move to the official PyPI registry, the command shortens to `pip install gaik` and the package becomes discoverable as a stable release.
+Installation works like any standard Python package.
 
 ## Fastest way to try it
 
@@ -82,8 +80,8 @@ export GOOGLE_API_KEY='...'
 **Azure OpenAI:**
 
 ```powershell
-$Env:AZURE_OPENAI_API_KEY = "..."
-$Env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
+$Env:AZURE_API_KEY = "..."
+$Env:AZURE_ENDPOINT = "https://your-resource.openai.azure.com/"
 ```
 
 ## Local development
@@ -93,8 +91,8 @@ $Env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
 
 ## Release process
 
-- GitHub Actions automatically publishes to Test PyPI whenever we cut a version and push a tag.
-- The next milestone is an official PyPI release, which makes the package easier to find and simplifies installation.
+- GitHub Actions automatically publishes to PyPI whenever we cut a version and push a tag.
+- Releases use the `release` environment for added deployment protection.
 
 ## Executive summary
 

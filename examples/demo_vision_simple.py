@@ -26,9 +26,9 @@ def main() -> None:
         print("   3. Set your OpenAI API key:")
         print("      export OPENAI_API_KEY='sk-...'")
         print("   4. Or use Azure OpenAI:")
-        print("      export AZURE_OPENAI_API_KEY='...'")
-        print("      export AZURE_OPENAI_ENDPOINT='https://...'")
-        print("      export AZURE_OPENAI_DEPLOYMENT='gpt-4o'")
+        print("      export AZURE_API_KEY='...'")
+        print("      export AZURE_ENDPOINT='https://...'")
+        print("      export AZURE_DEPLOYMENT='gpt-4o'")
         print("\n📖 For CLI usage, see: demo_vision_parser.py")
         return
 

@@ -1,28 +1,16 @@
-"""General AI Kit (GAIK) - Reusable AI/ML components for Python.
+"""General AI Kit (GAIK) - AI/ML toolkit for Python.
 
-GAIK provides modular, production-ready tools for common AI/ML tasks including:
-- Dynamic data extraction with structured outputs
-- Multi-provider LLM support (OpenAI, Anthropic, Azure, Google)
-- And more modules coming soon...
+Multi-provider LLM support with structured data extraction.
 
-Available modules:
-    - gaik.extract: Dynamic data extraction with LangChain structured outputs
-    - gaik.providers: Multi-provider LLM interface (OpenAI, Anthropic, Azure, Google)
-    - gaik.parsers: Vision-enabled PDF to Markdown parsing utilities
+Modules:
+    - gaik.extract: Structured data extraction
+    - gaik.providers: LLM provider interface (OpenAI, Anthropic, Azure, Google)
+    - gaik.parsers: PDF to Markdown parsing (vision models)
 
 Example:
     >>> from gaik.extract import SchemaExtractor
-    >>>
-    >>> # Using default OpenAI provider
-    >>> extractor = SchemaExtractor("Extract title and date from articles")
-    >>> results = extractor.extract(documents)
-    >>>
-    >>> # Using Anthropic Claude
-    >>> # IDE autocomplete shows: "openai" | "anthropic" | "google" | "azure"
-    >>> extractor = SchemaExtractor(
-    ...     "Extract name and age",
-    ...     provider="anthropic"
-    ... )
+    >>> extractor = SchemaExtractor("Extract name and age", provider="anthropic")
+    >>> results = extractor.extract(["Alice is 25"])
 """
 
 import importlib.metadata

@@ -106,14 +106,16 @@ def get_openai_config(use_azure: bool = True) -> OpenAIConfig:
     _load_env()
 
     if use_azure:
-        api_key = _first_env("AZURE_OPENAI_API_KEY", "AZURE_API_KEY")
-        endpoint = _first_env("AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_BASE")
+        api_key = _first_env("AZURE_API_KEY", "AZURE_OPENAI_API_KEY")
+        endpoint = _first_env("AZURE_ENDPOINT", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_BASE")
         api_version = _first_env(
-            "AZURE_OPENAI_API_VERSION",
             "AZURE_API_VERSION",
+            "AZURE_OPENAI_API_VERSION",
             "2024-12-01-preview",
         )
-        model = _first_env("AZURE_OPENAI_DEPLOYMENT", "AZURE_OPENAI_MODEL", "gpt-4.1")
+        model = _first_env(
+            "AZURE_DEPLOYMENT", "AZURE_OPENAI_DEPLOYMENT", "AZURE_OPENAI_MODEL", "gpt-4.1"
+        )
         return OpenAIConfig(
             use_azure=True,
             api_key=api_key,

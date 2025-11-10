@@ -284,8 +284,8 @@ Get your key: [ai.google.dev](https://ai.google.dev)
 **Azure OpenAI:**
 
 ```bash
-export AZURE_OPENAI_API_KEY='...'
-export AZURE_OPENAI_ENDPOINT='https://your-resource.openai.azure.com/'
+export AZURE_API_KEY='...'
+export AZURE_ENDPOINT='https://your-resource.openai.azure.com/'
 ```
 
 Alternatively, pass API keys directly to the extractor:
@@ -302,7 +302,7 @@ extractor = SchemaExtractor(
 
 ## 🔗 Resources
 
-- **Package (Test PyPI)**: [test.pypi.org/project/gaik](https://test.pypi.org/project/gaik/)
+- **Package (PyPI)**: [pypi.org/project/gaik](https://pypi.org/project/gaik/)
 - **Documentation**: [gaik-py/README.md](gaik-py/README.md)
 - **Publishing Guide**: [docs/PUBLISHING.md](docs/PUBLISHING.md)
 - **Cheatsheet (FI)**: [docs/gaik-toolkit-cheatsheet.md](docs/gaik-toolkit-cheatsheet.md)
