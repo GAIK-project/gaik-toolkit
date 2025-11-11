@@ -61,14 +61,14 @@ all = [
     "gaik[vision]",
 ]
 
-# Development tooling for maintainers only
+# Development tooling for maintainers only (pip install -e ".[dev]")
 dev = [
-    "ruff>=0.14.1",
-    "build>=1.0",
-    "twine>=4.0",
-    "pytest>=8.0",
-    "pytest-cov>=4.1",
-    "pytest-mock>=3.12",
+    "ruff>=0.14.1",      # Linter/formatter: ruff check . / ruff format .
+    "build>=1.0",        # Package builder: python -m build
+    "twine>=4.0",        # PyPI publisher: twine upload dist/*
+    "pytest>=8.0",       # Test runner: pytest
+    "pytest-cov>=4.1",   # Coverage reports (optional)
+    "pytest-mock>=3.12", # Mock fixtures for testing
 ]
 
 [project.urls]
@@ -77,45 +77,31 @@ Repository = "https://github.com/GAIK-project/toolkit-shared-components"
 Documentation = "https://github.com/GAIK-project/toolkit-shared-components/tree/main/gaik-py"
 Issues = "https://github.com/GAIK-project/toolkit-shared-components/issues"
 
+# Build system configuration (not installed, used during `python -m build`)
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
+# Source code location (not installed, directs setuptools behavior)
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# Include type hints marker file (py.typed included in package)
 [tool.setuptools.package-data]
 gaik = ["py.typed"]
 
+# Ruff linter/formatter settings (not installed, used when running `ruff check`)
 [tool.ruff]
 line-length = 100
 target-version = "py310"
 extend-exclude = ["scripts"]  # Exclude CI/CD scripts from linting
 
+# Ruff lint rules configuration
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 ignore = []
 
+# Pytest test runner configuration
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = [
-    "-v",
-    "--strict-markers",
-    "--cov=gaik",
-    "--cov-report=term-missing",
-    "--cov-report=xml",
-]
-
-[tool.coverage.run]
-source = ["src/gaik"]
-omit = ["*/tests/*", "*/scripts/*"]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-]
+addopts = ["-v", "--strict-markers"]
