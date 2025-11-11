@@ -57,13 +57,13 @@ jobs:
 
     - name: Test installation from PyPI
       run: |
-        # Wait a moment for PyPI to update
-        sleep 30
+        # Wait for PyPI to update
+        sleep 60
 
         # Install from production PyPI
         pip install gaik
 
-        # Run verification tests
+        # Run verification tests (skips optional dependencies)
         python gaik-py/scripts/verify_installation.py
 
     - name: Upload build artifacts

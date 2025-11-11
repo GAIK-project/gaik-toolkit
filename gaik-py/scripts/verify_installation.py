@@ -27,7 +27,7 @@ def test_all_submodules():
     modules_skipped = []
 
     # Modules that require optional dependencies
-    OPTIONAL_MODULES = ["gaik.parsers"]
+    OPTIONAL_MODULES = ["gaik.parsers", "gaik.extract", "gaik.providers"]
 
     for importer, modname, ispkg in pkgutil.walk_packages(
         path=gaik.__path__,
