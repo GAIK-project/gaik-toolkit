@@ -41,47 +41,61 @@ pip install -e .[vision]
 
 ## ➕ Adding New Code
 
-### Add a New LLM Provider
+### Project Module Structure
 
-**Files to edit:**
+```text
+gaik-py/src/gaik/
+├── extract/          # Text/structured data extraction
+├── parsers/          # Vision, PDF, and other parsers
+├── providers/        # LLM provider integrations
+└── [your-feature]/   # New standalone modules (e.g., audio, video)
+```
 
-1. **Create provider** → `gaik-py/src/gaik/providers/yourprovider.py`
+### Add a New Standalone Feature
 
-   ```python
-   from langchain_yourprovider import ChatYourProvider
-   from .base import LLMProvider, _build_model_kwargs
+For completely new capabilities (e.g., audio transcription, video processing) that don't fit into existing modules:
 
-   class YourProviderProvider(LLMProvider):
-       @property
-       def default_model(self) -> str:
-           return "model-name"
+1. **Create your module** → `gaik-py/src/gaik/[feature-name]/`
 
-       def create_chat_model(self, model=None, api_key=None, **kwargs):
-           model_name = model or self.default_model
-           model_kwargs = _build_model_kwargs(model_name, api_key=api_key, **kwargs)
-           return ChatYourProvider(**model_kwargs)
+   Example: Whisper audio transcription
+
+   ```text
+   gaik-py/src/gaik/audio/
+   ├── __init__.py
+   ├── transcriber.py
+   └── utils.py
    ```
 
-2. **Add dependency** → `gaik-py/pyproject.toml`
+2. **Add dependencies** → `gaik-py/pyproject.toml`
 
-   Add to `[project.optional-dependencies]` extract group:
+   Create a new optional dependency group:
 
    ```toml
-   extract = [
-       "langchain-core>=1.0.3",
-       "langchain-yourprovider>=1.0.0",  # Add here
+   [project.optional-dependencies]
+   audio = [
+       "openai-whisper>=1.0.0",
+       "torch>=2.0.0",
    ]
+   all = ["gaik[extract,vision,audio]"]  # Update all group
    ```
 
-3. **Register** → `gaik-py/src/gaik/providers/__init__.py`
+3. **Export public API** → `gaik-py/src/gaik/__init__.py`
 
-**Done!** Use with `SchemaExtractor("task", provider="yourprovider")`
+   ```python
+   from .audio import AudioTranscriber
+   ```
 
-### Add a New Feature/Parser
+4. **Add examples** → `examples/audio/`
 
-- **Extraction features** → `gaik-py/src/gaik/extract/`
-- **Vision/PDF parsers** → `gaik-py/src/gaik/parsers/`
-- **Add examples** → `examples/extract/` or `examples/vision/`
+   Include README and usage examples
+
+### Extend Existing Modules
+
+For features that fit into existing modules:
+
+- **Add parser:** `gaik-py/src/gaik/parsers/your_parser.py`
+- **Add extractor:** `gaik-py/src/gaik/extract/your_extractor.py`
+- **Add LLM provider:** `gaik-py/src/gaik/providers/your_provider.py` (see existing providers for examples)
 
 ---
 
