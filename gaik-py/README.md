@@ -247,11 +247,11 @@ get_openai_config(
 
 ## Default Models
 
-| Provider  | Default Model                |
-| --------- | ---------------------------- |
-| OpenAI    | `gpt-4.1`                    |
-| Anthropic | `claude-sonnet-4-5-20250929` |
-| Google    | `gemini-2.5-flash`           |
+| Provider  | Default Model                  |
+| --------- | ------------------------------ |
+| OpenAI    | `gpt-4.1`                      |
+| Anthropic | `claude-sonnet-4-5-20250929`   |
+| Google    | `gemini-2.5-flash`             |
 | Azure     | `gpt-4.1` (or your deployment) |
 
 ## Resources
