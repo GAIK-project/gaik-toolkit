@@ -146,22 +146,85 @@ vision = [
 
 ## 🧪 Testing
 
-**Write tests for your code:**
+**GAIK uses pytest for unit testing:**
 
-- Add tests to `gaik-py/tests/` - GitHub Actions runs these automatically
-- Add usage example to `examples/` - Shows how to use your feature
-
-**Code quality:**
+### Running Tests Locally
 
 ```bash
+cd gaik-py
+
+# Install dev dependencies (includes pytest)
+pip install -e ".[extract,dev]"
+
+# Run all tests
+pytest
+
+# Run tests with coverage report
+pytest --cov=gaik --cov-report=term
+
+# Run specific test file
+pytest tests/test_extract.py
+
+# Run tests in verbose mode
+pytest -v
+```
+
+### Writing Tests
+
+**Add unit tests to `gaik-py/tests/`:**
+
+- Use pytest framework
+- Follow naming: `test_*.py` or `*_test.py`
+- Mock external API calls (no real API keys in tests)
+- See `tests/test_extract.py` for examples
+
+**Example test:**
+
+```python
+def test_field_spec_creation():
+    field = FieldSpec(
+        field_name="test",
+        field_type="str",
+        description="Test field",
+        required=True
+    )
+    assert field.field_name == "test"
+```
+
+**Add usage examples to `examples/`:**
+
+- Shows real-world usage
+- Helps users understand your feature
+
+### Test Structure
+
+```text
+gaik-py/
+├── tests/              # Unit tests (pytest)
+│   ├── conftest.py    # Shared fixtures
+│   └── test_*.py      # Test files
+├── scripts/           # CI/CD verification scripts
+│   ├── verify_installation.py
+│   └── validate_version.py
+└── examples/          # Usage examples
+```
+
+### Code Quality
+
+```bash
+# Format code
 ruff format src/gaik/
+
+# Check linting
 ruff check --fix src/gaik/
 ```
 
-**Before committing:**
+### Before Committing
 
-- ✅ Tests added (if needed)
-- ✅ Code formatted (ruff)
+- ✅ Unit tests added for new features
+- ✅ All tests pass locally (`pytest`)
+- ✅ Code formatted (`ruff format`)
+- ✅ No linting errors (`ruff check`)
 
 ---
 
@@ -273,14 +336,15 @@ gh release create v0.3.0 --generate-notes dist/*
 
 ## 📁 Project Structure Reference
 
-```
+```text
 gaik-toolkit/
 ├── gaik-py/                          # 📦 PyPI package (published)
 │   ├── src/gaik/                     # Source code
 │   │   ├── extract/                  # Data extraction module
 │   │   ├── parsers/                  # Vision/PDF parsing
 │   │   └── providers/                # LLM provider implementations
-│   ├── tests/                        # 🧪 Test scripts
+│   ├── tests/                        # 🧪 Unit tests (pytest)
+│   ├── scripts/                      # 🔧 CI/CD verification scripts
 │   ├── pyproject.toml                # Package config & dependencies
 │   └── README.md                     # Package documentation
 │
@@ -301,6 +365,8 @@ gaik-toolkit/
 **Where to add code:**
 
 - Production-ready code → `gaik-py/src/gaik/`
+- Unit tests → `gaik-py/tests/`
+- CI/CD scripts → `gaik-py/scripts/`
 - Code in development → `dev/` (see [dev/README.md](dev/README.md))
 - Usage examples → `examples/`
 

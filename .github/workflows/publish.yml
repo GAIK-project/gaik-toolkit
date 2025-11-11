@@ -32,7 +32,7 @@ jobs:
     - name: Validate version
       run: |
         TAG=${GITHUB_REF#refs/tags/}
-        python gaik-py/tests/validate_version.py $TAG
+        python gaik-py/scripts/validate_version.py $TAG
 
     - name: Install build dependencies
       run: |
@@ -64,7 +64,7 @@ jobs:
         pip install gaik
 
         # Run verification tests
-        python gaik-py/tests/verify_installation.py
+        python gaik-py/scripts/verify_installation.py
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4

@@ -31,7 +31,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         cd gaik-py
-        pip install -e ".[extract]"  # Install with extract dependencies for full testing
+        pip install -e ".[extract,dev]"  # Install with extract and dev dependencies for testing
 
     - name: Test basic imports
       run: |
@@ -40,10 +40,15 @@ jobs:
         python -c "from gaik.providers import get_provider"
         echo "✅ All imports successful!"
 
-    - name: Run test scripts
+    - name: Run unit tests with pytest
+      working-directory: gaik-py
+      run: |
+        pytest tests/ -v --cov=gaik --cov-report=term --cov-report=xml
+
+    - name: Run verification script
       run: |
         # Run installation verification (doesn't need API key)
-        python gaik-py/tests/verify_installation.py
+        python gaik-py/scripts/verify_installation.py
 
     - name: Install build dependencies
       run: pip install build twine
