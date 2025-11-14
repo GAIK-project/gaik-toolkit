@@ -91,11 +91,85 @@ For completely new capabilities (e.g., audio transcription, video processing) th
 
 ### Extend Existing Modules
 
-For features that fit into existing modules:
+For features that fit into existing modules, follow these step-by-step guides:
 
-- **Add parser:** `packages/python/gaik/src/gaik/parsers/your_parser.py`
-- **Add extractor:** `packages/python/gaik/src/gaik/extract/your_extractor.py`
-- **Add LLM provider:** `packages/python/gaik/src/gaik/providers/your_provider.py` (see existing providers for examples)
+#### Add a New Parser
+
+Parsers convert documents (PDFs, images, etc.) to structured formats.
+
+1. **Create parser file** → `packages/python/gaik/src/gaik/parsers/your_parser.py`
+
+   ```python
+   """Your parser description.
+
+   Example
+   -------
+   >>> from gaik.parsers import YourParser
+   >>> parser = YourParser()
+   >>> result = parser.parse("document.pdf")
+   """
+
+   from __future__ import annotations
+
+   class YourParser:
+       """Parser that converts X to Y."""
+
+       def __init__(self, config: dict | None = None):
+           self.config = config or {}
+
+       def parse(self, input_path: str) -> str:
+           """Parse input and return result."""
+           # Your implementation here
+           return result
+   ```
+
+2. **Export in module** → `packages/python/gaik/src/gaik/parsers/__init__.py`
+
+   ```python
+   from .your_parser import YourParser
+
+   __all__ = [..., "YourParser"]  # Add to existing exports
+   ```
+
+3. **Add dependencies** (if needed) → `packages/python/gaik/pyproject.toml`
+
+   ```toml
+   [project.optional-dependencies]
+   vision = [
+       "your-library>=1.0.0",  # Add here
+   ]
+   ```
+
+4. **Add tests** → `packages/python/gaik/src/gaik/parsers/tests/test_your_parser.py`
+
+   ```python
+   from gaik.parsers import YourParser
+
+   def test_your_parser():
+       parser = YourParser()
+       result = parser.parse("test_input")
+       assert result == "expected_output"
+   ```
+
+5. **Add usage example** → `examples/your_parser/demo.py`
+
+   Include README explaining how to use your parser.
+
+6. **Test locally**
+
+   ```bash
+   cd packages/python/gaik
+   pip install -e .[vision,dev]
+   pytest src/gaik/parsers/tests/test_your_parser.py
+   ```
+
+#### Add a New Extractor
+
+Follow similar pattern in `packages/python/gaik/src/gaik/extract/` (see existing extractors for examples)
+
+#### Add a New LLM Provider
+
+Follow the `BaseProvider` interface in `packages/python/gaik/src/gaik/providers/base.py` (see existing providers for examples)
 
 ---
 
