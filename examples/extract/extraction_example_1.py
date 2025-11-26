@@ -1,6 +1,11 @@
-# -----------------------------------------------------------------------------
-# EXAMPLE USAGE
-# -----------------------------------------------------------------------------
+"""
+Example 1: End-to-end dynamic schema generation and extraction.
+
+This script demonstrates how to:
+1. Configure the OpenAI/Azure client.
+2. Generate a schema from natural-language requirements using SchemaGenerator.
+3. Extract structured data from sample documents and save the results.
+"""
 
 import sys
 from pathlib import Path
@@ -89,4 +94,3 @@ if __name__ == "__main__":
     print("=" * 80)
     import json
     print(json.dumps(results, indent=2, default=str))
-

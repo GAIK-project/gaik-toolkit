@@ -1,6 +1,6 @@
 """
 End-to-end example:
-- Parse each whole PDF with VisionParser
+- Parse each whole PDF with a parser
 - Classify the parsed document (Purchase order vs Bill of material)
 - Prepend a header and save per-file outputs
 - Also build a combined output with --- separators
@@ -197,29 +197,21 @@ def extract_po_bom_data(combined_file_path: str = "./combined_classified_output.
     # Define extraction requirements
     user_requirements = """
     The task is to extract key fields from customer documents (Purchase Order (PO) and Bill of Material (BOM),
-    and align them so that each PO item is enriched with the correct technical details.
-
-    Start with the customer purchase order, which could have multiple items. The item is linked to its BOM via a Material Number.
-    For every item in the PO, pull out the Material Number along with the basic item details like Quantity, Description, sales order number, and Delivery Date.
-
-    Use the item's Material Number from the PO to find the BOM having the same Material Number (represented as 'ID' at Level 0).
-    From the matching BOM, extract the part's 'Type/Part Designation' and Dimensions.
-
-    Once you have the Type/Part Designation and Dimensions matched back to the PO item, keep them linked together with the PO fields you already pulled out.
-    Repeat this process for all items in the PO.
-
-    The final output should therefore contain as many lines as the number of items in the PO. Each line should have:
-    - PO number (from PO)
-    - Item number (from PO)
-    - Description (combination of Description and Description 3) (from PO)
-    - Material Number (from PO → linked with 'ID' at Level 0 in BOM)
-    - Quantity or number of pieces (PC) (from PO)
-    - Sales order number (from PO) 
+    and align them so that each PO item is enriched with the correct technical details. 
+    Begin with the customer’s purchase order, which may include multiple items. 
+    The item is linked to its BOM via a Material Number. For every item in the PO, 
+    extract the Material Number along with the basic item details, such as Quantity, Description, 
+    and Delivery Date. Use the item’s Material Number from the PO to find the BOM having the same Material Number (represented as ‘ID’). 
+    From the matching BOM, extract the part’s ‘Type/Part Designation’ and Dimensions. 
+    The final output should contain as many lines as the number of items in the PO. 
+    Each line should have: 
+    - Material Number
+    - Quantity 
+    - Description
     - Delivery Date (from PO)
-    - Type/Part Designation (from BOM)
-    - Dimensions (from BOM) [The dimension is referred to as SAHAUSPIT]
-
-    IMPORTANT: There could be multiple items in the PO (hence multiple Material Numbers). For each Material Number,
+    - Type/Part Designation
+    - Dimensions (from BOM).
+    **IMPORTANT**: There could be multiple items in the PO (hence multiple Material Numbers). For each Material Number,
     the above mentioned fields have to be extracted and matched with the corresponding BOM.
     """
 
