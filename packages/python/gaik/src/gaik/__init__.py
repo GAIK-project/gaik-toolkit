@@ -29,8 +29,8 @@ Example - PDF Parsing:
 Example - Audio Transcription:
     >>> from gaik.transcriber import Transcriber, get_openai_config
     >>> config = get_openai_config(use_azure=True)
-    >>> transcriber = Transcriber(config)
-    >>> result = transcriber.transcribe("meeting.mp3", enhance=True)
+    >>> transcriber = Transcriber(config)  # enhanced_transcript=True by default
+    >>> result = transcriber.transcribe("meeting.mp3")
 """
 
 import importlib.metadata
