@@ -29,7 +29,7 @@ pip install gaik[extractor]    # Data extraction only
 | Package | Description | Documentation |
 |---------|-------------|---------------|
 | **extractor** | Extract structured data using natural language requirements | [📖 Docs](packages/python/gaik/src/gaik/extractor/README.md) |
-| **parsers** | Convert PDFs to Markdown with vision models or local parsing | [📖 Docs](packages/python/gaik/src/gaik/parsers/README.md) |
+| **parsers** | Parse PDFs and Word docs with vision models, PyMuPDF, python-docx, or Docling | [📖 Docs](packages/python/gaik/src/gaik/parsers/README.md) |
 | **transcriber** | Transcribe audio/video with Whisper and GPT enhancement | [📖 Docs](packages/python/gaik/src/gaik/transcriber/README.md) |
 
 ## Documentation

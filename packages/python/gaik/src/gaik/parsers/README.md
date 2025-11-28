@@ -1,6 +1,6 @@
 # Parsers
 
-Convert PDFs and documents to structured text using vision models, PyMuPDF, or Docling OCR.
+Convert PDFs and Word documents to structured text using vision models, PyMuPDF, python-docx, or Docling OCR.
 
 ## Installation
 
@@ -40,10 +40,11 @@ parser.save_markdown(markdown, "document.md")
 ## Features
 
 - **Vision-Based Parsing** - PDF to Markdown using OpenAI GPT-4V with table extraction
-- **Fast Local Parsing** - PyMuPDF for quick text extraction without AI
+- **Fast Local Parsing** - PyMuPDF for quick PDF text extraction, DocxParser for Word documents - no AI required
 - **Advanced OCR** - Docling parser with OCR, table extraction, and multi-format support
 - **Multi-Page Context** - Maintains context across pages for better accuracy
 - **Table Cleaning** - Automatically merges and cleans tables across page breaks
+- **Word Document Support** - Extract text from .docx and .doc files using python-docx
 
 ---
 
@@ -77,12 +78,40 @@ from gaik.parsers import PyMuPDFParser
 
 parser = PyMuPDFParser()
 
-# Parse document (fast, no AI required)
+# Parse PDF document (fast, no AI required)
 result = parser.parse_document(file_path: str)
 # Returns: {"text_content": str, "metadata": dict}
 
 print(result["text_content"])
 print(result["metadata"])  # Page count, author, etc.
+```
+
+### DocxParser
+
+```python
+from gaik.parsers import DocxParser
+
+parser = DocxParser()
+
+# Parse Word document (fast, no AI required)
+result = parser.parse_document(
+    file_path: str,
+    use_markdown: bool = True  # True for simple text, False for structured
+)
+# Returns: {
+#     "text_content": str,
+#     "file_name": str,
+#     "word_count": int,
+#     "parsing_method": "docx",
+#     ...
+# }
+
+print(result["text_content"])
+print(f"Word count: {result['word_count']}")
+
+# Or use convenience function
+from gaik.parsers import parse_docx
+result = parse_docx("document.docx", output_path="output.txt")
 ```
 
 ### DoclingParser
@@ -126,7 +155,7 @@ config = get_openai_config(use_azure=False)
 | `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
 | `AZURE_API_VERSION` | Optional | API version (default: 2024-02-15-preview) |
 
-**Note:** PyMuPDFParser and DoclingParser do not require API keys.
+**Note:** PyMuPDFParser, DocxParser, and DoclingParser do not require API keys.
 
 ---
 

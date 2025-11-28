@@ -4,7 +4,7 @@ AI toolkit with structured data extraction, document parsing, and audio/video tr
 
 Modules:
     - gaik.extractor: Schema generation and structured data extraction
-    - gaik.parsers: PDF to Markdown parsing (vision models, PyMuPDF, Docling)
+    - gaik.parsers: Document parsing - PDFs and Word docs (vision models, PyMuPDF, python-docx, Docling)
     - gaik.transcriber: Audio/video transcription using Whisper with GPT enhancement
 
 Example - Schema-based Extraction:
