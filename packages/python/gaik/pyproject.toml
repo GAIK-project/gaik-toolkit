@@ -34,8 +34,10 @@ classifiers = [
 ]
 
 dependencies = [
-    # Core runtime requirement shared across all installs
+    # Core runtime requirements shared across all installs
     "pydantic>=2.12.4",
+    "python-dotenv>=1.0.0",  # Required by config.py
+    "openai>=1.58.0",        # Required by config.py
 ]
 
 [project.optional-dependencies]
