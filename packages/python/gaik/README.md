@@ -1,6 +1,6 @@
 # GAIK - General AI Kit
 
-AI toolkit for Python with structured data extraction and document parsing using OpenAI/Azure OpenAI.
+AI toolkit for Python with structured data extraction, document parsing, and audio/video transcription using OpenAI/Azure OpenAI.
 
 ## Installation
 
@@ -11,9 +11,69 @@ pip install gaik[extractor]
 # PDF parsing (vision-based + PyMuPDF)
 pip install gaik[parser]
 
-# All features 
+# Audio/video transcription (Whisper + GPT)
+pip install gaik[transcriber]
+# Note: Video processing requires ffmpeg (optional system dependency)
+# See "System Requirements" section below for installation instructions
+
+# All features
 pip install gaik[all]
 ```
+
+## System Requirements
+
+### Optional: FFmpeg (for Video Processing)
+
+The transcriber module works without ffmpeg for basic audio transcription (.mp3, .wav, .m4a files).
+
+**FFmpeg is only needed for:**
+- 🎥 Processing video files (.mp4, .avi, .mov, .mkv, etc.) - extracts audio
+- 📦 Compressing large audio files (>25MB) - reduces file size for Whisper API
+
+**Installation by Platform:**
+
+**Windows:**
+```powershell
+# Option 1: Using winget (Windows 10+)
+winget install ffmpeg
+
+# Option 2: Using Chocolatey
+choco install ffmpeg
+
+# Option 3: Manual installation
+# 1. Download from https://ffmpeg.org/download.html
+# 2. Extract to C:\ffmpeg
+# 3. Add C:\ffmpeg\bin to PATH:
+#    - Search "Environment Variables" in Windows
+#    - Edit "Path" under System Variables
+#    - Add new entry: C:\ffmpeg\bin
+```
+
+**macOS:**
+```bash
+# Using Homebrew (recommended)
+brew install ffmpeg
+```
+
+**Linux:**
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install ffmpeg
+
+# Fedora/RHEL
+sudo dnf install ffmpeg
+
+# Arch
+sudo pacman -S ffmpeg
+```
+
+**Verify Installation:**
+```bash
+ffmpeg -version
+```
+
+If the command returns version information, ffmpeg is properly installed and in your PATH.
 
 ## Quick Start
 
@@ -75,6 +135,27 @@ print(result["text_content"])
 print(result["metadata"])  # Page count, author, etc.
 ```
 
+### Audio/Video Transcription
+
+```python
+from gaik.transcriber import Transcriber, get_openai_config
+
+# Set environment: AZURE_API_KEY, AZURE_ENDPOINT (or OPENAI_API_KEY)
+config = get_openai_config(use_azure=True)
+transcriber = Transcriber(config)
+
+# Transcribe with optional GPT enhancement
+result = transcriber.transcribe(
+    "meeting_recording.mp3",
+    enhance=True,  # Use GPT to improve formatting and structure
+    save_raw=True  # Save both raw and enhanced transcripts
+)
+
+# Save results
+result.save("output/transcripts/")
+print(result.enhanced_transcript)
+```
+
 ## Features
 
 ### 🔍 Structured Data Extraction (`gaik.extractor`)
@@ -96,6 +177,22 @@ print(result["metadata"])  # Page count, author, etc.
 - **PyMuPDFParser** - Fast local text extraction with metadata
 - **DoclingParser** - Advanced document parsing with OCR and multi-format support
 - **No external binaries** - Pure Python dependencies
+
+### 🎤 Audio/Video Transcription (`gaik.transcriber`)
+
+- **Transcriber** - High-level API for audio/video transcription
+  - OpenAI Whisper integration for accurate speech-to-text
+  - Automatic chunking for long audio files (handles files > 25MB)
+  - Context-aware transcription across chunks
+  - Optional GPT enhancement for improved formatting and structure
+  - **Audio formats** (no ffmpeg required): mp3, wav, m4a, ogg
+  - **Video formats** (requires ffmpeg): mp4, avi, mov, mkv, flv
+  - **Audio compression** (requires ffmpeg): Automatic compression for large files
+  - Batch processing capabilities
+- **TranscriptionResult** - Container for raw and enhanced transcripts
+  - Save to multiple formats
+  - Preserve both raw Whisper output and GPT-enhanced versions
+- **Azure OpenAI and OpenAI support** - Works with both platforms
 
 ## API Reference
 
@@ -199,16 +296,62 @@ parser = DoclingParser(
 - `parse_document(file_path: str) -> dict` - Parse document with OCR
 - `convert_to_markdown(file_path: str) -> str` - Convert to markdown
 
+### Transcriber Module
+
+#### Transcriber
+
+```python
+from gaik.transcriber import Transcriber, get_openai_config
+
+config = get_openai_config(use_azure=True)
+transcriber = Transcriber(
+    config: dict,                          # From get_openai_config()
+    whisper_prompt: str | None = None,     # Custom prompt for Whisper
+    gpt_enhancement_prompt: str | None = None  # Custom prompt for GPT enhancement
+)
+```
+
+**System Requirements:**
+- Basic audio transcription (.mp3, .wav, .m4a): No additional dependencies
+- Video processing (.mp4, .avi, .mov, etc.): Requires ffmpeg (see [System Requirements](#system-requirements))
+- Audio compression (files >25MB): Requires ffmpeg (optional, improves performance)
+
+**Methods:**
+- `transcribe(audio_path: str, enhance: bool = False, save_raw: bool = True) -> TranscriptionResult`
+  - `audio_path`: Path to audio/video file
+  - `enhance`: Whether to use GPT for transcript enhancement
+  - `save_raw`: Whether to save raw Whisper transcript
+  - Returns: `TranscriptionResult` with raw and/or enhanced transcripts
+
+**Utilities:**
+- `split_and_transcribe(audio_path, config, prompt) -> str` - Basic chunking and transcription
+- `split_and_transcribe_with_context(audio_path, config, prompt, overlap_ms) -> str` - Context-aware transcription
+- `post_process_transcript(raw_text, config, prompt) -> str` - GPT enhancement
+
+#### TranscriptionResult
+
+Container for transcription outputs with save capabilities.
+
+**Attributes:**
+- `raw_transcript: str` - Original Whisper output
+- `enhanced_transcript: str | None` - GPT-enhanced version
+- `job_id: str` - Unique identifier for this transcription
+
+**Methods:**
+- `save(directory: str, save_raw: bool = True, save_enhanced: bool = True) -> dict[str, Path]`
+  - Saves transcripts to files
+  - Returns: Mapping of artifact type to file path
+
 ## Environment Variables
 
-### For Extractors and Parsers
+### For All Modules (Extractors, Parsers, and Transcribers)
 
 | Provider | Required Variables | Optional |
 |----------|-------------------|----------|
 | **OpenAI** | `OPENAI_API_KEY` | - |
 | **Azure OpenAI** | `AZURE_API_KEY`<br>`AZURE_ENDPOINT`<br>`AZURE_DEPLOYMENT` | `AZURE_API_VERSION` (default: 2024-02-15-preview) |
 
-**Note:** Set `use_azure=True` in `get_openai_config()` for Azure, or `use_azure=False` for standard OpenAI.
+**Note:** Set `use_azure=True` in `get_openai_config()` for Azure, or `use_azure=False` for standard OpenAI. All modules (extractor, parsers, transcriber) use the same configuration pattern.
 
 ## Default Models
 

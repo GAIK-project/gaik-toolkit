@@ -10,15 +10,15 @@ Quick guide for developers.
 
 ```text
 packages/python/gaik/src/gaik/
-├── extract/          # Text/structured data extraction (+ tests)
+├── extractor/        # Schema generation & structured extraction (+ tests)
 ├── parsers/          # Vision, PDF, and other parsers (+ tests)
-├── providers/        # LLM provider integrations (+ tests)
-└── [your-feature]/   # New standalone modules (e.g., audio, video)
+├── transcriber/      # Audio/video transcription (+ tests)
+└── [your-feature]/   # New standalone modules
 ```
 
 ### Extend Existing Module
 
-Add new functionality to existing modules (e.g., `extract/`, `parsers/`, `providers/`).
+Add new functionality to existing modules (e.g., `extractor/`, `parsers/`, `transcriber/`).
 
 #### Example: Add a new parser to `parsers/`
 
@@ -50,16 +50,16 @@ Add new functionality to existing modules (e.g., `extract/`, `parsers/`, `provid
 
 ### Add New Standalone Feature
 
-Create entirely new module for capabilities that don't fit existing modules (e.g., audio, video).
+Create entirely new module for capabilities that don't fit existing modules.
 
-#### Example: Audio transcription module
+#### Example: New analysis module
 
-1. **Create module** → `packages/python/gaik/src/gaik/audio/`
+1. **Create module** → `packages/python/gaik/src/gaik/analysis/`
 
    ```text
-   packages/python/gaik/src/gaik/audio/
+   packages/python/gaik/src/gaik/analysis/
    ├── __init__.py
-   ├── transcriber.py
+   ├── analyzer.py
    └── utils.py
    ```
 
@@ -69,22 +69,29 @@ Create entirely new module for capabilities that don't fit existing modules (e.g
 
    ```toml
    [project.optional-dependencies]
-   audio = [
-       "openai-whisper>=1.0.0",
-       "torch>=2.0.0",
+   analysis = [
+       "numpy>=1.24.0",
+       "pandas>=2.0.0",
    ]
-   all = ["gaik[extract,parser,audio]"]  # Update all group
+   all = ["gaik[extractor,parser,transcriber,analysis]"]  # Update all group
    ```
 
 3. **Export public API** → [src/gaik/\_\_init\_\_.py](packages/python/gaik/src/gaik/__init__.py)
 
    ```python
-   from .audio import AudioTranscriber
+   from . import analysis
+
+   __all__ = [
+       "extractor",
+       "parsers",
+       "transcriber",
+       "analysis",  # Add new module
+   ]
    ```
 
-4. **Add tests** _(recommended)_ → `packages/python/gaik/src/gaik/audio/tests/`
+4. **Add tests** _(recommended)_ → `packages/python/gaik/src/gaik/analysis/tests/`
 
-5. **Add examples** _(recommended)_ → `examples/audio/` with README
+5. **Add examples** _(recommended)_ → `examples/analysis/` with README
 
 ## Testing (Optional, but Recommended)
 
@@ -132,9 +139,9 @@ git push origin v0.3.0      # Triggers GitHub Actions
 ```text
 gaik-toolkit/
 ├── packages/python/gaik/src/gaik/  # Package source
-│   ├── extract/                    # Extraction + tests
-│   ├── parsers/                    # Parsers + tests
-│   └── providers/                  # LLM providers + tests
+│   ├── extractor/                  # Schema generation & extraction + tests
+│   ├── parsers/                    # PDF/vision parsers + tests
+│   └── transcriber/                # Audio/video transcription + tests
 ├── examples/                       # Usage examples
 ├── scripts/                        # CI/build scripts
 └── .github/workflows/              # CI/CD

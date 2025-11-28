@@ -9,14 +9,17 @@ authors = [{ name = "GAIK Project" }]
 keywords = [
     "ai",
     "ml",
-    "langchain",
     "openai",
-    "anthropic",
-    "google",
+    "azure-openai",
     "structured-outputs",
     "pydantic",
     "schema",
     "extraction",
+    "transcription",
+    "whisper",
+    "audio",
+    "video",
+    "pdf-parsing",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -56,10 +59,18 @@ parser = [
     "psutil"
 ]
 
+# Audio/video transcription
+transcriber = [
+    "openai>=1.14.3",         # OpenAI API for Whisper and GPT
+    "pydub>=0.25.1",          # Audio manipulation and chunking
+    "python-dotenv>=1.0.1",   # Environment variable management
+]
+
 # All features
 all = [
     "gaik[extract]",
     "gaik[parser]",
+    "gaik[transcriber]",
 ]
 
 # Development tooling for maintainers only (pip install -e ".[dev]")
