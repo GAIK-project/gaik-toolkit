@@ -22,19 +22,25 @@ Example:
     >>> pages = parser.convert_pdf("document.pdf")
 """
 
-from .docling import DoclingParser, parse_document
-from .pymypdf import PyMuPDFParser, parse_pdf
-from .vision import OpenAIConfig, VisionParser, get_openai_config
+__all__ = []
 
-__all__ = [
-    # Vision-based parsing
-    "VisionParser",
-    "OpenAIConfig",
-    "get_openai_config",
-    # Local parsing
-    "PyMuPDFParser",
-    "parse_pdf",
-    # Advanced parsing
-    "DoclingParser",
-    "parse_document",
-]
+# Vision-based parsing (requires openai)
+try:
+    from .vision import OpenAIConfig, VisionParser, get_openai_config
+    __all__.extend(["VisionParser", "OpenAIConfig", "get_openai_config"])
+except ImportError:
+    pass
+
+# Local parsing (requires PyMuPDF)
+try:
+    from .pymypdf import PyMuPDFParser, parse_pdf
+    __all__.extend(["PyMuPDFParser", "parse_pdf"])
+except ImportError:
+    pass
+
+# Advanced parsing (requires docling)
+try:
+    from .docling import DoclingParser, parse_document
+    __all__.extend(["DoclingParser", "parse_document"])
+except ImportError:
+    pass

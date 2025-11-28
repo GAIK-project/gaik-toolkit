@@ -40,14 +40,12 @@ try:
 except importlib.metadata.PackageNotFoundError:
     __version__ = "0.0.0.dev"
 
-# Expose submodules for cleaner imports
-from . import extractor
-from . import parsers
-from . import transcriber
+# Submodules are NOT imported automatically to avoid requiring optional dependencies.
+# Users should import submodules explicitly:
+#   from gaik.extractor import SchemaGenerator, DataExtractor
+#   from gaik.parsers import VisionParser
+#   from gaik.transcriber import Transcriber
 
 __all__ = [
     "__version__",
-    "extractor",
-    "parsers",
-    "transcriber",
 ]
