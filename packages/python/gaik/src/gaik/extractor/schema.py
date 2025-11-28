@@ -27,7 +27,7 @@ from openai import OpenAI, AzureOpenAI
 from openai import APIError, RateLimitError, APITimeoutError
 
 # Import shared configuration
-from .config import get_openai_config, create_openai_client
+from gaik.config import get_openai_config, create_openai_client
 
 try:
     # Pydantic v2 style config (preferred)

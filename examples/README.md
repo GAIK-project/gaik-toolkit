@@ -47,6 +47,16 @@ uv run python examples/parsers/demo_vision_simple.py
 python examples/parsers/demo_vision_simple.py
 ```
 
+### Document Classification
+
+```bash
+# Using UV
+uv run python examples/classifier/classification_example.py
+
+# Or with activated venv
+python examples/classifier/classification_example.py
+```
+
 ## Documentation
 
 See [packages/python/gaik](../packages/python/gaik) for full API documentation.

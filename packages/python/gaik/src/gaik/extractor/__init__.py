@@ -19,7 +19,7 @@ Advanced (for custom schemas):
     - create_extraction_model: Create Pydantic model from requirements
 """
 
-from .config import get_openai_config, create_openai_client
+from gaik.config import get_openai_config, create_openai_client
 from .schema import (
     SchemaGenerator,
     FieldSpec,

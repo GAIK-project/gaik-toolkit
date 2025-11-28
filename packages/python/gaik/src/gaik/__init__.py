@@ -6,6 +6,7 @@ Modules:
     - gaik.extractor: Schema generation and structured data extraction
     - gaik.parsers: Document parsing - PDFs and Word docs (vision models, PyMuPDF, python-docx, Docling)
     - gaik.transcriber: Audio/video transcription using Whisper with GPT enhancement
+    - gaik.doc_classifier: Document classification into predefined categories
 
 Example - Schema-based Extraction:
     >>> from gaik.extractor import SchemaGenerator, DataExtractor, get_openai_config
@@ -45,6 +46,7 @@ except importlib.metadata.PackageNotFoundError:
 #   from gaik.extractor import SchemaGenerator, DataExtractor
 #   from gaik.parsers import VisionParser
 #   from gaik.transcriber import Transcriber
+#   from gaik.doc_classifier import DocumentClassifier
 
 __all__ = [
     "__version__",

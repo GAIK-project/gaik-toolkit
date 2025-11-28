@@ -28,7 +28,7 @@ __all__ = []
 
 # Configuration (requires openai, python-dotenv)
 try:
-    from .config import create_openai_client, get_openai_config
+    from gaik.config import create_openai_client, get_openai_config
     __all__.extend(["get_openai_config", "create_openai_client"])
 except ImportError:
     pass

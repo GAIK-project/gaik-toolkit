@@ -70,11 +70,21 @@ transcriber = [
     "python-dotenv>=1.0.1",   # Environment variable management
 ]
 
+# Document classification
+classifier = [
+    "openai>=1.58.0",          # For LLM classification
+    "pydantic>=2.0.0",         # For structured outputs
+    "python-dotenv>=1.0.0",    # Environment variables
+    "PyMuPDF>=1.23.0",         # PDF parsing
+    "python-docx>=1.0.0",      # DOCX parsing
+]
+
 # All features
 all = [
     "gaik[extract]",
     "gaik[parser]",
     "gaik[transcriber]",
+    "gaik[classifier]",
 ]
 
 # Development tooling for maintainers only (pip install -e ".[dev]")
