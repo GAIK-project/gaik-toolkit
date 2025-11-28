@@ -28,22 +28,32 @@ Example:
     >>> result = docx_parser.parse_document("document.docx")
 """
 
-from .docling import DoclingParser, parse_document
-from .docx_parser import DocxParser, parse_docx
-from .pymypdf import PyMuPDFParser, parse_pdf
-from .vision import OpenAIConfig, VisionParser, get_openai_config
+__all__ = []
 
-__all__ = [
-    # Vision-based parsing
-    "VisionParser",
-    "OpenAIConfig",
-    "get_openai_config",
-    # Local parsing
-    "PyMuPDFParser",
-    "parse_pdf",
-    "DocxParser",
-    "parse_docx",
-    # Advanced parsing
-    "DoclingParser",
-    "parse_document",
-]
+# Vision-based parsing (requires openai)
+try:
+    from .vision import OpenAIConfig, VisionParser, get_openai_config
+    __all__.extend(["VisionParser", "OpenAIConfig", "get_openai_config"])
+except ImportError:
+    pass
+
+# Local PDF parsing (requires PyMuPDF)
+try:
+    from .pymypdf import PyMuPDFParser, parse_pdf
+    __all__.extend(["PyMuPDFParser", "parse_pdf"])
+except ImportError:
+    pass
+
+# Local DOCX parsing (requires python-docx)
+try:
+    from .docx_parser import DocxParser, parse_docx
+    __all__.extend(["DocxParser", "parse_docx"])
+except ImportError:
+    pass
+
+# Advanced parsing (requires docling)
+try:
+    from .docling import DoclingParser, parse_document
+    __all__.extend(["DoclingParser", "parse_document"])
+except ImportError:
+    pass

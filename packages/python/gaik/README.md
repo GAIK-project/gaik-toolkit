@@ -115,13 +115,11 @@ config = get_openai_config(use_azure=True)
 parser = VisionParser(
     openai_config=config,
     use_context=True,      # Multi-page continuity
-    dpi=150,               # Image quality (150-300)
-    clean_output=True      # Clean and merge tables
 )
 
-pages = parser.convert_pdf("invoice.pdf")
+pages = parser.convert_pdf("invoice.pdf", dpi=150, clean_output=True)
 markdown = pages[0] if len(pages) == 1 else "\n\n".join(pages)
-parser.save_markdown(markdown, "invoice.md")
+parser.save_markdown(pages, "invoice.md")
 ```
 
 ### Fast Local PDF Parsing
@@ -142,14 +140,10 @@ from gaik.transcriber import Transcriber, get_openai_config
 
 # Set environment: AZURE_API_KEY, AZURE_ENDPOINT (or OPENAI_API_KEY)
 config = get_openai_config(use_azure=True)
-transcriber = Transcriber(config)
+transcriber = Transcriber(config)  # enhanced_transcript=True by default
 
-# Transcribe with optional GPT enhancement
-result = transcriber.transcribe(
-    "meeting_recording.mp3",
-    enhance=True,  # Use GPT to improve formatting and structure
-    save_raw=True  # Save both raw and enhanced transcripts
-)
+# Transcribe audio/video file
+result = transcriber.transcribe("meeting_recording.mp3")
 
 # Save results
 result.save("output/transcripts/")
@@ -255,19 +249,19 @@ client = create_openai_client(config: dict) -> OpenAI | AzureOpenAI
 ```python
 from gaik.parsers import VisionParser, get_openai_config
 
+config = get_openai_config(use_azure=True)  # Returns OpenAIConfig dataclass
 parser = VisionParser(
-    openai_config: dict,           # From get_openai_config()
+    openai_config: OpenAIConfig,   # From get_openai_config()
     custom_prompt: str | None = None,
     use_context: bool = True,      # Multi-page context
     max_tokens: int = 16_000,
-    dpi: int = 200,                # 150-300 recommended
-    clean_output: bool = True      # Table cleaning
+    temperature: float = 0.0
 )
 ```
 
 **Methods:**
-- `convert_pdf(pdf_path: str) -> list[str]` - Convert PDF to markdown pages
-- `save_markdown(markdown_content: str, output_path: str)` - Save markdown to file
+- `convert_pdf(pdf_path: str, *, dpi: int = 200, clean_output: bool = True) -> list[str]` - Convert PDF to markdown pages
+- `save_markdown(markdown_pages: Sequence[str], output_path: str, *, separator: str = "\n\n---\n\n") -> None` - Save markdown to file
 
 #### PyMuPDFParser
 
@@ -305,9 +299,14 @@ from gaik.transcriber import Transcriber, get_openai_config
 
 config = get_openai_config(use_azure=True)
 transcriber = Transcriber(
-    config: dict,                          # From get_openai_config()
-    whisper_prompt: str | None = None,     # Custom prompt for Whisper
-    gpt_enhancement_prompt: str | None = None  # Custom prompt for GPT enhancement
+    api_config: dict,                      # From get_openai_config()
+    output_dir: str | Path = "transcriber_workspace",
+    *,
+    compress_audio: bool = True,           # Compress large audio files
+    enhanced_transcript: bool = True,      # Enable GPT enhancement
+    max_size_mb: int = 25,                 # Max file size for Whisper
+    max_duration_seconds: int = 1500,      # Max duration per chunk
+    default_prompt: str = DEFAULT_PROMPT   # Custom Whisper prompt
 )
 ```
 
@@ -317,16 +316,12 @@ transcriber = Transcriber(
 - Audio compression (files >25MB): Requires ffmpeg (optional, improves performance)
 
 **Methods:**
-- `transcribe(audio_path: str, enhance: bool = False, save_raw: bool = True) -> TranscriptionResult`
-  - `audio_path`: Path to audio/video file
-  - `enhance`: Whether to use GPT for transcript enhancement
-  - `save_raw`: Whether to save raw Whisper transcript
+- `transcribe(file_path: str | Path, *, custom_context: str = "", use_case_name: str | None = None, compress_audio: bool | None = None) -> TranscriptionResult`
+  - `file_path`: Path to audio/video file
+  - `custom_context`: Additional context for transcription
+  - `use_case_name`: Optional name for organizing output
+  - `compress_audio`: Override instance setting for this call
   - Returns: `TranscriptionResult` with raw and/or enhanced transcripts
-
-**Utilities:**
-- `split_and_transcribe(audio_path, config, prompt) -> str` - Basic chunking and transcription
-- `split_and_transcribe_with_context(audio_path, config, prompt, overlap_ms) -> str` - Context-aware transcription
-- `post_process_transcript(raw_text, config, prompt) -> str` - GPT enhancement
 
 #### TranscriptionResult
 

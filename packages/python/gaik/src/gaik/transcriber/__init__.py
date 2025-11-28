@@ -24,26 +24,32 @@ Example:
     >>> result.save("output/")
 """
 
-from .config import create_openai_client, get_openai_config
-from .transcriber import (
-    DEFAULT_PROMPT,
-    Transcriber,
-    TranscriptionResult,
-    post_process_transcript,
-    split_and_transcribe,
-    split_and_transcribe_with_context,
-)
+__all__ = []
 
-__all__ = [
-    # Main API
-    "Transcriber",
-    "TranscriptionResult",
-    # Configuration
-    "get_openai_config",
-    "create_openai_client",
-    # Utilities
-    "split_and_transcribe",
-    "split_and_transcribe_with_context",
-    "post_process_transcript",
-    "DEFAULT_PROMPT",
-]
+# Configuration (requires openai, python-dotenv)
+try:
+    from .config import create_openai_client, get_openai_config
+    __all__.extend(["get_openai_config", "create_openai_client"])
+except ImportError:
+    pass
+
+# Transcription (requires openai, pydub)
+try:
+    from .transcriber import (
+        DEFAULT_PROMPT,
+        Transcriber,
+        TranscriptionResult,
+        post_process_transcript,
+        split_and_transcribe,
+        split_and_transcribe_with_context,
+    )
+    __all__.extend([
+        "Transcriber",
+        "TranscriptionResult",
+        "split_and_transcribe",
+        "split_and_transcribe_with_context",
+        "post_process_transcript",
+        "DEFAULT_PROMPT",
+    ])
+except ImportError:
+    pass

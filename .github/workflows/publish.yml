@@ -54,11 +54,23 @@ jobs:
 
     - name: Test installation from PyPI
       run: |
-        # Wait for PyPI to update
+        # Wait for PyPI CDN to propagate the new version
         sleep 60
 
-        # Install from production PyPI
-        pip install gaik
+        # Extract version from tag (v0.2.20 -> 0.2.20)
+        VERSION=${GITHUB_REF_NAME#v}
+        echo "Installing gaik version: $VERSION"
+
+        # Install exact version with no cache to avoid stale CDN responses
+        pip install --no-cache-dir "gaik==$VERSION"
+
+        # Verify correct version was installed
+        INSTALLED=$(python -c "from gaik import __version__; print(__version__)")
+        echo "Installed version: $INSTALLED"
+        if [ "$INSTALLED" != "$VERSION" ]; then
+          echo "ERROR: Version mismatch! Expected $VERSION but got $INSTALLED"
+          exit 1
+        fi
 
         # Run verification tests (skips optional dependencies)
         python packages/python/gaik/scripts/verify_installation.py
