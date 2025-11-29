@@ -17,11 +17,11 @@ def basic_classification():
     classifier = DocumentClassifier(config=config)
 
     # Define categories
-    classes = ["invoice", "receipt", "contract", "report", "memo"]
+    classes = ["invoice", "receipt", "contract", "report", "memo", "article"]
 
     # Classify single file
     result = classifier.classify(
-        file_or_dir="doc.pdf",
+        file_or_dir=r"doc.pdf",
         classes=classes
     )
 
@@ -194,21 +194,17 @@ def error_handling_example():
 
 
 if __name__ == "__main__":
-    print("\n")
-    print("*" * 60)
-    print("Document Classifier Examples")
-    print("*" * 60)
 
     # Run examples (comment out ones you don't want to run)
 
-    # Basic examples
-    # basic_classification()
+    ## Basic examples
+    basic_classification()
     # directory_classification()
 
-    # Advanced examples
+    ## Advanced examples
     # custom_parser_example()
     # mixed_file_types_example()
 
-    # Error handling
+    ## Error handling
     # error_handling_example()
 

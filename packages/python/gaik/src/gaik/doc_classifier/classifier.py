@@ -8,11 +8,15 @@ of documents and categorizing them using LLM-based classification.
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Literal
 
 from pydantic import BaseModel, Field
 
 from gaik.config import create_openai_client
+from ..parsers.pymypdf import PyMuPDFParser
+from ..parsers.docx_parser import DocxParser
+from ..parsers.vision import VisionParser, OpenAIConfig
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,8 +38,6 @@ def _create_classification_model(classes: List[str]):
     Returns:
         Pydantic BaseModel class for classification results
     """
-    from typing import Literal
-
     # Create Literal type from classes
     ClassLiteral = Literal[tuple(classes)]  # type: ignore
 
@@ -96,11 +98,17 @@ class DocumentClassifier:
         parser: Optional[str] = None
     ) -> Dict:
         """
-        Classify document(s) into provided categories.
+        Classify document(s) into predefined categories.
+
+        Extraction behavior:
+        - PDF files: Extracts first 1000 characters using PyMuPDFParser
+        - DOCX files: Extracts first 1000 characters using DocxParser
+        - Image files: Analyzes entire image using VisionParser
 
         Args:
             file_or_dir: Path to a single file or directory
             classes: List of classification categories (e.g., ["invoice", "receipt", "contract"])
+                    'unknown' class is automatically added if not present
             parser: Optional parser override ('pymupdf', 'docx', 'vision')
 
         Returns:
@@ -180,8 +188,8 @@ class DocumentClassifier:
             # Determine parser to use
             parser_type = self._get_parser_for_file(file_path, parser_override)
 
-            # Extract first page text
-            text = self._extract_first_page(file_path, parser_type)
+            # Extract text (1000 chars for PDF/DOCX, full for images)
+            text = self._extract_text(file_path, parser_type)
 
             if not text or len(text.strip()) == 0:
                 logger.warning(f"No text extracted from {file_path}")
@@ -252,49 +260,44 @@ class DocumentClassifier:
 
         return results
 
-    def _extract_first_page(self, file_path: str, parser_type: str) -> str:
+    def _extract_text(self, file_path: str, parser_type: str) -> str:
         """
-        Extract first page text from document using specified parser.
+        Extract text from document using specified parser.
+        For PDF/DOCX: extracts full text then truncates to 1000 chars.
+        For images: uses VisionParser to analyze the entire image.
 
         Args:
             file_path: Path to document
             parser_type: Parser to use ('pymupdf', 'docx', 'vision')
 
         Returns:
-            Extracted text content
+            Extracted text content (max 1000 chars for PDF/DOCX)
 
         Raises:
             ValueError: If parser type is unsupported or extraction fails
         """
         if parser_type == 'pymupdf':
             try:
-                import fitz  # PyMuPDF
-
-                doc = fitz.open(file_path)
-                if doc.page_count == 0:
-                    raise ValueError("PDF has no pages")
-
-                first_page = doc[0]
-                text = first_page.get_text()
-                doc.close()
-                return text
+                parser = PyMuPDFParser()
+                result = parser.parse_document(file_path)
+                full_text = result['text_content']
+                # Return first 1000 characters
+                return full_text[:1000]
             except Exception as e:
                 raise ValueError(f"PyMuPDF extraction failed: {str(e)}")
 
         elif parser_type == 'docx':
             try:
-                from gaik.parsers import DocxParser
-
                 parser = DocxParser()
                 result = parser.parse_document(file_path)
-                return result['text_content']
+                full_text = result['text_content']
+                # Return first 1000 characters
+                return full_text[:1000]
             except Exception as e:
                 raise ValueError(f"DOCX extraction failed: {str(e)}")
 
         elif parser_type == 'vision':
             try:
-                from gaik.parsers.vision import OpenAIConfig, VisionParser
-
                 # Convert dict config to OpenAIConfig dataclass
                 openai_config = OpenAIConfig(
                     model=self.config.get('model', 'gpt-4.1'),
@@ -306,9 +309,26 @@ class DocumentClassifier:
 
                 parser = VisionParser(openai_config=openai_config)
 
-                # For PDFs, extract first page only
-                pages = parser.convert_pdf(file_path, dpi=200)
-                return pages[0] if pages else ""
+                # Check if file is PDF or image
+                file_type = self._detect_file_type(file_path)
+
+                if file_type == 'pdf':
+                    # For PDFs via vision: convert and get first page
+                    pages = parser.convert_pdf(file_path, dpi=200)
+                    return pages[0] if pages else ""
+
+                elif file_type == 'image':
+                    # For standalone images: read bytes and parse directly
+                    with open(file_path, 'rb') as f:
+                        image_bytes = f.read()
+
+                    # Parse image (entire image is analyzed)
+                    text = parser._parse_image(image_bytes, page=1, previous_context=None)
+                    return text
+
+                else:
+                    raise ValueError(f"Vision parser received unexpected file type: {file_type}")
+
             except Exception as e:
                 raise ValueError(f"Vision extraction failed: {str(e)}")
 
@@ -332,11 +352,12 @@ class DocumentClassifier:
         # Create prompt
         classes_str = ", ".join(f"'{c}'" for c in classes if c != 'unknown')
 
+        # Truncate to 4000 chars (~1000 tokens) to prevent token limit errors
         user_prompt = f"""Classify the following document into one of these categories: {classes_str}
 
 If the document does not clearly fit any category, classify it as 'unknown'.
 
-Document content (first page):
+Document content:
 ```
 {text[:4000]}
 ```

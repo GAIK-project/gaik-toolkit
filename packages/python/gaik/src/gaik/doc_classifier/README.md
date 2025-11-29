@@ -1,9 +1,6 @@
 # Document Classifier
 
-[![PyPI version](https://badge.fury.io/py/gaik.svg)](https://pypi.org/project/gaik/)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-
-LLM-powered single-label document classification for PDFs, Word files, and images.
+Classify documents into predefined categories using LLM analysis. Supports PDFs, Word documents, and images.
 
 ## Installation
 
@@ -11,9 +8,11 @@ LLM-powered single-label document classification for PDFs, Word files, and image
 pip install gaik[classifier]
 ```
 
-## How to Use
+**Note:** Requires OpenAI or Azure OpenAI API access
 
-### Basic Classification
+---
+
+## Quick Start
 
 ```python
 from gaik.doc_classifier import DocumentClassifier, get_openai_config
@@ -36,6 +35,86 @@ print(f"Confidence: {result['document.pdf']['confidence']:.2f}")
 print(f"Reasoning: {result['document.pdf']['reasoning']}")
 ```
 
+---
+
+## Features
+
+- **Multi-Format Support** - PDFs, Word documents (.docx, .doc), and images (.png, .jpg, .jpeg)
+- **Smart Extraction** - Extracts first 1000 characters from PDFs/DOCX, analyzes full images
+- **Auto Parser Selection** - PyMuPDF for PDFs, DocxParser for Word, VisionParser for images
+- **Confidence Scoring** - Returns classification confidence (0.0-1.0) and reasoning
+- **Batch Processing** - Classify entire directories of mixed file types
+- **Unknown Fallback** - Automatic "unknown" class for uncertain classifications
+
+---
+
+## Basic API
+
+### DocumentClassifier
+
+```python
+from gaik.doc_classifier import DocumentClassifier
+
+classifier = DocumentClassifier(
+    config: dict,              # From get_openai_config()
+    model: str | None = None   # Optional model override
+)
+
+# Classify file(s)
+results = classifier.classify(
+    file_or_dir: str,          # Path to file or directory
+    classes: list[str],        # Classification categories
+    parser: str | None = None  # Optional: "pymupdf", "docx", "vision"
+)
+```
+
+**Extraction Behavior:**
+- **PDF files**: Extracts first 1000 characters using PyMuPDFParser
+- **DOCX files**: Extracts first 1000 characters using DocxParser
+- **Image files**: Analyzes entire image using VisionParser
+
+**Returns:**
+```python
+{
+    "filename.pdf": {
+        "class": "invoice",
+        "confidence": 0.95,
+        "reasoning": "Contains invoice number and billing details"
+    }
+}
+```
+
+### Configuration
+
+```python
+from gaik.doc_classifier import get_openai_config
+
+# Azure OpenAI (default)
+config = get_openai_config(use_azure=True)
+
+# Standard OpenAI
+config = get_openai_config(use_azure=False)
+```
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `AZURE_API_KEY` | Azure only | Azure OpenAI API key |
+| `AZURE_ENDPOINT` | Azure only | Azure OpenAI endpoint URL |
+| `AZURE_DEPLOYMENT` | Azure only | Azure deployment name |
+| `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
+| `AZURE_API_VERSION` | Optional | API version (default: 2025-03-01-preview) |
+
+---
+
+## Examples
+
+See [examples/classifier/](../../../../../../examples/classifier/) for complete examples:
+- `classification_example.py` - Basic, directory, custom parser, mixed file types
+
 ### Directory Classification
 
 ```python
@@ -56,31 +135,18 @@ for filename, classification in results.items():
 result = classifier.classify(
     file_or_dir="complex_document.pdf",
     classes=["invoice", "receipt"],
-    parser="vision"  # Options: "pymupdf", "docx", "vision"
+    parser="vision"  # Override default PyMuPDF parser
 )
 ```
 
-**See [examples/classifier/](../../../../../../examples/classifier/) for more examples.**
+---
 
-## Packages
+## Resources
 
-| Package | Description | Documentation |
-|---------|-------------|---------------|
-| **gaik.doc_classifier** | Core document classification pipeline | [📖 Docs](./classifier.py) |
-| **gaik.config** | Shared OpenAI/Azure client configuration | [📖 Docs](../config.py) |
-| **examples.classifier** | Ready-to-run classification workflows | [📖 Docs](../../../../../../examples/classifier/classification_example.py) |
-
-## Documentation
-
-- **Getting Started** - See package documentation above
-- **Examples** - [examples/classifier/](../../../../../../examples/classifier/)
-- **Contributing** - [CONTRIBUTING.md](../../../../../../CONTRIBUTING.md)
-
-## Requirements
-
-- Python 3.10+
-- OpenAI or Azure OpenAI API access
-- `gaik[classifier]` extras (installs `openai`, `PyMuPDF`, `python-docx`, and dependencies)
+- **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
+- **Examples**: [examples/](../../../../../../examples/)
+- **Contributing**: [CONTRIBUTING.md](../../../../../../CONTRIBUTING.md)
+- **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License
 
