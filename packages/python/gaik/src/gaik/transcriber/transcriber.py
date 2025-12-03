@@ -114,7 +114,11 @@ class Transcriber:
             )
             cleanup_paths.extend(temps)
 
-            prompt = custom_context or self.default_prompt
+            if custom_context:
+                self.default_prompt = self.default_prompt + "\n" + custom_context
+            prompt = self.default_prompt
+            print(f"Transcribing prompt: {prompt}")
+            # prompt = custom_context or self.default_prompt
             raw_transcript = self._transcribe_audio(audio_path, prompt)
 
             enhanced_text: Optional[str] = None
