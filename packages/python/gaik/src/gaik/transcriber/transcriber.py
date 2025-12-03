@@ -337,7 +337,7 @@ def post_process_transcript(raw_transcript, api_config):
     model_name = api_config.get('model', 'GPT model')
     print(f"Enhancing transcript quality with {model_name}...")
     prompt = f"""
-    You are an expert transcript editor specializing in AI consultation meeting transcription. Please improve the following raw transcript of an AI needs analysis and advisory meeting between AI experts and company representatives.
+    You are an expert transcript editor. Please improve the following raw transcript. The transcript could be in any language, e.g., English, Finnish, Swedish, etc.
 
     Your task is to:
     1. Fix any transcription errors, inconsistencies, and unclear speech
@@ -349,7 +349,8 @@ def post_process_transcript(raw_transcript, api_config):
 
     **QUALITY ENHANCEMENT:**
     - Remove filler words (um, uh, you know) for clarity while preserving natural speech patterns
-    - Fix grammatical errors and incomplete sentences
+    - Fix grammatical errors, spelling mistakes, and incomplete sentences
+    - Use consistent terms/words for a concept. 
     - Ensure proper capitalization and punctuation
     - Group related statements by the same speaker into coherent paragraphs
     - Add line breaks between different speakers for visual clarity
