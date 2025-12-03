@@ -50,7 +50,18 @@ jobs:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: |
-        twine upload dist/*
+        if twine upload dist/* 2>&1 | tee upload_output.txt; then
+          echo "✅ Successfully uploaded to PyPI"
+        else
+          if grep -q "File already exists" upload_output.txt; then
+            echo "::warning::Package version already exists on PyPI - skipping upload"
+            echo "⚠️ This version was already published to PyPI"
+          else
+            echo "❌ Upload failed with unexpected error"
+            cat upload_output.txt
+            exit 1
+          fi
+        fi
 
     - name: Test installation from PyPI
       run: |
