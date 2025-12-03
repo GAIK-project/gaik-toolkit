@@ -19,10 +19,7 @@ from openai import AzureOpenAI
 from pydub import AudioSegment
 
 DEFAULT_PROMPT = (
-    "Extract transcript in English with proper dialogue structure. "
-    "The following conversation is an AI need analysis and advisory meeting between "
-    "AI advisors and company representatives. Under no circumstances create transcript "
-    "in any other language than English."
+    "Detect the language and extract transcript in the same language. The audio could be in any language, such as English, Finnish, Swedish, etc."
 )
 
 
@@ -468,7 +465,7 @@ def split_and_transcribe_with_context(
 
 {trimmed_context}
 
-Continue the transcription, maintaining speaker consistency and dialogue structure. This is an AI need analysis and advisory meeting between AI advisors and company representatives.'''
+Continue the transcription, maintaining speaker consistency and dialogue structure.'''
 
             if use_azure:
                 print("Using MS Azure endpoint for transcription")
