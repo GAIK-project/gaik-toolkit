@@ -82,13 +82,13 @@ demo/
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/parse` | POST | Parse PDF/DOCX documents |
-| `/classify` | POST | Classify documents |
-| `/extract` | POST | Extract structured data |
-| `/transcribe` | POST | Transcribe audio/video |
+| Endpoint      | Method | Description              |
+| ------------- | ------ | ------------------------ |
+| `/health`     | GET    | Health check             |
+| `/parse`      | POST   | Parse PDF/DOCX documents |
+| `/classify`   | POST   | Classify documents       |
+| `/extract`    | POST   | Extract structured data  |
+| `/transcribe` | POST   | Transcribe audio/video   |
 
 ## Tech Stack
 
