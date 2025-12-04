@@ -5,10 +5,18 @@ on:
     branches:
       - main
       - dev
+    paths:
+      - 'packages/**'
+      - '.github/workflows/**'
+      - 'scripts/**'
   pull_request:
     branches:
       - main
       - dev
+    paths:
+      - 'packages/**'
+      - '.github/workflows/**'
+      - 'scripts/**'
   workflow_call:  # Allow this workflow to be called by other workflows
 
 jobs:
