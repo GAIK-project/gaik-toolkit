@@ -1,6 +1,30 @@
 # TypeScript Packages
 
-This folder is a placeholder for future npm packages (TypeScript/JavaScript). Follow the same conventions as the Python workspace:
+This folder contains TypeScript/JavaScript npm packages for the GAIK toolkit.
+
+## Available Packages
+
+### [@gaik/ai](./gaik/)
+
+AI toolkit providing:
+
+- Provider-agnostic AI operations (Azure OpenAI, OpenAI via Vercel AI SDK)
+- Embedding generation and caching
+- Structured text generation with Zod schemas
+- PostgreSQL vector search (semantic & hybrid)
+- RAG pipeline utilities
+- Prompt template management
+
+```bash
+cd packages/ts/gaik
+pnpm install
+pnpm run build
+pnpm test
+```
+
+> **Note:** You can also use `npm` instead of `pnpm` if preferred.
+
+## Package Structure
 
 | Folder                                    | Purpose                           |
 | ----------------------------------------- | --------------------------------- |
@@ -15,7 +39,7 @@ This folder is a placeholder for future npm packages (TypeScript/JavaScript). Fo
    ```bash
    mkdir -p packages/ts/<package-name>/{src,tests}
    cd packages/ts/<package-name>
-   npm init -y
+   pnpm init
    ```
 
 2. **Tooling**
@@ -30,5 +54,3 @@ This folder is a placeholder for future npm packages (TypeScript/JavaScript). Fo
 
 4. **Docs**
    - Add a `README.md` inside the package describing usage and build/test commands.
-
-Until a package is added, this README keeps the directory under version control and documents the intended structure.
