@@ -21,7 +21,7 @@ import os
 import re
 import time
 from decimal import Decimal, InvalidOperation
-from datetime import datetime, date
+from datetime import datetime
 from typing import Annotated, Literal, Optional, List, Any, Dict, get_origin, get_args
 from openai import OpenAI, AzureOpenAI
 from openai import APIError, RateLimitError, APITimeoutError
@@ -284,115 +284,12 @@ def parse_nested_requirements(
 
 
 # -----------------------------------------------------------------------------
-# Type Detection Rules for LLM Prompt
-# -----------------------------------------------------------------------------
-
-TYPE_DETECTION_RULES = """
-FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
-
-1. ENUM (field_type='str' + populate 'enum' list):
-   Use when a SMALL, FIXED set of allowed values (2-8 options) is explicitly specified.
-   Recognition patterns:
-   - Bracketed values: [value1, value2, value3] or (a, b, c)
-   - Slash/pipe separated: "hot/cold/warm", "yes|no|maybe"
-   - Explicit options: "one of:", "options:", "allowed values:", "choose from:"
-   - Binary choices: "yes/no", "true/false", "active/inactive"
-   Examples:
-   - "Weather [hot, cold, warm]" → field_type='str', enum=['hot', 'cold', 'warm']
-   - "Status: active/inactive/pending" → field_type='str', enum=['active', 'inactive', 'pending']
-   IMPORTANT: Do NOT treat examples prefixed with "e.g.", "example:", "such as" as enum values.
-
-2. DATE (field_type='date'):
-   Use for any date or timestamp field.
-   Recognition patterns:
-   - Contains "date" in name or description: "entry date", "start date", "date of birth"
-   - Format specifications: Follow user's specified format if given. If not use the format 'DD-MM-YYYY'
-   - Temporal references: "when", "timestamp", "created on", "modified at"
-   Examples:
-   - "Entry Date" → field_type='date'
-   - "Date of visit" → field_type='date'
-
-3. LIST OF STRINGS (field_type='list[str]'):
-   Use when field should contain multiple text items.
-   Recognition patterns:
-   - Explicit list notation: "[List of ...]", "list of items"
-   - Multiple items expected: "comma-separated", "multiple values"
-   - Plural collection nouns: "tasks", "attachments", "tags", "categories", "items"
-   Examples:
-   - "Tasks performed" → field_type='list[str]'
-   - "Attachments [List of files]" → field_type='list[str]'
-
-4. LIST OF OBJECTS (field_type='list[dict]'):
-   Use for complex nested structures with multiple fields per item.
-   Recognition patterns:
-   - "table of", "records containing", "items with fields"
-   - Multiple sub-fields described for each item
-   Example:
-   - "Line items with product, quantity, and price" → field_type='list[dict]'
-
-5. INTEGER (field_type='int'):
-   Use for whole numbers, counts, quantities.
-   Recognition patterns:
-   - "number of", "count", "quantity", "total"
-   - Week/day/year numbers: "week number", "day of month"
-   - IDs that are numeric: "employee ID" (if specified as numeric)
-   Examples:
-   - "Work Week [Week number]" → field_type='int'
-   - "Number of attendees" → field_type='int'
-
-6. FLOAT (field_type='float'):
-   Use for decimal numbers, measurements, percentages, ratios.
-   Recognition patterns:
-   - "percentage", "ratio", "rate"
-   - Measurements: "temperature", "weight", "height", "distance"
-   - Averages or statistics: "average", "mean", "score"
-   Examples:
-   - "Completion percentage" → field_type='float'
-   - "Temperature reading" → field_type='float'
-
-7. DECIMAL (field_type='decimal'):
-   Use for precise monetary or financial values where precision matters.
-   Recognition patterns:
-   - Currency: "price", "cost", "amount", "total", "fee", "salary"
-   - Financial: "invoice total", "payment amount", "budget"
-   Examples:
-   - "Total Amount [EUR]" → field_type='decimal'
-   - "Unit price" → field_type='decimal'
-
-8. BOOLEAN (field_type='bool'):
-   Use for true/false flags and binary states.
-   Recognition patterns:
-   - Field names starting with: "is_", "has_", "can_", "should_"
-   - Questions: "whether", "if applicable"
-   - Binary flags: "approved", "completed", "verified" (when yes/no answer)
-   Examples:
-   - "Is approved" → field_type='bool'
-   - "Has attachments" → field_type='bool'
-
-9. STRING (field_type='str'):
-   Default for text fields when no other type clearly applies.
-   Use for: names, descriptions, remarks, comments, signatures, addresses, observations.
-   Examples:
-   - "Company name" → field_type='str'
-   - "General remarks" → field_type='str'
-
-PRIORITY ORDER: When uncertain, apply rules in this order:
-1. Check for explicit enum values first (brackets, slashes)
-2. Check for date-related keywords
-3. Check for list indicators
-4. Check for numeric patterns (int vs float vs decimal)
-5. Check for boolean patterns
-6. Default to 'str'
-"""
-
-# -----------------------------------------------------------------------------
 # Parse the user's natural language into field specs
 # -----------------------------------------------------------------------------
 
 def parse_user_requirements(user_description: str, *, client=None, model: str = None) -> ExtractionRequirements:
     """
-    Parse extraction requirements from natural language using LLM with type detection rules.
-    Works with any input format - numbered lists, bullets, prose, tables, etc.
+    Parse the extraction requirements from the user's natural language using structured outputs.
     """
     if client is None:
         config = get_openai_config(use_azure=True)
@@ -400,8 +297,6 @@ def parse_user_requirements(user_description: str, *, client=None, model: str = 
         model = model if model else config['model']
     elif model is None:
         raise ValueError("model must be provided when client is specified")
-
-    cleaned_description = _clean_requirements_text(user_description)
 
     resp = _parse_with(
         client=client,
@@ -411,42 +306,16 @@ def parse_user_requirements(user_description: str, *, client=None, model: str = 
             {
                 "role": "user",
                 "content": "Parse the extraction requirements below into the target schema.\n"
-                           "Apply the type detection rules to determine the correct field_type for each field.\n"
                            "If a field cannot be identified reliably, omit it.\n"
-                           + TYPE_DETECTION_RULES +
-                           "\n\nRequirements to parse:\n```txt\n" + cleaned_description + "\n```"
+                           "```txt\n" + user_description + "\n```"
             },
         ],
         response_format=ExtractionRequirements,
     )
     req = resp.choices[0].message.parsed
-    _apply_type_overrides(req)
     if getattr(resp, "usage", None):
         print(f"[parse_user_requirements] tokens={resp.usage.total_tokens}")
     return req
-
-
-def _clean_requirements_text(text: str) -> str:
-    """Trim whitespace noise while preserving numbered/bulleted structure."""
-    lines = [line.strip() for line in text.splitlines()]
-    cleaned_lines = [line for line in lines if line]
-    return "\n".join(cleaned_lines)
-
-
-def _apply_type_overrides(requirements: ExtractionRequirements) -> None:
-    """
-    Apply deterministic heuristics to FieldSpec entries to enforce critical types
-    even when the LLM guesses incorrectly (e.g., date fields must be typed as date).
-    """
-    for field in requirements.fields:
-        name = field.field_name.lower()
-        desc = field.description.lower()
-
-        if "date" in name or "date" in desc:
-            field.field_type = "date"
-            # Preserve custom regex if user already supplied one
-            if not field.pattern:
-                field.pattern = r"\d{2}\.\d{2}\.\d{4}"
 
 # -----------------------------------------------------------------------------
 # Create dynamic Pydantic model from field specs
@@ -497,7 +366,7 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
         "float": float,
         "bool": bool,
         "list[str]": list[str],
-        "date": date,
+        "date": str,
         "decimal": Decimal,
         "list[dict]": list[dict],  # for nested structures like items
     }
@@ -544,73 +413,18 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
 # Normalization helpers (post-LLM)
 # -----------------------------------------------------------------------------
 
-DEFAULT_OUTPUT_DATE_FORMAT = "%Y-%m-%d"
-
-
-def _try_format_date(value: str, output_format: str = DEFAULT_OUTPUT_DATE_FORMAT) -> tuple[bool, str]:
-    """Attempt to parse/format a date string. Returns (success, formatted_value)."""
-    value = value.strip()
-    parse_formats = [
-        "%Y-%m-%d",
-        "%Y-%m-%d",
-        "%Y/%m/%d",
-        "%d/%m/%Y",
-        "%d-%m-%Y",
-        "%m/%d/%Y",
-        "%B %d, %Y",
-        "%d %B %Y",
-        "%Y.%m.%d",
-        "%d.%m.%Y",
-        "%m-%d-%Y",
-        "%b %d, %Y",
-        "%d %b %Y",
-        "%b %d %Y",
-    ]
-    for fmt in parse_formats:
+def _to_iso_date(s: str) -> str:
+    s = s.strip()
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%Y/%m/%d", "%d/%m/%Y"):
         try:
-            parsed = datetime.strptime(value, fmt)
-            return True, parsed.strftime(output_format)
+            return datetime.strptime(s, fmt).date().isoformat()
         except ValueError:
             continue
-    return False, value
+    return s  # leave as-is if unparseable
 
 
-def _normalize_date_string(value: str, output_format: Optional[str] = None) -> str:
-    """
-    Normalize a date string into the desired format while accepting multiple inputs.
-    Falls back to the original value if parsing fails so Pydantic validation can catch it.
-    """
-    fmt = output_format or DEFAULT_OUTPUT_DATE_FORMAT
-    success, formatted = _try_format_date(value, output_format=fmt)
-    if success:
-        return formatted
-    return formatted
-
-
-MONTH_PATTERN = "(January|February|March|April|May|June|July|August|September|October|November|December)"
-DATE_REGEX_PATTERNS = [
-    re.compile(r"\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b"),
-    re.compile(r"\b\d{4}[./-]\d{1,2}[./-]\d{1,2}\b"),
-    re.compile(rf"\b\d{{1,2}}\s+{MONTH_PATTERN}\s+\d{{4}}\b", re.IGNORECASE),
-    re.compile(rf"\b{MONTH_PATTERN}\s+\d{{1,2}},\s+\d{{4}}\b", re.IGNORECASE),
-]
-
-
-def _extract_candidate_dates(text: str, output_format: Optional[str] = None) -> set[str]:
-    """Find all date-like strings in text and return normalized values."""
-    candidates: set[str] = set()
-    for pattern in DATE_REGEX_PATTERNS:
-        for match in pattern.finditer(text):
-            raw = match.group(0)
-            success, normalized = _try_format_date(raw, output_format=output_format or DEFAULT_OUTPUT_DATE_FORMAT)
-            if success:
-                candidates.add(normalized)
-    return candidates
-
-
-def _normalize_record(data: dict, req: ExtractionRequirements, source_text: Optional[str] = None) -> dict:
+def _normalize_record(data: dict, req: ExtractionRequirements) -> dict:
     spec_by_name = {f.field_name: f for f in req.fields}
-    candidate_dates = _extract_candidate_dates(source_text) if source_text else None
     out = {}
     for k, v in data.items():
         spec = spec_by_name.get(k)
@@ -618,15 +432,8 @@ def _normalize_record(data: dict, req: ExtractionRequirements, source_text: Opti
             out[k] = v
             continue
 
-        if spec.field_type == "date":
-            desired_format = _resolve_date_format(spec)
-            value_str = v.strftime(DEFAULT_OUTPUT_DATE_FORMAT) if isinstance(v, date) else str(v)
-            normalized = _normalize_date_string(value_str, desired_format)
-            if candidate_dates:
-                if normalized not in candidate_dates and len(candidate_dates) == 1:
-                    candidate = next(iter(candidate_dates))
-                    normalized = _normalize_date_string(candidate, desired_format)
-            out[k] = normalized
+        if spec.field_type == "date" and isinstance(v, str):
+            out[k] = _to_iso_date(v)
         elif spec.field_type == "list[str]":
             if isinstance(v, str):
                 out[k] = [s.strip() for s in re.split(r"[;,]", v) if s.strip()]
@@ -637,36 +444,6 @@ def _normalize_record(data: dict, req: ExtractionRequirements, source_text: Opti
         else:
             out[k] = v
     return out
-
-
-def _resolve_date_format(spec: FieldSpec) -> str:
-    tokens = {
-        "yyyy-mm-dd": "%Y-%m-%d",
-        "yyyy/mm/dd": "%Y/%m/%d",
-        "dd.mm.yyyy": "%d.%m.%Y",
-        "dd/mm/yyyy": "%d/%m/%Y",
-        "mm/dd/yyyy": "%m/%d/%Y",
-        "dd-mm-yyyy": "%d-%m-%Y",
-        "mm-dd-yyyy": "%m-%d-%Y",
-    }
-    description = spec.description.lower()
-    for token, fmt in tokens.items():
-        if token in description:
-            return fmt
-
-    pattern_map = {
-        r"\d{4}-\d{2}-\d{2}": "%Y-%m-%d",
-        r"\d{4}/\d{2}/\d{2}": "%Y/%m/%d",
-        r"\d{2}\.\d{2}\.\d{4}": "%d.%m.%Y",
-        r"\d{2}/\d{2}/\d{4}": "%d/%m/%Y",
-        r"\d{2}-\d{2}-\d{4}": "%d-%m-%Y",
-    }
-    if spec.pattern:
-        for regex, fmt in pattern_map.items():
-            if regex in spec.pattern:
-                return fmt
-
-    return DEFAULT_OUTPUT_DATE_FORMAT
 
 
 # -----------------------------------------------------------------------------
