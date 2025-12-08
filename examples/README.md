@@ -18,10 +18,14 @@ uv pip install gaik[all]
 ## Environment Variables
 
 ```bash
-# Set API keys (choose what you need)
+# For OpenAI
 export OPENAI_API_KEY='sk-...'
-export ANTHROPIC_API_KEY='sk-ant-...'
-export GOOGLE_API_KEY='...'
+
+# For Azure OpenAI (default in examples)
+export AZURE_API_KEY='...'
+export AZURE_ENDPOINT='https://your-resource.openai.azure.com/'
+export AZURE_DEPLOYMENT='gpt-4o'
+export AZURE_API_VERSION='2024-02-15-preview'  # optional
 ```
 
 ## Usage

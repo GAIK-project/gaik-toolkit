@@ -17,14 +17,11 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 # Allow running the example without installing the package
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from gaik.extractor import (  # noqa: E402
-    DataExtractor,
-    ExtractionRequirements,  # noqa: E402
-    SchemaGenerator,
-    get_openai_config,
-)
+from gaik.extractor import ExtractionRequirements  # noqa: E402
+from gaik.extractor import (DataExtractor, SchemaGenerator,  # noqa: E402
+                            get_openai_config)
 from gaik.extractor.schema import print_pydantic_schema  # noqa: E402
 
 # ---------------------------------------------------------------------------

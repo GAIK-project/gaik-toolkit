@@ -6,7 +6,16 @@ Requires: pip install gaik[parser]
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+# Load environment variables from .env file BEFORE importing gaik modules
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent.parent / ".env")
+
+# Add src directory to path to import modules (works without pip install)
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from gaik.parsers import VisionParser, get_openai_config
 
@@ -18,9 +27,9 @@ def main() -> None:
     pdf_path = Path(__file__).parent / "WEF-page-10.pdf"
 
     if not pdf_path.exists():
-        print("⚠️  No sample PDF found.")
+        print("[WARNING] No sample PDF found.")
         print(f"   Expected: {pdf_path}")
-        print("\n💡 To test VisionParser:")
+        print("\n[TIP] To test VisionParser:")
         print("   1. Place a PDF file in the examples/ directory")
         print("   2. Update pdf_path variable above")
         print("   3. Set your OpenAI API key:")
@@ -29,16 +38,16 @@ def main() -> None:
         print("      export AZURE_API_KEY='...'")
         print("      export AZURE_ENDPOINT='https://...'")
         print("      export AZURE_DEPLOYMENT='gpt-4o'")
-        print("\n📖 For CLI usage, see: demo_vision_parser.py")
+        print("\n[INFO] For CLI usage, see: demo_vision_parser.py")
         return
 
     # Initialize parser (defaults to Azure OpenAI, or set use_azure=False for OpenAI)
-    print("🔧 Initializing VisionParser...")
+    print("[SETUP] Initializing VisionParser...")
     config = get_openai_config(use_azure=True)  # or use_azure=False for OpenAI
-    parser = VisionParser(config)
+    parser = VisionParser(openai_config=config)
 
     # Convert PDF to Markdown
-    print(f"📄 Converting PDF: {pdf_path.name}")
+    print(f"[DOC] Converting PDF: {pdf_path.name}")
     markdown_pages = parser.convert_pdf(
         str(pdf_path),
         dpi=200,  # Image quality for PDF rendering
@@ -56,7 +65,7 @@ def main() -> None:
     # Save to file
     output_path = pdf_path.with_suffix(".md")
     parser.save_markdown(markdown_pages, str(output_path))
-    print(f"\n✅ Markdown saved to: {output_path}")
+    print(f"\n[OK] Markdown saved to: {output_path}")
 
 
 if __name__ == "__main__":

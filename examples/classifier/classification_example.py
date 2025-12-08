@@ -3,6 +3,17 @@
 Demonstrates how to classify documents into predefined categories using the doc_classifier package.
 """
 
+import sys
+from pathlib import Path
+
+# Load environment variables from .env file BEFORE importing gaik modules
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent.parent / ".env")
+
+# Add src directory to path to import modules (works without pip install)
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+
 from gaik.doc_classifier import DocumentClassifier, get_openai_config
 
 
@@ -19,8 +30,9 @@ def basic_classification():
     # Define categories
     classes = ["invoice", "receipt", "contract", "report", "memo", "article"]
 
-    # Classify single file
-    result = classifier.classify(file_or_dir=r"doc.pdf", classes=classes)
+    # Classify single file (use sample PDF from parsers folder)
+    sample_pdf = Path(__file__).parent.parent / "parsers" / "WEF-page-10.pdf"
+    result = classifier.classify(file_or_dir=str(sample_pdf), classes=classes)
 
     # Print results
     for filename, classification in result.items():

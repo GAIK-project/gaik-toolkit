@@ -22,7 +22,7 @@ pip install gaik[transcriber]
 # See "System Requirements" section below for installation instructions
 
 # All features
-pip install gaik
+pip install gaik[all]
 ```
 
 ## System Requirements
@@ -467,10 +467,9 @@ parser = VisionParser(
     openai_config=config,
     custom_prompt=custom_prompt,
     use_context=True,
-    dpi=200
 )
 
-pages = parser.convert_pdf("complex_form.pdf")
+pages = parser.convert_pdf("complex_form.pdf", dpi=200)
 ```
 
 ### Multi-PDF Processing with Classification
@@ -480,7 +479,7 @@ from gaik.parsers import VisionParser, get_openai_config
 from pathlib import Path
 
 config = get_openai_config(use_azure=True)
-parser = VisionParser(openai_config=config, use_context=True, clean_output=True)
+parser = VisionParser(openai_config=config, use_context=True)
 
 pdf_files = Path("documents/").glob("*.pdf")
 
@@ -488,7 +487,7 @@ for pdf_path in pdf_files:
     print(f"Processing: {pdf_path}")
     
     # Parse PDF
-    pages = parser.convert_pdf(str(pdf_path))
+    pages = parser.convert_pdf(str(pdf_path), clean_output=True)
     markdown = pages[0] if len(pages) == 1 else "\n\n".join(pages)
     
     # Save with same name as PDF
@@ -506,8 +505,8 @@ from gaik.extractor import SchemaGenerator, DataExtractor
 config = get_openai_config(use_azure=True)
 
 # Step 1: Parse PDF to markdown
-parser = VisionParser(openai_config=config, clean_output=True)
-pages = parser.convert_pdf("invoice.pdf")
+parser = VisionParser(openai_config=config)
+pages = parser.convert_pdf("invoice.pdf", clean_output=True)
 markdown_text = pages[0]
 
 # Step 2: Generate extraction schema

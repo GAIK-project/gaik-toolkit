@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 # Add GAIK package to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from gaik.transcriber import Transcriber, get_openai_config
 

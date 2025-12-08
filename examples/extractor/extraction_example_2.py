@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 # Add src directory to path to import modules (works without pip install)
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from gaik.extractor import DataExtractor, SchemaGenerator, get_openai_config
 from gaik.parsers import VisionParser
@@ -111,9 +111,8 @@ def main():
         openai_config=config,  # Required
         custom_prompt=custom_prompt,  # Optional
         use_context=True,  # Improves multi-page continuity
-        dpi=150,  # 200 is OK; 300 for denser docs
-        clean_output=True,  # Clean/merge tables across pages
     )
+    # Note: dpi and clean_output are passed to convert_pdf() method
 
     # parser = PyMuPDFParser()
     # Parse document with markdown format (simple text)
@@ -140,7 +139,7 @@ def main():
 
         # 4a) Parse the full document
         # VisionParser.convert_pdf() returns a list of strings (one per page or merged)
-        markdown_pages = parser.convert_pdf(path)
+        markdown_pages = parser.convert_pdf(path, dpi=150, clean_output=True)
 
         if not markdown_pages or not isinstance(markdown_pages, list):
             raise RuntimeError(f"Invalid parse result for: {path}")

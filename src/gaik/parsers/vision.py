@@ -275,7 +275,7 @@ class VisionParser:
         response = self._client.chat.completions.create(
             model=self.config.model,
             messages=[{"role": "user", "content": payload}],
-            max_tokens=self.max_tokens,
+            max_completion_tokens=self.max_tokens,
             temperature=self.temperature,
         )
 
@@ -293,7 +293,7 @@ class VisionParser:
         response = self._client.chat.completions.create(
             model=self.config.model,
             messages=[{"role": "user", "content": cleanup_prompt}],
-            max_tokens=self.max_tokens,
+            max_completion_tokens=self.max_tokens,
             temperature=self.temperature,
         )
 

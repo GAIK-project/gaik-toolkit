@@ -15,14 +15,11 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 # Add src directory to path so we can import without installing the package
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from gaik.extractor import (  # noqa: E402  # noqa: E402
-    DataExtractor,
-    ExtractionRequirements,
-    FieldSpec,
-    get_openai_config,
-)
+from gaik.extractor import (DataExtractor,  # noqa: E402  # noqa: E402
+                            ExtractionRequirements, FieldSpec,
+                            get_openai_config)
 
 
 class ProjectInfo(BaseModel):

@@ -10,8 +10,13 @@ This script demonstrates how to:
 import sys
 from pathlib import Path
 
+# Load environment variables from .env file BEFORE importing gaik modules
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 # Add src directory to path to import modules (works without pip install)
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from gaik.extractor import DataExtractor, SchemaGenerator, get_openai_config
 
@@ -79,7 +84,7 @@ Additional or variation works: additional asbestos removal work in the third-flo
     print("-" * 80)
 
     schema = generator.generate_schema(user_requirements=user_requirements)
-    print(f"\n✓ Generated schema: {schema.__name__}")
+    print(f"\n[OK] Generated schema: {schema.__name__}")
     print(f"  Structure: {generator.structure_analysis.structure_type}")
     print(f"  Fields: {[f.field_name for f in generator.item_requirements.fields]}")
 

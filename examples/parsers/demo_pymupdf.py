@@ -6,7 +6,11 @@ Requires: pip install gaik[parser]
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+# Add src directory to path to import modules (works without pip install)
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from gaik.parsers.pymypdf import PyMuPDFParser
 
@@ -37,7 +41,12 @@ def main() -> None:
     print("\n" + "=" * 60)
     print("EXTRACTED TEXT")
     print("=" * 60)
-    print(result["text_content"])
+    # Handle Unicode characters that may not be supported by Windows terminal
+    try:
+        print(result["text_content"])
+    except UnicodeEncodeError:
+        # Fall back to ASCII with replacement for unsupported characters
+        print(result["text_content"].encode("ascii", errors="replace").decode("ascii"))
 
     # Show metadata
     print("\n" + "=" * 60)
