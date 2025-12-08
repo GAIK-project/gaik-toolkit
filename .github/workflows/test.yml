@@ -18,6 +18,11 @@ on:
       - 'pyproject.toml'
       - '.github/workflows/**'
   workflow_call:  # Allow this workflow to be called by other workflows
+    inputs:
+      ref:
+        description: 'Git ref to checkout (for tag-based builds)'
+        required: false
+        type: string
 
 jobs:
   test:
@@ -29,6 +34,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref || github.ref }}  # Use input ref if provided, otherwise default
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5

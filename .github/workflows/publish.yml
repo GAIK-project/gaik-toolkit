@@ -14,6 +14,8 @@ jobs:
   # Run tests before publishing
   test:
     uses: ./.github/workflows/test.yml
+    with:
+      ref: ${{ github.ref }}  # Pass the tag ref to test workflow
 
   build-and-publish:
     needs: test  # Only publish if tests pass
