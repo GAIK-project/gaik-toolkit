@@ -17,21 +17,17 @@ The toolkit is a combination of modular components that could either be used as 
 ## Installation
 
 ```bash
-# Install all packages
-pip install gaik[all]
-
-# Or install individual packages, e.g.,
-pip install gaik[extractor]    # Data extraction only
+pip install gaik
 ```
 
 ## Packages
 
 | Package | Description | Documentation |
 |---------|-------------|---------------|
-| **extractor** | Extract structured data using natural language requirements | [📖 Docs](packages/python/gaik/src/gaik/extractor/README.md) |
-| **parsers** | Parse PDFs and Word docs with vision models, PyMuPDF, python-docx, or Docling | [📖 Docs](packages/python/gaik/src/gaik/parsers/README.md) |
-| **doc_classifier** | Classify documents into predefined categories using LLM analysis | [📖 Docs](packages/python/gaik/src/gaik/doc_classifier/README.md) |
-| **transcriber** | Transcribe audio/video with Whisper and GPT enhancement | [📖 Docs](packages/python/gaik/src/gaik/transcriber/README.md) |
+| **extractor** | Extract structured data using natural language requirements | [📖 Docs](docs/extractor.md) |
+| **parsers** | Parse PDFs and Word docs with vision models, PyMuPDF, python-docx, or Docling | [📖 Docs](docs/parsers.md) |
+| **doc_classifier** | Classify documents into predefined categories using LLM analysis | [📖 Docs](docs/doc_classifier.md) |
+| **transcriber** | Transcribe audio/video with Whisper and GPT enhancement | [📖 Docs](docs/transcriber.md) |
 
 ## Documentation
 

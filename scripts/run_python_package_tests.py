@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Utility to install and test every Python package under packages/python."""
+"""Utility to install and test every Python package under packages/."""
 
 from __future__ import annotations
 
@@ -18,8 +18,8 @@ except ModuleNotFoundError:  # pragma: no cover - fallback for 3.10
         subprocess.run([sys.executable, "-m", "pip", "install", "tomli"], check=True)
         import tomli as tomllib  # type: ignore[import-not-found]
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-PYTHON_PACKAGES_ROOT = REPO_ROOT / "packages" / "python"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PACKAGES_ROOT = REPO_ROOT / "packages"
 
 
 def run_command(
@@ -33,10 +33,10 @@ def run_command(
 
 
 def discover_python_packages() -> list[Path]:
-    """Return every directory under packages/python that contains a pyproject.toml."""
-    if not PYTHON_PACKAGES_ROOT.exists():
+    """Return every directory under packages/ that contains a pyproject.toml."""
+    if not PACKAGES_ROOT.exists():
         return []
-    return sorted(path.parent for path in PYTHON_PACKAGES_ROOT.glob("*/pyproject.toml"))
+    return sorted(path.parent for path in PACKAGES_ROOT.glob("*/pyproject.toml"))
 
 
 def load_metadata(package_dir: Path) -> Dict[str, Any]:
@@ -69,7 +69,7 @@ def determine_extras(metadata: Dict[str, Any]) -> list[str]:
 def main() -> None:
     packages = discover_python_packages()
     if not packages:
-        print("⚠️  No Python packages discovered under packages/python.")
+        print("⚠️  No Python packages discovered under packages/.")
         return
 
     run_command(

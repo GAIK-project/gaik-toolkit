@@ -6,6 +6,13 @@ FastAPI backend that provides REST endpoints for the GAIK toolkit components.
 
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env.local from demo folder
+env_path = Path(__file__).parent.parent / ".env.local"
+load_dotenv(env_path)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
