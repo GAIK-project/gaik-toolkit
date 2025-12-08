@@ -16,8 +16,9 @@ from __future__ import annotations
 import base64
 import logging
 import os
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any
 
 try:  # Optional dependency, documented via extra: gaik[vision]
     from dotenv import load_dotenv as _load_dotenv  # type: ignore
@@ -130,14 +131,14 @@ class VisionParser:
 
     def __init__(
         self,
-        openai_config: OpenAIConfig,
+        openai_config: OpenAIConfig | Mapping[str, Any],
         *,
         custom_prompt: str | None = None,
         use_context: bool = True,
         max_tokens: int = 16_000,
         temperature: float = 0.0,
     ) -> None:
-        self.config = openai_config
+        self.config = self._coerce_config(openai_config)
         self.custom_prompt = custom_prompt or self._default_prompt()
         self.use_context = use_context
         self.max_tokens = max_tokens
@@ -223,6 +224,25 @@ class VisionParser:
 
         logger.debug("Initializing standard OpenAI client")
         return OpenAI(api_key=config.api_key)
+    
+    @staticmethod
+    def _coerce_config(config: OpenAIConfig | Mapping[str, Any]) -> OpenAIConfig:
+        """Normalize dict-based configs to OpenAIConfig."""
+
+        if isinstance(config, OpenAIConfig):
+            return config
+
+        if not isinstance(config, Mapping):
+            raise TypeError("openai_config must be an OpenAIConfig or a mapping.")
+
+        return OpenAIConfig(
+            model=config.get("model") or "gpt-4.1",
+            use_azure=config.get("use_azure", True),
+            api_key=config.get("api_key"),
+            azure_endpoint=config.get("azure_endpoint"),
+            azure_audio_endpoint=config.get("azure_audio_endpoint"),
+            api_version=config.get("api_version"),
+        )
 
     def _pdf_to_images(self, pdf_path: str, *, dpi: int) -> list[bytes]:
         """Convert PDF pages to PNG image bytes using PyMuPDF.

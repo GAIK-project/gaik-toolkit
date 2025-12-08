@@ -84,7 +84,7 @@ def classify_document(
         ],
         temperature=0,
         top_p=1.0,
-        max_tokens=50,
+        max_completion_tokens=50,
     )
 
     if use_azure:
@@ -123,8 +123,8 @@ def main():
     pdf_paths = [
         "input/PO.pdf",
         "input/BOM1.pdf",
-        "input/BOM12.pdf",
-        "input/BOM13.pdf",
+        "input/BOM2.pdf",
+        "input/BOM3.pdf",
     ]
 
     # 4) Optional: build a combined output too

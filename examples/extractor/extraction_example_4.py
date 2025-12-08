@@ -15,14 +15,17 @@ import json
 import sys
 from contextlib import redirect_stdout
 from pathlib import Path
+import decimal
+from decimal import Decimal
+from typing import List, Literal, Optional
 
 # Allow running the example without installing the package
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from gaik.extractor import ExtractionRequirements  # noqa: E402
-from gaik.extractor import (DataExtractor, SchemaGenerator,  # noqa: E402
+from gaik.extractor import ExtractionRequirements  
+from gaik.extractor import (DataExtractor, SchemaGenerator,  
                             get_openai_config)
-from gaik.extractor.schema import print_pydantic_schema  # noqa: E402
+from gaik.extractor.schema import print_pydantic_schema  
 
 # ---------------------------------------------------------------------------
 # Shared sample data (same as extraction_example_1.py)
@@ -100,6 +103,7 @@ def save_schema_to_python(model: type, path: Path) -> None:
 Auto-generated schema module (do not edit manually).
 """
 
+import decimal
 from decimal import Decimal
 from typing import List, Literal, Optional
 
