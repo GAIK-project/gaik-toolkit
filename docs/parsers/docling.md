@@ -5,7 +5,7 @@ Advanced OCR-capable parser with support for PDFs, images, and multiple formats 
 ## Installation
 
 ```bash
-pip install gaik
+pip install gaik[parser]
 ```
 
 **Note:** No API keys required - runs locally with optional GPU acceleration

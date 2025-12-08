@@ -5,7 +5,7 @@ Fast local PDF text extraction using PyMuPDF. No API calls required.
 ## Installation
 
 ```bash
-pip install gaik
+pip install gaik[parser]
 ```
 
 **Note:** No API keys required - runs completely locally

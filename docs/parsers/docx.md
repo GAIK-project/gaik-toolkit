@@ -5,7 +5,7 @@ Parse Word documents (.docx, .doc) to text using python-docx. No API calls requi
 ## Installation
 
 ```bash
-pip install gaik
+pip install gaik[parser]
 ```
 
 **Note:** No API keys required - runs completely locally

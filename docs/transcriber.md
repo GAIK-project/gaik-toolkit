@@ -5,7 +5,7 @@ Transcribe audio and video files using OpenAI Whisper with optional GPT enhancem
 ## Installation
 
 ```bash
-pip install gaik
+pip install gaik[transcriber]
 ```
 
 **Note:** Video processing requires ffmpeg. See [System Requirements](#system-requirements) below.

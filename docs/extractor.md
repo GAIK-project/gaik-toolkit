@@ -5,7 +5,7 @@ Extract structured data from documents using natural language requirements with 
 ## Installation
 
 ```bash
-pip install gaik
+pip install gaik[extractor]
 ```
 
 **Note:** Requires OpenAI or Azure OpenAI API access

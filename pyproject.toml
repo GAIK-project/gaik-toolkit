@@ -34,46 +34,60 @@ classifiers = [
 ]
 
 dependencies = [
-    # Core
+    # Core runtime requirements shared across all installs
     "pydantic>=2.12.4",
     "python-dotenv>=1.0.0",
     "openai>=1.58.0",
-    # Document parsing (PDF, DOCX)
-    "PyMuPDF>=1.23.0",
-    "python-docx>=1.0.0",
-    "docling",
-    "psutil",
-    # Audio/video transcription
-    "pydub>=0.25.1",
 ]
 
 [project.optional-dependencies]
-# Development tooling for maintainers only (pip install -e ".[dev]")
-dev = [
-    "ruff>=0.14.1",      # Linter/formatter: ruff check . / ruff format .
-    "build>=1.0",        # Package builder: python -m build
-    "twine>=4.0",        # PyPI publisher: twine upload dist/*
-    "pytest>=8.0",       # Test runner: pytest
-    "pytest-cov>=4.1",   # Coverage reports (optional)
-    "pytest-mock>=3.12", # Mock fixtures for testing
-    "tomli>=2.0.1",      # TOML parser for Python 3.10 tooling
+# Data extraction with LLM providers
+extract = [
+    "openai>=1.58.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
 ]
 
-# Continuous integration dependencies (dev + provider extras)
-ci = [
-    # Extraction extras
-    "langchain-core>=1.0.3",
-    "langchain-openai>=1.0.2",
-    "langchain-anthropic>=1.0.1",
-    "langchain-google-genai>=3.0.1",
-    # Development/test tooling
+# Document parsing (PDF, DOCX, images)
+parser = [
+    "openai>=2.7",
+    "PyMuPDF>=1.23.0",
+    "python-docx>=1.0.0",
+    "python-dotenv>=1.0.0",
+    "docling",
+    "psutil",
+]
+
+# Audio/video transcription
+transcriber = [
+    "openai>=1.14.3",
+    "pydub>=0.25.1",
+    "python-dotenv>=1.0.1",
+]
+
+# Document classification
+classifier = [
+    "openai>=1.58.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "PyMuPDF>=1.23.0",
+    "python-docx>=1.0.0",
+]
+
+# All features
+all = [
+    "gaik[extract]",
+    "gaik[parser]",
+    "gaik[transcriber]",
+    "gaik[classifier]",
+]
+
+# Development tooling for maintainers only (pip install -e ".[dev]")
+dev = [
     "ruff>=0.14.1",
     "build>=1.0",
     "twine>=4.0",
     "pytest>=8.0",
-    "pytest-cov>=4.1",
-    "pytest-mock>=3.12",
-    "tomli>=2.0.1",
 ]
 
 [project.urls]

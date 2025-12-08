@@ -5,7 +5,7 @@ Parse PDFs to Markdown using OpenAI GPT-4 Vision with advanced table extraction 
 ## Installation
 
 ```bash
-pip install gaik
+pip install gaik[parser]
 ```
 
 **Note:** Requires OpenAI or Azure OpenAI API access

@@ -5,7 +5,7 @@ Convert PDFs and Word documents to structured text using multiple parsing backen
 ## Installation
 
 ```bash
-pip install gaik
+pip install gaik[parser]
 ```
 
 **Note:** Requires OpenAI or Azure OpenAI API access for vision-based parsing

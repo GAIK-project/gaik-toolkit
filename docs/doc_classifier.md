@@ -5,7 +5,7 @@ Classify documents into predefined categories using LLM analysis. Supports PDFs,
 ## Installation
 
 ```bash
-pip install gaik
+pip install gaik[classifier]
 ```
 
 **Note:** Requires OpenAI or Azure OpenAI API access
