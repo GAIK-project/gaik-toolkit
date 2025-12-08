@@ -6,17 +6,17 @@ on:
       - main
       - dev
     paths:
-      - 'packages/gaik/**'
+      - 'src/**'
+      - 'pyproject.toml'
       - '.github/workflows/**'
-      - 'scripts/**'
   pull_request:
     branches:
       - main
       - dev
     paths:
-      - 'packages/gaik/**'
+      - 'src/**'
+      - 'pyproject.toml'
       - '.github/workflows/**'
-      - 'scripts/**'
   workflow_call:  # Allow this workflow to be called by other workflows
 
 jobs:
@@ -35,23 +35,22 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Smoke test basic import
-      run: |
-        pip install packages/gaik/
-        python -c "from gaik import __version__; print(f'gaik {__version__} OK')"
+    - name: Install package
+      run: pip install -e ".[dev]"
 
-    - name: Run package-specific tests
-      run: python scripts/run_python_package_tests.py
+    - name: Smoke test basic import
+      run: python -c "from gaik import __version__; print(f'gaik {__version__} OK')"
+
+    - name: Run tests
+      run: pytest -v --strict-markers
 
     - name: Install build dependencies
       run: pip install build twine
 
     - name: Build package
-      working-directory: packages/gaik
       run: python -m build
 
     - name: Check package with twine
-      working-directory: packages/gaik
       run: twine check dist/*
 
     - name: Upload build artifacts
@@ -59,5 +58,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: test-dist-package
-        path: packages/gaik/dist/
+        path: dist/
         retention-days: 3

@@ -9,7 +9,6 @@ Quick start examples for GAIK toolkit.
 pip install gaik[all]
 
 # Or for development
-cd packages/python/gaik
 pip install -e ".[all]"
 
 # If using UV (recommended)
@@ -59,4 +58,4 @@ python examples/classifier/classification_example.py
 
 ## Documentation
 
-See [packages/python/gaik](../packages/python/gaik) for full API documentation.
+See [docs/](../docs/) for full API documentation.

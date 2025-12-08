@@ -120,7 +120,7 @@ config = get_openai_config(use_azure=False)
 
 ## Examples
 
-See [examples/extract/](../examples/extract/) for complete examples:
+See [examples/extractor/](../examples/extractor/) for complete examples:
 - `extraction_example_1.py` - Basic extraction
 - `extraction_example_2.py` - Nested/hierarchical extraction
 - `extraction_example_3.py` - Manual schema definition
@@ -131,7 +131,7 @@ See [examples/extract/](../examples/extract/) for complete examples:
 ## Resources
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
-- **Examples**: [examples/](../examples/)
+- **Examples**: [examples/](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples)
 - **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 

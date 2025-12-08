@@ -162,7 +162,7 @@ See [examples/transcriber/](../examples/transcriber/) for complete examples.
 ## Resources
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
-- **Examples**: [examples/](../examples/)
+- **Examples**: [examples/](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples)
 - **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 

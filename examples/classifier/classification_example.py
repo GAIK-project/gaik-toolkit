@@ -20,10 +20,7 @@ def basic_classification():
     classes = ["invoice", "receipt", "contract", "report", "memo", "article"]
 
     # Classify single file
-    result = classifier.classify(
-        file_or_dir=r"doc.pdf",
-        classes=classes
-    )
+    result = classifier.classify(file_or_dir=r"doc.pdf", classes=classes)
 
     # Print results
     for filename, classification in result.items():
@@ -44,19 +41,29 @@ def directory_classification():
     classifier = DocumentClassifier(config=config)
 
     # Define categories
-    classes = ["invoice", "receipt", "contract", "report", "memo", "purchase order", "bill of material"]
+    classes = [
+        "invoice",
+        "receipt",
+        "contract",
+        "report",
+        "memo",
+        "purchase order",
+        "bill of material",
+    ]
 
     # Classify entire directory
     results = classifier.classify(
         file_or_dir=r"C:\Users\h02317\Downloads\test\multi-type with hierarchical relationships\Luvata",
-        classes=classes
+        classes=classes,
     )
 
     # Print results summary
     print(f"\nClassified {len(results)} documents:\n")
     for filename, classification in results.items():
-        print(f"{filename}: {classification['class']} "
-              f"(confidence: {classification['confidence']:.2f})")
+        print(
+            f"{filename}: {classification['class']} "
+            f"(confidence: {classification['confidence']:.2f})"
+        )
 
     # Print detailed results
     print("\n" + "-" * 60)
@@ -86,7 +93,7 @@ def custom_parser_example():
     result = classifier.classify(
         file_or_dir="complex_document.pdf",
         classes=classes,
-        parser="vision"  # Override default PyMuPDF parser
+        parser="vision",  # Override default PyMuPDF parser
     )
 
     # Print results
@@ -112,15 +119,12 @@ def mixed_file_types_example():
 
     # Classify directory with mixed file types
     # PyMuPDF for PDFs, DocxParser for Word docs, VisionParser for images
-    results = classifier.classify(
-        file_or_dir="mixed_documents/",
-        classes=classes
-    )
+    results = classifier.classify(file_or_dir="mixed_documents/", classes=classes)
 
     # Group by file type
-    pdfs = {k: v for k, v in results.items() if k.endswith('.pdf')}
-    docx = {k: v for k, v in results.items() if k.endswith(('.docx', '.doc'))}
-    images = {k: v for k, v in results.items() if k.endswith(('.png', '.jpg', '.jpeg'))}
+    pdfs = {k: v for k, v in results.items() if k.endswith(".pdf")}
+    docx = {k: v for k, v in results.items() if k.endswith((".docx", ".doc"))}
+    images = {k: v for k, v in results.items() if k.endswith((".png", ".jpg", ".jpeg"))}
 
     print(f"\nPDFs: {len(pdfs)}")
     for filename, classification in pdfs.items():
@@ -152,7 +156,7 @@ def error_handling_example():
     try:
         result = classifier.classify(
             file_or_dir="document.txt",  # Unsupported format
-            classes=classes
+            classes=classes,
         )
     except ValueError as e:
         print(f"   Error: {e}")
@@ -160,41 +164,30 @@ def error_handling_example():
     # Example 2: Empty directory
     print("\n2. Empty directory:")
     try:
-        results = classifier.classify(
-            file_or_dir="empty_folder/",
-            classes=classes
-        )
+        classifier.classify(file_or_dir="empty_folder/", classes=classes)
     except ValueError as e:
         print(f"   Error: {e}")
 
     # Example 3: Corrupt file (will be caught during parsing)
     print("\n3. Corrupt file:")
     try:
-        result = classifier.classify(
-            file_or_dir="corrupt.pdf",
-            classes=classes
-        )
+        result = classifier.classify(file_or_dir="corrupt.pdf", classes=classes)
     except ValueError as e:
         print(f"   Error: {e}")
 
     # Example 4: Unknown classification
     print("\n4. Unknown classification (document doesn't match any class):")
-    result = classifier.classify(
-        file_or_dir="unclear_document.pdf",
-        classes=classes
-    )
+    result = classifier.classify(file_or_dir="unclear_document.pdf", classes=classes)
 
     for filename, classification in result.items():
-        if classification['class'] == 'unknown':
+        if classification["class"] == "unknown":
             print(f"   Document: {filename}")
             print(f"   Class: {classification['class']}")
             print(f"   Confidence: {classification['confidence']:.2f}")
             print(f"   Reasoning: {classification['reasoning']}")
 
 
-
 if __name__ == "__main__":
-
     # Run examples (comment out ones you don't want to run)
 
     ## Basic examples
@@ -207,4 +200,3 @@ if __name__ == "__main__":
 
     ## Error handling
     # error_handling_example()
-

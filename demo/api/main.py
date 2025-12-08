@@ -4,7 +4,6 @@ GAIK Toolkit Demo API
 FastAPI backend that provides REST endpoints for the GAIK toolkit components.
 """
 
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -16,7 +15,6 @@ load_dotenv(env_path)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from routers import classifier, extractor, parser, transcriber
 
 

@@ -9,7 +9,7 @@ Quick guide for developers.
 ### Project Module Structure
 
 ```text
-packages/python/gaik/src/gaik/
+src/gaik/
 ├── extractor/        # Schema generation & structured extraction (+ tests)
 ├── parsers/          # Vision, PDF, and other parsers (+ tests)
 ├── transcriber/      # Audio/video transcription (+ tests)
@@ -22,16 +22,16 @@ Add new functionality to existing modules (e.g., `extractor/`, `parsers/`, `tran
 
 #### Example: Add a new parser to `parsers/`
 
-1. **Create parser file** → `packages/python/gaik/src/gaik/parsers/your_parser.py`
+1. **Create parser file** → `src/gaik/parsers/your_parser.py`
 
-2. **Export in module** → [src/gaik/parsers/\_\_init\_\_.py](packages/python/gaik/src/gaik/parsers/__init__.py)
+2. **Export in module** → [src/gaik/parsers/\_\_init\_\_.py](src/gaik/parsers/__init__.py)
 
    ```python
    from .your_parser import YourParser
    __all__ = [..., "YourParser"]
    ```
 
-3. **Add dependencies** → [pyproject.toml](packages/python/gaik/pyproject.toml)
+3. **Add dependencies** → [pyproject.toml](pyproject.toml)
 
    Add to existing `[parser]` group (NOT a new group):
 
@@ -44,7 +44,7 @@ Add new functionality to existing modules (e.g., `extractor/`, `parsers/`, `tran
    ]
    ```
 
-4. **Add tests** _(recommended)_ → `packages/python/gaik/src/gaik/parsers/tests/test_your_parser.py`
+4. **Add tests** _(recommended)_ → `src/gaik/parsers/tests/test_your_parser.py`
 
 5. **Add example** _(recommended)_ → `examples/parsers/demo_your_parser.py`
 
@@ -54,16 +54,16 @@ Create entirely new module for capabilities that don't fit existing modules.
 
 #### Example: New analysis module
 
-1. **Create module** → `packages/python/gaik/src/gaik/analysis/`
+1. **Create module** → `src/gaik/analysis/`
 
    ```text
-   packages/python/gaik/src/gaik/analysis/
+   src/gaik/analysis/
    ├── __init__.py
    ├── analyzer.py
    └── utils.py
    ```
 
-2. **Add dependencies** → [pyproject.toml](packages/python/gaik/pyproject.toml)
+2. **Add dependencies** → [pyproject.toml](pyproject.toml)
 
    Create NEW optional dependency group:
 
@@ -76,7 +76,7 @@ Create entirely new module for capabilities that don't fit existing modules.
    all = ["gaik[extractor,parser,transcriber,analysis]"]  # Update all group
    ```
 
-3. **Export public API** → [src/gaik/\_\_init\_\_.py](packages/python/gaik/src/gaik/__init__.py)
+3. **Export public API** → [src/gaik/\_\_init\_\_.py](src/gaik/__init__.py)
 
    ```python
    from . import analysis
@@ -89,7 +89,7 @@ Create entirely new module for capabilities that don't fit existing modules.
    ]
    ```
 
-4. **Add tests** _(recommended)_ → `packages/python/gaik/src/gaik/analysis/tests/`
+4. **Add tests** _(recommended)_ → `src/gaik/analysis/tests/`
 
 5. **Add examples** _(recommended)_ → `examples/analysis/` with README
 
@@ -97,13 +97,10 @@ Create entirely new module for capabilities that don't fit existing modules.
 
 Tests are automatically run by GitHub Actions on every push. Local testing and linting are optional but help catch issues early.
 
-**Tests go in:** `packages/python/gaik/src/gaik/<module>/tests/`
+**Tests go in:** `src/gaik/<module>/tests/`
 
 ```bash
-cd packages/python/gaik
-
-# Option 1: Using activated venv (recommended for monorepo)
-# Activate root venv first, then:
+# Option 1: Using activated venv
 pip install -e .[all,dev]
 pytest                      # Run all tests
 ruff check --fix .          # Lint
@@ -138,7 +135,7 @@ git push origin v0.3.0      # Triggers GitHub Actions
 
 ```text
 gaik-toolkit/
-├── packages/python/gaik/src/gaik/  # Package source
+├── src/gaik/                       # Package source
 │   ├── extractor/                  # Schema generation & extraction + tests
 │   ├── parsers/                    # PDF/vision parsers + tests
 │   └── transcriber/                # Audio/video transcription + tests

@@ -25,7 +25,7 @@ pip install gaik
 | Package | Description | Documentation |
 |---------|-------------|---------------|
 | **extractor** | Extract structured data using natural language requirements | [📖 Docs](docs/extractor.md) |
-| **parsers** | Parse PDFs and Word docs with vision models, PyMuPDF, python-docx, or Docling | [📖 Docs](docs/parsers.md) |
+| **parsers** | Parse PDFs and Word docs with vision models, PyMuPDF, python-docx, or Docling | [📖 Docs](docs/parsers/) |
 | **doc_classifier** | Classify documents into predefined categories using LLM analysis | [📖 Docs](docs/doc_classifier.md) |
 | **transcriber** | Transcribe audio/video with Whisper and GPT enhancement | [📖 Docs](docs/transcriber.md) |
 

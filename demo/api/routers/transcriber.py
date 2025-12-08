@@ -81,9 +81,7 @@ async def transcribe_audio(
         )
 
     except ImportError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Transcriber not installed: {e}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Transcriber not installed: {e}") from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
     finally:

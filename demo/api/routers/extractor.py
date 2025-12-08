@@ -43,7 +43,8 @@ async def extract_data(request: ExtractRequest):
         raise HTTPException(status_code=400, detail="No requirements provided")
 
     try:
-        from pydantic import BaseModel as PydanticBaseModel, create_model
+        from pydantic import BaseModel as PydanticBaseModel
+        from pydantic import create_model
 
         from gaik.extractor import DataExtractor
         from gaik.extractor.schema import ExtractionRequirements
@@ -53,16 +54,11 @@ async def extract_data(request: ExtractRequest):
 
         # Create dynamic extraction model if fields provided
         if request.fields:
-            field_definitions = {
-                name: (str | None, None) for name in request.fields.keys()
-            }
+            field_definitions = {name: (str | None, None) for name in request.fields.keys()}
             ExtractionModel = create_model("DynamicExtraction", **field_definitions)
 
             requirements = ExtractionRequirements(
-                fields={
-                    name: {"description": desc}
-                    for name, desc in request.fields.items()
-                }
+                fields={name: {"description": desc} for name, desc in request.fields.items()}
             )
         else:
             # Use a simple generic model
@@ -87,8 +83,6 @@ async def extract_data(request: ExtractRequest):
         )
 
     except ImportError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Extractor not installed: {e}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Extractor not installed: {e}") from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
