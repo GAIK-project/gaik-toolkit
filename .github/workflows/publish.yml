@@ -39,6 +39,42 @@ jobs:
     - name: Build package
       run: python -m build
 
+    - name: Validate version matches tag
+      run: |
+        # Extract version from tag (v0.2.24 -> 0.2.24)
+        TAG_VERSION=${GITHUB_REF_NAME#v}
+        echo "Tag version: $TAG_VERSION"
+        
+        # Get version from built package
+        BUILT_VERSION=$(python -c "import re; whl=list(__import__('pathlib').Path('dist').glob('*.whl'))[0].name; print(re.search(r'-([0-9]+\.[0-9]+\.[0-9]+[^-]*)-', whl).group(1))")
+        echo "Built version: $BUILT_VERSION"
+        
+        # Verify they match
+        if [ "$BUILT_VERSION" != "$TAG_VERSION" ]; then
+          echo "::error::Version mismatch! Tag is $TAG_VERSION but package built as $BUILT_VERSION"
+          echo ""
+          echo "This usually happens when there are commits after the tag."
+          echo "Fix: Delete the tag, ensure you're on the correct commit, then recreate:"
+          echo "  git tag -d $GITHUB_REF_NAME"
+          echo "  git push origin :refs/tags/$GITHUB_REF_NAME"
+          echo "  git tag $GITHUB_REF_NAME"
+          echo "  git push origin $GITHUB_REF_NAME"
+          exit 1
+        fi
+        echo "✅ Version validation passed: $BUILT_VERSION"
+
+    - name: Validate tag points to HEAD
+      run: |
+        TAG_COMMIT=$(git rev-list -n 1 $GITHUB_REF_NAME)
+        HEAD_COMMIT=$(git rev-parse HEAD)
+        
+        if [ "$TAG_COMMIT" != "$HEAD_COMMIT" ]; then
+          echo "::warning::Tag $GITHUB_REF_NAME points to $TAG_COMMIT but HEAD is $HEAD_COMMIT"
+          echo "This may indicate the tag was created on a different commit."
+        fi
+        echo "Tag commit: $TAG_COMMIT"
+        echo "HEAD commit: $HEAD_COMMIT"
+
     - name: Check package
       run: twine check dist/*
 
@@ -69,16 +105,28 @@ jobs:
         VERSION=${GITHUB_REF_NAME#v}
         echo "Installing gaik version: $VERSION"
 
-        # Install exact version with no cache to avoid stale CDN responses
-        pip install --no-cache-dir "gaik==$VERSION"
+        # Install exact version with retry logic for CDN propagation
+        MAX_RETRIES=3
+        RETRY_DELAY=30
+        for i in $(seq 1 $MAX_RETRIES); do
+          echo "Attempt $i of $MAX_RETRIES..."
+          if pip install --no-cache-dir "gaik==$VERSION"; then
+            echo "✅ Successfully installed gaik==$VERSION"
+            break
+          else
+            if [ $i -lt $MAX_RETRIES ]; then
+              echo "Installation failed, waiting ${RETRY_DELAY}s before retry..."
+              sleep $RETRY_DELAY
+            else
+              echo "❌ Failed to install after $MAX_RETRIES attempts"
+              exit 1
+            fi
+          fi
+        done
 
         # Verify correct version was installed
         INSTALLED=$(python -c "from gaik import __version__; print(__version__)")
         echo "Installed version: $INSTALLED"
-        if [ "$INSTALLED" != "$VERSION" ]; then
-          echo "ERROR: Version mismatch! Expected $VERSION but got $INSTALLED"
-          exit 1
-        fi
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4

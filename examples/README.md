@@ -30,10 +30,10 @@ export GOOGLE_API_KEY='...'
 
 ```bash
 # Using UV
-uv run python examples/extract/demo_anthropic.py
+uv run python examples/extractor/extraction_example_1.py
 
 # Or with activated venv
-python examples/extract/demo_anthropic.py
+python examples/extractor/extraction_example_1.py
 ```
 
 ### PDF to Markdown Parsing

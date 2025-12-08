@@ -59,9 +59,10 @@ async def transcribe_audio(
         tmp_path = tmp.name
 
     try:
-        from gaik.transcriber import Transcriber
+        from gaik.transcriber import Transcriber, get_openai_config
 
-        config = {"api_key": api_key}
+        config = get_openai_config(use_azure=False)  # Use standard OpenAI
+        config["api_key"] = api_key  # Override with provided key
         transcriber = Transcriber(
             api_config=config,
             enhanced_transcript=enhanced,

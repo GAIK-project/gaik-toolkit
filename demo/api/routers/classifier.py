@@ -55,9 +55,10 @@ async def classify_document(
         tmp_path = tmp.name
 
     try:
-        from gaik.doc_classifier import DocumentClassifier
+        from gaik.doc_classifier import DocumentClassifier, get_openai_config
 
-        config = {"api_key": api_key}
+        config = get_openai_config(use_azure=False)  # Use standard OpenAI
+        config["api_key"] = api_key  # Override with provided key
         classifier = DocumentClassifier(config)
 
         class_list = [c.strip() for c in classes.split(",")]
