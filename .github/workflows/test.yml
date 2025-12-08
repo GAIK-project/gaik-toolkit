@@ -34,9 +34,10 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+        cache: 'pip'
 
     - name: Install package
-      run: pip install -e ".[all,dev]"
+      run: pip install ".[all,dev]"
 
     - name: Smoke test basic import
       run: python -c "from gaik import __version__; print(f'gaik {__version__} OK')"
