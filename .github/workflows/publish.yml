@@ -24,6 +24,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
+        ref: ${{ github.ref }}  # Checkout the exact tag commit
         fetch-depth: 0  # Required for setuptools-scm to read git tags
 
     - name: Set up Python
