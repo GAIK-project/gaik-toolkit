@@ -11,14 +11,14 @@ permissions:
   pull-requests: read  # Required for generating release notes
 
 jobs:
-  # TODO: Re-enable tests after debugging version issue
-  # test:
-  #   uses: ./.github/workflows/test.yml
-  #   with:
-  #     ref: ${{ github.ref }}  # Pass the tag ref to test workflow
+  # Run tests before publishing
+  test:
+    uses: ./.github/workflows/test.yml
+    with:
+      ref: ${{ github.ref }}  # Pass the tag ref to test workflow
 
   build-and-publish:
-    # needs: test  # Temporarily disabled for debugging
+    needs: test  # Only publish if tests pass
     runs-on: ubuntu-latest
     environment: release  # Use GitHub environment for protection
 
