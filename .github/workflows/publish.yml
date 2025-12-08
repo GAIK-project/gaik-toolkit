@@ -40,7 +40,14 @@ jobs:
         pip install build twine
 
     - name: Build package
-      run: python -m build
+      env:
+        # Force setuptools-scm to use the tag version, ignoring git state
+        SETUPTOOLS_SCM_PRETEND_VERSION: ${{ github.ref_name }}
+      run: |
+        # Remove 'v' prefix from tag (v0.2.26 -> 0.2.26)
+        export SETUPTOOLS_SCM_PRETEND_VERSION=${SETUPTOOLS_SCM_PRETEND_VERSION#v}
+        echo "Building with version: $SETUPTOOLS_SCM_PRETEND_VERSION"
+        python -m build
 
     - name: Validate version matches tag
       run: |
