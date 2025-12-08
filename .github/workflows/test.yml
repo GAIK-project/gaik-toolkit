@@ -36,7 +36,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install package
-      run: pip install -e ".[dev]"
+      run: pip install -e ".[all,dev]"
 
     - name: Smoke test basic import
       run: python -c "from gaik import __version__; print(f'gaik {__version__} OK')"
