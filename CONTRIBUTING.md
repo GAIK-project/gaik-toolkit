@@ -125,11 +125,26 @@ git push origin v0.3.0      # Triggers GitHub Actions
 
 - Runs all tests (pytest)
 - Builds the package
+- **Validates version matches tag** (fails early if mismatch)
 - Validates package (twine check)
 - Publishes to PyPI
 - Creates GitHub Release
 
 **Note:** Linting (ruff) is not enforced by CI. Run locally if needed.
+
+### Fixing Version Mismatch
+
+If the pipeline fails with "Version mismatch" error, it means commits were added after the tag. Fix by recreating the tag:
+
+```bash
+# 1. Delete old tag locally and from remote
+git tag -d v0.3.0
+git push origin :refs/tags/v0.3.0
+
+# 2. Create new tag on current HEAD
+git tag v0.3.0
+git push origin v0.3.0
+```
 
 ## Project Structure
 
@@ -154,14 +169,16 @@ flowchart LR
     D --> E[GitHub Actions]
     E --> F[Run Tests]
     F --> G[Build Package]
-    G --> H[Validate with Twine]
-    H --> I[Publish to PyPI]
-    I --> J[Create GitHub Release]
+    G --> H[Validate Version]
+    H --> I[Validate with Twine]
+    I --> J[Publish to PyPI]
+    J --> K[Create GitHub Release]
 
     style E fill:#f9f,stroke:#333
     style F fill:#bbf,stroke:#333
     style G fill:#bbf,stroke:#333
-    style H fill:#bbf,stroke:#333
-    style I fill:#bfb,stroke:#333
+    style H fill:#fbb,stroke:#333
+    style I fill:#bbf,stroke:#333
     style J fill:#bfb,stroke:#333
+    style K fill:#bfb,stroke:#333
 ```
