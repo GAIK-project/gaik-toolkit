@@ -51,20 +51,3 @@ jobs:
 
     - name: Run tests
       run: pytest -v --strict-markers
-
-    - name: Install build dependencies
-      run: pip install build twine
-
-    - name: Build package
-      run: python -m build
-
-    - name: Check package with twine
-      run: twine check dist/*
-
-    - name: Upload build artifacts
-      if: matrix.python-version == '3.10'
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-dist-package
-        path: dist/
-        retention-days: 3
