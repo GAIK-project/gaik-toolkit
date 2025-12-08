@@ -41,4 +41,5 @@ Thumbs.db
 venv/
 ¨
 .claude*
-.ruff_cache/
+.ruff_cache/src/gaik/_version.py
+src/gaik/_version.py
