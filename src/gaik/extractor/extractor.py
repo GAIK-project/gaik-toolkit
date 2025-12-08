@@ -16,7 +16,7 @@ from gaik.config import create_openai_client
 from .schema import (
     SYSTEM_PARSER,
     ExtractionRequirements,
-    _normalize_record,
+    normalize_extracted_data,
     _parse_with,
 )
 
@@ -139,15 +139,16 @@ class DataExtractor:
             parsed = resp.choices[0].message.parsed
             result_dict = parsed.model_dump()
 
-            # Normalize items
+            # Normalize extracted data (dates, lists, etc.)
             if isinstance(result_dict, dict):
                 # If nested container exists, normalize each item
                 for key, value in list(result_dict.items()):
                     if isinstance(value, list) and value and isinstance(value[0], dict):
-                        result_dict[key] = [_normalize_record(item, requirements) for item in value]
+                        result_dict[key] = [
+                            normalize_extracted_data(item, requirements) for item in value
+                        ]
                 # Also normalize the flat record itself
-                flat_norm = _normalize_record(result_dict, requirements)
-                result_dict.update(flat_norm)
+                result_dict = normalize_extracted_data(result_dict, requirements)
 
             results.append(result_dict)
 

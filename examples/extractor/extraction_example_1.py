@@ -17,6 +17,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 # Add src directory to path to import modules (works without pip install)
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+# sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from gaik.extractor import DataExtractor, SchemaGenerator, get_openai_config
 

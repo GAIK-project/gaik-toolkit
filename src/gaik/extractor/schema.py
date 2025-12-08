@@ -110,7 +110,7 @@ class FieldSpec(BaseModel):
     required: bool = True
     enum: list[str] | None = Field(default=None, description="Allowed values (if enumerated)")
     pattern: str | None = Field(default=None, description="Regex to validate strings (optional)")
-    format: Literal["iso-date", "currency-eur"] | None = Field(default=None)
+    format: str | None = Field(default=None, description="Output format (e.g., date strftime format)")
 
     @field_validator("field_name")
     @classmethod
@@ -305,11 +305,12 @@ FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
    Use for any date or timestamp field.
    Recognition patterns:
    - Contains "date" in name or description: "entry date", "start date", "date of birth"
-   - Format specifications: Follow user's specified format if given. If not use the format 'DD-MM-YYYY'
+   - Date words in any language: "päivämäärä" (Finnish), "datum" (German), "fecha" (Spanish), etc.
    - Temporal references: "when", "timestamp", "created on", "modified at"
    Examples:
    - "Entry Date" → field_type='date'
    - "Date of visit" → field_type='date'
+   - "Päivämäärä" → field_type='date'
 
 3. LIST OF STRINGS (field_type='list[str]'):
    Use when field should contain multiple text items.
@@ -437,20 +438,71 @@ def _clean_requirements_text(text: str) -> str:
     return "\n".join(cleaned_lines)
 
 
+# Date format patterns to detect from user requirements
+DATE_FORMAT_PATTERNS: dict[str, str] = {
+    "dd/mm/yyyy": "%d/%m/%Y",
+    "dd/mm/yyy": "%d/%m/%Y",
+    "dd-mm-yyyy": "%d-%m-%Y",
+    "dd.mm.yyyy": "%d.%m.%Y",
+    "mm/dd/yyyy": "%m/%d/%Y",
+    "mm-dd-yyyy": "%m-%d-%Y",
+    "yyyy-mm-dd": "%Y-%m-%d",
+    "yyyy/mm/dd": "%Y/%m/%d",
+    "yyyy.mm.dd": "%Y.%m.%d",
+}
+
+# Date-related keywords in multiple languages for field detection
+DATE_KEYWORDS = [
+    "date",           # English
+    "datum",          # German, Dutch, Swedish
+    "fecha",          # Spanish
+    "päivämäärä",     # Finnish
+    "paivamaara",     # Finnish (ASCII)
+    "päiväys",        # Finnish (alternative)
+    "paivays",        # Finnish (ASCII alternative)
+    "data",           # Italian, Portuguese, Polish
+    "jour",           # French
+    "dátum",          # Hungarian
+    "dato",           # Norwegian, Danish
+    "tarih",          # Turkish
+]
+
+
+def _detect_date_format(text: str) -> str | None:
+    """Detect date format from description text (e.g., 'DD/MM/YYYY' -> '%d/%m/%Y')."""
+    if not text:
+        return None
+    text_lower = text.lower().replace(" ", "")
+    for pattern, strftime_fmt in DATE_FORMAT_PATTERNS.items():
+        if pattern in text_lower:
+            return strftime_fmt
+    return None
+
+
+def _is_date_field(name: str, description: str) -> bool:
+    """Check if a field is a date field based on name or description (multilingual)."""
+    name_lower = name.lower()
+    desc_lower = description.lower()
+    for keyword in DATE_KEYWORDS:
+        if keyword in name_lower or keyword in desc_lower:
+            return True
+    return False
+
+
 def _apply_type_overrides(requirements: ExtractionRequirements) -> None:
     """
     Apply deterministic heuristics to FieldSpec entries to enforce critical types
     even when the LLM guesses incorrectly (e.g., date fields must be typed as date).
+    Also detects date output format from field descriptions.
+    Supports multiple languages for date detection.
     """
     for field in requirements.fields:
-        name = field.field_name.lower()
-        desc = field.description.lower()
-
-        if "date" in name or "date" in desc:
+        if _is_date_field(field.field_name, field.description):
             field.field_type = "date"
-            # Preserve custom regex if user already supplied one
-            if not field.pattern:
-                field.pattern = r"\d{2}\.\d{2}\.\d{4}"
+            # Detect date format from description (e.g., "DD/MM/YYYY")
+            detected_format = _detect_date_format(field.description)
+            if detected_format:
+                field.format = detected_format
 
 
 # -----------------------------------------------------------------------------
@@ -498,13 +550,14 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
     - Apply enums, regex patterns, and formats where applicable.
     """
     # Map string type names to actual Python types
+    # Note: dates use str to allow flexible input formats, then normalized in post-processing
     base_types = {
         "str": str,
         "int": int,
         "float": float,
         "bool": bool,
         "list[str]": list[str],
-        "date": date,
+        "date": str,  # Use str for dates - normalized in post-processing
         "decimal": Decimal,
         "list[dict]": list[dict],  # for nested structures like items
     }
@@ -552,137 +605,111 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
 # Normalization helpers (post-LLM)
 # -----------------------------------------------------------------------------
 
-DEFAULT_OUTPUT_DATE_FORMAT = "%Y-%m-%d"
 
+def parse_date(value: str | date | None, output_format: str = "%Y-%m-%d") -> str | None:
+    """
+    Parse a date from various formats and return in the specified output format.
 
-def _try_format_date(
-    value: str, output_format: str = DEFAULT_OUTPUT_DATE_FORMAT
-) -> tuple[bool, str]:
-    """Attempt to parse/format a date string. Returns (success, formatted_value)."""
-    value = value.strip()
-    parse_formats = [
-        "%Y-%m-%d",
-        "%Y-%m-%d",
-        "%Y/%m/%d",
-        "%d/%m/%Y",
-        "%d-%m-%Y",
-        "%m/%d/%Y",
-        "%B %d, %Y",
-        "%d %B %Y",
-        "%Y.%m.%d",
-        "%d.%m.%Y",
-        "%m-%d-%Y",
-        "%b %d, %Y",
-        "%d %b %Y",
-        "%b %d %Y",
+    Handles common formats: ISO, European (DD/MM/YYYY), US (MM/DD/YYYY), etc.
+    Also fixes common OCR/LLM year errors (e.g., 1004 -> 2004).
+
+    Args:
+        value: Date string, datetime.date object, or None
+        output_format: strftime format for output (default: ISO format)
+
+    Returns:
+        Formatted date string or None if parsing fails
+    """
+    if value is None:
+        return None
+
+    # Handle datetime.date objects directly
+    if isinstance(value, date):
+        return value.strftime(output_format)
+
+    value = str(value).strip()
+    if not value:
+        return None
+
+    # Common date formats to try (ordered by likelihood)
+    formats = [
+        "%Y-%m-%d",      # ISO: 2024-04-25
+        "%d/%m/%Y",      # European: 25/04/2024
+        "%d-%m-%Y",      # European with dash: 25-04-2024
+        "%d.%m.%Y",      # European with dot: 25.04.2024
+        "%m/%d/%Y",      # US: 04/25/2024
+        "%m-%d-%Y",      # US with dash: 04-25-2024
+        "%Y/%m/%d",      # ISO with slash: 2024/04/25
+        "%Y.%m.%d",      # ISO with dot: 2024.04.25
+        "%B %d, %Y",     # Full month: April 25, 2024
+        "%d %B %Y",      # Day first: 25 April 2024
+        "%b %d, %Y",     # Short month: Apr 25, 2024
+        "%d %b %Y",      # Day first short: 25 Apr 2024
     ]
-    for fmt in parse_formats:
+
+    for fmt in formats:
         try:
             parsed = datetime.strptime(value, fmt)
-            return True, parsed.strftime(output_format)
+
+            # Fix common year errors
+            year = parsed.year
+            if year < 100:
+                # Two-digit year: 24 -> 2024, 95 -> 1995
+                year = year + 2000 if year < 50 else year + 1900
+            elif 1000 <= year < 1100:
+                # OCR/LLM error: 1004 -> 2004, 1024 -> 2024
+                year = year + 1000
+
+            if year != parsed.year:
+                parsed = parsed.replace(year=year)
+
+            return parsed.strftime(output_format)
         except ValueError:
             continue
-    return False, value
+
+    # Return original value if no format matched
+    return value
 
 
-def _normalize_date_string(value: str, output_format: str | None = None) -> str:
-    """
-    Normalize a date string into the desired format while accepting multiple inputs.
-    Falls back to the original value if parsing fails so Pydantic validation can catch it.
-    """
-    fmt = output_format or DEFAULT_OUTPUT_DATE_FORMAT
-    success, formatted = _try_format_date(value, output_format=fmt)
-    if success:
-        return formatted
-    return formatted
-
-
-MONTH_PATTERN = (
-    "(January|February|March|April|May|June|July|August|September|October|November|December)"
-)
-DATE_REGEX_PATTERNS = [
-    re.compile(r"\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b"),
-    re.compile(r"\b\d{4}[./-]\d{1,2}[./-]\d{1,2}\b"),
-    re.compile(rf"\b\d{{1,2}}\s+{MONTH_PATTERN}\s+\d{{4}}\b", re.IGNORECASE),
-    re.compile(rf"\b{MONTH_PATTERN}\s+\d{{1,2}},\s+\d{{4}}\b", re.IGNORECASE),
-]
-
-
-def _extract_candidate_dates(text: str, output_format: str | None = None) -> set[str]:
-    """Find all date-like strings in text and return normalized values."""
-    candidates: set[str] = set()
-    for pattern in DATE_REGEX_PATTERNS:
-        for match in pattern.finditer(text):
-            raw = match.group(0)
-            success, normalized = _try_format_date(
-                raw, output_format=output_format or DEFAULT_OUTPUT_DATE_FORMAT
-            )
-            if success:
-                candidates.add(normalized)
-    return candidates
-
-
-def _normalize_record(
-    data: dict, req: ExtractionRequirements, source_text: str | None = None
+def normalize_extracted_data(
+    data: dict, requirements: ExtractionRequirements, default_date_format: str = "%Y-%m-%d"
 ) -> dict:
-    spec_by_name = {f.field_name: f for f in req.fields}
-    candidate_dates = _extract_candidate_dates(source_text) if source_text else None
-    out = {}
-    for k, v in data.items():
-        spec = spec_by_name.get(k)
-        if spec is None or v is None:
-            out[k] = v
+    """
+    Normalize extracted data, converting dates and handling list fields.
+
+    Args:
+        data: Raw extracted data dictionary
+        requirements: Field specifications
+        default_date_format: Default output format for dates (used if not specified in field)
+
+    Returns:
+        Normalized data dictionary
+    """
+    spec_by_name = {f.field_name: f for f in requirements.fields}
+    result = {}
+
+    for key, value in data.items():
+        spec = spec_by_name.get(key)
+
+        if spec is None or value is None:
+            result[key] = value
             continue
 
         if spec.field_type == "date":
-            desired_format = _resolve_date_format(spec)
-            value_str = v.strftime(DEFAULT_OUTPUT_DATE_FORMAT) if isinstance(v, date) else str(v)
-            normalized = _normalize_date_string(value_str, desired_format)
-            if candidate_dates:
-                if normalized not in candidate_dates and len(candidate_dates) == 1:
-                    candidate = next(iter(candidate_dates))
-                    normalized = _normalize_date_string(candidate, desired_format)
-            out[k] = normalized
+            # Use format from field spec if available, otherwise use default
+            date_format = spec.format if spec.format else default_date_format
+            result[key] = parse_date(value, date_format)
         elif spec.field_type == "list[str]":
-            if isinstance(v, str):
-                out[k] = [s.strip() for s in re.split(r"[;,]", v) if s.strip()]
-            elif isinstance(v, list):
-                out[k] = [str(x).strip() for x in v]
+            if isinstance(value, str):
+                result[key] = [s.strip() for s in re.split(r"[;,]", value) if s.strip()]
+            elif isinstance(value, list):
+                result[key] = [str(x).strip() for x in value]
             else:
-                out[k] = v
+                result[key] = value
         else:
-            out[k] = v
-    return out
+            result[key] = value
 
-
-def _resolve_date_format(spec: FieldSpec) -> str:
-    tokens = {
-        "yyyy-mm-dd": "%Y-%m-%d",
-        "yyyy/mm/dd": "%Y/%m/%d",
-        "dd.mm.yyyy": "%d.%m.%Y",
-        "dd/mm/yyyy": "%d/%m/%Y",
-        "mm/dd/yyyy": "%m/%d/%Y",
-        "dd-mm-yyyy": "%d-%m-%Y",
-        "mm-dd-yyyy": "%m-%d-%Y",
-    }
-    description = spec.description.lower()
-    for token, fmt in tokens.items():
-        if token in description:
-            return fmt
-
-    pattern_map = {
-        r"\d{4}-\d{2}-\d{2}": "%Y-%m-%d",
-        r"\d{4}/\d{2}/\d{2}": "%Y/%m/%d",
-        r"\d{2}\.\d{2}\.\d{4}": "%d.%m.%Y",
-        r"\d{2}/\d{2}/\d{4}": "%d/%m/%Y",
-        r"\d{2}-\d{2}-\d{4}": "%d-%m-%Y",
-    }
-    if spec.pattern:
-        for regex, fmt in pattern_map.items():
-            if regex in spec.pattern:
-                return fmt
-
-    return DEFAULT_OUTPUT_DATE_FORMAT
+    return result
 
 
 # -----------------------------------------------------------------------------

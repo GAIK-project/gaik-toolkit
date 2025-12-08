@@ -28,6 +28,8 @@ from .schema import (
     SchemaGenerator,
     StructureAnalysis,
     create_extraction_model,
+    parse_date,
+    normalize_extracted_data,
 )
 
 __all__ = [
@@ -44,6 +46,8 @@ __all__ = [
     "create_extraction_model",
     # Utilities
     "save_to_json",
+    "parse_date",
+    "normalize_extracted_data",
 ]
 
 __version__ = "0.1.0"
