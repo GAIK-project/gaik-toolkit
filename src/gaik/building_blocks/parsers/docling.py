@@ -8,6 +8,7 @@ try:
         EasyOcrOptions,
         PdfPipelineOptions,
         RapidOcrOptions,
+        TableStructureOptions,  # Add this line
         TesseractCliOcrOptions,
         TesseractOcrOptions,
     )
@@ -124,7 +125,7 @@ class DoclingParser:
         enable_table_structure: bool = True,
         enable_formula_enrichment: bool = True,
         num_threads: int = 4,
-        ocr_engine: str = "tesseract_cli",
+        ocr_engine: str = "rapidocr",
     ):
         """
         Initialize the DoclingParser with configuration options.
@@ -156,7 +157,10 @@ class DoclingParser:
             generate_picture_images=False,
             generate_page_images=False,
             do_formula_enrichment=enable_formula_enrichment,
-            table_structure_options={"do_cell_matching": True},
+            table_structure_options=TableStructureOptions(
+                kind="docling_tableformer",
+                do_cell_matching=True
+            ) if enable_table_structure else None,
             accelerator_options=AcceleratorOptions(num_threads=num_threads, device=self.device),
         )
 

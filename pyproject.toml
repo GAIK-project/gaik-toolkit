@@ -54,7 +54,7 @@ parser = [
     "PyMuPDF>=1.23.0",
     "python-docx>=1.0.0",
     "python-dotenv>=1.0.0",
-    "docling",
+    "docling==2.64.1",
     "psutil",
 ]
 
