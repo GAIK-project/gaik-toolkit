@@ -234,18 +234,18 @@ def parse_nested_requirements(
     print("Analyzing structure type...")
     analysis = detect_structure_type(user_description, client=client, model=model)
 
-    print(f"âœ“ Structure type: {analysis.structure_type}")
+    print(f"Structure type: {analysis.structure_type}")
     print(f"  Reasoning: {analysis.reasoning}")
 
     if analysis.structure_type == "flat":
         # Just parse as flat requirements
-        print("  â†’ Using flat structure")
+        print("  Using flat structure")
         requirements = parse_user_requirements(user_description, client=client, model=model)
         extraction_model = create_extraction_model(requirements)
         return extraction_model, requirements, analysis
 
     # Nested structure
-    print(f"  â†’ Using nested structure with '{analysis.parent_container_name}' field")
+    print(f"  Using nested structure with '{analysis.parent_container_name}' field")
     print(f"  Parent: {analysis.parent_description}")
 
     print("\nParsing item-level fields...")
@@ -253,7 +253,7 @@ def parse_nested_requirements(
         analysis.item_description, client=client, model=model
     )
 
-    print(f"âœ“ Identified {len(item_requirements.fields)} fields per item")
+    print(f"Identified {len(item_requirements.fields)} fields per item")
     print(f"  Fields: {[f.field_name for f in item_requirements.fields]}")
 
     print("\nCreating nested Pydantic model...")
@@ -276,7 +276,7 @@ def parse_nested_requirements(
         },
     )
 
-    print(f"âœ“ Created nested model: {ParentModel.__name__}")
+    print(f"Created nested model: {ParentModel.__name__}")
     print(f"  Container field: '{analysis.parent_container_name}' (List[{ItemModel.__name__}])")
 
     return ParentModel, item_requirements, analysis

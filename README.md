@@ -159,7 +159,7 @@ print(result.enhanced_transcript)
 
 ## Features
 
-### ðŸ” Structured Data Extraction (`gaik.building_blocks.extractor`)
+### Structured Data Extraction (`gaik.building_blocks.extractor`)
 
 - **SchemaGenerator** - Automatically generates Pydantic schemas from natural language requirements
 - **DataExtractor** - Extracts structured data using generated schemas
@@ -168,7 +168,7 @@ print(result.enhanced_transcript)
 - **Multi-provider** - OpenAI and Azure OpenAI support
 - **JSON Export** - Save results to JSON files automatically
 
-### ðŸ“„ Document Parsing (`gaik.building_blocks.parsers`)
+### Document Parsing (`gaik.building_blocks.parsers`)
 
 **VisionParser** - PDF to Markdown using OpenAI vision models (GPT-4V)
 - Multi-page context awareness
@@ -182,7 +182,7 @@ print(result.enhanced_transcript)
 
 **No external binaries** - Pure Python dependencies
 
-### ðŸŽ¤ Audio/Video Transcription (`gaik.building_blocks.transcriber`)
+### Audio/Video Transcription (`gaik.building_blocks.transcriber`)
 
 **Transcriber** - High-level API for audio/video transcription
 - OpenAI Whisper integration for accurate speech-to-text
