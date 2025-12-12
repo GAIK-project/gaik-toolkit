@@ -4,13 +4,13 @@
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 ![Tests](https://github.com/GAIK-project/gaik-toolkit/actions/workflows/tests.yml/badge.svg)
 
-GAIK (General AI Kit) is the **core Python toolkit of the GAIK project**. It provides **reusable building blocks and composable software components** for knowledge-centric GenAI solutions.
+GAIK (General AI Kit) is the core Python toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides reusable building blocks and composable software components for knowledge-centric GenAI solutions.
 
-The toolkit focuses on three recurring tasks in organizational knowledge workflows:
+The toolkit focuses on three core knowledge processes in organizational workflows:
 
-- **Structured data extraction** from unstructured text
-- **Document parsing** (PDFs and other formats) into LLM-friendly markdown or text
-- **Audio/video transcription** into clean transcripts
+- **Knowledge extraction** – extracting structured information from unstructured content (documents, PDFs, web pages, audio transcripts).
+- **Knowledge capture** – precise and accurate access of information from variety of data sources (internal documents, ERPs, Drives, etc.).
+- **Knowledge generation** – using the structured representations (and underlying models) to produce summaries, reports, insights, and other human-readable outputs tailored to specific tasks.
 
 Internally, these capabilities are exposed as:
 
