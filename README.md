@@ -1,101 +1,121 @@
-﻿# GAIK - General AI Kit
+﻿# GAIK – General AI Kit
 
-[![PyPI version](https://badge.fury.io/py/gaik.svg)](https://badge.fury.io/py/gaik)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://github.com/GAIK-project/gaik-toolkit/actions/workflows/test.yml/badge.svg)](https://github.com/GAIK-project/gaik-toolkit/actions/workflows/test.yml)
+[![PyPI version](https://img.shields.io/pypi/v/gaik.svg)](https://pypi.org/project/gaik/)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
+![Tests](https://github.com/GAIK-project/gaik-toolkit/actions/workflows/tests.yml/badge.svg)
 
-AI toolkit for Python with structured data extraction, document parsing, and audio/video transcription using OpenAI/Azure OpenAI.
+GAIK (General AI Kit) is the **core Python toolkit of the GAIK project**. It provides **reusable building blocks and composable software components** for knowledge-centric GenAI solutions.
+
+The toolkit focuses on three recurring tasks in organizational knowledge workflows:
+
+- **Structured data extraction** from unstructured text
+- **Document parsing** (PDFs and other formats) into LLM-friendly markdown or text
+- **Audio/video transcription** into clean transcripts
+
+Internally, these capabilities are exposed as:
+
+- **Building blocks** – atomic utilities such as `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`
+- **Software components** – opinionated end‑to‑end pipelines such as “audio → structured data” and “documents → structured data”
+
+This repository is the **implementation layer** that the broader GAIK vision builds on. Solution templates, wizards and organization‑specific workflows can all be composed from these blocks.
+
+> If the **Solution Wizard** decides *what* workflow you need, this toolkit is *how* that workflow gets implemented in Python.
+
+---
+
+## How this toolkit fits into the GAIK vision
+
+At project level, GAIK aims to support **knowledge processes** in organizations – especially SMEs – by providing:
+
+- **Building blocks** for *capture, access, and generation*  
+  (e.g. transcribing calls, parsing documents, extracting structured records)
+- **Software components** that combine those blocks into end‑to‑end pipelines  
+  (e.g. “incident audio → structured incident JSON”, “invoice PDF → structured invoice”)
+- A higher‑level **Solution Wizard** (under development) that:
+  - selects a **template** for a use case (generic pattern)
+  - maps business‑level requirements to **services**, **components**, and **connectors**
+  - exports **deployable workflows** that call these toolkit components
+
+This repository covers the **toolkit layer**:
+
+- It gives you **well‑tested primitives** (`SchemaGenerator`, `DataExtractor`, `VisionParser`, `Transcriber`, …).
+- It includes **composed pipelines** in `gaik.software_components` for common patterns:
+  - Audio → structured data
+  - Documents → structured data
+- It is structured so higher‑level orchestration (templates / SolutionWizardSpec) can treat these as **standardized components**.
+
+---
+
+## Architecture overview
+
+GAIK distinguishes three levels:
+
+| Level                  | Concept in GAIK                         | Examples                                                      |
+|------------------------|-----------------------------------------|---------------------------------------------------------------|
+| **Service**            | Logical capability                      | `speech_to_text`, `document_parsing`, `information_extraction` |
+| **Building block**     | Atomic toolkit class / function         | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser` |
+| **Software component** | Composed, workflow‑ready unit           | `AudioToStructuredData`, `DocumentsToStructuredData`, future domain‑specific services |
+
+In code, that maps to:
+
+- `gaik.building_blocks.*` – low‑level, reusable primitives  
+- `gaik.software_components.*` – opinionated end‑to‑end pipelines that orchestrate multiple building blocks
+
+The higher‑level GAIK Solution Wizard (not part of this repo) will:
+
+1. Select a template (generic pattern) for a use case
+2. Choose required services
+3. Map them to building blocks / software components from this toolkit
+4. Generate an executable workflow and deployment configuration
+
+---
 
 ## Installation
 
+Install only what you need, or the full toolkit:
+
 ```bash
-# Extractor features (schema generation + extraction)
-pip install gaik[extractor]
+# Structured extraction (schema generation + extraction)
+pip install "gaik[extractor]"
 
-# PDF parsing (vision-based + PyMuPDF)
-pip install gaik[parser]
+# Document parsing (vision‑based + local parsers)
+pip install "gaik[parser]"
 
-# Audio/video transcription (Whisper + GPT)
-pip install gaik[transcriber]
+# Audio/video transcription (Whisper + GPT enhancement)
+pip install "gaik[transcriber]"
 
-# Note: Video processing requires ffmpeg (optional system dependency)
-# See "System Requirements" section below for installation instructions
-
-# All features
-pip install gaik[all]
+# Everything
+pip install "gaik[all]"
 ```
 
-## System Requirements
+> For video processing and audio compression you’ll need `ffmpeg` installed on your system (optional but recommended).
 
-### Optional: FFmpeg (for Video Processing)
+---
 
-The transcriber module works without ffmpeg for basic audio transcription (`.mp3`, `.wav`, `.m4a` files).
+## Core modules
 
-FFmpeg is only needed for:
-- Video **Processing video files** (`.mp4`, `.avi`, `.mov`, `.mkv`, etc.) - extracts audio
-- Compression **Compressing large audio files** (>25MB) - reduces file size for Whisper API
+### 1. Extractor – schema‑based structured data
 
-**Installation by Platform:**
+**Goal:** turn natural‑language requirements into a schema, then use that schema to extract **type‑safe structured data** from text.
 
-**Windows:**
-```bash
-# Option 1: Using winget (Windows 10+)
-winget install ffmpeg
+Key building blocks:
 
-# Option 2: Using Chocolatey
-choco install ffmpeg
+- `SchemaGenerator` – infers a Pydantic model from a requirements prompt (field names, types, nested structures)
+- `DataExtractor` – uses that model to extract structured records from one or more documents
+- Shared helpers: `get_openai_config`, `create_openai_client` for OpenAI/Azure configuration
 
-# Option 3: Manual installation
-# 1. Download from https://ffmpeg.org/download.html
-# 2. Extract to C:\ffmpeg
-# 3. Add C:\ffmpeg\bin to PATH:
-#    - Search "Environment Variables" in Windows
-#    - Edit "Path" under System Variables
-#    - Add new entry: C:\ffmpeg\bin
-```
-
-**macOS:**
-```bash
-# Using Homebrew (recommended)
-brew install ffmpeg
-```
-
-**Linux:**
-```bash
-# Ubuntu/Debian
-sudo apt-get update
-sudo apt-get install ffmpeg
-
-# Fedora/RHEL
-sudo dnf install ffmpeg
-
-# Arch
-sudo pacman -S ffmpeg
-```
-
-**Verify Installation:**
-```bash
-ffmpeg -version
-```
-If the command returns version information, ffmpeg is properly installed and in your PATH.
-
-## Quick Start
-
-### Schema-Based Data Extraction
+Typical pattern:
 
 ```python
 from gaik.building_blocks.extractor import SchemaGenerator, DataExtractor, get_openai_config
 
-# Configure OpenAI (Azure or standard)
 config = get_openai_config(use_azure=True)
 
-# Step 1: Generate schema from natural language
 generator = SchemaGenerator(config=config)
 schema = generator.generate_schema(
-    user_requirements="Extract invoice number, total amount in USD, and vendor name"
+    user_requirements="Extract invoice number, total amount in USD, and vendor name."
 )
 
-# Step 2: Extract data using generated schema
 extractor = DataExtractor(config=config)
 results = extractor.extract(
     extraction_model=schema,
@@ -103,459 +123,181 @@ results = extractor.extract(
     user_requirements=generator.item_requirements.use_case_name,
     documents=["Invoice #12345 from Acme Corp, Total: $1,500"],
     save_json=True,
-    json_path="results.json"
+    json_path="results.json",
 )
-
-print(results)  # [{'invoice_number': '12345', 'total_amount': 1500.0, 'vendor_name': 'Acme Corp'}]
+print(results)
 ```
 
-### Vision-Based PDF Parsing
+### 2. Parsers – documents → text / markdown
+
+**Goal:** convert PDFs and other documents into clean text or markdown, ready for extraction or retrieval.
+
+Building blocks:
+
+- `VisionParser` – LLM/vision‑based PDF → markdown (multi‑page context, table handling, custom prompts)
+- `PyMuPDFParser` – fast, local PDF text extraction (no external binaries)
+- `DoclingParser` – OCR and multi‑format parsing (for more complex documents)
+
+Example (vision‑based PDF → markdown):
 
 ```python
 from gaik.building_blocks.parsers import VisionParser, get_openai_config
 
-# Set environment: AZURE_API_KEY, AZURE_ENDPOINT, AZURE_DEPLOYMENT (or OPENAI_API_KEY)
 config = get_openai_config(use_azure=True)
 
 parser = VisionParser(
     openai_config=config,
-    use_context=True,      # Multi-page continuity
-)
-
-pages = parser.convert_pdf("invoice.pdf", dpi=150, clean_output=True)
-markdown = pages[0] if len(pages) == 1 else "\n\n".join(pages)
-parser.save_markdown(pages, "invoice.md")
-```
-
-### Fast Local PDF Parsing
-
-```python
-from gaik.building_blocks.parsers import PyMuPDFParser
-
-parser = PyMuPDFParser()
-result = parser.parse_document("document.pdf")
-
-print(result["text_content"])
-print(result["metadata"])  # Page count, author, etc.
-```
-
-### Audio/Video Transcription
-
-```python
-from gaik.building_blocks.transcriber import Transcriber, get_openai_config
-
-# Set environment: AZURE_API_KEY, AZURE_ENDPOINT (or OPENAI_API_KEY)
-config = get_openai_config(use_azure=True)
-
-transcriber = Transcriber(config)  # enhanced_transcript=True by default
-
-# Transcribe audio/video file
-result = transcriber.transcribe("meeting_recording.mp3")
-
-# Save results
-result.save("output/transcripts/")
-print(result.enhanced_transcript)
-```
-
-## Features
-
-### Structured Data Extraction (`gaik.building_blocks.extractor`)
-
-- **SchemaGenerator** - Automatically generates Pydantic schemas from natural language requirements
-- **DataExtractor** - Extracts structured data using generated schemas
-- **Smart Structure Detection** - Automatically detects nested vs flat data structures
-- **Type-safe** - Full Pydantic validation with field types, enums, and patterns
-- **Multi-provider** - OpenAI and Azure OpenAI support
-- **JSON Export** - Save results to JSON files automatically
-
-### Document Parsing (`gaik.building_blocks.parsers`)
-
-**VisionParser** - PDF to Markdown using OpenAI vision models (GPT-4V)
-- Multi-page context awareness
-- Table extraction and cleaning
-- Configurable DPI and custom prompts
-- Azure OpenAI support
-
-**PyMuPDFParser** - Fast local text extraction with metadata
-
-**DoclingParser** - Advanced document parsing with OCR and multi-format support
-
-**No external binaries** - Pure Python dependencies
-
-### Audio/Video Transcription (`gaik.building_blocks.transcriber`)
-
-**Transcriber** - High-level API for audio/video transcription
-- OpenAI Whisper integration for accurate speech-to-text
-- Automatic chunking for long audio files (handles files > 25MB)
-- Context-aware transcription across chunks
-- Optional GPT enhancement for improved formatting and structure
-- **Audio formats (no ffmpeg required)**: mp3, wav, m4a, ogg
-- **Video formats (requires ffmpeg)**: mp4, avi, mov, mkv, flv
-- **Audio compression (requires ffmpeg)**: Automatic compression for large files
-- Batch processing capabilities
-
-**TranscriptionResult** - Container for raw and enhanced transcripts
-- Save to multiple formats
-- Preserve both raw Whisper output and GPT-enhanced versions
-
-**Azure OpenAI and OpenAI support** - Works with both platforms
-
-## API Reference
-
-### Extractor Module
-
-#### SchemaGenerator
-
-```python
-from gaik.building_blocks.extractor import SchemaGenerator, get_openai_config
-
-generator = SchemaGenerator(
-    config: dict,              # From get_openai_config()
-    model: str | None = None   # Optional model override
-)
-```
-
-**Methods:**
-- `generate_schema(user_requirements: str) -> type[BaseModel]` - Generate Pydantic schema
-- `analyze_structure(user_requirements: str) -> StructureAnalysis` - Detect nested/flat structure
-- `get_schema_info() -> str` - Get human-readable schema information
-
-**Attributes:**
-- `extraction_model` - Generated Pydantic model
-- `item_requirements` - Parsed field requirements
-- `structure_analysis` - Structure type analysis
-
-#### DataExtractor
-
-```python
-from gaik.building_blocks.extractor import DataExtractor
-
-extractor = DataExtractor(
-    config: dict,              # From get_openai_config()
-    model: str | None = None   # Optional model override
-)
-```
-
-**Methods:**
-
-`extract(extraction_model, requirements, user_requirements, documents, save_json=False, json_path=None) -> list[dict]`
-- `extraction_model`: Pydantic model from SchemaGenerator
-- `requirements`: ExtractionRequirements from SchemaGenerator
-- `user_requirements`: Original requirements string
-- `documents`: List of document strings to extract from
-- `save_json`: Whether to save results to JSON
-- `json_path`: Path for JSON output file
-
-#### Configuration
-
-```python
-from gaik.building_blocks.extractor import get_openai_config, create_openai_client
-
-config = get_openai_config(use_azure: bool = True) -> dict
-client = create_openai_client(config: dict) -> OpenAI | AzureOpenAI
-```
-
-### Parser Module
-
-#### VisionParser
-
-```python
-from gaik.building_blocks.parsers import VisionParser, get_openai_config
-
-config = get_openai_config(use_azure=True)  # Returns OpenAIConfig dataclass
-
-parser = VisionParser(
-    openai_config: OpenAIConfig,   # From get_openai_config()
-    custom_prompt: str | None = None,
-    use_context: bool = True,      # Multi-page context
-    max_tokens: int = 16_000,
-    temperature: float = 0.0
-)
-```
-
-**Methods:**
-- `convert_pdf(pdf_path: str, *, dpi: int = 200, clean_output: bool = True) -> list[str]` - Convert PDF to markdown pages
-- `save_markdown(markdown_pages: Sequence[str], output_path: str, *, separator: str = "\n\n---\n\n") -> None` - Save markdown to file
-
-#### PyMuPDFParser
-
-```python
-from gaik.building_blocks.parsers import PyMuPDFParser
-
-parser = PyMuPDFParser()
-```
-
-**Methods:**
-- `parse_document(file_path: str) -> dict` - Extract text and metadata
-  - Returns: `{"text_content": str, "metadata": dict}`
-
-#### DoclingParser
-
-```python
-from gaik.building_blocks.parsers import DoclingParser
-
-parser = DoclingParser(
-    ocr_engine: str = "easyocr",  # or "tesseract", "rapid"
-    use_gpu: bool = False
-)
-```
-
-**Methods:**
-- `parse_document(file_path: str) -> dict` - Parse document with OCR
-- `convert_to_markdown(file_path: str) -> str` - Convert to markdown
-
-### Transcriber Module
-
-#### Transcriber
-
-```python
-from gaik.building_blocks.transcriber import Transcriber, get_openai_config
-
-config = get_openai_config(use_azure=True)
-
-transcriber = Transcriber(
-    api_config: dict,                      # From get_openai_config()
-    output_dir: str | Path = "transcriber_workspace",
-    *,
-    compress_audio: bool = True,           # Compress large audio files
-    enhanced_transcript: bool = True,      # Enable GPT enhancement
-    max_size_mb: int = 25,                 # Max file size for Whisper
-    max_duration_seconds: int = 1500,      # Max duration per chunk
-    default_prompt: str = DEFAULT_PROMPT   # Custom Whisper prompt
-)
-```
-
-**System Requirements:**
-- **Basic audio transcription** (`.mp3`, `.wav`, `.m4a`): No additional dependencies
-- **Video processing** (`.mp4`, `.avi`, `.mov`, etc.): Requires ffmpeg (see System Requirements)
-- **Audio compression** (files >25MB): Requires ffmpeg (optional, improves performance)
-
-**Methods:**
-
-`transcribe(file_path: str | Path, *, custom_context: str = "", use_case_name: str | None = None, compress_audio: bool | None = None) -> TranscriptionResult`
-- `file_path`: Path to audio/video file
-- `custom_context`: Additional context for transcription
-- `use_case_name`: Optional name for organizing output
-- `compress_audio`: Override instance setting for this call
-- Returns: `TranscriptionResult` with raw and/or enhanced transcripts
-
-#### TranscriptionResult
-
-Container for transcription outputs with save capabilities.
-
-**Attributes:**
-- `raw_transcript: str` - Original Whisper output
-- `enhanced_transcript: str | None` - GPT-enhanced version
-- `job_id: str` - Unique identifier for this transcription
-
-**Methods:**
-- `save(directory: str, save_raw: bool = True, save_enhanced: bool = True) -> dict[str, Path]`
-  - Saves transcripts to files
-  - Returns: Mapping of artifact type to file path
-
-## Environment Variables
-
-### For All Modules (Extractors, Parsers, and Transcribers)
-
-| Provider | Required Variables | Optional |
-|----------|-------------------|----------|
-| **OpenAI** | `OPENAI_API_KEY` | - |
-| **Azure OpenAI** | `AZURE_API_KEY`<br>`AZURE_ENDPOINT`<br>`AZURE_DEPLOYMENT` | `AZURE_API_VERSION` (default: 2024-02-15-preview) |
-
-**Note:** Set `use_azure=True` in `get_openai_config()` for Azure, or `use_azure=False` for standard OpenAI. All modules (extractor, parsers, transcriber) use the same configuration pattern.
-
-### Default Models
-
-| Provider | Default Model | Notes |
-|----------|--------------|-------|
-| **OpenAI** | `gpt-4.1` | For extraction and vision parsing |
-| **Azure OpenAI** | User's deployment | Specified via `AZURE_DEPLOYMENT` env variable |
-
-## Software Components
-
-### Audio -> Structured Data pipeline (transcriber + extractor)
-
-- Import: `from gaik.software_components.audio_to_structured_data import AudioToStructuredData`
-- Example: `examples/software_components/audio_to_structured_data/pipeline_example.py`
-- Returns raw/enhanced transcripts, extracted fields, and the generated schema/requirements. Optional schema reuse/persistence is demonstrated via the example's `generate_schema`/`schema_name` flags.
-
-### Documents -> Structured Data pipeline (parser + extractor)
-
-- Import: `from gaik.software_components.documents_to_structured_data import DocumentsToStructuredData`
-- Example: `examples/software_components/documents_to_structured_data/pipeline_example.py`
-- Parser choices: `vision_parser`, `docling`, `pymupdf`, `docx`. Returns parsed text, extracted fields, and the generated schema/requirements, with optional schema reuse/persistence similar to the audio pipeline.
-## Extraction Examples
-
-### Batch Document Processing
-
-```python
-from gaik.building_blocks.extractor import SchemaGenerator, DataExtractor, get_openai_config
-
-config = get_openai_config(use_azure=True)
-
-# Generate schema once
-generator = SchemaGenerator(config=config)
-schema = generator.generate_schema("""
-Extract from invoices:
-- invoice_number: Invoice ID (string)
-- amount: Total in USD (number)
-- vendor: Company name (string)
-""")
-
-# Extract from multiple documents
-extractor = DataExtractor(config=config)
-documents = [
-    "Invoice #12345 from Acme Corp. Total: $1,500",
-    "INV-67890, Supplier: TechCo, Amount: $2,750"
-]
-
-results = extractor.extract(
-    extraction_model=schema,
-    requirements=generator.item_requirements,
-    user_requirements=generator.item_requirements.use_case_name,
-    documents=documents
-)
-
-for result in results:
-    print(f"Invoice: {result['invoice_number']}, Amount: ${result['amount']}")
-```
-
-### Nested Data Extraction
-
-```python
-# The SchemaGenerator automatically detects nested structures
-generator = SchemaGenerator(config=config)
-schema = generator.generate_schema("""
-Extract purchase orders with multiple line items.
-For each PO, extract:
-- PO number
-- Vendor name
-- Items (multiple):
-  - Item description
-  - Quantity
-  - Unit price
-""")
-
-# Returns nested Pydantic model with list of items
-print(generator.structure_analysis.structure_type)  # 'nested'
-```
-
-### Schema Inspection
-
-```python
-# After generating schema
-generator = SchemaGenerator(config=config)
-schema = generator.generate_schema("Extract name, age, and email")
-
-# View schema information
-print(generator.get_schema_info())
-
-# Access field requirements
-for field in generator.item_requirements.fields:
-    print(f"{field.field_name}: {field.field_type} - {field.description}")
-
-# JSON schema
-json_schema = schema.model_json_schema()
-print(json_schema)
-```
-
-## Parsing Examples
-
-### Custom Prompt for Vision Parser
-
-```python
-from gaik.building_blocks.parsers import VisionParser, get_openai_config
-
-config = get_openai_config(use_azure=True)
-
-custom_prompt = """
-Convert document to markdown:
-- Preserve all tables with proper formatting
-- Include headers and footers
-- Maintain layout structure
-- Extract form fields
-"""
-
-parser = VisionParser(
-    openai_config=config,
-    custom_prompt=custom_prompt,
     use_context=True,
 )
 
-pages = parser.convert_pdf("complex_form.pdf", dpi=200)
+pages = parser.convert_pdf("invoice.pdf", dpi=150, clean_output=True)
+markdown = "
+
+".join(pages)
+parser.save_markdown(pages, "invoice.md")
 ```
 
-### Multi-PDF Processing with Classification
+### 3. Transcriber – audio / video → transcripts
+
+**Goal:** transcribe audio or video into raw and optionally GPT‑enhanced transcripts, with chunking and compression handled for you.
+
+Building blocks:
+
+- `Transcriber` – wraps Whisper + optional GPT enhancement, including:
+  - chunking for long audio
+  - optional audio compression (via ffmpeg)
+  - context‑aware multi‑chunk transcription
+- `TranscriptionResult` – container with save/export helpers
+
+Example:
 
 ```python
-from gaik.building_blocks.parsers import VisionParser, get_openai_config
-from pathlib import Path
+from gaik.building_blocks.transcriber import Transcriber, get_openai_config
 
 config = get_openai_config(use_azure=True)
-parser = VisionParser(openai_config=config, use_context=True)
-
-pdf_files = Path("documents/").glob("*.pdf")
-
-for pdf_path in pdf_files:
-    print(f"Processing: {pdf_path}")
-    
-    # Parse PDF
-    pages = parser.convert_pdf(str(pdf_path), clean_output=True)
-    markdown = pages[0] if len(pages) == 1 else "\n\n".join(pages)
-    
-    # Save with same name as PDF
-    output_path = pdf_path.with_suffix(".md")
-    parser.save_markdown(markdown, str(output_path))
-    print(f"Saved: {output_path}")
-```
-
-### Combined Extraction + Parsing Pipeline
-
-```python
-from gaik.building_blocks.parsers import VisionParser, get_openai_config
-from gaik.building_blocks.extractor import SchemaGenerator, DataExtractor
-
-config = get_openai_config(use_azure=True)
-
-# Step 1: Parse PDF to markdown
-parser = VisionParser(openai_config=config)
-pages = parser.convert_pdf("invoice.pdf", clean_output=True)
-markdown_text = pages[0]
-
-# Step 2: Generate extraction schema
-generator = SchemaGenerator(config=config)
-schema = generator.generate_schema("""
-Extract invoice details:
-- Invoice number
-- Date
-- Total amount
-- Vendor name
-""")
-
-# Step 3: Extract structured data from parsed markdown
-extractor = DataExtractor(config=config)
-results = extractor.extract(
-    extraction_model=schema,
-    requirements=generator.item_requirements,
-    user_requirements=generator.item_requirements.use_case_name,
-    documents=[markdown_text]
+transcriber = Transcriber(
+    api_config=config,
+    output_dir="transcriber_workspace",
 )
 
-print(results[0])  # {'invoice_number': '...', 'date': '...', ...}
+result = transcriber.transcribe("meeting_recording.mp3")
+print(result.enhanced_transcript or result.raw_transcript)
+result.save("output/transcripts/")
 ```
 
-## Resources
+---
 
-- **Examples**: [examples/building_blocks/](examples/building_blocks/)
-- **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
-- **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
+## Software components (end‑to‑end pipelines)
+
+To align with GAIK’s **template / Solution Wizard** vision, the toolkit also supports **reusable software components** built from the building blocks. These represent common generic patterns.
+
+### Audio → Structured Data
+
+A generic pattern that:
+
+1. Transcribes audio/video into text  
+2. Generates a schema from user requirements  
+3. Extracts structured fields from the transcript(s)  
+4. Optionally persists or reuses schemas across runs
+
+Conceptually:
+
+```text
+Audio
+  → Transcriber
+    → Transcript
+      → SchemaGenerator
+        → Schema
+          → DataExtractor
+            → Structured JSON
+```
+
+### Documents → Structured Data
+
+A generic pattern that:
+
+1. Parses documents (PDFs, etc.) to text/markdown (VisionParser / Docling / PyMuPDF / DOCX parsing)
+2. Generates a schema from user requirements
+3. Extracts structured fields from the parsed text
+4. Supports schema reuse/persistence similar to the audio pipeline
+
+These pipelines are what higher‑level templates (e.g. “Incident Reporting (Voice → Structured Report)”, “Invoice PDF → Structured Invoice Record”) will bind to.
+
+---
+
+## Configuration & environment variables
+
+All modules share a consistent configuration pattern via `get_openai_config` and `create_openai_client`.
+
+Supported providers & environment variables:
+
+| Provider | Required env vars                                     |
+|----------|--------------------------------------------------------|
+| OpenAI   | `OPENAI_API_KEY`                                      |
+| Azure    | `AZURE_API_KEY`, `AZURE_ENDPOINT`, `AZURE_DEPLOYMENT` |
+
+`get_openai_config(use_azure=True)` returns a config dict that can be passed to all building blocks.
+
+---
+
+## Typical GAIK workflows this toolkit enables
+
+Although the full Solution Wizard and template catalogue live outside this repo, this toolkit is designed to support patterns such as:
+
+- **Incident reporting (voice → structured incident report)**  
+  `Transcriber` + `SchemaGenerator` + `DataExtractor`
+- **Invoice / PO processing (PDF → structured records)**  
+  `VisionParser` / `PyMuPDFParser` + `SchemaGenerator` + `DataExtractor`
+- **Contract review (documents → clause database)**  
+  Any parser + extractor with nested schemas
+- **Customer meetings (call / meeting → CRM fields + summary)**  
+  `Transcriber` + extractor, optionally combined with your own task‑specific code or agents
+
+At solution level, a template or SolutionWizardSpec can express these as **services** implemented by GAIK building blocks and software components.
+
+---
+
+## Examples & documentation
+
+Explore the examples included in the repository:
+
+- Building‑block level examples: `examples/building_blocks/`
+- Software component examples: `examples/software_components/`
+- Demos and experiments: `demo/`
+
+Project documentation (work in progress) is available at:
+
+- https://gaik-docs.2.rahtiapp.fi/
+
+---
+
+## Roadmap (GAIK project context)
+
+Planned / evolving directions:
+
+- Additional **building blocks**:
+  - document classifiers
+  - domain‑specific extractors
+  - additional parsing / enrichment utilities
+- More **software components** for common enterprise patterns:
+  - incident reporting
+  - meeting summarization
+  - HR / recruitment workflows
+- Tighter integration with **template catalogues** and a **Solution Wizard** that:
+  - maps business requirements → templates
+  - selects services & components
+  - emits deployable workflows using GAIK toolkit components
+
+---
+
+## Contributing
+
+Contributions are welcome — from bug reports and documentation improvements to new building blocks and software components that fit the GAIK architecture.
+
+Please see `CONTRIBUTING.md` for contribution guidelines.
+
+---
 
 ## License
 
-MIT - see [LICENSE](LICENSE)
-
-
-
-
-
-
+This project is licensed under the MIT License – see `LICENSE` for details.
