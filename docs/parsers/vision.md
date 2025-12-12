@@ -1,4 +1,4 @@
-# VisionParser
+﻿# VisionParser
 
 Parse PDFs to Markdown using OpenAI GPT-4 Vision with advanced table extraction and multi-page context awareness.
 
@@ -15,7 +15,7 @@ pip install gaik[parser]
 ## Quick Start
 
 ```python
-from gaik.parsers import VisionParser, get_openai_config
+from gaik.building_blocks.parsers import VisionParser, get_openai_config
 
 # Configure
 config = get_openai_config(use_azure=True)
@@ -52,7 +52,7 @@ parser.save_markdown(markdown, "document.md")
 ### VisionParser
 
 ```python
-from gaik.parsers import VisionParser
+from gaik.building_blocks.parsers import VisionParser
 
 parser = VisionParser(
     openai_config: dict,           # From get_openai_config()
@@ -73,7 +73,7 @@ parser.save_markdown(markdown_content: str, output_path: str)
 ### Configuration
 
 ```python
-from gaik.parsers import get_openai_config
+from gaik.building_blocks.parsers import get_openai_config
 
 # Azure OpenAI (default)
 config = get_openai_config(use_azure=True)
@@ -107,7 +107,7 @@ config = get_openai_config(use_azure=False)
 
 ## Examples
 
-See [examples/parsers/demo_vision_simple.py](../../examples/parsers/demo_vision_simple.py) for complete example.
+See [examples/building_blocks/parsers/demo_vision_simple.py](../../examples/building_blocks/parsers/demo_vision_simple.py) for complete example.
 
 ---
 
@@ -120,4 +120,8 @@ See [examples/parsers/demo_vision_simple.py](../../examples/parsers/demo_vision_
 ## License
 
 MIT - see [LICENSE](../../LICENSE)
+
+
+
+
 

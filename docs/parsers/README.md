@@ -1,4 +1,4 @@
-# Parsers
+﻿# Parsers
 
 Convert PDFs and Word documents to structured text using multiple parsing backends.
 
@@ -68,18 +68,23 @@ For VisionParser only:
 
 ## Examples
 
-See [examples/parsers/](../../examples/parsers/) for complete examples.
+See [examples/building_blocks/parsers/](../../examples/building_blocks/parsers/) for complete examples.
 
 ---
 
 ## Resources
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
-- **Examples**: [examples/](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples)
+- **Examples**: [examples/building_blocks/](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples/building_blocks)
 - **Contributing**: [CONTRIBUTING.md](../../CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License
 
 MIT - see [LICENSE](../../LICENSE)
+
+
+
+
+
 

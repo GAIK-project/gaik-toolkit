@@ -1,4 +1,4 @@
-# Document Classifier
+﻿# Document Classifier
 
 Classify documents into predefined categories using LLM analysis. Supports PDFs, Word documents, and images.
 
@@ -15,7 +15,7 @@ pip install gaik[classifier]
 ## Quick Start
 
 ```python
-from gaik.doc_classifier import DocumentClassifier, get_openai_config
+from gaik.building_blocks.doc_classifier import DocumentClassifier, get_openai_config
 
 # Configure
 config = get_openai_config(use_azure=True)
@@ -53,7 +53,7 @@ print(f"Reasoning: {result['document.pdf']['reasoning']}")
 ### DocumentClassifier
 
 ```python
-from gaik.doc_classifier import DocumentClassifier
+from gaik.building_blocks.doc_classifier import DocumentClassifier
 
 classifier = DocumentClassifier(
     config: dict,              # From get_openai_config()
@@ -87,7 +87,7 @@ results = classifier.classify(
 ### Configuration
 
 ```python
-from gaik.doc_classifier import get_openai_config
+from gaik.building_blocks.doc_classifier import get_openai_config
 
 # Azure OpenAI (default)
 config = get_openai_config(use_azure=True)
@@ -112,7 +112,7 @@ config = get_openai_config(use_azure=False)
 
 ## Examples
 
-See [examples/classifier/](../examples/classifier/) for complete examples:
+See [examples/building_blocks/classifier/](../examples/building_blocks/classifier/) for complete examples:
 - `classification_example.py` - Basic, directory, custom parser, mixed file types
 
 ### Directory Classification
@@ -144,10 +144,16 @@ result = classifier.classify(
 ## Resources
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
-- **Examples**: [examples/](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples)
+- **Examples**: [examples/building_blocks/](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples/building_blocks)
 - **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License
 
 MIT - see [LICENSE](../LICENSE)
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-"""Classifier router - Document classification endpoints"""
+﻿"""Classifier router - Document classification endpoints"""
 
 import os
 import tempfile
@@ -55,7 +55,7 @@ async def classify_document(
         tmp_path = tmp.name
 
     try:
-        from gaik.doc_classifier import DocumentClassifier, get_openai_config
+        from gaik.building_blocks.doc_classifier import DocumentClassifier, get_openai_config
 
         config = get_openai_config(use_azure=False)  # Use standard OpenAI
         config["api_key"] = api_key  # Override with provided key
@@ -93,3 +93,4 @@ async def classify_document(
         raise HTTPException(status_code=500, detail=str(e)) from e
     finally:
         Path(tmp_path).unlink(missing_ok=True)
+

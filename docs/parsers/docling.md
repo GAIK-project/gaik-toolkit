@@ -1,4 +1,4 @@
-# DoclingParser
+﻿# DoclingParser
 
 Advanced OCR-capable parser with support for PDFs, images, and multiple formats using the Docling library.
 
@@ -15,7 +15,7 @@ pip install gaik[parser]
 ## Quick Start
 
 ```python
-from gaik.parsers import DoclingParser
+from gaik.building_blocks.parsers import DoclingParser
 
 parser = DoclingParser(
     ocr_engine="easyocr",  # or "tesseract", "rapid"
@@ -48,7 +48,7 @@ markdown = parser.convert_to_markdown("document.pdf")
 ### DoclingParser
 
 ```python
-from gaik.parsers import DoclingParser
+from gaik.building_blocks.parsers import DoclingParser
 
 parser = DoclingParser(
     ocr_engine: str = "easyocr",  # or "tesseract", "rapid"
@@ -122,7 +122,7 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 ## Examples
 
 ```python
-from gaik.parsers import DoclingParser
+from gaik.building_blocks.parsers import DoclingParser
 
 # Basic OCR parsing
 parser = DoclingParser(ocr_engine="easyocr")
@@ -151,4 +151,5 @@ with open("output.md", "w") as f:
 ## License
 
 MIT - see [LICENSE](../../LICENSE)
+
 

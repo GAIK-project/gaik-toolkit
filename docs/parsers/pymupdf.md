@@ -1,4 +1,4 @@
-# PyMuPDFParser
+﻿# PyMuPDFParser
 
 Fast local PDF text extraction using PyMuPDF. No API calls required.
 
@@ -15,7 +15,7 @@ pip install gaik[parser]
 ## Quick Start
 
 ```python
-from gaik.parsers import PyMuPDFParser
+from gaik.building_blocks.parsers import PyMuPDFParser
 
 parser = PyMuPDFParser()
 
@@ -44,7 +44,7 @@ print(result["metadata"])  # Page count, author, etc.
 ### PyMuPDFParser
 
 ```python
-from gaik.parsers import PyMuPDFParser
+from gaik.building_blocks.parsers import PyMuPDFParser
 
 parser = PyMuPDFParser()
 
@@ -93,7 +93,7 @@ print(result["metadata"])  # Page count, author, title, etc.
 
 ## Examples
 
-See [examples/parsers/demo_pymupdf.py](../../examples/parsers/demo_pymupdf.py) for complete example.
+See [examples/building_blocks/parsers/demo_pymupdf.py](../../examples/building_blocks/parsers/demo_pymupdf.py) for complete example.
 
 ---
 
@@ -106,4 +106,8 @@ See [examples/parsers/demo_pymupdf.py](../../examples/parsers/demo_pymupdf.py) f
 ## License
 
 MIT - see [LICENSE](../../LICENSE)
+
+
+
+
 

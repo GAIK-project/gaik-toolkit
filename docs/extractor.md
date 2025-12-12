@@ -1,4 +1,4 @@
-# Extractor
+﻿# Extractor
 
 Extract structured data from documents using natural language requirements with automatic Pydantic schema generation.
 
@@ -15,7 +15,7 @@ pip install gaik[extractor]
 ## Quick Start
 
 ```python
-from gaik.extractor import SchemaGenerator, DataExtractor, get_openai_config
+from gaik.building_blocks.extractor import SchemaGenerator, DataExtractor, get_openai_config
 
 # Configure
 config = get_openai_config(use_azure=True)
@@ -32,7 +32,7 @@ results = extractor.extract(
     extraction_model=schema,
     requirements=generator.item_requirements,
     user_requirements="Extract project info",
-    documents=["Project: AI Initiative, Budget: €2.5M, Status: Active"]
+    documents=["Project: AI Initiative, Budget: â‚¬2.5M, Status: Active"]
 )
 
 print(results)  # [{'project_title': 'AI Initiative', 'budget': 2500000.0, 'status': 'active'}]
@@ -42,7 +42,7 @@ print(results)  # [{'project_title': 'AI Initiative', 'budget': 2500000.0, 'stat
 
 ## Features
 
-- **Natural Language → Schema** - Describe extraction needs in plain English, get Pydantic models
+- **Natural Language â†’ Schema** - Describe extraction needs in plain English, get Pydantic models
 - **Auto Structure Detection** - Automatically detects flat vs nested data patterns
 - **Type-Safe Extraction** - Full Pydantic validation with field types, enums, and patterns
 - **Multi-Provider** - OpenAI and Azure OpenAI support
@@ -55,7 +55,7 @@ print(results)  # [{'project_title': 'AI Initiative', 'budget': 2500000.0, 'stat
 ### SchemaGenerator
 
 ```python
-from gaik.extractor import SchemaGenerator
+from gaik.building_blocks.extractor import SchemaGenerator
 
 generator = SchemaGenerator(
     config: dict,              # From get_openai_config()
@@ -74,7 +74,7 @@ generator.structure_analysis    # Structure type analysis
 ### DataExtractor
 
 ```python
-from gaik.extractor import DataExtractor
+from gaik.building_blocks.extractor import DataExtractor
 
 extractor = DataExtractor(
     config: dict,              # From get_openai_config()
@@ -95,7 +95,7 @@ results = extractor.extract(
 ### Configuration
 
 ```python
-from gaik.extractor import get_openai_config
+from gaik.building_blocks.extractor import get_openai_config
 
 # Azure OpenAI (default)
 config = get_openai_config(use_azure=True)
@@ -120,7 +120,7 @@ config = get_openai_config(use_azure=False)
 
 ## Examples
 
-See [examples/extractor/](../examples/extractor/) for complete examples:
+See [examples/building_blocks/extractor/](../examples/building_blocks/extractor/) for complete examples:
 - `extraction_example_1.py` - Basic extraction
 - `extraction_example_2.py` - Nested/hierarchical extraction
 - `extraction_example_3.py` - Manual schema definition
@@ -131,10 +131,16 @@ See [examples/extractor/](../examples/extractor/) for complete examples:
 ## Resources
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
-- **Examples**: [examples/](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples)
+- **Examples**: [examples/building_blocks/](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples/building_blocks)
 - **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License
 
 MIT - see [LICENSE](../LICENSE)
+
+
+
+
+
+

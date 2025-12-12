@@ -1,4 +1,4 @@
-"""Parser router - Document parsing endpoints"""
+﻿"""Parser router - Document parsing endpoints"""
 
 import tempfile
 from pathlib import Path
@@ -42,12 +42,12 @@ async def parse_document(
             parser_type = "docx" if suffix == ".docx" else "pymupdf"
 
         if parser_type == "docx":
-            from gaik.parsers import DocxParser
+            from gaik.building_blocks.parsers import DocxParser
 
             parser = DocxParser()
             result = parser.parse_document(tmp_path)
         elif parser_type == "pymupdf":
-            from gaik.parsers import PyMuPDFParser
+            from gaik.building_blocks.parsers import PyMuPDFParser
 
             parser = PyMuPDFParser()
             result = parser.parse_document(tmp_path)
@@ -74,3 +74,4 @@ async def parse_document(
     finally:
         # Cleanup temp file
         Path(tmp_path).unlink(missing_ok=True)
+

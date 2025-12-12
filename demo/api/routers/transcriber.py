@@ -1,4 +1,4 @@
-"""Transcriber router - Audio/video transcription endpoints"""
+﻿"""Transcriber router - Audio/video transcription endpoints"""
 
 import os
 import tempfile
@@ -59,7 +59,7 @@ async def transcribe_audio(
         tmp_path = tmp.name
 
     try:
-        from gaik.transcriber import Transcriber, get_openai_config
+        from gaik.building_blocks.transcriber import Transcriber, get_openai_config
 
         config = get_openai_config(use_azure=False)  # Use standard OpenAI
         config["api_key"] = api_key  # Override with provided key
@@ -87,3 +87,4 @@ async def transcribe_audio(
         raise HTTPException(status_code=500, detail=str(e)) from e
     finally:
         Path(tmp_path).unlink(missing_ok=True)
+

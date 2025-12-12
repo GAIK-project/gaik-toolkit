@@ -1,4 +1,4 @@
-# DocxParser
+﻿# DocxParser
 
 Parse Word documents (.docx, .doc) to text using python-docx. No API calls required.
 
@@ -15,7 +15,7 @@ pip install gaik[parser]
 ## Quick Start
 
 ```python
-from gaik.parsers import DocxParser
+from gaik.building_blocks.parsers import DocxParser
 
 parser = DocxParser()
 
@@ -30,7 +30,7 @@ print(result["text_content"])
 print(f"Word count: {result['word_count']}")
 
 # Or use convenience function
-from gaik.parsers import parse_docx
+from gaik.building_blocks.parsers import parse_docx
 result = parse_docx("document.docx", output_path="output.txt")
 ```
 
@@ -52,7 +52,7 @@ result = parse_docx("document.docx", output_path="output.txt")
 ### DocxParser
 
 ```python
-from gaik.parsers import DocxParser
+from gaik.building_blocks.parsers import DocxParser
 
 parser = DocxParser()
 
@@ -78,7 +78,7 @@ result = parser.parse_document(
 ### Convenience Function
 
 ```python
-from gaik.parsers import parse_docx
+from gaik.building_blocks.parsers import parse_docx
 
 # Parse and optionally save to file
 result = parse_docx(
@@ -110,14 +110,14 @@ result = parse_docx(
 
 ```python
 # Basic extraction
-from gaik.parsers import DocxParser
+from gaik.building_blocks.parsers import DocxParser
 
 parser = DocxParser()
 result = parser.parse_document("report.docx")
 print(result["text_content"])
 
 # Save to file
-from gaik.parsers import parse_docx
+from gaik.building_blocks.parsers import parse_docx
 
 parse_docx("input.docx", output_path="output.txt")
 ```
@@ -133,4 +133,5 @@ parse_docx("input.docx", output_path="output.txt")
 ## License
 
 MIT - see [LICENSE](../../LICENSE)
+
 

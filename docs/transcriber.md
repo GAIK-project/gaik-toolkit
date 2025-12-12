@@ -1,4 +1,4 @@
-# Transcriber
+﻿# Transcriber
 
 Transcribe audio and video files using OpenAI Whisper with optional GPT enhancement for improved formatting.
 
@@ -19,8 +19,8 @@ pip install gaik[transcriber]
 The transcriber works **without ffmpeg** for basic audio transcription (.mp3, .wav, .m4a files).
 
 **FFmpeg is only needed for:**
-- 🎥 Processing video files (.mp4, .avi, .mov, .mkv, etc.) - extracts audio
-- 📦 Compressing large audio files (>25MB) - reduces file size for Whisper API
+- ðŸŽ¥ Processing video files (.mp4, .avi, .mov, .mkv, etc.) - extracts audio
+- ðŸ“¦ Compressing large audio files (>25MB) - reduces file size for Whisper API
 
 **Installation:**
 
@@ -49,7 +49,7 @@ ffmpeg -version
 ## Quick Start
 
 ```python
-from gaik.transcriber import Transcriber, get_openai_config
+from gaik.building_blocks.transcriber import Transcriber, get_openai_config
 
 # Configure
 config = get_openai_config(use_azure=True)
@@ -91,7 +91,7 @@ print(result.enhanced_transcript)
 ### Transcriber
 
 ```python
-from gaik.transcriber import Transcriber
+from gaik.building_blocks.transcriber import Transcriber
 
 transcriber = Transcriber(
     api_config: dict,                          # From get_openai_config()
@@ -131,7 +131,7 @@ saved_paths = result.save(
 ### Configuration
 
 ```python
-from gaik.transcriber import get_openai_config
+from gaik.building_blocks.transcriber import get_openai_config
 
 # Azure OpenAI (default)
 config = get_openai_config(use_azure=True)
@@ -155,17 +155,23 @@ config = get_openai_config(use_azure=False)
 
 ## Examples
 
-See [examples/transcriber/](../examples/transcriber/) for complete examples.
+See [examples/building_blocks/transcriber/](../examples/building_blocks/transcriber/) for complete examples.
 
 ---
 
 ## Resources
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
-- **Examples**: [examples/](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples)
+- **Examples**: [examples/building_blocks/](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples/building_blocks)
 - **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License
 
 MIT - see [LICENSE](../LICENSE)
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-# GAIK - General AI Kit
+﻿# GAIK - General AI Kit
 
 [![PyPI version](https://badge.fury.io/py/gaik.svg)](https://badge.fury.io/py/gaik)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -32,8 +32,8 @@ pip install gaik[all]
 The transcriber module works without ffmpeg for basic audio transcription (`.mp3`, `.wav`, `.m4a` files).
 
 FFmpeg is only needed for:
-- 🎥 **Processing video files** (`.mp4`, `.avi`, `.mov`, `.mkv`, etc.) - extracts audio
-- 📦 **Compressing large audio files** (>25MB) - reduces file size for Whisper API
+- ðŸŽ¥ **Processing video files** (`.mp4`, `.avi`, `.mov`, `.mkv`, etc.) - extracts audio
+- ðŸ“¦ **Compressing large audio files** (>25MB) - reduces file size for Whisper API
 
 **Installation by Platform:**
 
@@ -84,7 +84,7 @@ If the command returns version information, ffmpeg is properly installed and in 
 ### Schema-Based Data Extraction
 
 ```python
-from gaik.extractor import SchemaGenerator, DataExtractor, get_openai_config
+from gaik.building_blocks.extractor import SchemaGenerator, DataExtractor, get_openai_config
 
 # Configure OpenAI (Azure or standard)
 config = get_openai_config(use_azure=True)
@@ -112,7 +112,7 @@ print(results)  # [{'invoice_number': '12345', 'total_amount': 1500.0, 'vendor_n
 ### Vision-Based PDF Parsing
 
 ```python
-from gaik.parsers import VisionParser, get_openai_config
+from gaik.building_blocks.parsers import VisionParser, get_openai_config
 
 # Set environment: AZURE_API_KEY, AZURE_ENDPOINT, AZURE_DEPLOYMENT (or OPENAI_API_KEY)
 config = get_openai_config(use_azure=True)
@@ -130,7 +130,7 @@ parser.save_markdown(pages, "invoice.md")
 ### Fast Local PDF Parsing
 
 ```python
-from gaik.parsers import PyMuPDFParser
+from gaik.building_blocks.parsers import PyMuPDFParser
 
 parser = PyMuPDFParser()
 result = parser.parse_document("document.pdf")
@@ -142,7 +142,7 @@ print(result["metadata"])  # Page count, author, etc.
 ### Audio/Video Transcription
 
 ```python
-from gaik.transcriber import Transcriber, get_openai_config
+from gaik.building_blocks.transcriber import Transcriber, get_openai_config
 
 # Set environment: AZURE_API_KEY, AZURE_ENDPOINT (or OPENAI_API_KEY)
 config = get_openai_config(use_azure=True)
@@ -159,7 +159,7 @@ print(result.enhanced_transcript)
 
 ## Features
 
-### 🔍 Structured Data Extraction (`gaik.extractor`)
+### ðŸ” Structured Data Extraction (`gaik.building_blocks.extractor`)
 
 - **SchemaGenerator** - Automatically generates Pydantic schemas from natural language requirements
 - **DataExtractor** - Extracts structured data using generated schemas
@@ -168,7 +168,7 @@ print(result.enhanced_transcript)
 - **Multi-provider** - OpenAI and Azure OpenAI support
 - **JSON Export** - Save results to JSON files automatically
 
-### 📄 Document Parsing (`gaik.parsers`)
+### ðŸ“„ Document Parsing (`gaik.building_blocks.parsers`)
 
 **VisionParser** - PDF to Markdown using OpenAI vision models (GPT-4V)
 - Multi-page context awareness
@@ -182,7 +182,7 @@ print(result.enhanced_transcript)
 
 **No external binaries** - Pure Python dependencies
 
-### 🎤 Audio/Video Transcription (`gaik.transcriber`)
+### ðŸŽ¤ Audio/Video Transcription (`gaik.building_blocks.transcriber`)
 
 **Transcriber** - High-level API for audio/video transcription
 - OpenAI Whisper integration for accurate speech-to-text
@@ -207,7 +207,7 @@ print(result.enhanced_transcript)
 #### SchemaGenerator
 
 ```python
-from gaik.extractor import SchemaGenerator, get_openai_config
+from gaik.building_blocks.extractor import SchemaGenerator, get_openai_config
 
 generator = SchemaGenerator(
     config: dict,              # From get_openai_config()
@@ -228,7 +228,7 @@ generator = SchemaGenerator(
 #### DataExtractor
 
 ```python
-from gaik.extractor import DataExtractor
+from gaik.building_blocks.extractor import DataExtractor
 
 extractor = DataExtractor(
     config: dict,              # From get_openai_config()
@@ -249,7 +249,7 @@ extractor = DataExtractor(
 #### Configuration
 
 ```python
-from gaik.extractor import get_openai_config, create_openai_client
+from gaik.building_blocks.extractor import get_openai_config, create_openai_client
 
 config = get_openai_config(use_azure: bool = True) -> dict
 client = create_openai_client(config: dict) -> OpenAI | AzureOpenAI
@@ -260,7 +260,7 @@ client = create_openai_client(config: dict) -> OpenAI | AzureOpenAI
 #### VisionParser
 
 ```python
-from gaik.parsers import VisionParser, get_openai_config
+from gaik.building_blocks.parsers import VisionParser, get_openai_config
 
 config = get_openai_config(use_azure=True)  # Returns OpenAIConfig dataclass
 
@@ -280,7 +280,7 @@ parser = VisionParser(
 #### PyMuPDFParser
 
 ```python
-from gaik.parsers import PyMuPDFParser
+from gaik.building_blocks.parsers import PyMuPDFParser
 
 parser = PyMuPDFParser()
 ```
@@ -292,7 +292,7 @@ parser = PyMuPDFParser()
 #### DoclingParser
 
 ```python
-from gaik.parsers import DoclingParser
+from gaik.building_blocks.parsers import DoclingParser
 
 parser = DoclingParser(
     ocr_engine: str = "easyocr",  # or "tesseract", "rapid"
@@ -309,7 +309,7 @@ parser = DoclingParser(
 #### Transcriber
 
 ```python
-from gaik.transcriber import Transcriber, get_openai_config
+from gaik.building_blocks.transcriber import Transcriber, get_openai_config
 
 config = get_openai_config(use_azure=True)
 
@@ -371,12 +371,25 @@ Container for transcription outputs with save capabilities.
 | **OpenAI** | `gpt-4.1` | For extraction and vision parsing |
 | **Azure OpenAI** | User's deployment | Specified via `AZURE_DEPLOYMENT` env variable |
 
+## Software Components
+
+### Audio -> Structured Data pipeline (transcriber + extractor)
+
+- Import: `from gaik.software_components.audio_to_structured_data import AudioToStructuredData`
+- Example: `examples/software_components/audio_to_structured_data/pipeline_example.py`
+- Returns raw/enhanced transcripts, extracted fields, and the generated schema/requirements. Optional schema reuse/persistence is demonstrated via the example's `generate_schema`/`schema_name` flags.
+
+### Documents -> Structured Data pipeline (parser + extractor)
+
+- Import: `from gaik.software_components.documents_to_structured_data import DocumentsToStructuredData`
+- Example: `examples/software_components/documents_to_structured_data/pipeline_example.py`
+- Parser choices: `vision_parser`, `docling`, `pymupdf`, `docx`. Returns parsed text, extracted fields, and the generated schema/requirements, with optional schema reuse/persistence similar to the audio pipeline.
 ## Extraction Examples
 
 ### Batch Document Processing
 
 ```python
-from gaik.extractor import SchemaGenerator, DataExtractor, get_openai_config
+from gaik.building_blocks.extractor import SchemaGenerator, DataExtractor, get_openai_config
 
 config = get_openai_config(use_azure=True)
 
@@ -451,7 +464,7 @@ print(json_schema)
 ### Custom Prompt for Vision Parser
 
 ```python
-from gaik.parsers import VisionParser, get_openai_config
+from gaik.building_blocks.parsers import VisionParser, get_openai_config
 
 config = get_openai_config(use_azure=True)
 
@@ -475,7 +488,7 @@ pages = parser.convert_pdf("complex_form.pdf", dpi=200)
 ### Multi-PDF Processing with Classification
 
 ```python
-from gaik.parsers import VisionParser, get_openai_config
+from gaik.building_blocks.parsers import VisionParser, get_openai_config
 from pathlib import Path
 
 config = get_openai_config(use_azure=True)
@@ -499,8 +512,8 @@ for pdf_path in pdf_files:
 ### Combined Extraction + Parsing Pipeline
 
 ```python
-from gaik.parsers import VisionParser, get_openai_config
-from gaik.extractor import SchemaGenerator, DataExtractor
+from gaik.building_blocks.parsers import VisionParser, get_openai_config
+from gaik.building_blocks.extractor import SchemaGenerator, DataExtractor
 
 config = get_openai_config(use_azure=True)
 
@@ -533,10 +546,16 @@ print(results[0])  # {'invoice_number': '...', 'date': '...', ...}
 
 ## Resources
 
-- **Examples**: [examples/](examples/)
+- **Examples**: [examples/building_blocks/](examples/building_blocks/)
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
 - **Contributing**: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License
 
 MIT - see [LICENSE](LICENSE)
+
+
+
+
+
+
