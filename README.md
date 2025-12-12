@@ -1,10 +1,10 @@
-﻿# GAIK – General AI Kit
+﻿# GAIK – Generative AI Knowledge Management Toolkit
 
 [![PyPI version](https://img.shields.io/pypi/v/gaik.svg)](https://pypi.org/project/gaik/)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 ![Tests](https://github.com/GAIK-project/gaik-toolkit/actions/workflows/tests.yml/badge.svg)
 
-GAIK (General AI Kit) is the core Python toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides reusable building blocks and composable software components for knowledge-centric GenAI solutions.
+This is a generative AI toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides reusable building blocks and composable software components for knowledge-centric GenAI solutions.
 
 The toolkit focuses on three core knowledge processes in organizational workflows:
 
