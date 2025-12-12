@@ -31,7 +31,7 @@ def save_to_json(results: list[dict], json_path: str) -> None:
     """
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, default=str)
-    print(f"âœ“ Results saved to: {json_path}")
+    print(f"OK Results saved to: {json_path}")
 
 
 class DataExtractor:
@@ -152,7 +152,7 @@ class DataExtractor:
 
             results.append(result_dict)
 
-        print(f"\nâœ“ Completed extraction from {len(documents)} document(s)")
+        print(f"\nOK Completed extraction from {len(documents)} document(s)")
 
         # Save to JSON if requested
         if save_json:

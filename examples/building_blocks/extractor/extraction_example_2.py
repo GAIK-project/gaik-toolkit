@@ -96,7 +96,7 @@ def classify_document(
 
     if "purchase" in label:
         return "**Purchase order:**"
-    # Default to Bill of material if itâ€™s not clearly PO
+    # Default to Bill of material if it's not clearly PO
     return "**Bill of material:**"
 
 
@@ -117,7 +117,7 @@ def main():
     # parser = PyMuPDFParser()
     # Parse document with markdown format (simple text)
 
-    print("âœ“ Parser initialized")
+    print("OK Parser initialized")
 
     # 3) PDFs to process
     pdf_paths = [
@@ -155,7 +155,7 @@ def main():
         # 4c) Prepend header + separator
         final_markdown = f"{header}\n{full_markdown}\n---\n"
 
-        # 4d) Save per-file output next to the input (â€¦_output.md)
+        # 4d) Save per-file output next to the input (..._output.md)
         out_file = Path(path).with_suffix("").as_posix() + "_output.md"
         print(f"Saving: {out_file}")
         parser.save_markdown(final_markdown, out_file)
@@ -168,7 +168,7 @@ def main():
     print(f"\nSaving combined output: {combined_path}")
     with open(combined_path, "w", encoding="utf-8") as f:
         f.write(combined)
-    print("âœ“ All done!")
+    print("OK All done!")
 
     return combined_path
 
@@ -192,11 +192,11 @@ def extract_po_bom_data(combined_file_path: str = "./combined_classified_output.
     user_requirements = """
     The task is to extract key fields from customer documents (Purchase Order (PO) and Bill of Material (BOM),
     and align them so that each PO item is enriched with the correct technical details.
-    Begin with the customerâ€™s purchase order, which may include multiple items.
+    Begin with the customer's purchase order, which may include multiple items.
     The item is linked to its BOM via a Material Number. For every item in the PO,
     extract the Material Number along with the basic item details, such as Quantity, Description,
-    and Delivery Date. Use the itemâ€™s Material Number from the PO to find the BOM having the same Material Number (represented as â€˜IDâ€™).
-    From the matching BOM, extract the partâ€™s â€˜Type/Part Designationâ€™ and Dimensions.
+    and Delivery Date. Use the item's Material Number from the PO to find the BOM having the same Material Number (represented as 'ID').
+    From the matching BOM, extract the part's 'Type/Part Designation' and Dimensions.
     The final output should contain as many lines as the number of items in the PO.
     Each line should have:
     - Material Number
@@ -213,10 +213,10 @@ def extract_po_bom_data(combined_file_path: str = "./combined_classified_output.
     try:
         with open(combined_file_path, encoding="utf-8") as f:
             combined_content = f.read()
-        print(f"\nâœ“ Loaded document from: {combined_file_path}")
+        print(f"\nOK Loaded document from: {combined_file_path}")
         print(f"  Content length: {len(combined_content)} characters\n")
     except FileNotFoundError:
-        print(f"\nâœ— Error: File not found: {combined_file_path}")
+        print(f"\nX Error: File not found: {combined_file_path}")
         print("Please run the main() function first to generate the combined file.")
         return None
 
@@ -226,7 +226,7 @@ def extract_po_bom_data(combined_file_path: str = "./combined_classified_output.
     generator = SchemaGenerator(config=config)
     schema = generator.generate_schema(user_requirements=user_requirements)
 
-    print(f"\nâœ“ Generated schema: {schema.__name__}")
+    print(f"\nOK Generated schema: {schema.__name__}")
     print(f"  Structure: {generator.structure_analysis.structure_type}")
 
     # Step 2: Extract data
@@ -260,7 +260,7 @@ def extract_po_bom_data(combined_file_path: str = "./combined_classified_output.
                 print(f"  {key}: {value}")
 
     print("\n" + "=" * 80)
-    print("âœ“ PO+BOM extraction complete!")
+    print("OK PO+BOM extraction complete!")
     print("=" * 80)
 
     return results
@@ -276,7 +276,7 @@ if __name__ == "__main__":
         extract_po_bom_data(combined_path)
 
     except Exception as e:
-        print(f"\nâœ— Error: {e}")
+        print(f"\nX Error: {e}")
         import traceback
 
         traceback.print_exc()

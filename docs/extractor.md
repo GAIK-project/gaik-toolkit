@@ -32,7 +32,7 @@ results = extractor.extract(
     extraction_model=schema,
     requirements=generator.item_requirements,
     user_requirements="Extract project info",
-    documents=["Project: AI Initiative, Budget: â‚¬2.5M, Status: Active"]
+    documents=["Project: AI Initiative, Budget: EUR2.5M, Status: Active"]
 )
 
 print(results)  # [{'project_title': 'AI Initiative', 'budget': 2500000.0, 'status': 'active'}]
@@ -42,7 +42,7 @@ print(results)  # [{'project_title': 'AI Initiative', 'budget': 2500000.0, 'stat
 
 ## Features
 
-- **Natural Language â†’ Schema** - Describe extraction needs in plain English, get Pydantic models
+- **Natural Language -> Schema** - Describe extraction needs in plain English, get Pydantic models
 - **Auto Structure Detection** - Automatically detects flat vs nested data patterns
 - **Type-Safe Extraction** - Full Pydantic validation with field types, enums, and patterns
 - **Multi-Provider** - OpenAI and Azure OpenAI support

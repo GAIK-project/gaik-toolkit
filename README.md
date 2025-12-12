@@ -32,8 +32,8 @@ pip install gaik[all]
 The transcriber module works without ffmpeg for basic audio transcription (`.mp3`, `.wav`, `.m4a` files).
 
 FFmpeg is only needed for:
-- ðŸŽ¥ **Processing video files** (`.mp4`, `.avi`, `.mov`, `.mkv`, etc.) - extracts audio
-- ðŸ“¦ **Compressing large audio files** (>25MB) - reduces file size for Whisper API
+- Video **Processing video files** (`.mp4`, `.avi`, `.mov`, `.mkv`, etc.) - extracts audio
+- Compression **Compressing large audio files** (>25MB) - reduces file size for Whisper API
 
 **Installation by Platform:**
 

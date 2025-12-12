@@ -297,8 +297,8 @@ FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
    - Explicit options: "one of:", "options:", "allowed values:", "choose from:"
    - Binary choices: "yes/no", "true/false", "active/inactive"
    Examples:
-   - "Weather [hot, cold, warm]" â†’ field_type='str', enum=['hot', 'cold', 'warm']
-   - "Status: active/inactive/pending" â†’ field_type='str', enum=['active', 'inactive', 'pending']
+   - "Weather [hot, cold, warm]" -> field_type='str', enum=['hot', 'cold', 'warm']
+   - "Status: active/inactive/pending" -> field_type='str', enum=['active', 'inactive', 'pending']
    IMPORTANT: Do NOT treat examples prefixed with "e.g.", "example:", "such as" as enum values.
 
 2. DATE (field_type='date'):
@@ -308,9 +308,9 @@ FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
    - Date words in any language: "pÃ¤ivÃ¤mÃ¤Ã¤rÃ¤" (Finnish), "datum" (German), "fecha" (Spanish), etc.
    - Temporal references: "when", "timestamp", "created on", "modified at"
    Examples:
-   - "Entry Date" â†’ field_type='date'
-   - "Date of visit" â†’ field_type='date'
-   - "PÃ¤ivÃ¤mÃ¤Ã¤rÃ¤" â†’ field_type='date'
+   - "Entry Date" -> field_type='date'
+   - "Date of visit" -> field_type='date'
+   - "PÃ¤ivÃ¤mÃ¤Ã¤rÃ¤" -> field_type='date'
 
 3. LIST OF STRINGS (field_type='list[str]'):
    Use when field should contain multiple text items.
@@ -319,8 +319,8 @@ FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
    - Multiple items expected: "comma-separated", "multiple values"
    - Plural collection nouns: "tasks", "attachments", "tags", "categories", "items"
    Examples:
-   - "Tasks performed" â†’ field_type='list[str]'
-   - "Attachments [List of files]" â†’ field_type='list[str]'
+   - "Tasks performed" -> field_type='list[str]'
+   - "Attachments [List of files]" -> field_type='list[str]'
 
 4. LIST OF OBJECTS (field_type='list[dict]'):
    Use for complex nested structures with multiple fields per item.
@@ -328,7 +328,7 @@ FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
    - "table of", "records containing", "items with fields"
    - Multiple sub-fields described for each item
    Example:
-   - "Line items with product, quantity, and price" â†’ field_type='list[dict]'
+   - "Line items with product, quantity, and price" -> field_type='list[dict]'
 
 5. INTEGER (field_type='int'):
    Use for whole numbers, counts, quantities.
@@ -337,8 +337,8 @@ FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
    - Week/day/year numbers: "week number", "day of month"
    - IDs that are numeric: "employee ID" (if specified as numeric)
    Examples:
-   - "Work Week [Week number]" â†’ field_type='int'
-   - "Number of attendees" â†’ field_type='int'
+   - "Work Week [Week number]" -> field_type='int'
+   - "Number of attendees" -> field_type='int'
 
 6. FLOAT (field_type='float'):
    Use for decimal numbers, measurements, percentages, ratios.
@@ -347,8 +347,8 @@ FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
    - Measurements: "temperature", "weight", "height", "distance"
    - Averages or statistics: "average", "mean", "score"
    Examples:
-   - "Completion percentage" â†’ field_type='float'
-   - "Temperature reading" â†’ field_type='float'
+   - "Completion percentage" -> field_type='float'
+   - "Temperature reading" -> field_type='float'
 
 7. DECIMAL (field_type='decimal'):
    Use for precise monetary or financial values where precision matters.
@@ -356,8 +356,8 @@ FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
    - Currency: "price", "cost", "amount", "total", "fee", "salary"
    - Financial: "invoice total", "payment amount", "budget"
    Examples:
-   - "Total Amount [EUR]" â†’ field_type='decimal'
-   - "Unit price" â†’ field_type='decimal'
+   - "Total Amount [EUR]" -> field_type='decimal'
+   - "Unit price" -> field_type='decimal'
 
 8. BOOLEAN (field_type='bool'):
    Use for true/false flags and binary states.
@@ -366,15 +366,15 @@ FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
    - Questions: "whether", "if applicable"
    - Binary flags: "approved", "completed", "verified" (when yes/no answer)
    Examples:
-   - "Is approved" â†’ field_type='bool'
-   - "Has attachments" â†’ field_type='bool'
+   - "Is approved" -> field_type='bool'
+   - "Has attachments" -> field_type='bool'
 
 9. STRING (field_type='str'):
    Default for text fields when no other type clearly applies.
    Use for: names, descriptions, remarks, comments, signatures, addresses, observations.
    Examples:
-   - "Company name" â†’ field_type='str'
-   - "General remarks" â†’ field_type='str'
+   - "Company name" -> field_type='str'
+   - "General remarks" -> field_type='str'
 
 PRIORITY ORDER: When uncertain, apply rules in this order:
 1. Check for explicit enum values first (brackets, slashes)
@@ -575,7 +575,7 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
         elif f.field_type == "decimal":
             annotated = Decimal  # leave numeric constraints to normalization/validation
 
-        # Enums â†’ Literal[...] for strict checking
+        # Enums -> Literal[...] for strict checking
         if f.enum:
             # Build a Literal[...] dynamically; acceptable for runtime checks
             annotated = Literal[tuple(f.enum)]  # type: ignore[misc,call-arg]

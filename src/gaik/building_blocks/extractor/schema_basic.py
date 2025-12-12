@@ -388,7 +388,7 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
         elif f.field_type == "decimal":
             annotated = Decimal  # leave numeric constraints to normalization/validation
 
-        # Enums â†’ Literal[...] for strict checking
+        # Enums -> Literal[...] for strict checking
         if f.enum:
             # Build a Literal[...] dynamically; acceptable for runtime checks
             annotated = Literal[tuple(f.enum)]  # type: ignore[misc,call-arg]

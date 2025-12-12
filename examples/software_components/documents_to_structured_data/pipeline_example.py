@@ -46,7 +46,7 @@ def main() -> None:
     result = pipeline.run(
         file_path=Path(r"input/invoice.pdf"),
         user_requirements=USER_REQUIREMENTS,
-        parser_choice="pymupdf",  # vision_parser | docling | pymupdf | docx
+        parser_choice="docling",  # vision_parser | docling | pymupdf | docx
         parser_ctor={
             # Example: {"clean_output": True} for VisionParser
         },

@@ -1,0 +1,12 @@
+[
+  {
+    "invoice_number": "INV-2025-1247",
+    "sender_name": "TECHSOLUTIONS LLC",
+    "receiver_name": "GlobalTech Industries Inc.",
+    "purchase_order_number": "PO-GT-9842",
+    "date_of_invoice": "2025-12-12",
+    "subtotal": "39845",
+    "discount": "1992.25",
+    "tax": "2744.33"
+  }
+]
