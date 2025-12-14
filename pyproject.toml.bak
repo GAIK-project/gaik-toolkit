@@ -80,19 +80,6 @@ all = [
     "gaik[parser]",
     "gaik[transcriber]",
     "gaik[classifier]",
-    "gaik[audio-to-structured-data]",
-    "gaik[documents-to-structured-data]",
-]
-
-# Software components
-audio-to-structured-data = [
-    "gaik[transcriber]",
-    "gaik[extract]",
-]
-
-documents-to-structured-data = [
-    "gaik[parser]",
-    "gaik[extract]",
 ]
 
 # Development tooling for maintainers only (pip install -e ".[dev]")

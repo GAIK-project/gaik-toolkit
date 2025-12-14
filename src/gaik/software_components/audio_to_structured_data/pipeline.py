@@ -24,10 +24,10 @@ from gaik.building_blocks.extractor.schema import print_pydantic_schema
 class PipelineResult:
     """Container for combined pipeline outputs."""
 
-    transcription: TranscriptionResult
-    extracted_fields: list[dict[str, Any]]
-    schema: type
-    requirements: ExtractionRequirements
+    transcription: TranscriptionResult      # Raw and enhanced transcript
+    extracted_fields: list[dict[str, Any]]  # Structured data extracted
+    schema: type                            # The generated Pydantic schema
+    requirements: ExtractionRequirements    # Extraction requirements
 
 
 class AudioToStructuredData:

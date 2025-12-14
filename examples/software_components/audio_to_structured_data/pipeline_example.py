@@ -1,6 +1,7 @@
 """
-Minimal example: transcribe audio and extract structured fields in one step,
-with optional schema reuse/persistence.
+Example: extracts key structured fields from audios by dynamically building extraction models from user requiements
+Software component: audio_to_structured_data
+Workflow: input audio->transcribe->parse user requirement and build schema->extract key data
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ USER_REQUIREMENTS = """
 
     1. Patient Name
     2. Date of Birth (Format: dd.mm.yyyy)
-    3. Consultation Date (dd.mm.yyyy)
+    3. Consultation Date (Format: dd.mm.yyyy)
     4. Symptoms
     5. Symptom Duration
     6. Medical History
@@ -58,7 +59,7 @@ def main() -> None:
         "output_dir": "./",
         "compress_audio": True, # (Optional) for compressing large audios (uses FFMPEG)
         "enhanced_transcript": False,
-}
+    }
     transcribe_options = {
         "custom_context": "",    # Optional extra prompt for transcription
         "use_case_name": "audio_to_structured_data",   # Optional label for logging

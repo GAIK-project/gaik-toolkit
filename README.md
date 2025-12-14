@@ -78,11 +78,15 @@ Install only what you need, or the full toolkit:
 # Structured extraction (schema generation + extraction)
 pip install "gaik[extractor]"
 
-# Document parsing (vision‑based + local parsers)
+# Document parsing (vision-based + local parsers)
 pip install "gaik[parser]"
 
 # Audio/video transcription (Whisper + GPT enhancement)
 pip install "gaik[transcriber]"
+
+# Software components (pipelines)
+pip install "gaik[audio-to-structured-data]"
+pip install "gaik[documents-to-structured-data]"
 
 # Everything
 pip install "gaik[all]"

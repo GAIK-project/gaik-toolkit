@@ -1,5 +1,6 @@
 """
-Example: parse documents (PDF/images/DOCX) and extract structured invoice fields.
+Example: parse documents (PDF/images/DOCX) and extract structured fields by dynamically building extraction models from user requiements
+Workflow: input documents->parse documents (vision_parser, docling, pymupdf, docx)-> parse user requirement and build schema->extract key data
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from gaik.software_components.documents_to_structured_data import DocumentsToStr
 
 
 USER_REQUIREMENTS = """
-Extract invoice number, sender name, receiver name, purchase order number, date of invoice, subtotal, discount, and tax from the invoice.
+Extract invoice number, sender name, receiver name, purchase order number, date of invoice, subtotal, discount, tax, and grand total from the invoice.
 """
 
 
@@ -44,9 +45,9 @@ def main() -> None:
         schema, requirements = existing
 
     result = pipeline.run(
-        file_path=Path(r"input/invoice.pdf"),
+        file_path=Path(r"input/scanned_invoice.jpeg"),
         user_requirements=USER_REQUIREMENTS,
-        parser_choice="docling",  # vision_parser | docling | pymupdf | docx
+        parser_choice="vision_parser",  # vision_parser | docling | pymupdf | docx
         parser_ctor={
             # Example: {"clean_output": True} for VisionParser
         },
