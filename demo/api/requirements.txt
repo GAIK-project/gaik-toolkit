@@ -3,3 +3,4 @@ uvicorn[standard]>=0.32.0
 python-multipart>=0.0.17
 python-dotenv>=1.0.0
 gaik[all]
+fpdf2>=2.7.0

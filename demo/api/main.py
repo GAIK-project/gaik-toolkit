@@ -15,7 +15,7 @@ load_dotenv(env_path)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import classifier, extractor, parser, transcriber
+from routers import classifier, extractor, parser, pipeline, transcriber
 
 
 @asynccontextmanager
@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GAIK Toolkit Demo API",
-    description="REST API for GAIK toolkit components: extractor, parser, classifier, transcriber",
+    description="REST API for GAIK toolkit components: extractor, parser, classifier, transcriber, pipeline",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -51,6 +51,7 @@ app.include_router(parser.router, prefix="/parse", tags=["Parser"])
 app.include_router(classifier.router, prefix="/classify", tags=["Classifier"])
 app.include_router(extractor.router, prefix="/extract", tags=["Extractor"])
 app.include_router(transcriber.router, prefix="/transcribe", tags=["Transcriber"])
+app.include_router(pipeline.router, prefix="/pipeline", tags=["Pipeline"])
 
 
 @app.get("/health")
@@ -71,5 +72,6 @@ async def root():
             "classify": "/classify - Document classification",
             "extract": "/extract - Data extraction",
             "transcribe": "/transcribe - Audio/video transcription",
+            "pipeline": "/pipeline - End-to-end pipelines (audio/document to structured data)",
         },
     }
