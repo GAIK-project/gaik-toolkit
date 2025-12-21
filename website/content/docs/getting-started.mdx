@@ -1,0 +1,131 @@
+---
+title: Getting Started
+description: Quick start guide for GAIK toolkit
+---
+
+## Installation
+
+Install GAIK toolkit using pip. The package supports Python 3.10+.
+
+```bash
+# All features
+pip install gaik[all]
+
+# Or install specific components
+pip install gaik[parser]      # PDF parsing only
+pip install gaik[transcriber] # Audio transcription only
+```
+
+## Environment Setup
+
+Set up your API keys as environment variables:
+
+### Azure OpenAI (Recommended)
+
+```bash
+export AZURE_API_KEY="your-api-key"
+export AZURE_ENDPOINT="https://your-endpoint.openai.azure.com/"
+export AZURE_API_VERSION="2025-03-01-preview"  # Optional
+```
+
+### Standard OpenAI
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+## Quick Start
+
+Here's a simple example to get you started with GAIK:
+
+```python
+from gaik.building_blocks.extractor import (
+    SchemaGenerator, DataExtractor, get_openai_config
+)
+
+# Configure OpenAI (Azure or standard)
+config = get_openai_config(use_azure=True)  # or use_azure=False
+
+# Step 1: Generate schema from requirements
+generator = SchemaGenerator(config=config)
+schema = generator.generate_schema(
+    user_requirements="Extract name and age from text"
+)
+
+# Step 2: Extract data
+extractor = DataExtractor(config=config)
+results = extractor.extract(
+    extraction_model=schema,
+    requirements=generator.item_requirements,
+    user_requirements="Extract name and age from text",
+    documents=["Alice is 25 years old"]
+)
+
+print(results)  # [{'name': 'Alice', 'age': 25}]
+```
+
+## End-to-End Document Pipeline
+
+For a simpler high-level API, use the software components:
+
+```python
+from gaik.software_components.documents_to_structured_data import (
+    DocumentsToStructuredData
+)
+from pathlib import Path
+
+# Create pipeline
+pipeline = DocumentsToStructuredData(use_azure=True)
+
+# Process document
+result = pipeline.run(
+    file_path=Path("invoice.pdf"),
+    user_requirements="""
+    Extract invoice information:
+    - invoice_number: Invoice ID
+    - vendor: Company name
+    - total_amount: Total in EUR (decimal)
+    - date: Invoice date
+    """,
+    parser_choice="vision_parser",  # or "pymupdf", "docling", "docx"
+)
+
+print(result.extracted_fields)
+```
+
+## Parse PDF to Markdown
+
+```python
+from gaik.building_blocks.parsers import VisionParser, get_openai_config
+
+# Configure and parse
+config = get_openai_config(use_azure=True)
+parser = VisionParser(openai_config=config)
+
+pages = parser.convert_pdf("document.pdf")
+markdown = "\n\n".join(pages)
+print(markdown)
+```
+
+## Audio Transcription
+
+```python
+from gaik.building_blocks.transcriber import Transcriber, get_openai_config
+
+config = get_openai_config(use_azure=True)
+transcriber = Transcriber(
+    api_config=config,
+    output_dir="transcripts/",
+    enhanced_transcript=True  # Optional GPT enhancement
+)
+
+result = transcriber.transcribe("meeting.mp3")
+print(result.raw_transcript)
+```
+
+## Next Steps
+
+- Explore the [Toolkit](/toolkit) documentation
+- Learn about [Data Extraction](/toolkit/knowledge-extraction)
+- Discover [PDF Parsing](/toolkit/parser) capabilities
+- View on [PyPI](https://pypi.org/project/gaik/) or [GitHub](https://github.com/GAIK-project/gaik-toolkit)

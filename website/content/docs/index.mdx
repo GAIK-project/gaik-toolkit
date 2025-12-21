@@ -1,0 +1,139 @@
+---
+title: GAIK - Generative AI-Enhanced Knowledge Management
+description: Bridging research, technology and real-world business applications
+---
+
+<div style={{textAlign: 'center', margin: '2rem 0'}}>
+  <img src="/gaik-toolkit/logos/SVG/gaik_logo_big_fitted.svg" alt="GAIK Logo" style={{maxWidth: '600px', width: '100%', height: 'auto'}} />
+</div>
+
+## Bridging Research, Technology and Real-World Applications
+
+GAIK explores how generative AI can transform knowledge management in businesses through collaborative research between academia, technology providers, and industry partners.
+
+Knowledge management remains one of the most persistent challenges facing modern businesses. Despite rapid advances in generative AI, most companies struggle to effectively implement these technologies for knowledge-intensive processes.
+
+### GAIK Toolkit - Now Available
+
+The GAIK toolkit is now published on PyPI! Get started with structured data extraction, PDF parsing, audio transcription, and document classification.
+
+```bash
+pip install gaik[all]
+```
+
+**Version:** 0.2.29 | **[PyPI](https://pypi.org/project/gaik/)** | **[GitHub](https://github.com/GAIK-project/gaik-toolkit)** | **Python 3.10+**
+
+**Quick Example:**
+```python
+from gaik.building_blocks.extractor import (
+    SchemaGenerator, DataExtractor, get_openai_config
+)
+
+# Configure OpenAI
+config = get_openai_config(use_azure=True)
+
+# Generate schema from requirements
+generator = SchemaGenerator(config=config)
+schema = generator.generate_schema(
+    user_requirements="Extract name and age from text"
+)
+
+# Extract data
+extractor = DataExtractor(config=config)
+results = extractor.extract(
+    extraction_model=schema,
+    requirements=generator.item_requirements,
+    user_requirements="Extract name and age from text",
+    documents=["Alice is 25 years old"]
+)
+
+print(results)  # [{'name': 'Alice', 'age': 25}]
+```
+
+
+## Key Research Questions
+
+- How can generative AI be made accessible to businesses without extensive technical expertise?
+- What frameworks enable scalable knowledge management solutions across different industries?
+- How do we bridge the gap between cutting-edge AI research and practical business applications?
+- What reusable components can accelerate AI adoption in knowledge work?
+
+## GAIK's Approach
+
+GAIK investigates generative AI applications through three fundamental knowledge management processes:
+
+### Knowledge Generation
+
+Auto-generate business reports, sales proposals, marketing materials, project proposals, and more.
+
+### Knowledge Capture
+
+Extract information from business documents, videos, voice recordings, emails, and meeting recordings.
+
+### Knowledge Access
+
+Quick, precise, and intelligent access to organizational knowledge including document repositories, databases, wikis, CRMs, and intranets.
+
+## Innovation
+
+**Multi-Stakeholder Development**: Our consortium brings together academic researchers, technology experts, and industry practitioners to ensure research relevance and practical applicability.
+
+**Knowledge Management-Focused Modular Architecture**: We take a specialized, in-depth approach to knowledge management by developing standalone GenAI components that address specific KM challenges. Each component is designed to be modular and reusable, allowing them to function independently or integrate into a knowledge management toolkit.
+
+**Scalable Complexity Framework**: We research how AI solutions can adapt to different user expertise levels, from business managers to AI developers.
+
+**Open Science Approach**: All research outputs, including the GenAI toolkit, are developed as open-source contributions to the research community.
+
+**Real-World Validation**: Research is validated through active collaboration with partner companies across healthcare, manufacturing, and construction sectors.
+
+## GAIK's Impact
+
+**For the Academic Community**: Contributing to the understanding of practical generative AI applications in business contexts and developing reusable research frameworks.
+
+**For Technology Innovation**: Creating open-source tools and methodologies that advance the field of business AI applications.
+
+**For Industry Advancement**: Demonstrating how research-based solutions can address real knowledge management challenges in diverse business sectors.
+
+## Consortium and Collaboration
+
+**Research Leadership**: Haaga-Helia University of Applied Sciences
+
+**Academic Partners**: University of Helsinki, Tampere University
+
+**International Research Collaboration**: TIB Leibniz Information Centre (Germany), 3IA Côte d'Azur (France), MCI The Entrepreneurial School (Austria)
+
+**Industry Research Partners**: 5 Finnish companies belonging to the healthcare, construction, and manufacturing sectors
+
+## Explore the Toolkit
+
+<Cards>
+  <Card
+    title="Getting Started"
+    href="/getting-started"
+    description="Installation and basic usage guide"
+  />
+  <Card
+    title="Toolkit Documentation"
+    href="/toolkit"
+    description="Complete API reference"
+  />
+  <Card
+    title="Examples"
+    href="/examples"
+    description="Real-world implementation examples"
+  />
+</Cards>
+
+## Get Involved in Our Research
+
+**Research Collaboration** - Connect with our team to explore joint research opportunities
+
+**Follow Our Progress** - Stay updated on research findings, publications, and developments
+
+**Early Adopters** - Be an early adopter of our GenAI KM toolkit by joining our network
+
+**Academic Exchange** - Engage in knowledge sharing and collaborative research initiatives
+
+---
+
+GAIK (Generative AI-Enhanced Knowledge Management) is co-funded by the European Regional Development Fund and represents collaborative research at the intersection of artificial intelligence, business innovation, and practical technology applications.

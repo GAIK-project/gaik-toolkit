@@ -1,0 +1,262 @@
+---
+title: PDF Parsing
+description: Convert PDFs to Markdown with vision models or fast local extraction
+---
+
+## Overview
+
+GAIK provides multiple PDF parsing options: vision-based parsing using language models (VisionParser), fast local text extraction (PyMuPDFParser), advanced document parsing with OCR (DoclingParser), and Word document support (DocxParser).
+
+## Installation
+
+```bash
+pip install gaik[parser]
+# or
+pip install gaik[all]
+```
+
+## VisionParser
+
+Vision-based PDF parsing converts documents to Markdown using AI vision models. Ideal for complex layouts, tables, scanned documents, and documents with visual elements.
+
+### Features
+
+- **Vision-Driven** - Uses AI vision models to understand document layout
+- **Markdown Output** - Clean, structured Markdown format
+- **Table Preservation** - Maintains table structure
+- **OCR Support** - Handles scanned PDFs
+- **Context-Aware** - Uses previous pages for better context
+- **Clean Output** - Optional removal of headers/footers
+
+### Basic Usage
+
+```python
+from gaik.building_blocks.parsers import VisionParser, get_openai_config
+
+# Configure OpenAI (Azure or standard)
+config = get_openai_config(use_azure=True)  # or use_azure=False
+parser = VisionParser(openai_config=config)
+
+# Convert PDF to Markdown
+pages = parser.convert_pdf("invoice.pdf")
+markdown = "\n\n".join(pages)
+print(markdown)
+
+# With clean output (removes headers/footers)
+pages = parser.convert_pdf("invoice.pdf", clean_output=True)
+```
+
+### Configuration
+
+Set up environment variables:
+
+```bash
+# For Azure OpenAI
+export AZURE_API_KEY="your-key"
+export AZURE_ENDPOINT="https://your-endpoint.openai.azure.com/"
+
+# For standard OpenAI
+export OPENAI_API_KEY="sk-..."
+```
+
+Create configuration:
+
+```python
+from gaik.building_blocks.parsers import get_openai_config
+
+# Azure OpenAI
+config = get_openai_config(use_azure=True)
+
+# Standard OpenAI
+config = get_openai_config(use_azure=False)
+```
+
+### Advanced Options
+
+```python
+from gaik.building_blocks.parsers import VisionParser, get_openai_config
+
+config = get_openai_config(use_azure=True)
+parser = VisionParser(openai_config=config)
+
+# Convert with options
+pages = parser.convert_pdf(
+    pdf_path="document.pdf",
+    dpi=150,              # Image resolution (default: 150)
+    clean_output=True     # Remove headers/footers
+)
+```
+
+## PyMuPDFParser
+
+Fast local PDF text extraction without external API calls. Ideal for simple text extraction and batch processing.
+
+### Features
+
+- **Fast** - Pure Python, no external binaries
+- **Local** - No API calls or costs
+- **Metadata** - Extracts document properties
+- **Simple** - Straightforward text extraction
+
+### Basic Usage
+
+```python
+from gaik.building_blocks.parsers import PyMuPDFParser
+
+parser = PyMuPDFParser()
+text = parser.parse_pdf("document.pdf")
+print(text)
+```
+
+## DoclingParser
+
+Advanced document parsing using IBM's Docling library with OCR and table extraction capabilities.
+
+### Features
+
+- **OCR Support** - Handles scanned documents
+- **Table Extraction** - Excellent table detection
+- **Multiple Formats** - PDF, images, and more
+- **Local Processing** - No API calls
+
+### Basic Usage
+
+```python
+from gaik.building_blocks.parsers import DoclingParser
+
+parser = DoclingParser()
+result = parser.parse("document.pdf")
+print(result)
+```
+
+## DocxParser
+
+Word document (.docx/.doc) text extraction.
+
+### Features
+
+- **Word Support** - Handles .docx and .doc files
+- **Text Extraction** - Clean text output
+- **Local Processing** - No API calls
+
+### Basic Usage
+
+```python
+from gaik.building_blocks.parsers import DocxParser
+
+parser = DocxParser()
+text = parser.parse_docx("document.docx")
+print(text)
+```
+
+## Comparison
+
+| Feature | VisionParser | PyMuPDFParser | DoclingParser | DocxParser |
+|---------|--------------|---------------|---------------|------------|
+| **Speed** | Slower (API) | Very fast | Medium | Fast |
+| **Cost** | API costs | Free | Free | Free |
+| **Layout Understanding** | Excellent | Basic | Good | N/A |
+| **Table Extraction** | Excellent | Limited | Excellent | N/A |
+| **Scanned PDFs** | Excellent | None | Good (OCR) | N/A |
+| **Output Format** | Markdown | Plain text | Markdown | Plain text |
+| **Offline** | No | Yes | Yes | Yes |
+
+## When to Use Which
+
+### Use VisionParser When:
+- Documents have complex layouts
+- Tables need to be preserved
+- Dealing with scanned PDFs
+- Visual structure is important
+- Quality is more important than speed
+
+### Use PyMuPDFParser When:
+- You need fast extraction
+- Documents are text-heavy digital PDFs
+- Simple text extraction is sufficient
+- You want to avoid API costs
+- Processing many documents in batch
+
+### Use DoclingParser When:
+- You need OCR without API costs
+- Tables are important
+- You want local processing with good accuracy
+
+### Use DocxParser When:
+- Working with Word documents
+
+## Complete Example
+
+```python
+from gaik.building_blocks.parsers import (
+    VisionParser, PyMuPDFParser, DoclingParser, get_openai_config
+)
+
+# Method 1: Vision-based (high quality, API-based)
+config = get_openai_config(use_azure=True)
+vision_parser = VisionParser(openai_config=config)
+pages = vision_parser.convert_pdf("complex_invoice.pdf", clean_output=True)
+vision_markdown = "\n\n".join(pages)
+
+# Method 2: Local extraction (fast, free)
+local_parser = PyMuPDFParser()
+text = local_parser.parse_pdf("simple_document.pdf")
+
+# Method 3: Docling (OCR, local)
+docling_parser = DoclingParser()
+docling_result = docling_parser.parse("scanned_document.pdf")
+
+# Save outputs
+with open("vision_output.md", "w", encoding="utf-8") as f:
+    f.write(vision_markdown)
+
+with open("local_output.txt", "w", encoding="utf-8") as f:
+    f.write(text)
+```
+
+## End-to-End Pipeline
+
+For combined parsing and extraction, use the high-level pipeline:
+
+```python
+from gaik.software_components.documents_to_structured_data import (
+    DocumentsToStructuredData
+)
+from pathlib import Path
+
+pipeline = DocumentsToStructuredData(use_azure=True)
+
+# Using vision parser
+result = pipeline.run(
+    file_path=Path("invoice.pdf"),
+    user_requirements="Extract invoice number, vendor, and total",
+    parser_choice="vision_parser"  # or "pymupdf", "docling", "docx"
+)
+
+print(f"Parsed pages: {len(result.parsed_documents)}")
+print(f"Extracted data: {result.extracted_fields}")
+```
+
+## Error Handling
+
+```python
+from gaik.building_blocks.parsers import VisionParser, get_openai_config
+
+try:
+    config = get_openai_config(use_azure=True)
+    parser = VisionParser(openai_config=config)
+    pages = parser.convert_pdf("document.pdf")
+except FileNotFoundError:
+    print("PDF file not found")
+except ValueError as e:
+    print(f"Configuration error: {e}")
+except Exception as e:
+    print(f"Parsing failed: {e}")
+```
+
+## Next Steps
+
+- Learn about [Data Extraction](/toolkit/knowledge-extraction)
+- Explore the [Getting Started](/getting-started) guide
+- Check out [Examples](/examples) for real-world use cases
+- View on [PyPI](https://pypi.org/project/gaik/) or [GitHub](https://github.com/GAIK-project/gaik-toolkit)

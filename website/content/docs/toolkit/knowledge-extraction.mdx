@@ -1,0 +1,473 @@
+---
+title: Data Extraction
+description: Extract structured data from text using SchemaGenerator and DataExtractor
+---
+
+## Overview
+
+GAIK's data extraction component converts unstructured text into typed, validated data using natural language descriptions. It automatically generates Pydantic models from your requirements and extracts structured data with full type safety.
+
+## Installation
+
+```bash
+pip install gaik[all]
+```
+
+## Key Features
+
+- **Natural Language Schemas** - Define extraction schemas using plain English
+- **Dynamic Schema Generation** - Automatically creates Pydantic models
+- **Type-Safe** - Full Pydantic validation for all extracted data
+- **Structure Detection** - Automatically detects flat vs. nested data structures
+- **Schema Persistence** - Save and reuse generated schemas
+- **Batch Processing** - Extract from multiple documents efficiently
+
+## Basic Usage
+
+```python
+from gaik.building_blocks.extractor import (
+    SchemaGenerator, DataExtractor, get_openai_config
+)
+
+# Configure OpenAI (Azure or standard)
+config = get_openai_config(use_azure=True)  # or use_azure=False
+
+# Step 1: Generate schema from requirements
+generator = SchemaGenerator(config=config)
+schema = generator.generate_schema(
+    user_requirements="Extract name and age from text"
+)
+
+# Step 2: Extract data
+extractor = DataExtractor(config=config)
+results = extractor.extract(
+    extraction_model=schema,
+    requirements=generator.item_requirements,
+    user_requirements="Extract name and age from text",
+    documents=["Alice is 25 years old"]
+)
+
+print(results)  # [{'name': 'Alice', 'age': 25}]
+```
+
+## How It Works
+
+1. **Define Requirements** - Describe what you want to extract in natural language
+2. **Generate Schema** - SchemaGenerator creates a Pydantic model automatically
+3. **Extract Data** - DataExtractor processes documents and returns validated data
+
+The generator analyzes your requirements and automatically determines:
+- Field names and types
+- Whether data is flat or nested (lists/tables)
+- Required vs optional fields
+
+## Configuration
+
+### Azure OpenAI
+
+```bash
+export AZURE_API_KEY="your-api-key"
+export AZURE_ENDPOINT="https://your-endpoint.openai.azure.com/"
+export AZURE_API_VERSION="2025-03-01-preview"  # Optional
+```
+
+```python
+from gaik.building_blocks.extractor import get_openai_config
+
+config = get_openai_config(use_azure=True)
+```
+
+### Standard OpenAI
+
+```bash
+export OPENAI_API_KEY="sk-..."
+```
+
+```python
+config = get_openai_config(use_azure=False)
+```
+
+## Schema Definition
+
+### Natural Language Requirements
+
+Define schemas using clear descriptions:
+
+```python
+from gaik.building_blocks.extractor import SchemaGenerator, get_openai_config
+
+config = get_openai_config(use_azure=True)
+generator = SchemaGenerator(config=config)
+
+# Simple extraction
+schema = generator.generate_schema(
+    user_requirements="Extract name and age from text"
+)
+
+# Detailed multi-field extraction
+schema = generator.generate_schema(
+    user_requirements="""
+    Extract invoice information:
+    - invoice_number: Invoice ID (string)
+    - amount: Total in USD (decimal)
+    - vendor: Company name (string)
+    - date: Invoice date (date)
+    """
+)
+
+# Check structure type
+print(generator.structure_analysis.structure_type)  # "flat" or "nested_list"
+```
+
+### Manual Schema Definition
+
+For more control, define schemas manually:
+
+```python
+from pydantic import BaseModel, Field
+from decimal import Decimal
+from typing import Literal
+from gaik.building_blocks.extractor import (
+    DataExtractor, ExtractionRequirements, FieldSpec, get_openai_config
+)
+
+# Define Pydantic model
+class Invoice(BaseModel):
+    invoice_number: str = Field(description="Invoice ID")
+    amount: Decimal = Field(description="Total amount")
+    vendor: str = Field(description="Company name")
+    status: Literal["paid", "pending", "overdue"] = Field(description="Payment status")
+
+# Define extraction requirements
+requirements = ExtractionRequirements(
+    use_case_name="Invoice",
+    fields=[
+        FieldSpec(
+            field_name="invoice_number",
+            field_type="str",
+            description="Invoice ID",
+            required=True
+        ),
+        FieldSpec(
+            field_name="amount",
+            field_type="decimal",
+            description="Total amount",
+            required=True
+        ),
+        FieldSpec(
+            field_name="vendor",
+            field_type="str",
+            description="Company name",
+            required=True
+        ),
+        FieldSpec(
+            field_name="status",
+            field_type="str",
+            enum=["paid", "pending", "overdue"],
+            description="Payment status",
+            required=True
+        ),
+    ]
+)
+
+# Extract data
+config = get_openai_config(use_azure=True)
+extractor = DataExtractor(config=config)
+results = extractor.extract(
+    extraction_model=Invoice,
+    requirements=requirements,
+    user_requirements="Extract invoice information",
+    documents=["Invoice #12345 from Acme Corp. Total: $1,500. Status: paid"]
+)
+```
+
+## Supported Field Types
+
+The schema generator supports these field types:
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `str` | Text strings | Names, IDs |
+| `int` | Integers | Counts, quantities |
+| `float` | Decimal numbers | Percentages |
+| `bool` | Boolean values | Yes/No flags |
+| `date` | Date values | Invoice dates |
+| `decimal` | Precise decimals | Monetary amounts |
+| `list[str]` | List of strings | Tags, items |
+| `list[dict]` | Nested structures | Table rows |
+
+## Batch Processing
+
+Extract from multiple documents:
+
+```python
+from gaik.building_blocks.extractor import (
+    SchemaGenerator, DataExtractor, get_openai_config
+)
+
+config = get_openai_config(use_azure=True)
+
+# Generate schema
+generator = SchemaGenerator(config=config)
+schema = generator.generate_schema(
+    user_requirements="""
+    Extract:
+    - invoice_number: Invoice ID
+    - amount: Total in USD
+    - vendor: Company name
+    """
+)
+
+# Extract from multiple documents
+documents = [
+    "Invoice #12345 from Acme Corp. Total: $1,500",
+    "INV-67890, Supplier: TechCo, Amount: $2,750",
+    "Invoice number: 54321, Vendor: GlobalCo, Total: $999"
+]
+
+extractor = DataExtractor(config=config)
+results = extractor.extract(
+    extraction_model=schema,
+    requirements=generator.item_requirements,
+    user_requirements="Extract invoice data",
+    documents=documents,
+    save_json=True,
+    json_path="results.json"
+)
+
+for result in results:
+    print(f"Invoice: {result['invoice_number']}, Amount: ${result['amount']}")
+```
+
+## Saving and Loading Schemas
+
+Persist generated schemas for reuse:
+
+```python
+from gaik.building_blocks.extractor import (
+    SchemaGenerator, DataExtractor, get_openai_config,
+    save_schema_to_python, save_requirements,
+    load_saved_schema, load_saved_requirements
+)
+from pathlib import Path
+
+config = get_openai_config(use_azure=True)
+
+# Generate and save schema
+generator = SchemaGenerator(config=config)
+schema = generator.generate_schema(
+    user_requirements="Extract project title, funding, and status"
+)
+
+save_schema_to_python(schema, Path("schema.py"))
+save_requirements(
+    generator.item_requirements,
+    schema.__name__,
+    Path("requirements.json")
+)
+
+# Later, load and reuse
+model_name, requirements = load_saved_requirements(Path("requirements.json"))
+SavedModel = load_saved_schema(Path("schema.py"), model_name)
+
+extractor = DataExtractor(config=config)
+results = extractor.extract(
+    extraction_model=SavedModel,
+    requirements=requirements,
+    user_requirements="Extract project info",
+    documents=new_documents
+)
+```
+
+## Complete Examples
+
+### Invoice Processing
+
+```python
+from gaik.building_blocks.extractor import (
+    SchemaGenerator, DataExtractor, get_openai_config
+)
+
+config = get_openai_config(use_azure=True)
+
+# Generate invoice schema
+generator = SchemaGenerator(config=config)
+schema = generator.generate_schema(
+    user_requirements="""
+    Extract invoice information:
+    - invoice_number: Invoice or reference number
+    - vendor: Vendor or supplier name
+    - amount: Total amount (decimal)
+    - date: Invoice date
+    - line_items: List of items with description and price
+    """
+)
+
+invoice_text = """
+INVOICE #2024-001
+Date: January 15, 2024
+From: Acme Corporation
+
+Items:
+- Widget A: $500
+- Widget B: $750
+
+Total: $1,250.00
+"""
+
+extractor = DataExtractor(config=config)
+results = extractor.extract(
+    extraction_model=schema,
+    requirements=generator.item_requirements,
+    user_requirements="Extract invoice data",
+    documents=[invoice_text]
+)
+
+print(results[0])
+```
+
+### Project Data Extraction
+
+```python
+from gaik.building_blocks.extractor import (
+    SchemaGenerator, DataExtractor, get_openai_config
+)
+
+config = get_openai_config(use_azure=True)
+
+generator = SchemaGenerator(config=config)
+schema = generator.generate_schema(
+    user_requirements="""
+    Extract project information:
+    - project_title: Project name (string)
+    - start_date: Project start date (date)
+    - total_funding_eur: Total funding in EUR (decimal)
+    - status: Project status (enum: ongoing, completed, cancelled)
+    - team_members: List of team member names
+    """
+)
+
+extractor = DataExtractor(config=config)
+results = extractor.extract(
+    extraction_model=schema,
+    requirements=generator.item_requirements,
+    user_requirements="Extract project data",
+    documents=[project_text]
+)
+```
+
+## High-Level Pipeline
+
+For end-to-end document processing, use the software component:
+
+```python
+from gaik.software_components.documents_to_structured_data import (
+    DocumentsToStructuredData
+)
+from pathlib import Path
+
+pipeline = DocumentsToStructuredData(use_azure=True)
+
+result = pipeline.run(
+    file_path=Path("invoice.pdf"),
+    user_requirements="""
+    Extract:
+    - invoice_number
+    - vendor
+    - total_amount
+    - date
+    """,
+    parser_choice="vision_parser",  # or "pymupdf", "docling", "docx"
+    extract_options={"save_json": True}
+)
+
+print(f"Parsed: {len(result.parsed_documents)} pages")
+print(f"Extracted: {result.extracted_fields}")
+print(f"Schema: {result.schema.__name__}")
+```
+
+## API Reference
+
+### SchemaGenerator
+
+```python
+SchemaGenerator(config: dict)
+```
+
+**Methods:**
+- `generate_schema(user_requirements: str) -> type[BaseModel]` - Generate Pydantic model from requirements
+
+**Properties:**
+- `structure_analysis.structure_type` - "flat" or "nested_list"
+- `item_requirements` - ExtractionRequirements object
+
+### DataExtractor
+
+```python
+DataExtractor(config: dict)
+```
+
+**Methods:**
+- `extract(extraction_model, requirements, user_requirements, documents, save_json=False, json_path=None) -> list[dict]`
+
+### FieldSpec
+
+```python
+FieldSpec(
+    field_name: str,
+    field_type: str,  # "str", "int", "float", "bool", "date", "decimal", "list[str]", "list[dict]"
+    description: str,
+    required: bool = True,
+    enum: list[str] | None = None
+)
+```
+
+### ExtractionRequirements
+
+```python
+ExtractionRequirements(
+    use_case_name: str,
+    fields: list[FieldSpec]
+)
+```
+
+## Error Handling
+
+```python
+from gaik.building_blocks.extractor import (
+    SchemaGenerator, DataExtractor, get_openai_config
+)
+
+try:
+    config = get_openai_config(use_azure=True)
+    generator = SchemaGenerator(config=config)
+    schema = generator.generate_schema(user_requirements="Extract name and age")
+
+    extractor = DataExtractor(config=config)
+    results = extractor.extract(
+        extraction_model=schema,
+        requirements=generator.item_requirements,
+        user_requirements="Extract name and age",
+        documents=["Some text"]
+    )
+except ValueError as e:
+    print(f"Validation error: {e}")
+except Exception as e:
+    print(f"Extraction failed: {e}")
+```
+
+## Best Practices
+
+1. **Clear Requirements** - Be specific about what you want to extract
+2. **Specify Types** - Include type hints (e.g., "amount in EUR (decimal)")
+3. **Use Enums** - For fields with fixed values, specify allowed options
+4. **Batch Processing** - Process multiple documents together for efficiency
+5. **Save Schemas** - Persist generated schemas for production use
+6. **Validate Early** - Test with sample documents before processing large batches
+
+## Next Steps
+
+- Explore [PDF Parsing](/toolkit/parser) for document extraction
+- Check out the [Getting Started](/getting-started) guide
+- View on [PyPI](https://pypi.org/project/gaik/) or [GitHub](https://github.com/GAIK-project/gaik-toolkit)
+- See [Examples](/examples) for real-world use cases
