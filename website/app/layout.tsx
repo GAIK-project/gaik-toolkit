@@ -63,6 +63,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
           search={{
             options: {
               type: 'static',
+              api: '/gaik-toolkit/api/search',
             },
           }}
         >
