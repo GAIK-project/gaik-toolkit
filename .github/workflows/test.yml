@@ -6,17 +6,19 @@ on:
       - main
       - dev
     paths:
-      - 'src/**'
+      - 'packages/python/**'
       - 'pyproject.toml'
-      - '.github/workflows/**'
+      - '.github/workflows/test.yml'
+      - '.github/workflows/publish.yml'
   pull_request:
     branches:
       - main
       - dev
     paths:
-      - 'src/**'
+      - 'packages/python/**'
       - 'pyproject.toml'
-      - '.github/workflows/**'
+      - '.github/workflows/test.yml'
+      - '.github/workflows/publish.yml'
   workflow_call:  # Allow this workflow to be called by other workflows
     inputs:
       ref:
