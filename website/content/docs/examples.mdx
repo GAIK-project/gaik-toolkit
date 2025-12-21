@@ -3,10 +3,6 @@ title: Examples
 description: Real-world examples and use cases for GAIK toolkit
 ---
 
-## Introduction
-
-This section provides practical examples demonstrating how to use GAIK toolkit for common data extraction, document parsing, and transcription tasks.
-
 ## Common Use Cases
 
 ### Data Extraction
@@ -49,7 +45,6 @@ print(results)
 - Form data extraction
 - Resume/CV parsing
 - Customer data extraction
-- Document classification
 
 ### PDF Processing
 
@@ -70,7 +65,6 @@ markdown = "\n\n".join(pages)
 - Document archival
 - Content extraction from scanned documents
 - Table extraction from PDFs
-- Academic paper processing
 
 ### End-to-End Document Pipeline
 
@@ -121,9 +115,6 @@ result = transcriber.transcribe(
 
 print(result.raw_transcript)
 print(result.enhanced_transcript)
-
-# Save to files
-saved_paths = result.save("output/")
 ```
 
 **Use Cases:**
@@ -196,40 +187,7 @@ for i, result in enumerate(results, 1):
     print(f"Document {i}: {result}")
 ```
 
-## Example Patterns
-
-### Saving and Reusing Schemas
-
-```python
-from gaik.building_blocks.extractor import (
-    SchemaGenerator, DataExtractor, get_openai_config,
-    save_schema_to_python, save_requirements,
-    load_saved_schema, load_saved_requirements
-)
-from pathlib import Path
-
-config = get_openai_config(use_azure=True)
-
-# First time: Generate and save
-generator = SchemaGenerator(config=config)
-schema = generator.generate_schema(
-    user_requirements="Extract invoice number, vendor, and total"
-)
-save_schema_to_python(schema, Path("invoice_schema.py"))
-save_requirements(generator.item_requirements, schema.__name__, Path("invoice_requirements.json"))
-
-# Later: Load and reuse
-model_name, requirements = load_saved_requirements(Path("invoice_requirements.json"))
-SavedSchema = load_saved_schema(Path("invoice_schema.py"), model_name)
-
-extractor = DataExtractor(config=config)
-results = extractor.extract(
-    extraction_model=SavedSchema,
-    requirements=requirements,
-    user_requirements="Extract invoice data",
-    documents=new_invoices
-)
-```
+## Advanced Patterns
 
 ### Combined PDF + Extraction
 
@@ -268,45 +226,12 @@ results = extractor.extract(
 print(results[0])
 ```
 
-## Prerequisites
-
-Before working with these examples:
-
-- Install GAIK toolkit: `pip install gaik[all]`
-- Set up API keys (Azure OpenAI or standard OpenAI)
-- Python 3.10 or higher
-
-## Environment Setup
-
-```bash
-# Azure OpenAI (Recommended)
-export AZURE_API_KEY="your-api-key"
-export AZURE_ENDPOINT="https://your-endpoint.openai.azure.com/"
-
-# Standard OpenAI
-export OPENAI_API_KEY="sk-..."
-```
-
-## Getting Help
-
-If you need more information:
-
-1. Check the [Getting Started](/getting-started) guide
-2. Review [Data Extraction](/toolkit/knowledge-extraction) documentation
-3. Explore [PDF Parsing](/toolkit/parser) capabilities
-4. Visit [GitHub](https://github.com/GAIK-project/gaik-toolkit) for more examples
-5. Check [PyPI](https://pypi.org/project/gaik/) for package details
-
 ## More Examples
 
-Additional examples are available in the [examples folder](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples):
+Additional examples are available in the [GitHub examples folder](https://github.com/GAIK-project/gaik-toolkit/tree/main/examples):
 
 - `examples/building_blocks/extractor/` - Data extraction examples
 - `examples/building_blocks/parsers/` - PDF parsing examples
 - `examples/building_blocks/transcriber/` - Audio transcription examples
 - `examples/building_blocks/classifier/` - Document classification examples
 - `examples/software_components/` - End-to-end pipeline examples
-
-## Contributing Examples
-
-Have a great use case for GAIK toolkit? Contributions are welcome! Visit the [GitHub repository](https://github.com/GAIK-project/gaik-toolkit) to share your examples.

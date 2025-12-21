@@ -19,8 +19,8 @@ pip install gaik[all]
 - **Dynamic Schema Generation** - Automatically creates Pydantic models
 - **Type-Safe** - Full Pydantic validation for all extracted data
 - **Structure Detection** - Automatically detects flat vs. nested data structures
-- **Schema Persistence** - Save and reuse generated schemas
 - **Batch Processing** - Extract from multiple documents efficiently
+- **JSON Export** - Save extraction results to JSON files
 
 ## Basic Usage
 
@@ -239,46 +239,6 @@ for result in results:
     print(f"Invoice: {result['invoice_number']}, Amount: ${result['amount']}")
 ```
 
-## Saving and Loading Schemas
-
-Persist generated schemas for reuse:
-
-```python
-from gaik.building_blocks.extractor import (
-    SchemaGenerator, DataExtractor, get_openai_config,
-    save_schema_to_python, save_requirements,
-    load_saved_schema, load_saved_requirements
-)
-from pathlib import Path
-
-config = get_openai_config(use_azure=True)
-
-# Generate and save schema
-generator = SchemaGenerator(config=config)
-schema = generator.generate_schema(
-    user_requirements="Extract project title, funding, and status"
-)
-
-save_schema_to_python(schema, Path("schema.py"))
-save_requirements(
-    generator.item_requirements,
-    schema.__name__,
-    Path("requirements.json")
-)
-
-# Later, load and reuse
-model_name, requirements = load_saved_requirements(Path("requirements.json"))
-SavedModel = load_saved_schema(Path("schema.py"), model_name)
-
-extractor = DataExtractor(config=config)
-results = extractor.extract(
-    extraction_model=SavedModel,
-    requirements=requirements,
-    user_requirements="Extract project info",
-    documents=new_documents
-)
-```
-
 ## Complete Examples
 
 ### Invoice Processing
@@ -462,8 +422,8 @@ except Exception as e:
 2. **Specify Types** - Include type hints (e.g., "amount in EUR (decimal)")
 3. **Use Enums** - For fields with fixed values, specify allowed options
 4. **Batch Processing** - Process multiple documents together for efficiency
-5. **Save Schemas** - Persist generated schemas for production use
-6. **Validate Early** - Test with sample documents before processing large batches
+5. **Validate Early** - Test with sample documents before processing large batches
+6. **Save Results** - Use `save_json=True` to persist extraction results
 
 ## Next Steps
 
