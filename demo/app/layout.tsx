@@ -1,15 +1,21 @@
+import { SiteNav } from "@/components/layout/site-nav";
 import { Toaster } from "@/components/ui/sonner";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, JetBrains_Mono, Sora } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const sora = Sora({
+  variable: "--font-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const fraunces = Fraunces({
+  variable: "--font-serif",
+  subsets: ["latin"],
+});
+
+const jetBrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
 });
 
@@ -30,9 +36,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${sora.variable} ${fraunces.variable} ${jetBrainsMono.variable} antialiased`}
       >
-        {children}
+        <div className="min-h-screen">
+          <SiteNav />
+          {children}
+        </div>
         <Toaster />
       </body>
     </html>

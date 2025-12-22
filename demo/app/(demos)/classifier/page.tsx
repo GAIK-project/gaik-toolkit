@@ -21,7 +21,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/demo/file-upload";
+import { DemoStepper } from "@/components/demo/demo-stepper";
 import { ResultCard, ConfidenceBar } from "@/components/demo/result-card";
+import { Step } from "@/components/demo/step-indicator";
 import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -42,6 +44,24 @@ export default function ClassifierPage() {
   const [parserType, setParserType] = useState<string>("auto");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ClassifyResult | null>(null);
+
+  const flowSteps: Step[] = [
+    {
+      id: "upload",
+      name: "Upload",
+      status: file ? "completed" : "pending",
+    },
+    {
+      id: "classes",
+      name: "Classes",
+      status: file && classes.length >= 2 ? "completed" : "pending",
+    },
+    {
+      id: "review",
+      name: "Review",
+      status: result ? "completed" : "pending",
+    },
+  ];
 
   const handleAddClass = () => {
     const trimmed = classInput.trim().toLowerCase();
@@ -108,7 +128,7 @@ export default function ClassifierPage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
+        <h1 className="text-3xl font-semibold tracking-tight font-serif flex items-center gap-3">
           <Tags className="h-8 w-8" />
           Document Classifier
         </h1>
@@ -116,6 +136,8 @@ export default function ClassifierPage() {
           Classify documents into predefined categories using LLM analysis
         </p>
       </header>
+
+      <DemoStepper steps={flowSteps} className="mb-8" />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Input Section */}

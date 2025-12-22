@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Check, Circle, X, Loader2 } from "lucide-react";
+import { Check, Circle, CircleDot, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface Step {
@@ -51,7 +51,7 @@ export function StepIndicator({
                 step.status === "completed" &&
                   "border-green-500 bg-green-500 text-white",
                 step.status === "in_progress" &&
-                  "border-primary bg-primary/10 text-primary",
+                  "border-primary/60 bg-primary/10 text-primary",
                 step.status === "error" &&
                   "border-destructive bg-destructive text-white",
                 step.status === "pending" &&
@@ -68,25 +68,11 @@ export function StepIndicator({
                 </motion.div>
               )}
               {step.status === "in_progress" && (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <CircleDot className="h-4 w-4" />
               )}
               {step.status === "error" && <X className="h-4 w-4" />}
               {step.status === "pending" && (
                 <Circle className="h-3 w-3 fill-current" />
-              )}
-
-              {/* Pulse animation for in_progress */}
-              {step.status === "in_progress" && (
-                <motion.div
-                  className="absolute inset-0 rounded-full border-2 border-primary"
-                  initial={{ scale: 1, opacity: 1 }}
-                  animate={{ scale: 1.5, opacity: 0 }}
-                  transition={{
-                    duration: 1,
-                    repeat: Infinity,
-                    ease: "easeOut",
-                  }}
-                />
               )}
             </motion.div>
 

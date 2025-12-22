@@ -1,3 +1,7 @@
 export default function Template({ children }: { children: React.ReactNode }) {
-  return <main className="container mx-auto px-4 py-16">{children}</main>;
+  return (
+    <main className="mx-auto w-full max-w-6xl px-6 pb-24 pt-24 sm:px-8">
+      {children}
+    </main>
+  );
 }

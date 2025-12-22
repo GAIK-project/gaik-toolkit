@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { FileSearch, FileText, FolderKanban, Mic, Workflow } from "lucide-react";
 import Link from "next/link";
 
@@ -47,58 +48,57 @@ export function DemoCards() {
   const otherDemos = demos.filter((d) => !d.featured);
 
   return (
-    <section className="mx-auto mt-16 max-w-4xl space-y-6">
-      {/* Featured Pipeline Demo */}
-      {featuredDemo && (
-        <Link href={featuredDemo.href}>
-          <Card className="transition-all hover:border-primary hover:shadow-lg border-2 border-primary/20 bg-linear-to-br from-primary/5 to-transparent">
-            <CardHeader>
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-                  <featuredDemo.icon className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="text-xl">{featuredDemo.title}</CardTitle>
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
-                      Featured
-                    </span>
-                  </div>
-                  <CardDescription className="mt-1">
-                    {featuredDemo.description}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Try the complete end-to-end workflow demo
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
-      )}
+    <section className="space-y-6">
+      <div className="flex items-end justify-between gap-4">
+        <h2 className="text-2xl font-semibold font-serif md:text-3xl">Demos</h2>
+      </div>
 
-      {/* Other demos grid */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {otherDemos.map((demo) => (
-          <Link key={demo.href} href={demo.href}>
-            <Card className="h-full transition-colors hover:border-primary">
-              <CardHeader>
-                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <demo.icon className="h-5 w-5 text-primary" />
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        {/* Featured Pipeline Demo */}
+        {featuredDemo && (
+          <Link href={featuredDemo.href} className="group">
+            <Card className="relative h-full overflow-hidden border border-primary/20 bg-card transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">
+                    <featuredDemo.icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-xl">
+                        {featuredDemo.title}
+                      </CardTitle>
+                      <Badge className="bg-primary/15 text-primary">
+                        Featured
+                      </Badge>
+                    </div>
+                    <CardDescription>{featuredDemo.description}</CardDescription>
+                  </div>
                 </div>
-                <CardTitle>{demo.title}</CardTitle>
-                <CardDescription>{demo.description}</CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Click to try the interactive demo
-                </p>
+              <CardContent className="flex min-h-[180px] items-center justify-center text-sm text-muted-foreground">
+                End-to-end workflow in one run.
               </CardContent>
             </Card>
           </Link>
-        ))}
+        )}
+
+        {/* Other demos grid */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {otherDemos.map((demo) => (
+            <Link key={demo.href} href={demo.href} className="group">
+              <Card className="h-full border bg-card transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-md">
+                <CardHeader>
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <demo.icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <CardTitle className="text-lg">{demo.title}</CardTitle>
+                  <CardDescription>{demo.description}</CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+          ))}
+        </div>
       </div>
     </section>
   );

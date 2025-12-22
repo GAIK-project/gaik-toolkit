@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileUpload } from "@/components/demo/file-upload";
+import { DemoStepper } from "@/components/demo/demo-stepper";
 import {
   ResultCard,
   ResultText,
@@ -102,6 +103,30 @@ export default function PipelinePage() {
   // Shared state
   const [isLoading, setIsLoading] = useState(false);
   const [steps, setSteps] = useState<Step[]>([]);
+
+  const activeFile = pipelineType === "audio" ? audioFile : docFile;
+  const activeRequirements =
+    pipelineType === "audio" ? audioRequirements : docRequirements;
+  const hasResult = pipelineType === "audio" ? audioResult : docResult;
+
+  const flowSteps: Step[] = [
+    {
+      id: "upload",
+      name: "Upload",
+      status: activeFile ? "completed" : "pending",
+    },
+    {
+      id: "configure",
+      name: "Configure",
+      status:
+        activeFile && activeRequirements.trim() ? "completed" : "pending",
+    },
+    {
+      id: "review",
+      name: "Results",
+      status: hasResult ? "completed" : "pending",
+    },
+  ];
 
   const handleAudioPipeline = async () => {
     if (!audioFile) {
@@ -247,7 +272,7 @@ export default function PipelinePage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
+        <h1 className="text-3xl font-semibold tracking-tight font-serif flex items-center gap-3">
           <Workflow className="h-8 w-8" />
           Pipeline Demo
         </h1>
@@ -256,6 +281,8 @@ export default function PipelinePage() {
           PDF export
         </p>
       </header>
+
+      <DemoStepper steps={flowSteps} className="mb-8" />
 
       {/* Pipeline Type Selector */}
       <Tabs

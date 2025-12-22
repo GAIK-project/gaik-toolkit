@@ -16,7 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileUpload } from "@/components/demo/file-upload";
+import { DemoStepper } from "@/components/demo/demo-stepper";
 import { ResultCard, ResultJson } from "@/components/demo/result-card";
+import { Step } from "@/components/demo/step-indicator";
 import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -50,6 +52,30 @@ export default function ExtractorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [result, setResult] = useState<ExtractResult | null>(null);
+
+  const hasInput =
+    inputMode === "text"
+      ? documentText.trim().length > 0
+      : Boolean(file);
+  const hasConfig = userRequirements.trim().length > 0 && fields.length > 0;
+
+  const flowSteps: Step[] = [
+    {
+      id: "input",
+      name: "Input",
+      status: hasInput ? "completed" : "pending",
+    },
+    {
+      id: "configure",
+      name: "Configure",
+      status: hasInput && hasConfig ? "completed" : "pending",
+    },
+    {
+      id: "review",
+      name: "Review",
+      status: result ? "completed" : "pending",
+    },
+  ];
 
   const handleAddField = () => {
     if (newFieldName.trim() && newFieldDesc.trim()) {
@@ -174,7 +200,7 @@ export default function ExtractorPage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
+        <h1 className="text-3xl font-semibold tracking-tight font-serif flex items-center gap-3">
           <Database className="h-8 w-8" />
           Data Extractor
         </h1>
@@ -183,6 +209,8 @@ export default function ExtractorPage() {
           requirements
         </p>
       </header>
+
+      <DemoStepper steps={flowSteps} className="mb-8" />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Input Section */}

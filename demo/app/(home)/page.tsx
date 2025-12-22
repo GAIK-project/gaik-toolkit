@@ -4,10 +4,10 @@ import { InstallSnippet } from "./components/install-snippet";
 
 export default function HomePage() {
   return (
-    <>
+    <div className="space-y-24">
       <Hero />
       <DemoCards />
       <InstallSnippet />
-    </>
+    </div>
   );
 }

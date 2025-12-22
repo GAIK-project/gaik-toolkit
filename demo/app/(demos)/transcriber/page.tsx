@@ -16,7 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileUpload } from "@/components/demo/file-upload";
+import { DemoStepper } from "@/components/demo/demo-stepper";
 import { ResultCard, ResultText } from "@/components/demo/result-card";
+import { Step } from "@/components/demo/step-indicator";
 import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -35,6 +37,24 @@ export default function TranscriberPage() {
   const [compressAudio, setCompressAudio] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<TranscribeResult | null>(null);
+
+  const flowSteps: Step[] = [
+    {
+      id: "upload",
+      name: "Upload",
+      status: file ? "completed" : "pending",
+    },
+    {
+      id: "transcribe",
+      name: "Transcribe",
+      status: result ? "completed" : "pending",
+    },
+    {
+      id: "review",
+      name: "Review",
+      status: result ? "completed" : "pending",
+    },
+  ];
 
   const handleSubmit = async () => {
     if (!file) {
@@ -79,7 +99,7 @@ export default function TranscriberPage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
+        <h1 className="text-3xl font-semibold tracking-tight font-serif flex items-center gap-3">
           <Mic className="h-8 w-8" />
           Audio/Video Transcriber
         </h1>
@@ -87,6 +107,8 @@ export default function TranscriberPage() {
           Transcribe audio and video with Whisper and optional GPT enhancement
         </p>
       </header>
+
+      <DemoStepper steps={flowSteps} className="mb-8" />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Input Section */}
