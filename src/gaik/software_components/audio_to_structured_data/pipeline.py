@@ -73,7 +73,9 @@ class AudioToStructuredData:
             schema: Optional pre-generated schema model to reuse.
             requirements: Optional ExtractionRequirements corresponding to the schema.
         """
-        transcriber = Transcriber(api_config=self.api_config, **(transcriber_ctor or {}))
+        transcriber_ctor = transcriber_ctor or {}
+        transcriber_ctor.setdefault("enhanced_transcript", False)
+        transcriber = Transcriber(api_config=self.api_config, **transcriber_ctor)
         transcribe_options = transcribe_options or {}
         transcription = transcriber.transcribe(
             file_path=file_path,

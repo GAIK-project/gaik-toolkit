@@ -6,6 +6,7 @@ import hashlib
 import math
 import os
 import shutil
+import subprocess
 import tempfile
 import time
 from dataclasses import dataclass
@@ -16,10 +17,7 @@ import openai
 from openai import AzureOpenAI
 from pydub import AudioSegment
 
-DEFAULT_PROMPT = (
-    "Detect the language and extract transcript in the same language. "
-    "The audio could be in any language, such as English, Finnish, Swedish, etc."
-)
+DEFAULT_PROMPT = "Detect the language and extract transcript in the same language. The audio could be in any language, such as English, Finnish, Swedish, etc."
 
 
 @dataclass
@@ -70,7 +68,7 @@ class Transcriber:
         api_config: dict,
         output_dir: str | Path = "transcriber_workspace",
         *,
-        compress_audio: bool = True,  # kept for backward compatibility; no longer used
+        compress_audio: bool = True,
         enhanced_transcript: bool = True,
         max_size_mb: int = 25,
         max_duration_seconds: int = 1500,
@@ -78,7 +76,7 @@ class Transcriber:
     ) -> None:
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
-        self.compress_audio = compress_audio  # backward compat; not used in simplified flow
+        self.compress_audio = compress_audio
         self.enhanced_transcript = enhanced_transcript
         self.max_size_mb = max_size_mb
         self.max_duration_seconds = max_duration_seconds
@@ -91,7 +89,7 @@ class Transcriber:
         *,
         custom_context: str = "",
         use_case_name: str | None = None,
-        compress_audio: bool | None = None,  # kept for backward compatibility; no longer used
+        compress_audio: bool | None = None,
     ) -> TranscriptionResult:
         """Transcribe an audio or video file and return transcript info."""
 
@@ -100,54 +98,184 @@ class Transcriber:
             raise FileNotFoundError(f"Input file not found: {input_path}")
 
         job_id = self._generate_job_id(input_path)
-
         print("=" * 80)
         print(f"Transcribing file: {input_path}")
         if use_case_name:
             print(f"Use case: {use_case_name}")
         print("=" * 80)
 
-        # IMPORTANT: do NOT mutate self.default_prompt across calls.
-        prompt = self.default_prompt + (("\n" + custom_context) if custom_context else "")
-        print(f"Transcribing prompt: {prompt}")
+        cleanup_paths: list[Path] = []
+        try:
+            audio_path, temps = self._prepare_audio(
+                input_path, job_id, compress_audio=compress_audio
+            )
+            cleanup_paths.extend(temps)
 
-        # Simplified: do not extract/compress audio. Use original file if <= 25MB,
-        # otherwise chunk via PyDub (which can decode both audio and video containers).
-        raw_transcript = self._transcribe_input(input_path, prompt)
+            if custom_context:
+                self.default_prompt = self.default_prompt + "\n" + custom_context
+            prompt = self.default_prompt
+            print(f"Transcribing prompt: {prompt}")
+            # prompt = custom_context or self.default_prompt
+            raw_transcript = self._transcribe_audio(audio_path, prompt)
 
-        enhanced_text: str | None = None
-        if self.enhanced_transcript:
-            print("Enhancing transcript for improved readability...")
-            enhanced_text = post_process_transcript(raw_transcript, self.api_config)
-        else:
-            print("Transcript enhancement disabled; returning raw text only.")
+            enhanced_text: str | None = None
 
-        print("Transcription complete. Use TranscriptionResult.save(...) to persist output.")
+            if self.enhanced_transcript:
+                print("Enhancing transcript for improved readability...")
+                enhanced_text = post_process_transcript(raw_transcript, self.api_config)
+            else:
+                print("Transcript enhancement disabled; returning raw text only.")
 
-        return TranscriptionResult(
-            raw_transcript=raw_transcript,
-            enhanced_transcript=enhanced_text,
-            job_id=job_id,
-        )
+            print("Transcription complete. Use TranscriptionResult.save(...) to persist output.")
+
+            return TranscriptionResult(
+                raw_transcript=raw_transcript,
+                enhanced_transcript=enhanced_text,
+                job_id=job_id,
+            )
+        finally:
+            self._cleanup_files(cleanup_paths)
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
     def _generate_job_id(self, file_path: Path) -> str:
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        return hashlib.md5(f"{file_path.stem}_{timestamp}".encode("utf-8")).hexdigest()[:10]
+        return hashlib.md5(f"{file_path.stem}_{timestamp}".encode()).hexdigest()[:10]
 
-    def _transcribe_input(self, input_path: Path, prompt: str) -> str:
-        """
-        If input <= max_size_mb: single-pass transcription using the original file
-        (audio OR video container supported by the API).
-        Else: chunk with PyDub and transcribe sequentially.
-        """
-        if self._needs_chunking(input_path):
-            print("Chunking input for transcription...")
-            audio = AudioSegment.from_file(input_path)  # works for audio, and many video containers via ffmpeg
+    def _prepare_audio(
+        self,
+        input_path: Path,
+        job_id: str,
+        *,
+        compress_audio: bool | None = None,
+    ) -> tuple[Path, list[Path]]:
+        compress = self.compress_audio if compress_audio is None else compress_audio
+        temp_paths: list[Path] = []
+
+        if self._has_video_stream(input_path):
+            print("Video detected. Extracting audio track...")
+            extracted = self._extract_audio_from_video(input_path, job_id)
+            if extracted:
+                temp_paths.append(extracted)
+                return extracted, temp_paths
+            print("FFmpeg unavailable; using original file.")
+            return input_path, temp_paths
+
+        size_mb = input_path.stat().st_size / (1024 * 1024)
+        if size_mb > self.max_size_mb and compress:
+            print(
+                f"Large audio detected ({size_mb:.1f}MB). Attempting compression to 32k bitrate..."
+            )
+            compressed = self._compress_audio(input_path, job_id)
+            if compressed:
+                temp_paths.append(compressed)
+                return compressed, temp_paths
+            print("Compression skipped (no FFmpeg). Using original audio.")
+
+        if size_mb < self.max_size_mb and compress:
+            print("File size is below chunk threshold. Skipping compression.")
+
+        return input_path, temp_paths
+
+    def _has_video_stream(self, file_path: Path) -> bool:
+        try:
+            result = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "quiet",
+                    "-select_streams",
+                    "v:0",
+                    "-show_entries",
+                    "stream=codec_type",
+                    "-of",
+                    "csv=p=0",
+                    str(file_path),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return result.stdout.strip() != ""
+        except (subprocess.SubprocessError, FileNotFoundError):
+            return file_path.suffix.lower() in {".mp4", ".avi", ".mov", ".mkv", ".flv"}
+
+    def _compress_audio(self, file_path: Path, job_id: str) -> Path | None:
+        ffmpeg_path = _find_ffmpeg()
+        if not ffmpeg_path:
+            return None
+
+        compressed_path = self.workspace_dir / f"{job_id}_compressed_audio.ogg"
+        try:
+            subprocess.run(
+                [
+                    ffmpeg_path,
+                    "-i",
+                    str(file_path),
+                    "-vn",
+                    "-map_metadata",
+                    "-1",
+                    "-ac",
+                    "1",
+                    "-c:a",
+                    "libopus",
+                    "-b:a",
+                    "32k",
+                    "-application",
+                    "voip",
+                    str(compressed_path),
+                    "-y",
+                ],
+                check=True,
+                capture_output=True,
+            )
+            return compressed_path
+        except subprocess.SubprocessError as exc:
+            print(f"Compression failed: {exc}")
+            return None
+
+    def _extract_audio_from_video(self, file_path: Path, job_id: str) -> Path | None:
+        ffmpeg_path = _find_ffmpeg()
+        if not ffmpeg_path:
+            return None
+
+        extracted_path = self.workspace_dir / f"{job_id}_audio.mp3"
+        try:
+            subprocess.run(
+                [
+                    ffmpeg_path,
+                    "-i",
+                    str(file_path),
+                    "-q:a",
+                    "0",
+                    "-map",
+                    "a",
+                    str(extracted_path),
+                    "-y",
+                ],
+                check=True,
+                capture_output=True,
+            )
+            return extracted_path
+        except subprocess.SubprocessError as exc:
+            print(f"Audio extraction failed: {exc}")
+            return None
+
+    def _cleanup_files(self, paths: list[Path]) -> None:
+        for path in paths:
+            if path and path.exists():
+                try:
+                    path.unlink()
+                except OSError as exc:
+                    print(f"Unable to remove temporary file {path}: {exc}")
+
+    def _transcribe_audio(self, audio_path: Path, prompt: str) -> str:
+        if self._needs_chunking(audio_path):
+            print("Chunking audio for transcription...")
+            audio = AudioSegment.from_file(audio_path)
             return split_and_transcribe_with_context(
-                str(input_path),
+                str(audio_path),
                 self.api_config,
                 self.max_size_mb,
                 self.max_duration_seconds,
@@ -155,34 +283,31 @@ class Transcriber:
                 base_prompt=prompt,
             )
 
-        print("Transcribing in a single request (original file)...")
-        return self._single_pass_transcription(input_path, prompt)
+        print("Transcribing audio in a single request...")
+        return self._single_pass_transcription(audio_path, prompt)
 
-    def _needs_chunking(self, file_path: Path) -> bool:
-        size_mb = file_path.stat().st_size / (1024 * 1024)
+    def _needs_chunking(self, audio_path: Path) -> bool:
+        size_mb = audio_path.stat().st_size / (1024 * 1024)
         return size_mb > self.max_size_mb
 
-    def _single_pass_transcription(self, file_path: Path, prompt: str) -> str:
-        """
-        Single-pass transcription of the original file (audio OR video).
-        """
+    def _single_pass_transcription(self, audio_path: Path, prompt: str) -> str:
         transcription_model = self.api_config.get("transcription_model", "whisper-1")
-        use_azure = bool(self.api_config.get("use_azure", False))
+        use_azure = self.api_config.get("use_azure", False)
         api_key = self.api_config.get("api_key")
 
-        with file_path.open("rb") as f:
+        with audio_path.open("rb") as audio_file:
             if use_azure:
                 audio_client = self._build_azure_audio_client()
                 response = audio_client.audio.transcriptions.create(
                     model=transcription_model,
-                    file=f,
+                    file=audio_file,
                     prompt=prompt,
                 )
             else:
                 openai.api_key = api_key
                 response = openai.audio.transcriptions.create(
                     model=transcription_model,
-                    file=f,
+                    file=audio_file,
                     prompt=prompt,
                 )
         return response.text
@@ -204,7 +329,7 @@ class Transcriber:
         )
 
 
-def post_process_transcript(raw_transcript: str, api_config: dict) -> str:
+def post_process_transcript(raw_transcript, api_config):
     """Enhance transcript quality with GPT models."""
 
     model_name = api_config.get("model", "GPT model")
@@ -235,7 +360,7 @@ def post_process_transcript(raw_transcript: str, api_config: dict) -> str:
     """
 
     try:
-        use_azure = bool(api_config.get("use_azure", False))
+        use_azure = api_config.get("use_azure", False)
         if use_azure:
             client = AzureOpenAI(
                 api_key=api_config.get("api_key"),
@@ -248,10 +373,7 @@ def post_process_transcript(raw_transcript: str, api_config: dict) -> str:
                 messages=[
                     {
                         "role": "system",
-                        "content": (
-                            "You are an expert transcript editor who improves the quality, "
-                            "readability, and structure of transcribed conversations."
-                        ),
+                        "content": "You are an expert transcript editor who improves the quality, readability, and structure of transcribed conversations.",
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -265,10 +387,7 @@ def post_process_transcript(raw_transcript: str, api_config: dict) -> str:
                 messages=[
                     {
                         "role": "system",
-                        "content": (
-                            "You are an expert transcript editor who improves the quality, "
-                            "readability, and structure of transcribed conversations."
-                        ),
+                        "content": "You are an expert transcript editor who improves the quality, readability, and structure of transcribed conversations.",
                     },
                     {"role": "user", "content": prompt},
                 ],
@@ -292,7 +411,7 @@ def split_and_transcribe_with_context(
 ):
     """Split audio into chunks and transcribe with rolling context."""
 
-    use_azure = bool(api_config.get("use_azure", False))
+    use_azure = api_config.get("use_azure", False)
     api_key = api_config.get("api_key")
     transcription_model = api_config.get("transcription_model", "whisper-1")
 
@@ -306,7 +425,7 @@ def split_and_transcribe_with_context(
     chunks_by_duration = math.ceil(duration_seconds / (max_duration_seconds * 0.95))
     num_chunks = max(1, max(chunks_by_size, chunks_by_duration))
 
-    print(f"Splitting into {num_chunks} chunks based on size and duration")
+    print(f"Splitting audio into {num_chunks} chunks based on size and duration")
 
     chunk_length_ms = len(audio) // num_chunks
     temp_dir = tempfile.mkdtemp()
@@ -339,6 +458,10 @@ def split_and_transcribe_with_context(
             chunk_path = os.path.join(temp_dir, f"chunk_{i}.mp3")
             chunk.export(chunk_path, format="mp3")
 
+            chunk_size_mb = os.path.getsize(chunk_path) / (1024 * 1024)
+            chunk_duration = len(chunk) / 1000
+            print(f"Chunk {i + 1}/{num_chunks}: {chunk_size_mb:.2f}MB, {chunk_duration:.2f}s")
+
             start_time = format_timestamp(start_ms / 1000)
             end_time = format_timestamp(end_ms / 1000)
             chunk_header = f"\n[Timestamp: {start_time} - {end_time}]\n"
@@ -353,19 +476,20 @@ def split_and_transcribe_with_context(
 
 Continue the transcription, maintaining speaker consistency and dialogue structure."""
 
+            if use_azure:
+                print("Using MS Azure endpoint for transcription")
+            else:
+                print("Using OpenAI direct endpoint for transcription")
+
             try:
                 with open(chunk_path, "rb") as chunk_file:
                     if use_azure:
                         transcript_response = audio_client.audio.transcriptions.create(
-                            model=transcription_model,
-                            file=chunk_file,
-                            prompt=prompt,
+                            model=transcription_model, file=chunk_file, prompt=prompt
                         )
                     else:
                         transcript_response = openai.audio.transcriptions.create(
-                            model=transcription_model,
-                            file=chunk_file,
-                            prompt=prompt,
+                            model=transcription_model, file=chunk_file, prompt=prompt
                         )
 
                     chunk_transcript = transcript_response.text
@@ -374,7 +498,7 @@ Continue the transcription, maintaining speaker consistency and dialogue structu
                     time.sleep(1)
             except Exception as exc:
                 print(f"Error transcribing chunk {i + 1}: {exc}")
-                transcripts.append(f"{chunk_header}[Transcription failed for segment {i + 1}]")
+                transcripts.append(f"[Transcription failed for segment {i + 1}]")
                 time.sleep(5)
             finally:
                 try:
@@ -408,3 +532,30 @@ def format_timestamp(seconds):
     minutes = int(seconds // 60)
     seconds = int(seconds % 60)
     return f"{minutes:02d}:{seconds:02d}"
+
+
+def _find_ffmpeg() -> str | None:
+    try:
+        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
+        return "ffmpeg"
+    except (subprocess.SubprocessError, FileNotFoundError):
+        pass
+
+    possible_paths = [
+        "ffmpeg",
+        "/usr/bin/ffmpeg",
+        "/usr/local/bin/ffmpeg",
+        "C:\\ffmpeg\\bin\\ffmpeg.exe",
+        (
+            "ffmpeg-2025-03-10-git-87e5da9067-essentials_build\\"
+            "ffmpeg-2025-03-10-git-87e5da9067-essentials_build\\bin\\ffmpeg.exe"
+        ),
+    ]
+
+    for path in possible_paths:
+        try:
+            subprocess.run([path, "-version"], capture_output=True, check=True)
+            return path
+        except (subprocess.SubprocessError, FileNotFoundError):
+            continue
+    return None

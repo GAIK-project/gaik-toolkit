@@ -1,0 +1,188 @@
+{
+  "model_name": "Ty_maap_iv_kirja_kenttien_poiminta_nitallenteesta_Extraction",
+  "requirements": {
+    "use_case_name": "Ty\u00f6maap\u00e4iv\u00e4kirja kenttien poiminta \u00e4\u00e4nitallenteesta",
+    "fields": [
+      {
+        "field_name": "kohde",
+        "field_type": "str",
+        "description": "Kohde [Subject of the diary]",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "laatija",
+        "field_type": "str",
+        "description": "Laatija [Name of the author recording the diary]",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "saa",
+        "field_type": "str",
+        "description": "S\u00e4\u00e4 [e.g., 3 \u00b0C, 2 m/s, 78 % suht. kosteus, Kp: -1.4 C]",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "paivamaara",
+        "field_type": "date",
+        "description": "P\u00e4iv\u00e4m\u00e4\u00e4r\u00e4 [Format: dd.mm.yyyy]",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": "%d.%m.%Y"
+      },
+      {
+        "field_name": "resurssit_henkilosto",
+        "field_type": "str",
+        "description": "Resurssit - Henkil\u00f6st\u00f6 [e.g., Ty\u00f6njohtajat: 2 hl\u00f6, Ty\u00f6ntekij\u00e4t: 1 hl\u00f6, Alihankkijat: 4 hl\u00f6, Yhteens\u00e4: 7 hl\u00f6]",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "tyoviikko",
+        "field_type": "int",
+        "description": "Ty\u00f6viikko [Week number, e.g., 2]",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "paivan_tyot_omat_tyot",
+        "field_type": "list[str]",
+        "description": "P\u00e4iv\u00e4n ty\u00f6t (Omat ty\u00f6t) [List all works]",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "paivan_tapahtumat",
+        "field_type": "str",
+        "description": "P\u00e4iv\u00e4n tapahtumat",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "liitteet",
+        "field_type": "str",
+        "description": "Liitteet [number and type of attachments, e.g., 4 photos, 1 email attachment]",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "valvojan_huomiot",
+        "field_type": "str",
+        "description": "Valvojan huomiot",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "paivan_poikkeamat",
+        "field_type": "str",
+        "description": "P\u00e4iv\u00e4n poikkeamat",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "aloitetut_tyovaiheet",
+        "field_type": "list[str]",
+        "description": "Aloitetut ty\u00f6vaiheet",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "kaynnissa_olevat_tyovai",
+        "field_type": "list[str]",
+        "description": "K\u00e4ynniss\u00e4 olevat ty\u00f6vai",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "paattyneet_tyovai",
+        "field_type": "list[str]",
+        "description": "P\u00e4\u00e4ttyneet ty\u00f6vai",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "keskeytyneet_tyovai",
+        "field_type": "list[str]",
+        "description": "Keskeytyneet ty\u00f6vai",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "pyydetyt_lisajat",
+        "field_type": "str",
+        "description": "Pyydetyt lis\u00e4ajat",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "tehdyt_katselmukset",
+        "field_type": "str",
+        "description": "Tehdyt katselmukset",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "valvojan_huomautukset",
+        "field_type": "str",
+        "description": "Valvojan huomautukset",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "valvojan_allekirjoitus",
+        "field_type": "str",
+        "description": "Valvojan allekirjoitus",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "vastaavan_allekirjoitus",
+        "field_type": "str",
+        "description": "Vastaavan allekirjoitus",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  }
+}
