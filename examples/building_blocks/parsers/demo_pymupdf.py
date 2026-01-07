@@ -1,4 +1,4 @@
-﻿"""Simple demonstration of PyMuPDF parser for fast local PDF text extraction.
+"""Simple demonstration of PyMuPDF parser for fast local PDF text extraction.
 
 This example shows how to use PyMuPDF for PDF parsing without external APIs.
 Requires: pip install gaik[parser]
@@ -66,5 +66,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

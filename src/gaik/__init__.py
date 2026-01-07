@@ -1,4 +1,4 @@
-﻿"""General AI Kit (GAIK) - AI/ML toolkit for Python.
+"""General AI Kit (GAIK) - AI/ML toolkit for Python.
 
 AI toolkit with structured data extraction, document parsing, and audio/video transcription using OpenAI/Azure OpenAI.
 
@@ -51,4 +51,3 @@ except importlib.metadata.PackageNotFoundError:
 __all__ = [
     "__version__",
 ]
-

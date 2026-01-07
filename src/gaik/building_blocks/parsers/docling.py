@@ -158,9 +158,10 @@ class DoclingParser:
             generate_page_images=False,
             do_formula_enrichment=enable_formula_enrichment,
             table_structure_options=TableStructureOptions(
-                kind="docling_tableformer",
-                do_cell_matching=True
-            ) if enable_table_structure else None,
+                kind="docling_tableformer", do_cell_matching=True
+            )
+            if enable_table_structure
+            else None,
             accelerator_options=AcceleratorOptions(num_threads=num_threads, device=self.device),
         )
 

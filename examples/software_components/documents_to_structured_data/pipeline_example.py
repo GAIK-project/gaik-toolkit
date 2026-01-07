@@ -17,8 +17,9 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 # Add src directory to path to import modules (works without pip install)
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from gaik.software_components.documents_to_structured_data import DocumentsToStructuredData  # noqa: E402
-
+from gaik.software_components.documents_to_structured_data import (
+    DocumentsToStructuredData,  # noqa: E402
+)
 
 USER_REQUIREMENTS = """
 Extract invoice number, sender name, receiver name, purchase order number, date of invoice, subtotal, discount, tax, and grand total from the invoice.

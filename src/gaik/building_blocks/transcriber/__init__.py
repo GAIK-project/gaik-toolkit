@@ -1,4 +1,4 @@
-﻿"""Audio and Video Transcription
+"""Audio and Video Transcription
 
 This module provides audio/video transcription using OpenAI Whisper with optional GPT enhancement.
 
@@ -57,4 +57,3 @@ try:
     )
 except ImportError:
     pass
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "motion/react";
 import { FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,11 @@ import {
 } from "@/components/ui/select";
 import { FileUpload } from "@/components/demo/file-upload";
 import { DemoStepper } from "@/components/demo/demo-stepper";
-import { ResultCard, ResultText, ResultJson } from "@/components/demo/result-card";
+import {
+  ResultCard,
+  ResultText,
+  ResultJson,
+} from "@/components/demo/result-card";
 import { Step } from "@/components/demo/step-indicator";
 import { toast } from "sonner";
 
@@ -38,6 +42,14 @@ export default function ParserPage() {
   const [parserType, setParserType] = useState<string>("auto");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ParseResult | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const flowSteps: Step[] = [
     {
@@ -58,10 +70,16 @@ export default function ParserPage() {
   ];
 
   const handleSubmit = async () => {
+    if (isLoading) return; // Prevent double-click
+
     if (!file) {
       toast.error("Please select a file first");
       return;
     }
+
+    // Abort previous request if any
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
     setResult(null);
@@ -74,17 +92,27 @@ export default function ParserPage() {
       const response = await fetch(`${API_URL}/parse/`, {
         method: "POST",
         body: formData,
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to parse document");
+        let errorMessage = "Failed to parse document";
+        try {
+          const error = await response.json();
+          errorMessage = error.detail || errorMessage;
+        } catch {
+          // JSON parsing failed, use default message
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       setResult(data);
       toast.success("Document parsed successfully!");
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return; // Request was aborted, don't show error
+      }
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
@@ -98,11 +126,11 @@ export default function ParserPage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight font-serif flex items-center gap-3">
+        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <FileText className="h-8 w-8" />
           Document Parser
         </h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="text-muted-foreground mt-2">
           Parse PDFs and Word documents with PyMuPDF or DOCX parsers
         </p>
       </header>
@@ -175,8 +203,8 @@ export default function ParserPage() {
             <Card>
               <CardContent className="flex items-center justify-center py-12">
                 <div className="text-center">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                  <p className="mt-2 text-muted-foreground">
+                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
+                  <p className="text-muted-foreground mt-2">
                     Parsing document...
                   </p>
                 </div>

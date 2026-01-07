@@ -265,9 +265,7 @@ async def document_pipeline(
         steps[2].message = f"Extracted {len(result.extracted_fields)} items"
 
         # Get parsed content
-        parsed_content = (
-            result.parsed_documents[0] if result.parsed_documents else None
-        )
+        parsed_content = result.parsed_documents[0] if result.parsed_documents else None
 
         response = DocumentPipelineResponse(
             job_id=job_id,

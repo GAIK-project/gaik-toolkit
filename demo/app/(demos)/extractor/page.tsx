@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "motion/react";
 import { Database, Loader2, Plus, Trash2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ export default function ExtractorPage() {
   const [documentText, setDocumentText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [userRequirements, setUserRequirements] = useState(
-    "Extract key information from this document"
+    "Extract key information from this document",
   );
   const [fields, setFields] = useState<Field[]>(DEFAULT_FIELDS);
   const [newFieldName, setNewFieldName] = useState("");
@@ -52,11 +52,17 @@ export default function ExtractorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [result, setResult] = useState<ExtractResult | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const hasInput =
-    inputMode === "text"
-      ? documentText.trim().length > 0
-      : Boolean(file);
+    inputMode === "text" ? documentText.trim().length > 0 : Boolean(file);
   const hasConfig = userRequirements.trim().length > 0 && fields.length > 0;
 
   const flowSteps: Step[] = [
@@ -84,7 +90,10 @@ export default function ExtractorPage() {
         toast.error("Field already exists");
         return;
       }
-      setFields([...fields, { name: fieldKey, description: newFieldDesc.trim() }]);
+      setFields([
+        ...fields,
+        { name: fieldKey, description: newFieldDesc.trim() },
+      ]);
       setNewFieldName("");
       setNewFieldDesc("");
     }
@@ -106,18 +115,28 @@ export default function ExtractorPage() {
       const response = await fetch(`${API_URL}/parse/`, {
         method: "POST",
         body: formData,
+        signal: abortControllerRef.current?.signal,
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to parse document");
+        let errorMessage = "Failed to parse document";
+        try {
+          const error = await response.json();
+          errorMessage = error.detail || errorMessage;
+        } catch {
+          // JSON parsing failed, use default message
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       return data.text_content || "";
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return null;
+      }
       toast.error(
-        error instanceof Error ? error.message : "Failed to parse file"
+        error instanceof Error ? error.message : "Failed to parse file",
       );
       return null;
     } finally {
@@ -126,7 +145,13 @@ export default function ExtractorPage() {
   };
 
   const handleSubmit = async () => {
+    if (isLoading || isParsing) return; // Prevent double-click
+
     let textToProcess = documentText;
+
+    // Abort previous request if any
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     // If in file mode, parse the file first
     if (inputMode === "file") {
@@ -163,7 +188,7 @@ export default function ExtractorPage() {
           acc[field.name] = field.description;
           return acc;
         },
-        {} as Record<string, string>
+        {} as Record<string, string>,
       );
 
       const response = await fetch(`${API_URL}/extract/`, {
@@ -176,17 +201,27 @@ export default function ExtractorPage() {
           user_requirements: userRequirements,
           fields: fieldsMap,
         }),
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to extract data");
+        let errorMessage = "Failed to extract data";
+        try {
+          const error = await response.json();
+          errorMessage = error.detail || errorMessage;
+        } catch {
+          // JSON parsing failed, use default message
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       setResult(data);
       toast.success("Data extracted successfully!");
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return; // Request was aborted, don't show error
+      }
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
@@ -200,11 +235,11 @@ export default function ExtractorPage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight font-serif flex items-center gap-3">
+        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Database className="h-8 w-8" />
           Data Extractor
         </h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="text-muted-foreground mt-2">
           Extract structured data from documents using natural language
           requirements
         </p>
@@ -227,7 +262,7 @@ export default function ExtractorPage() {
                 value={inputMode}
                 onValueChange={(v) => setInputMode(v as "text" | "file")}
               >
-                <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsList className="mb-4 grid w-full grid-cols-2">
                   <TabsTrigger value="text">Paste Text</TabsTrigger>
                   <TabsTrigger value="file">Upload File</TabsTrigger>
                 </TabsList>
@@ -256,9 +291,7 @@ export default function ExtractorPage() {
           <Card>
             <CardHeader>
               <CardTitle>Extraction Settings</CardTitle>
-              <CardDescription>
-                Define what data to extract
-              </CardDescription>
+              <CardDescription>Define what data to extract</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -275,13 +308,13 @@ export default function ExtractorPage() {
 
               <div className="space-y-2">
                 <Label>Fields to Extract</Label>
-                <div className="space-y-2 max-h-48 overflow-auto">
+                <div className="max-h-48 space-y-2 overflow-auto">
                   {fields.map((field) => (
                     <div
                       key={field.name}
                       className="flex items-center gap-2 rounded-md border p-2 text-sm"
                     >
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0 flex-1">
                         <span className="font-mono font-medium">
                           {field.name}
                         </span>
@@ -302,7 +335,7 @@ export default function ExtractorPage() {
                   ))}
                 </div>
 
-                <div className="flex gap-2 mt-2">
+                <div className="mt-2 flex gap-2">
                   <Input
                     value={newFieldName}
                     onChange={(e) => setNewFieldName(e.target.value)}
@@ -364,13 +397,11 @@ export default function ExtractorPage() {
             <Card>
               <CardContent className="flex items-center justify-center py-12">
                 <div className="text-center">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                  <p className="mt-2 text-muted-foreground">
-                    {isParsing
-                      ? "Parsing document..."
-                      : "Extracting data..."}
+                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
+                  <p className="text-muted-foreground mt-2">
+                    {isParsing ? "Parsing document..." : "Extracting data..."}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-muted-foreground mt-1 text-xs">
                     This may take a few seconds
                   </p>
                 </div>
@@ -390,20 +421,17 @@ export default function ExtractorPage() {
                   {result.results.map((item, index) => (
                     <div key={index} className="space-y-2">
                       {result.results.length > 1 && (
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-muted-foreground text-sm font-medium">
                           Document {index + 1}
                         </p>
                       )}
-                      <div className="rounded-md border divide-y">
+                      <div className="divide-y rounded-md border">
                         {Object.entries(item).map(([key, value]) => (
-                          <div
-                            key={key}
-                            className="flex items-start gap-4 p-3"
-                          >
-                            <span className="font-mono text-sm font-medium min-w-32">
+                          <div key={key} className="flex items-start gap-4 p-3">
+                            <span className="min-w-32 font-mono text-sm font-medium">
                               {key}
                             </span>
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-muted-foreground text-sm">
                               {value !== null && value !== undefined
                                 ? String(value)
                                 : "-"}

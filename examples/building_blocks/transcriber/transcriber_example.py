@@ -1,4 +1,4 @@
-﻿"""Minimal example for running the Transcriber class on a single file."""
+"""Minimal example for running the Transcriber class on a single file."""
 
 from __future__ import annotations
 
@@ -64,5 +64,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

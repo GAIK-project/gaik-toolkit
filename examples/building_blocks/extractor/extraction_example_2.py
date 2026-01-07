@@ -1,4 +1,4 @@
-﻿"""
+"""
 End-to-end example:
 - Parse each whole PDF with a parser
 - Classify the parsed document (Purchase order vs Bill of material)
@@ -280,5 +280,3 @@ if __name__ == "__main__":
         import traceback
 
         traceback.print_exc()
-
-

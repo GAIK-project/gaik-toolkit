@@ -29,7 +29,7 @@ export function StepIndicator({
       className={cn(
         "flex",
         isHorizontal ? "flex-row items-center gap-2" : "flex-col gap-4",
-        className
+        className,
       )}
     >
       {steps.map((step, index) => (
@@ -37,7 +37,7 @@ export function StepIndicator({
           key={step.id}
           className={cn(
             "flex items-center",
-            isHorizontal ? "flex-1" : "flex-row gap-3"
+            isHorizontal ? "flex-1" : "flex-row gap-3",
           )}
         >
           {/* Step circle */}
@@ -55,7 +55,7 @@ export function StepIndicator({
                 step.status === "error" &&
                   "border-destructive bg-destructive text-white",
                 step.status === "pending" &&
-                  "border-muted-foreground/30 bg-muted text-muted-foreground"
+                  "border-muted-foreground/30 bg-muted text-muted-foreground",
               )}
             >
               {step.status === "completed" && (
@@ -84,7 +84,7 @@ export function StepIndicator({
                   step.status === "completed" && "text-green-600",
                   step.status === "in_progress" && "text-primary",
                   step.status === "error" && "text-destructive",
-                  step.status === "pending" && "text-muted-foreground"
+                  step.status === "pending" && "text-muted-foreground",
                 )}
               >
                 {step.name}
@@ -101,13 +101,13 @@ export function StepIndicator({
                   step.status === "completed" && "text-green-600",
                   step.status === "in_progress" && "text-primary",
                   step.status === "error" && "text-destructive",
-                  step.status === "pending" && "text-muted-foreground"
+                  step.status === "pending" && "text-muted-foreground",
                 )}
               >
                 {step.name}
               </span>
               {step.message && (
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-muted-foreground mt-0.5 text-xs">
                   {step.message}
                 </p>
               )}
@@ -116,13 +116,13 @@ export function StepIndicator({
 
           {/* Connector line (for horizontal, except last) */}
           {isHorizontal && index < steps.length - 1 && (
-            <div className="flex-1 mx-2">
+            <div className="mx-2 flex-1">
               <div
                 className={cn(
                   "h-0.5 w-full rounded-full transition-colors",
                   step.status === "completed"
                     ? "bg-green-500"
-                    : "bg-muted-foreground/20"
+                    : "bg-muted-foreground/20",
                 )}
               />
             </div>
@@ -171,7 +171,7 @@ export function StepIndicatorCompact({
               step.status === "completed" && "bg-green-500",
               step.status === "in_progress" && "bg-primary",
               step.status === "error" && "bg-destructive",
-              step.status === "pending" && "bg-muted"
+              step.status === "pending" && "bg-muted",
             )}
             initial={{ scaleX: 0 }}
             animate={{ scaleX: 1 }}

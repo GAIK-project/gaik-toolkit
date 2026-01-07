@@ -1,4 +1,4 @@
-﻿"""
+"""
 Dynamic Schema Extraction with Structured Outputs
 
 Schema.py extracts structured data from documents using LLMs,
@@ -110,7 +110,9 @@ class FieldSpec(BaseModel):
     required: bool = True
     enum: list[str] | None = Field(default=None, description="Allowed values (if enumerated)")
     pattern: str | None = Field(default=None, description="Regex to validate strings (optional)")
-    format: str | None = Field(default=None, description="Output format (e.g., date strftime format)")
+    format: str | None = Field(
+        default=None, description="Output format (e.g., date strftime format)"
+    )
 
     @field_validator("field_name")
     @classmethod
@@ -453,20 +455,19 @@ DATE_FORMAT_PATTERNS: dict[str, str] = {
 
 # Date-related keywords in multiple languages for field detection
 DATE_KEYWORDS = [
-    "date",        # English
-    "datum",       # German, Dutch, Swedish
-    "fecha",       # Spanish
+    "date",  # English
+    "datum",  # German, Dutch, Swedish
+    "fecha",  # Spanish
     "päivämäärä",  # Finnish
     "paivamaara",  # Finnish (ASCII)
-    "päiväys",     # Finnish (alternative)
-    "paivays",     # Finnish (ASCII alternative)
-    "data",        # Italian, Portuguese, Polish
-    "jour",        # French
-    "dátum",       # Hungarian
-    "dato",        # Norwegian, Danish
-    "tarih",       # Turkish
+    "päiväys",  # Finnish (alternative)
+    "paivays",  # Finnish (ASCII alternative)
+    "data",  # Italian, Portuguese, Polish
+    "jour",  # French
+    "dátum",  # Hungarian
+    "dato",  # Norwegian, Danish
+    "tarih",  # Turkish
 ]
-
 
 
 def _detect_date_format(text: str) -> str | None:
@@ -634,18 +635,18 @@ def parse_date(value: str | date | None, output_format: str = "%Y-%m-%d") -> str
 
     # Common date formats to try (ordered by likelihood)
     formats = [
-        "%Y-%m-%d",      # ISO: 2024-04-25
-        "%d/%m/%Y",      # European: 25/04/2024
-        "%d-%m-%Y",      # European with dash: 25-04-2024
-        "%d.%m.%Y",      # European with dot: 25.04.2024
-        "%m/%d/%Y",      # US: 04/25/2024
-        "%m-%d-%Y",      # US with dash: 04-25-2024
-        "%Y/%m/%d",      # ISO with slash: 2024/04/25
-        "%Y.%m.%d",      # ISO with dot: 2024.04.25
-        "%B %d, %Y",     # Full month: April 25, 2024
-        "%d %B %Y",      # Day first: 25 April 2024
-        "%b %d, %Y",     # Short month: Apr 25, 2024
-        "%d %b %Y",      # Day first short: 25 Apr 2024
+        "%Y-%m-%d",  # ISO: 2024-04-25
+        "%d/%m/%Y",  # European: 25/04/2024
+        "%d-%m-%Y",  # European with dash: 25-04-2024
+        "%d.%m.%Y",  # European with dot: 25.04.2024
+        "%m/%d/%Y",  # US: 04/25/2024
+        "%m-%d-%Y",  # US with dash: 04-25-2024
+        "%Y/%m/%d",  # ISO with slash: 2024/04/25
+        "%Y.%m.%d",  # ISO with dot: 2024.04.25
+        "%B %d, %Y",  # Full month: April 25, 2024
+        "%d %B %Y",  # Day first: 25 April 2024
+        "%b %d, %Y",  # Short month: Apr 25, 2024
+        "%d %b %Y",  # Day first short: 25 Apr 2024
     ]
 
     for fmt in formats:
@@ -911,4 +912,3 @@ class SchemaGenerator:
             else [],
             "field_count": len(self.item_requirements.fields) if self.item_requirements else 0,
         }
-

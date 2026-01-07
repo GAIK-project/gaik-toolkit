@@ -1,4 +1,4 @@
-﻿"""
+"""
 Document classification using LLM analysis.
 
 This module provides document classification capabilities by analyzing the first page
@@ -455,4 +455,3 @@ Provide your classification with:
         """
         supported = [".pdf", ".docx", ".doc", ".png", ".jpg", ".jpeg"]
         return Path(file_path).suffix.lower() in supported
-

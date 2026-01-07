@@ -20,7 +20,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.audio_to_structured_data import AudioToStructuredData  # noqa: E402
 
-
 USER_REQUIREMENTS = """
     The task is to extract all required fields for a standard medical consultation summary
     from the transcript of a clinician’s dictated voice note after meeting with a patient.
@@ -50,23 +49,27 @@ USER_REQUIREMENTS = """
 def main() -> None:
     schema_dir = Path(__file__).parent / "schema"
     extract_options = {
-        "save_json": False, #save extraction results
-        "json_path": "extraction_results.json", #path of the extracted results
+        "save_json": False,  # save extraction results
+        "json_path": "extraction_results.json",  # path of the extracted results
         "generate_schema": True,  # Set False to reuse an existing saved schema. If True, a new schema will be built and saved.
         "schema_name": "schema",  # Without .py; defaults to 'schema'
     }
     transcriber_ctor = {
         "output_dir": "./",
-        "compress_audio": True, # (Optional) for compressing large audios (uses FFMPEG)
+        "compress_audio": True,  # (Optional) for compressing large audios (uses FFMPEG)
         "enhanced_transcript": False,
     }
     transcribe_options = {
-        "custom_context": "",    # Optional extra prompt for transcription
-        "use_case_name": "audio_to_structured_data",   # Optional label for logging
+        "custom_context": "",  # Optional extra prompt for transcription
+        "use_case_name": "audio_to_structured_data",  # Optional label for logging
     }
 
-    generate_schema = extract_options.pop("generate_schema", True) #whether a new schema is to be generated
-    schema_name = extract_options.pop("schema_name", "schema") # Whether a schema name is given; if not, use default
+    generate_schema = extract_options.pop(
+        "generate_schema", True
+    )  # whether a new schema is to be generated
+    schema_name = extract_options.pop(
+        "schema_name", "schema"
+    )  # Whether a schema name is given; if not, use default
 
     # Create the pipleine (transcription+schema generation+extraction)
     pipeline = AudioToStructuredData(use_azure=True)
@@ -99,7 +102,8 @@ def main() -> None:
     print("\nExtracted fields:\n")
     print(json.dumps(result.extracted_fields, indent=2, default=str))
 
-    #The raw and/or enhanced transcripts are in result.transcription.raw_transcript and result.transcription.enhanced_transcript
+    # The raw and/or enhanced transcripts are in result.transcription.raw_transcript and result.transcription.enhanced_transcript
+
 
 if __name__ == "__main__":
     main()

@@ -6,28 +6,29 @@ Takes any audio, transcribes, parses fields and dynamically builds schema, extra
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import importlib.util
 import io
 import json
-from pathlib import Path
-from typing import Any, Sequence
+from collections.abc import Sequence
 from contextlib import redirect_stdout
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 from gaik.building_blocks.config import get_openai_config
-from gaik.building_blocks.extractor import DataExtractor, SchemaGenerator, ExtractionRequirements
-from gaik.building_blocks.transcriber import Transcriber, TranscriptionResult
+from gaik.building_blocks.extractor import DataExtractor, ExtractionRequirements, SchemaGenerator
 from gaik.building_blocks.extractor.schema import print_pydantic_schema
+from gaik.building_blocks.transcriber import Transcriber, TranscriptionResult
 
 
 @dataclass
 class PipelineResult:
     """Container for combined pipeline outputs."""
 
-    transcription: TranscriptionResult      # Raw and enhanced transcript
+    transcription: TranscriptionResult  # Raw and enhanced transcript
     extracted_fields: list[dict[str, Any]]  # Structured data extracted
-    schema: type                            # The generated Pydantic schema
-    requirements: ExtractionRequirements    # Extraction requirements
+    schema: type  # The generated Pydantic schema
+    requirements: ExtractionRequirements  # Extraction requirements
 
 
 class AudioToStructuredData:
@@ -95,7 +96,9 @@ class AudioToStructuredData:
         else:
             schema_generator = None
 
-        documents: Sequence[str] = [transcription.enhanced_transcript or transcription.raw_transcript]
+        documents: Sequence[str] = [
+            transcription.enhanced_transcript or transcription.raw_transcript
+        ]
 
         extractor_ctor = extractor_ctor or {}
         data_extractor = DataExtractor(config=extractor_cfg, **extractor_ctor)

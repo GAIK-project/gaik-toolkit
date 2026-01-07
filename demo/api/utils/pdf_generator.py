@@ -45,8 +45,7 @@ class StructuredDataToPDF:
         """
         if FPDF is None:
             raise ImportError(
-                "fpdf2 is required for PDF generation. "
-                "Install with: pip install fpdf2"
+                "fpdf2 is required for PDF generation. Install with: pip install fpdf2"
             )
         self.title = title
 

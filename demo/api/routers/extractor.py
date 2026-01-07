@@ -1,4 +1,4 @@
-﻿"""Extractor router - Data extraction endpoints"""
+"""Extractor router - Data extraction endpoints"""
 
 import os
 
@@ -45,8 +45,12 @@ async def extract_data(request: ExtractRequest):
     try:
         from pydantic import create_model
 
-        from gaik.building_blocks.extractor import (DataExtractor, ExtractionRequirements,
-                                    FieldSpec, get_openai_config)
+        from gaik.building_blocks.extractor import (
+            DataExtractor,
+            ExtractionRequirements,
+            FieldSpec,
+            get_openai_config,
+        )
 
         config = get_openai_config(use_azure=False)  # Use standard OpenAI
         config["api_key"] = api_key  # Override with provided key
@@ -105,4 +109,3 @@ async def extract_data(request: ExtractRequest):
         raise HTTPException(status_code=500, detail=f"Extractor not installed: {e}") from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
-

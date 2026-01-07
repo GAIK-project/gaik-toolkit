@@ -1,4 +1,4 @@
-﻿"""
+"""
 Data Extractor for extracting structured data from documents using generated Pydantic schemas.
 
 This module provides the DataExtractor class for extracting data from documents
@@ -16,8 +16,8 @@ from gaik.building_blocks.config import create_openai_client
 from .schema import (
     SYSTEM_PARSER,
     ExtractionRequirements,
-    normalize_extracted_data,
     _parse_with,
+    normalize_extracted_data,
 )
 
 
@@ -159,4 +159,3 @@ class DataExtractor:
             save_to_json(results, json_path)
 
         return results
-

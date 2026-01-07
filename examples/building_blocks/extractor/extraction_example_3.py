@@ -1,4 +1,4 @@
-﻿"""
+"""
 Example 3: Using a manually defined schema instead of SchemaGenerator.
 
 This demo shows how to:
@@ -17,9 +17,12 @@ from pydantic import BaseModel, ConfigDict, Field
 # Add src directory to path so we can import without installing the package
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from gaik.building_blocks.extractor import (DataExtractor,  # noqa: E402  # noqa: E402
-                            ExtractionRequirements, FieldSpec,
-                            get_openai_config)
+from gaik.building_blocks.extractor import (  # noqa: E402  # noqa: E402
+    DataExtractor,
+    ExtractionRequirements,
+    FieldSpec,
+    get_openai_config,
+)
 
 
 class ProjectInfo(BaseModel):
@@ -105,5 +108,3 @@ if __name__ == "__main__":
     import json as _json
 
     print(_json.dumps(results, indent=2, default=str))
-
-

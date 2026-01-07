@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "motion/react";
 import {
   Workflow,
@@ -78,7 +78,7 @@ function mapSteps(steps: PipelineStep[]): Step[] {
 
 export default function PipelinePage() {
   const [pipelineType, setPipelineType] = useState<"audio" | "document">(
-    "audio"
+    "audio",
   );
 
   // Audio pipeline state
@@ -88,7 +88,7 @@ export default function PipelinePage() {
   const [compressAudio, setCompressAudio] = useState(true);
   const [generateAudioPdf, setGenerateAudioPdf] = useState(false);
   const [audioResult, setAudioResult] = useState<AudioPipelineResult | null>(
-    null
+    null,
   );
 
   // Document pipeline state
@@ -97,12 +97,20 @@ export default function PipelinePage() {
   const [parserType, setParserType] = useState("auto");
   const [generateDocPdf, setGenerateDocPdf] = useState(false);
   const [docResult, setDocResult] = useState<DocumentPipelineResult | null>(
-    null
+    null,
   );
 
   // Shared state
   const [isLoading, setIsLoading] = useState(false);
   const [steps, setSteps] = useState<Step[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const activeFile = pipelineType === "audio" ? audioFile : docFile;
   const activeRequirements =
@@ -118,8 +126,7 @@ export default function PipelinePage() {
     {
       id: "configure",
       name: "Configure",
-      status:
-        activeFile && activeRequirements.trim() ? "completed" : "pending",
+      status: activeFile && activeRequirements.trim() ? "completed" : "pending",
     },
     {
       id: "review",
@@ -129,6 +136,8 @@ export default function PipelinePage() {
   ];
 
   const handleAudioPipeline = async () => {
+    if (isLoading) return; // Prevent double-click
+
     if (!audioFile) {
       toast.error("Please select an audio/video file first");
       return;
@@ -138,6 +147,10 @@ export default function PipelinePage() {
       toast.error("Please describe what data you want to extract");
       return;
     }
+
+    // Abort previous request if any
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
     setAudioResult(null);
@@ -164,11 +177,18 @@ export default function PipelinePage() {
       const response = await fetch(`${API_URL}/pipeline/audio`, {
         method: "POST",
         body: formData,
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Pipeline failed");
+        let errorMessage = "Pipeline failed";
+        try {
+          const error = await response.json();
+          errorMessage = error.detail || errorMessage;
+        } catch {
+          // JSON parsing failed, use default message
+        }
+        throw new Error(errorMessage);
       }
 
       const data: AudioPipelineResult = await response.json();
@@ -181,11 +201,14 @@ export default function PipelinePage() {
         toast.success("Pipeline complete!");
       }
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return; // Request was aborted, don't show error
+      }
       toast.error(error instanceof Error ? error.message : "An error occurred");
       setSteps((prev) =>
         prev.map((s) =>
-          s.status === "in_progress" ? { ...s, status: "error" } : s
-        )
+          s.status === "in_progress" ? { ...s, status: "error" } : s,
+        ),
       );
     } finally {
       setIsLoading(false);
@@ -193,6 +216,8 @@ export default function PipelinePage() {
   };
 
   const handleDocumentPipeline = async () => {
+    if (isLoading) return; // Prevent double-click
+
     if (!docFile) {
       toast.error("Please select a document file first");
       return;
@@ -202,6 +227,10 @@ export default function PipelinePage() {
       toast.error("Please describe what data you want to extract");
       return;
     }
+
+    // Abort previous request if any
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
     setDocResult(null);
@@ -227,11 +256,18 @@ export default function PipelinePage() {
       const response = await fetch(`${API_URL}/pipeline/document`, {
         method: "POST",
         body: formData,
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Pipeline failed");
+        let errorMessage = "Pipeline failed";
+        try {
+          const error = await response.json();
+          errorMessage = error.detail || errorMessage;
+        } catch {
+          // JSON parsing failed, use default message
+        }
+        throw new Error(errorMessage);
       }
 
       const data: DocumentPipelineResult = await response.json();
@@ -244,11 +280,14 @@ export default function PipelinePage() {
         toast.success("Pipeline complete!");
       }
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return; // Request was aborted, don't show error
+      }
       toast.error(error instanceof Error ? error.message : "An error occurred");
       setSteps((prev) =>
         prev.map((s) =>
-          s.status === "in_progress" ? { ...s, status: "error" } : s
-        )
+          s.status === "in_progress" ? { ...s, status: "error" } : s,
+        ),
       );
     } finally {
       setIsLoading(false);
@@ -272,11 +311,11 @@ export default function PipelinePage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight font-serif flex items-center gap-3">
+        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Workflow className="h-8 w-8" />
           Pipeline Demo
         </h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="text-muted-foreground mt-2">
           End-to-end workflows: Audio/Document to Structured Data with optional
           PDF export
         </p>
@@ -345,7 +384,7 @@ export default function PipelinePage() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="enhanced">Enhanced Transcript</Label>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-muted-foreground text-xs">
                         Use LLM to improve readability
                       </p>
                     </div>
@@ -360,7 +399,7 @@ export default function PipelinePage() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="compress">Compress Audio</Label>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-muted-foreground text-xs">
                         Compress before sending
                       </p>
                     </div>
@@ -375,7 +414,7 @@ export default function PipelinePage() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="pdf-audio">Generate PDF Report</Label>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-muted-foreground text-xs">
                         Create downloadable PDF
                       </p>
                     </div>
@@ -390,7 +429,9 @@ export default function PipelinePage() {
 
                 <Button
                   onClick={handleAudioPipeline}
-                  disabled={!audioFile || !audioRequirements.trim() || isLoading}
+                  disabled={
+                    !audioFile || !audioRequirements.trim() || isLoading
+                  }
                   className="w-full"
                   size="lg"
                 >
@@ -428,11 +469,11 @@ export default function PipelinePage() {
                 <Card>
                   <CardContent className="flex items-center justify-center py-12">
                     <div className="text-center">
-                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                      <p className="mt-2 text-muted-foreground">
+                      <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
+                      <p className="text-muted-foreground mt-2">
                         Running pipeline...
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-muted-foreground mt-1 text-xs">
                         This may take a while
                       </p>
                     </div>
@@ -490,7 +531,7 @@ export default function PipelinePage() {
                         copyContent={JSON.stringify(
                           audioResult.extracted_data,
                           null,
-                          2
+                          2,
                         )}
                         delay={0.1}
                       >
@@ -593,7 +634,7 @@ export default function PipelinePage() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="pdf-doc">Generate PDF Report</Label>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       Create downloadable PDF
                     </p>
                   </div>
@@ -645,11 +686,11 @@ export default function PipelinePage() {
                 <Card>
                   <CardContent className="flex items-center justify-center py-12">
                     <div className="text-center">
-                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                      <p className="mt-2 text-muted-foreground">
+                      <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
+                      <p className="text-muted-foreground mt-2">
                         Running pipeline...
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-muted-foreground mt-1 text-xs">
                         This may take a while
                       </p>
                     </div>
@@ -681,7 +722,7 @@ export default function PipelinePage() {
                         copyContent={JSON.stringify(
                           docResult.extracted_data,
                           null,
-                          2
+                          2,
                         )}
                         delay={0.1}
                       >

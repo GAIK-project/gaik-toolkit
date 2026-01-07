@@ -1,4 +1,4 @@
-﻿"""Document and PDF Parsers
+"""Document and PDF Parsers
 
 This module provides multiple document parsing options:
 
@@ -61,4 +61,3 @@ try:
     __all__.extend(["DoclingParser", "parse_document"])
 except ImportError:
     pass
-

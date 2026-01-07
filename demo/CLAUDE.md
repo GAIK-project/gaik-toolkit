@@ -1,0 +1,2 @@
+- Backend API: Use gaik toolkit (https://pypi.org/project/gaik/)
+- Package managers: Use pnpm and uv, not npm

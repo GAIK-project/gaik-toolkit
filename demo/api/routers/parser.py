@@ -1,4 +1,4 @@
-﻿"""Parser router - Document parsing endpoints"""
+"""Parser router - Document parsing endpoints"""
 
 import tempfile
 from pathlib import Path
@@ -74,4 +74,3 @@ async def parse_document(
     finally:
         # Cleanup temp file
         Path(tmp_path).unlink(missing_ok=True)
-

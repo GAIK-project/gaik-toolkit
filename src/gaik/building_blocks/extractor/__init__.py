@@ -1,4 +1,4 @@
-﻿"""
+"""
 Knowledge Extraction Using Dynamic Schema Generation
 
 Extract structured data from documents using natural language requirements.
@@ -28,8 +28,8 @@ from .schema import (
     SchemaGenerator,
     StructureAnalysis,
     create_extraction_model,
-    parse_date,
     normalize_extracted_data,
+    parse_date,
 )
 
 __all__ = [
@@ -51,4 +51,3 @@ __all__ = [
 ]
 
 __version__ = "0.1.0"
-

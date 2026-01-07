@@ -1,4 +1,4 @@
-﻿"""Transcriber router - Audio/video transcription endpoints"""
+"""Transcriber router - Audio/video transcription endpoints"""
 
 import os
 import tempfile
@@ -87,4 +87,3 @@ async def transcribe_audio(
         raise HTTPException(status_code=500, detail=str(e)) from e
     finally:
         Path(tmp_path).unlink(missing_ok=True)
-

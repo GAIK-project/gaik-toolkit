@@ -10,12 +10,7 @@ interface DemoStepperProps {
 
 export function DemoStepper({ steps, className }: DemoStepperProps) {
   return (
-    <div
-      className={cn(
-        "rounded-2xl border bg-card p-4 shadow-sm",
-        className
-      )}
-    >
+    <div className={cn("bg-card rounded-2xl border p-4 shadow-sm", className)}>
       <StepIndicator steps={steps} orientation="horizontal" />
     </div>
   );

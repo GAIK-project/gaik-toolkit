@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export function InstallSnippet() {
   return (
     <section>
-      <Card className="overflow-hidden border bg-card shadow-sm">
+      <Card className="bg-card overflow-hidden border shadow-sm">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <span className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-full">
               <Terminal className="h-5 w-5" />
             </span>
             <CardTitle className="text-xl font-semibold">Quick start</CardTitle>

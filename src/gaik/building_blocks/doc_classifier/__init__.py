@@ -1,4 +1,4 @@
-﻿"""Document Classification
+"""Document Classification
 
 Classify documents into predefined categories using LLM analysis of the first page.
 
@@ -71,4 +71,3 @@ __all__ = [
 ]
 
 __version__ = "0.1.0"
-

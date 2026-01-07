@@ -1,4 +1,4 @@
-﻿"""
+"""
 Example 1: End-to-end dynamic schema generation and extraction.
 
 This script demonstrates how to:
@@ -100,4 +100,3 @@ if __name__ == "__main__":
     import json
 
     print(json.dumps(results, indent=2, default=str))
-

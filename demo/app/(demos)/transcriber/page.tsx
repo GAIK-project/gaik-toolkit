@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "motion/react";
 import { Mic, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,14 @@ export default function TranscriberPage() {
   const [compressAudio, setCompressAudio] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<TranscribeResult | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const flowSteps: Step[] = [
     {
@@ -57,10 +65,16 @@ export default function TranscriberPage() {
   ];
 
   const handleSubmit = async () => {
+    if (isLoading) return; // Prevent double-click
+
     if (!file) {
       toast.error("Please select an audio/video file first");
       return;
     }
+
+    // Abort previous request if any
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
     setResult(null);
@@ -75,17 +89,27 @@ export default function TranscriberPage() {
       const response = await fetch(`${API_URL}/transcribe/`, {
         method: "POST",
         body: formData,
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to transcribe");
+        let errorMessage = "Failed to transcribe";
+        try {
+          const error = await response.json();
+          errorMessage = error.detail || errorMessage;
+        } catch {
+          // JSON parsing failed, use default message
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       setResult(data);
       toast.success("Transcription complete!");
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return; // Request was aborted, don't show error
+      }
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
@@ -99,11 +123,11 @@ export default function TranscriberPage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight font-serif flex items-center gap-3">
+        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Mic className="h-8 w-8" />
           Audio/Video Transcriber
         </h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="text-muted-foreground mt-2">
           Transcribe audio and video with Whisper and optional GPT enhancement
         </p>
       </header>
@@ -147,7 +171,7 @@ export default function TranscriberPage() {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="enhanced">Enhanced Transcript</Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     Use LLM to improve readability
                   </p>
                 </div>
@@ -162,7 +186,7 @@ export default function TranscriberPage() {
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="compress">Compress Audio</Label>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-foreground text-xs">
                     Compress before sending (faster upload)
                   </p>
                 </div>
@@ -202,11 +226,11 @@ export default function TranscriberPage() {
             <Card>
               <CardContent className="flex items-center justify-center py-12">
                 <div className="text-center">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                  <p className="mt-2 text-muted-foreground">
+                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
+                  <p className="text-muted-foreground mt-2">
                     Transcribing audio...
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-muted-foreground mt-1 text-xs">
                     This may take a while for longer files
                   </p>
                 </div>

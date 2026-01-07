@@ -1,4 +1,4 @@
-﻿"""
+"""
 Dynamic Schema Extraction with Structured Outputs
 
 Schema.py extracts structured data from documents using LLMs,
@@ -651,4 +651,3 @@ class SchemaGenerator:
             else [],
             "field_count": len(self.item_requirements.fields) if self.item_requirements else 0,
         }
-

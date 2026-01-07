@@ -1,4 +1,4 @@
-﻿"""
+"""
 Example 4: Persisting a dynamically generated schema for later reuse.
 
 Steps demonstrated:
@@ -15,17 +15,17 @@ import json
 import sys
 from contextlib import redirect_stdout
 from pathlib import Path
-import decimal
-from decimal import Decimal
-from typing import List, Literal, Optional
 
 # Allow running the example without installing the package
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from gaik.building_blocks.extractor import ExtractionRequirements  
-from gaik.building_blocks.extractor import (DataExtractor, SchemaGenerator,  
-                            get_openai_config)
-from gaik.building_blocks.extractor.schema import print_pydantic_schema  
+from gaik.building_blocks.extractor import (
+    DataExtractor,
+    ExtractionRequirements,
+    SchemaGenerator,
+    get_openai_config,
+)
+from gaik.building_blocks.extractor.schema import print_pydantic_schema
 
 # ---------------------------------------------------------------------------
 # Shared sample data (same as extraction_example_1.py)
@@ -187,5 +187,3 @@ def load_assets_and_extract():
 if __name__ == "__main__":
     generate_and_persist_assets()
     load_assets_and_extract()
-
-

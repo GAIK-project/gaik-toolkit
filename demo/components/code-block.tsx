@@ -16,10 +16,7 @@ type CodeBlockProps = {
   language: string;
   filename?: string;
   highlightLines?: number[];
-} & (
-  | { code: string; tabs?: never }
-  | { code?: never; tabs: Tab[] }
-);
+} & ({ code: string; tabs?: never } | { code?: never; tabs: Tab[] });
 
 export function CodeBlock({
   language,
@@ -77,7 +74,11 @@ export function CodeBlock({
           className="flex items-center gap-1 rounded p-1 text-xs text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
           aria-label="Copy code"
         >
-          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+          {copied ? (
+            <Check className="h-4 w-4" />
+          ) : (
+            <Copy className="h-4 w-4" />
+          )}
         </button>
       </div>
       <SyntaxHighlighter

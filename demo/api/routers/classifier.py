@@ -1,4 +1,4 @@
-﻿"""Classifier router - Document classification endpoints"""
+"""Classifier router - Document classification endpoints"""
 
 import os
 import tempfile
@@ -93,4 +93,3 @@ async def classify_document(
         raise HTTPException(status_code=500, detail=str(e)) from e
     finally:
         Path(tmp_path).unlink(missing_ok=True)
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "motion/react";
 import { Tags, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,14 @@ export default function ClassifierPage() {
   const [parserType, setParserType] = useState<string>("auto");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ClassifyResult | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const flowSteps: Step[] = [
     {
@@ -83,6 +91,8 @@ export default function ClassifierPage() {
   };
 
   const handleSubmit = async () => {
+    if (isLoading) return; // Prevent double-click
+
     if (!file) {
       toast.error("Please select a file first");
       return;
@@ -91,6 +101,10 @@ export default function ClassifierPage() {
       toast.error("Please add at least 2 classes");
       return;
     }
+
+    // Abort previous request if any
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
     setResult(null);
@@ -104,17 +118,27 @@ export default function ClassifierPage() {
       const response = await fetch(`${API_URL}/classify/`, {
         method: "POST",
         body: formData,
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to classify document");
+        let errorMessage = "Failed to classify document";
+        try {
+          const error = await response.json();
+          errorMessage = error.detail || errorMessage;
+        } catch {
+          // JSON parsing failed, use default message
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
       setResult(data);
       toast.success("Document classified successfully!");
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return; // Request was aborted, don't show error
+      }
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
@@ -128,11 +152,11 @@ export default function ClassifierPage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight font-serif flex items-center gap-3">
+        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Tags className="h-8 w-8" />
           Document Classifier
         </h1>
-        <p className="mt-2 text-muted-foreground">
+        <p className="text-muted-foreground mt-2">
           Classify documents into predefined categories using LLM analysis
         </p>
       </header>
@@ -161,7 +185,9 @@ export default function ClassifierPage() {
             />
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Classification Classes</label>
+              <label className="text-sm font-medium">
+                Classification Classes
+              </label>
               <div className="flex gap-2">
                 <Input
                   value={classInput}
@@ -179,12 +205,12 @@ export default function ClassifierPage() {
                   Add
                 </Button>
               </div>
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {classes.map((cls) => (
                   <Badge
                     key={cls}
                     variant="secondary"
-                    className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                    className="hover:bg-destructive hover:text-destructive-foreground cursor-pointer transition-colors"
                     onClick={() => !isLoading && handleRemoveClass(cls)}
                   >
                     {cls} ×
@@ -238,11 +264,11 @@ export default function ClassifierPage() {
             <Card>
               <CardContent className="flex items-center justify-center py-12">
                 <div className="text-center">
-                  <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-                  <p className="mt-2 text-muted-foreground">
+                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
+                  <p className="text-muted-foreground mt-2">
                     Analyzing document...
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-muted-foreground mt-1 text-xs">
                     This may take a few seconds
                   </p>
                 </div>
@@ -259,15 +285,14 @@ export default function ClassifierPage() {
               >
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-sm text-muted-foreground">Category:</span>
-                    <Badge variant="default" className="text-base px-3 py-1">
+                    <span className="text-muted-foreground text-sm">
+                      Category:
+                    </span>
+                    <Badge variant="default" className="px-3 py-1 text-base">
                       {result.classification}
                     </Badge>
                   </div>
-                  <ConfidenceBar
-                    value={result.confidence}
-                    label="Confidence"
-                  />
+                  <ConfidenceBar value={result.confidence} label="Confidence" />
                 </div>
               </ResultCard>
 
@@ -278,7 +303,7 @@ export default function ClassifierPage() {
                   copyContent={result.reasoning}
                   delay={0.1}
                 >
-                  <p className="text-sm leading-relaxed text-muted-foreground">
+                  <p className="text-muted-foreground text-sm leading-relaxed">
                     {result.reasoning}
                   </p>
                 </ResultCard>

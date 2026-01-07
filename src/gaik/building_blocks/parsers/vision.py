@@ -1,4 +1,4 @@
-﻿"""Vision-enabled PDF to Markdown parsing utilities.
+"""Vision-enabled PDF to Markdown parsing utilities.
 
 This module exposes :class:`VisionParser`, a helper that converts PDF pages to images
 and sends them to OpenAI's vision-enabled chat completions (including Azure
@@ -224,7 +224,7 @@ class VisionParser:
 
         logger.debug("Initializing standard OpenAI client")
         return OpenAI(api_key=config.api_key)
-    
+
     @staticmethod
     def _coerce_config(config: OpenAIConfig | Mapping[str, Any]) -> OpenAIConfig:
         """Normalize dict-based configs to OpenAIConfig."""
@@ -396,4 +396,3 @@ class VisionParser:
             "OUTPUT: Return ONLY the cleaned, merged markdown. No explanations, no code block "
             "wrappers."
         )
-

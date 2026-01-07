@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface ResultCardProps {
   title: string;
@@ -34,9 +35,14 @@ export function ResultCard({
 
   const handleCopy = async () => {
     if (!copyContent) return;
-    await navigator.clipboard.writeText(copyContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(copyContent);
+      setCopied(true);
+      toast.success("Copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Failed to copy to clipboard");
+    }
   };
 
   return (
@@ -80,12 +86,16 @@ interface ResultTextProps {
   className?: string;
 }
 
-export function ResultText({ content, maxHeight = "300px", className }: ResultTextProps) {
+export function ResultText({
+  content,
+  maxHeight = "300px",
+  className,
+}: ResultTextProps) {
   return (
     <div
       className={cn(
-        "rounded-md bg-muted p-4 font-mono text-sm overflow-auto whitespace-pre-wrap",
-        className
+        "bg-muted overflow-auto rounded-md p-4 font-mono text-sm whitespace-pre-wrap",
+        className,
       )}
       style={{ maxHeight }}
     >
@@ -100,14 +110,18 @@ interface ResultJsonProps {
   className?: string;
 }
 
-export function ResultJson({ data, maxHeight = "300px", className }: ResultJsonProps) {
+export function ResultJson({
+  data,
+  maxHeight = "300px",
+  className,
+}: ResultJsonProps) {
   const formatted = JSON.stringify(data, null, 2);
 
   return (
     <div
       className={cn(
-        "rounded-md bg-muted p-4 font-mono text-sm overflow-auto",
-        className
+        "bg-muted overflow-auto rounded-md p-4 font-mono text-sm",
+        className,
       )}
       style={{ maxHeight }}
     >
@@ -138,7 +152,7 @@ export function ConfidenceBar({ value, label, className }: ConfidenceBarProps) {
           <span className="font-medium">{percentage}%</span>
         </div>
       )}
-      <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+      <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
         <motion.div
           className={cn("h-full rounded-full", getColor())}
           initial={{ width: 0 }}

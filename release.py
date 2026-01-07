@@ -134,8 +134,8 @@ def main():
     print()
     print("This will:")
     print(f"  1. Create git tag '{tag}'")
-    print(f"  2. Push tag to origin")
-    print(f"  3. GitHub Actions will publish to PyPI")
+    print("  2. Push tag to origin")
+    print("  3. GitHub Actions will publish to PyPI")
     print()
 
     response = input("Proceed? [y/N]: ").strip().lower()

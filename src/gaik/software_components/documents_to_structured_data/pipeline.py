@@ -4,21 +4,21 @@ Reusable pipeline to parse documents (PDF/images/DOCX) and extract structured da
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import importlib.util
 import io
 import json
-from pathlib import Path
-from typing import Any, Sequence
 from contextlib import redirect_stdout
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 from gaik.building_blocks.config import get_openai_config
-from gaik.building_blocks.extractor import DataExtractor, SchemaGenerator, ExtractionRequirements
+from gaik.building_blocks.extractor import DataExtractor, ExtractionRequirements, SchemaGenerator
 from gaik.building_blocks.extractor.schema import print_pydantic_schema
 
 # Optional parsers
 try:
-    from gaik.building_blocks.parsers import VisionParser, DoclingParser, PyMuPDFParser, DocxParser
+    from gaik.building_blocks.parsers import DoclingParser, DocxParser, PyMuPDFParser, VisionParser
 except ImportError:  # pragma: no cover - optional deps
     VisionParser = DoclingParser = PyMuPDFParser = DocxParser = None  # type: ignore
 
@@ -127,7 +127,9 @@ class DocumentsToStructuredData:
             return DocxParser(**ctor)
         raise ValueError(f"Unsupported parser_choice: {parser_choice}")
 
-    def _parse_document(self, parser_choice: str, parser, file_path: str | Path, parse_options: dict) -> list[str]:
+    def _parse_document(
+        self, parser_choice: str, parser, file_path: str | Path, parse_options: dict
+    ) -> list[str]:
         choice = parser_choice.lower()
         if choice == "vision_parser":
             pages = parser.convert_pdf(str(file_path), **parse_options)

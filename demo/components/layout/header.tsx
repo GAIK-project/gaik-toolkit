@@ -18,13 +18,13 @@ export function Header() {
           <nav className="hidden gap-4 md:flex">
             <Link
               href="/"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground text-sm transition-colors"
             >
               Home
             </Link>
             <Link
               href="/about"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground text-sm transition-colors"
             >
               About
             </Link>

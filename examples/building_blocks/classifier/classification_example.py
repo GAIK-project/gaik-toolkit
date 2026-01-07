@@ -1,4 +1,4 @@
-﻿"""Document Classifier Example
+"""Document Classifier Example
 
 Demonstrates how to classify documents into predefined categories using the doc_classifier package.
 """
@@ -212,5 +212,3 @@ if __name__ == "__main__":
 
     ## Error handling
     # error_handling_example()
-
-

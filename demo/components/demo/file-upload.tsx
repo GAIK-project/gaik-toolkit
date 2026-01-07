@@ -29,10 +29,12 @@ export function FileUpload({
   const validateFile = useCallback(
     (file: File): boolean => {
       // Check file type
-      const acceptedTypes = accept.split(",").map((t) => t.trim().toLowerCase());
+      const acceptedTypes = accept
+        .split(",")
+        .map((t) => t.trim().toLowerCase());
       const fileExt = `.${file.name.split(".").pop()?.toLowerCase()}`;
       const isValidType = acceptedTypes.some(
-        (type) => type === fileExt || file.type.includes(type.replace(".", ""))
+        (type) => type === fileExt || file.type.includes(type.replace(".", "")),
       );
 
       if (!isValidType) {
@@ -49,7 +51,7 @@ export function FileUpload({
       setError(null);
       return true;
     },
-    [accept, maxSize]
+    [accept, maxSize],
   );
 
   const handleFile = useCallback(
@@ -59,7 +61,7 @@ export function FileUpload({
         onFileSelect(file);
       }
     },
-    [validateFile, onFileSelect]
+    [validateFile, onFileSelect],
   );
 
   const handleDrop = useCallback(
@@ -74,7 +76,7 @@ export function FileUpload({
         handleFile(file);
       }
     },
-    [disabled, handleFile]
+    [disabled, handleFile],
   );
 
   const handleDragOver = useCallback(
@@ -84,7 +86,7 @@ export function FileUpload({
         setIsDragging(true);
       }
     },
-    [disabled]
+    [disabled],
   );
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
@@ -99,7 +101,7 @@ export function FileUpload({
         handleFile(file);
       }
     },
-    [handleFile]
+    [handleFile],
   );
 
   const removeFile = useCallback(() => {
@@ -126,17 +128,19 @@ export function FileUpload({
             className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-950"
           >
             <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-            <File className="h-5 w-5 text-muted-foreground" />
-            <div className="flex-1 min-w-0">
-              <p className="truncate font-medium text-sm">{selectedFile.name}</p>
-              <p className="text-xs text-muted-foreground">
+            <File className="text-muted-foreground h-5 w-5" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">
+                {selectedFile.name}
+              </p>
+              <p className="text-muted-foreground text-xs">
                 {formatFileSize(selectedFile.size)}
               </p>
             </div>
             <button
               onClick={removeFile}
               disabled={disabled}
-              className="rounded-full p-1 hover:bg-green-100 dark:hover:bg-green-900 transition-colors"
+              className="rounded-full p-1 transition-colors hover:bg-green-100 dark:hover:bg-green-900"
               aria-label="Remove file"
             >
               <X className="h-4 w-4" />
@@ -154,30 +158,34 @@ export function FileUpload({
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               className={cn(
-                "flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 transition-all cursor-pointer",
+                "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 transition-all",
                 isDragging
                   ? "border-primary bg-primary/5 scale-[1.02]"
                   : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50",
-                disabled && "opacity-50 cursor-not-allowed",
-                error && "border-destructive"
+                disabled && "cursor-not-allowed opacity-50",
+                error && "border-destructive",
               )}
             >
               <motion.div
-                animate={isDragging ? { scale: 1.1, y: -5 } : { scale: 1, y: 0 }}
+                animate={
+                  isDragging ? { scale: 1.1, y: -5 } : { scale: 1, y: 0 }
+                }
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
               >
                 <Upload
                   className={cn(
                     "h-10 w-10",
-                    isDragging ? "text-primary" : "text-muted-foreground"
+                    isDragging ? "text-primary" : "text-muted-foreground",
                   )}
                 />
               </motion.div>
               <div className="text-center">
                 <p className="font-medium">
-                  {isDragging ? "Drop file here" : "Drag & drop or click to upload"}
+                  {isDragging
+                    ? "Drop file here"
+                    : "Drag & drop or click to upload"}
                 </p>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-muted-foreground mt-1 text-sm">
                   Supports: {accept} (max {maxSize}MB)
                 </p>
               </div>
@@ -196,10 +204,11 @@ export function FileUpload({
       <AnimatePresence>
         {error && (
           <motion.p
+            role="alert"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mt-2 text-sm text-destructive"
+            className="text-destructive mt-2 text-sm"
           >
             {error}
           </motion.p>
