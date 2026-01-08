@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:api": "cd api && uvicorn main:app --reload --port 8000",
-    "dev:all": "concurrently --names \"next,api\" -c \"cyan,magenta\" \"npm run dev\" \"npm run dev:api\"",
+    "dev:all": "concurrently --names \"next,api\" -c \"cyan,magenta\" \"pnpm dev\" \"pnpm dev:api\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
