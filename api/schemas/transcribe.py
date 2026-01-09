@@ -8,9 +8,7 @@ class TranscribeResponse(BaseModel):
 
     filename: str = Field(..., description="Original filename")
     raw_transcript: str = Field(..., description="Raw transcript from Whisper")
-    enhanced_transcript: str | None = Field(
-        None, description="LLM-enhanced transcript"
-    )
+    enhanced_transcript: str | None = Field(None, description="LLM-enhanced transcript")
     job_id: str = Field(..., description="Unique job identifier")
 
     model_config = {

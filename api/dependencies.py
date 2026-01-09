@@ -1,6 +1,6 @@
 """FastAPI dependencies and authentication."""
 
-from fastapi import Security, HTTPException, status
+from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
 from api.config import settings

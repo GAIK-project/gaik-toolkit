@@ -11,9 +11,7 @@ class ParseResponse(BaseModel):
     filename: str = Field(..., description="Original filename")
     parser: str = Field(..., description="Parser used (pymupdf/docx/vision)")
     text_content: str = Field(..., description="Extracted text content")
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Document metadata"
-    )
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Document metadata")
 
     model_config = {
         "json_schema_extra": {

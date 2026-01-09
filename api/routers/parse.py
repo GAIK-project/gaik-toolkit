@@ -6,11 +6,10 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from gaik.building_blocks.parsers import DocxParser, PyMuPDFParser, VisionParser
-
-from api.config import settings, get_openai_config
+from api.config import get_openai_config, settings
 from api.dependencies import verify_api_key
 from api.schemas.parse import ParseResponse
+from gaik.building_blocks.parsers import DocxParser, PyMuPDFParser, VisionParser
 
 router = APIRouter()
 
@@ -97,15 +96,13 @@ async def parse_document(
                 openai_config["azure_endpoint"] = config["azure_endpoint"]
                 openai_config["api_version"] = config["api_version"]
 
-            parser = VisionParser(openai_config=openai_config, clean_output=True)
-            pages = parser.convert_pdf(tmp_path)
+            parser = VisionParser(openai_config=openai_config)
+            pages = parser.convert_pdf(tmp_path, clean_output=True)
             text_content = "\n\n".join(pages)
             metadata = {"pages": len(pages), "parser": "vision"}
 
         else:
-            raise HTTPException(
-                status_code=400, detail=f"Unknown parser type: {parser_type}"
-            )
+            raise HTTPException(status_code=400, detail=f"Unknown parser type: {parser_type}")
 
         # Add word count to metadata
         metadata["word_count"] = len(text_content.split())

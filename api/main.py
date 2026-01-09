@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.config import settings
-from api.routers import transcribe, parse
+from api.routers import parse, transcribe
 
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,

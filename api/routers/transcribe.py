@@ -5,11 +5,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from gaik.building_blocks.transcriber.transcriber import Transcriber
-
-from api.config import settings, get_openai_config
+from api.config import get_openai_config, settings
 from api.dependencies import verify_api_key
 from api.schemas.transcribe import TranscribeResponse
+from gaik.building_blocks.transcriber.transcriber import Transcriber
 
 router = APIRouter()
 
@@ -23,12 +22,8 @@ router = APIRouter()
 )
 async def transcribe_audio(
     file: UploadFile = File(..., description="Audio/video file to transcribe"),
-    custom_context: str = Form(
-        default="", description="Optional context for transcription"
-    ),
-    enhanced: bool = Form(
-        default=True, description="Enhance transcript with LLM post-processing"
-    ),
+    custom_context: str = Form(default="", description="Optional context for transcription"),
+    enhanced: bool = Form(default=True, description="Enhance transcript with LLM post-processing"),
 ):
     """
     Transcribe an audio or video file.
