@@ -1,0 +1,16 @@
+# GAIK Toolkit API Dependencies
+# Uses gaik[all] which includes all building blocks
+
+# GAIK toolkit with all extras (transcriber, parser, extractor)
+# Install from project root: pip install -e ".[all]"
+# Or from PyPI when published: gaik[all]
+
+# FastAPI and ASGI
+fastapi>=0.128.0
+uvicorn[standard]>=0.40.0
+
+# File upload handling
+python-multipart>=0.0.21
+
+# Configuration
+pydantic-settings>=2.12.0
