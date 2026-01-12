@@ -1,13 +1,11 @@
 """Transcribe endpoint for audio/video transcription."""
 
-import tempfile
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from api.config import get_openai_config, settings
 from api.dependencies import verify_api_key
 from api.schemas.transcribe import TranscribeResponse
+from api.utils import temp_file, validate_file_size, validate_upload
 from gaik.building_blocks.transcriber.transcriber import Transcriber
 
 router = APIRouter()
@@ -34,53 +32,32 @@ async def transcribe_audio(
 
     Returns transcription with raw and optionally enhanced text.
     """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Filename is required")
+    suffix = validate_upload(file, settings.ALLOWED_AUDIO_EXTENSIONS)
 
-    # Validate file extension
-    suffix = Path(file.filename).suffix.lower()
-    if suffix not in settings.ALLOWED_AUDIO_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported format: {suffix}. Allowed: {settings.ALLOWED_AUDIO_EXTENSIONS}",
-        )
-
-    # Read and validate file size
     content = await file.read()
-    if len(content) > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large. Maximum size: {settings.MAX_FILE_SIZE_MB}MB",
-        )
+    validate_file_size(content)
 
-    # Save to temporary file
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
+    with temp_file(content, suffix) as tmp_path:
+        try:
+            config = get_openai_config()
+            transcriber = Transcriber(
+                api_config=config,
+                enhanced_transcript=enhanced,
+            )
 
-    try:
-        config = get_openai_config()
-        transcriber = Transcriber(
-            api_config=config,
-            enhanced_transcript=enhanced,
-        )
+            result = transcriber.transcribe(
+                file_path=tmp_path,
+                custom_context=custom_context,
+            )
 
-        result = transcriber.transcribe(
-            file_path=tmp_path,
-            custom_context=custom_context,
-        )
+            return TranscribeResponse(
+                filename=file.filename,
+                raw_transcript=result.raw_transcript,
+                enhanced_transcript=result.enhanced_transcript,
+                job_id=result.job_id,
+            )
 
-        return TranscribeResponse(
-            filename=file.filename,
-            raw_transcript=result.raw_transcript,
-            enhanced_transcript=result.enhanced_transcript,
-            job_id=result.job_id,
-        )
-
-    except FileNotFoundError:
-        raise HTTPException(status_code=500, detail="Transcription failed: file processing error")
-    except Exception:
-        raise HTTPException(status_code=500, detail="Transcription failed")
-    finally:
-        # Clean up temporary file
-        Path(tmp_path).unlink(missing_ok=True)
+        except FileNotFoundError:
+            raise HTTPException(status_code=500, detail="Transcription failed: file error")
+        except Exception:
+            raise HTTPException(status_code=500, detail="Transcription failed")

@@ -1,0 +1,42 @@
+# Git
+.git/
+.github/
+.gitignore
+
+# Development/IDE
+.venv/
+venv/
+.vscode/
+.idea/
+.pytest_cache/
+.ruff_cache/
+.claude/
+__pycache__/
+*.py[cod]
+
+# Documentation & examples (not needed in production)
+docs/
+demo/
+examples/
+website/
+*.md
+!api/README.md
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Environment files (secrets handled via OpenShift)
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temp files
+tmp*
+*.tmp
