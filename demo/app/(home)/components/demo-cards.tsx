@@ -106,21 +106,16 @@ export function DemoCards() {
                   </div>
                 </CardHeader>
 
-                <CardContent className="p-0">
+                <CardContent className="overflow-hidden px-4">
                   <video
                     src="/video/incident-veo.mp4"
                     poster="/start.png"
                     autoPlay
+                    loop
                     muted
                     playsInline
                     preload="auto"
-                    className="w-full"
-                    onTimeUpdate={(e) => {
-                      const video = e.currentTarget;
-                      if (video.duration - video.currentTime < 1.5) {
-                        video.pause();
-                      }
-                    }}
+                    className="w-full rounded-lg"
                   />
                 </CardContent>
 
