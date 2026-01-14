@@ -31,7 +31,8 @@ import {
   GlimpseDescription,
   GlimpseImage,
 } from "@/components/kibo-ui/glimpse";
-import type { LinkPreview } from "@/lib/link-previews";
+import { GitHubIcon } from "@/components/github-icon";
+import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
 
 const navItems = [
   { label: "Home", href: "/", icon: Home },
@@ -72,20 +73,6 @@ function NavLink({ href, label, icon: Icon, active, variant }: NavLinkProps) {
   );
 }
 
-const GITHUB_URL = "https://github.com/GAIK-project/gaik-toolkit";
-
-function GitHubIcon({ className }: { className?: string }) {
-  return (
-    <Image
-      src="/logos/github-mark-white.svg"
-      alt=""
-      width={20}
-      height={20}
-      className={cn("dark:invert-0 invert", className)}
-    />
-  );
-}
-
 interface GitHubLinkProps {
   preview?: LinkPreview | null;
   variant: "desktop" | "mobile";
@@ -96,7 +83,7 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
 
   const linkContent = (
     <a
-      href={GITHUB_URL}
+      href={GITHUB_REPO_URL}
       target="_blank"
       rel="noopener noreferrer"
       className={cn(

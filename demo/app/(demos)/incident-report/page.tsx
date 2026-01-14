@@ -654,7 +654,7 @@ export default function IncidentReportPage() {
 
               {result.extracted_data && result.extracted_data.length > 0 && (
                 <ResultCard
-                  title="Structured Incident Report"
+                  title="Incident Details"
                   description="Details extracted by AI"
                   copyContent={JSON.stringify(result.extracted_data, null, 2)}
                   delay={0.1}

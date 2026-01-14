@@ -10,11 +10,14 @@ import {
 } from "@/components/ui/card";
 import {
   AlertTriangle,
+  Database,
+  Download,
   FileSearch,
   FileText,
   FolderKanban,
   type LucideIcon,
   Mic,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -36,37 +39,37 @@ const demos: Demo[] = [
     featured: true,
   },
   {
-    title: "Extractor",
+    title: "Data Extraction",
     description:
-      "Extract structured data from documents using natural language",
+      "Automatically find and list important details from any document",
     href: "/extractor",
     icon: FileSearch,
   },
   {
-    title: "Parser",
-    description: "Parse PDFs and Word documents with vision models or PyMuPDF",
+    title: "Document Reader",
+    description: "Read text and layout from PDF and Word files accurately",
     href: "/parser",
     icon: FileText,
   },
   {
-    title: "Classifier",
-    description: "Classify documents into predefined categories using LLM",
+    title: "Document Sorter",
+    description: "Automatically sort your files into the right folders",
     href: "/classifier",
     icon: FolderKanban,
   },
   {
-    title: "Transcriber",
-    description: "Transcribe audio and video with Whisper and GPT enhancement",
+    title: "Speech to Text",
+    description: "Convert voice recordings and videos into clear, written text",
     href: "/transcriber",
     icon: Mic,
   },
 ];
 
-const features = [
-  "Voice & Text Input",
-  "Automatic Extraction",
-  "Structured JSON",
-  "PDF Generation",
+const featureList = [
+  { label: "Speak or Type", icon: Mic },
+  { label: "Instant Analysis", icon: Sparkles },
+  { label: "Organized Data", icon: Database },
+  { label: "PDF Export", icon: Download },
 ];
 
 export function DemoCards() {
@@ -103,17 +106,6 @@ export function DemoCards() {
                   </div>
                 </CardHeader>
 
-                <CardContent className="flex flex-wrap gap-2 pb-4">
-                  {features.map((feature) => (
-                    <span
-                      key={feature}
-                      className="bg-muted text-muted-foreground rounded-full px-3 py-1 text-xs"
-                    >
-                      {feature}
-                    </span>
-                  ))}
-                </CardContent>
-
                 <CardContent className="p-0">
                   <video
                     src="/video/incident-veo.mp4"
@@ -130,6 +122,24 @@ export function DemoCards() {
                       }
                     }}
                   />
+                </CardContent>
+
+                <CardContent className="pt-2 pb-6">
+                  <div className="grid grid-cols-2 gap-3">
+                    {featureList.map((feature) => (
+                      <div
+                        key={feature.label}
+                        className="bg-muted/50 flex items-center gap-3 rounded-lg p-3"
+                      >
+                        <div className="bg-background flex h-8 w-8 items-center justify-center rounded-full shadow-sm">
+                          <feature.icon className="text-primary h-4 w-4" />
+                        </div>
+                        <span className="text-sm font-medium">
+                          {feature.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </Link>

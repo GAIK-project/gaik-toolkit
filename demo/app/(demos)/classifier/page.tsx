@@ -144,10 +144,10 @@ export default function ClassifierPage() {
       <header className="mb-8">
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Tags className="h-8 w-8" />
-          Document Classifier
+          Document Sorter
         </h1>
         <p className="text-muted-foreground mt-2">
-          Classify documents into predefined categories using LLM analysis
+          Automatically sort documents into categories using AI
         </p>
       </header>
 
@@ -187,7 +187,7 @@ export default function ClassifierPage() {
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="settings" className="border-none">
                   <AccordionTrigger className="text-muted-foreground hover:text-foreground py-2 text-sm font-medium">
-                    Classification Settings
+                    Sorting Settings
                   </AccordionTrigger>
                   <AccordionContent className="space-y-6 pt-4">
                     <div className="space-y-2">
@@ -253,12 +253,12 @@ export default function ClassifierPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Classifying...
+                    Sorting...
                   </>
                 ) : (
                   <>
                     <Sparkles className="mr-2 h-4 w-4" />
-                    Classify Document
+                    Sort Document
                   </>
                 )}
               </Button>
@@ -278,7 +278,7 @@ export default function ClassifierPage() {
           {result && !isLoading && (
             <>
               <ResultCard
-                title="Classification Result"
+                title="Sorting Result"
                 description={`File: ${result.filename}`}
                 delay={0}
               >

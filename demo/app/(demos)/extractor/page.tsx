@@ -213,8 +213,7 @@ export default function ExtractorPage() {
           Data Extractor
         </h1>
         <p className="text-muted-foreground mt-2">
-          Extract structured data from documents using natural language
-          requirements
+          Automatically find and list important details from any document
         </p>
       </header>
 

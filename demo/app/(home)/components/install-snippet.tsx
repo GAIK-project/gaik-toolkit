@@ -1,11 +1,11 @@
 "use client";
 
 import { CodeBlock } from "@/components/code-block";
+import { GitHubIcon } from "@/components/github-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpRight, BookOpen, Package, Terminal } from "lucide-react";
 import { motion } from "motion/react";
-import Image from "next/image";
 
 export function InstallSnippet() {
   return (
@@ -62,13 +62,7 @@ export function InstallSnippet() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Image
-                    src="/logos/github-mark-white.svg"
-                    alt=""
-                    width={16}
-                    height={16}
-                    className="h-4 w-4"
-                  />
+                  <GitHubIcon className="h-4 w-4" />
                   View Examples
                   <ArrowUpRight className="h-4 w-4" />
                 </a>

@@ -114,10 +114,10 @@ export default function ParserPage() {
       <header className="mb-8">
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <FileText className="h-8 w-8" />
-          Document Parser
+          Document Reader
         </h1>
         <p className="text-muted-foreground mt-2">
-          Parse PDFs and Word documents with PyMuPDF or DOCX parsers
+          Read text and layout from PDF and Word files accurately
         </p>
       </header>
 
@@ -130,7 +130,7 @@ export default function ParserPage() {
                 <div>
                   <CardTitle>Upload Document</CardTitle>
                   <CardDescription>
-                    Select a PDF or DOCX file to parse
+                    Select a PDF or DOCX file to read
                   </CardDescription>
                 </div>
                 <ExamplePreviewDialog
@@ -157,7 +157,7 @@ export default function ParserPage() {
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="settings" className="border-none">
                   <AccordionTrigger className="text-muted-foreground hover:text-foreground py-2 text-sm font-medium">
-                    Parser Settings
+                    Document Settings
                   </AccordionTrigger>
                   <AccordionContent className="pt-4">
                     <div className="space-y-2">
@@ -194,7 +194,7 @@ export default function ParserPage() {
                     Parsing...
                   </>
                 ) : (
-                  "Parse Document"
+                  "Read Document"
                 )}
               </Button>
             </CardContent>
@@ -208,8 +208,8 @@ export default function ParserPage() {
           {result && !isLoading && (
             <>
               <ResultCard
-                title="Parsed Content"
-                description={`Parsed with ${result.parser} parser`}
+                title="Document Content"
+                description={`Read using ${result.parser} method`}
                 copyContent={result.text_content}
                 delay={0}
               >

@@ -9,9 +9,9 @@ import {
   GlimpseDescription,
   GlimpseImage,
 } from "@/components/kibo-ui/glimpse";
-import type { LinkPreview } from "@/lib/link-previews";
+import { GitHubIcon } from "@/components/github-icon";
+import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
 
-const GITHUB_URL = "https://github.com/GAIK-project/gaik-toolkit";
 const DOCS_URL = "https://gaik-toolkit.2.rahtiapp.fi/";
 
 export interface FooterProps {
@@ -23,18 +23,12 @@ export function Footer({ githubPreview }: FooterProps) {
 
   const githubLink = (
     <a
-      href={GITHUB_URL}
+      href={GITHUB_REPO_URL}
       target="_blank"
       rel="noopener noreferrer"
       className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
     >
-      <Image
-        src="/logos/github-mark-white.svg"
-        alt=""
-        width={14}
-        height={14}
-        className="dark:invert-0 invert"
-      />
+      <GitHubIcon className="h-3.5 w-3.5" />
       GitHub
     </a>
   );

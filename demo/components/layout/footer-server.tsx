@@ -1,14 +1,7 @@
-import { getGithubPreview } from "@/lib/link-previews";
+import { getGithubPreviewSafe } from "@/lib/link-previews";
 import { Footer } from "./footer";
 
 export async function FooterServer() {
-  let githubPreview = null;
-
-  try {
-    githubPreview = await getGithubPreview();
-  } catch {
-    // Fallback to no preview if fetch fails
-  }
-
+  const githubPreview = await getGithubPreviewSafe();
   return <Footer githubPreview={githubPreview} />;
 }

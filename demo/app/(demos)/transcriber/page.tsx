@@ -121,10 +121,10 @@ export default function TranscriberPage() {
       <header className="mb-8">
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Mic className="h-8 w-8" />
-          Audio/Video Transcriber
+          Speech to Text
         </h1>
         <p className="text-muted-foreground mt-2">
-          Transcribe audio and video with Whisper and optional GPT enhancement
+          Convert voice recordings and videos into clear, written text
         </p>
       </header>
 
@@ -153,7 +153,7 @@ export default function TranscriberPage() {
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="settings" className="border-none">
                   <AccordionTrigger className="text-muted-foreground hover:text-foreground py-2 text-sm font-medium">
-                    Transcription Settings
+                    Processing Settings
                   </AccordionTrigger>
                   <AccordionContent className="space-y-6 pt-4">
                     <div className="space-y-2">
@@ -171,7 +171,7 @@ export default function TranscriberPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                          <Label htmlFor="enhanced">Enhanced Transcript</Label>
+                          <Label htmlFor="enhanced">Polished Text</Label>
                           <p className="text-muted-foreground text-xs">
                             Use LLM to improve readability
                           </p>
@@ -212,7 +212,7 @@ export default function TranscriberPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Transcribing...
+                    Converting...
                   </>
                 ) : (
                   <>
@@ -236,7 +236,7 @@ export default function TranscriberPage() {
 
           {result && !isLoading && (
             <ResultCard
-              title="Transcription Result"
+              title="Result"
               description={`File: ${result.filename}`}
               delay={0}
             >
