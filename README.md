@@ -90,9 +90,14 @@ pip install "gaik[documents-to-structured-data]"
 
 # Everything
 pip install "gaik[all]"
+
+# CPU-only (no GPU/torch/docling) - smaller footprint for cloud deployments
+pip install "gaik[all-cpu]"
 ```
 
-> For video processing and audio compression you’ll need `ffmpeg` installed on your system (optional but recommended).
+> **Tip:** Use `gaik[all-cpu]` for environments without GPU support (e.g., CSC Rahti, lightweight containers). It includes all features except the heavy `docling` parser which requires PyTorch.
+
+For video processing and audio compression you'll need `ffmpeg` installed on your system (optional but recommended).
 
 ---
 
