@@ -21,8 +21,6 @@ import { ResultCard, ResultText } from "@/components/demo/result-card";
 import { Step } from "@/components/demo/step-indicator";
 import { toast } from "sonner";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 interface TranscribeResult {
   filename: string;
   raw_transcript: string;
@@ -86,7 +84,7 @@ export default function TranscriberPage() {
       formData.append("enhanced", String(enhanced));
       formData.append("compress_audio", String(compressAudio));
 
-      const response = await fetch(`${API_URL}/transcribe/`, {
+      const response = await fetch("/api/transcribe/", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current.signal,

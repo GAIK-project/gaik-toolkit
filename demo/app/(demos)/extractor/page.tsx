@@ -21,8 +21,6 @@ import { ResultCard, ResultJson } from "@/components/demo/result-card";
 import { Step } from "@/components/demo/step-indicator";
 import { toast } from "sonner";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 interface Field {
   name: string;
   description: string;
@@ -112,7 +110,7 @@ export default function ExtractorPage() {
       formData.append("file", file);
       formData.append("parser_type", "auto");
 
-      const response = await fetch(`${API_URL}/parse/`, {
+      const response = await fetch("/api/parse/", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current?.signal,
@@ -191,7 +189,7 @@ export default function ExtractorPage() {
         {} as Record<string, string>,
       );
 
-      const response = await fetch(`${API_URL}/extract/`, {
+      const response = await fetch("/api/extract/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

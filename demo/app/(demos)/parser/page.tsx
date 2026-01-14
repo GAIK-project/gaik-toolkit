@@ -28,8 +28,6 @@ import {
 import { Step } from "@/components/demo/step-indicator";
 import { toast } from "sonner";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 interface ParseResult {
   filename: string;
   parser: string;
@@ -89,7 +87,7 @@ export default function ParserPage() {
       formData.append("file", file);
       formData.append("parser_type", parserType);
 
-      const response = await fetch(`${API_URL}/parse/`, {
+      const response = await fetch("/api/parse/", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current.signal,

@@ -1,18 +1,11 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 export function Hero() {
   return (
     <section className="bg-card rounded-3xl border p-8 shadow-sm md:p-12">
       <div className="space-y-6">
-        <Badge
-          variant="secondary"
-          className="w-fit text-[10px] tracking-[0.2em] uppercase"
-        >
-          GAIK Toolkit
-        </Badge>
         <div className="space-y-3">
           <h1 className="font-serif text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl">
             Interactive document AI demos.
@@ -23,8 +16,8 @@ export function Hero() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Button size="lg" asChild>
-            <Link href="/pipeline">
-              Launch Pipeline
+            <Link href="/incident-report">
+              Try Demo
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>

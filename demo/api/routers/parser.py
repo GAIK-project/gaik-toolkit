@@ -52,11 +52,12 @@ async def parse_document(
             parser = PyMuPDFParser()
             result = parser.parse_document(tmp_path)
         elif parser_type == "vision":
-            # Vision parser requires OpenAI config
-            raise HTTPException(
-                status_code=501,
-                detail="Vision parser requires OpenAI API key configuration",
-            )
+            from gaik.building_blocks.config import get_openai_config
+            from gaik.building_blocks.parsers import VisionParser
+
+            openai_config = get_openai_config()
+            parser = VisionParser(openai_config=openai_config)
+            result = parser.parse_document(tmp_path)
         else:
             raise HTTPException(status_code=400, detail=f"Unknown parser: {parser_type}")
 

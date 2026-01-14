@@ -26,8 +26,6 @@ import { ResultCard, ConfidenceBar } from "@/components/demo/result-card";
 import { Step } from "@/components/demo/step-indicator";
 import { toast } from "sonner";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 interface ClassifyResult {
   filename: string;
   classification: string;
@@ -115,7 +113,7 @@ export default function ClassifierPage() {
       formData.append("classes", classes.join(","));
       formData.append("parser", parserType);
 
-      const response = await fetch(`${API_URL}/classify/`, {
+      const response = await fetch("/api/classify/", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current.signal,

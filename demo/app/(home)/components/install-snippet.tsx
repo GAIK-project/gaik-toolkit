@@ -21,7 +21,7 @@ export function InstallSnippet() {
             filename="terminal"
             code="pip install gaik[all]"
           />
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-3">
             <Button variant="outline" asChild>
               <a
                 href="https://pypi.org/project/gaik/"

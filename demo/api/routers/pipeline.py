@@ -15,6 +15,9 @@ router = APIRouter()
 # Temporary storage for generated PDFs
 PDF_STORAGE: dict[str, Path] = {}
 
+# Logo path for PDF generation
+LOGO_PATH = Path(__file__).parent.parent.parent / "public" / "logos" / "gaik_logo_medium.png"
+
 
 class PipelineStep(BaseModel):
     """A single step in the pipeline."""
@@ -43,6 +46,17 @@ class DocumentPipelineResponse(BaseModel):
     job_id: str
     steps: list[PipelineStep]
     parsed_content: str | None = None
+    extracted_data: list[dict] | None = None
+    pdf_available: bool = False
+    error: str | None = None
+
+
+class TextPipelineResponse(BaseModel):
+    """Response from text pipeline."""
+
+    job_id: str
+    steps: list[PipelineStep]
+    input_text: str | None = None
     extracted_data: list[dict] | None = None
     pdf_available: bool = False
     error: str | None = None
@@ -150,7 +164,10 @@ async def audio_pipeline(
 
                 from utils.pdf_generator import StructuredDataToPDF
 
-                pdf_generator = StructuredDataToPDF(title="Extracted Data Report")
+                logo = LOGO_PATH if LOGO_PATH.exists() else None
+                pdf_generator = StructuredDataToPDF(
+                    title="Extracted Data Report", logo_path=logo
+                )
                 pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
                 pdf_generator.run(result.extracted_fields, pdf_path)
 
@@ -281,7 +298,10 @@ async def document_pipeline(
 
                 from utils.pdf_generator import StructuredDataToPDF
 
-                pdf_generator = StructuredDataToPDF(title="Extracted Data Report")
+                logo = LOGO_PATH if LOGO_PATH.exists() else None
+                pdf_generator = StructuredDataToPDF(
+                    title="Extracted Data Report", logo_path=logo
+                )
                 pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
                 pdf_generator.run(result.extracted_fields, pdf_path)
 
@@ -314,6 +334,100 @@ async def document_pipeline(
         )
     finally:
         Path(tmp_path).unlink(missing_ok=True)
+
+
+@router.post("/text", response_model=TextPipelineResponse)
+async def text_pipeline(
+    text: str = Form(...),
+    user_requirements: str = Form(...),
+    generate_pdf: bool = Form(False),
+):
+    """
+    Run the text extraction pipeline: Extract structured data from text.
+
+    - **text**: Input text to extract data from
+    - **user_requirements**: What data to extract from the text
+    - **generate_pdf**: Whether to generate a PDF report
+    """
+    job_id = str(uuid.uuid4())
+
+    # Initialize steps
+    steps = [
+        PipelineStep(step=1, name="Input", status="completed"),
+        PipelineStep(step=2, name="Extract", status="pending"),
+    ]
+    if generate_pdf:
+        steps.append(PipelineStep(step=3, name="Generate PDF", status="pending"))
+
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="No text provided")
+
+    try:
+        config = _get_api_config()
+
+        # Step 2: Extract structured data
+        steps[1].status = "in_progress"
+
+        from gaik.building_blocks.extractor.schema import SchemaGenerator
+
+        generator = SchemaGenerator(config=config)
+        extracted_data = generator.extract(
+            user_requirements=user_requirements,
+            documents=[text],
+        )
+
+        steps[1].status = "completed"
+        steps[1].message = f"Extracted {len(extracted_data)} items"
+
+        response = TextPipelineResponse(
+            job_id=job_id,
+            steps=steps,
+            input_text=text,
+            extracted_data=extracted_data,
+        )
+
+        # Step 3: Generate PDF if requested
+        if generate_pdf and extracted_data:
+            try:
+                pdf_step_idx = 2
+                steps[pdf_step_idx].status = "in_progress"
+
+                from utils.pdf_generator import StructuredDataToPDF
+
+                logo = LOGO_PATH if LOGO_PATH.exists() else None
+                pdf_generator = StructuredDataToPDF(
+                    title="Extracted Data Report", logo_path=logo
+                )
+                pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                pdf_generator.run(extracted_data, pdf_path)
+
+                PDF_STORAGE[job_id] = pdf_path
+                response.pdf_available = True
+                steps[pdf_step_idx].status = "completed"
+                steps[pdf_step_idx].message = "PDF generated"
+            except Exception as e:
+                steps[pdf_step_idx].status = "error"
+                steps[pdf_step_idx].message = f"PDF generation failed: {e}"
+
+        return response
+
+    except ImportError as e:
+        raise HTTPException(
+            status_code=500, detail=f"Required components not installed: {e}"
+        ) from e
+    except Exception as e:
+        # Mark current step as error
+        for step in steps:
+            if step.status == "in_progress":
+                step.status = "error"
+                step.message = str(e)
+                break
+
+        return TextPipelineResponse(
+            job_id=job_id,
+            steps=steps,
+            error=str(e),
+        )
 
 
 @router.get("/pdf/{job_id}")

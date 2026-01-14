@@ -7,21 +7,30 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  AlertTriangle,
   FileSearch,
   FileText,
   FolderKanban,
+  type LucideIcon,
   Mic,
-  Workflow,
 } from "lucide-react";
 import Link from "next/link";
 
-const demos = [
+interface Demo {
+  title: string;
+  description: string;
+  href: string;
+  icon: LucideIcon;
+  featured?: boolean;
+}
+
+const demos: Demo[] = [
   {
-    title: "Pipeline Demo",
+    title: "Incident Reporting",
     description:
-      "End-to-end workflows: Audio/Document to Structured Data with PDF export",
-    href: "/pipeline",
-    icon: Workflow,
+      "Record an incident, transcribe audio, and extract structured report",
+    href: "/incident-report",
+    icon: AlertTriangle,
     featured: true,
   },
   {
@@ -52,19 +61,16 @@ const demos = [
 ];
 
 export function DemoCards() {
-  const featuredDemo = demos.find((d) => d.featured);
-  const otherDemos = demos.filter((d) => !d.featured);
+  const featuredDemo = demos.find((demo) => demo.featured);
+  const otherDemos = demos.filter((demo) => !demo.featured);
 
   return (
     <section className="space-y-6">
-      <div className="flex items-end justify-between gap-4">
-        <h2 className="font-serif text-2xl font-semibold md:text-3xl">Demos</h2>
-      </div>
+      <h2 className="font-serif text-2xl font-semibold md:text-3xl">Demos</h2>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        {/* Featured Pipeline Demo */}
         {featuredDemo && (
-          <Link href={featuredDemo.href} className="group">
+          <Link href={featuredDemo.href}>
             <Card className="border-primary/20 bg-card hover:border-primary/40 relative h-full overflow-hidden border transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-4">
@@ -87,16 +93,15 @@ export function DemoCards() {
                 </div>
               </CardHeader>
               <CardContent className="text-muted-foreground flex min-h-[180px] items-center justify-center text-sm">
-                End-to-end workflow in one run.
+                Voice-to-structured-report in one click.
               </CardContent>
             </Card>
           </Link>
         )}
 
-        {/* Other demos grid */}
         <div className="grid gap-4 sm:grid-cols-2">
           {otherDemos.map((demo) => (
-            <Link key={demo.href} href={demo.href} className="group">
+            <Link key={demo.href} href={demo.href}>
               <Card className="bg-card hover:border-primary/40 h-full border transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
                 <CardHeader>
                   <div className="bg-primary/10 mb-3 flex h-10 w-10 items-center justify-center rounded-lg">
