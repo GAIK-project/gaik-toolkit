@@ -66,7 +66,7 @@ export function DemoCards() {
   const otherDemos = demos.filter((demo) => !demo.featured);
 
   return (
-    <section className="space-y-6">
+    <section id="demos" className="space-y-6">
       <h2 className="font-serif text-2xl font-semibold md:text-3xl">Demos</h2>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">

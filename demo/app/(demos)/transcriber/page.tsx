@@ -17,7 +17,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileUpload } from "@/components/demo/file-upload";
 import { DemoStepper } from "@/components/demo/demo-stepper";
-import { ResultCard, ResultText } from "@/components/demo/result-card";
+import {
+  ResultCard,
+  ResultText,
+  LoadingCard,
+  EmptyStateCard,
+} from "@/components/demo/result-card";
 import { Step } from "@/components/demo/step-indicator";
 import toast from "react-hot-toast";
 
@@ -62,7 +67,7 @@ export default function TranscriberPage() {
     },
   ];
 
-  const handleSubmit = async () => {
+  async function handleSubmit(): Promise<void> {
     if (isLoading) return; // Prevent double-click
 
     if (!file) {
@@ -112,7 +117,7 @@ export default function TranscriberPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   return (
     <motion.div
@@ -221,19 +226,10 @@ export default function TranscriberPage() {
         {/* Results Section */}
         <div className="space-y-4">
           {isLoading && (
-            <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
-                  <p className="text-muted-foreground mt-2">
-                    Transcribing audio...
-                  </p>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    This may take a while for longer files
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <LoadingCard
+              message="Transcribing audio..."
+              subMessage="This may take a while for longer files"
+            />
           )}
 
           {result && !isLoading && (
@@ -271,13 +267,7 @@ export default function TranscriberPage() {
           )}
 
           {!result && !isLoading && (
-            <Card className="border-dashed">
-              <CardContent className="flex items-center justify-center py-12">
-                <p className="text-muted-foreground text-center">
-                  Upload an audio/video file to see transcription here
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyStateCard message="Upload an audio/video file to see transcription here" />
           )}
         </div>
       </div>

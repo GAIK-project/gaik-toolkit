@@ -1,20 +1,8 @@
-"use client";
-
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export function Hero() {
-  const [version, setVersion] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/")
-      .then((res) => res.json())
-      .then((data) => setVersion(data.version))
-      .catch(() => setVersion(null));
-  }, []);
-
   return (
     <section className="bg-card rounded-3xl border p-8 shadow-sm md:p-12">
       <div className="space-y-6">
@@ -29,18 +17,12 @@ export function Hero() {
         <div className="flex flex-wrap gap-3">
           <Button size="lg" asChild>
             <Link href="/incident-report">
-              Try Demo
+              Try Incident Report
               <ArrowRight className="h-4 w-4" />
             </Link>
           </Button>
           <Button size="lg" variant="outline" asChild>
-            <a
-              href="https://pypi.org/project/gaik/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              PyPI {version ? `v${version}` : "Package"}
-            </a>
+            <a href="#demos">See All Demos</a>
           </Button>
         </div>
       </div>
