@@ -21,9 +21,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 # Copy requirements first (layer caching)
 COPY requirements.txt .
 
-# Install dependencies - use all-cpu extra (no torch/docling)
-RUN uv pip install --system --no-cache -r requirements.txt && \
-    uv pip install --system --no-cache gaik[all-cpu]
+# Install dependencies (gaik[all-cpu] included in requirements.txt)
+RUN uv pip install --system --no-cache -r requirements.txt
 
 # Copy application code
 COPY . .
