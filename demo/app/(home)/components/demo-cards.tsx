@@ -19,6 +19,7 @@ import {
   Mic,
   Sparkles,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 interface Demo {
@@ -107,27 +108,26 @@ export function DemoCards() {
                 </CardHeader>
 
                 <CardContent className="overflow-hidden px-4">
-                  <video
-                    src="/video/incident-veo.mp4"
-                    poster="/start.png"
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    preload="auto"
-                    className="w-full rounded-lg"
-                  />
+                  <div className="relative h-80 overflow-hidden rounded-lg">
+                    <Image
+                      src="/incident-report-v1.png"
+                      alt="Incident Reporting Demo"
+                      fill
+                      className="object-cover object-center"
+                      style={{ objectPosition: "center 45%" }}
+                    />
+                  </div>
                 </CardContent>
 
-                <CardContent className="pt-2 pb-6">
-                  <div className="grid grid-cols-2 gap-3">
+                <CardContent className="flex-1 pt-2 pb-6">
+                  <div className="grid h-full grid-cols-2 gap-3">
                     {featureList.map((feature) => (
                       <div
                         key={feature.label}
-                        className="bg-muted/50 flex items-center gap-3 rounded-lg p-3"
+                        className="bg-muted/50 flex flex-col items-center justify-center gap-2 rounded-lg p-4"
                       >
-                        <div className="bg-background flex h-8 w-8 items-center justify-center rounded-full shadow-sm">
-                          <feature.icon className="text-primary h-4 w-4" />
+                        <div className="bg-background flex h-10 w-10 items-center justify-center rounded-full shadow-sm">
+                          <feature.icon className="text-primary h-5 w-5" />
                         </div>
                         <span className="text-sm font-medium">
                           {feature.label}

@@ -33,8 +33,8 @@ export function InstallSnippet() {
               filename="terminal"
               code="pip install gaik[all]"
             />
-            <div className="flex flex-col gap-3">
-              <Button variant="outline" asChild>
+            <div className="flex h-full flex-col gap-3">
+              <Button variant="outline" className="h-auto flex-1" asChild>
                 <a
                   href="https://pypi.org/project/gaik/"
                   target="_blank"
@@ -45,7 +45,7 @@ export function InstallSnippet() {
                   <ArrowUpRight className="h-4 w-4" />
                 </a>
               </Button>
-              <Button variant="outline" asChild>
+              <Button variant="outline" className="h-auto flex-1" asChild>
                 <a
                   href="https://gaik-project.github.io/gaik-toolkit/"
                   target="_blank"
@@ -56,7 +56,7 @@ export function InstallSnippet() {
                   <ArrowUpRight className="h-4 w-4" />
                 </a>
               </Button>
-              <Button asChild>
+              <Button className="h-auto flex-1" asChild>
                 <a
                   href="https://github.com/GAIK-project/gaik-toolkit/tree/main/examples"
                   target="_blank"
