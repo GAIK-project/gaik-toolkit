@@ -1,0 +1,27 @@
+# Python virtual environment
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+
+# Workspace/temp files
+transcriber_workspace/
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+.dockerignore
+
+# Docs
+*.md

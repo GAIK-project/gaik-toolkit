@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gaik-demo-api
+  labels:
+    app: gaik-demo-api
+    app.kubernetes.io/part-of: gaik-toolkit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gaik-demo-api
+  template:
+    metadata:
+      labels:
+        app: gaik-demo-api
+    spec:
+      containers:
+        - name: gaik-demo-api
+          image: image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo-api:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: OPENAI_API_KEY
+                  optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10

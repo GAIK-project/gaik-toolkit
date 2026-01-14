@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: gaik-demo
+  labels:
+    app: gaik-demo
+spec:
+  host: gaik-demo.2.rahtiapp.fi
+  to:
+    kind: Service
+    name: gaik-demo
+    weight: 100
+  port:
+    targetPort: 3000
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

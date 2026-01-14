@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gaik-demo
+  labels:
+    app: gaik-demo
+spec:
+  selector:
+    app: gaik-demo
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gaik-demo-api
+  labels:
+    app: gaik-demo-api
+spec:
+  selector:
+    app: gaik-demo-api
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
