@@ -460,8 +460,8 @@ async def text_pipeline_stream(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         steps = [
-            {"step": 1, "name": "Generate Schema", "status": "pending"},
-            {"step": 2, "name": "Extract Data", "status": "pending"},
+            {"step": 1, "name": "Analyzing Requirements", "status": "pending"},
+            {"step": 2, "name": "Extracting Details", "status": "pending"},
         ]
         if generate_pdf:
             steps.append({"step": 3, "name": "Generate PDF", "status": "pending"})

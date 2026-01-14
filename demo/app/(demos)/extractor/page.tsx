@@ -1,8 +1,18 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { motion } from "motion/react";
-import { Database, Loader2, Plus, Trash2, Sparkles } from "lucide-react";
+import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
+import { FileUpload } from "@/components/demo/file-upload";
+import {
+  EmptyStateCard,
+  LoadingCard,
+  ResultCard,
+} from "@/components/demo/result-card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,18 +22,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileUpload } from "@/components/demo/file-upload";
-import { DemoStepper } from "@/components/demo/demo-stepper";
-import {
-  ResultCard,
-  LoadingCard,
-  EmptyStateCard,
-} from "@/components/demo/result-card";
-import { Step } from "@/components/demo/step-indicator";
-import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Database, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 interface Field {
@@ -74,24 +78,6 @@ export default function ExtractorPage() {
     inputMode === "text" ? documentText.trim().length > 0 : Boolean(file);
   const hasConfig = userRequirements.trim().length > 0 && fields.length > 0;
 
-  const flowSteps: Step[] = [
-    {
-      id: "input",
-      name: "Input",
-      status: hasInput ? "completed" : "pending",
-    },
-    {
-      id: "configure",
-      name: "Configure",
-      status: hasInput && hasConfig ? "completed" : "pending",
-    },
-    {
-      id: "review",
-      name: "Review",
-      status: result ? "completed" : "pending",
-    },
-  ];
-
   function handleAddField(): void {
     if (!newFieldName.trim() || !newFieldDesc.trim()) return;
 
@@ -100,7 +86,10 @@ export default function ExtractorPage() {
       toast.error("Field already exists");
       return;
     }
-    setFields([...fields, { name: fieldKey, description: newFieldDesc.trim() }]);
+    setFields([
+      ...fields,
+      { name: fieldKey, description: newFieldDesc.trim() },
+    ]);
     setNewFieldName("");
     setNewFieldDesc("");
   }
@@ -229,8 +218,6 @@ export default function ExtractorPage() {
         </p>
       </header>
 
-      <DemoStepper steps={flowSteps} className="mb-8" />
-
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Input Section */}
         <div className="space-y-6">
@@ -283,107 +270,122 @@ export default function ExtractorPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Extraction Settings</CardTitle>
-              <CardDescription>Define what data to extract</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="requirements">Requirements</Label>
-                <Textarea
-                  id="requirements"
-                  value={userRequirements}
-                  onChange={(e) => setUserRequirements(e.target.value)}
-                  placeholder="Describe what data to extract..."
-                  disabled={isLoading}
-                  rows={2}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Fields to Extract</Label>
-                <div className="max-h-48 space-y-2 overflow-auto">
-                  {fields.map((field) => (
-                    <div
-                      key={field.name}
-                      className="flex items-center gap-2 rounded-md border p-2 text-sm"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <span className="font-mono font-medium">
-                          {field.name}
-                        </span>
-                        <span className="text-muted-foreground ml-2">
-                          - {field.description}
-                        </span>
+          <div className="space-y-4">
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="settings" className="border-none">
+                <AccordionTrigger className="text-muted-foreground hover:text-foreground py-2 text-sm font-medium">
+                  Extraction Settings
+                </AccordionTrigger>
+                <AccordionContent className="pt-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Configuration</CardTitle>
+                      <CardDescription>
+                        Define what data to extract
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="requirements">Requirements</Label>
+                        <Textarea
+                          id="requirements"
+                          value={userRequirements}
+                          onChange={(e) => setUserRequirements(e.target.value)}
+                          placeholder="Describe what data to extract..."
+                          disabled={isLoading}
+                          rows={2}
+                        />
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 shrink-0"
-                        onClick={() => handleRemoveField(field.name)}
-                        disabled={isLoading}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
 
-                <div className="mt-2 flex gap-2">
-                  <Input
-                    value={newFieldName}
-                    onChange={(e) => setNewFieldName(e.target.value)}
-                    placeholder="Field name"
-                    disabled={isLoading}
-                    className="flex-1"
-                  />
-                  <Input
-                    value={newFieldDesc}
-                    onChange={(e) => setNewFieldDesc(e.target.value)}
-                    placeholder="Description"
-                    disabled={isLoading}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={handleAddField}
-                    disabled={
-                      isLoading || !newFieldName.trim() || !newFieldDesc.trim()
-                    }
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+                      <div className="space-y-2">
+                        <Label>Fields to Extract</Label>
+                        <div className="max-h-48 space-y-2 overflow-auto">
+                          {fields.map((field) => (
+                            <div
+                              key={field.name}
+                              className="flex items-center gap-2 rounded-md border p-2 text-sm"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <span className="font-mono font-medium">
+                                  {field.name}
+                                </span>
+                                <span className="text-muted-foreground ml-2">
+                                  - {field.description}
+                                </span>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0"
+                                onClick={() => handleRemoveField(field.name)}
+                                disabled={isLoading}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
 
-              <Button
-                onClick={handleSubmit}
-                disabled={
-                  isLoading ||
-                  isParsing ||
-                  fields.length === 0 ||
-                  (inputMode === "text" && !documentText.trim()) ||
-                  (inputMode === "file" && !file)
-                }
-                className="w-full"
-                size="lg"
-              >
-                {isLoading || isParsing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isParsing ? "Parsing document..." : "Extracting..."}
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Extract Data
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
+                        <div className="mt-2 flex gap-2">
+                          <Input
+                            value={newFieldName}
+                            onChange={(e) => setNewFieldName(e.target.value)}
+                            placeholder="Field name"
+                            disabled={isLoading}
+                            className="flex-1"
+                          />
+                          <Input
+                            value={newFieldDesc}
+                            onChange={(e) => setNewFieldDesc(e.target.value)}
+                            placeholder="Description"
+                            disabled={isLoading}
+                            className="flex-1"
+                          />
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            onClick={handleAddField}
+                            disabled={
+                              isLoading ||
+                              !newFieldName.trim() ||
+                              !newFieldDesc.trim()
+                            }
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+
+          <Button
+            onClick={handleSubmit}
+            disabled={
+              isLoading ||
+              isParsing ||
+              fields.length === 0 ||
+              (inputMode === "text" && !documentText.trim()) ||
+              (inputMode === "file" && !file)
+            }
+            className="w-full"
+            size="lg"
+          >
+            {isLoading || isParsing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {isParsing ? "Parsing document..." : "Extracting..."}
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Extract Data
+              </>
+            )}
+          </Button>
         </div>
 
         {/* Results Section */}

@@ -1,3 +1,6 @@
+"use client";
+
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -5,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertTriangle,
   FileSearch,
@@ -14,7 +16,6 @@ import {
   type LucideIcon,
   Mic,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 
 interface Demo {
@@ -61,6 +62,13 @@ const demos: Demo[] = [
   },
 ];
 
+const features = [
+  "Voice & Text Input",
+  "Automatic Extraction",
+  "Structured JSON",
+  "PDF Generation",
+];
+
 export function DemoCards() {
   const featuredDemo = demos.find((demo) => demo.featured);
   const otherDemos = demos.filter((demo) => !demo.featured);
@@ -71,46 +79,69 @@ export function DemoCards() {
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         {featuredDemo && (
-          <Link href={featuredDemo.href}>
-            <Card className="border-primary/20 bg-card hover:border-primary/40 relative h-full overflow-hidden border transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-4">
-                  <div className="bg-primary/15 flex h-12 w-12 items-center justify-center rounded-xl">
-                    <featuredDemo.icon className="text-primary h-6 w-6" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-xl">
-                        {featuredDemo.title}
-                      </CardTitle>
-                      <Badge className="bg-primary/15 text-primary">
-                        Featured
-                      </Badge>
+          <div className="h-full">
+            <Link href={featuredDemo.href} className="block h-full">
+              <Card className="border-primary/20 bg-card hover:border-primary/40 group relative h-full overflow-hidden border transition-colors duration-200 hover:shadow-md">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-primary/10 flex h-12 w-12 items-center justify-center rounded-xl">
+                      <featuredDemo.icon className="text-primary h-6 w-6" />
                     </div>
-                    <CardDescription>
-                      {featuredDemo.description}
-                    </CardDescription>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-xl">
+                          {featuredDemo.title}
+                        </CardTitle>
+                        <Badge className="bg-primary/15 text-primary hover:bg-primary/15 border-none">
+                          Featured
+                        </Badge>
+                      </div>
+                      <CardDescription>
+                        {featuredDemo.description}
+                      </CardDescription>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="relative h-[160px] overflow-hidden p-0">
-                <Image
-                  src="/incident-report.png"
-                  alt="Incident Report Demo"
-                  fill
-                  className="object-cover object-center"
-                />
-              </CardContent>
-            </Card>
-          </Link>
+                </CardHeader>
+
+                <CardContent className="flex flex-wrap gap-2 pb-4">
+                  {features.map((feature) => (
+                    <span
+                      key={feature}
+                      className="bg-muted text-muted-foreground rounded-full px-3 py-1 text-xs"
+                    >
+                      {feature}
+                    </span>
+                  ))}
+                </CardContent>
+
+                <CardContent className="p-0">
+                  <video
+                    src="/video/incident-veo.mp4"
+                    poster="/start.png"
+                    autoPlay
+                    muted
+                    playsInline
+                    preload="auto"
+                    className="w-full"
+                    onTimeUpdate={(e) => {
+                      const video = e.currentTarget;
+                      if (video.duration - video.currentTime < 1.5) {
+                        video.pause();
+                      }
+                    }}
+                  />
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
           {otherDemos.map((demo) => (
-            <Link key={demo.href} href={demo.href}>
-              <Card className="bg-card hover:border-primary/40 h-full border transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+            <Link key={demo.href} href={demo.href} className="block h-full">
+              <Card className="bg-card hover:border-primary/40 group h-full border transition-colors duration-200 hover:shadow-md">
                 <CardHeader>
-                  <div className="bg-primary/10 mb-3 flex h-10 w-10 items-center justify-center rounded-lg">
+                  <div className="bg-primary/5 mb-3 flex h-10 w-10 items-center justify-center rounded-lg">
                     <demo.icon className="text-primary h-5 w-5" />
                   </div>
                   <CardTitle className="text-lg">{demo.title}</CardTitle>

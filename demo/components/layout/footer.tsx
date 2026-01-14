@@ -1,81 +1,97 @@
+import { BookOpen } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
+import {
+  Glimpse,
+  GlimpseTrigger,
+  GlimpseContent,
+  GlimpseTitle,
+  GlimpseDescription,
+  GlimpseImage,
+} from "@/components/kibo-ui/glimpse";
+import type { LinkPreview } from "@/lib/link-previews";
 
-/**
- * Global Footer Component
- *
- * This is a shared footer that can be used across your application.
- * Place it in your root layout or in specific route group layouts.
- */
+const GITHUB_URL = "https://github.com/GAIK-project/gaik-toolkit";
+const DOCS_URL = "https://gaik-toolkit.2.rahtiapp.fi/";
 
-export function Footer() {
+export interface FooterProps {
+  githubPreview?: LinkPreview | null;
+}
+
+export function Footer({ githubPreview }: FooterProps) {
   const currentYear = new Date().getFullYear();
 
+  const githubLink = (
+    <a
+      href={GITHUB_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+    >
+      <Image
+        src="/logos/github-mark-white.svg"
+        alt=""
+        width={14}
+        height={14}
+        className="dark:invert-0 invert"
+      />
+      GitHub
+    </a>
+  );
+
   return (
-    <footer className="bg-muted/50 border-t">
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid gap-8 md:grid-cols-3">
-          <div>
-            <h3 className="mb-3 font-semibold">About</h3>
-            <p className="text-muted-foreground text-sm">
-              Your application description goes here.
-            </p>
+    <footer className="border-t">
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+          <div className="flex items-center gap-2">
+            <Link href="/" className="shrink-0">
+              <Image
+                src="/logos/gaik-logo-letter-only.png"
+                alt="GAIK"
+                width={24}
+                height={24}
+                className="h-6 w-6"
+              />
+            </Link>
+            <span className="text-muted-foreground text-sm">
+              &copy; {currentYear} GAIK Project
+            </span>
           </div>
 
-          <div>
-            <h3 className="mb-3 font-semibold">Quick Links</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link
-                  href="/"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/about"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  About
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/contact"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Contact
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="mb-3 font-semibold">Legal</h3>
-            <ul className="space-y-2 text-sm">
-              <li>
-                <Link
-                  href="/privacy"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/terms"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Terms of Service
-                </Link>
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="text-muted-foreground mt-8 border-t pt-8 text-center text-sm">
-          <p>&copy; {currentYear} Your Company. All rights reserved.</p>
+          <nav className="text-muted-foreground flex items-center gap-4 text-sm">
+            {githubPreview ? (
+              <Glimpse>
+                <GlimpseTrigger asChild>{githubLink}</GlimpseTrigger>
+                <GlimpseContent className="w-80">
+                  {githubPreview.image && (
+                    <GlimpseImage
+                      src={githubPreview.image}
+                      alt={githubPreview.title || "GitHub"}
+                    />
+                  )}
+                  <GlimpseTitle>
+                    {githubPreview.title || "GAIK Toolkit"}
+                  </GlimpseTitle>
+                  <GlimpseDescription>
+                    {githubPreview.description ||
+                      "AI-powered document processing toolkit"}
+                  </GlimpseDescription>
+                </GlimpseContent>
+              </Glimpse>
+            ) : (
+              githubLink
+            )}
+            <span className="text-border">|</span>
+            <a
+              href={DOCS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground flex items-center gap-1.5 transition-colors"
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              Docs
+            </a>
+          </nav>
         </div>
       </div>
     </footer>

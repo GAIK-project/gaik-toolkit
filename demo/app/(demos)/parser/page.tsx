@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { motion } from "motion/react";
-import { FileText, Loader2 } from "lucide-react";
+import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
+import { FileUpload } from "@/components/demo/file-upload";
+import {
+  EmptyStateCard,
+  LoadingCard,
+  ResultCard,
+  ResultJson,
+  ResultText,
+} from "@/components/demo/result-card";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,6 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -18,18 +25,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { FileUpload } from "@/components/demo/file-upload";
-import { DemoStepper } from "@/components/demo/demo-stepper";
 import {
-  ResultCard,
-  ResultText,
-  ResultJson,
-  LoadingCard,
-  EmptyStateCard,
-} from "@/components/demo/result-card";
-import { Step } from "@/components/demo/step-indicator";
-import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@radix-ui/react-accordion";
+import { FileText, Loader2 } from "lucide-react";
+import { motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 interface ParseResult {
@@ -57,24 +61,6 @@ export default function ParserPage() {
     setFile(exampleFile);
     setResult(null);
   }
-
-  const flowSteps: Step[] = [
-    {
-      id: "upload",
-      name: "Upload",
-      status: file ? "completed" : "pending",
-    },
-    {
-      id: "parse",
-      name: "Parse",
-      status: result ? "completed" : "pending",
-    },
-    {
-      id: "review",
-      name: "Review",
-      status: result ? "completed" : "pending",
-    },
-  ];
 
   async function handleSubmit(): Promise<void> {
     if (isLoading) return;
@@ -135,76 +121,85 @@ export default function ParserPage() {
         </p>
       </header>
 
-      <DemoStepper steps={flowSteps} className="mb-8" />
-
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Input Section */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Upload Document</CardTitle>
-                <CardDescription>
-                  Select a PDF or DOCX file to parse
-                </CardDescription>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Upload Document</CardTitle>
+                  <CardDescription>
+                    Select a PDF or DOCX file to parse
+                  </CardDescription>
+                </div>
+                <ExamplePreviewDialog
+                  exampleUrl="/GAIK_Test_Document_Demo.pdf"
+                  exampleName="GAIK_Test_Document_Demo.pdf"
+                  onUseExample={handleUseExample}
+                  disabled={isLoading}
+                />
               </div>
-              <ExamplePreviewDialog
-                exampleUrl="/GAIK_Test_Document_Demo.pdf"
-                exampleName="GAIK_Test_Document_Demo.pdf"
-                onUseExample={handleUseExample}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <FileUpload
+                accept=".pdf,.docx"
+                maxSize={10}
+                file={file}
+                onFileSelect={setFile}
+                onFileRemove={() => {
+                  setFile(null);
+                  setResult(null);
+                }}
                 disabled={isLoading}
               />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <FileUpload
-              accept=".pdf,.docx"
-              maxSize={10}
-              file={file}
-              onFileSelect={setFile}
-              onFileRemove={() => {
-                setFile(null);
-                setResult(null);
-              }}
-              disabled={isLoading}
-            />
 
-            <div className="space-y-2">
-              <Label>Parser Type</Label>
-              <Select
-                value={parserType}
-                onValueChange={setParserType}
-                disabled={isLoading}
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="settings" className="border-none">
+                  <AccordionTrigger className="text-muted-foreground hover:text-foreground py-2 text-sm font-medium">
+                    Parser Settings
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4">
+                    <div className="space-y-2">
+                      <Label>Parser Type</Label>
+                      <Select
+                        value={parserType}
+                        onValueChange={setParserType}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">Auto-detect</SelectItem>
+                          <SelectItem value="pymupdf">PyMuPDF (PDF)</SelectItem>
+                          <SelectItem value="docx">DOCX Parser</SelectItem>
+                          <SelectItem value="vision">Vision</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+
+              <Button
+                onClick={handleSubmit}
+                disabled={!file || isLoading}
+                className="w-full"
+                size="lg"
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto-detect</SelectItem>
-                  <SelectItem value="pymupdf">PyMuPDF (PDF)</SelectItem>
-                  <SelectItem value="docx">DOCX Parser</SelectItem>
-                  <SelectItem value="vision">Vision</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button
-              onClick={handleSubmit}
-              disabled={!file || isLoading}
-              className="w-full"
-              size="lg"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Parsing...
-                </>
-              ) : (
-                "Parse Document"
-              )}
-            </Button>
-          </CardContent>
-        </Card>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Parsing...
+                  </>
+                ) : (
+                  "Parse Document"
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Results Section */}
         <div className="space-y-4">

@@ -1,8 +1,20 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { motion } from "motion/react";
-import { Tags, Loader2, Sparkles } from "lucide-react";
+import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
+import { FileUpload } from "@/components/demo/file-upload";
+import {
+  ConfidenceBar,
+  EmptyStateCard,
+  LoadingCard,
+  ResultCard,
+} from "@/components/demo/result-card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,6 +23,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -18,19 +32,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { FileUpload } from "@/components/demo/file-upload";
-import { DemoStepper } from "@/components/demo/demo-stepper";
-import {
-  ResultCard,
-  ConfidenceBar,
-  LoadingCard,
-  EmptyStateCard,
-} from "@/components/demo/result-card";
-import { Step } from "@/components/demo/step-indicator";
-import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
+import { Loader2, Sparkles, Tags } from "lucide-react";
+import { motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 interface ClassifyResult {
@@ -62,24 +66,6 @@ export default function ClassifierPage() {
     setFile(exampleFile);
     setResult(null);
   }
-
-  const flowSteps: Step[] = [
-    {
-      id: "upload",
-      name: "Upload",
-      status: file ? "completed" : "pending",
-    },
-    {
-      id: "classes",
-      name: "Classes",
-      status: file && classes.length >= 2 ? "completed" : "pending",
-    },
-    {
-      id: "review",
-      name: "Review",
-      status: result ? "completed" : "pending",
-    },
-  ];
 
   function handleAddClass(): void {
     const trimmed = classInput.trim().toLowerCase();
@@ -165,111 +151,120 @@ export default function ClassifierPage() {
         </p>
       </header>
 
-      <DemoStepper steps={flowSteps} className="mb-8" />
-
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Input Section */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Upload & Configure</CardTitle>
-                <CardDescription>
-                  Select a document and define classification categories
-                </CardDescription>
-              </div>
-              <ExamplePreviewDialog
-                exampleUrl="/GAIK_Test_Document_Demo.pdf"
-                exampleName="GAIK_Test_Document_Demo.pdf"
-                onUseExample={handleUseExample}
-                disabled={isLoading}
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <FileUpload
-              accept=".pdf,.docx,.png,.jpg,.jpeg"
-              maxSize={10}
-              file={file}
-              onFileSelect={setFile}
-              onFileRemove={() => {
-                setFile(null);
-                setResult(null);
-              }}
-              disabled={isLoading}
-            />
-
-            <div className="space-y-2">
-              <Label>Classification Classes</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={classInput}
-                  onChange={(e) => setClassInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Add a class..."
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Upload & Configure</CardTitle>
+                  <CardDescription>
+                    Select a document and define classification categories
+                  </CardDescription>
+                </div>
+                <ExamplePreviewDialog
+                  exampleUrl="/GAIK_Test_Document_Demo.pdf"
+                  exampleName="GAIK_Test_Document_Demo.pdf"
+                  onUseExample={handleUseExample}
                   disabled={isLoading}
                 />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleAddClass}
-                  disabled={isLoading || !classInput.trim()}
-                >
-                  Add
-                </Button>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {classes.map((cls) => (
-                  <Badge
-                    key={cls}
-                    variant="secondary"
-                    className="hover:bg-destructive hover:text-destructive-foreground cursor-pointer transition-colors"
-                    onClick={() => !isLoading && handleRemoveClass(cls)}
-                  >
-                    {cls} ×
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Parser Type</Label>
-              <Select
-                value={parserType}
-                onValueChange={setParserType}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <FileUpload
+                accept=".pdf,.docx,.png,.jpg,.jpeg"
+                maxSize={10}
+                file={file}
+                onFileSelect={setFile}
+                onFileRemove={() => {
+                  setFile(null);
+                  setResult(null);
+                }}
                 disabled={isLoading}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">Auto-detect</SelectItem>
-                  <SelectItem value="pymupdf">PyMuPDF (PDF)</SelectItem>
-                  <SelectItem value="docx">DOCX Parser</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              />
 
-            <Button
-              onClick={handleSubmit}
-              disabled={!file || classes.length < 2 || isLoading}
-              className="w-full"
-              size="lg"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Classifying...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Classify Document
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="settings" className="border-none">
+                  <AccordionTrigger className="text-muted-foreground hover:text-foreground py-2 text-sm font-medium">
+                    Classification Settings
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-6 pt-4">
+                    <div className="space-y-2">
+                      <Label>Classification Classes</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={classInput}
+                          onChange={(e) => setClassInput(e.target.value)}
+                          onKeyDown={handleKeyDown}
+                          placeholder="Add a class..."
+                          disabled={isLoading}
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={handleAddClass}
+                          disabled={isLoading || !classInput.trim()}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {classes.map((cls) => (
+                          <Badge
+                            key={cls}
+                            variant="secondary"
+                            className="hover:bg-destructive hover:text-destructive-foreground cursor-pointer transition-colors"
+                            onClick={() => !isLoading && handleRemoveClass(cls)}
+                          >
+                            {cls} ×
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Parser Type</Label>
+                      <Select
+                        value={parserType}
+                        onValueChange={setParserType}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">Auto-detect</SelectItem>
+                          <SelectItem value="pymupdf">PyMuPDF (PDF)</SelectItem>
+                          <SelectItem value="docx">DOCX Parser</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+
+              <Button
+                onClick={handleSubmit}
+                disabled={!file || classes.length < 2 || isLoading}
+                className="w-full"
+                size="lg"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Classifying...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Classify Document
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Results Section */}
         <div className="space-y-4">

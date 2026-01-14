@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  ArrowUpRight,
   FileSearch,
   FileText,
   Home,
@@ -24,6 +23,15 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import {
+  Glimpse,
+  GlimpseTrigger,
+  GlimpseContent,
+  GlimpseTitle,
+  GlimpseDescription,
+  GlimpseImage,
+} from "@/components/kibo-ui/glimpse";
+import type { LinkPreview } from "@/lib/link-previews";
 
 const navItems = [
   { label: "Home", href: "/", icon: Home },
@@ -64,6 +72,77 @@ function NavLink({ href, label, icon: Icon, active, variant }: NavLinkProps) {
   );
 }
 
+const GITHUB_URL = "https://github.com/GAIK-project/gaik-toolkit";
+
+function GitHubIcon({ className }: { className?: string }) {
+  return (
+    <Image
+      src="/logos/github-mark-white.svg"
+      alt=""
+      width={20}
+      height={20}
+      className={cn("dark:invert-0 invert", className)}
+    />
+  );
+}
+
+interface GitHubLinkProps {
+  preview?: LinkPreview | null;
+  variant: "desktop" | "mobile";
+}
+
+function GitHubLink({ preview, variant }: GitHubLinkProps) {
+  const isDesktop = variant === "desktop";
+
+  const linkContent = (
+    <a
+      href={GITHUB_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        "flex items-center font-medium transition",
+        isDesktop
+          ? "gap-2 text-sm"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground gap-3 rounded-lg px-3 py-2.5 text-sm"
+      )}
+    >
+      <GitHubIcon className={isDesktop ? "h-4 w-4" : "h-5 w-5"} />
+      GitHub
+    </a>
+  );
+
+  if (!preview) {
+    return isDesktop ? (
+      <Button variant="outline" size="sm" asChild className="hidden shrink-0 sm:inline-flex">
+        {linkContent}
+      </Button>
+    ) : (
+      linkContent
+    );
+  }
+
+  return (
+    <Glimpse>
+      <GlimpseTrigger asChild>
+        {isDesktop ? (
+          <Button variant="outline" size="sm" asChild className="hidden shrink-0 sm:inline-flex">
+            {linkContent}
+          </Button>
+        ) : (
+          linkContent
+        )}
+      </GlimpseTrigger>
+      <GlimpseContent className="w-80">
+        {preview.image && <GlimpseImage src={preview.image} alt={preview.title || "GitHub"} />}
+        <GlimpseTitle>{preview.title || "GAIK Toolkit"}</GlimpseTitle>
+        <GlimpseDescription>
+          {preview.description || "AI-powered document processing toolkit"}
+        </GlimpseDescription>
+      </GlimpseContent>
+    </Glimpse>
+  );
+}
+
 function MobileMenuButton() {
   return (
     <Button variant="outline" size="icon" className="md:hidden">
@@ -75,9 +154,10 @@ function MobileMenuButton() {
 
 interface MobileNavProps {
   isActive: (href: string) => boolean;
+  githubPreview?: LinkPreview | null;
 }
 
-function MobileNav({ isActive }: MobileNavProps) {
+function MobileNav({ isActive, githubPreview }: MobileNavProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -109,22 +189,18 @@ function MobileNav({ isActive }: MobileNavProps) {
             />
           ))}
           <hr className="my-2" />
-          <a
-            href="https://github.com/GAIK-project/gaik-toolkit"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
-          >
-            <ArrowUpRight className="h-5 w-5" />
-            GitHub
-          </a>
+          <GitHubLink preview={githubPreview} variant="mobile" />
         </nav>
       </SheetContent>
     </Sheet>
   );
 }
 
-export function SiteNav() {
+export interface SiteNavProps {
+  githubPreview?: LinkPreview | null;
+}
+
+export function SiteNav({ githubPreview }: SiteNavProps) {
   const pathname = usePathname();
 
   function isActive(href: string): boolean {
@@ -160,23 +236,8 @@ export function SiteNav() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            asChild
-            className="hidden shrink-0 sm:inline-flex"
-          >
-            <a
-              href="https://github.com/GAIK-project/gaik-toolkit"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <ArrowUpRight className="mr-1 h-4 w-4" />
-              GitHub
-            </a>
-          </Button>
-
-          <MobileNav isActive={isActive} />
+          <GitHubLink preview={githubPreview} variant="desktop" />
+          <MobileNav isActive={isActive} githubPreview={githubPreview} />
         </div>
       </div>
     </header>
