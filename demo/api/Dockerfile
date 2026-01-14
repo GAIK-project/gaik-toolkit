@@ -21,9 +21,9 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 # Copy requirements first (layer caching)
 COPY requirements.txt .
 
-# Install dependencies - use transcriber extra only (no torch/docling)
+# Install dependencies - use all-cpu extra (no torch/docling)
 RUN uv pip install --system --no-cache -r requirements.txt && \
-    uv pip install --system --no-cache gaik[transcriber] PyMuPDF python-docx
+    uv pip install --system --no-cache gaik[all-cpu]
 
 # Copy application code
 COPY . .

@@ -95,6 +95,28 @@ documents-to-structured-data = [
     "gaik[extract]",
 ]
 
+# CPU-only variants (no GPU/torch/docling dependencies)
+parser-cpu = [
+    "openai>=2.7",
+    "PyMuPDF>=1.23.0",
+    "python-docx>=1.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+documents-to-structured-data-cpu = [
+    "gaik[parser-cpu]",
+    "gaik[extract]",
+]
+
+all-cpu = [
+    "gaik[extract]",
+    "gaik[parser-cpu]",
+    "gaik[transcriber]",
+    "gaik[classifier]",
+    "gaik[audio-to-structured-data]",
+    "gaik[documents-to-structured-data-cpu]",
+]
+
 # Development tooling for maintainers only (pip install -e ".[dev]")
 dev = [
     "ruff>=0.14.1",
