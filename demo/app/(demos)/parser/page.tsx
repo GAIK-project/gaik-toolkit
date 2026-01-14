@@ -30,7 +30,7 @@ import {
 } from "@/components/demo/result-card";
 import { Step } from "@/components/demo/step-indicator";
 import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
-import { toast } from "sonner";
+import toast from "react-hot-toast";
 
 interface ParseResult {
   filename: string;

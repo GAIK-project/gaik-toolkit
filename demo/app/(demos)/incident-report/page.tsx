@@ -38,7 +38,7 @@ import {
   Step,
   StepIndicatorCompact,
 } from "@/components/demo/step-indicator";
-import { toast } from "sonner";
+import toast from "react-hot-toast";
 
 interface SSEStep {
   step: number;

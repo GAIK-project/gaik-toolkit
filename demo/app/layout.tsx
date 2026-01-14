@@ -1,5 +1,5 @@
 import { SiteNav } from "@/components/layout/site-nav";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import type { Metadata } from "next";
 import { Fraunces, JetBrains_Mono, Sora } from "next/font/google";
 import "./globals.css";

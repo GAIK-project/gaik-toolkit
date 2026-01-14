@@ -19,7 +19,7 @@ import { FileUpload } from "@/components/demo/file-upload";
 import { DemoStepper } from "@/components/demo/demo-stepper";
 import { ResultCard, ResultText } from "@/components/demo/result-card";
 import { Step } from "@/components/demo/step-indicator";
-import { toast } from "sonner";
+import toast from "react-hot-toast";
 
 interface TranscribeResult {
   filename: string;
