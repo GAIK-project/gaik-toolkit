@@ -32,6 +32,16 @@ export function InstallSnippet() {
                 <ArrowUpRight className="h-4 w-4" />
               </a>
             </Button>
+            <Button variant="outline" asChild>
+              <a
+                href="https://gaik-project.github.io/gaik-toolkit/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Documentation
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
+            </Button>
             <Button asChild>
               <a
                 href="https://github.com/GAIK-project/gaik-toolkit/tree/main/examples"
