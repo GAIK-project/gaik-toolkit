@@ -14,6 +14,7 @@ import {
   type LucideIcon,
   Mic,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 interface Demo {
@@ -92,8 +93,13 @@ export function DemoCards() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="text-muted-foreground flex min-h-[180px] items-center justify-center text-sm">
-                Voice-to-structured-report in one click.
+              <CardContent className="relative h-[160px] overflow-hidden p-0">
+                <Image
+                  src="/incident-report.png"
+                  alt="Incident Report Demo"
+                  fill
+                  className="object-cover object-center"
+                />
               </CardContent>
             </Card>
           </Link>

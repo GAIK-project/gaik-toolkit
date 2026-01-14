@@ -183,9 +183,7 @@ export default function ParserPage() {
                   <SelectItem value="auto">Auto-detect</SelectItem>
                   <SelectItem value="pymupdf">PyMuPDF (PDF)</SelectItem>
                   <SelectItem value="docx">DOCX Parser</SelectItem>
-                  <SelectItem value="vision" disabled>
-                    Vision (requires API key)
-                  </SelectItem>
+                  <SelectItem value="vision">Vision</SelectItem>
                 </SelectContent>
               </Select>
             </div>

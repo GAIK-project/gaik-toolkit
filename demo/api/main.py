@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
+from gaik import __version__ as gaik_version
 
 # Load .env.local from demo folder
 env_path = Path(__file__).parent.parent / ".env.local"
@@ -30,7 +31,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="GAIK Toolkit Demo API",
     description="REST API for GAIK toolkit components: extractor, parser, classifier, transcriber, pipeline",
-    version="0.1.0",
+    version=gaik_version,
     lifespan=lifespan,
     redirect_slashes=False,
 )
@@ -41,6 +42,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://gaik-demo.2.rahtiapp.fi",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -66,7 +68,7 @@ async def root():
     """Root endpoint with API info"""
     return {
         "name": "GAIK Toolkit Demo API",
-        "version": "0.1.0",
+        "version": gaik_version,
         "docs": "/docs",
         "endpoints": {
             "parse": "/parse - Document parsing (PDF, DOCX)",

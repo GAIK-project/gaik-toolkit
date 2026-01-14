@@ -1,8 +1,20 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export function Hero() {
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/")
+      .then((res) => res.json())
+      .then((data) => setVersion(data.version))
+      .catch(() => setVersion(null));
+  }, []);
+
   return (
     <section className="bg-card rounded-3xl border p-8 shadow-sm md:p-12">
       <div className="space-y-6">
@@ -27,7 +39,7 @@ export function Hero() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              PyPI Package
+              PyPI {version ? `v${version}` : "Package"}
             </a>
           </Button>
         </div>

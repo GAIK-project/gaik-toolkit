@@ -65,6 +65,7 @@ async def transcribe_audio(
         config["api_key"] = api_key  # Override with provided key
         transcriber = Transcriber(
             api_config=config,
+            output_dir=tempfile.gettempdir(),
             enhanced_transcript=enhanced,
             compress_audio=compress_audio,
         )
