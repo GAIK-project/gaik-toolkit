@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 interface FileUploadProps {
   accept?: string;
   maxSize?: number; // in MB
+  file?: File | null; // Controlled file state
   onFileSelect: (file: File) => void;
   onFileRemove?: () => void;
   disabled?: boolean;
@@ -17,14 +18,18 @@ interface FileUploadProps {
 export function FileUpload({
   accept = ".pdf,.docx",
   maxSize = 10,
+  file: controlledFile,
   onFileSelect,
   onFileRemove,
   disabled = false,
   className,
 }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [internalFile, setInternalFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Use controlled file if provided, otherwise use internal state
+  const selectedFile = controlledFile !== undefined ? controlledFile : internalFile;
 
   const validateFile = useCallback(
     (file: File): boolean => {
@@ -57,7 +62,7 @@ export function FileUpload({
   const handleFile = useCallback(
     (file: File) => {
       if (validateFile(file)) {
-        setSelectedFile(file);
+        setInternalFile(file);
         onFileSelect(file);
       }
     },
@@ -105,7 +110,7 @@ export function FileUpload({
   );
 
   const removeFile = useCallback(() => {
-    setSelectedFile(null);
+    setInternalFile(null);
     setError(null);
     onFileRemove?.();
   }, [onFileRemove]);

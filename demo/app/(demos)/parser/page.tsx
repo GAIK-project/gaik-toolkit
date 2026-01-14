@@ -18,14 +18,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { FileUpload } from "@/components/demo/file-upload";
 import { DemoStepper } from "@/components/demo/demo-stepper";
 import {
   ResultCard,
   ResultText,
   ResultJson,
+  LoadingCard,
+  EmptyStateCard,
 } from "@/components/demo/result-card";
 import { Step } from "@/components/demo/step-indicator";
+import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
 import { toast } from "sonner";
 
 interface ParseResult {
@@ -49,6 +53,11 @@ export default function ParserPage() {
     };
   }, []);
 
+  function handleUseExample(exampleFile: File): void {
+    setFile(exampleFile);
+    setResult(null);
+  }
+
   const flowSteps: Step[] = [
     {
       id: "upload",
@@ -67,15 +76,14 @@ export default function ParserPage() {
     },
   ];
 
-  const handleSubmit = async () => {
-    if (isLoading) return; // Prevent double-click
+  async function handleSubmit(): Promise<void> {
+    if (isLoading) return;
 
     if (!file) {
       toast.error("Please select a file first");
       return;
     }
 
-    // Abort previous request if any
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
@@ -87,21 +95,15 @@ export default function ParserPage() {
       formData.append("file", file);
       formData.append("parser_type", parserType);
 
-      const response = await fetch("/api/parse/", {
+      const response = await fetch("/api/parse", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
-        let errorMessage = "Failed to parse document";
-        try {
-          const error = await response.json();
-          errorMessage = error.detail || errorMessage;
-        } catch {
-          // JSON parsing failed, use default message
-        }
-        throw new Error(errorMessage);
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.detail ?? "Failed to parse document");
       }
 
       const data = await response.json();
@@ -109,13 +111,13 @@ export default function ParserPage() {
       toast.success("Document parsed successfully!");
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        return; // Request was aborted, don't show error
+        return;
       }
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   return (
     <motion.div
@@ -139,15 +141,26 @@ export default function ParserPage() {
         {/* Input Section */}
         <Card>
           <CardHeader>
-            <CardTitle>Upload Document</CardTitle>
-            <CardDescription>
-              Select a PDF or DOCX file to parse
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Upload Document</CardTitle>
+                <CardDescription>
+                  Select a PDF or DOCX file to parse
+                </CardDescription>
+              </div>
+              <ExamplePreviewDialog
+                exampleUrl="/GAIK_Test_Document_Demo.pdf"
+                exampleName="GAIK_Test_Document_Demo.pdf"
+                onUseExample={handleUseExample}
+                disabled={isLoading}
+              />
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <FileUpload
               accept=".pdf,.docx"
               maxSize={10}
+              file={file}
               onFileSelect={setFile}
               onFileRemove={() => {
                 setFile(null);
@@ -157,7 +170,7 @@ export default function ParserPage() {
             />
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Parser Type</label>
+              <Label>Parser Type</Label>
               <Select
                 value={parserType}
                 onValueChange={setParserType}
@@ -197,18 +210,7 @@ export default function ParserPage() {
 
         {/* Results Section */}
         <div className="space-y-4">
-          {isLoading && (
-            <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
-                  <p className="text-muted-foreground mt-2">
-                    Parsing document...
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {isLoading && <LoadingCard message="Parsing document..." />}
 
           {result && !isLoading && (
             <>
@@ -238,13 +240,7 @@ export default function ParserPage() {
           )}
 
           {!result && !isLoading && (
-            <Card className="border-dashed">
-              <CardContent className="flex items-center justify-center py-12">
-                <p className="text-muted-foreground text-center">
-                  Upload a document to see parsed results here
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyStateCard message="Upload a document to see parsed results here" />
           )}
         </div>
       </div>

@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -16,11 +16,11 @@ class ClassifyRequest(BaseModel):
     parser: Literal["pymupdf", "docx", "vision"] | None = None
 
 
-@router.post("/")
+@router.post("")
 async def classify_document(
     file: UploadFile = File(...),
-    classes: str = "invoice,receipt,contract,report",
-    parser: Literal["auto", "pymupdf", "docx"] = "auto",
+    classes: str = Form("invoice,receipt,contract,report"),
+    parser: Literal["auto", "pymupdf", "docx"] = Form("auto"),
 ):
     """
     Classify a document into predefined categories.

@@ -9,7 +9,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("")
 async def parse_document(
     file: UploadFile = File(...),
     parser_type: Literal["auto", "pymupdf", "docx", "vision"] = "auto",

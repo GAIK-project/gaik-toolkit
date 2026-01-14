@@ -7,11 +7,11 @@ import {
   Loader2,
   Sparkles,
   Download,
-  Eye,
   Wand2,
   PenLine,
   FileAudio,
   FileText,
+  ClipboardPaste,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,11 +32,50 @@ import {
   ResultCard,
   ResultText,
   ResultJson,
+  EmptyStateCard,
 } from "@/components/demo/result-card";
-import { Step } from "@/components/demo/step-indicator";
+import {
+  Step,
+  StepIndicatorCompact,
+} from "@/components/demo/step-indicator";
 import { toast } from "sonner";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+interface SSEStep {
+  step: number;
+  name: string;
+  status: "pending" | "in_progress" | "completed" | "error";
+  message?: string;
+}
+
+interface SSEEvent {
+  type: string;
+  data: Record<string, unknown>;
+}
+
+function parseSSEEvents(text: string): SSEEvent[] {
+  const events: SSEEvent[] = [];
+  const lines = text.split("\n");
+  let currentEvent: { type?: string; data?: string } = {};
+
+  for (const line of lines) {
+    if (line.startsWith("event: ")) {
+      currentEvent.type = line.slice(7);
+    } else if (line.startsWith("data: ")) {
+      currentEvent.data = line.slice(6);
+    } else if (line === "" && currentEvent.type && currentEvent.data) {
+      try {
+        events.push({
+          type: currentEvent.type,
+          data: JSON.parse(currentEvent.data),
+        });
+      } catch {
+        // Skip invalid JSON
+      }
+      currentEvent = {};
+    }
+  }
+  return events;
+}
 
 const DEFAULT_INCIDENT_SCHEMA = `Extract the following from the incident report:
 - Incident date and time
@@ -68,6 +107,7 @@ interface IncidentReportResult {
   job_id: string;
   raw_transcript: string | null;
   enhanced_transcript: string | null;
+  input_text: string | null; // For text pipeline
   extracted_data: Record<string, unknown>[] | null;
   pdf_available: boolean;
   error?: string | null;
@@ -85,6 +125,7 @@ export default function IncidentReportPage() {
   const [generatePdf, setGeneratePdf] = useState(false);
   const [result, setResult] = useState<IncidentReportResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [pipelineSteps, setPipelineSteps] = useState<SSEStep[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -119,7 +160,7 @@ export default function IncidentReportPage() {
     },
   ];
 
-  const handleSubmit = async () => {
+  async function handleSubmit(): Promise<void> {
     if (isLoading || !hasInput) return;
 
     abortControllerRef.current?.abort();
@@ -127,6 +168,7 @@ export default function IncidentReportPage() {
 
     setIsLoading(true);
     setResult(null);
+    setPipelineSteps([]);
 
     try {
       const userRequirements =
@@ -138,45 +180,91 @@ export default function IncidentReportPage() {
       formData.append("user_requirements", userRequirements);
       formData.append("generate_pdf", String(generatePdf));
 
-      let endpoint: string;
-
+      // Use SSE streaming for text mode, regular fetch for audio
       if (inputMode === "audio" && audioFile) {
         formData.append("file", audioFile);
         formData.append("enhanced", String(enhanced));
         formData.append("compress_audio", "true");
-        endpoint = `${API_URL}/pipeline/audio`;
+
+        const response = await fetch("/api/pipeline/audio", {
+          method: "POST",
+          body: formData,
+          signal: abortControllerRef.current.signal,
+        });
+
+        if (!response.ok) {
+          const errorMessage = await response
+            .json()
+            .then((err) => err.detail || "Failed to process input")
+            .catch(() => "Failed to process input");
+          throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+        setResult(data);
+        toast.success("Incident report generated!");
       } else {
+        // Text mode with SSE streaming
         formData.append("text", textInput);
-        endpoint = `${API_URL}/pipeline/text`;
+
+        const response = await fetch("/api/pipeline/text/stream", {
+          method: "POST",
+          body: formData,
+          signal: abortControllerRef.current.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to process input");
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("No response body");
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const events = parseSSEEvents(buffer);
+
+          for (const event of events) {
+            if (event.type === "steps") {
+              setPipelineSteps(event.data.steps as unknown as SSEStep[]);
+            } else if (event.type === "step_update") {
+              const update = event.data as unknown as SSEStep;
+              setPipelineSteps((prev) =>
+                prev.map((s) => (s.step === update.step ? update : s))
+              );
+            } else if (event.type === "result") {
+              setResult(event.data as unknown as IncidentReportResult);
+              toast.success("Incident report generated!");
+            } else if (event.type === "error") {
+              throw new Error(
+                (event.data.message as string) || "Processing failed"
+              );
+            }
+          }
+
+          // Clear processed events from buffer
+          const lastEventEnd = buffer.lastIndexOf("\n\n");
+          if (lastEventEnd !== -1) {
+            buffer = buffer.slice(lastEventEnd + 2);
+          }
+        }
       }
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        body: formData,
-        signal: abortControllerRef.current.signal,
-      });
-
-      if (!response.ok) {
-        const errorMessage = await response
-          .json()
-          .then((err) => err.detail || "Failed to process input")
-          .catch(() => "Failed to process input");
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      setResult(data);
-      toast.success("Incident report generated!");
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   function openPdfDownload(jobId: string): void {
-    window.open(`${API_URL}/pipeline/pdf/${jobId}`, "_blank");
+    window.open(`/api/pipeline/pdf/${jobId}`, "_blank");
   }
 
   function resetDemo(): void {
@@ -227,8 +315,8 @@ export default function IncidentReportPage() {
                 </CardDescription>
               </div>
               <Button variant="ghost" size="sm" onClick={loadExampleText}>
-                <Eye className="mr-2 h-4 w-4" />
-                Example
+                <ClipboardPaste className="mr-2 h-4 w-4" />
+                Use Example
               </Button>
             </div>
           </CardHeader>
@@ -267,14 +355,22 @@ export default function IncidentReportPage() {
               />
             ) : (
               <div className="space-y-2">
-                <Textarea
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  placeholder="Enter incident report text here..."
-                  disabled={isLoading}
-                  rows={8}
-                  className="min-h-[180px] resize-none"
-                />
+                <div
+                  className={`rounded-lg border-2 transition-colors ${
+                    textInput
+                      ? "border-primary/30 bg-primary/5"
+                      : "border-dashed border-muted-foreground/25"
+                  }`}
+                >
+                  <Textarea
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    placeholder="Enter incident report text here..."
+                    disabled={isLoading}
+                    rows={8}
+                    className="min-h-[180px] resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                  />
+                </div>
                 {textInput && (
                   <Button
                     variant="ghost"
@@ -387,17 +483,26 @@ export default function IncidentReportPage() {
         <div className="space-y-4">
           {isLoading && (
             <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
-                  <p className="text-muted-foreground mt-2">
+              <CardContent className="pt-6">
+                <div className="flex flex-col items-center gap-4">
+                  <Loader2 className="text-primary h-8 w-8 animate-spin" />
+                  <p className="text-muted-foreground text-sm">
                     {inputMode === "audio"
                       ? "Processing incident recording..."
                       : "Extracting incident data..."}
                   </p>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    This may take a moment
-                  </p>
+                  {pipelineSteps.length > 0 && (
+                    <div className="w-full">
+                      <StepIndicatorCompact
+                        steps={pipelineSteps.map((s) => ({
+                          id: String(s.step),
+                          name: s.name,
+                          status: s.status,
+                          message: s.message,
+                        }))}
+                      />
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -440,6 +545,14 @@ export default function IncidentReportPage() {
                 </ResultCard>
               )}
 
+              {result.input_text &&
+                !result.raw_transcript &&
+                !result.enhanced_transcript && (
+                  <ResultCard title="Input Text" copyContent={result.input_text}>
+                    <ResultText content={result.input_text} maxHeight="180px" />
+                  </ResultCard>
+                )}
+
               {result.extracted_data && result.extracted_data.length > 0 && (
                 <ResultCard
                   title="Incident Report Data"
@@ -468,15 +581,13 @@ export default function IncidentReportPage() {
           )}
 
           {!result && !isLoading && (
-            <Card className="border-dashed">
-              <CardContent className="flex items-center justify-center py-12">
-                <p className="text-muted-foreground text-center">
-                  {inputMode === "audio"
-                    ? "Upload an incident recording to generate a structured report"
-                    : "Enter incident text to generate a structured report"}
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyStateCard
+              message={
+                inputMode === "audio"
+                  ? "Upload an incident recording to generate a structured report"
+                  : "Enter incident text to generate a structured report"
+              }
+            />
           )}
         </div>
       </div>

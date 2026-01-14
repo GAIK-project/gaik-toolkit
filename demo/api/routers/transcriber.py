@@ -17,7 +17,7 @@ class TranscribeResponse(BaseModel):
     job_id: str
 
 
-@router.post("/", response_model=TranscribeResponse)
+@router.post("", response_model=TranscribeResponse)
 async def transcribe_audio(
     file: UploadFile = File(...),
     custom_context: str = "",

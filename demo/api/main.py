@@ -32,6 +32,7 @@ app = FastAPI(
     description="REST API for GAIK toolkit components: extractor, parser, classifier, transcriber, pipeline",
     version="0.1.0",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 # CORS for Next.js frontend

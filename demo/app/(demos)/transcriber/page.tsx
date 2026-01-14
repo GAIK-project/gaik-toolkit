@@ -84,7 +84,7 @@ export default function TranscriberPage() {
       formData.append("enhanced", String(enhanced));
       formData.append("compress_audio", String(compressAudio));
 
-      const response = await fetch("/api/transcribe/", {
+      const response = await fetch("/api/transcribe", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current.signal,

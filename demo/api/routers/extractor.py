@@ -19,7 +19,7 @@ class ExtractResponse(BaseModel):
     document_count: int
 
 
-@router.post("/", response_model=ExtractResponse)
+@router.post("", response_model=ExtractResponse)
 async def extract_data(request: ExtractRequest):
     """
     Extract structured data from documents using natural language requirements.

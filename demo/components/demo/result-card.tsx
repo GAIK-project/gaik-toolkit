@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Loader2 } from "lucide-react";
 import { useState } from "react";
 import {
   Card,
@@ -138,11 +138,12 @@ interface ConfidenceBarProps {
 
 export function ConfidenceBar({ value, label, className }: ConfidenceBarProps) {
   const percentage = Math.round(value * 100);
-  const getColor = () => {
+
+  function getColor(): string {
     if (percentage >= 80) return "bg-green-500";
     if (percentage >= 60) return "bg-yellow-500";
     return "bg-red-500";
-  };
+  }
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -161,5 +162,40 @@ export function ConfidenceBar({ value, label, className }: ConfidenceBarProps) {
         />
       </div>
     </div>
+  );
+}
+
+interface LoadingCardProps {
+  message: string;
+  subMessage?: string;
+}
+
+export function LoadingCard({ message, subMessage }: LoadingCardProps) {
+  return (
+    <Card>
+      <CardContent className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground mt-2">{message}</p>
+          {subMessage && (
+            <p className="text-muted-foreground mt-1 text-xs">{subMessage}</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface EmptyStateCardProps {
+  message: string;
+}
+
+export function EmptyStateCard({ message }: EmptyStateCardProps) {
+  return (
+    <Card className="border-dashed">
+      <CardContent className="flex items-center justify-center py-12">
+        <p className="text-muted-foreground text-center">{message}</p>
+      </CardContent>
+    </Card>
   );
 }

@@ -20,10 +20,17 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { FileUpload } from "@/components/demo/file-upload";
 import { DemoStepper } from "@/components/demo/demo-stepper";
-import { ResultCard, ConfidenceBar } from "@/components/demo/result-card";
+import {
+  ResultCard,
+  ConfidenceBar,
+  LoadingCard,
+  EmptyStateCard,
+} from "@/components/demo/result-card";
 import { Step } from "@/components/demo/step-indicator";
+import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
 import { toast } from "sonner";
 
 interface ClassifyResult {
@@ -51,6 +58,11 @@ export default function ClassifierPage() {
     };
   }, []);
 
+  function handleUseExample(exampleFile: File): void {
+    setFile(exampleFile);
+    setResult(null);
+  }
+
   const flowSteps: Step[] = [
     {
       id: "upload",
@@ -69,26 +81,26 @@ export default function ClassifierPage() {
     },
   ];
 
-  const handleAddClass = () => {
+  function handleAddClass(): void {
     const trimmed = classInput.trim().toLowerCase();
     if (trimmed && !classes.includes(trimmed)) {
       setClasses([...classes, trimmed]);
       setClassInput("");
     }
-  };
+  }
 
-  const handleRemoveClass = (classToRemove: string) => {
+  function handleRemoveClass(classToRemove: string): void {
     setClasses(classes.filter((c) => c !== classToRemove));
-  };
+  }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  function handleKeyDown(e: React.KeyboardEvent): void {
     if (e.key === "Enter") {
       e.preventDefault();
       handleAddClass();
     }
-  };
+  }
 
-  const handleSubmit = async () => {
+  async function handleSubmit(): Promise<void> {
     if (isLoading) return; // Prevent double-click
 
     if (!file) {
@@ -113,21 +125,15 @@ export default function ClassifierPage() {
       formData.append("classes", classes.join(","));
       formData.append("parser", parserType);
 
-      const response = await fetch("/api/classify/", {
+      const response = await fetch("/api/classify", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
-        let errorMessage = "Failed to classify document";
-        try {
-          const error = await response.json();
-          errorMessage = error.detail || errorMessage;
-        } catch {
-          // JSON parsing failed, use default message
-        }
-        throw new Error(errorMessage);
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.detail ?? "Failed to classify document");
       }
 
       const data = await response.json();
@@ -141,7 +147,7 @@ export default function ClassifierPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   return (
     <motion.div
@@ -165,15 +171,26 @@ export default function ClassifierPage() {
         {/* Input Section */}
         <Card>
           <CardHeader>
-            <CardTitle>Upload & Configure</CardTitle>
-            <CardDescription>
-              Select a document and define classification categories
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Upload & Configure</CardTitle>
+                <CardDescription>
+                  Select a document and define classification categories
+                </CardDescription>
+              </div>
+              <ExamplePreviewDialog
+                exampleUrl="/GAIK_Test_Document_Demo.pdf"
+                exampleName="GAIK_Test_Document_Demo.pdf"
+                onUseExample={handleUseExample}
+                disabled={isLoading}
+              />
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <FileUpload
               accept=".pdf,.docx,.png,.jpg,.jpeg"
               maxSize={10}
+              file={file}
               onFileSelect={setFile}
               onFileRemove={() => {
                 setFile(null);
@@ -183,9 +200,7 @@ export default function ClassifierPage() {
             />
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Classification Classes
-              </label>
+              <Label>Classification Classes</Label>
               <div className="flex gap-2">
                 <Input
                   value={classInput}
@@ -218,7 +233,7 @@ export default function ClassifierPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Parser Type</label>
+              <Label>Parser Type</Label>
               <Select
                 value={parserType}
                 onValueChange={setParserType}
@@ -259,19 +274,10 @@ export default function ClassifierPage() {
         {/* Results Section */}
         <div className="space-y-4">
           {isLoading && (
-            <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
-                  <p className="text-muted-foreground mt-2">
-                    Analyzing document...
-                  </p>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    This may take a few seconds
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <LoadingCard
+              message="Analyzing document..."
+              subMessage="This may take a few seconds"
+            />
           )}
 
           {result && !isLoading && (
@@ -310,13 +316,7 @@ export default function ClassifierPage() {
           )}
 
           {!result && !isLoading && (
-            <Card className="border-dashed">
-              <CardContent className="flex items-center justify-center py-12">
-                <p className="text-muted-foreground text-center">
-                  Upload a document and click classify to see results
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyStateCard message="Upload a document and click classify to see results" />
           )}
         </div>
       </div>

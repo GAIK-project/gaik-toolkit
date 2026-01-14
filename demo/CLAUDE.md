@@ -1,2 +1,3 @@
 - Backend API: Use gaik toolkit (https://pypi.org/project/gaik/)
 - Package managers: Use bun and uv, not npm or pnpm
+- API proxy: `proxy.ts` is the Next.js 15 middleware for proxying API requests (https://nextjs.org/docs/app/getting-started/proxy)

@@ -1,16 +1,23 @@
 """Pipeline router - End-to-end pipeline endpoints for demos."""
 
+import json
 import os
 import tempfile
 import uuid
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 router = APIRouter()
+
+
+def sse_event(event_type: str, data: dict) -> str:
+    """Format data as an SSE event."""
+    return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
 
 # Temporary storage for generated PDFs
 PDF_STORAGE: dict[str, Path] = {}
@@ -368,10 +375,18 @@ async def text_pipeline(
         # Step 2: Extract structured data
         steps[1].status = "in_progress"
 
+        from gaik.building_blocks.extractor.extractor import DataExtractor
         from gaik.building_blocks.extractor.schema import SchemaGenerator
 
+        # Step 1: Generate schema from user requirements
         generator = SchemaGenerator(config=config)
-        extracted_data = generator.extract(
+        extraction_model = generator.generate_schema(user_requirements)
+
+        # Step 2: Extract data using the generated schema
+        extractor = DataExtractor(config=config)
+        extracted_data = extractor.extract(
+            extraction_model=extraction_model,
+            requirements=generator.item_requirements,
             user_requirements=user_requirements,
             documents=[text],
         )
@@ -428,6 +443,127 @@ async def text_pipeline(
             steps=steps,
             error=str(e),
         )
+
+
+@router.post("/text/stream")
+async def text_pipeline_stream(
+    text: str = Form(...),
+    user_requirements: str = Form(...),
+    generate_pdf: bool = Form(False),
+):
+    """
+    Run the text extraction pipeline with SSE streaming progress updates.
+
+    Returns Server-Sent Events with progress updates and final result.
+    """
+    job_id = str(uuid.uuid4())
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        steps = [
+            {"step": 1, "name": "Generate Schema", "status": "pending"},
+            {"step": 2, "name": "Extract Data", "status": "pending"},
+        ]
+        if generate_pdf:
+            steps.append({"step": 3, "name": "Generate PDF", "status": "pending"})
+
+        # Send initial steps
+        yield sse_event("steps", {"steps": steps})
+
+        if not text or not text.strip():
+            yield sse_event("error", {"message": "No text provided"})
+            return
+
+        try:
+            config = _get_api_config()
+
+            # Step 1: Generate schema
+            steps[0]["status"] = "in_progress"
+            yield sse_event("step_update", steps[0])
+
+            from gaik.building_blocks.extractor.extractor import DataExtractor
+            from gaik.building_blocks.extractor.schema import SchemaGenerator
+
+            generator = SchemaGenerator(config=config)
+            extraction_model = generator.generate_schema(user_requirements)
+
+            steps[0]["status"] = "completed"
+            yield sse_event("step_update", steps[0])
+
+            # Step 2: Extract data
+            steps[1]["status"] = "in_progress"
+            yield sse_event("step_update", steps[1])
+
+            extractor = DataExtractor(config=config)
+            extracted_data = extractor.extract(
+                extraction_model=extraction_model,
+                requirements=generator.item_requirements,
+                user_requirements=user_requirements,
+                documents=[text],
+            )
+
+            steps[1]["status"] = "completed"
+            steps[1]["message"] = f"Extracted {len(extracted_data)} items"
+            yield sse_event("step_update", steps[1])
+
+            # Step 3: Generate PDF if requested
+            pdf_available = False
+            if generate_pdf and extracted_data:
+                pdf_step_idx = 2
+                steps[pdf_step_idx]["status"] = "in_progress"
+                yield sse_event("step_update", steps[pdf_step_idx])
+
+                try:
+                    from utils.pdf_generator import StructuredDataToPDF
+
+                    logo = LOGO_PATH if LOGO_PATH.exists() else None
+                    pdf_generator = StructuredDataToPDF(
+                        title="Extracted Data Report", logo_path=logo
+                    )
+                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                    pdf_generator.run(extracted_data, pdf_path)
+
+                    PDF_STORAGE[job_id] = pdf_path
+                    pdf_available = True
+                    steps[pdf_step_idx]["status"] = "completed"
+                    steps[pdf_step_idx]["message"] = "PDF generated"
+                    yield sse_event("step_update", steps[pdf_step_idx])
+                except Exception as e:
+                    steps[pdf_step_idx]["status"] = "error"
+                    steps[pdf_step_idx]["message"] = f"PDF generation failed: {e}"
+                    yield sse_event("step_update", steps[pdf_step_idx])
+
+            # Send final result
+            yield sse_event(
+                "result",
+                {
+                    "job_id": job_id,
+                    "input_text": text,
+                    "extracted_data": extracted_data,
+                    "pdf_available": pdf_available,
+                },
+            )
+
+        except ImportError as e:
+            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+        except Exception as e:
+            # Mark current step as error
+            for step in steps:
+                if step["status"] == "in_progress":
+                    step["status"] = "error"
+                    step["message"] = str(e)
+                    yield sse_event("step_update", step)
+                    break
+            yield sse_event("error", {"message": str(e)})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/pdf/{job_id}")

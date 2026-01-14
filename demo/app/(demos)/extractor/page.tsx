@@ -17,8 +17,13 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileUpload } from "@/components/demo/file-upload";
 import { DemoStepper } from "@/components/demo/demo-stepper";
-import { ResultCard, ResultJson } from "@/components/demo/result-card";
+import {
+  ResultCard,
+  LoadingCard,
+  EmptyStateCard,
+} from "@/components/demo/result-card";
 import { Step } from "@/components/demo/step-indicator";
+import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
 import { toast } from "sonner";
 
 interface Field {
@@ -59,6 +64,12 @@ export default function ExtractorPage() {
     };
   }, []);
 
+  function handleUseExample(exampleFile: File): void {
+    setFile(exampleFile);
+    setInputMode("file");
+    setResult(null);
+  }
+
   const hasInput =
     inputMode === "text" ? documentText.trim().length > 0 : Boolean(file);
   const hasConfig = userRequirements.trim().length > 0 && fields.length > 0;
@@ -81,27 +92,24 @@ export default function ExtractorPage() {
     },
   ];
 
-  const handleAddField = () => {
-    if (newFieldName.trim() && newFieldDesc.trim()) {
-      const fieldKey = newFieldName.trim().toLowerCase().replace(/\s+/g, "_");
-      if (fields.some((f) => f.name === fieldKey)) {
-        toast.error("Field already exists");
-        return;
-      }
-      setFields([
-        ...fields,
-        { name: fieldKey, description: newFieldDesc.trim() },
-      ]);
-      setNewFieldName("");
-      setNewFieldDesc("");
+  function handleAddField(): void {
+    if (!newFieldName.trim() || !newFieldDesc.trim()) return;
+
+    const fieldKey = newFieldName.trim().toLowerCase().replace(/\s+/g, "_");
+    if (fields.some((f) => f.name === fieldKey)) {
+      toast.error("Field already exists");
+      return;
     }
-  };
+    setFields([...fields, { name: fieldKey, description: newFieldDesc.trim() }]);
+    setNewFieldName("");
+    setNewFieldDesc("");
+  }
 
-  const handleRemoveField = (name: string) => {
+  function handleRemoveField(name: string): void {
     setFields(fields.filter((f) => f.name !== name));
-  };
+  }
 
-  const parseFile = async (): Promise<string | null> => {
+  async function parseFile(): Promise<string | null> {
     if (!file) return null;
 
     setIsParsing(true);
@@ -110,21 +118,15 @@ export default function ExtractorPage() {
       formData.append("file", file);
       formData.append("parser_type", "auto");
 
-      const response = await fetch("/api/parse/", {
+      const response = await fetch("/api/parse", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current?.signal,
       });
 
       if (!response.ok) {
-        let errorMessage = "Failed to parse document";
-        try {
-          const error = await response.json();
-          errorMessage = error.detail || errorMessage;
-        } catch {
-          // JSON parsing failed, use default message
-        }
-        throw new Error(errorMessage);
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.detail ?? "Failed to parse document");
       }
 
       const data = await response.json();
@@ -140,18 +142,16 @@ export default function ExtractorPage() {
     } finally {
       setIsParsing(false);
     }
-  };
+  }
 
-  const handleSubmit = async () => {
-    if (isLoading || isParsing) return; // Prevent double-click
+  async function handleSubmit(): Promise<void> {
+    if (isLoading || isParsing) return;
 
-    let textToProcess = documentText;
-
-    // Abort previous request if any
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
-    // If in file mode, parse the file first
+    let textToProcess = documentText;
+
     if (inputMode === "file") {
       if (!file) {
         toast.error("Please select a file first");
@@ -181,19 +181,13 @@ export default function ExtractorPage() {
     setResult(null);
 
     try {
-      const fieldsMap = fields.reduce(
-        (acc, field) => {
-          acc[field.name] = field.description;
-          return acc;
-        },
-        {} as Record<string, string>,
+      const fieldsMap = Object.fromEntries(
+        fields.map((field) => [field.name, field.description]),
       );
 
-      const response = await fetch("/api/extract/", {
+      const response = await fetch("/api/extract", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           documents: [textToProcess],
           user_requirements: userRequirements,
@@ -203,28 +197,20 @@ export default function ExtractorPage() {
       });
 
       if (!response.ok) {
-        let errorMessage = "Failed to extract data";
-        try {
-          const error = await response.json();
-          errorMessage = error.detail || errorMessage;
-        } catch {
-          // JSON parsing failed, use default message
-        }
-        throw new Error(errorMessage);
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.detail ?? "Failed to extract data");
       }
 
       const data = await response.json();
       setResult(data);
       toast.success("Data extracted successfully!");
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        return; // Request was aborted, don't show error
-      }
+      if (error instanceof Error && error.name === "AbortError") return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   return (
     <motion.div
@@ -250,10 +236,20 @@ export default function ExtractorPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Document Input</CardTitle>
-              <CardDescription>
-                Provide the document text to extract data from
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Document Input</CardTitle>
+                  <CardDescription>
+                    Provide the document text to extract data from
+                  </CardDescription>
+                </div>
+                <ExamplePreviewDialog
+                  exampleUrl="/GAIK_Test_Document_Demo.pdf"
+                  exampleName="GAIK_Test_Document_Demo.pdf"
+                  onUseExample={handleUseExample}
+                  disabled={isLoading || isParsing}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <Tabs
@@ -277,6 +273,7 @@ export default function ExtractorPage() {
                   <FileUpload
                     accept=".pdf,.docx"
                     maxSize={10}
+                    file={file}
                     onFileSelect={setFile}
                     onFileRemove={() => setFile(null)}
                     disabled={isLoading}
@@ -392,19 +389,10 @@ export default function ExtractorPage() {
         {/* Results Section */}
         <div className="space-y-4">
           {(isLoading || isParsing) && (
-            <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
-                  <p className="text-muted-foreground mt-2">
-                    {isParsing ? "Parsing document..." : "Extracting data..."}
-                  </p>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    This may take a few seconds
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <LoadingCard
+              message={isParsing ? "Parsing document..." : "Extracting data..."}
+              subMessage="This may take a few seconds"
+            />
           )}
 
           {result && !isLoading && !isParsing && (
@@ -447,13 +435,7 @@ export default function ExtractorPage() {
           )}
 
           {!result && !isLoading && !isParsing && (
-            <Card className="border-dashed">
-              <CardContent className="flex items-center justify-center py-12">
-                <p className="text-muted-foreground text-center">
-                  Provide document text and click extract to see results
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyStateCard message="Provide document text and click extract to see results" />
           )}
         </div>
       </div>
