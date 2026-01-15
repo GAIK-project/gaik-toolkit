@@ -1,8 +1,18 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { motion } from "motion/react";
-import { Mic, Loader2, Sparkles } from "lucide-react";
+import { FileUpload } from "@/components/demo/file-upload";
+import {
+  EmptyStateCard,
+  LoadingCard,
+  ResultCard,
+  ResultText,
+} from "@/components/demo/result-card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,19 +21,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileUpload } from "@/components/demo/file-upload";
-import { DemoStepper } from "@/components/demo/demo-stepper";
-import {
-  ResultCard,
-  ResultText,
-  LoadingCard,
-  EmptyStateCard,
-} from "@/components/demo/result-card";
-import { Step } from "@/components/demo/step-indicator";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, Mic, Sparkles } from "lucide-react";
+import { motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 interface TranscribeResult {
@@ -48,24 +52,6 @@ export default function TranscriberPage() {
       abortControllerRef.current?.abort();
     };
   }, []);
-
-  const flowSteps: Step[] = [
-    {
-      id: "upload",
-      name: "Upload",
-      status: file ? "completed" : "pending",
-    },
-    {
-      id: "transcribe",
-      name: "Transcribe",
-      status: result ? "completed" : "pending",
-    },
-    {
-      id: "review",
-      name: "Review",
-      status: result ? "completed" : "pending",
-    },
-  ];
 
   async function handleSubmit(): Promise<void> {
     if (isLoading) return; // Prevent double-click
@@ -128,100 +114,109 @@ export default function TranscriberPage() {
       <header className="mb-8">
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Mic className="h-8 w-8" />
-          Audio/Video Transcriber
+          Speech to Text
         </h1>
         <p className="text-muted-foreground mt-2">
-          Transcribe audio and video with Whisper and optional GPT enhancement
+          Convert voice recordings and videos into clear, written text
         </p>
       </header>
 
-      <DemoStepper steps={flowSteps} className="mb-8" />
-
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Input Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload Media</CardTitle>
-            <CardDescription>
-              Select an audio or video file to transcribe
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <FileUpload
-              accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac"
-              maxSize={50}
-              onFileSelect={setFile}
-              onFileRemove={() => {
-                setFile(null);
-                setResult(null);
-              }}
-              disabled={isLoading}
-            />
-
-            <div className="space-y-2">
-              <Label htmlFor="context">Custom Context (Optional)</Label>
-              <Textarea
-                id="context"
-                value={customContext}
-                onChange={(e) => setCustomContext(e.target.value)}
-                placeholder="Add context to help with transcription accuracy (e.g., speaker names, technical terms, topic)..."
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Upload Media</CardTitle>
+              <CardDescription>
+                Select an audio or video file to transcribe
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <FileUpload
+                accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac"
+                maxSize={50}
+                onFileSelect={setFile}
+                onFileRemove={() => {
+                  setFile(null);
+                  setResult(null);
+                }}
                 disabled={isLoading}
-                rows={3}
               />
-            </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="enhanced">Enhanced Transcript</Label>
-                  <p className="text-muted-foreground text-xs">
-                    Use LLM to improve readability
-                  </p>
-                </div>
-                <Switch
-                  id="enhanced"
-                  checked={enhanced}
-                  onCheckedChange={setEnhanced}
-                  disabled={isLoading}
-                />
-              </div>
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="settings" className="border-none">
+                  <AccordionTrigger className="text-muted-foreground hover:text-foreground py-2 text-sm font-medium">
+                    Processing Settings
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-6 pt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="context">Custom Context (Optional)</Label>
+                      <Textarea
+                        id="context"
+                        value={customContext}
+                        onChange={(e) => setCustomContext(e.target.value)}
+                        placeholder="Add context to help with transcription accuracy (e.g., speaker names, technical terms, topic)..."
+                        disabled={isLoading}
+                        rows={3}
+                      />
+                    </div>
 
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="compress">Compress Audio</Label>
-                  <p className="text-muted-foreground text-xs">
-                    Compress before sending (faster upload)
-                  </p>
-                </div>
-                <Switch
-                  id="compress"
-                  checked={compressAudio}
-                  onCheckedChange={setCompressAudio}
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="enhanced">Polished Text</Label>
+                          <p className="text-muted-foreground text-xs">
+                            Use LLM to improve readability
+                          </p>
+                        </div>
+                        <Switch
+                          id="enhanced"
+                          checked={enhanced}
+                          onCheckedChange={setEnhanced}
+                          disabled={isLoading}
+                        />
+                      </div>
 
-            <Button
-              onClick={handleSubmit}
-              disabled={!file || isLoading}
-              className="w-full"
-              size="lg"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Transcribing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Transcribe
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="compress">Compress Audio</Label>
+                          <p className="text-muted-foreground text-xs">
+                            Compress before sending (faster upload)
+                          </p>
+                        </div>
+                        <Switch
+                          id="compress"
+                          checked={compressAudio}
+                          onCheckedChange={setCompressAudio}
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+
+              <Button
+                onClick={handleSubmit}
+                disabled={!file || isLoading}
+                className="w-full"
+                size="lg"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Converting...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Transcribe
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Results Section */}
         <div className="space-y-4">
@@ -234,7 +229,7 @@ export default function TranscriberPage() {
 
           {result && !isLoading && (
             <ResultCard
-              title="Transcription Result"
+              title="Result"
               description={`File: ${result.filename}`}
               delay={0}
             >

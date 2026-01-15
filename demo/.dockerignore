@@ -44,6 +44,9 @@ LICENSE
 coverage/
 .nyc_output/
 
+# Videos
+public/video/
+
 # Misc
 .DS_Store
 Thumbs.db

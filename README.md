@@ -76,7 +76,7 @@ Install only what you need, or the full toolkit:
 
 ```bash
 # Structured extraction (schema generation + extraction)
-pip install "gaik[extractor]"
+pip install "gaik[extract]"
 
 # Document parsing (vision-based + local parsers)
 pip install "gaik[parser]"
