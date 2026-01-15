@@ -46,8 +46,8 @@ export function IncidentDetails({ data, className }: IncidentDetailsProps) {
               }).format(d);
             }
           }
-        } catch (e) {
-          /* ignore */
+        } catch {
+          /* ignore parsing errors */
         }
 
         return (

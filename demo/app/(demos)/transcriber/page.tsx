@@ -53,13 +53,6 @@ export default function TranscriberPage() {
     };
   }, []);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-    };
-  }, []);
-
   async function handleSubmit(): Promise<void> {
     if (isLoading) return; // Prevent double-click
 
