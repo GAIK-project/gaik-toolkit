@@ -7,7 +7,6 @@ description: Introduction to GAIK toolkit components
 
 GAIK toolkit is an AI-powered toolkit for Python that provides structured data extraction, document parsing, audio transcription, and document classification. It uses OpenAI models (Azure OpenAI or standard OpenAI) for intelligent document processing.
 
-**Current Version:** 0.2.29
 **PyPI:** [https://pypi.org/project/gaik/](https://pypi.org/project/gaik/)
 **GitHub:** [https://github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
 **Python Support:** 3.10+
@@ -47,11 +46,11 @@ End-to-end pipelines that combine building blocks:
 
 ```bash
 # All features
-pip install gaik[all]
+pip install "gaik[all]"
 
 # Specific components
-pip install gaik[parser]      # PDF parsing
-pip install gaik[transcriber] # Audio transcription
+pip install "gaik[parser]"      # PDF parsing
+pip install "gaik[transcriber]" # Audio transcription
 ```
 
 ## Supported Providers

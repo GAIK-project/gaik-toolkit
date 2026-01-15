@@ -35,43 +35,32 @@ classifiers = [
 
 dependencies = [
     # Core runtime requirements shared across all installs
-    "pydantic>=2.12.4",
-    "python-dotenv>=1.0.0",
-    "openai>=1.58.0",
+    "pydantic>=2.12.0",
+    "python-dotenv>=1.2.0",
+    "openai>=2.7.0",
 ]
 
 [project.optional-dependencies]
-# Data extraction with LLM providers
-extract = [
-    "openai>=1.58.0",
-    "pydantic>=2.0.0",
-    "python-dotenv>=1.0.0",
-]
+# Data extraction with LLM providers (core deps provide openai, pydantic, python-dotenv)
+extract = []
 
 # Document parsing (PDF, DOCX, images)
 parser = [
-    "openai>=2.7",
-    "PyMuPDF>=1.23.0",
-    "python-docx>=1.0.0",
-    "python-dotenv>=1.0.0",
+    "PyMuPDF>=1.26.0",
+    "python-docx>=1.2.0",
     "docling==2.64.1",
     "psutil",
 ]
 
 # Audio/video transcription
 transcriber = [
-    "openai>=1.14.3",
     "pydub>=0.25.1",
-    "python-dotenv>=1.0.1",
 ]
 
 # Document classification
 classifier = [
-    "openai>=1.58.0",
-    "pydantic>=2.0.0",
-    "python-dotenv>=1.0.0",
-    "PyMuPDF>=1.23.0",
-    "python-docx>=1.0.0",
+    "PyMuPDF>=1.26.0",
+    "python-docx>=1.2.0",
 ]
 
 # All features
@@ -97,10 +86,8 @@ documents-to-structured-data = [
 
 # CPU-only variants (no GPU/torch/docling dependencies)
 parser-cpu = [
-    "openai>=2.7",
-    "PyMuPDF>=1.23.0",
-    "python-docx>=1.0.0",
-    "python-dotenv>=1.0.0",
+    "PyMuPDF>=1.26.0",
+    "python-docx>=1.2.0",
 ]
 
 documents-to-structured-data-cpu = [
