@@ -29,9 +29,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Copy build-time env (only NEXT_PUBLIC_* vars, no secrets)
-# .env.production is Next.js standard for production builds
-COPY .env.production .env.local
+# Create empty .env.local for build (no NEXT_PUBLIC_* vars needed currently)
+# If you add NEXT_PUBLIC_* vars later, create .env.production with them
+RUN touch .env.local
 
 RUN bun run build
 
