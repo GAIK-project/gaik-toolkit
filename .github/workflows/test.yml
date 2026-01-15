@@ -6,7 +6,7 @@ on:
       - main
       - dev
     paths:
-      - 'packages/python/**'
+      - 'src/**'
       - 'pyproject.toml'
       - '.github/workflows/test.yml'
       - '.github/workflows/publish.yml'
@@ -15,7 +15,7 @@ on:
       - main
       - dev
     paths:
-      - 'packages/python/**'
+      - 'src/**'
       - 'pyproject.toml'
       - '.github/workflows/test.yml'
       - '.github/workflows/publish.yml'
@@ -31,7 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        # PRs: only Python 3.11 for fast feedback
+        # Push to main/dev: full matrix
+        python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.11"]') || fromJSON('["3.10", "3.11", "3.12"]') }}
 
     steps:
     - name: Checkout code
@@ -43,10 +45,12 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-        cache: 'pip'
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v4
 
     - name: Install package
-      run: pip install ".[all,dev]"
+      run: uv pip install --system ".[all,dev]"
 
     - name: Smoke test basic import
       run: python -c "from gaik import __version__; print(f'gaik {__version__} OK')"
