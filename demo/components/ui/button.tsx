@@ -46,15 +46,21 @@ function Button({
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
   }) {
-  const Comp = asChild ? Slot : "button";
+  const sharedProps = {
+    "data-slot": "button",
+    className: cn(buttonVariants({ variant, size, className })),
+  };
 
-  return (
-    <Comp
-      data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
-  );
+  if (asChild) {
+    return (
+      <Slot
+        {...sharedProps}
+        {...(props as React.ComponentProps<typeof Slot>)}
+      />
+    );
+  }
+
+  return <button {...sharedProps} {...props} />;
 }
 
 export { Button, buttonVariants };

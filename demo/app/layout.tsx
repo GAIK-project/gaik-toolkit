@@ -1,5 +1,3 @@
-import { FooterServer } from "@/components/layout/footer-server";
-import { SiteNavServer } from "@/components/layout/site-nav-server";
 import { Toaster } from "@/components/ui/toaster";
 import type { Metadata } from "next";
 import { Fraunces, JetBrains_Mono, Sora } from "next/font/google";
@@ -68,11 +66,7 @@ export default function RootLayout({
       <body
         className={`${sora.variable} ${fraunces.variable} ${jetBrainsMono.variable} antialiased`}
       >
-        <div className="flex min-h-screen flex-col">
-          <SiteNavServer />
-          <div className="flex-1">{children}</div>
-          <FooterServer />
-        </div>
+        {children}
         <Toaster />
       </body>
     </html>

@@ -63,6 +63,28 @@
   --shadow-2xl: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.1);
   --tracking-normal: 0em;
   --spacing: 0.23rem;
+  --hu-font-sans: var(--font-sans);
+  --hu-font-mono: var(--font-mono);
+  --card-radius: 10px;
+  --hu-background: hsl(0, 0%, 100%);
+  --hu-foreground: hsl(0, 0%, 14%);
+  --hu-card: hsl(0, 0%, 99%);
+  --hu-card-foreground: hsl(0, 0%, 14%);
+  --hu-primary: hsl(235, 100%, 60%);
+  --hu-primary-foreground: hsl(0, 0%, 98%);
+  --hu-secondary: hsl(0, 0%, 97%);
+  --hu-secondary-foreground: hsl(0, 0%, 20%);
+  --hu-muted: hsl(0, 0%, 97%);
+  --hu-muted-foreground: hsl(0, 0%, 56%);
+  --hu-accent: hsl(0, 0%, 96%);
+  --hu-accent-foreground: hsl(0, 0%, 20%);
+  --hu-destructive: hsl(9, 96%, 47%);
+  --hu-destructive-foreground: hsl(0, 0%, 98%);
+  --hu-border: hsl(0, 0%, 92%);
+  --hu-input: hsl(0, 0%, 100%);
+  --hu-ring: hsl(0, 0%, 71%);
+  --color-fd-background: hsl(var(--hu-background));
+  --color-fd-card: hsl(var(--hu-background));
 }
 
 .dark {
@@ -118,6 +140,25 @@
   --shadow-xl:
     0px 1px 2px 0px hsl(0 0% 0% / 0.04), 0px 8px 10px -1px hsl(0 0% 0% / 0.04);
   --shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.1);
+  --hu-background: hsl(0, 0%, 7%);
+  --hu-foreground: hsl(0, 0%, 100%);
+  --hu-card: hsl(0, 0%, 9%);
+  --hu-card-foreground: hsl(0, 0%, 100%);
+  --hu-primary: hsl(235, 100%, 60%);
+  --hu-primary-foreground: hsl(0, 0%, 98%);
+  --hu-secondary: hsl(0, 0%, 15%);
+  --hu-secondary-foreground: hsl(0, 0%, 100%);
+  --hu-muted: hsl(0, 0%, 15%);
+  --hu-muted-foreground: hsl(0, 0%, 71%);
+  --hu-accent: hsl(0, 0%, 15%);
+  --hu-accent-foreground: hsl(0, 0%, 100%);
+  --hu-destructive: hsl(0, 84%, 50%);
+  --hu-destructive-foreground: hsl(0, 0%, 98%);
+  --hu-border: 0, 0%, 100%, 10%;
+  --hu-input: 0, 0%, 100%, 5%;
+  --hu-ring: hsl(0, 0%, 56%);
+  --color-fd-background: hsl(var(--hu-background));
+  --color-fd-card: hsl(var(--hu-background));
 }
 
 @theme inline {
@@ -171,6 +212,74 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+  @keyframes ball {
+  from {
+    transform: rotate(0) translateY(-6.5em);
+    }
+  50% {
+    transform: rotate(180deg) translateY(-6em);
+    }
+  to {
+    transform: rotate(360deg) translateY(-6.5em);
+    }
+  }
+  @keyframes ballInnerShadow {
+  from {
+    transform: rotate(0);
+    }
+  to {
+    transform: rotate(-360deg);
+    }
+  }
+  @keyframes ballOuterShadow {
+  from {
+    transform: rotate(20deg);
+    }
+  to {
+    transform: rotate(-340deg);
+    }
+  }
+  @keyframes ballTexture {
+  from {
+    transform: translateX(0);
+    }
+  to {
+    transform: translateX(50%);
+    }
+  }
+  @keyframes trackCover {
+  from {
+    transform: rotate(0);
+    }
+  to {
+    transform: rotate(360deg);
+    }
+  }
+  --hu-font-geist: var(----hu-font-geist);
+  --hu-font-jetbrains: var(----hu-font-jetbrains);
+  --radius: var(----radius);
+  --card-radius: var(----card-radius);
+  --color-hu-background: var(----hu-background);
+  --color-hu-foreground: var(----hu-foreground);
+  --color-hu-card: var(----hu-card);
+  --color-hu-card-foreground: var(----hu-card-foreground);
+  --color-hu-primary: var(----hu-primary);
+  --color-hu-primary-foreground: var(----hu-primary-foreground);
+  --color-hu-secondary: var(----hu-secondary);
+  --color-hu-secondary-foreground: var(----hu-secondary-foreground);
+  --color-hu-muted: var(----hu-muted);
+  --color-hu-muted-foreground: var(----hu-muted-foreground);
+  --color-hu-accent: var(----hu-accent);
+  --color-hu-accent-foreground: var(----hu-accent-foreground);
+  --color-hu-destructive: var(----hu-destructive);
+  --color-hu-destructive-foreground: var(----hu-destructive-foreground);
+  --color-hu-border: var(----hu-border);
+  --color-hu-input: var(----hu-input);
+  --color-hu-ring: var(----hu-ring);
+  --color-color-fd-background: var(----color-fd-background);
+  --color-color-fd-card: var(----color-fd-card);
+  --color-color-color-fd-card: var(----color-color-fd-card);
+  --color-color-color-fd-background: var(----color-color-fd-background)
 }
 
 @layer base {
@@ -180,5 +289,106 @@
   body {
     @apply bg-background text-foreground font-sans;
     letter-spacing: var(--tracking-normal);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .pl {
+    --pl-size: 9rem;
+    position: relative;
+    width: var(--pl-size);
+    height: var(--pl-size);
+    font-size: 0.7rem;
+  }
+
+  .pl__outer-ring,
+  .pl__inner-ring,
+  .pl__track-cover,
+  .pl__ball,
+  .pl__ball-texture,
+  .pl__ball-outer-shadow,
+  .pl__ball-inner-shadow,
+  .pl__ball-side-shadows {
+    position: absolute;
+    border-radius: 9999px;
+  }
+
+  .pl__outer-ring {
+    inset: 0.6em;
+    border: 0.35em solid rgba(255, 255, 255, 0.16);
+    box-shadow: inset 0 0 0.8em rgba(255, 255, 255, 0.08);
+  }
+
+  .pl__inner-ring {
+    inset: 1.6em;
+    border: 0.28em solid rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 0 1em rgba(0, 0, 0, 0.35);
+  }
+
+  .pl__track-cover {
+    inset: 0.4em;
+    border: 0.5em solid transparent;
+    border-top-color: rgba(255, 255, 255, 0.5);
+    border-right-color: rgba(255, 255, 255, 0.25);
+    animation: trackCover 2.4s linear infinite;
+  }
+
+  .pl__ball {
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    animation: ball 2.2s ease-in-out infinite;
+  }
+
+  .pl__ball-texture,
+  .pl__ball-outer-shadow,
+  .pl__ball-inner-shadow,
+  .pl__ball-side-shadows {
+    top: 0;
+    left: 0;
+    width: 2.2em;
+    height: 2.2em;
+    transform: translate(-50%, -50%);
+  }
+
+  .pl__ball-texture {
+    background: radial-gradient(
+      circle at 30% 30%,
+      #ffffff 0%,
+      #e3edf7 55%,
+      #b9c8d9 100%
+    );
+    animation: ballTexture 1.6s linear infinite;
+  }
+
+  .pl__ball-outer-shadow {
+    box-shadow: 0 0.8em 0.9em rgba(0, 0, 0, 0.35);
+    animation: ballOuterShadow 2.2s ease-in-out infinite;
+    opacity: 0.8;
+  }
+
+  .pl__ball-inner-shadow {
+    box-shadow: inset 0 -0.35em 0.6em rgba(0, 0, 0, 0.25);
+    animation: ballInnerShadow 2.2s ease-in-out infinite;
+    mix-blend-mode: multiply;
+  }
+
+  .pl__ball-side-shadows {
+    background: radial-gradient(
+      circle at 65% 35%,
+      rgba(255, 255, 255, 0.35),
+      rgba(255, 255, 255, 0)
+    );
+    opacity: 0.5;
   }
 }
