@@ -28,12 +28,12 @@ async def extract_data(request: ExtractRequest):
     - **user_requirements**: Natural language description of what to extract
     - **fields**: Optional field definitions (name -> description)
     """
-    # Check for OpenAI API key
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    # Check for API key (Azure or OpenAI)
+    use_azure = bool(os.getenv("AZURE_API_KEY"))
+    if not use_azure and not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(
             status_code=500,
-            detail="OPENAI_API_KEY environment variable not set",
+            detail="Either AZURE_API_KEY or OPENAI_API_KEY environment variable must be set",
         )
 
     if not request.documents:
@@ -52,8 +52,7 @@ async def extract_data(request: ExtractRequest):
             get_openai_config,
         )
 
-        config = get_openai_config(use_azure=False)  # Use standard OpenAI
-        config["api_key"] = api_key  # Override with provided key
+        config = get_openai_config(use_azure=use_azure)
         extractor = DataExtractor(config)
 
         # Create dynamic extraction model if fields provided

@@ -1,10 +1,11 @@
 """Parser router - Document parsing endpoints"""
 
+import os
 import tempfile
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 router = APIRouter()
 
@@ -12,7 +13,7 @@ router = APIRouter()
 @router.post("")
 async def parse_document(
     file: UploadFile = File(...),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision"] = "auto",
+    parser_type: Literal["auto", "pymupdf", "docx", "vision"] = Form("auto"),
 ):
     """
     Parse a document (PDF or DOCX) and extract text content.
@@ -55,9 +56,11 @@ async def parse_document(
             from gaik.building_blocks.config import get_openai_config
             from gaik.building_blocks.parsers import VisionParser
 
-            openai_config = get_openai_config()
+            openai_config = get_openai_config(use_azure=bool(os.getenv("AZURE_API_KEY")))
             parser = VisionParser(openai_config=openai_config)
-            result = parser.parse_document(tmp_path)
+            # VisionParser uses convert_pdf() which returns list of markdown pages
+            markdown_pages = parser.convert_pdf(tmp_path)
+            result = {"text_content": "\n\n".join(markdown_pages), "metadata": {}}
         else:
             raise HTTPException(status_code=400, detail=f"Unknown parser: {parser_type}")
 

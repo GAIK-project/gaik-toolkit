@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "scripts": {
-    "dev": "bun --bun next dev",
+    "dev": "bun --bun next dev --port 3001",
     "dev:api": "cd api && uvicorn main:app --reload --port 8000",
     "dev:all": "concurrently --names \"next,api\" -c \"cyan,magenta\" \"bun dev\" \"bun dev:api\"",
     "build": "bun --bun next build",

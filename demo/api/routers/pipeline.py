@@ -70,19 +70,17 @@ class TextPipelineResponse(BaseModel):
 
 
 def _get_api_config():
-    """Get OpenAI configuration from environment."""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    """Get OpenAI configuration from environment (Azure or standard)."""
+    use_azure = bool(os.getenv("AZURE_API_KEY"))
+    if not use_azure and not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(
             status_code=500,
-            detail="OPENAI_API_KEY environment variable not set",
+            detail="Either AZURE_API_KEY or OPENAI_API_KEY environment variable must be set",
         )
 
     from gaik.building_blocks.config import get_openai_config
 
-    config = get_openai_config(use_azure=False)
-    config["api_key"] = api_key
-    return config
+    return get_openai_config(use_azure=use_azure)
 
 
 @router.post("/audio", response_model=AudioPipelineResponse)

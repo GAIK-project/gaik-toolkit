@@ -35,12 +35,12 @@ async def transcribe_audio(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
 
-    # Check for OpenAI API key
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    # Check for API key (Azure or OpenAI)
+    use_azure = bool(os.getenv("AZURE_API_KEY"))
+    if not use_azure and not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(
             status_code=500,
-            detail="OPENAI_API_KEY environment variable not set",
+            detail="Either AZURE_API_KEY or OPENAI_API_KEY environment variable must be set",
         )
 
     suffix = Path(file.filename).suffix.lower()
@@ -61,8 +61,7 @@ async def transcribe_audio(
     try:
         from gaik.building_blocks.transcriber import Transcriber, get_openai_config
 
-        config = get_openai_config(use_azure=False)  # Use standard OpenAI
-        config["api_key"] = api_key  # Override with provided key
+        config = get_openai_config(use_azure=use_azure)
         transcriber = Transcriber(
             api_config=config,
             output_dir=tempfile.gettempdir(),

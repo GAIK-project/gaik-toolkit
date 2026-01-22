@@ -43,3 +43,5 @@ next-env.d.ts
 .claude
 !.env.example
 rahti.md
+
+.mcp.json
