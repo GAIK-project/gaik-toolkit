@@ -53,6 +53,10 @@ except ImportError as e:
             pass
 
 
+import os
+import re
+from collections import OrderedDict
+
 # Try to import langchain (optional dependency)
 try:
     from langchain.schema import Document
@@ -66,11 +70,6 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             pass
 
-
-import os
-import re
-from collections import OrderedDict
-
 # Try to import additional format options
 try:
     from docling.document_converter import DocxFormatOption, TxtFormatOption
@@ -80,14 +79,8 @@ except ImportError:
     HAS_ADDITIONAL_FORMATS = False
     print("Warning: Additional format options not available. Only PDF will be supported.")
 
-# Try to import basic document converter for fallback
-try:
-    from docling.document_converter import DocumentConverter
-
-    HAS_BASIC_CONVERTER = True
-except ImportError:
-    HAS_BASIC_CONVERTER = False
-    print("Warning: Basic document converter not available.")
+# HAS_BASIC_CONVERTER tracks if DocumentConverter was successfully imported above
+HAS_BASIC_CONVERTER = DOCLING_IMPORT_SUCCESS
 
 # Try to import torch for CUDA detection
 try:
@@ -177,14 +170,10 @@ class DoclingParser:
         self.supported_extensions = self._get_supported_extensions()
 
     def _detect_device(self):
-        """Detect the best available device (CUDA or CPU)"""
-        if HAS_TORCH:
-            if torch.cuda.is_available():
-                return AcceleratorDevice.CUDA
-            else:
-                return AcceleratorDevice.CPU
-        else:
-            return AcceleratorDevice.CPU
+        """Detect the best available device (CUDA or CPU)."""
+        if HAS_TORCH and torch.cuda.is_available():
+            return AcceleratorDevice.CUDA
+        return AcceleratorDevice.CPU
 
     def _set_ocr_engine(self, ocr_engine: str):
         """
@@ -210,32 +199,24 @@ class DoclingParser:
             )
 
     def _initialize_format_options(self):
-        """Initialize format options for all supported file types"""
+        """Initialize format options for all supported file types."""
         format_options = {}
 
         # PDF format (always supported)
         format_options[InputFormat.PDF] = PdfFormatOption(pipeline_options=self.pipeline_options)
 
-        # Additional formats if available
+        # Additional formats if available (DOCX and TXT)
+        # If HAS_ADDITIONAL_FORMATS is True, these classes are guaranteed to exist
         if HAS_ADDITIONAL_FORMATS:
-            try:
-                # DOCX format
-                format_options[InputFormat.DOCX] = DocxFormatOption()
-            except Exception:
-                pass
-
-            try:
-                # TXT format
-                format_options[InputFormat.TXT] = TxtFormatOption()
-            except Exception:
-                pass
+            format_options[InputFormat.DOCX] = DocxFormatOption()
+            format_options[InputFormat.TXT] = TxtFormatOption()
 
         # If additional formats aren't available but basic converter is,
         # docling will use default format options for .docx and .txt
         return format_options
 
     def _get_supported_extensions(self):
-        """Get list of supported file extensions"""
+        """Get list of supported file extensions."""
         extensions = [".pdf"]  # PDF is always supported
 
         # Always support .docx and .txt if basic converter is available
@@ -244,19 +225,10 @@ class DoclingParser:
 
         # Add additional formats if available
         if HAS_ADDITIONAL_FORMATS and self.docling_available:
-            # Check if DOC format is supported (usually through DOCX)
-            try:
-                # Try to add DOC support (often handled by DOCX converter)
-                extensions.append(".doc")
-            except:
-                pass
-
-            # Check if PPT format is supported
-            try:
-                extensions.append(".ppt")
-                extensions.append(".pptx")
-            except:
-                pass
+            # DOC format (usually handled by DOCX converter)
+            extensions.append(".doc")
+            # PPT formats
+            extensions.extend([".ppt", ".pptx"])
 
         return extensions
 
@@ -298,7 +270,8 @@ class DoclingParser:
             file_path: Path to the document file to parse
             chunk_size: Not used (kept for compatibility with other parsers)
             chunk_overlap: Not used (kept for compatibility with other parsers)
-            use_markdown: If True, returns markdown format. If False, returns structured text format.
+            use_markdown: If True, returns markdown format. If False, returns
+                structured text format.
 
         Returns:
             Dictionary containing:
@@ -314,11 +287,10 @@ class DoclingParser:
         Raises:
             ValueError: If Docling is not available or file format is not supported
         """
-        import psutil
-
         if not self.docling_available:
             raise ValueError(
-                "Docling is not available. Please install required dependencies or use Fast parsing."
+                "Docling is not available. "
+                "Please install required dependencies or use Fast parsing."
             )
 
         if not self.is_supported_file(file_path):
@@ -326,39 +298,6 @@ class DoclingParser:
 
         file_extension = self.get_file_extension(file_path)
         file_name = os.path.basename(file_path)
-        os.path.splitext(file_name)[0]
-
-        # Check container memory limits and available memory
-        process = psutil.Process()
-        process.memory_info()
-        psutil.virtual_memory()
-
-        # Check if running in container with cgroup limits (v1 and v2)
-        try:
-            # Try cgroup v1 first
-            with open("/sys/fs/cgroup/memory/memory.limit_in_bytes") as f:
-                cgroup_limit = int(f.read().strip())
-        except (FileNotFoundError, PermissionError):
-            try:
-                # Try cgroup v2
-                with open("/sys/fs/cgroup/memory.max") as f:
-                    cgroup_limit = f.read().strip()
-                    if cgroup_limit != "max":
-                        cgroup_limit = int(cgroup_limit)
-            except (FileNotFoundError, PermissionError):
-                pass
-
-        try:
-            # Try cgroup v1 usage
-            with open("/sys/fs/cgroup/memory/memory.usage_in_bytes") as f:
-                int(f.read().strip())
-        except (FileNotFoundError, PermissionError):
-            try:
-                # Try cgroup v2 usage
-                with open("/sys/fs/cgroup/memory.current") as f:
-                    int(f.read().strip())
-            except (FileNotFoundError, PermissionError):
-                pass
 
         # Convert document using docling
         result = self.converter.convert(file_path)

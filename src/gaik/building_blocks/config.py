@@ -5,13 +5,38 @@ This module provides reusable configuration utilities for creating
 OpenAI/Azure OpenAI clients across different extraction modules.
 """
 
-import os
+from functools import lru_cache
 
-from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
+from pydantic_settings import BaseSettings
 
-# Load environment variables
-load_dotenv()
+
+class OpenAISettings(BaseSettings):
+    """OpenAI/Azure configuration from environment variables."""
+
+    # Azure settings
+    AZURE_API_KEY: str | None = None
+    AZURE_ENDPOINT: str = "https://haagahelia-poc-gaik.openai.azure.com/"
+    AZURE_API_VERSION: str = "2025-03-01-preview"
+    AZURE_DEPLOYMENT: str = "gpt-5.1"
+    AZURE_TRANSCRIPTION_MODEL: str = "whisper"
+
+    # OpenAI settings
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-5.1-2025-11-13"
+    OPENAI_TRANSCRIPTION_MODEL: str = "whisper-1"
+
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
+
+
+@lru_cache
+def get_settings() -> OpenAISettings:
+    """Get cached settings singleton."""
+    return OpenAISettings()
 
 
 def get_openai_config(use_azure: bool = True) -> dict:
@@ -30,23 +55,25 @@ def get_openai_config(use_azure: bool = True) -> dict:
         >>> config = get_openai_config(use_azure=False)
         >>> # Returns OpenAI config with model name
     """
+    settings = get_settings()
+
     if use_azure:
         return {
             "use_azure": True,
-            "api_key": os.getenv("AZURE_API_KEY"),
-            "azure_endpoint": "https://haagahelia-poc-gaik.openai.azure.com/",
-            "azure_audio_endpoint": "https://haagahelia-poc-gaik.openai.azure.com/",
-            "api_version": "2025-03-01-preview",
-            "model": "gpt-5.1",  # gpt-5    #gpt-4.1
-            "transcription_model": "whisper",
+            "api_key": settings.AZURE_API_KEY,
+            "azure_endpoint": settings.AZURE_ENDPOINT,
+            "azure_audio_endpoint": settings.AZURE_ENDPOINT,
+            "api_version": settings.AZURE_API_VERSION,
+            "model": settings.AZURE_DEPLOYMENT,
+            "transcription_model": settings.AZURE_TRANSCRIPTION_MODEL,
         }
-    else:
-        return {
-            "use_azure": False,
-            "api_key": os.getenv("OPENAI_API_KEY"),
-            "model": "gpt-5.1-2025-11-13",  # gpt-5-2025-08-07    #gpt-4.1-2025-04-14
-            "transcription_model": "whisper-1",
-        }
+
+    return {
+        "use_azure": False,
+        "api_key": settings.OPENAI_API_KEY,
+        "model": settings.OPENAI_MODEL,
+        "transcription_model": settings.OPENAI_TRANSCRIPTION_MODEL,
+    }
 
 
 def create_openai_client(config: dict):
