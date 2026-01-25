@@ -34,3 +34,31 @@ def test_doc_classifier_import():
     from gaik.building_blocks import doc_classifier
 
     assert doc_classifier is not None
+
+
+def test_embedder_import():
+    """Test that embedder module can be imported."""
+    from gaik.building_blocks.RAG import embedder
+
+    assert embedder is not None
+
+
+def test_vector_store_import():
+    """Test that vector_store module can be imported."""
+    from gaik.building_blocks.RAG import vector_store
+
+    assert vector_store is not None
+
+
+def test_retriever_import():
+    """Test that retriever module can be imported."""
+    from gaik.building_blocks.RAG import retriever
+
+    assert retriever is not None
+
+
+def test_answer_generator_import():
+    """Test that answer_generator module can be imported."""
+    from gaik.building_blocks.RAG import answer_generator
+
+    assert answer_generator is not None

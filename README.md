@@ -15,6 +15,7 @@ The toolkit focuses on three core knowledge processes in organizational workflow
 Internally, these capabilities are exposed as:
 
 - **Building blocks** – atomic utilities such as `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`
+- **RAG building blocks** – `rag_parser_docling`, `rag_parser_vision`, `embedder`, `vector_store`
 - **Software components** – opinionated end‑to‑end pipelines such as “audio → structured data” and “documents → structured data”
 
 This repository is the **implementation layer** that the broader GAIK vision builds on. Solution templates, wizards and organization‑specific workflows can all be composed from these blocks.
@@ -80,6 +81,12 @@ pip install "gaik[extractor]"
 
 # Document parsing (vision-based + local parsers)
 pip install "gaik[parser]"
+
+# RAG parsing (chunked outputs)
+pip install "gaik[rag-parser-docling]"
+pip install "gaik[rag-parser-vision]"
+pip install "gaik[embedder]"
+pip install "gaik[vector-store]"
 
 # Audio/video transcription (Whisper + GPT enhancement)
 pip install "gaik[transcriber]"
@@ -266,6 +273,7 @@ At solution level, a template or SolutionWizardSpec can express these as **servi
 Explore the examples included in the repository:
 
 - Building‑block level examples: `examples/building_blocks/`
+- RAG building‑block examples: `examples/building_blocks/RAG/`
 - Software component examples: `examples/software_components/`
 - Demos and experiments: `demo/`
 

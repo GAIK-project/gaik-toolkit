@@ -6,4 +6,6 @@ __all__ = [
     "transcriber",
     "parsers",
     "doc_classifier",
+    "RAG",
+    "agents",
 ]
