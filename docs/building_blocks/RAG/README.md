@@ -15,4 +15,4 @@ contract based on `langchain_core.documents.Document`.
 - **answer_generator**: Generate answers from retrieved context with optional
   citations and conversation history.
 
-See each subfolder for a full README and usage examples.
+See the files in this folder for full READMEs and usage examples.
