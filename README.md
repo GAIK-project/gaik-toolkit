@@ -15,7 +15,8 @@ The toolkit focuses on three core knowledge processes in organizational workflow
 Internally, these capabilities are exposed as:
 
 - **Building blocks** – atomic utilities such as `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`
-- **Software components** – opinionated end‑to‑end pipelines such as “audio → structured data” and “documents → structured data”
+- **RAG building blocks** – `rag_parser_docling`, `rag_parser_vision`, `embedder`, `vector_store`, `retriever`, `answer_generator`, `rag_agent`
+- **Software components** – opinionated end‑to‑end pipelines such as “audio → structured data”, “documents → structured data”, and “RAG workflow”
 
 This repository is the **implementation layer** that the broader GAIK vision builds on. Solution templates, wizards and organization‑specific workflows can all be composed from these blocks.
 
@@ -81,12 +82,22 @@ pip install "gaik[extract]"
 # Document parsing (vision-based + local parsers)
 pip install "gaik[parser]"
 
+# RAG parsing (chunked outputs)
+pip install "gaik[rag-parser-docling]"
+pip install "gaik[rag-parser-vision]"
+pip install "gaik[embedder]"
+pip install "gaik[vector-store]"
+pip install "gaik[retriever]"
+pip install "gaik[answer-generator]"
+pip install "gaik[rag-agent]"
+
 # Audio/video transcription (Whisper + GPT enhancement)
 pip install "gaik[transcriber]"
 
 # Software components (pipelines)
 pip install "gaik[audio-to-structured-data]"
 pip install "gaik[documents-to-structured-data]"
+pip install "gaik[rag-workflow]"
 
 # Everything
 pip install "gaik[all]"
@@ -232,6 +243,15 @@ A generic pattern that:
 
 These pipelines are what higher‑level templates (e.g. “Incident Reporting (Voice → Structured Report)”, “Invoice PDF → Structured Invoice Record”) will bind to.
 
+### RAG Workflow
+
+A retrieval‑augmented pipeline that:
+
+1. Parses documents into structured chunks (Docling + vision)
+2. Generates embeddings and stores them in a vector database (Chroma)
+3. Retrieves top‑k relevant chunks for a query
+4. Produces a cited answer from retrieved context
+
 ---
 
 ## Configuration & environment variables
@@ -271,6 +291,7 @@ At solution level, a template or SolutionWizardSpec can express these as **servi
 Explore the examples included in the repository:
 
 - Building‑block level examples: `examples/building_blocks/`
+- RAG building‑block examples: `examples/building_blocks/RAG/`
 - Software component examples: `examples/software_components/`
 - Demos and experiments: `demo/`
 
