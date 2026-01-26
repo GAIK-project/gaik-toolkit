@@ -33,6 +33,21 @@ spec:
                 secretKeyRef:
                   name: gaik-demo-api-auth
                   key: API_PASSWORD
+            - name: NEXT_PUBLIC_SUPABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-supabase
+                  key: NEXT_PUBLIC_SUPABASE_URL
+            - name: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-supabase
+                  key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+            - name: SUPABASE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-supabase
+                  key: SUPABASE_SECRET_KEY
           resources:
             requests:
               cpu: 100m

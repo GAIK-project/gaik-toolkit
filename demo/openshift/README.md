@@ -56,11 +56,14 @@ docker push image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo:latest
 
 ### Frontend (gaik-demo)
 
-| Variable       | Description         | Source                                 |
-| -------------- | ------------------- | -------------------------------------- |
-| `BACKEND_URL`  | Internal API URL    | Hardcoded: `http://gaik-demo-api:8000` |
-| `API_USERNAME` | Basic Auth username | Secret: `gaik-demo-api-auth`           |
-| `API_PASSWORD` | Basic Auth password | Secret: `gaik-demo-api-auth`           |
+| Variable                               | Description          | Source                                 |
+| -------------------------------------- | -------------------- | -------------------------------------- |
+| `BACKEND_URL`                          | Internal API URL     | Hardcoded: `http://gaik-demo-api:8000` |
+| `API_USERNAME`                         | Basic Auth username  | Secret: `gaik-demo-api-auth`           |
+| `API_PASSWORD`                         | Basic Auth password  | Secret: `gaik-demo-api-auth`           |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Secret: `gaik-demo-supabase`           |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key    | Secret: `gaik-demo-supabase`           |
+| `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |
 
 ### Backend (gaik-demo-api)
 
