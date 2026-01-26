@@ -2,6 +2,10 @@
 .env*
 !.env.example
 
+# OpenShift secrets (never commit real secrets!)
+**/secrets.yaml
+!**/secrets.yaml.example
+
 # Internal documentation (contains internal URLs)
 api/USAGE.md
 # Python
