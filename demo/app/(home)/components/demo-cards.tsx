@@ -15,6 +15,7 @@ import {
   FileSearch,
   FileText,
   FolderKanban,
+  Library,
   type LucideIcon,
   Mic,
   Sparkles,
@@ -38,6 +39,13 @@ const demos: Demo[] = [
     href: "/incident-report",
     icon: AlertTriangle,
     featured: true,
+  },
+  {
+    title: "RAG Builder",
+    description:
+      "Index PDF documents and ask questions with AI-powered citations",
+    href: "/rag",
+    icon: Library,
   },
   {
     title: "Data Extraction",

@@ -1,12 +1,12 @@
 ---
 name: gaik-toolkit
-version: "1.0.0"
+version: "1.1.0"
 description: |
   GAIK (Generative AI Knowledge Management Toolkit) development guidance.
   Use when working with: structured data extraction from documents/PDFs/audio,
   schema generation, document parsing (VisionParser, PyMuPDFParser, DoclingParser),
   audio transcription with Whisper, document classification, or end-to-end pipelines
-  (AudioToStructuredData, DocumentsToStructuredData).
+  (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow).
 ---
 
 # GAIK Toolkit
@@ -17,7 +17,8 @@ Python toolkit for knowledge extraction, capture, and generation. Use when worki
 - Document parsing (PDF, DOCX, images)
 - Audio/video transcription with Whisper + GPT enhancement
 - Document classification
-- End-to-end pipelines: AudioToStructuredData, DocumentsToStructuredData
+- **RAG pipelines**: embedder, vector store, retriever, answer generator
+- End-to-end pipelines: AudioToStructuredData, DocumentsToStructuredData, **RAGWorkflow**
 
 ## Quick Links
 
@@ -51,6 +52,17 @@ pip install "gaik[classifier]"
 # Software components (pipelines)
 pip install "gaik[audio-to-structured-data]"
 pip install "gaik[documents-to-structured-data]"
+
+# RAG building blocks
+pip install "gaik[embedder]"
+pip install "gaik[vector-store]"
+pip install "gaik[retriever]"
+pip install "gaik[answer-generator]"
+pip install "gaik[rag-parser-docling]"
+pip install "gaik[rag-parser-vision]"
+
+# RAG workflow (full RAG pipeline)
+pip install "gaik[rag-workflow]"
 
 # Everything with GPU support
 pip install "gaik[all]"
@@ -202,6 +214,95 @@ result = classifier.classify(
 # Returns: {"filename.pdf": {"class": "invoice", "confidence": 0.95, "reasoning": "..."}}
 ```
 
+### RAG Building Blocks
+
+#### Embedder (Text Embeddings)
+
+```python
+from gaik.building_blocks.RAG.embedder import Embedder
+from gaik.building_blocks.config import get_openai_config
+
+config = get_openai_config(use_azure=True)
+embedder = Embedder(config=config, model="text-embedding-3-large")
+
+# Embed documents
+embeddings, docs = embedder.embed(["Document text 1", "Document text 2"])
+
+# Embed a single query for search
+query_embedding = embedder.embed_query("What is the main topic?")
+```
+
+#### VectorStore (Embeddings Storage)
+
+```python
+from gaik.building_blocks.RAG.vector_store import VectorStore
+
+# In-memory storage
+store = VectorStore(persist=False)
+
+# Persistent Chroma storage
+store = VectorStore(
+    persist=True,
+    persist_path="chroma_store",
+    collection_name="my_collection"
+)
+
+# Add documents and embeddings
+store.add(documents, embeddings)
+
+# Search by query embedding
+results = store.search(query_embedding, top_k=5)
+# Returns: [(Document, score), ...]
+```
+
+#### Retriever (Semantic + Hybrid Search)
+
+```python
+from gaik.building_blocks.RAG.retriever import Retriever
+
+retriever = Retriever(
+    embedder=embedder,
+    vector_store=store,
+    hybrid_search=True,  # Combine vector + BM25
+    re_rank=True,        # Cross-encoder reranking
+    top_k=5,
+)
+
+documents = retriever.search(
+    "What are the key findings?",
+    include_scores=True
+)
+```
+
+#### AnswerGenerator (RAG Response)
+
+```python
+from gaik.building_blocks.RAG.answer_generator import AnswerGenerator
+
+generator = AnswerGenerator(
+    config=config,
+    citations=True,   # Include [document, page] citations
+    stream=True,      # Stream response tokens
+)
+
+answer = generator.generate("What is the summary?", documents, stream=False)
+# Or stream:
+for chunk in generator.generate("What is the summary?", documents, stream=True):
+    print(chunk, end="")
+```
+
+#### VisionRagParser (PDF to RAG Chunks)
+
+```python
+from gaik.building_blocks.RAG.rag_parser_vision import VisionRagParser
+
+parser = VisionRagParser(vision_config=config)
+
+# Get LangChain Document chunks with vision-enhanced image descriptions
+chunks = parser.convert_pdf_to_chunks_with_vision("document.pdf")
+# Each chunk has: page_content, metadata (source, document_name, page_number, heading)
+```
+
 ## Software Components (End-to-End Pipelines)
 
 ### AudioToStructuredData
@@ -249,6 +350,42 @@ print(result.extracted_fields)
 - `pymupdf` - Fast local extraction
 - `docx` - Word documents
 
+### RAGWorkflow
+
+End-to-end RAG: PDF -> Parse -> Embed -> Store -> Retrieve -> Answer:
+
+```python
+from gaik.software_components.RAG_workflow import RAGWorkflow
+
+# Initialize workflow
+workflow = RAGWorkflow(
+    use_azure=True,
+    persist=True,                 # Use Chroma for persistence
+    persist_path="chroma_store",
+    retriever_top_k=5,
+    retriever_hybrid=False,       # Enable hybrid search
+    retriever_rerank=False,       # Enable cross-encoder reranking
+    citations=True,               # Include citations in answers
+    stream=True,                  # Stream responses
+)
+
+# Index documents (parses PDF, creates embeddings, stores in vector DB)
+index_result = workflow.index_documents(["doc1.pdf", "doc2.pdf"])
+print(f"Indexed {index_result.num_documents} docs, {index_result.num_chunks} chunks")
+
+# Ask questions with RAG
+result = workflow.ask("What are the key findings?", stream=False)
+print(result.answer)
+
+# Access retrieved source documents
+for doc in result.documents:
+    print(f"Source: {doc.metadata['document_name']}, Page: {doc.metadata['page_number']}")
+
+# Stream the answer
+for chunk in workflow.ask("Summarize the main points", stream=True).answer:
+    print(chunk, end="")
+```
+
 ### Schema Persistence
 
 Save and reuse schemas across runs:
@@ -276,13 +413,13 @@ if existing:
 
 | Level | Concept | Examples |
 |-------|---------|----------|
-| **Service** | Logical capability | `speech_to_text`, `document_parsing`, `information_extraction` |
-| **Building block** | Atomic toolkit class/function | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser` |
-| **Software component** | Composed, workflow-ready unit | `AudioToStructuredData`, `DocumentsToStructuredData` |
+| **Service** | Logical capability | `speech_to_text`, `document_parsing`, `information_extraction`, `rag` |
+| **Building block** | Atomic toolkit class/function | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `Embedder`, `VectorStore`, `Retriever`, `AnswerGenerator` |
+| **Software component** | Composed, workflow-ready unit | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow` |
 
 ## Maintenance Notes
 
-This skill is designed for gaik-toolkit v0.2.x. Update when:
+This skill is designed for gaik-toolkit v0.3.x. Update when:
 - New building blocks or software components are added
 - Import paths change in `src/gaik/`
 - Major API changes occur

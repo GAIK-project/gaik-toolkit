@@ -8,6 +8,7 @@ import {
   FileSearch,
   FileText,
   Home,
+  Library,
   LucideIcon,
   Menu,
   Mic,
@@ -37,6 +38,7 @@ import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
 const navItems = [
   { label: "Home", href: "/", icon: Home },
   { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
+  { label: "RAG Builder", href: "/rag", icon: Library },
   { label: "Extractor", href: "/extractor", icon: FileSearch },
   { label: "Parser", href: "/parser", icon: FileText },
   { label: "Classifier", href: "/classifier", icon: Tags },

@@ -16,7 +16,7 @@ load_dotenv(env_path)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import classifier, extractor, parser, pipeline, transcriber
+from routers import classifier, extractor, parser, pipeline, rag, transcriber
 
 
 @asynccontextmanager
@@ -55,6 +55,7 @@ app.include_router(classifier.router, prefix="/classify", tags=["Classifier"])
 app.include_router(extractor.router, prefix="/extract", tags=["Extractor"])
 app.include_router(transcriber.router, prefix="/transcribe", tags=["Transcriber"])
 app.include_router(pipeline.router, prefix="/pipeline", tags=["Pipeline"])
+app.include_router(rag.router, prefix="/rag", tags=["RAG"])
 
 
 @app.get("/health")
@@ -76,5 +77,6 @@ async def root():
             "extract": "/extract - Data extraction",
             "transcribe": "/transcribe - Audio/video transcription",
             "pipeline": "/pipeline - End-to-end pipelines (audio/document to structured data)",
+            "rag": "/rag - RAG pipeline (document indexing and Q&A with citations)",
         },
     }
