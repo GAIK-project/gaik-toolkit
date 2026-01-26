@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useActionState } from "react";
 import { Loader2 } from "lucide-react";
-import { useAuthForm } from "../hooks/use-auth-form";
+import { signUp, type AuthResult } from "../actions";
 import { AuthShell } from "../components/auth-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,8 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
 
+const initialState: AuthResult = {};
+
 export default function SignUpPage() {
-  const { isSubmitting, isDone, handleSubmit } = useAuthForm(1100);
+  const [state, formAction, isPending] = useActionState(signUp, initialState);
 
   return (
     <AuthShell
@@ -26,13 +29,20 @@ export default function SignUpPage() {
         </>
       }
     >
-      <form className="space-y-5" onSubmit={handleSubmit}>
-        {isDone && (
+      <form className="space-y-5" action={formAction}>
+        {state.success && (
           <Alert className="border-primary/20 bg-primary/5">
             <AlertTitle>Request received</AlertTitle>
             <AlertDescription>
               We will review your access request and reach out by email.
             </AlertDescription>
+          </Alert>
+        )}
+
+        {state.error && (
+          <Alert variant="destructive">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{state.error}</AlertDescription>
           </Alert>
         )}
 
@@ -46,7 +56,7 @@ export default function SignUpPage() {
               autoComplete="name"
               placeholder="Ava Johnson"
               required
-              disabled={isSubmitting}
+              disabled={isPending || state.success}
             />
           </Field>
 
@@ -59,7 +69,7 @@ export default function SignUpPage() {
               autoComplete="email"
               placeholder="ava@company.com"
               required
-              disabled={isSubmitting}
+              disabled={isPending || state.success}
             />
           </Field>
 
@@ -72,7 +82,8 @@ export default function SignUpPage() {
               autoComplete="new-password"
               placeholder="Create a password"
               required
-              disabled={isSubmitting}
+              minLength={6}
+              disabled={isPending || state.success}
             />
           </Field>
 
@@ -86,7 +97,7 @@ export default function SignUpPage() {
               type="text"
               autoComplete="organization"
               placeholder="Company name"
-              disabled={isSubmitting}
+              disabled={isPending || state.success}
             />
           </Field>
 
@@ -99,13 +110,18 @@ export default function SignUpPage() {
               name="useCase"
               placeholder="Tell us what you want to build with GAIK Toolkit."
               rows={3}
-              disabled={isSubmitting}
+              className="max-h-32 resize-none overflow-y-auto"
+              disabled={isPending || state.success}
             />
           </Field>
         </FieldGroup>
 
-        <Button className="w-full" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? (
+        <Button
+          className="w-full"
+          type="submit"
+          disabled={isPending || state.success}
+        >
+          {isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               Sending request...
@@ -115,9 +131,12 @@ export default function SignUpPage() {
           )}
         </Button>
 
-        <p className="text-center text-xs text-muted-foreground">
-          By requesting access, you agree that we can contact you about GAIK
-          Toolkit.
+        <p className="text-muted-foreground text-center text-xs">
+          By requesting access, you agree to our{" "}
+          <Link href="/privacy" className="hover:text-foreground underline">
+            Privacy Policy
+          </Link>
+          .
         </p>
       </form>
     </AuthShell>

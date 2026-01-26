@@ -51,7 +51,6 @@ export const metadata: Metadata = {
     images: ["/logos/gaik_logo_medium.png"],
   },
   icons: {
-    icon: "/logos/favicon.ico",
     apple: "/logos/gaik_logo_medium.png",
   },
 };

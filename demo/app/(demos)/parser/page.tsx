@@ -31,7 +31,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { FileText, Loader2 } from "lucide-react";
+import { FileText } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -188,14 +188,7 @@ export default function ParserPage() {
                 className="w-full"
                 size="lg"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Parsing...
-                  </>
-                ) : (
-                  "Read Document"
-                )}
+                {isLoading ? "Parsing..." : "Read Document"}
               </Button>
             </CardContent>
           </Card>

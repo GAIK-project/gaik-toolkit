@@ -71,7 +71,7 @@ export function ExamplePreviewDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+        <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -80,16 +80,16 @@ export function ExamplePreviewDialog({
             <DialogDescription>{exampleName}</DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 min-h-0 overflow-hidden rounded-md border bg-muted/30">
+          <div className="bg-muted/30 min-h-0 flex-1 overflow-hidden rounded-md border">
             {previewUrl ? (
               <iframe
                 src={previewUrl}
-                className="w-full h-[500px]"
+                className="h-[500px] w-full"
                 title="Document preview"
               />
             ) : (
-              <div className="flex items-center justify-center h-[500px]">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="flex h-[500px] items-center justify-center">
+                <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
               </div>
             )}
           </div>

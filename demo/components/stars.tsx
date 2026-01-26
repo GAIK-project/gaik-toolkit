@@ -48,11 +48,11 @@ function StarLayer({
       data-slot="star-layer"
       animate={{ y: [0, -2000] }}
       transition={transition}
-      className={cn("absolute top-0 left-0 w-full h-[2000px]", className)}
+      className={cn("absolute top-0 left-0 h-[2000px] w-full", className)}
       {...props}
     >
       <div
-        className="absolute bg-transparent rounded-full"
+        className="absolute rounded-full bg-transparent"
         style={{
           width: `${size}px`,
           height: `${size}px`,
@@ -60,7 +60,7 @@ function StarLayer({
         }}
       />
       <div
-        className="absolute bg-transparent rounded-full top-[2000px]"
+        className="absolute top-[2000px] rounded-full bg-transparent"
         style={{
           width: `${size}px`,
           height: `${size}px`,

@@ -5,21 +5,27 @@ import {
   DocumentList,
   type IndexedDocument,
 } from "@/components/demo/document-list";
-import { CitationCard, type Source } from "@/components/demo/citation-card";
+import { type Source } from "@/lib/types";
 import {
-  EmptyStateCard,
-  ResultCard,
-} from "@/components/demo/result-card";
-import { StepIndicator } from "@/components/demo/step-indicator";
+  ChatMessage as ChatMessageBubble,
+  StreamingMessage,
+} from "@/components/demo/chat-message";
+import { ChatInput } from "@/components/demo/chat-input";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -29,86 +35,57 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { parseSSEEvents, type SSEStep } from "@/lib/sse";
 import {
-  BookOpen,
-  ChevronDown,
-  ChevronUp,
+  FileText,
   Library,
   Loader2,
-  Search,
+  MessageSquare,
+  Plus,
   Settings2,
   Sparkles,
   Trash2,
   Upload,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
-interface SSEStep {
-  step: number;
-  name: string;
-  status: "pending" | "in_progress" | "completed" | "error";
-  message?: string;
-}
-
-interface SSEEvent {
-  type: string;
-  data: Record<string, unknown>;
-}
-
-function parseSSEEvents(text: string): SSEEvent[] {
-  const events: SSEEvent[] = [];
-  const lines = text.split("\n");
-  let currentEvent: { type?: string; data?: string } = {};
-
-  for (const line of lines) {
-    if (line.startsWith("event: ")) {
-      currentEvent.type = line.slice(7);
-    } else if (line.startsWith("data: ")) {
-      currentEvent.data = line.slice(6);
-    } else if (line === "" && currentEvent.type && currentEvent.data) {
-      try {
-        events.push({
-          type: currentEvent.type,
-          data: JSON.parse(currentEvent.data),
-        });
-      } catch {
-        // Skip invalid JSON
-      }
-      currentEvent = {};
-    }
-  }
-  return events;
-}
-
-interface QueryResult {
-  answer: string;
-  sources: Source[];
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  sources?: Source[];
+  timestamp: Date;
 }
 
 export default function RAGPage() {
   // Collection state
   const [collectionId, setCollectionId] = useState<string | null>(null);
-  const [indexedDocuments, setIndexedDocuments] = useState<IndexedDocument[]>([]);
+  const [indexedDocuments, setIndexedDocuments] = useState<IndexedDocument[]>(
+    [],
+  );
 
   // Upload state
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isIndexing, setIsIndexing] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
-  // Query state
-  const [question, setQuestion] = useState("");
+  // Chat state
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isQuerying, setIsQuerying] = useState(false);
-  const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
   const [streamingAnswer, setStreamingAnswer] = useState<string[]>([]);
+  const [streamingSources, setStreamingSources] = useState<Source[]>([]);
   const [querySteps, setQuerySteps] = useState<SSEStep[]>([]);
 
   // Settings state
-  const [showSettings, setShowSettings] = useState(false);
   const [topK, setTopK] = useState(5);
-  const [searchType, setSearchType] = useState<"semantic" | "hybrid">("semantic");
+  const [searchType, setSearchType] = useState<"semantic" | "hybrid">(
+    "semantic",
+  );
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return () => {
@@ -116,17 +93,26 @@ export default function RAGPage() {
     };
   }, []);
 
-  const hasDocuments = indexedDocuments.filter((d) => d.status === "indexed").length > 0;
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop =
+        chatContainerRef.current.scrollHeight;
+    }
+  }, [messages, streamingAnswer]);
+
+  const indexedCount = indexedDocuments.filter(
+    (d) => d.status === "indexed",
+  ).length;
+  const hasDocuments = indexedCount > 0;
 
   function handleFileSelect(file: File): void {
-    // Add to pending files if not already there
     if (!pendingFiles.some((f) => f.name === file.name)) {
       setPendingFiles([...pendingFiles, file]);
     }
   }
 
   function handleFileRemove(): void {
-    // Clear the most recent pending file
     setPendingFiles([]);
   }
 
@@ -138,7 +124,6 @@ export default function RAGPage() {
 
     setIsIndexing(true);
 
-    // Mark files as processing
     const processingDocs: IndexedDocument[] = pendingFiles.map((f) => ({
       filename: f.name,
       chunkCount: 0,
@@ -168,11 +153,11 @@ export default function RAGPage() {
 
       const data = await response.json();
 
-      // Update collection ID
       setCollectionId(data.collection_id);
 
-      // Update documents with results
-      const updatedDocs = [...indexedDocuments.filter((d) => d.status === "indexed")];
+      const updatedDocs = [
+        ...indexedDocuments.filter((d) => d.status === "indexed"),
+      ];
       for (const doc of data.documents) {
         updatedDocs.push({
           filename: doc.filename,
@@ -181,39 +166,50 @@ export default function RAGPage() {
         });
       }
       setIndexedDocuments(updatedDocs);
-
-      // Clear pending files
       setPendingFiles([]);
+      setUploadDialogOpen(false);
 
       if (data.status === "success") {
-        toast.success(`Indexed ${data.document_count} document(s) with ${data.chunk_count} chunks`);
+        toast.success(
+          `Indexed ${data.document_count} document(s) with ${data.chunk_count} chunks`,
+        );
       } else {
         toast.error("Some documents failed to index");
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
-      toast.error(error instanceof Error ? error.message : "Failed to index documents");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to index documents",
+      );
 
-      // Mark processing files as error
       setIndexedDocuments(
         indexedDocuments.map((d) =>
-          d.status === "processing" ? { ...d, status: "error" as const } : d
-        )
+          d.status === "processing" ? { ...d, status: "error" as const } : d,
+        ),
       );
     } finally {
       setIsIndexing(false);
     }
   }
 
-  async function handleQuery(): Promise<void> {
+  async function handleQuery(question: string): Promise<void> {
     if (!question.trim() || !collectionId || isQuerying) return;
 
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
+    // Add user message
+    const userMessage: ChatMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: question,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+
     setIsQuerying(true);
-    setQueryResult(null);
     setStreamingAnswer([]);
+    setStreamingSources([]);
     setQuerySteps([
       { step: 1, name: "Searching documents", status: "in_progress" },
       { step: 2, name: "Generating answer", status: "pending" },
@@ -257,18 +253,21 @@ export default function RAGPage() {
           } else if (event.type === "step_update") {
             const update = event.data as unknown as SSEStep;
             setQuerySteps((prev) =>
-              prev.map((s) => (s.step === update.step ? update : s))
+              prev.map((s) => (s.step === update.step ? update : s)),
             );
           } else if (event.type === "sources") {
-            sources = (event.data.sources as unknown as Array<{
-              document_name: string;
-              page_number: string | number | null;
-              relevance_score?: number | null;
-            }>).map((s) => ({
+            sources = (
+              event.data.sources as unknown as Array<{
+                document_name: string;
+                page_number: string | number | null;
+                relevance_score?: number | null;
+              }>
+            ).map((s) => ({
               documentName: s.document_name,
               pageNumber: s.page_number,
               relevanceScore: s.relevance_score,
             }));
+            setStreamingSources(sources);
           } else if (event.type === "answer_chunk") {
             const chunk = event.data.chunk as string;
             setStreamingAnswer((prev) => [...prev, chunk]);
@@ -281,21 +280,25 @@ export default function RAGPage() {
                 relevance_score?: number | null;
               }>;
             };
-            setQueryResult({
-              answer: result.answer,
+
+            // Add assistant message
+            const assistantMessage: ChatMessage = {
+              id: `assistant-${Date.now()}`,
+              role: "assistant",
+              content: result.answer,
               sources: result.sources.map((s) => ({
                 documentName: s.document_name,
                 pageNumber: s.page_number,
                 relevanceScore: s.relevance_score,
               })),
-            });
-            toast.success("Answer generated!");
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, assistantMessage]);
           } else if (event.type === "error") {
             throw new Error((event.data.message as string) || "Query failed");
           }
         }
 
-        // Clear processed events from buffer
         const lastEventEnd = buffer.lastIndexOf("\n\n");
         if (lastEventEnd !== -1) {
           buffer = buffer.slice(lastEventEnd + 2);
@@ -308,11 +311,14 @@ export default function RAGPage() {
         prev.map((s) =>
           s.status === "in_progress"
             ? { ...s, status: "error", message: "Failed" }
-            : s
-        )
+            : s,
+        ),
       );
     } finally {
       setIsQuerying(false);
+      setStreamingAnswer([]);
+      setStreamingSources([]);
+      setQuerySteps([]);
     }
   }
 
@@ -323,16 +329,17 @@ export default function RAGPage() {
       await fetch(`/api/rag/clear/${collectionId}`, { method: "DELETE" });
       setCollectionId(null);
       setIndexedDocuments([]);
-      setQueryResult(null);
-      setStreamingAnswer([]);
+      setMessages([]);
       toast.success("Collection cleared");
-    } catch (error) {
+    } catch {
       toast.error("Failed to clear collection");
     }
   }
 
   function handleRemoveDocument(filename: string): void {
-    setIndexedDocuments(indexedDocuments.filter((d) => d.filename !== filename));
+    setIndexedDocuments(
+      indexedDocuments.filter((d) => d.filename !== filename),
+    );
   }
 
   return (
@@ -340,294 +347,248 @@ export default function RAGPage() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
+      className="flex h-[calc(100vh-8rem)] flex-col"
     >
-      <header className="mb-8 pl-1">
-        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-          <Library className="text-primary h-8 w-8" />
-          RAG Builder
-        </h1>
-        <p className="text-muted-foreground mt-2 text-lg">
-          Index PDF documents and ask questions with AI-powered answers and citations.
-        </p>
-      </header>
+      {/* Header */}
+      <header className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Library className="text-primary h-7 w-7" />
+          <div>
+            <h1 className="font-serif text-2xl font-semibold tracking-tight">
+              RAG Builder
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              Ask questions about your documents
+            </p>
+          </div>
+        </div>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        {/* Left Column: Controls */}
-        <div className="space-y-6">
-          {/* Document Upload Card */}
-          <Card className="shadow-md">
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Upload className="h-5 w-5" />
-                    Document Upload
-                  </CardTitle>
-                  <CardDescription>
-                    Upload PDF files to index for RAG queries
-                  </CardDescription>
+        <div className="flex items-center gap-2">
+          {/* Document status badge */}
+          {hasDocuments && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  {indexedCount} doc{indexedCount !== 1 ? "s" : ""} indexed
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <div className="p-2">
+                  <DocumentList
+                    documents={indexedDocuments}
+                    onRemove={handleRemoveDocument}
+                    className="max-h-48 overflow-auto"
+                  />
                 </div>
-                {hasDocuments && (
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleClearCollection}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Clear all documents
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {/* Upload button */}
+          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Upload PDF
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Upload Documents
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <FileUpload
+                  accept=".pdf"
+                  maxSize={50}
+                  file={pendingFiles[0] || null}
+                  onFileSelect={handleFileSelect}
+                  onFileRemove={handleFileRemove}
+                  disabled={isIndexing}
+                />
+
+                {pendingFiles.length > 0 && (
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleClearCollection}
-                    className="text-destructive hover:text-destructive"
+                    onClick={handleIndexDocuments}
+                    disabled={isIndexing}
+                    className="w-full"
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Clear All
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    {isIndexing ? "Indexing..." : "Index Document"}
                   </Button>
                 )}
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FileUpload
-                accept=".pdf"
-                maxSize={50}
-                file={pendingFiles[0] || null}
-                onFileSelect={handleFileSelect}
-                onFileRemove={handleFileRemove}
-                disabled={isIndexing}
-              />
+            </DialogContent>
+          </Dialog>
 
-              {pendingFiles.length > 0 && (
-                <Button
-                  onClick={handleIndexDocuments}
-                  disabled={isIndexing}
-                  className="w-full"
-                >
-                  {isIndexing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Indexing...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Index Document{pendingFiles.length > 1 ? "s" : ""}
-                    </>
-                  )}
-                </Button>
-              )}
-
-              {indexedDocuments.length > 0 && (
-                <DocumentList
-                  documents={indexedDocuments}
-                  onRemove={handleRemoveDocument}
-                  className="pt-2"
-                />
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Question Card */}
-          <Card className="shadow-md">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
-                Ask a Question
-              </CardTitle>
-              <CardDescription>
-                Query your indexed documents with natural language
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="question">Your Question</Label>
-                <div className="relative">
-                  <Input
-                    id="question"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="What would you like to know about your documents?"
-                    disabled={!hasDocuments || isQuerying}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleQuery();
-                      }
-                    }}
-                    className="pr-10"
-                  />
-                  <Search className="text-muted-foreground absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                </div>
-              </div>
-
-              {/* Settings Toggle */}
-              <div className="border-muted rounded-lg border">
-                <button
-                  onClick={() => setShowSettings(!showSettings)}
-                  className="hover:bg-muted/50 flex w-full items-center justify-between p-3 text-sm font-medium transition-colors"
-                  type="button"
-                >
-                  <div className="flex items-center gap-2">
-                    <Settings2 className="text-muted-foreground h-4 w-4" />
-                    <span>Search Settings</span>
-                  </div>
-                  {showSettings ? (
-                    <ChevronUp className="text-muted-foreground h-4 w-4" />
-                  ) : (
-                    <ChevronDown className="text-muted-foreground h-4 w-4" />
-                  )}
-                </button>
-                <AnimatePresence>
-                  {showSettings && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden"
-                    >
-                      <div className="space-y-4 border-t p-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="topK">Results (Top K)</Label>
-                            <Select
-                              value={String(topK)}
-                              onValueChange={(v) => setTopK(Number(v))}
-                            >
-                              <SelectTrigger id="topK">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="3">3 chunks</SelectItem>
-                                <SelectItem value="5">5 chunks</SelectItem>
-                                <SelectItem value="10">10 chunks</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="searchType">Search Type</Label>
-                            <Select
-                              value={searchType}
-                              onValueChange={(v) =>
-                                setSearchType(v as "semantic" | "hybrid")
-                              }
-                            >
-                              <SelectTrigger id="searchType">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="semantic">Semantic</SelectItem>
-                                <SelectItem value="hybrid">Hybrid</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <p className="text-muted-foreground text-xs">
-                          {searchType === "semantic"
-                            ? "Uses vector similarity to find relevant content"
-                            : "Combines vector search with keyword matching (BM25)"}
-                        </p>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              <Button
-                onClick={handleQuery}
-                disabled={!hasDocuments || !question.trim() || isQuerying}
-                className="w-full"
-                size="lg"
-              >
-                {isQuerying ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Searching...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Get Answer
-                  </>
-                )}
+          {/* Settings */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Settings2 className="h-4 w-4" />
               </Button>
-
-              {!hasDocuments && (
-                <p className="text-muted-foreground text-center text-sm">
-                  Upload and index documents first to ask questions
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right Column: Results */}
-        <div className="space-y-4">
-          {isQuerying && (
-            <Card className="border-primary/20 overflow-hidden shadow-lg">
-              <CardContent className="pt-6">
-                <div className="flex flex-col gap-6">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-primary/10 flex h-12 w-12 items-center justify-center rounded-full">
-                      <Loader2 className="text-primary h-6 w-6 animate-spin" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">Searching...</h3>
-                      <p className="text-muted-foreground text-sm">
-                        Finding relevant information in your documents
-                      </p>
-                    </div>
-                  </div>
-
-                  {querySteps.length > 0 && (
-                    <div className="bg-muted/30 rounded-lg border p-4">
-                      <StepIndicator
-                        steps={querySteps.map((s) => ({
-                          id: String(s.step),
-                          name: s.name,
-                          status: s.status,
-                          message: s.message,
-                        }))}
-                        orientation="vertical"
-                      />
-                    </div>
-                  )}
-
-                  {streamingAnswer.length > 0 && (
-                    <div className="bg-muted/30 rounded-lg border p-4">
-                      <p className="text-muted-foreground mb-2 text-xs font-medium uppercase">
-                        Generating answer...
-                      </p>
-                      <div className="whitespace-pre-wrap text-sm">
-                        {streamingAnswer.join("")}
-                        <motion.span
-                          animate={{ opacity: [1, 0] }}
-                          transition={{ duration: 0.5, repeat: Infinity }}
-                          className="bg-primary ml-0.5 inline-block h-4 w-2"
-                        />
-                      </div>
-                    </div>
-                  )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="space-y-4 p-3">
+                <div className="space-y-2">
+                  <Label htmlFor="topK" className="text-xs">
+                    Results (Top K)
+                  </Label>
+                  <Select
+                    value={String(topK)}
+                    onValueChange={(v) => setTopK(Number(v))}
+                  >
+                    <SelectTrigger id="topK" className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">3 chunks</SelectItem>
+                      <SelectItem value="5">5 chunks</SelectItem>
+                      <SelectItem value="10">10 chunks</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                <div className="space-y-2">
+                  <Label htmlFor="searchType" className="text-xs">
+                    Search Type
+                  </Label>
+                  <Select
+                    value={searchType}
+                    onValueChange={(v) =>
+                      setSearchType(v as "semantic" | "hybrid")
+                    }
+                  >
+                    <SelectTrigger id="searchType" className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="semantic">Semantic</SelectItem>
+                      <SelectItem value="hybrid">Hybrid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  {searchType === "semantic"
+                    ? "Uses vector similarity"
+                    : "Combines vectors + keywords"}
+                </p>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
 
-          {queryResult && !isQuerying && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              <CitationCard
-                answer={queryResult.answer}
-                sources={queryResult.sources}
-              />
-            </motion.div>
-          )}
+      {/* Chat area */}
+      <div
+        ref={chatContainerRef}
+        className="bg-muted/20 flex-1 overflow-auto rounded-xl border p-4"
+      >
+        {/* Empty state */}
+        {messages.length === 0 && !isQuerying && (
+          <div className="flex h-full flex-col items-center justify-center text-center">
+            <div className="bg-muted mb-4 rounded-full p-4">
+              <MessageSquare className="text-muted-foreground h-8 w-8" />
+            </div>
+            <h3 className="text-lg font-medium">Start a conversation</h3>
+            <p className="text-muted-foreground mt-1 max-w-sm text-sm">
+              {hasDocuments
+                ? "Ask questions about your indexed documents and get AI-powered answers with citations."
+                : "Upload PDF documents first, then ask questions to get AI-powered answers."}
+            </p>
+            {!hasDocuments && (
+              <Button
+                onClick={() => setUploadDialogOpen(true)}
+                className="mt-4 gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                Upload your first document
+              </Button>
+            )}
+          </div>
+        )}
 
-          {!queryResult && !isQuerying && (
-            <EmptyStateCard
-              message={
-                hasDocuments
-                  ? "Ask a question to see AI-generated answers with citations"
-                  : "Upload and index PDF documents to get started"
-              }
+        {/* Messages */}
+        <div className="space-y-4">
+          {messages.map((message) => (
+            <ChatMessageBubble
+              key={message.id}
+              role={message.role}
+              content={message.content}
+              sources={message.sources}
+            />
+          ))}
+
+          {/* Streaming message */}
+          {isQuerying && streamingAnswer.length > 0 && (
+            <StreamingMessage
+              chunks={streamingAnswer}
+              sources={streamingSources}
             />
           )}
+
+          {/* Loading indicator */}
+          {isQuerying && streamingAnswer.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-3"
+            >
+              <div className="bg-muted text-muted-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+              <div className="bg-muted rounded-2xl px-4 py-3">
+                <div className="space-y-2">
+                  {querySteps.map((step) => (
+                    <div
+                      key={step.step}
+                      className={cn(
+                        "flex items-center gap-2 text-sm",
+                        step.status === "completed" && "text-green-600",
+                        step.status === "in_progress" && "text-primary",
+                        step.status === "error" && "text-destructive",
+                      )}
+                    >
+                      {step.status === "in_progress" && (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      )}
+                      <span>{step.name}</span>
+                      {step.message && (
+                        <span className="text-muted-foreground text-xs">
+                          ({step.message})
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
         </div>
+      </div>
+
+      {/* Input area */}
+      <div className="mt-4">
+        <ChatInput
+          onSubmit={handleQuery}
+          disabled={!hasDocuments}
+          isLoading={isQuerying}
+          placeholder={
+            hasDocuments
+              ? "Ask a question about your documents..."
+              : "Upload documents first to start asking questions"
+          }
+        />
       </div>
     </motion.div>
   );

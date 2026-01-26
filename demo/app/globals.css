@@ -213,46 +213,46 @@
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
   @keyframes ball {
-  from {
-    transform: rotate(0) translateY(-6.5em);
+    from {
+      transform: rotate(0) translateY(-6.5em);
     }
-  50% {
-    transform: rotate(180deg) translateY(-6em);
+    50% {
+      transform: rotate(180deg) translateY(-6em);
     }
-  to {
-    transform: rotate(360deg) translateY(-6.5em);
+    to {
+      transform: rotate(360deg) translateY(-6.5em);
     }
   }
   @keyframes ballInnerShadow {
-  from {
-    transform: rotate(0);
+    from {
+      transform: rotate(0);
     }
-  to {
-    transform: rotate(-360deg);
+    to {
+      transform: rotate(-360deg);
     }
   }
   @keyframes ballOuterShadow {
-  from {
-    transform: rotate(20deg);
+    from {
+      transform: rotate(20deg);
     }
-  to {
-    transform: rotate(-340deg);
+    to {
+      transform: rotate(-340deg);
     }
   }
   @keyframes ballTexture {
-  from {
-    transform: translateX(0);
+    from {
+      transform: translateX(0);
     }
-  to {
-    transform: translateX(50%);
+    to {
+      transform: translateX(50%);
     }
   }
   @keyframes trackCover {
-  from {
-    transform: rotate(0);
+    from {
+      transform: rotate(0);
     }
-  to {
-    transform: rotate(360deg);
+    to {
+      transform: rotate(360deg);
     }
   }
   --hu-font-geist: var(----hu-font-geist);
@@ -279,7 +279,7 @@
   --color-color-fd-background: var(----color-fd-background);
   --color-color-fd-card: var(----color-fd-card);
   --color-color-color-fd-card: var(----color-color-fd-card);
-  --color-color-color-fd-background: var(----color-color-fd-background)
+  --color-color-color-fd-background: var(----color-color-fd-background);
 }
 
 @layer base {
@@ -289,15 +289,6 @@
   body {
     @apply bg-background text-foreground font-sans;
     letter-spacing: var(--tracking-normal);
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
   }
 }
 

@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Sparkles, Tags } from "lucide-react";
+import { Sparkles, Tags } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -250,17 +250,8 @@ export default function ClassifierPage() {
                 className="w-full"
                 size="lg"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sorting...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Sort Document
-                  </>
-                )}
+                <Sparkles className="mr-2 h-4 w-4" />
+                {isLoading ? "Sorting..." : "Sort Document"}
               </Button>
             </CardContent>
           </Card>

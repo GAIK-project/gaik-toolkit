@@ -1,7 +1,13 @@
 "use client";
 
 import { motion, AnimatePresence } from "motion/react";
-import { FileText, CheckCircle, Loader2, AlertCircle, Trash2 } from "lucide-react";
+import {
+  FileText,
+  CheckCircle,
+  Loader2,
+  AlertCircle,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -17,7 +23,11 @@ interface DocumentListProps {
   className?: string;
 }
 
-export function DocumentList({ documents, onRemove, className }: DocumentListProps) {
+export function DocumentList({
+  documents,
+  onRemove,
+  className,
+}: DocumentListProps) {
   if (documents.length === 0) {
     return null;
   }
@@ -48,9 +58,12 @@ export function DocumentList({ documents, onRemove, className }: DocumentListPro
               transition={{ delay: index * 0.05 }}
               className={cn(
                 "flex items-center gap-3 rounded-lg border p-3",
-                doc.status === "indexed" && "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950",
-                doc.status === "processing" && "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950",
-                doc.status === "error" && "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950",
+                doc.status === "indexed" &&
+                  "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950",
+                doc.status === "processing" &&
+                  "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950",
+                doc.status === "error" &&
+                  "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950",
               )}
             >
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/50 dark:bg-black/20">
@@ -99,7 +112,10 @@ interface DocumentListCompactProps {
   className?: string;
 }
 
-export function DocumentListCompact({ documents, className }: DocumentListCompactProps) {
+export function DocumentListCompact({
+  documents,
+  className,
+}: DocumentListCompactProps) {
   const indexed = documents.filter((d) => d.status === "indexed").length;
   const processing = documents.filter((d) => d.status === "processing").length;
   const errors = documents.filter((d) => d.status === "error").length;

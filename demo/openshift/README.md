@@ -55,23 +55,25 @@ docker push image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo:latest
 ## Environment Variables
 
 ### Frontend (gaik-demo)
-| Variable | Description | Source |
-|----------|-------------|--------|
-| `BACKEND_URL` | Internal API URL | Hardcoded: `http://gaik-demo-api:8000` |
-| `API_USERNAME` | Basic Auth username | Secret: `gaik-demo-api-auth` |
-| `API_PASSWORD` | Basic Auth password | Secret: `gaik-demo-api-auth` |
+
+| Variable       | Description         | Source                                 |
+| -------------- | ------------------- | -------------------------------------- |
+| `BACKEND_URL`  | Internal API URL    | Hardcoded: `http://gaik-demo-api:8000` |
+| `API_USERNAME` | Basic Auth username | Secret: `gaik-demo-api-auth`           |
+| `API_PASSWORD` | Basic Auth password | Secret: `gaik-demo-api-auth`           |
 
 ### Backend (gaik-demo-api)
-| Variable | Description | Source |
-|----------|-------------|--------|
+
+| Variable         | Description                        | Source                       |
+| ---------------- | ---------------------------------- | ---------------------------- |
 | `OPENAI_API_KEY` | OpenAI API key (for transcription) | Secret: `gaik-demo-api-keys` |
 
 ## Files
 
-| File | Description |
-|------|-------------|
-| `deployment-frontend.yaml` | Frontend deployment (Next.js) |
-| `deployment-api.yaml` | Backend API deployment (FastAPI) |
-| `services.yaml` | ClusterIP services for both |
-| `route.yaml` | Public HTTPS route for frontend |
-| `secrets.yaml.example` | Example secrets template |
+| File                       | Description                      |
+| -------------------------- | -------------------------------- |
+| `deployment-frontend.yaml` | Frontend deployment (Next.js)    |
+| `deployment-api.yaml`      | Backend API deployment (FastAPI) |
+| `services.yaml`            | ClusterIP services for both      |
+| `route.yaml`               | Public HTTPS route for frontend  |
+| `secrets.yaml.example`     | Example secrets template         |

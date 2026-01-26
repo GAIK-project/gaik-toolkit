@@ -68,7 +68,10 @@ function Item({
 
   if (asChild) {
     return (
-      <Slot {...sharedProps} {...(props as React.ComponentProps<typeof Slot>)} />
+      <Slot
+        {...sharedProps}
+        {...(props as React.ComponentProps<typeof Slot>)}
+      />
     );
   }
 

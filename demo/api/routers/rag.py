@@ -223,6 +223,13 @@ async def query_rag(
             stream=False,
         )
 
+        # Handle empty results gracefully
+        if not result.documents:
+            return QueryResponse(
+                answer="I couldn't find any relevant information in the indexed documents to answer your question. Please try rephrasing your question or ensure the relevant documents have been indexed.",
+                sources=[],
+            )
+
         # Extract sources from retrieved documents
         sources: list[Source] = []
         for doc in result.documents:
@@ -287,7 +294,23 @@ async def query_rag_stream(
 
             # Convert to documents with optional hybrid/rerank
             from langchain_core.documents import Document
-            documents = [doc for doc, _score in results]
+            documents = [doc for doc, _score in results] if results else []
+
+            # Handle empty results gracefully
+            if not documents:
+                steps[0]["status"] = "completed"
+                steps[0]["message"] = "No relevant documents found"
+                yield sse_event("step_update", steps[0])
+                yield sse_event("sources", {"sources": []})
+
+                steps[1]["status"] = "completed"
+                yield sse_event("step_update", steps[1])
+
+                yield sse_event("result", {
+                    "answer": "I couldn't find any relevant information in the indexed documents to answer your question. Please try rephrasing your question or ensure the relevant documents have been indexed.",
+                    "sources": [],
+                })
+                return
 
             # Extract sources
             sources = []

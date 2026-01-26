@@ -410,7 +410,10 @@ function SidebarGroupLabel({
 
   if (asChild) {
     return (
-      <Slot {...sharedProps} {...(props as React.ComponentProps<typeof Slot>)} />
+      <Slot
+        {...sharedProps}
+        {...(props as React.ComponentProps<typeof Slot>)}
+      />
     );
   }
 
@@ -435,7 +438,10 @@ function SidebarGroupAction({
 
   if (asChild) {
     return (
-      <Slot {...sharedProps} {...(props as React.ComponentProps<typeof Slot>)} />
+      <Slot
+        {...sharedProps}
+        {...(props as React.ComponentProps<typeof Slot>)}
+      />
     );
   }
 
@@ -579,7 +585,10 @@ function SidebarMenuAction({
 
   if (asChild) {
     return (
-      <Slot {...sharedProps} {...(props as React.ComponentProps<typeof Slot>)} />
+      <Slot
+        {...sharedProps}
+        {...(props as React.ComponentProps<typeof Slot>)}
+      />
     );
   }
 

@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import { parseSSEEvents, type SSEStep } from "@/lib/sse";
 import {
   AlertTriangle,
   ChevronDown,
@@ -40,43 +41,6 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-
-interface SSEStep {
-  step: number;
-  name: string;
-  status: "pending" | "in_progress" | "completed" | "error";
-  message?: string;
-}
-
-interface SSEEvent {
-  type: string;
-  data: Record<string, unknown>;
-}
-
-function parseSSEEvents(text: string): SSEEvent[] {
-  const events: SSEEvent[] = [];
-  const lines = text.split("\n");
-  let currentEvent: { type?: string; data?: string } = {};
-
-  for (const line of lines) {
-    if (line.startsWith("event: ")) {
-      currentEvent.type = line.slice(7);
-    } else if (line.startsWith("data: ")) {
-      currentEvent.data = line.slice(6);
-    } else if (line === "" && currentEvent.type && currentEvent.data) {
-      try {
-        events.push({
-          type: currentEvent.type,
-          data: JSON.parse(currentEvent.data),
-        });
-      } catch {
-        // Skip invalid JSON
-      }
-      currentEvent = {};
-    }
-  }
-  return events;
-}
 
 const DEFAULT_INCIDENT_SCHEMA = `Extract the following from the incident report:
 - Incident date and time
@@ -556,17 +520,8 @@ export default function IncidentReportPage() {
                 className="w-full"
                 size="lg"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate Incident Report
-                  </>
-                )}
+                <Sparkles className="mr-2 h-4 w-4" />
+                {isLoading ? "Processing..." : "Generate Incident Report"}
               </Button>
             </CardContent>
           </Card>

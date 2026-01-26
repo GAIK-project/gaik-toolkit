@@ -92,7 +92,7 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
         "flex items-center font-medium transition",
         isDesktop
           ? "gap-2 text-sm"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground gap-3 rounded-lg px-3 py-2.5 text-sm"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground gap-3 rounded-lg px-3 py-2.5 text-sm",
       )}
     >
       <GitHubIcon className={isDesktop ? "h-4 w-4" : "h-5 w-5"} />
@@ -102,7 +102,12 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
 
   if (!preview) {
     return isDesktop ? (
-      <Button variant="outline" size="sm" asChild className="hidden shrink-0 sm:inline-flex">
+      <Button
+        variant="outline"
+        size="sm"
+        asChild
+        className="hidden shrink-0 sm:inline-flex"
+      >
         {linkContent}
       </Button>
     ) : (
@@ -114,7 +119,12 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
     <Glimpse>
       <GlimpseTrigger asChild>
         {isDesktop ? (
-          <Button variant="outline" size="sm" asChild className="hidden shrink-0 sm:inline-flex">
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="hidden shrink-0 sm:inline-flex"
+          >
             {linkContent}
           </Button>
         ) : (
@@ -122,7 +132,9 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
         )}
       </GlimpseTrigger>
       <GlimpseContent className="w-80">
-        {preview.image && <GlimpseImage src={preview.image} alt={preview.title || "GitHub"} />}
+        {preview.image && (
+          <GlimpseImage src={preview.image} alt={preview.title || "GitHub"} />
+        )}
         <GlimpseTitle>{preview.title || "GAIK Toolkit"}</GlimpseTitle>
         <GlimpseDescription>
           {preview.description || "AI-powered document processing toolkit"}

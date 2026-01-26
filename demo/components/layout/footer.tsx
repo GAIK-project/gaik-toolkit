@@ -1,4 +1,4 @@
-import { BookOpen } from "lucide-react";
+import { BookOpen, UserPlus } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -85,6 +85,14 @@ export function Footer({ githubPreview }: FooterProps) {
               <BookOpen className="h-3.5 w-3.5" />
               Docs
             </a>
+            <span className="text-border">|</span>
+            <Link
+              href="/sign-up"
+              className="hover:text-foreground flex items-center gap-1.5 transition-colors"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              Request Access
+            </Link>
           </nav>
         </div>
       </div>

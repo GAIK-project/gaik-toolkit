@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Database, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Database, Plus, Sparkles, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -373,17 +373,12 @@ export default function ExtractorPage() {
             className="w-full"
             size="lg"
           >
-            {isLoading || isParsing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {isParsing ? "Parsing document..." : "Extracting..."}
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Extract Data
-              </>
-            )}
+            <Sparkles className="mr-2 h-4 w-4" />
+            {isLoading || isParsing
+              ? isParsing
+                ? "Parsing document..."
+                : "Extracting..."
+              : "Extract Data"}
           </Button>
         </div>
 

@@ -1,19 +1,6 @@
 import type { ReactNode } from "react";
-import { FooterServer } from "@/components/layout/footer-server";
-import { SiteNavServer } from "@/components/layout/site-nav-server";
+import { MainLayout } from "@/components/layout/main-layout";
 
-export default async function DemosLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex min-h-screen flex-col">
-      <SiteNavServer />
-      <main className="mx-auto w-full max-w-6xl px-6 pt-24 pb-24 sm:px-8">
-        <div className="space-y-10">{children}</div>
-      </main>
-      <FooterServer />
-    </div>
-  );
+export default function DemosLayout({ children }: { children: ReactNode }) {
+  return <MainLayout contentWrapper="spaced">{children}</MainLayout>;
 }

@@ -1,27 +1,39 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE_NAME, type CookieToSet } from "./constants";
+
+// Protected demo routes that require approved access
+const PROTECTED_ROUTES = [
+  "/classifier",
+  "/extractor",
+  "/incident-report",
+  "/parser",
+  "/rag",
+  "/transcriber",
+];
+
+// Default route for authenticated users
+const DEFAULT_DEMO_ROUTE = PROTECTED_ROUTES[0];
+
+// Auth routes that should redirect logged-in users
+const AUTH_ROUTES = ["/sign-in", "/sign-up"];
+
+const BYPASS_AUTH = process.env.BYPASS_AUTH === "true";
+
+function isProtectedRoute(pathname: string): boolean {
+  return PROTECTED_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+}
+
+function isAuthRoute(pathname: string): boolean {
+  return AUTH_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
+}
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  let supabaseResponse = NextResponse.next({ request });
 
-  // Generate session ID for regular users if not exists
-  const existingSession = request.cookies.get(SESSION_COOKIE_NAME);
-  if (!existingSession) {
-    const sessionId = crypto.randomUUID();
-    supabaseResponse.cookies.set(SESSION_COOKIE_NAME, sessionId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 365, // 1 year
-      path: "/",
-    });
-  }
-
-  // With Fluid compute, don't put this client in a global environment
-  // variable. Always create a new one on each request.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
@@ -30,13 +42,11 @@ export async function updateSession(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet: CookieToSet[]) {
+        setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+          supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
           );
@@ -45,56 +55,63 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getClaims(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
+  const pathname = request.nextUrl.pathname;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  // IMPORTANT: If you remove getClaims() and you use server-side rendering
-  // with the Supabase client, your users may be randomly logged out.
-  try {
-    const { data } = await supabase.auth.getClaims();
-    const user = data?.claims;
-
-    // Protect admin routes
-    if (
-      request.nextUrl.pathname.startsWith("/admin") &&
-      !request.nextUrl.pathname.startsWith("/admin/login")
-    ) {
-      if (!user) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/admin/login";
-        return NextResponse.redirect(url);
-      }
+  // Handle protected demo routes
+  if (isProtectedRoute(pathname)) {
+    if (BYPASS_AUTH) {
+      return supabaseResponse;
     }
-  } catch (error) {
-    // Log error but allow request to proceed for public routes
-    console.error("Supabase auth check failed:", error);
 
-    // For admin routes, redirect to login when Supabase is unavailable
-    if (
-      request.nextUrl.pathname.startsWith("/admin") &&
-      !request.nextUrl.pathname.startsWith("/admin/login")
-    ) {
+    if (!user) {
       const url = request.nextUrl.clone();
-      url.pathname = "/admin/login";
-      url.searchParams.set("error", "service_unavailable");
+      url.pathname = "/sign-in";
       return NextResponse.redirect(url);
     }
-    // For public routes, continue without auth check
+
+    // Check access request status
+    const { data: accessRequest } = await supabase
+      .from("access_requests")
+      .select("status")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!accessRequest || accessRequest.status === "pending") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/access-pending";
+      return NextResponse.redirect(url);
+    }
+
+    if (accessRequest.status === "rejected") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/sign-in";
+      return NextResponse.redirect(url);
+    }
   }
 
-  // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
-  // creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
+  // Redirect logged-in users with approved access away from auth routes
+  if (isAuthRoute(pathname) && user) {
+    const { data: accessRequest } = await supabase
+      .from("access_requests")
+      .select("status")
+      .eq("user_id", user.id)
+      .single();
+
+    if (accessRequest?.status === "approved") {
+      const url = request.nextUrl.clone();
+      url.pathname = DEFAULT_DEMO_ROUTE;
+      return NextResponse.redirect(url);
+    }
+
+    if (accessRequest?.status === "pending") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/access-pending";
+      return NextResponse.redirect(url);
+    }
+  }
 
   return supabaseResponse;
 }

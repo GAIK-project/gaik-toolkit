@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Mic, Sparkles } from "lucide-react";
+import { Mic, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -202,17 +202,8 @@ export default function TranscriberPage() {
                 className="w-full"
                 size="lg"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Converting...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Transcribe
-                  </>
-                )}
+                <Sparkles className="mr-2 h-4 w-4" />
+                {isLoading ? "Converting..." : "Transcribe"}
               </Button>
             </CardContent>
           </Card>

@@ -30,7 +30,7 @@ export type GlimpseTitleProps = ComponentProps<"p">;
 
 export const GlimpseTitle = ({ className, ...props }: GlimpseTitleProps) => {
   return (
-    <p className={cn("truncate font-semibold text-sm", className)} {...props} />
+    <p className={cn("truncate text-sm font-semibold", className)} {...props} />
   );
 };
 
@@ -42,7 +42,7 @@ export const GlimpseDescription = ({
 }: GlimpseDescriptionProps) => {
   return (
     <p
-      className={cn("line-clamp-2 text-muted-foreground text-sm", className)}
+      className={cn("text-muted-foreground line-clamp-2 text-sm", className)}
       {...props}
     />
   );
@@ -60,7 +60,7 @@ export const GlimpseImage = ({
     alt={alt ?? ""}
     className={cn(
       "mb-4 aspect-[120/63] w-full rounded-md border object-cover",
-      className
+      className,
     )}
     {...props}
   />

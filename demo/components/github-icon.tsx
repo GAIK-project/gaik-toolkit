@@ -12,7 +12,7 @@ export function GitHubIcon({ className }: GitHubIconProps) {
       alt=""
       width={20}
       height={20}
-      className={cn("dark:invert-0 invert", className)}
+      className={cn("invert dark:invert-0", className)}
     />
   );
 }

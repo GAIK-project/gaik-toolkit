@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "scripts": {
-    "dev": "bun --bun next dev --port 3001",
+    "dev": "bun --bun next dev",
     "dev:api": "cd api && uvicorn main:app --reload --port 8000",
     "dev:all": "concurrently --names \"next,api\" -c \"cyan,magenta\" \"bun dev\" \"bun dev:api\"",
     "build": "bun --bun next build",
@@ -41,6 +41,8 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.91.1",
     "@tsparticles/engine": "^3.9.1",
     "@tsparticles/react": "^3.0.0",
     "@tsparticles/slim": "^3.9.1",

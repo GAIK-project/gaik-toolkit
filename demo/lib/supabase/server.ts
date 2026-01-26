@@ -1,12 +1,11 @@
-import { createServerClient as createSsrServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import type { CookieToSet } from "./constants";
 
-export async function createServerClient() {
+export async function createClient() {
   const cookieStore = await cookies();
 
-  return createSsrServerClient(
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
@@ -14,29 +13,17 @@ export async function createServerClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet: CookieToSet[]) {
+        setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options),
             );
           } catch {
-            // Server Component context - cookies cannot be set, this is expected behavior
+            // Server Component context - ignored, proxy handles refresh
           }
         },
       },
     },
-  );
-}
-
-/**
- * Create a Supabase client without cookies for use inside "use cache" functions.
- * This client uses the anon key and does not require request context.
- * Use this for read-only public data that can be cached.
- */
-export function createCacheableClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
   );
 }
 
@@ -50,10 +37,14 @@ export function createServiceClient() {
     throw new Error("SUPABASE_SECRET_KEY is not set");
   }
 
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serviceRoleKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
     },
-  });
+  );
 }

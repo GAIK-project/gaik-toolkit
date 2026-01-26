@@ -28,11 +28,11 @@ export function AuthBackdrop({ children }: AuthBackdropProps) {
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute -left-32 top-24 z-1 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.18),transparent_60%)] blur-3xl"
+        className="pointer-events-none absolute top-24 -left-32 z-1 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.18),transparent_60%)] blur-3xl"
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute -bottom-24 -right-24 z-1 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(20,184,166,0.22),transparent_65%)] blur-3xl"
+        className="pointer-events-none absolute -right-24 -bottom-24 z-1 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(20,184,166,0.22),transparent_65%)] blur-3xl"
         aria-hidden="true"
       />
       <div className="relative z-10 min-h-screen">{children}</div>

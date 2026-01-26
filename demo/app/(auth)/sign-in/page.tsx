@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useActionState } from "react";
 import { Loader2 } from "lucide-react";
-import { useAuthForm } from "../hooks/use-auth-form";
+import { signIn, type AuthResult } from "../actions";
 import { AuthShell } from "../components/auth-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldLabel } from "@/components/ui/field";
 
+const initialState: AuthResult = {};
+
 export default function SignInPage() {
-  const { isSubmitting, isDone, handleSubmit } = useAuthForm(900);
+  const [state, formAction, isPending] = useActionState(signIn, initialState);
 
   return (
     <AuthShell
@@ -25,14 +28,11 @@ export default function SignInPage() {
         </>
       }
     >
-      <form className="space-y-5" onSubmit={handleSubmit}>
-        {isDone && (
-          <Alert className="border-primary/20 bg-primary/5">
-            <AlertTitle>Sign-in is almost ready</AlertTitle>
-            <AlertDescription>
-              Auth wiring is coming next. We will connect this flow to the
-              database soon.
-            </AlertDescription>
+      <form className="space-y-5" action={formAction}>
+        {state.error && (
+          <Alert variant="destructive">
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{state.error}</AlertDescription>
           </Alert>
         )}
 
@@ -45,7 +45,7 @@ export default function SignInPage() {
             autoComplete="email"
             placeholder="you@company.com"
             required
-            disabled={isSubmitting}
+            disabled={isPending}
           />
         </Field>
 
@@ -58,12 +58,12 @@ export default function SignInPage() {
             autoComplete="current-password"
             placeholder="********"
             required
-            disabled={isSubmitting}
+            disabled={isPending}
           />
         </Field>
 
-        <Button className="w-full" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? (
+        <Button className="w-full" type="submit" disabled={isPending}>
+          {isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               Signing in...
@@ -73,7 +73,7 @@ export default function SignInPage() {
           )}
         </Button>
 
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-center text-xs">
           Demo access is reviewed manually. We will notify you by email.
         </p>
       </form>

@@ -8,6 +8,7 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 - **Parser** - Parse PDFs and Word documents with multiple backends
 - **Classifier** - Classify documents into predefined categories
 - **Transcriber** - Transcribe audio/video with Whisper and GPT enhancement
+- **RAG Builder** - Build retrieval-augmented generation pipelines with document upload and Q&A
 
 ## Quick Start
 
@@ -15,7 +16,7 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 
 - Node.js 22+
 - Python 3.10+
-- pnpm
+- bun
 - OpenAI API key
 
 ### Development
@@ -23,7 +24,7 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 1. **Install frontend dependencies:**
 
 ```bash
-pnpm install
+bun install
 ```
 
 2. **Install API dependencies:**
@@ -43,7 +44,7 @@ export OPENAI_API_KEY=your-key-here
 
 ```bash
 # Terminal 1: Frontend
-pnpm dev
+bun dev
 
 # Terminal 2: API
 cd api
@@ -72,7 +73,8 @@ demo/
 │   ├── extractor/         # Extractor demo
 │   ├── parser/            # Parser demo
 │   ├── classifier/        # Classifier demo
-│   └── transcriber/       # Transcriber demo
+│   ├── transcriber/       # Transcriber demo
+│   └── rag/               # RAG Builder demo
 ├── api/                    # FastAPI backend
 │   ├── main.py            # API entry point
 │   └── routers/           # API endpoints
@@ -82,13 +84,14 @@ demo/
 
 ## API Endpoints
 
-| Endpoint      | Method | Description              |
-| ------------- | ------ | ------------------------ |
-| `/health`     | GET    | Health check             |
-| `/parse`      | POST   | Parse PDF/DOCX documents |
-| `/classify`   | POST   | Classify documents       |
-| `/extract`    | POST   | Extract structured data  |
-| `/transcribe` | POST   | Transcribe audio/video   |
+| Endpoint      | Method | Description                     |
+| ------------- | ------ | ------------------------------- |
+| `/health`     | GET    | Health check                    |
+| `/parse`      | POST   | Parse PDF/DOCX documents        |
+| `/classify`   | POST   | Classify documents              |
+| `/extract`    | POST   | Extract structured data         |
+| `/transcribe` | POST   | Transcribe audio/video          |
+| `/rag`        | POST   | RAG pipeline with SSE streaming |
 
 ## Tech Stack
 

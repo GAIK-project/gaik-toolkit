@@ -29,7 +29,8 @@ export function FileUpload({
   const [error, setError] = useState<string | null>(null);
 
   // Use controlled file if provided, otherwise use internal state
-  const selectedFile = controlledFile !== undefined ? controlledFile : internalFile;
+  const selectedFile =
+    controlledFile !== undefined ? controlledFile : internalFile;
 
   const validateFile = useCallback(
     (file: File): boolean => {
