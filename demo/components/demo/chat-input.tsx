@@ -1,7 +1,14 @@
+/**
+ * Simple chat input component.
+ *
+ * Note: For production use, prefer PromptInput from @/components/ai-elements/prompt-input
+ * which provides more features like file attachments, paste handling, and better accessibility.
+ *
+ * This component is kept as a simpler alternative for basic use cases.
+ */
 "use client";
 
 import { useRef, useState } from "react";
-import { motion } from "motion/react";
 import { Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -25,7 +32,7 @@ export function ChatInput({
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleSubmit = () => {
+  function handleSubmit(): void {
     const trimmed = value.trim();
     if (!trimmed || disabled || isLoading) return;
 
@@ -36,30 +43,30 @@ export function ChatInput({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-  };
+  }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>): void {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
-  };
+  }
 
-  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  function handleInput(e: React.ChangeEvent<HTMLTextAreaElement>): void {
     setValue(e.target.value);
 
     // Auto-resize textarea
     const textarea = e.target;
     textarea.style.height = "auto";
     textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
-  };
+  }
 
   const isDisabled = disabled || isLoading;
   const canSubmit = value.trim().length > 0 && !isDisabled;
 
   return (
     <div className={cn("relative", className)}>
-      <div className="bg-background focus-within:ring-ring flex items-end gap-2 rounded-2xl border p-2 shadow-sm focus-within:ring-2 focus-within:ring-offset-2">
+      <div className="focus-within:ring-ring flex items-end gap-2 rounded-2xl border bg-white p-2 shadow-sm focus-within:ring-2 focus-within:ring-offset-2">
         <Textarea
           ref={textareaRef}
           value={value}

@@ -1,3 +1,11 @@
+/**
+ * Simple chat message component with source citations.
+ *
+ * Note: For production use with AI SDK, prefer Message from @/components/ai-elements/message
+ * which provides markdown rendering, branch navigation, and better integration with useChat.
+ *
+ * This component is kept as a simpler alternative for basic chat UIs.
+ */
 "use client";
 
 import { useState } from "react";
@@ -30,7 +38,7 @@ export function ChatMessage({
   const [copied, setCopied] = useState(false);
   const isUser = role === "user";
 
-  const handleCopy = async () => {
+  async function handleCopy(): Promise<void> {
     try {
       await navigator.clipboard.writeText(content);
       setCopied(true);
@@ -39,7 +47,7 @@ export function ChatMessage({
     } catch {
       toast.error("Failed to copy");
     }
-  };
+  }
 
   // Group sources by document
   const groupedSources = sources.reduce<Record<string, Source[]>>(

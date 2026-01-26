@@ -91,7 +91,10 @@ class AnswerGenerator:
                 temperature=0.0,
             )
         )
-        answer = response.choices[0].message.content or ""
+        if not response or not response.choices:
+            answer = ""
+        else:
+            answer = response.choices[0].message.content or ""
         self._remember(query, answer)
         return answer
 
@@ -126,6 +129,8 @@ class AnswerGenerator:
                 )
             )
             for chunk in response:
+                if not chunk.choices:
+                    continue
                 delta = chunk.choices[0].delta.content
                 if delta:
                     collected.append(delta)

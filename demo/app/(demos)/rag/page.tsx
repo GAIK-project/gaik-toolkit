@@ -7,10 +7,29 @@ import {
 } from "@/components/demo/document-list";
 import { type Source } from "@/lib/types";
 import {
-  ChatMessage as ChatMessageBubble,
-  StreamingMessage,
-} from "@/components/demo/chat-message";
-import { ChatInput } from "@/components/demo/chat-input";
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import {
+  Message,
+  MessageContent,
+  MessageResponse,
+} from "@/components/ai-elements/message";
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputTextarea,
+  PromptInputFooter,
+  PromptInputSubmit,
+} from "@/components/ai-elements/prompt-input";
+import {
+  Sources,
+  SourcesTrigger,
+  SourcesContent,
+  Source as SourceItem,
+} from "@/components/ai-elements/sources";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -59,6 +78,21 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+/** Transforms API source format to local Source type */
+function transformSources(
+  apiSources: Array<{
+    document_name: string;
+    page_number: string | number | null;
+    relevance_score?: number | null;
+  }>,
+): Source[] {
+  return apiSources.map((s) => ({
+    documentName: s.document_name,
+    pageNumber: s.page_number,
+    relevanceScore: s.relevance_score,
+  }));
+}
+
 export default function RAGPage() {
   // Collection state
   const [collectionId, setCollectionId] = useState<string | null>(null);
@@ -85,21 +119,12 @@ export default function RAGPage() {
   );
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
     };
   }, []);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop =
-        chatContainerRef.current.scrollHeight;
-    }
-  }, [messages, streamingAnswer]);
 
   const indexedCount = indexedDocuments.filter(
     (d) => d.status === "indexed",
@@ -256,17 +281,13 @@ export default function RAGPage() {
               prev.map((s) => (s.step === update.step ? update : s)),
             );
           } else if (event.type === "sources") {
-            sources = (
+            sources = transformSources(
               event.data.sources as unknown as Array<{
                 document_name: string;
                 page_number: string | number | null;
                 relevance_score?: number | null;
-              }>
-            ).map((s) => ({
-              documentName: s.document_name,
-              pageNumber: s.page_number,
-              relevanceScore: s.relevance_score,
-            }));
+              }>,
+            );
             setStreamingSources(sources);
           } else if (event.type === "answer_chunk") {
             const chunk = event.data.chunk as string;
@@ -286,11 +307,7 @@ export default function RAGPage() {
               id: `assistant-${Date.now()}`,
               role: "assistant",
               content: result.answer,
-              sources: result.sources.map((s) => ({
-                documentName: s.document_name,
-                pageNumber: s.page_number,
-                relevanceScore: s.relevance_score,
-              })),
+              sources: transformSources(result.sources),
               timestamp: new Date(),
             };
             setMessages((prev) => [...prev, assistantMessage]);
@@ -347,7 +364,7 @@ export default function RAGPage() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="flex h-[calc(100vh-8rem)] flex-col"
+      className="flex h-[calc(100vh-12rem)] flex-col"
     >
       {/* Header */}
       <header className="mb-4 flex items-center justify-between">
@@ -490,51 +507,73 @@ export default function RAGPage() {
       </header>
 
       {/* Chat area */}
-      <div
-        ref={chatContainerRef}
-        className="bg-muted/20 flex-1 overflow-auto rounded-xl border p-4"
-      >
-        {/* Empty state */}
-        {messages.length === 0 && !isQuerying && (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="bg-muted mb-4 rounded-full p-4">
-              <MessageSquare className="text-muted-foreground h-8 w-8" />
-            </div>
-            <h3 className="text-lg font-medium">Start a conversation</h3>
-            <p className="text-muted-foreground mt-1 max-w-sm text-sm">
-              {hasDocuments
-                ? "Ask questions about your indexed documents and get AI-powered answers with citations."
-                : "Upload PDF documents first, then ask questions to get AI-powered answers."}
-            </p>
-            {!hasDocuments && (
-              <Button
-                onClick={() => setUploadDialogOpen(true)}
-                className="mt-4 gap-2"
-              >
-                <Upload className="h-4 w-4" />
-                Upload your first document
-              </Button>
-            )}
-          </div>
-        )}
+      <Conversation className="flex-1 rounded-xl border bg-white">
+        <ConversationContent className="p-4">
+          {/* Empty state */}
+          {messages.length === 0 && !isQuerying && (
+            <ConversationEmptyState
+              title="Start a conversation"
+              description={
+                hasDocuments
+                  ? "Ask questions about your indexed documents and get AI-powered answers with citations."
+                  : "Upload PDF documents first, then ask questions to get AI-powered answers."
+              }
+              icon={<MessageSquare className="h-8 w-8" />}
+            >
+              {!hasDocuments && (
+                <Button
+                  onClick={() => setUploadDialogOpen(true)}
+                  className="mt-4 gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload your first document
+                </Button>
+              )}
+            </ConversationEmptyState>
+          )}
 
-        {/* Messages */}
-        <div className="space-y-4">
+          {/* Messages */}
           {messages.map((message) => (
-            <ChatMessageBubble
-              key={message.id}
-              role={message.role}
-              content={message.content}
-              sources={message.sources}
-            />
+            <Message key={message.id} from={message.role}>
+              <MessageContent>
+                <MessageResponse>{message.content}</MessageResponse>
+                {message.sources && message.sources.length > 0 && (
+                  <Sources>
+                    <SourcesTrigger count={message.sources.length} />
+                    <SourcesContent>
+                      {message.sources.map((source, i) => (
+                        <SourceItem
+                          key={i}
+                          title={`${source.documentName}${source.pageNumber ? ` p.${source.pageNumber}` : ""}`}
+                        />
+                      ))}
+                    </SourcesContent>
+                  </Sources>
+                )}
+              </MessageContent>
+            </Message>
           ))}
 
           {/* Streaming message */}
           {isQuerying && streamingAnswer.length > 0 && (
-            <StreamingMessage
-              chunks={streamingAnswer}
-              sources={streamingSources}
-            />
+            <Message from="assistant">
+              <MessageContent>
+                <MessageResponse>{streamingAnswer.join("")}</MessageResponse>
+                {streamingSources.length > 0 && (
+                  <Sources>
+                    <SourcesTrigger count={streamingSources.length} />
+                    <SourcesContent>
+                      {streamingSources.map((source, i) => (
+                        <SourceItem
+                          key={i}
+                          title={`${source.documentName}${source.pageNumber ? ` p.${source.pageNumber}` : ""}`}
+                        />
+                      ))}
+                    </SourcesContent>
+                  </Sources>
+                )}
+              </MessageContent>
+            </Message>
           )}
 
           {/* Loading indicator */}
@@ -574,22 +613,30 @@ export default function RAGPage() {
               </div>
             </motion.div>
           )}
-        </div>
-      </div>
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
 
       {/* Input area */}
-      <div className="mt-4">
-        <ChatInput
-          onSubmit={handleQuery}
-          disabled={!hasDocuments}
-          isLoading={isQuerying}
-          placeholder={
-            hasDocuments
-              ? "Ask a question about your documents..."
-              : "Upload documents first to start asking questions"
-          }
-        />
-      </div>
+      <PromptInput onSubmit={({ text }) => handleQuery(text)} className="mt-4">
+        <PromptInputBody>
+          <PromptInputTextarea
+            placeholder={
+              hasDocuments
+                ? "Ask a question about your documents..."
+                : "Upload documents first to start asking questions"
+            }
+            disabled={!hasDocuments}
+          />
+        </PromptInputBody>
+        <PromptInputFooter>
+          <div />
+          <PromptInputSubmit
+            status={isQuerying ? "streaming" : "ready"}
+            disabled={!hasDocuments}
+          />
+        </PromptInputFooter>
+      </PromptInput>
     </motion.div>
   );
 }
