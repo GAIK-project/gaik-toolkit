@@ -3,7 +3,7 @@ name = "gaik"
 dynamic = ["version"]
 description = "General AI Kit - Reusable AI/ML components for Python"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "GAIK Project" }]
 keywords = [
@@ -26,7 +26,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -212,7 +211,7 @@ gaik = ["py.typed"]
 # Ruff linter/formatter settings (not installed, used when running `ruff check`)
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 extend-exclude = ["scripts"]  # Exclude CI/CD scripts from linting
 
 # Ruff lint rules configuration

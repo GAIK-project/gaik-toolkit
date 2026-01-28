@@ -33,7 +33,7 @@ jobs:
       matrix:
         # PRs: only Python 3.11 for fast feedback
         # Push to main/dev: full matrix
-        python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.11"]') || fromJSON('["3.10", "3.11", "3.12"]') }}
+        python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.11"]') || fromJSON('["3.11", "3.12"]') }}
 
     steps:
     - name: Checkout code
