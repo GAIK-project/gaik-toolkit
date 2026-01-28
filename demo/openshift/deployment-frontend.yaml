@@ -23,16 +23,11 @@ spec:
           env:
             - name: BACKEND_URL
               value: "http://gaik-demo-api:8000"
-            - name: API_USERNAME
+            - name: ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: gaik-demo-api-auth
-                  key: API_USERNAME
-            - name: API_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: gaik-demo-api-auth
-                  key: API_PASSWORD
+                  name: gaik-demo-admin
+                  key: ADMIN_PASSWORD
             - name: NEXT_PUBLIC_SUPABASE_URL
               valueFrom:
                 secretKeyRef:

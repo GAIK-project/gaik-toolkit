@@ -14,7 +14,6 @@ Templates for deploying GAIK Demo to CSC Rahti 2 (OpenShift).
         │
         ▼
   gaik-demo.2.rahtiapp.fi
-  (Basic Auth protected)
 ```
 
 ## Quick Deploy
@@ -59,17 +58,18 @@ docker push image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo:latest
 | Variable                               | Description          | Source                                 |
 | -------------------------------------- | -------------------- | -------------------------------------- |
 | `BACKEND_URL`                          | Internal API URL     | Hardcoded: `http://gaik-demo-api:8000` |
-| `API_USERNAME`                         | Basic Auth username  | Secret: `gaik-demo-api-auth`           |
-| `API_PASSWORD`                         | Basic Auth password  | Secret: `gaik-demo-api-auth`           |
+| `ADMIN_PASSWORD`                       | Admin dashboard auth | Secret: `gaik-demo-admin`              |
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Secret: `gaik-demo-supabase`           |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key    | Secret: `gaik-demo-supabase`           |
 | `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |
 
 ### Backend (gaik-demo-api)
 
-| Variable         | Description                        | Source                       |
-| ---------------- | ---------------------------------- | ---------------------------- |
-| `OPENAI_API_KEY` | OpenAI API key (for transcription) | Secret: `gaik-demo-api-keys` |
+| Variable            | Description           | Source                       |
+| ------------------- | --------------------- | ---------------------------- |
+| `AZURE_API_KEY`      | Azure OpenAI API key  | Secret: `gaik-demo-api-keys` |
+| `AZURE_ENDPOINT`     | Azure OpenAI endpoint | Secret: `gaik-demo-api-keys` |
+| `AZURE_API_VERSION`  | Azure API version     | Secret: `gaik-demo-api-keys` |
 
 ## Files
 

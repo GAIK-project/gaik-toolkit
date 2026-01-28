@@ -21,11 +21,23 @@ spec:
           ports:
             - containerPort: 8000
           env:
-            - name: OPENAI_API_KEY
+            - name: AZURE_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: gaik-demo-api-keys
-                  key: OPENAI_API_KEY
+                  key: AZURE_API_KEY
+                  optional: true
+            - name: AZURE_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_ENDPOINT
+                  optional: true
+            - name: AZURE_API_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_API_VERSION
                   optional: true
           resources:
             requests:
