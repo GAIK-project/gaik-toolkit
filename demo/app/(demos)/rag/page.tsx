@@ -76,15 +76,37 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-/** Remove inline citations like [tmp3aa44x65, page 1] - sources are shown in Sources component */
+/** Remove inline citations like [document_name, page 1] - sources are shown in Sources component */
 function removeCitations(text: string): string {
-  return text.replace(/\s*\[tmp[a-z0-9]+,?\s*page\s*\d+\]/gi, "").trim();
+  // Match patterns like [document_name, page 1] or [document_name, Page 1]
+  return text.replace(/\s*\[[^\]]+,\s*[Pp]age\s*\d+\]/g, "").trim();
 }
 
-/** Format source title for display */
+/** Format source title for display - makes document names more readable */
 function formatSourceTitle(source: Source): string {
-  const page = source.pageNumber ? ` p.${source.pageNumber}` : "";
-  return `${source.documentName}${page}`;
+  // Convert kebab-case/snake_case to readable title and truncate if too long
+  let name = source.documentName
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  // Truncate long names
+  if (name.length > 40) {
+    name = name.slice(0, 37) + "...";
+  }
+
+  const page = source.pageNumber ? `, sivu ${source.pageNumber}` : "";
+  return `${name}${page}`;
+}
+
+/** Deduplicate sources by document name + page number */
+function deduplicateSources(sources: Source[]): Source[] {
+  const seen = new Set<string>();
+  return sources.filter((s) => {
+    const key = `${s.documentName}-${s.pageNumber}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /** Transforms API source format to local Source type */
@@ -134,22 +156,42 @@ export default function RAGPage() {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount and verify collection exists
   useEffect(() => {
     const savedCollectionId = localStorage.getItem(STORAGE_KEYS.collectionId);
     const savedDocs = localStorage.getItem(STORAGE_KEYS.indexedDocuments);
 
     if (savedCollectionId) {
-      setCollectionId(savedCollectionId);
+      // Verify collection still exists on backend
+      fetch(`/api/rag/status/${savedCollectionId}`)
+        .then((res) => {
+          if (res.ok) {
+            setCollectionId(savedCollectionId);
+            if (savedDocs) {
+              try {
+                setIndexedDocuments(JSON.parse(savedDocs));
+              } catch {
+                // Invalid JSON, ignore
+              }
+            }
+          } else {
+            // Collection no longer exists, clear localStorage
+            localStorage.removeItem(STORAGE_KEYS.collectionId);
+            localStorage.removeItem(STORAGE_KEYS.indexedDocuments);
+            toast("Previous session expired. Please upload documents again.");
+          }
+        })
+        .catch(() => {
+          // Backend unreachable, don't restore state
+          localStorage.removeItem(STORAGE_KEYS.collectionId);
+          localStorage.removeItem(STORAGE_KEYS.indexedDocuments);
+        })
+        .finally(() => {
+          setIsHydrated(true);
+        });
+    } else {
+      setIsHydrated(true);
     }
-    if (savedDocs) {
-      try {
-        setIndexedDocuments(JSON.parse(savedDocs));
-      } catch {
-        // Invalid JSON, ignore
-      }
-    }
-    setIsHydrated(true);
   }, []);
 
   // Save to localStorage when state changes
@@ -620,12 +662,22 @@ export default function RAGPage() {
                 </MessageResponse>
                 {message.sources && message.sources.length > 0 && (
                   <Sources>
-                    <SourcesTrigger count={message.sources.length} />
-                    <SourcesContent>
-                      {message.sources.map((source, i) => (
-                        <SourceItem key={i} title={formatSourceTitle(source)} />
-                      ))}
-                    </SourcesContent>
+                    {(() => {
+                      const uniqueSources = deduplicateSources(message.sources);
+                      return (
+                        <>
+                          <SourcesTrigger count={uniqueSources.length} />
+                          <SourcesContent>
+                            {uniqueSources.map((source, i) => (
+                              <SourceItem
+                                key={i}
+                                title={formatSourceTitle(source)}
+                              />
+                            ))}
+                          </SourcesContent>
+                        </>
+                      );
+                    })()}
                   </Sources>
                 )}
               </MessageContent>
@@ -641,12 +693,22 @@ export default function RAGPage() {
                 </MessageResponse>
                 {streamingSources.length > 0 && (
                   <Sources>
-                    <SourcesTrigger count={streamingSources.length} />
-                    <SourcesContent>
-                      {streamingSources.map((source, i) => (
-                        <SourceItem key={i} title={formatSourceTitle(source)} />
-                      ))}
-                    </SourcesContent>
+                    {(() => {
+                      const uniqueSources = deduplicateSources(streamingSources);
+                      return (
+                        <>
+                          <SourcesTrigger count={uniqueSources.length} />
+                          <SourcesContent>
+                            {uniqueSources.map((source, i) => (
+                              <SourceItem
+                                key={i}
+                                title={formatSourceTitle(source)}
+                              />
+                            ))}
+                          </SourcesContent>
+                        </>
+                      );
+                    })()}
                   </Sources>
                 )}
               </MessageContent>
