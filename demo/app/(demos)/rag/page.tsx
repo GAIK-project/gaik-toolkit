@@ -30,6 +30,7 @@ import {
   SourcesContent,
   Source as SourceItem,
 } from "@/components/ai-elements/sources";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -53,12 +54,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import { parseSSEEvents, type SSEStep } from "@/lib/sse";
+import { parseSSEEvents } from "@/lib/sse";
 import {
   FileText,
   Library,
-  Loader2,
   MessageSquare,
   Plus,
   Settings2,
@@ -76,6 +75,17 @@ interface ChatMessage {
   content: string;
   sources?: Source[];
   timestamp: Date;
+}
+
+/** Remove inline citations like [tmp3aa44x65, page 1] - sources are shown in Sources component */
+function removeCitations(text: string): string {
+  return text.replace(/\s*\[tmp[a-z0-9]+,?\s*page\s*\d+\]/gi, "").trim();
+}
+
+/** Format source title for display */
+function formatSourceTitle(source: Source): string {
+  const page = source.pageNumber ? ` p.${source.pageNumber}` : "";
+  return `${source.documentName}${page}`;
 }
 
 /** Transforms API source format to local Source type */
@@ -116,7 +126,6 @@ export default function RAGPage() {
   const [isQuerying, setIsQuerying] = useState(false);
   const [streamingAnswer, setStreamingAnswer] = useState<string[]>([]);
   const [streamingSources, setStreamingSources] = useState<Source[]>([]);
-  const [querySteps, setQuerySteps] = useState<SSEStep[]>([]);
 
   // Settings state
   const [topK, setTopK] = useState(5);
@@ -279,10 +288,6 @@ export default function RAGPage() {
     setIsQuerying(true);
     setStreamingAnswer([]);
     setStreamingSources([]);
-    setQuerySteps([
-      { step: 1, name: "Searching documents", status: "in_progress" },
-      { step: 2, name: "Generating answer", status: "pending" },
-    ]);
 
     try {
       const formData = new FormData();
@@ -317,14 +322,7 @@ export default function RAGPage() {
         const events = parseSSEEvents(buffer);
 
         for (const event of events) {
-          if (event.type === "steps") {
-            setQuerySteps(event.data.steps as unknown as SSEStep[]);
-          } else if (event.type === "step_update") {
-            const update = event.data as unknown as SSEStep;
-            setQuerySteps((prev) =>
-              prev.map((s) => (s.step === update.step ? update : s)),
-            );
-          } else if (event.type === "sources") {
+          if (event.type === "sources") {
             sources = transformSources(
               event.data.sources as unknown as Array<{
                 document_name: string;
@@ -368,18 +366,10 @@ export default function RAGPage() {
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       toast.error(error instanceof Error ? error.message : "Query failed");
-      setQuerySteps((prev) =>
-        prev.map((s) =>
-          s.status === "in_progress"
-            ? { ...s, status: "error", message: "Failed" }
-            : s,
-        ),
-      );
     } finally {
       setIsQuerying(false);
       setStreamingAnswer([]);
       setStreamingSources([]);
-      setQuerySteps([]);
     }
   }
 
@@ -626,7 +616,9 @@ export default function RAGPage() {
           {messages.map((message) => (
             <Message key={message.id} from={message.role}>
               <MessageContent>
-                <MessageResponse>{message.content}</MessageResponse>
+                <MessageResponse>
+                  {removeCitations(message.content)}
+                </MessageResponse>
                 {message.sources && message.sources.length > 0 && (
                   <Sources>
                     <SourcesTrigger count={message.sources.length} />
@@ -634,7 +626,7 @@ export default function RAGPage() {
                       {message.sources.map((source, i) => (
                         <SourceItem
                           key={i}
-                          title={`${source.documentName}${source.pageNumber ? ` p.${source.pageNumber}` : ""}`}
+                          title={formatSourceTitle(source)}
                         />
                       ))}
                     </SourcesContent>
@@ -648,7 +640,9 @@ export default function RAGPage() {
           {isQuerying && streamingAnswer.length > 0 && (
             <Message from="assistant">
               <MessageContent>
-                <MessageResponse>{streamingAnswer.join("")}</MessageResponse>
+                <MessageResponse>
+                  {removeCitations(streamingAnswer.join(""))}
+                </MessageResponse>
                 {streamingSources.length > 0 && (
                   <Sources>
                     <SourcesTrigger count={streamingSources.length} />
@@ -656,7 +650,7 @@ export default function RAGPage() {
                       {streamingSources.map((source, i) => (
                         <SourceItem
                           key={i}
-                          title={`${source.documentName}${source.pageNumber ? ` p.${source.pageNumber}` : ""}`}
+                          title={formatSourceTitle(source)}
                         />
                       ))}
                     </SourcesContent>
@@ -673,33 +667,10 @@ export default function RAGPage() {
               animate={{ opacity: 1, y: 0 }}
               className="flex gap-3"
             >
-              <div className="bg-muted text-muted-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
-                <Loader2 className="h-4 w-4 animate-spin" />
-              </div>
               <div className="bg-muted rounded-2xl px-4 py-3">
-                <div className="space-y-2">
-                  {querySteps.map((step) => (
-                    <div
-                      key={step.step}
-                      className={cn(
-                        "flex items-center gap-2 text-sm",
-                        step.status === "completed" && "text-green-600",
-                        step.status === "in_progress" && "text-primary",
-                        step.status === "error" && "text-destructive",
-                      )}
-                    >
-                      {step.status === "in_progress" && (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      )}
-                      <span>{step.name}</span>
-                      {step.message && (
-                        <span className="text-muted-foreground text-xs">
-                          ({step.message})
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <Shimmer className="text-sm text-muted-foreground">
+                  Searching documents
+                </Shimmer>
               </div>
             </motion.div>
           )}
