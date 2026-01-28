@@ -8,13 +8,13 @@ import {
 } from "@/components/ui/card";
 import {
   AlertTriangle,
+  Bot,
   Database,
   Download,
   FileSearch,
   FileText,
   FileUp,
   FolderKanban,
-  Library,
   Lock,
   type LucideIcon,
   MessageSquareQuote,
@@ -61,8 +61,9 @@ const demos: Demo[] = [
     description:
       "Index PDF documents and ask questions with AI-powered citations",
     href: "/rag",
-    icon: Library,
+    icon: Bot,
     featured: true,
+    image: "/rag-builder-v1.png",
     featureList: [
       { label: "Upload PDFs", icon: FileUp },
       { label: "AI Search", icon: Search },
@@ -143,7 +144,7 @@ function FeaturedCard({
       </CardHeader>
 
       {demo.image && (
-        <CardContent className="overflow-hidden px-4">
+        <CardContent className="-mt-2 overflow-hidden px-4 pt-0">
           <div className="relative h-56 overflow-hidden rounded-lg lg:h-64">
             <Image
               src={demo.image}

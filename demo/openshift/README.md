@@ -67,9 +67,9 @@ docker push image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo:latest
 
 | Variable            | Description           | Source                       |
 | ------------------- | --------------------- | ---------------------------- |
-| `AZURE_API_KEY`      | Azure OpenAI API key  | Secret: `gaik-demo-api-keys` |
-| `AZURE_ENDPOINT`     | Azure OpenAI endpoint | Secret: `gaik-demo-api-keys` |
-| `AZURE_API_VERSION`  | Azure API version     | Secret: `gaik-demo-api-keys` |
+| `AZURE_API_KEY`     | Azure OpenAI API key  | Secret: `gaik-demo-api-keys` |
+| `AZURE_ENDPOINT`    | Azure OpenAI endpoint | Secret: `gaik-demo-api-keys` |
+| `AZURE_API_VERSION` | Azure API version     | Secret: `gaik-demo-api-keys` |
 
 ## Files
 

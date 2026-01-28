@@ -38,7 +38,7 @@ export function InstallSnippet() {
                 href="https://pypi.org/project/gaik/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 inline-flex h-auto flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all"
+                className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 inline-flex h-auto flex-1 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium shadow-xs transition-all"
               >
                 <Package className="h-4 w-4" />
                 PyPI Package
@@ -48,7 +48,7 @@ export function InstallSnippet() {
                 href="https://gaik-project.github.io/gaik-toolkit/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 inline-flex h-auto flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all"
+                className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 inline-flex h-auto flex-1 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium shadow-xs transition-all"
               >
                 <BookOpen className="h-4 w-4" />
                 Documentation

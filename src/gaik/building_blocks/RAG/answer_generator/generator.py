@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from typing import Iterable
+from collections.abc import Iterable
 
 from openai import APIError, APITimeoutError, RateLimitError
 
@@ -13,7 +13,6 @@ except ImportError:
     Document = None  # type: ignore[assignment]
 
 from gaik.building_blocks.config import create_openai_client, get_openai_config
-
 
 DEFAULT_PROMPT = (
     "You are a helpful assistant that answers questions using only the provided context.\n"

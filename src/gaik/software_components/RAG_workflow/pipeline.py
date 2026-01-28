@@ -4,9 +4,9 @@ RAG workflow: vision parser -> embedder -> vector store -> retriever -> answer g
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from gaik.building_blocks.config import get_openai_config
 from gaik.building_blocks.RAG.answer_generator import AnswerGenerator

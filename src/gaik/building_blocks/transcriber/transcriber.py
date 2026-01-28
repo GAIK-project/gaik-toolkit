@@ -135,7 +135,7 @@ class Transcriber:
     # ------------------------------------------------------------------
     def _generate_job_id(self, file_path: Path) -> str:
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        return hashlib.md5(f"{file_path.stem}_{timestamp}".encode("utf-8")).hexdigest()[:10]
+        return hashlib.md5(f"{file_path.stem}_{timestamp}".encode()).hexdigest()[:10]
 
     def _transcribe_input(self, input_path: Path, prompt: str) -> str:
         """

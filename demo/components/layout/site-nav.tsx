@@ -105,7 +105,7 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
         href={GITHUB_REPO_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-all sm:inline-flex"
+        className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-xs transition-all sm:inline-flex"
       >
         <GitHubIcon className="h-4 w-4" />
         GitHub
@@ -123,7 +123,7 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
             href={GITHUB_REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-all sm:inline-flex"
+            className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-xs transition-all sm:inline-flex"
           >
             <GitHubIcon className="h-4 w-4" />
             GitHub

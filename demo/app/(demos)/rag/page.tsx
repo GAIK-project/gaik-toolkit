@@ -56,8 +56,8 @@ import {
 } from "@/components/ui/select";
 import { parseSSEEvents } from "@/lib/sse";
 import {
+  Bot,
   FileText,
-  Library,
   MessageSquare,
   Plus,
   Settings2,
@@ -403,7 +403,7 @@ export default function RAGPage() {
       {/* Header */}
       <header className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Library className="text-primary h-7 w-7" />
+          <Bot className="text-primary h-7 w-7" />
           <div>
             <h1 className="font-serif text-2xl font-semibold tracking-tight">
               RAG Builder
@@ -624,10 +624,7 @@ export default function RAGPage() {
                     <SourcesTrigger count={message.sources.length} />
                     <SourcesContent>
                       {message.sources.map((source, i) => (
-                        <SourceItem
-                          key={i}
-                          title={formatSourceTitle(source)}
-                        />
+                        <SourceItem key={i} title={formatSourceTitle(source)} />
                       ))}
                     </SourcesContent>
                   </Sources>
@@ -648,10 +645,7 @@ export default function RAGPage() {
                     <SourcesTrigger count={streamingSources.length} />
                     <SourcesContent>
                       {streamingSources.map((source, i) => (
-                        <SourceItem
-                          key={i}
-                          title={formatSourceTitle(source)}
-                        />
+                        <SourceItem key={i} title={formatSourceTitle(source)} />
                       ))}
                     </SourcesContent>
                   </Sources>
@@ -668,7 +662,7 @@ export default function RAGPage() {
               className="flex gap-3"
             >
               <div className="bg-muted rounded-2xl px-4 py-3">
-                <Shimmer className="text-sm text-muted-foreground">
+                <Shimmer className="text-muted-foreground text-sm">
                   Searching documents
                 </Shimmer>
               </div>

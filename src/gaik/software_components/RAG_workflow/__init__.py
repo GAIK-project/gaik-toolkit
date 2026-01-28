@@ -1,6 +1,6 @@
 """RAG workflow software component."""
 
-from .pipeline import RAGWorkflow, RAGWorkflowResult, IndexResult
+from .pipeline import IndexResult, RAGWorkflow, RAGWorkflowResult
 
 __all__ = [
     "RAGWorkflow",

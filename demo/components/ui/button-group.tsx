@@ -36,10 +36,7 @@ function ButtonGroup({
   );
 }
 
-function ButtonGroupText({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
+function ButtonGroupText({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 from io import BytesIO
-from typing import TYPE_CHECKING, Optional, Any
+from typing import TYPE_CHECKING, Any
 
 # Patch transformers export for AutoProcessor before docling imports.
 try:
@@ -25,9 +25,6 @@ except Exception:
 
 if TYPE_CHECKING:
     from langchain_core.documents import Document
-    from docling.datamodel.base_models import InputFormat
-    from docling.datamodel.pipeline_options import PdfPipelineOptions
-    from docling.document_converter import DocumentConverter, PdfFormatOption
 
 # Note: All docling imports are deferred to __init__ to avoid
 # torch DLL loading issues on Windows at module import time
@@ -64,7 +61,7 @@ class VisionRagParser:
         enable_formula_enrichment: bool = True,
         num_threads: int = 4,
         verbose: bool = True,
-        vision_prompt: Optional[str] = None,
+        vision_prompt: str | None = None,
     ) -> None:
         """
         Initialize the VisionRagParser.
@@ -98,8 +95,8 @@ class VisionRagParser:
 
         # Initialize Docling with image extraction enabled
         from gaik.building_blocks.RAG.rag_parser_docling.parser import (
-            pick_accelerator,
             _build_ocr_options,
+            pick_accelerator,
         )
 
         device = pick_accelerator(verbose=verbose)
@@ -141,7 +138,7 @@ class VisionRagParser:
         )
 
     def convert_pdf_to_markdown_with_vision(
-        self, pdf_path: str, output_path: Optional[str] = None
+        self, pdf_path: str, output_path: str | None = None
     ) -> str:
         """
         Convert PDF to markdown with AI-generated image descriptions.
@@ -178,7 +175,7 @@ class VisionRagParser:
 
         return markdown_text
 
-    def convert_pdf_to_chunks_with_vision(self, pdf_path: str) -> list["Document"]:
+    def convert_pdf_to_chunks_with_vision(self, pdf_path: str) -> list[Document]:
         """
         Convert PDF to RAG chunks with AI-generated image descriptions.
 
@@ -420,7 +417,7 @@ class VisionRagParser:
             "Analyze this image from a document and provide a concise interpretation.\n\n"
             "**If this is a CHART, GRAPH, or DATA VISUALIZATION:**\n"
             "1. State the title and subtitle if visible\n"
-            "2. Provide a concise interpretation with key insights." 
+            "2. Provide a concise interpretation with key insights."
                 "The key insights should be sufficient to answer any question.\n\n"
             "**If this is a DIAGRAM or INFOGRAPHIC:**\n"
             "1. Provide a concise interpretation with key insights. "
@@ -438,7 +435,7 @@ class VisionRagParser:
 def parse_pdf_to_markdown_with_vision(
     pdf_path: str,
     vision_config: OpenAIConfig | dict,
-    output_path: Optional[str] = None,
+    output_path: str | None = None,
 ) -> str:
     """
     Convenience function to convert PDF to markdown with vision descriptions.
@@ -457,7 +454,7 @@ def parse_pdf_to_markdown_with_vision(
 
 def parse_pdf_to_chunks_with_vision(
     pdf_path: str, vision_config: OpenAIConfig | dict
-) -> list["Document"]:
+) -> list[Document]:
     """
     Convenience function to convert PDF to RAG chunks with vision descriptions.
 

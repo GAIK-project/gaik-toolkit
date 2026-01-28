@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import re
 from collections import OrderedDict
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 # Patch transformers export for AutoProcessor before docling imports.
 try:
@@ -176,7 +176,7 @@ class DoclingRagParser:
 
         return re.sub(pattern, replacement, md_text)
 
-    def convert_pdf_to_markdown(self, pdf_path: str, output_path: Optional[str] = None) -> str:
+    def convert_pdf_to_markdown(self, pdf_path: str, output_path: str | None = None) -> str:
         if output_path is None:
             pdf_name = os.path.splitext(os.path.basename(pdf_path))[0]
             output_path = os.path.join(os.path.dirname(pdf_path), f"{pdf_name}.md")
@@ -192,7 +192,7 @@ class DoclingRagParser:
 
     def convert_pdf_to_chunks_with_metadata(
         self, pdf_path: str
-    ) -> list["Document"]:
+    ) -> list[Document]:
         """
         Convert PDF to chunks with metadata including document name and page numbers.
         Returns a list of LangChain Document objects with metadata.
@@ -294,13 +294,13 @@ class DoclingRagParser:
         return langchain_docs
 
 
-def parse_pdf_to_markdown(pdf_path: str, output_path: Optional[str] = None) -> str:
+def parse_pdf_to_markdown(pdf_path: str, output_path: str | None = None) -> str:
     """Convenience wrapper for DoclingRagParser.convert_pdf_to_markdown."""
     parser = DoclingRagParser()
     return parser.convert_pdf_to_markdown(pdf_path, output_path=output_path)
 
 
-def parse_pdf_to_chunks_with_metadata(pdf_path: str) -> list["Document"]:
+def parse_pdf_to_chunks_with_metadata(pdf_path: str) -> list[Document]:
     """
     Convenience wrapper for DoclingRagParser.convert_pdf_to_chunks_with_metadata.
 
