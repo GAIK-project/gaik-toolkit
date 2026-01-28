@@ -171,6 +171,7 @@ all-cpu = [
     "gaik[classifier]",
     "gaik[audio-to-structured-data]",
     "gaik[documents-to-structured-data-cpu]",
+    "gaik[rag-workflow]",
 ]
 
 # Development tooling for maintainers only (pip install -e ".[dev]")
