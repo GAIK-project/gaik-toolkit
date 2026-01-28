@@ -84,9 +84,7 @@ export function AuthShell({
         </div>
 
         {footer && (
-          <div className="mt-6 text-center text-sm text-white/70">
-            {footer}
-          </div>
+          <div className="mt-6 text-center text-sm text-white/70">{footer}</div>
         )}
       </motion.div>
     </div>

@@ -1,11 +1,4 @@
-import {
-  Shield,
-  Database,
-  Eye,
-  Scale,
-  Mail,
-  Building2,
-} from "lucide-react";
+import { Shield, Database, Eye, Scale, Mail, Building2 } from "lucide-react";
 
 function Section({
   icon: Icon,
@@ -93,8 +86,8 @@ export function PrivacyContent() {
       <Section icon={Mail} title="Contact">
         <div className="space-y-1">
           <p>
-            <strong className="text-foreground">Project manager:</strong>{" "}
-            Anne Wuokko —{" "}
+            <strong className="text-foreground">Project manager:</strong> Anne
+            Wuokko —{" "}
             <a
               href="mailto:anne.wuokko@haaga-helia.fi"
               className="text-teal-600 hover:underline dark:text-teal-400"

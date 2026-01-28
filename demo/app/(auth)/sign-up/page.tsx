@@ -104,11 +104,7 @@ export default function SignUpPage() {
           </Field>
         </FieldGroup>
 
-        <Button
-          className="w-full"
-          type="submit"
-          disabled={isPending}
-        >
+        <Button className="w-full" type="submit" disabled={isPending}>
           {isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />

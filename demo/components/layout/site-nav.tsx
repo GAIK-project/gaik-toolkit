@@ -133,7 +133,12 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
         )}
       </GlimpseTrigger>
       <GlimpseContent className="w-80">
-        <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer" className="block text-inherit no-underline">
+        <a
+          href={GITHUB_REPO_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-inherit no-underline"
+        >
           {preview.image && (
             <GlimpseImage src={preview.image} alt={preview.title || "GitHub"} />
           )}
@@ -202,7 +207,9 @@ function MobileNav({ isActive, githubPreview, isLoggedIn }: MobileNavProps) {
                 type="button"
                 className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
                 onClick={async () => {
-                  const res = await fetch("/api/auth/sign-out", { method: "POST" });
+                  const res = await fetch("/api/auth/sign-out", {
+                    method: "POST",
+                  });
                   const data = await res.json();
                   if (data.redirectTo) {
                     window.location.href = data.redirectTo;
@@ -271,7 +278,9 @@ export function SiteNav({ githubPreview, isLoggedIn }: SiteNavProps) {
                 className="text-muted-foreground hover:text-foreground hidden gap-1.5 sm:inline-flex"
                 onClick={async (e) => {
                   e.preventDefault();
-                  const res = await fetch("/api/auth/sign-out", { method: "POST" });
+                  const res = await fetch("/api/auth/sign-out", {
+                    method: "POST",
+                  });
                   const data = await res.json();
                   if (data.redirectTo) {
                     window.location.href = data.redirectTo;
@@ -283,7 +292,11 @@ export function SiteNav({ githubPreview, isLoggedIn }: SiteNavProps) {
               </Button>
             </form>
           )}
-          <MobileNav isActive={isActive} githubPreview={githubPreview} isLoggedIn={isLoggedIn} />
+          <MobileNav
+            isActive={isActive}
+            githubPreview={githubPreview}
+            isLoggedIn={isLoggedIn}
+          />
         </div>
       </div>
     </header>
