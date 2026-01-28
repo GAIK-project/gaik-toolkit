@@ -9,6 +9,20 @@ import os
 from io import BytesIO
 from typing import TYPE_CHECKING, Optional, Any
 
+# Patch transformers export for AutoProcessor before docling imports.
+try:
+    import transformers as _tf
+
+    if not hasattr(_tf, "AutoProcessor"):
+        from transformers.models.auto.processing_auto import AutoProcessor as _AutoProcessor
+
+        _tf.AutoProcessor = _AutoProcessor
+        if hasattr(_tf, "__all__") and isinstance(_tf.__all__, list):
+            if "AutoProcessor" not in _tf.__all__:
+                _tf.__all__.append("AutoProcessor")
+except Exception:
+    pass
+
 if TYPE_CHECKING:
     from langchain_core.documents import Document
     from docling.datamodel.base_models import InputFormat
