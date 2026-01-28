@@ -4,7 +4,7 @@ import { updateSession } from "@/lib/supabase/proxy";
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|logos/).*)"],
 };
 
 function hasBody(method: string): boolean {
