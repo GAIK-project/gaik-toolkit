@@ -99,12 +99,26 @@ class RAGWorkflow:
             last_n=last_n,
         )
 
-    def index_documents(self, file_paths: list[str | Path]) -> IndexResult:
-        """Parse and index documents into the vector store."""
+    def index_documents(
+        self,
+        file_paths: list[str | Path],
+        *,
+        filenames: list[str] | None = None,
+    ) -> IndexResult:
+        """Parse and index documents into the vector store.
+
+        Args:
+            file_paths: List of paths to PDF files to index.
+            filenames: Optional list of original filenames (same order as file_paths).
+                       If provided, these names are used instead of extracting from paths.
+        """
         all_chunks: list[Document] = []
 
-        for file_path in file_paths:
-            chunks = self.parser.convert_pdf_to_chunks_with_vision(str(file_path))
+        for i, file_path in enumerate(file_paths):
+            doc_name = filenames[i] if filenames and i < len(filenames) else None
+            chunks = self.parser.convert_pdf_to_chunks_with_vision(
+                str(file_path), document_name=doc_name
+            )
             all_chunks.extend(chunks)
 
         embeddings, documents = self.embedder.embed(all_chunks)

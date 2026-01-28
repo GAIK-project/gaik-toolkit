@@ -163,9 +163,7 @@ class VisionRagParser:
         image_descriptions, _descriptions_by_page = self._describe_images(images_with_positions)
 
         markdown_text = result.document.export_to_markdown(image_mode="embedded")
-        markdown_text = self._replace_images_with_descriptions(
-            markdown_text, image_descriptions
-        )
+        markdown_text = self._replace_images_with_descriptions(markdown_text, image_descriptions)
 
         if output_path:
             with open(output_path, "w", encoding="utf-8") as f:
@@ -175,7 +173,9 @@ class VisionRagParser:
 
         return markdown_text
 
-    def convert_pdf_to_chunks_with_vision(self, pdf_path: str) -> list[Document]:
+    def convert_pdf_to_chunks_with_vision(
+        self, pdf_path: str, *, document_name: str | None = None
+    ) -> list[Document]:
         """
         Convert PDF to RAG chunks with AI-generated image descriptions.
 
@@ -187,6 +187,7 @@ class VisionRagParser:
 
         Args:
             pdf_path: Path to PDF file
+            document_name: Optional document name override (uses filename from path if not provided)
 
         Returns:
             List of LangChain Document objects with metadata
@@ -199,8 +200,7 @@ class VisionRagParser:
 
         if self.verbose:
             print(
-                f"Document parsing complete. Pages: "
-                f"{len(getattr(doc, 'pages', [])) or 'unknown'}"
+                f"Document parsing complete. Pages: {len(getattr(doc, 'pages', [])) or 'unknown'}"
             )
 
         images_with_positions = self._collect_images(doc)
@@ -226,7 +226,8 @@ class VisionRagParser:
             ) from exc
 
         chunker = HierarchicalChunker()
-        document_name = os.path.splitext(os.path.basename(pdf_path))[0]
+        # Use provided document_name or extract from path
+        doc_name = document_name or os.path.splitext(os.path.basename(pdf_path))[0]
         langchain_docs: list[Document] = []
         chunk_id = 0
 
@@ -235,8 +236,9 @@ class VisionRagParser:
                 chunk_text = chunk.text
                 chunk_dict = chunk.model_dump()
 
-                filename = document_name
-                if "meta" in chunk_dict and "origin" in chunk_dict["meta"]:
+                filename = doc_name
+                # Only use origin filename if document_name wasn't explicitly provided
+                if not document_name and "meta" in chunk_dict and "origin" in chunk_dict["meta"]:
                     origin_filename = chunk_dict["meta"]["origin"].get("filename")
                     if origin_filename:
                         filename = os.path.splitext(os.path.basename(origin_filename))[0]
@@ -287,7 +289,7 @@ class VisionRagParser:
                     print(f"Error processing chunk {chunk_id}: {exc}")
                 fallback_meta = {
                     "source": pdf_path,
-                    "document_name": document_name,
+                    "document_name": doc_name,
                     "page_number": "Unknown",
                     "heading": None,
                     "chunk_id": chunk_id,
@@ -299,8 +301,7 @@ class VisionRagParser:
 
         if self.verbose:
             print(
-                f"Created {len(langchain_docs)} chunks with vision-enhanced content "
-                f"from {document_name}"
+                f"Created {len(langchain_docs)} chunks with vision-enhanced content from {doc_name}"
             )
 
         return langchain_docs
@@ -332,8 +333,7 @@ class VisionRagParser:
         for idx, img_data in enumerate(images_with_positions, start=1):
             if self.verbose:
                 print(
-                    f"Analyzing image {idx}/{len(images_with_positions)} "
-                    f"(page {img_data['page']})"
+                    f"Analyzing image {idx}/{len(images_with_positions)} (page {img_data['page']})"
                 )
 
             img_bytes = self._pil_to_bytes(img_data["image"])
@@ -418,7 +418,7 @@ class VisionRagParser:
             "**If this is a CHART, GRAPH, or DATA VISUALIZATION:**\n"
             "1. State the title and subtitle if visible\n"
             "2. Provide a concise interpretation with key insights."
-                "The key insights should be sufficient to answer any question.\n\n"
+            "The key insights should be sufficient to answer any question.\n\n"
             "**If this is a DIAGRAM or INFOGRAPHIC:**\n"
             "1. Provide a concise interpretation with key insights. "
             "The key insights should be sufficient to answer any question.\n\n"

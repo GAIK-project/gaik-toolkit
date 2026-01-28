@@ -153,8 +153,9 @@ async def index_documents(
                 tmp_path = tmp.name
 
             try:
-                # Index the document
-                result = workflow.index_documents([tmp_path])
+                # Index the document with original filename (without extension)
+                original_name = Path(file.filename).stem
+                result = workflow.index_documents([tmp_path], filenames=[original_name])
                 total_chunks += result.num_chunks
 
                 indexed_docs.append(
@@ -211,7 +212,9 @@ async def query_rag(
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
     if collection_id not in RAG_INSTANCES:
-        raise HTTPException(status_code=404, detail="Collection not found. Please index documents first.")
+        raise HTTPException(
+            status_code=404, detail="Collection not found. Please index documents first."
+        )
 
     try:
         workflow = RAG_INSTANCES[collection_id]
@@ -271,7 +274,9 @@ async def query_rag_stream(
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
     if collection_id not in RAG_INSTANCES:
-        raise HTTPException(status_code=404, detail="Collection not found. Please index documents first.")
+        raise HTTPException(
+            status_code=404, detail="Collection not found. Please index documents first."
+        )
 
     async def event_generator() -> AsyncGenerator[str, None]:
         steps = [
@@ -294,6 +299,7 @@ async def query_rag_stream(
 
             # Convert to documents with optional hybrid/rerank
             from langchain_core.documents import Document
+
             documents = [doc for doc, _score in results] if results else []
 
             # Handle empty results gracefully
@@ -306,21 +312,26 @@ async def query_rag_stream(
                 steps[1]["status"] = "completed"
                 yield sse_event("step_update", steps[1])
 
-                yield sse_event("result", {
-                    "answer": "I couldn't find any relevant information in the indexed documents to answer your question. Please try rephrasing your question or ensure the relevant documents have been indexed.",
-                    "sources": [],
-                })
+                yield sse_event(
+                    "result",
+                    {
+                        "answer": "I couldn't find any relevant information in the indexed documents to answer your question. Please try rephrasing your question or ensure the relevant documents have been indexed.",
+                        "sources": [],
+                    },
+                )
                 return
 
             # Extract sources
             sources = []
             for doc in documents:
                 meta = doc.metadata
-                sources.append({
-                    "document_name": meta.get("document_name", "unknown"),
-                    "relevance_score": meta.get("relevance_score"),
-                    "page_number": meta.get("page_number", "unknown"),
-                })
+                sources.append(
+                    {
+                        "document_name": meta.get("document_name", "unknown"),
+                        "relevance_score": meta.get("relevance_score"),
+                        "page_number": meta.get("page_number", "unknown"),
+                    }
+                )
 
             steps[0]["status"] = "completed"
             steps[0]["message"] = f"Found {len(documents)} relevant chunks"
@@ -345,10 +356,13 @@ async def query_rag_stream(
             yield sse_event("step_update", steps[1])
 
             # Send final result
-            yield sse_event("result", {
-                "answer": full_answer,
-                "sources": sources,
-            })
+            yield sse_event(
+                "result",
+                {
+                    "answer": full_answer,
+                    "sources": sources,
+                },
+            )
 
         except ImportError as e:
             yield sse_event("error", {"message": f"Required components not installed: {e}"})
