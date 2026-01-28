@@ -11,9 +11,12 @@ export default function NotFound() {
           The page you&apos;re looking for doesn&apos;t exist.
         </p>
       </div>
-      <Button asChild>
-        <Link href="/">Back to Home</Link>
-      </Button>
+      <Link
+        href="/"
+        className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-9 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all"
+      >
+        Back to Home
+      </Link>
     </div>
   );
 }

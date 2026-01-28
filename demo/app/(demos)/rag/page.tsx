@@ -93,12 +93,18 @@ function transformSources(
   }));
 }
 
+const STORAGE_KEYS = {
+  collectionId: "rag-collection-id",
+  indexedDocuments: "rag-indexed-documents",
+} as const;
+
 export default function RAGPage() {
   // Collection state
   const [collectionId, setCollectionId] = useState<string | null>(null);
   const [indexedDocuments, setIndexedDocuments] = useState<IndexedDocument[]>(
     [],
   );
+  const [isHydrated, setIsHydrated] = useState(false);
 
   // Upload state
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -119,6 +125,44 @@ export default function RAGPage() {
   );
 
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedCollectionId = localStorage.getItem(STORAGE_KEYS.collectionId);
+    const savedDocs = localStorage.getItem(STORAGE_KEYS.indexedDocuments);
+
+    if (savedCollectionId) {
+      setCollectionId(savedCollectionId);
+    }
+    if (savedDocs) {
+      try {
+        setIndexedDocuments(JSON.parse(savedDocs));
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+    setIsHydrated(true);
+  }, []);
+
+  // Save to localStorage when state changes
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    if (collectionId) {
+      localStorage.setItem(STORAGE_KEYS.collectionId, collectionId);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.collectionId);
+    }
+
+    if (indexedDocuments.length > 0) {
+      localStorage.setItem(
+        STORAGE_KEYS.indexedDocuments,
+        JSON.stringify(indexedDocuments),
+      );
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.indexedDocuments);
+    }
+  }, [collectionId, indexedDocuments, isHydrated]);
 
   useEffect(() => {
     return () => {
@@ -381,7 +425,7 @@ export default function RAGPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Document status badge */}
+          {/* Document status badge - only show when documents exist */}
           {hasDocuments && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -410,50 +454,53 @@ export default function RAGPage() {
             </DropdownMenu>
           )}
 
-          {/* Upload button */}
-          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-2">
-                <Plus className="h-4 w-4" />
-                Upload PDF
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
-                  Upload Documents
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <FileUpload
-                  accept=".pdf"
-                  maxSize={50}
-                  file={pendingFiles[0] || null}
-                  onFileSelect={handleFileSelect}
-                  onFileRemove={handleFileRemove}
-                  disabled={isIndexing}
-                />
-
-                {pendingFiles.length > 0 && (
-                  <Button
-                    onClick={handleIndexDocuments}
+          {/* Upload button - only show when documents exist */}
+          {hasDocuments && (
+            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Upload PDF
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Upload className="h-5 w-5" />
+                    Upload Documents
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <FileUpload
+                    accept=".pdf"
+                    maxSize={50}
+                    file={pendingFiles[0] || null}
+                    onFileSelect={handleFileSelect}
+                    onFileRemove={handleFileRemove}
                     disabled={isIndexing}
-                    className="w-full"
-                  >
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    {isIndexing ? "Indexing..." : "Index Document"}
-                  </Button>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+                  />
+
+                  {pendingFiles.length > 0 && (
+                    <Button
+                      onClick={handleIndexDocuments}
+                      disabled={isIndexing}
+                      className="w-full"
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      {isIndexing ? "Indexing..." : "Index Document"}
+                    </Button>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
 
           {/* Settings */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="sm" className="gap-2">
                 <Settings2 className="h-4 w-4" />
+                Settings
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
@@ -511,25 +558,68 @@ export default function RAGPage() {
         <ConversationContent className="p-4">
           {/* Empty state */}
           {messages.length === 0 && !isQuerying && (
-            <ConversationEmptyState
-              title="Start a conversation"
-              description={
-                hasDocuments
-                  ? "Ask questions about your indexed documents and get AI-powered answers with citations."
-                  : "Upload PDF documents first, then ask questions to get AI-powered answers."
-              }
-              icon={<MessageSquare className="h-8 w-8" />}
-            >
-              {!hasDocuments && (
-                <Button
-                  onClick={() => setUploadDialogOpen(true)}
-                  className="mt-4 gap-2"
+            <>
+              {hasDocuments ? (
+                <ConversationEmptyState
+                  title="Start a conversation"
+                  description="Ask questions about your indexed documents and get AI-powered answers with citations."
+                  icon={<MessageSquare className="h-8 w-8" />}
+                />
+              ) : (
+                <Dialog
+                  open={uploadDialogOpen}
+                  onOpenChange={setUploadDialogOpen}
                 >
-                  <Upload className="h-4 w-4" />
-                  Upload your first document
-                </Button>
+                  <div className="flex h-full flex-col items-center justify-center py-16">
+                    <div className="bg-primary/10 mb-6 rounded-full p-6">
+                      <Upload className="text-primary h-12 w-12" />
+                    </div>
+                    <h2 className="mb-2 text-xl font-semibold">
+                      Upload your documents
+                    </h2>
+                    <p className="text-muted-foreground mb-6 max-w-md text-center">
+                      Upload PDF documents to get started. You can then ask
+                      questions and get AI-powered answers with citations.
+                    </p>
+                    <DialogTrigger asChild>
+                      <Button size="lg" className="gap-2">
+                        <Plus className="h-5 w-5" />
+                        Upload PDF
+                      </Button>
+                    </DialogTrigger>
+                  </div>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Upload className="h-5 w-5" />
+                        Upload Documents
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <FileUpload
+                        accept=".pdf"
+                        maxSize={50}
+                        file={pendingFiles[0] || null}
+                        onFileSelect={handleFileSelect}
+                        onFileRemove={handleFileRemove}
+                        disabled={isIndexing}
+                      />
+
+                      {pendingFiles.length > 0 && (
+                        <Button
+                          onClick={handleIndexDocuments}
+                          disabled={isIndexing}
+                          className="w-full"
+                        >
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          {isIndexing ? "Indexing..." : "Index Document"}
+                        </Button>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
               )}
-            </ConversationEmptyState>
+            </>
           )}
 
           {/* Messages */}

@@ -8,7 +8,6 @@ import {
   Bot,
   FileSearch,
   FileText,
-  Home,
   LogOut,
   LucideIcon,
   Menu,
@@ -37,7 +36,6 @@ import { GitHubIcon } from "@/components/github-icon";
 import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
 
 const navItems = [
-  { label: "Home", href: "/", icon: Home },
   { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
   { label: "RAG Builder", href: "/rag", icon: Bot },
   { label: "Extractor", href: "/extractor", icon: FileSearch },
@@ -103,14 +101,15 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
 
   if (!preview) {
     return isDesktop ? (
-      <Button
-        variant="outline"
-        size="sm"
-        asChild
-        className="hidden shrink-0 sm:inline-flex"
+      <a
+        href={GITHUB_REPO_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-all sm:inline-flex"
       >
-        {linkContent}
-      </Button>
+        <GitHubIcon className="h-4 w-4" />
+        GitHub
+      </a>
     ) : (
       linkContent
     );
@@ -120,14 +119,15 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
     <Glimpse>
       <GlimpseTrigger asChild>
         {isDesktop ? (
-          <Button
-            variant="outline"
-            size="sm"
-            asChild
-            className="hidden shrink-0 sm:inline-flex"
+          <a
+            href={GITHUB_REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-all sm:inline-flex"
           >
-            {linkContent}
-          </Button>
+            <GitHubIcon className="h-4 w-4" />
+            GitHub
+          </a>
         ) : (
           linkContent
         )}
@@ -154,7 +154,7 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
 
 function MobileMenuButton() {
   return (
-    <Button variant="outline" size="icon" className="md:hidden">
+    <Button variant="outline" size="icon" className="lg:hidden">
       <Menu className="h-5 w-5" />
       <span className="sr-only">Open menu</span>
     </Button>
@@ -241,20 +241,20 @@ export function SiteNav({ githubPreview, isLoggedIn }: SiteNavProps) {
 
   return (
     <header className="border-border/60 bg-background/80 sticky top-0 z-50 border-b backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 md:justify-center md:gap-6 md:px-6 md:py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 lg:justify-center lg:gap-6 lg:px-6 lg:py-4">
         <Link href="/" className="shrink-0">
           <Image
             src="/logos/gaik-logo-letter-only.png"
             alt="GAIK"
             width={40}
             height={40}
-            className="h-9 w-9 md:h-10 md:w-10"
+            className="h-9 w-9 lg:h-10 lg:w-10"
             priority
           />
         </Link>
 
         {/* Desktop Navigation */}
-        <nav aria-label="Primary" className="hidden md:block">
+        <nav aria-label="Primary" className="hidden lg:block">
           <div className="border-border/70 bg-card/70 flex items-center gap-1 rounded-full border p-1.5 shadow-sm">
             {navItems.map((item) => (
               <NavLink

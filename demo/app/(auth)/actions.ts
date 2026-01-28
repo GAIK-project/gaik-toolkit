@@ -115,8 +115,8 @@ export async function signIn(
     return { error: "Your access request was not approved." };
   }
 
-  // Access approved - redirect to demo
-  redirect("/classifier");
+  // Access approved - redirect to home
+  redirect("/");
 }
 
 export async function signOut(): Promise<void> {

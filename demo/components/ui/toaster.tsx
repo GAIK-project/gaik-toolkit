@@ -9,9 +9,9 @@ export function Toaster() {
       toastOptions={{
         duration: 4000,
         style: {
-          background: "hsl(var(--popover))",
-          color: "hsl(var(--popover-foreground))",
-          border: "1px solid hsl(var(--border))",
+          background: "var(--popover)",
+          color: "var(--popover-foreground)",
+          border: "1px solid var(--border)",
           borderRadius: "var(--radius)",
         },
       }}

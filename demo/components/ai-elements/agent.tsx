@@ -9,6 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { Tool } from "ai";
+import type { AccordionMultipleProps } from "@radix-ui/react-accordion";
 import { BotIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { memo } from "react";
@@ -75,7 +76,7 @@ export const AgentInstructions = memo(
   ),
 );
 
-export type AgentToolsProps = Omit<ComponentProps<typeof Accordion>, "type">;
+export type AgentToolsProps = Omit<AccordionMultipleProps, "type">;
 
 export const AgentTools = memo(({ className, ...props }: AgentToolsProps) => (
   <div className={cn("space-y-2", className)}>

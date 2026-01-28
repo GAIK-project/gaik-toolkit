@@ -19,12 +19,13 @@ export function Hero() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <Button size="lg" asChild className="h-12 px-6 text-base shadow-md">
-            <Link href="/incident-report">
-              Try Incident Report
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+          <Link
+            href="/incident-report"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-12 items-center justify-center gap-2 rounded-md px-6 text-base font-medium shadow-md transition-all"
+          >
+            Try Incident Report
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
           <Button
             size="lg"
             variant="outline"

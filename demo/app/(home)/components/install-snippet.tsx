@@ -34,39 +34,36 @@ export function InstallSnippet() {
               code="pip install gaik[all]"
             />
             <div className="flex h-full flex-col gap-3">
-              <Button variant="outline" className="h-auto flex-1" asChild>
-                <a
-                  href="https://pypi.org/project/gaik/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Package className="h-4 w-4" />
-                  PyPI Package
-                  <ArrowUpRight className="h-4 w-4" />
-                </a>
-              </Button>
-              <Button variant="outline" className="h-auto flex-1" asChild>
-                <a
-                  href="https://gaik-project.github.io/gaik-toolkit/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <BookOpen className="h-4 w-4" />
-                  Documentation
-                  <ArrowUpRight className="h-4 w-4" />
-                </a>
-              </Button>
-              <Button className="h-auto flex-1" asChild>
-                <a
-                  href="https://github.com/GAIK-project/gaik-toolkit/tree/main/examples"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <GitHubIcon className="h-4 w-4" />
-                  View Examples
-                  <ArrowUpRight className="h-4 w-4" />
-                </a>
-              </Button>
+              <a
+                href="https://pypi.org/project/gaik/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 inline-flex h-auto flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all"
+              >
+                <Package className="h-4 w-4" />
+                PyPI Package
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
+              <a
+                href="https://gaik-project.github.io/gaik-toolkit/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 inline-flex h-auto flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all"
+              >
+                <BookOpen className="h-4 w-4" />
+                Documentation
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
+              <a
+                href="https://github.com/GAIK-project/gaik-toolkit/tree/main/examples"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-auto flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all"
+              >
+                <GitHubIcon className="h-4 w-4" />
+                View Examples
+                <ArrowUpRight className="h-4 w-4" />
+              </a>
             </div>
           </CardContent>
         </Card>

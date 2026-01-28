@@ -45,6 +45,7 @@ type AuthShellProps = {
   description: string;
   children: ReactNode;
   footer?: ReactNode;
+  variant?: "dark" | "light";
 };
 
 export function AuthShell({
@@ -52,7 +53,10 @@ export function AuthShell({
   description,
   children,
   footer,
+  variant = "dark",
 }: AuthShellProps) {
+  const isDark = variant === "dark";
+
   return (
     <div className="pointer-events-none flex min-h-screen items-center justify-center px-6 py-16">
       <motion.div
@@ -64,27 +68,41 @@ export function AuthShell({
       >
         <div className="flex flex-col items-center text-center">
           <Image
-            src="/logos/SVG/gaik_logo_fullwhite.svg"
+            src={
+              isDark
+                ? "/logos/SVG/gaik_logo_fullwhite.svg"
+                : "/logos/SVG/gaik_logo_fullblack.svg"
+            }
             alt="GAIK Toolkit - Generative AI-Enhanced Knowledge Management in Business"
             width={320}
             height={160}
             className="h-20 w-auto sm:h-24"
             priority
           />
-          <h1 className="mt-6 font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
+          <h1
+            className={`mt-6 font-serif text-3xl font-semibold tracking-tight sm:text-4xl ${isDark ? "" : "text-slate-900"}`}
+          >
             {title}
           </h1>
-          <p className="mt-2 text-sm text-white/70 sm:text-base">
+          <p
+            className={`mt-2 text-sm sm:text-base ${isDark ? "text-white/70" : "text-slate-600"}`}
+          >
             {description}
           </p>
         </div>
 
-        <div className="mt-8 rounded-3xl border border-white/15 bg-white/95 p-6 text-slate-900 shadow-2xl backdrop-blur sm:p-8">
+        <div
+          className={`mt-8 rounded-3xl border p-6 text-slate-900 shadow-2xl backdrop-blur sm:p-8 ${isDark ? "border-white/15 bg-white/95" : "border-slate-200 bg-white"}`}
+        >
           {children}
         </div>
 
         {footer && (
-          <div className="mt-6 text-center text-sm text-white/70">{footer}</div>
+          <div
+            className={`mt-6 text-center text-sm ${isDark ? "text-white/70" : "text-slate-600"}`}
+          >
+            {footer}
+          </div>
         )}
       </motion.div>
     </div>

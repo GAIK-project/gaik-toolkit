@@ -43,6 +43,7 @@ function LoginForm() {
     <AuthShell
       title="Admin Access"
       description="Enter the admin password to manage access requests."
+      variant="light"
     >
       <form className="space-y-5" action={formAction}>
         {state.error && (
