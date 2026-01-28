@@ -31,21 +31,22 @@ def get_openai_config(use_azure: bool = True) -> dict:
         >>> # Returns OpenAI config with model name
     """
     if use_azure:
+        azure_endpoint = os.getenv("AZURE_ENDPOINT", "https://haagahelia-poc-gaik.openai.azure.com/")
         return {
             "use_azure": True,
             "api_key": os.getenv("AZURE_API_KEY"),
-            "azure_endpoint": "https://haagahelia-poc-gaik.openai.azure.com/",
-            "azure_audio_endpoint": "https://haagahelia-poc-gaik.openai.azure.com/",
-            "api_version": "2025-03-01-preview",
-            "model": "gpt-5.1",  # gpt-5    #gpt-4.1
-            "transcription_model": "whisper",
+            "azure_endpoint": azure_endpoint,
+            "azure_audio_endpoint": azure_endpoint,
+            "api_version": os.getenv("AZURE_API_VERSION", "2025-03-01-preview"),
+            "model": os.getenv("AZURE_DEPLOYMENT", "gpt-5.1"),
+            "transcription_model": os.getenv("AZURE_TRANSCRIPTION_MODEL", "whisper"),
         }
     else:
         return {
             "use_azure": False,
             "api_key": os.getenv("OPENAI_API_KEY"),
-            "model": "gpt-5.1-2025-11-13",  # gpt-5-2025-08-07    #gpt-4.1-2025-04-14
-            "transcription_model": "whisper-1",
+            "model": os.getenv("OPENAI_MODEL", "gpt-5.1-2025-11-13"),
+            "transcription_model": os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"),
         }
 
 
