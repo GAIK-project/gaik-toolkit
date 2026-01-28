@@ -65,7 +65,7 @@ export async function signUp(
     // Don't fail the signup - user was created, just log the error
   }
 
-  return { success: true };
+  redirect("/access-pending");
 }
 
 export async function signIn(

@@ -15,7 +15,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Proxy API requests to backend
-  if (pathname.startsWith("/api")) {
+  if (pathname.startsWith("/api") && !pathname.startsWith("/api/auth")) {
     const backendPath = pathname.replace(/^\/api/, "");
     const targetUrl = `${BACKEND_URL}${backendPath}${request.nextUrl.search}`;
 

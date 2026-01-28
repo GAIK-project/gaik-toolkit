@@ -222,7 +222,11 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
             <Link href="/sign-in" className="text-primary hover:underline">
               Sign in
             </Link>{" "}
-            to access the interactive demos.
+            to access the interactive demos. Don&apos;t have an account?{" "}
+            <Link href="/sign-up" className="text-primary hover:underline">
+              Sign up
+            </Link>
+            .
           </p>
         </div>
       )}

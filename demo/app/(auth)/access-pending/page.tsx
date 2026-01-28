@@ -3,7 +3,8 @@ import { signOut } from "../actions";
 import { getAccessStatus } from "@/data/auth";
 import { AuthShell } from "../components/auth-shell";
 import { Button } from "@/components/ui/button";
-import { Clock } from "lucide-react";
+import { SuccessAnimation } from "../components/success-animation";
+import { AccessPolling } from "../components/access-polling";
 
 export default async function AccessPendingPage() {
   const { isLoggedIn, status, email } = await getAccessStatus();
@@ -24,9 +25,8 @@ export default async function AccessPendingPage() {
       description="Your request is being reviewed by our team."
     >
       <div className="space-y-6 text-center">
-        <div className="bg-primary/10 mx-auto flex h-16 w-16 items-center justify-center rounded-full">
-          <Clock className="text-primary h-8 w-8" />
-        </div>
+        <SuccessAnimation />
+        <AccessPolling />
 
         <div className="space-y-2">
           <p className="text-muted-foreground text-sm">

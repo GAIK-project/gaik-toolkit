@@ -12,7 +12,7 @@ const PROTECTED_ROUTES = [
 ];
 
 // Default route for authenticated users
-const DEFAULT_DEMO_ROUTE = PROTECTED_ROUTES[0];
+const DEFAULT_DEMO_ROUTE = "/";
 
 // Auth routes that should redirect logged-in users
 const AUTH_ROUTES = ["/sign-in", "/sign-up"];

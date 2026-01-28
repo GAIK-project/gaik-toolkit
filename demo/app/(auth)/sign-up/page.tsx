@@ -5,11 +5,11 @@ import { useActionState } from "react";
 import { Loader2 } from "lucide-react";
 import { signUp, type AuthResult } from "../actions";
 import { AuthShell } from "../components/auth-shell";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
+import { PrivacyDialog } from "../components/privacy-dialog";
 
 const initialState: AuthResult = {};
 
@@ -30,20 +30,8 @@ export default function SignUpPage() {
       }
     >
       <form className="space-y-5" action={formAction}>
-        {state.success && (
-          <Alert className="border-primary/20 bg-primary/5">
-            <AlertTitle>Request received</AlertTitle>
-            <AlertDescription>
-              We will review your access request and reach out by email.
-            </AlertDescription>
-          </Alert>
-        )}
-
         {state.error && (
-          <Alert variant="destructive">
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{state.error}</AlertDescription>
-          </Alert>
+          <p className="text-destructive text-sm">{state.error}</p>
         )}
 
         <FieldGroup>
@@ -56,7 +44,7 @@ export default function SignUpPage() {
               autoComplete="name"
               placeholder="Ava Johnson"
               required
-              disabled={isPending || state.success}
+              disabled={isPending}
             />
           </Field>
 
@@ -69,7 +57,7 @@ export default function SignUpPage() {
               autoComplete="email"
               placeholder="ava@company.com"
               required
-              disabled={isPending || state.success}
+              disabled={isPending}
             />
           </Field>
 
@@ -83,7 +71,7 @@ export default function SignUpPage() {
               placeholder="Create a password"
               required
               minLength={6}
-              disabled={isPending || state.success}
+              disabled={isPending}
             />
           </Field>
 
@@ -97,7 +85,7 @@ export default function SignUpPage() {
               type="text"
               autoComplete="organization"
               placeholder="Company name"
-              disabled={isPending || state.success}
+              disabled={isPending}
             />
           </Field>
 
@@ -111,7 +99,7 @@ export default function SignUpPage() {
               placeholder="Tell us what you want to build with GAIK Toolkit."
               rows={3}
               className="max-h-32 resize-none overflow-y-auto"
-              disabled={isPending || state.success}
+              disabled={isPending}
             />
           </Field>
         </FieldGroup>
@@ -119,7 +107,7 @@ export default function SignUpPage() {
         <Button
           className="w-full"
           type="submit"
-          disabled={isPending || state.success}
+          disabled={isPending}
         >
           {isPending ? (
             <>
@@ -133,9 +121,14 @@ export default function SignUpPage() {
 
         <p className="text-muted-foreground text-center text-xs">
           By requesting access, you agree to our{" "}
-          <Link href="/privacy" className="hover:text-foreground underline">
-            Privacy Policy
-          </Link>
+          <PrivacyDialog>
+            <button
+              type="button"
+              className="hover:text-foreground cursor-pointer underline"
+            >
+              Privacy Policy
+            </button>
+          </PrivacyDialog>
           .
         </p>
       </form>

@@ -5,10 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  Bot,
   FileSearch,
   FileText,
   Home,
-  Library,
+  LogOut,
   LucideIcon,
   Menu,
   Mic,
@@ -38,7 +39,7 @@ import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
 const navItems = [
   { label: "Home", href: "/", icon: Home },
   { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
-  { label: "RAG Builder", href: "/rag", icon: Library },
+  { label: "RAG Builder", href: "/rag", icon: Bot },
   { label: "Extractor", href: "/extractor", icon: FileSearch },
   { label: "Parser", href: "/parser", icon: FileText },
   { label: "Classifier", href: "/classifier", icon: Tags },
@@ -132,13 +133,15 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
         )}
       </GlimpseTrigger>
       <GlimpseContent className="w-80">
-        {preview.image && (
-          <GlimpseImage src={preview.image} alt={preview.title || "GitHub"} />
-        )}
-        <GlimpseTitle>{preview.title || "GAIK Toolkit"}</GlimpseTitle>
-        <GlimpseDescription>
-          {preview.description || "AI-powered document processing toolkit"}
-        </GlimpseDescription>
+        <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer" className="block text-inherit no-underline">
+          {preview.image && (
+            <GlimpseImage src={preview.image} alt={preview.title || "GitHub"} />
+          )}
+          <GlimpseTitle>{preview.title || "GAIK Toolkit"}</GlimpseTitle>
+          <GlimpseDescription>
+            {preview.description || "AI-powered document processing toolkit"}
+          </GlimpseDescription>
+        </a>
       </GlimpseContent>
     </Glimpse>
   );
@@ -156,9 +159,10 @@ function MobileMenuButton() {
 interface MobileNavProps {
   isActive: (href: string) => boolean;
   githubPreview?: LinkPreview | null;
+  isLoggedIn?: boolean;
 }
 
-function MobileNav({ isActive, githubPreview }: MobileNavProps) {
+function MobileNav({ isActive, githubPreview, isLoggedIn }: MobileNavProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -191,6 +195,25 @@ function MobileNav({ isActive, githubPreview }: MobileNavProps) {
           ))}
           <hr className="my-2" />
           <GitHubLink preview={githubPreview} variant="mobile" />
+          {isLoggedIn && (
+            <>
+              <hr className="my-2" />
+              <button
+                type="button"
+                className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
+                onClick={async () => {
+                  const res = await fetch("/api/auth/sign-out", { method: "POST" });
+                  const data = await res.json();
+                  if (data.redirectTo) {
+                    window.location.href = data.redirectTo;
+                  }
+                }}
+              >
+                <LogOut className="h-5 w-5" />
+                Sign out
+              </button>
+            </>
+          )}
         </nav>
       </SheetContent>
     </Sheet>
@@ -199,9 +222,10 @@ function MobileNav({ isActive, githubPreview }: MobileNavProps) {
 
 export interface SiteNavProps {
   githubPreview?: LinkPreview | null;
+  isLoggedIn?: boolean;
 }
 
-export function SiteNav({ githubPreview }: SiteNavProps) {
+export function SiteNav({ githubPreview, isLoggedIn }: SiteNavProps) {
   const pathname = usePathname();
 
   function isActive(href: string): boolean {
@@ -238,7 +262,28 @@ export function SiteNav({ githubPreview }: SiteNavProps) {
 
         <div className="flex items-center gap-2">
           <GitHubLink preview={githubPreview} variant="desktop" />
-          <MobileNav isActive={isActive} githubPreview={githubPreview} />
+          {isLoggedIn && (
+            <form action="/api/auth/sign-out" method="POST">
+              <Button
+                variant="ghost"
+                size="sm"
+                type="submit"
+                className="text-muted-foreground hover:text-foreground hidden gap-1.5 sm:inline-flex"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  const res = await fetch("/api/auth/sign-out", { method: "POST" });
+                  const data = await res.json();
+                  if (data.redirectTo) {
+                    window.location.href = data.redirectTo;
+                  }
+                }}
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </Button>
+            </form>
+          )}
+          <MobileNav isActive={isActive} githubPreview={githubPreview} isLoggedIn={isLoggedIn} />
         </div>
       </div>
     </header>
