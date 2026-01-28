@@ -143,15 +143,26 @@ class StructuredDataToPDF:
         if isinstance(data, BaseModel):
             self._render_value(pdf, data.model_dump(), indent=0)
         elif isinstance(data, list):
-            for i, item in enumerate(data, 1):
-                self._write_line(pdf, f"Item {i}", indent=0, bold=True)
+            # Single item: render directly without "Item 1" header
+            if len(data) == 1:
+                item = data[0]
                 if isinstance(item, BaseModel):
-                    self._render_value(pdf, item.model_dump(), indent=1)
+                    self._render_value(pdf, item.model_dump(), indent=0)
                 elif isinstance(item, dict):
-                    self._render_value(pdf, item, indent=1)
+                    self._render_value(pdf, item, indent=0)
                 else:
-                    self._write_line(pdf, str(item), indent=1)
-                pdf.ln(4)
+                    self._write_line(pdf, str(item), indent=0)
+            else:
+                # Multiple items: show numbered headers
+                for i, item in enumerate(data, 1):
+                    self._write_line(pdf, f"#{i}", indent=0, bold=True)
+                    if isinstance(item, BaseModel):
+                        self._render_value(pdf, item.model_dump(), indent=1)
+                    elif isinstance(item, dict):
+                        self._render_value(pdf, item, indent=1)
+                    else:
+                        self._write_line(pdf, str(item), indent=1)
+                    pdf.ln(4)
         else:
             self._render_value(pdf, data, indent=0)
 

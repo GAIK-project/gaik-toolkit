@@ -89,7 +89,7 @@ export default function IncidentReportPage() {
   );
   const [customSchema, setCustomSchema] = useState(DEFAULT_INCIDENT_SCHEMA);
   const [enhanced, setEnhanced] = useState(true);
-  const [generatePdf, setGeneratePdf] = useState(false);
+  const [generatePdf, setGeneratePdf] = useState(true);
 
   const [result, setResult] = useState<IncidentReportResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -141,6 +141,7 @@ export default function IncidentReportPage() {
         formData.append("file", audioFile);
         formData.append("enhanced", String(enhanced));
         formData.append("compress_audio", "true");
+        formData.append("pdf_title", "Incident Report");
 
         // Simulating steps for Audio (since it's not SSE in this demo version effectively)
         // In a real app, the audio endpoint ideally should stream too, but we'll adapt.
@@ -170,6 +171,7 @@ export default function IncidentReportPage() {
       } else {
         // Text mode with SSE streaming
         formData.append("text", textInput);
+        formData.append("pdf_title", "Incident Report");
 
         const response = await fetch("/api/pipeline/text/stream", {
           method: "POST",

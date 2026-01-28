@@ -88,6 +88,7 @@ async def audio_pipeline(
     file: UploadFile = File(...),
     user_requirements: str = Form(...),
     generate_pdf: bool = Form(False),
+    pdf_title: str = Form("Extracted Data Report"),
     enhanced: bool = Form(True),
     compress_audio: bool = Form(True),
 ):
@@ -97,6 +98,7 @@ async def audio_pipeline(
     - **file**: Audio/video file (mp3, wav, mp4, m4a, etc.)
     - **user_requirements**: What data to extract from the transcript
     - **generate_pdf**: Whether to generate a PDF report
+    - **pdf_title**: Title for the generated PDF report
     - **enhanced**: Whether to enhance transcript with LLM
     - **compress_audio**: Whether to compress audio before sending
     """
@@ -171,7 +173,7 @@ async def audio_pipeline(
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(
-                    title="Extracted Data Report", logo_path=logo
+                    title=pdf_title, logo_path=logo
                 )
                 pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
                 pdf_generator.run(result.extracted_fields, pdf_path)
@@ -213,6 +215,7 @@ async def document_pipeline(
     user_requirements: str = Form(...),
     parser_type: Literal["auto", "pymupdf", "docx", "vision"] = Form("auto"),
     generate_pdf: bool = Form(False),
+    pdf_title: str = Form("Extracted Data Report"),
 ):
     """
     Run the complete document pipeline: Parse -> Extract -> (PDF).
@@ -221,6 +224,7 @@ async def document_pipeline(
     - **user_requirements**: What data to extract from the document
     - **parser_type**: Parser to use (auto, pymupdf, docx, vision)
     - **generate_pdf**: Whether to generate a PDF report
+    - **pdf_title**: Title for the generated PDF report
     """
     job_id = str(uuid.uuid4())
 
@@ -305,7 +309,7 @@ async def document_pipeline(
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(
-                    title="Extracted Data Report", logo_path=logo
+                    title=pdf_title, logo_path=logo
                 )
                 pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
                 pdf_generator.run(result.extracted_fields, pdf_path)
@@ -346,6 +350,7 @@ async def text_pipeline(
     text: str = Form(...),
     user_requirements: str = Form(...),
     generate_pdf: bool = Form(False),
+    pdf_title: str = Form("Extracted Data Report"),
 ):
     """
     Run the text extraction pipeline: Extract structured data from text.
@@ -353,6 +358,7 @@ async def text_pipeline(
     - **text**: Input text to extract data from
     - **user_requirements**: What data to extract from the text
     - **generate_pdf**: Whether to generate a PDF report
+    - **pdf_title**: Title for the generated PDF report
     """
     job_id = str(uuid.uuid4())
 
@@ -409,7 +415,7 @@ async def text_pipeline(
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(
-                    title="Extracted Data Report", logo_path=logo
+                    title=pdf_title, logo_path=logo
                 )
                 pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
                 pdf_generator.run(extracted_data, pdf_path)
@@ -448,6 +454,7 @@ async def text_pipeline_stream(
     text: str = Form(...),
     user_requirements: str = Form(...),
     generate_pdf: bool = Form(False),
+    pdf_title: str = Form("Extracted Data Report"),
 ):
     """
     Run the text extraction pipeline with SSE streaming progress updates.
@@ -515,7 +522,7 @@ async def text_pipeline_stream(
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(
-                        title="Extracted Data Report", logo_path=logo
+                        title=pdf_title, logo_path=logo
                     )
                     pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
                     pdf_generator.run(extracted_data, pdf_path)

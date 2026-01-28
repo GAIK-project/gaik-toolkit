@@ -35,19 +35,24 @@ export function IncidentDetails({ data, className }: IncidentDetailsProps) {
       {data.map((item, index) => {
         const report = item as IncidentReport;
 
-        // Format date nicely if possible
-        let formattedDate = report.date || "N/A";
-        try {
-          if (report.date) {
+        // Format date nicely if possible, use today as fallback
+        let formattedDate: string;
+        const dateFormatter = new Intl.DateTimeFormat("en-US", {
+          dateStyle: "long",
+        });
+
+        if (report.date) {
+          try {
             const d = new Date(report.date);
-            if (!isNaN(d.getTime())) {
-              formattedDate = new Intl.DateTimeFormat("en-US", {
-                dateStyle: "long",
-              }).format(d);
-            }
+            formattedDate = !isNaN(d.getTime())
+              ? dateFormatter.format(d)
+              : dateFormatter.format(new Date());
+          } catch {
+            formattedDate = dateFormatter.format(new Date());
           }
-        } catch {
-          /* ignore parsing errors */
+        } else {
+          // No date provided, use today as fallback
+          formattedDate = dateFormatter.format(new Date());
         }
 
         return (
