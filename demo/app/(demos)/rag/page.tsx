@@ -30,7 +30,6 @@ import {
   SourcesContent,
   Source as SourceItem,
 } from "@/components/ai-elements/sources";
-import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -662,9 +661,13 @@ export default function RAGPage() {
               className="flex gap-3"
             >
               <div className="bg-muted rounded-2xl px-4 py-3">
-                <Shimmer className="text-muted-foreground text-sm">
+                <motion.span
+                  animate={{ opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className="text-primary text-sm"
+                >
                   Searching documents
-                </Shimmer>
+                </motion.span>
               </div>
             </motion.div>
           )}
