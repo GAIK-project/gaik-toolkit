@@ -19,7 +19,7 @@ from gaik.building_blocks.config import get_openai_config
 
 def main() -> None:
     print("VISION ENHANCED RAG PARSER:\n")
-    sample_pdf = Path(__file__).parent.parent / "parsers" / "WEF-page-10.pdf"
+    sample_pdf = Path(__file__).parent.parent / "parsers" / "sample_report.pdf"
 
     if not sample_pdf.exists():
         print("No sample PDF found.")
@@ -33,20 +33,17 @@ def main() -> None:
     parser = VisionRagParser(
         vision_config=vision_config,
         verbose=True,
+        save_markdown=True,  
         enable_ocr=False,
         enable_table_structure=True,
-        enable_formula_enrichment=False,
+        enable_formula_enrichment=False
     )
 
-    print("\nConverting to markdown...")
+    print("\nConverting to markdown and chunks...")
     markdown_output = sample_pdf.with_name(f"{sample_pdf.stem}_vision.md")
-    parser.convert_pdf_to_markdown_with_vision(
-        str(sample_pdf), output_path=str(markdown_output)
+    _markdown, chunks = parser.convert_doc_to_chunks_with_vision(
+        str(sample_pdf), output_path=str(markdown_output), return_markdown=True
     )
-    print(f"Markdown saved to: {markdown_output}")
-
-    print("\nCreating RAG chunks...")
-    chunks = parser.convert_pdf_to_chunks_with_vision(str(sample_pdf))
     print(f"Total chunks: {len(chunks)}")
 
     for idx, chunk in enumerate(chunks[:2], start=1):

@@ -21,7 +21,7 @@ def main() -> None:
         Path(__file__).parent.parent.parent
         / "building_blocks"
         / "parsers"
-        / "WEF-page-10.pdf"
+        / "sample_report.pdf"
     )
 
     if not sample_pdf.exists():

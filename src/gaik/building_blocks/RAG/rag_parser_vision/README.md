@@ -81,7 +81,7 @@ from gaik.building_blocks.config import get_openai_config
 vision_config = get_openai_config(use_azure=True)
 parser = VisionRagParser(vision_config=vision_config)
 
-chunks = parser.convert_pdf_to_chunks_with_vision("document.pdf")
+chunks = parser.convert_doc_to_chunks_with_vision("document.pdf")
 print(chunks[0].metadata)
 ```
 
@@ -111,6 +111,7 @@ parser = VisionRagParser(
     enable_formula_enrichment: bool = True,
     num_threads: int = 4,
     verbose: bool = True,
+    save_markdown: bool = False,
     vision_prompt: str | None = None,
 )
 ```
@@ -118,14 +119,11 @@ parser = VisionRagParser(
 ### Methods
 
 ```python
-markdown = parser.convert_pdf_to_markdown_with_vision(
+chunks = parser.convert_doc_to_chunks_with_vision(
     pdf_path: str,
-    output_path: str | None = None
+    output_path: str | None = None,
+    return_markdown: bool = False,
 )
-
-chunks = parser.convert_pdf_to_chunks_with_vision(
-    pdf_path: str
-)  # -> list[Document]
 ```
 
 ---

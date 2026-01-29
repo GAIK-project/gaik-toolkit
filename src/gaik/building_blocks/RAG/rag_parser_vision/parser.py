@@ -74,9 +74,11 @@ class VisionRagParser:
             enable_formula_enrichment: Enable formula/equation enrichment (Docling)
             num_threads: Number of threads for processing (Docling)
             verbose: Print verbose output
+            save_markdown: Persist markdown output when output_path is provided
             vision_prompt: Custom prompt for vision model (defaults to chart/diagram analysis)
         """
         self.verbose = verbose
+        self.save_markdown = save_markdown
 
         # Import docling modules here to avoid torch DLL issues on Windows
         try:
@@ -190,12 +192,10 @@ class VisionRagParser:
             document_name: Optional document name override (uses filename from path if not provided)
 
         Returns:
-            List of LangChain Document objects with metadata
+            List of LangChain Document objects with metadata, or (markdown, chunks)
         """
-        if self.verbose:
-            print(f"Processing PDF with vision enhancement: {pdf_path}")
-
-        result = self.converter.convert(pdf_path)
+        result, markdown_text, descriptions_by_page = self._convert_with_vision(pdf_path)
+        self._maybe_save_markdown(markdown_text, output_path)
         doc = result.document
 
         if self.verbose:
@@ -233,7 +233,7 @@ class VisionRagParser:
 
         for chunk in chunker.chunk(doc):
             try:
-                chunk_text = chunk.text
+                chunk_text = chunk.text or ""
                 chunk_dict = chunk.model_dump()
 
                 filename = doc_name
@@ -304,7 +304,47 @@ class VisionRagParser:
                 f"Created {len(langchain_docs)} chunks with vision-enhanced content from {doc_name}"
             )
 
+        if return_markdown:
+            return markdown_text, langchain_docs
         return langchain_docs
+
+    def _convert_with_vision(
+        self, pdf_path: str
+    ) -> tuple["Any", str, dict[int, list[str]]]:
+        if self.verbose:
+            print(f"Processing PDF with vision enhancement: {pdf_path}")
+
+        result = self.converter.convert(pdf_path)
+        doc = result.document
+
+        if self.verbose:
+            print(
+                f"Document parsing complete. Pages: "
+                f"{len(getattr(doc, 'pages', [])) or 'unknown'}"
+            )
+
+        images_with_positions = self._collect_images(doc)
+        if self.verbose:
+            print(f"Found {len(images_with_positions)} images to analyze")
+
+        image_descriptions, descriptions_by_page = self._describe_images(images_with_positions)
+
+        markdown_text = result.document.export_to_markdown(image_mode="embedded")
+        markdown_text = self._replace_images_with_descriptions(
+            markdown_text, image_descriptions
+        )
+
+        return result, markdown_text, descriptions_by_page
+
+    def _maybe_save_markdown(self, markdown_text: str, output_path: Optional[str]) -> None:
+        if not self.save_markdown:
+            return
+        if not output_path:
+            return
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(markdown_text)
+        if self.verbose:
+            print(f"Markdown saved to: {output_path}")
 
     def _collect_images(self, doc) -> list[dict[str, Any]]:
         images_with_positions: list[dict[str, Any]] = []
@@ -466,4 +506,4 @@ def parse_pdf_to_chunks_with_vision(
         List of LangChain Document objects with metadata
     """
     parser = VisionRagParser(vision_config=vision_config)
-    return parser.convert_pdf_to_chunks_with_vision(pdf_path)
+    return parser.convert_doc_to_chunks_with_vision(pdf_path)
