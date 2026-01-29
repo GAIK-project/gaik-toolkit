@@ -46,7 +46,7 @@ GAIK distinguishes three levels:
 
 | Level                  | Concept in GAIK                         | Examples                                                      |
 |------------------------|-----------------------------------------|---------------------------------------------------------------|
-| **Service**            | Logical capability                      | `speech_to_text`, `document_parsing`, `information_extraction` |
+| **Knowledge Service**            | Logical capability                      | `speech_to_text`, `document_parsing`, `information_extraction` |
 | **Software component** | Atomic toolkit class / function         | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser` |
 | **Software module**    | Composed, workflow‑ready unit           | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow` |
 
