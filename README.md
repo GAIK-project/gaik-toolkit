@@ -14,10 +14,10 @@ The toolkit focuses on three core knowledge processes in organizational workflow
 
 Internally, these capabilities are exposed as:
 
-- **Software components** – atomic utilities such as `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`, and RAG components like `rag_parser_docling`, `rag_parser_vision`, `embedder`, `vector_store`, `retriever`, `answer_generator`
-- **Software modules** – opinionated end‑to‑end pipelines such as "audio → structured data", "documents → structured data", and "RAG workflow"
+- **Software components** – reusable utilities such as `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`, and RAG components like `rag_parser_docling`, `rag_parser_vision`, `embedder`, `vector_store`, `retriever`, `answer_generator`
+- **Software modules** – end‑to‑end pipelines combining the software components such as "audio → structured data", "documents → structured data", and "RAG workflow"
 
-This repository provides a **complete layer-based architecture** spanning from strategic guidance and business requirements to implementation and security compliance.
+This repository provides a **complete layer-based architecture** ranging from strategic guidance and business requirements to implementation and security compliance.
 
 > If the **Solution Wizard** decides *what* workflow you need, this toolkit provides the complete architecture to guide, design, implement, and deploy it.
 
@@ -25,7 +25,7 @@ This repository provides a **complete layer-based architecture** spanning from s
 
 ## Layer-Based Architecture
 
-The GAIK Toolkit is organized into a comprehensive layer-based architecture that spans from strategic planning to implementation and security:
+The GAIK Toolkit is organized into a layer-based architecture that spans from strategic planning to implementation and security:
 
 | Layer | Purpose | Contents |
 |-------|---------|----------|
