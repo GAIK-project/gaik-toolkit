@@ -27,8 +27,9 @@ This evaluation suite provides:
 
 ### **Sample Data & Documentation**
 
-- **`Ajokortti.mp3`** - Sample Finnish dental webinar audio
-- **`side-by-side-comparison.txt`** - Example evaluation report with aligned comparison
+- **`data/Ajokortti.mp3`** - Sample Finnish dental webinar audio
+- **`data/reference.txt`** - Ground truth transcript for sample audio
+- **`data/side-by-side-comparison.txt`** - Example evaluation report with aligned comparison
 - **`transcription_evaluation.pptx`** - Presentation with benchmark results and error analysis
 
 ---
@@ -248,13 +249,13 @@ Deletions:                  27
 SIDE-BY-SIDE (marked hypothesis, truncated):
 
 REF:               suojärven timon luento potilasvahingot protetiikassa siinä tulee hyvin laajasti protetiikkaa yleensä vähän vaikeusasteen arviointia ja muuta sitten
-HYP: koulutusta[I] suojärven timon luento potilasvahingot protetiikassa siinä tulee hyvin laajasti protetiikkaa yleensä vähän vaikeusasteen arviointia ja muuta sitten
+HYP: **koulutusta[I]** suojärven timon luento potilasvahingot protetiikassa siinä tulee hyvin laajasti protetiikkaa yleensä vähän vaikeusasteen arviointia ja muuta sitten
 
 REF: on parodontologi martta martolan              luento perimplantiitista                         ja sitten implantticaseja                        semmoinen vodcast jossa peterin                kanssa käydään läpi näitä yleisiä    
-HYP: on parodontologi martta martoon[S,C:martolan] luento periimplantiitista[S,C:perimplantiitista] ja sitten implanttikeissejä[S,C:implantticaseja] semmoinen vodcast jossa peetterin[S,C:peterin] kanssa käydään läpi näitä [D:yleisiä]
+HYP: on parodontologi martta martoon**[S,C:martolan]** luento periimplantiitista**[S,C:perimplantiitista]** ja sitten implanttikeissejä**[S,C:implantticaseja]** semmoinen vodcast jossa peetterin**[S,C:peterin]** kanssa käydään läpi näitä **[D:yleisiä]**
 
 REF: ongelmia     tai     yleisimpiä ongelmia mitä implanttien kanssa voi tulla ja ne on hyvä tunnistaa ja tietää miten ne
-HYP: [D:ongelmia] [D:tai] yleisimpiä ongelmia mitä implanttien kanssa voi tulla ja ne on hyvä tunnistaa ja tietää miten ne
+HYP: **[D:ongelmia]** **[D:tai]** yleisimpiä ongelmia mitä implanttien kanssa voi tulla ja ne on hyvä tunnistaa ja tietää miten ne
 ```
 
 ### Workflow 2: Enhance Transcripts with GPT-5.1
@@ -367,7 +368,7 @@ from pathlib import Path
 # 1. Transcribe audio with GAIK
 config = get_openai_config(use_azure=True)
 transcriber = Transcriber(api_config=config, output_dir="transcripts/")
-result = transcriber.transcribe("Ajokortti.mp3")
+result = transcriber.transcribe("data/Ajokortti.mp3")
 
 # 2. Save transcript for evaluation
 output_file = Path("whisper_output/Ajokortti.txt")
