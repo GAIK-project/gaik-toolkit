@@ -69,8 +69,11 @@ Where:
 ### Evaluation Context
 
 **Domain**: Finnish dental webinars (implantology, prosthetics, periodontology)
+
 **Language**: Finnish (morphologically complex, case inflections, compounds)
+
 **Content**: Technical terminology, brand names, proper nouns, mixed Finnish-English loanwords
+
 **Audio Quality**: Varies (professional recording to field conditions)
 
 ### Models Evaluated and Benchmarks
