@@ -6,7 +6,7 @@ from api.config import get_openai_config, settings
 from api.dependencies import verify_api_key
 from api.schemas.transcribe import TranscribeResponse
 from api.utils import temp_file, validate_file_size, validate_upload
-from gaik.building_blocks.transcriber.transcriber import Transcriber
+from gaik.software_components.transcriber.transcriber import Transcriber
 
 router = APIRouter()
 

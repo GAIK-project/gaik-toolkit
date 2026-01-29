@@ -85,14 +85,14 @@ def _get_api_config():
             detail="Either AZURE_API_KEY or OPENAI_API_KEY environment variable must be set",
         )
 
-    from gaik.building_blocks.config import get_openai_config
+    from gaik.software_components.config import get_openai_config
 
     return get_openai_config(use_azure=use_azure)
 
 
 def _get_or_create_workflow(collection_id: str | None = None):
     """Get existing RAG workflow or create a new one."""
-    from gaik.software_components.RAG_workflow import RAGWorkflow
+    from gaik.software_modules.RAG_workflow import RAGWorkflow
 
     if collection_id and collection_id in RAG_INSTANCES:
         return RAG_INSTANCES[collection_id], collection_id

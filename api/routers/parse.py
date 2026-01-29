@@ -8,7 +8,7 @@ from api.config import get_openai_config, settings
 from api.dependencies import verify_api_key
 from api.schemas.parse import ParseResponse
 from api.utils import temp_file, validate_file_size, validate_upload
-from gaik.building_blocks.parsers import DocxParser, PyMuPDFParser, VisionParser
+from gaik.software_components.parsers import DocxParser, PyMuPDFParser, VisionParser
 
 router = APIRouter()
 

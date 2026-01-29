@@ -43,18 +43,18 @@ async def parse_document(
             parser_type = "docx" if suffix == ".docx" else "pymupdf"
 
         if parser_type == "docx":
-            from gaik.building_blocks.parsers import DocxParser
+            from gaik.software_components.parsers import DocxParser
 
             parser = DocxParser()
             result = parser.parse_document(tmp_path)
         elif parser_type == "pymupdf":
-            from gaik.building_blocks.parsers import PyMuPDFParser
+            from gaik.software_components.parsers import PyMuPDFParser
 
             parser = PyMuPDFParser()
             result = parser.parse_document(tmp_path)
         elif parser_type == "vision":
-            from gaik.building_blocks.config import get_openai_config
-            from gaik.building_blocks.parsers import VisionParser
+            from gaik.software_components.config import get_openai_config
+            from gaik.software_components.parsers import VisionParser
 
             openai_config = get_openai_config(use_azure=bool(os.getenv("AZURE_API_KEY")))
             parser = VisionParser(openai_config=openai_config)

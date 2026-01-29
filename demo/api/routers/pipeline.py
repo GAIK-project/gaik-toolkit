@@ -78,7 +78,7 @@ def _get_api_config():
             detail="Either AZURE_API_KEY or OPENAI_API_KEY environment variable must be set",
         )
 
-    from gaik.building_blocks.config import get_openai_config
+    from gaik.software_components.config import get_openai_config
 
     return get_openai_config(use_azure=use_azure)
 
@@ -136,7 +136,7 @@ async def audio_pipeline(
         # Step 2: Transcribe
         steps[1].status = "in_progress"
 
-        from gaik.software_components.audio_to_structured_data import AudioToStructuredData
+        from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
 
         pipeline = AudioToStructuredData(api_config=config)
 
@@ -263,7 +263,7 @@ async def document_pipeline(
         # Step 2: Parse
         steps[1].status = "in_progress"
 
-        from gaik.software_components.documents_to_structured_data import (
+        from gaik.software_modules.documents_to_structured_data import (
             DocumentsToStructuredData,
         )
 
@@ -379,8 +379,8 @@ async def text_pipeline(
         # Step 2: Extract structured data
         steps[1].status = "in_progress"
 
-        from gaik.building_blocks.extractor.extractor import DataExtractor
-        from gaik.building_blocks.extractor.schema import SchemaGenerator
+        from gaik.software_components.extractor.extractor import DataExtractor
+        from gaik.software_components.extractor.schema import SchemaGenerator
 
         # Step 1: Generate schema from user requirements
         generator = SchemaGenerator(config=config)
@@ -485,8 +485,8 @@ async def text_pipeline_stream(
             steps[0]["status"] = "in_progress"
             yield sse_event("step_update", steps[0])
 
-            from gaik.building_blocks.extractor.extractor import DataExtractor
-            from gaik.building_blocks.extractor.schema import SchemaGenerator
+            from gaik.software_components.extractor.extractor import DataExtractor
+            from gaik.software_components.extractor.schema import SchemaGenerator
 
             generator = SchemaGenerator(config=config)
             extraction_model = generator.generate_schema(user_requirements)

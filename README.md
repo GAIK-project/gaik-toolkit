@@ -4,7 +4,7 @@
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 ![Tests](https://github.com/GAIK-project/gaik-toolkit/actions/workflows/tests.yml/badge.svg)
 
-This is a generative AI toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides reusable building blocks and composable software components for knowledge-centric GenAI solutions.
+This is a generative AI toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides a complete layer-based architecture for building knowledge-centric GenAI solutions, from strategic guidance to deployable implementations.
 
 The toolkit focuses on three core knowledge processes in organizational workflows:
 
@@ -14,36 +14,29 @@ The toolkit focuses on three core knowledge processes in organizational workflow
 
 Internally, these capabilities are exposed as:
 
-- **Building blocks** – atomic utilities such as `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`
-- **RAG building blocks** – `rag_parser_docling`, `rag_parser_vision`, `embedder`, `vector_store`, `retriever`, `answer_generator`, `rag_agent`
-- **Software components** – opinionated end‑to‑end pipelines such as “audio → structured data”, “documents → structured data”, and “RAG workflow”
+- **Software components** – atomic utilities such as `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`, and RAG components like `rag_parser_docling`, `rag_parser_vision`, `embedder`, `vector_store`, `retriever`, `answer_generator`
+- **Software modules** – opinionated end‑to‑end pipelines such as "audio → structured data", "documents → structured data", and "RAG workflow"
 
-This repository is the **implementation layer** that the broader GAIK vision builds on. Solution templates, wizards and organization‑specific workflows can all be composed from these blocks.
+This repository provides a **complete layer-based architecture** spanning from strategic guidance and business requirements to implementation and security compliance.
 
-> If the **Solution Wizard** decides *what* workflow you need, this toolkit is *how* that workflow gets implemented in Python.
+> If the **Solution Wizard** decides *what* workflow you need, this toolkit provides the complete architecture to guide, design, implement, and deploy it.
 
 ---
 
-## How this toolkit fits into the GAIK vision
+## Layer-Based Architecture
 
-At project level, GAIK aims to support **knowledge processes** in organizations – especially SMEs – by providing:
+The GAIK Toolkit is organized into a comprehensive layer-based architecture that spans from strategic planning to implementation and security:
 
-- **Building blocks** for *capture, access, and generation*  
-  (e.g. transcribing calls, parsing documents, extracting structured records)
-- **Software components** that combine those blocks into end‑to‑end pipelines  
-  (e.g. “incident audio → structured incident JSON”, “invoice PDF → structured invoice”)
-- A higher‑level **Solution Wizard** (under development) that:
-  - selects a **template** for a use case (generic pattern)
-  - maps business‑level requirements to **services**, **components**, and **connectors**
-  - exports **deployable workflows** that call these toolkit components
+| Layer | Purpose | Contents |
+|-------|---------|----------|
+| **guidance_layer** | Documentation, best practices, and development guides | CONTRIBUTING.md, documentation (software components & modules), project website |
+| **strategy_layer** | Strategic planning and decision-making frameworks | Strategic planning documents, decision frameworks |
+| **requirements_layer** | Requirements capture and specification | Requirement templates, user stories, acceptance criteria |
+| **business_layer** | Business process modeling and workflows | GenAI product canvas, workflow templates, work systems definitions |
+| **implementation_layer** | Executable code, examples, and tests | Source code (`gaik` package), examples, unit tests, deployment packages, connectors |
+| **security_compliance_layer** | Security policies and compliance frameworks | Security guidelines, compliance checks, audit trails |
 
-This repository covers the **toolkit layer**:
-
-- It gives you **well‑tested primitives** (`SchemaGenerator`, `DataExtractor`, `VisionParser`, `Transcriber`, …).
-- It includes **composed pipelines** in `gaik.software_components` for common patterns:
-  - Audio → structured data
-  - Documents → structured data
-- It is structured so higher‑level orchestration (templates / SolutionWizardSpec) can treat these as **standardized components**.
+This architecture ensures that GenAI solutions are built with proper governance, clear requirements, and comprehensive implementation support.
 
 ---
 
@@ -54,13 +47,13 @@ GAIK distinguishes three levels:
 | Level                  | Concept in GAIK                         | Examples                                                      |
 |------------------------|-----------------------------------------|---------------------------------------------------------------|
 | **Service**            | Logical capability                      | `speech_to_text`, `document_parsing`, `information_extraction` |
-| **Building block**     | Atomic toolkit class / function         | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser` |
-| **Software component** | Composed, workflow‑ready unit           | `AudioToStructuredData`, `DocumentsToStructuredData`, future domain‑specific services |
+| **Software component** | Atomic toolkit class / function         | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser` |
+| **Software module**    | Composed, workflow‑ready unit           | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow` |
 
 In code, that maps to:
 
-- `gaik.building_blocks.*` – low‑level, reusable primitives  
-- `gaik.software_components.*` – opinionated end‑to‑end pipelines that orchestrate multiple building blocks
+- `gaik.software_components.*` – low‑level, reusable primitives
+- `gaik.software_modules.*` – opinionated end‑to‑end pipelines that orchestrate multiple software components
 
 The higher‑level GAIK Solution Wizard (not part of this repo) will:
 
@@ -89,7 +82,6 @@ pip install "gaik[embedder]"
 pip install "gaik[vector-store]"
 pip install "gaik[retriever]"
 pip install "gaik[answer-generator]"
-pip install "gaik[rag-agent]"
 
 # Audio/video transcription (Whisper + GPT enhancement)
 pip install "gaik[transcriber]"
@@ -118,7 +110,7 @@ For video processing and audio compression you'll need `ffmpeg` installed on you
 
 **Goal:** turn natural‑language requirements into a schema, then use that schema to extract **type‑safe structured data** from text.
 
-Key building blocks:
+Key software components:
 
 - `SchemaGenerator` – infers a Pydantic model from a requirements prompt (field names, types, nested structures)
 - `DataExtractor` – uses that model to extract structured records from one or more documents
@@ -127,7 +119,7 @@ Key building blocks:
 Typical pattern:
 
 ```python
-from gaik.building_blocks.extractor import SchemaGenerator, DataExtractor, get_openai_config
+from gaik.software_components.extractor import SchemaGenerator, DataExtractor, get_openai_config
 
 config = get_openai_config(use_azure=True)
 
@@ -152,7 +144,7 @@ print(results)
 
 **Goal:** convert PDFs and other documents into clean text or markdown, ready for extraction or retrieval.
 
-Building blocks:
+Software components:
 
 - `VisionParser` – LLM/vision‑based PDF → markdown (multi‑page context, table handling, custom prompts)
 - `PyMuPDFParser` – fast, local PDF text extraction (no external binaries)
@@ -161,7 +153,7 @@ Building blocks:
 Example (vision‑based PDF → markdown):
 
 ```python
-from gaik.building_blocks.parsers import VisionParser, get_openai_config
+from gaik.software_components.parsers import VisionParser, get_openai_config
 
 config = get_openai_config(use_azure=True)
 
@@ -181,7 +173,7 @@ parser.save_markdown(pages, "invoice.md")
 
 **Goal:** transcribe audio or video into raw and optionally GPT‑enhanced transcripts, with chunking and compression handled for you.
 
-Building blocks:
+Software components:
 
 - `Transcriber` – wraps Whisper + optional GPT enhancement, including:
   - chunking for long audio
@@ -192,7 +184,7 @@ Building blocks:
 Example:
 
 ```python
-from gaik.building_blocks.transcriber import Transcriber, get_openai_config
+from gaik.software_components.transcriber import Transcriber, get_openai_config
 
 config = get_openai_config(use_azure=True)
 transcriber = Transcriber(
@@ -207,9 +199,9 @@ result.save("output/transcripts/")
 
 ---
 
-## Software components (end‑to‑end pipelines)
+## Software modules (end‑to‑end pipelines)
 
-To align with GAIK’s **template / Solution Wizard** vision, the toolkit also supports **reusable software components** built from the building blocks. These represent common generic patterns.
+To align with GAIK's **template / Solution Wizard** vision, the toolkit also supports **reusable software modules** built from the software components. These represent common generic patterns.
 
 ### Audio → Structured Data
 
@@ -273,16 +265,16 @@ Supported providers & environment variables:
 
 Although the full Solution Wizard and template catalogue live outside this repo, this toolkit is designed to support patterns such as:
 
-- **Incident reporting (voice → structured incident report)**  
+- **Incident reporting (voice → structured incident report)**
   `Transcriber` + `SchemaGenerator` + `DataExtractor`
-- **Invoice / PO processing (PDF → structured records)**  
+- **Invoice / PO processing (PDF → structured records)**
   `VisionParser` / `PyMuPDFParser` + `SchemaGenerator` + `DataExtractor`
-- **Contract review (documents → clause database)**  
+- **Contract review (documents → clause database)**
   Any parser + extractor with nested schemas
-- **Customer meetings (call / meeting → CRM fields + summary)**  
+- **Customer meetings (call / meeting → CRM fields + summary)**
   `Transcriber` + extractor, optionally combined with your own task‑specific code or agents
 
-At solution level, a template or SolutionWizardSpec can express these as **services** implemented by GAIK building blocks and software components.
+At solution level, a template or SolutionWizardSpec can express these as **services** implemented by GAIK software components and modules.
 
 ---
 
@@ -290,9 +282,8 @@ At solution level, a template or SolutionWizardSpec can express these as **servi
 
 Explore the examples included in the repository:
 
-- Building‑block level examples: `examples/building_blocks/`
-- RAG building‑block examples: `examples/building_blocks/RAG/`
-- Software component examples: `examples/software_components/`
+- Software component examples (including RAG components): `implementation_layer/examples/software_components/`
+- Software module examples: `implementation_layer/examples/software_modules/`
 - Demos and experiments: `demo/`
 
 Project documentation (work in progress) is available at:
@@ -305,14 +296,18 @@ Project documentation (work in progress) is available at:
 
 Planned / evolving directions:
 
-- Additional **building blocks**:
+- Additional **software components**:
   - document classifiers
   - domain‑specific extractors
   - additional parsing / enrichment utilities
-- More **software components** for common enterprise patterns:
+- More **software modules** for common enterprise patterns:
   - incident reporting
   - meeting summarization
   - HR / recruitment workflows
+- **Layer expansion**:
+  - Strategy layer: decision frameworks and planning tools
+  - Requirements layer: structured requirement templates
+  - Security & compliance layer: governance and audit frameworks
 - Tighter integration with **template catalogues** and a **Solution Wizard** that:
   - maps business requirements → templates
   - selects services & components
@@ -322,9 +317,9 @@ Planned / evolving directions:
 
 ## Contributing
 
-Contributions are welcome — from bug reports and documentation improvements to new building blocks and software components that fit the GAIK architecture.
+Contributions are welcome — from bug reports and documentation improvements to new software components and modules that fit the GAIK architecture.
 
-Please see `CONTRIBUTING.md` for contribution guidelines.
+Please see [`guidance_layer/CONTRIBUTING.md`](guidance_layer/CONTRIBUTING.md) for contribution guidelines.
 
 ---
 

@@ -45,7 +45,7 @@ async def extract_data(request: ExtractRequest):
     try:
         from pydantic import create_model
 
-        from gaik.building_blocks.extractor import (
+        from gaik.software_components.extractor import (
             DataExtractor,
             ExtractionRequirements,
             FieldSpec,

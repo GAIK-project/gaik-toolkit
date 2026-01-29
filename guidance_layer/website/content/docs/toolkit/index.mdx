@@ -1,0 +1,123 @@
+---
+title: Overview
+description: Introduction to GAIK toolkit components
+---
+
+## What is GAIK Toolkit?
+
+GAIK toolkit is an AI-powered toolkit for Python that provides structured data extraction, document parsing, audio transcription, and document classification. It uses OpenAI models (Azure OpenAI or standard OpenAI) for intelligent document processing.
+
+**PyPI:** [https://pypi.org/project/gaik/](https://pypi.org/project/gaik/)
+**GitHub:** [https://github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
+**Python Support:** 3.10+
+
+## Architecture
+
+The toolkit is organized into two layers:
+
+### Building Blocks (Low-level)
+
+Individual components for specific tasks:
+
+- **[Data Extraction](/toolkit/knowledge-extraction)** - Schema generation and structured data extraction
+- **[PDF Parsers](/toolkit/parser)** - Vision-based and local document parsing
+- **Transcriber** - Audio/video transcription with Whisper
+- **Document Classifier** - AI-powered document categorization
+
+### Software Components (High-level)
+
+End-to-end pipelines that combine building blocks:
+
+- **DocumentsToStructuredData** - Complete document parsing + extraction pipeline
+- **AudioToStructuredData** - Audio transcription + extraction pipeline
+
+## Key Features
+
+- **Structured Data Extraction** - Extract information using natural language descriptions
+- **Dynamic Schema Generation** - Automatically generate Pydantic models from requirements
+- **PDF to Markdown** - Vision-based parsing with table preservation
+- **Audio Transcription** - Whisper-powered transcription with optional enhancement
+- **Document Classification** - Categorize documents with confidence scores
+- **Type-Safe** - Full Pydantic validation for extracted data
+- **Batch Processing** - Process multiple documents efficiently
+- **Schema Persistence** - Save and reuse generated schemas
+
+## Installation
+
+```bash
+# All features
+pip install "gaik[all]"
+
+# Specific components
+pip install "gaik[parser]"      # PDF parsing
+pip install "gaik[transcriber]" # Audio transcription
+```
+
+## Supported Providers
+
+| Provider | Environment Variables | Models |
+|----------|----------------------|--------|
+| Azure OpenAI | `AZURE_API_KEY`, `AZURE_ENDPOINT` | gpt-4, gpt-5.1, whisper |
+| Standard OpenAI | `OPENAI_API_KEY` | gpt-4, gpt-5.1, whisper-1 |
+
+## Quick Example
+
+```python
+from gaik.software_components.extractor import (
+    SchemaGenerator, DataExtractor, get_openai_config
+)
+
+# Configure OpenAI
+config = get_openai_config(use_azure=True)
+
+# Generate schema from requirements
+generator = SchemaGenerator(config=config)
+schema = generator.generate_schema(
+    user_requirements="Extract invoice number, total, and date"
+)
+
+# Extract data
+extractor = DataExtractor(config=config)
+results = extractor.extract(
+    extraction_model=schema,
+    requirements=generator.item_requirements,
+    user_requirements="Extract invoice number, total, and date",
+    documents=["Invoice #12345, Total: $1,500, Date: 2024-01-15"]
+)
+
+print(results)
+```
+
+## High-Level Pipeline Example
+
+```python
+from gaik.software_modules.documents_to_structured_data import (
+    DocumentsToStructuredData
+)
+from pathlib import Path
+
+pipeline = DocumentsToStructuredData(use_azure=True)
+result = pipeline.run(
+    file_path=Path("invoice.pdf"),
+    user_requirements="Extract invoice number, vendor, and total",
+    parser_choice="vision_parser"
+)
+
+print(result.extracted_fields)
+```
+
+## Getting Started
+
+To start using the toolkit, check out the [Getting Started](/getting-started) guide or explore individual component documentation:
+
+<Cards>
+  <Card title="Data Extraction" href="/toolkit/knowledge-extraction" description="Extract structured data with SchemaGenerator and DataExtractor" />
+  <Card title="PDF Parsing" href="/toolkit/parser" description="Parse PDFs to Markdown" />
+</Cards>
+
+## Resources
+
+- **Installation Guide**: [Getting Started](/getting-started)
+- **PyPI Package**: [https://pypi.org/project/gaik/](https://pypi.org/project/gaik/)
+- **GitHub Repository**: [https://github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
+- **Examples**: [Real-world use cases](/examples)

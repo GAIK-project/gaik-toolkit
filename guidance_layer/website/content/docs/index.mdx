@@ -1,0 +1,135 @@
+---
+title: Introduction
+description: GAIK - GenAI toolkit for smarter knowledge work
+---
+
+<div style={{textAlign: 'center', margin: '2rem 0'}}>
+  <img src="/gaik-toolkit/logos/SVG/gaik_logo_big_fitted.svg" alt="GAIK Logo" style={{maxWidth: '600px', width: '100%', height: 'auto'}} />
+</div>
+
+## GenAI Toolkit for Smarter Knowledge Work
+
+GAIK toolkit provides reusable, modular components for building GenAI-powered knowledge management solutions. Extract structured data from documents, parse PDFs, transcribe audio, and classify documents - all with natural language descriptions.
+
+```bash
+pip install "gaik[all]"
+```
+
+**[PyPI](https://pypi.org/project/gaik/)** | **[GitHub](https://github.com/GAIK-project/gaik-toolkit)** | **Python 3.10+**
+
+## Quick Example
+
+```python
+from gaik.software_components.extractor import (
+    SchemaGenerator, DataExtractor, get_openai_config
+)
+
+# Configure OpenAI (Azure or standard)
+config = get_openai_config(use_azure=True)
+
+# Generate schema from natural language
+generator = SchemaGenerator(config=config)
+schema = generator.generate_schema(
+    user_requirements="Extract invoice number, vendor, and total amount"
+)
+
+# Extract data
+extractor = DataExtractor(config=config)
+results = extractor.extract(
+    extraction_model=schema,
+    requirements=generator.item_requirements,
+    user_requirements="Extract invoice data",
+    documents=["Invoice #12345 from Acme Corp. Total: $1,500"]
+)
+
+print(results)  # [{'invoice_number': '12345', 'vendor': 'Acme Corp', 'total_amount': 1500}]
+```
+
+## Key Features
+
+| Component | Description |
+|-----------|-------------|
+| **Data Extraction** | Extract structured data using natural language requirements |
+| **PDF Parsing** | Vision-based and local PDF to Markdown conversion |
+| **Audio Transcription** | Whisper-powered transcription with GPT enhancement |
+| **Document Classification** | AI-powered document categorization |
+
+## Architecture
+
+The toolkit is organized into two layers:
+
+### Building Blocks (Low-level)
+
+Individual components for specific tasks - use these when you need fine-grained control:
+
+- **SchemaGenerator** + **DataExtractor** - Dynamic schema generation and extraction
+- **VisionParser** / **PyMuPDFParser** / **DoclingParser** - PDF parsing options
+- **Transcriber** - Audio/video transcription
+- **DocumentClassifier** - Document categorization
+
+### Software Components (High-level)
+
+End-to-end pipelines that combine building blocks:
+
+- **DocumentsToStructuredData** - Parse documents and extract structured data
+- **AudioToStructuredData** - Transcribe audio and extract structured data
+
+## Knowledge Management Focus
+
+GAIK addresses three fundamental knowledge management processes:
+
+**Knowledge Capture** - Extract information from business documents, videos, voice recordings, emails, and meeting recordings.
+
+**Knowledge Access** - Quick, precise, and intelligent access to organizational knowledge.
+
+**Knowledge Generation** - Auto-generate reports, proposals, and documentation.
+
+## Modular Component Architecture
+
+Each component is designed as an independently deployable unit that can:
+
+- Function standalone or integrate with other components
+- Work as services, endpoints, or Model Context Protocols (MCPs)
+- Scale from simple scripts to production pipelines
+
+## Get Started
+
+<Cards>
+  <Card
+    title="Getting Started"
+    href="/getting-started"
+    description="Installation and environment setup"
+  />
+  <Card
+    title="Toolkit"
+    href="/toolkit"
+    description="Component documentation and API reference"
+  />
+  <Card
+    title="Examples"
+    href="/examples"
+    description="Real-world use cases and patterns"
+  />
+</Cards>
+
+## About GAIK
+
+GAIK (Generative AI-Enhanced Knowledge Management) is a research project exploring how generative AI can transform knowledge management in businesses.
+
+### Project Facts
+
+| | |
+|---|---|
+| **Project Lead** | Haaga-Helia University of Applied Sciences |
+| **Duration** | February 2025 - January 2027 |
+| **Co-funding** | European Regional Development Fund (ERDF) |
+
+### Partners
+
+**Academic:** University of Helsinki, Tampere University
+
+**Industry:** Azets Insight Oy, Luvata Oy, QAdental
+
+**International Research:** TIB Leibniz Information Centre (Germany), 3IA Cote d'Azur (France), MCI The Entrepreneurial School (Austria)
+
+Learn more at **[gaik.ai](https://gaik.ai/)**

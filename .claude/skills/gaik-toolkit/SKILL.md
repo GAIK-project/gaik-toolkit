@@ -24,7 +24,7 @@ Python toolkit for knowledge extraction, capture, and generation. Use when worki
 
 - **Documentation**: https://gaik-project.github.io/gaik-toolkit/
 - **GitHub**: https://github.com/GAIK-project/gaik-toolkit
-- **Source Code**: https://github.com/GAIK-project/gaik-toolkit/tree/main/src/gaik
+- **Source Code**: https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik
 - **Docs Source**: https://github.com/GAIK-project/gaik-toolkit/tree/main/website/content/docs
 - **PyPI**: https://pypi.org/project/gaik/
 - **PyPI JSON API**: https://pypi.org/pypi/gaik/json
@@ -421,7 +421,7 @@ if existing:
 
 This skill is designed for gaik-toolkit v0.3.x. Update when:
 - New building blocks or software components are added
-- Import paths change in `src/gaik/`
+- Import paths change in `implementation_layer/src/gaik/`
 - Major API changes occur
 
 The PyPI fetch script always retrieves the latest version info.

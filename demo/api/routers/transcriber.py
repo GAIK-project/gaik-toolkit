@@ -59,7 +59,7 @@ async def transcribe_audio(
         tmp_path = tmp.name
 
     try:
-        from gaik.building_blocks.transcriber import Transcriber, get_openai_config
+        from gaik.software_components.transcriber import Transcriber, get_openai_config
 
         config = get_openai_config(use_azure=use_azure)
         transcriber = Transcriber(

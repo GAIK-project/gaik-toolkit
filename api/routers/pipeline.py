@@ -94,7 +94,7 @@ async def create_diary(
         try:
             config = get_openai_config()
 
-            from gaik.software_components.audio_to_structured_data import (
+            from gaik.software_modules.audio_to_structured_data import (
                 AudioToStructuredData,
             )
 
@@ -199,8 +199,8 @@ async def _process_text_incident(
     try:
         config = get_openai_config()
 
-        from gaik.building_blocks.extractor.extractor import DataExtractor
-        from gaik.building_blocks.extractor.schema import SchemaGenerator
+        from gaik.software_components.extractor.extractor import DataExtractor
+        from gaik.software_components.extractor.schema import SchemaGenerator
 
         generator = SchemaGenerator(config=config)
         schema = generator.generate_schema(requirements)
@@ -254,7 +254,7 @@ async def _process_audio_incident(
         try:
             config = get_openai_config()
 
-            from gaik.software_components.audio_to_structured_data import (
+            from gaik.software_modules.audio_to_structured_data import (
                 AudioToStructuredData,
             )
 
@@ -307,7 +307,7 @@ async def _process_document_incident(
         try:
             config = get_openai_config()
 
-            from gaik.software_components.documents_to_structured_data import (
+            from gaik.software_modules.documents_to_structured_data import (
                 DocumentsToStructuredData,
             )
 

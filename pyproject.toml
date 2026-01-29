@@ -195,10 +195,10 @@ build-backend = "setuptools.build_meta"
 
 # Source code location (not installed, directs setuptools behavior)
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["implementation_layer/src"]
 exclude = ["gaik.tests", "gaik.*.tests"]
 [tool.setuptools_scm]
-version_file = "src/gaik/_version.py"
+version_file = "implementation_layer/src/gaik/_version.py"
 tag_regex = "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
 fallback_version = "0.0.0"
 version_scheme = "no-guess-dev"
@@ -222,5 +222,5 @@ ignore = []
 
 # Pytest test runner configuration
 [tool.pytest.ini_options]
-testpaths = ["src/gaik"]
+testpaths = ["implementation_layer/eval_methods/unit_tests"]
 addopts = ["-v", "--strict-markers"]

@@ -1,6 +1,6 @@
 """
 Generate PDF documents from structured data.
-Copied from gaik.software_components.structured_data_to_pdf for demo use.
+Copied from gaik.software_modules.structured_data_to_pdf for demo use.
 """
 
 from __future__ import annotations

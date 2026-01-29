@@ -46,7 +46,9 @@ Thumbs.db
 
 .venv
 venv/
-¨
-.claude/settings.local.json
+
+# Claude Code
+.claude/
+
 .ruff_cache/src/gaik/_version.py
 src/gaik/_version.py

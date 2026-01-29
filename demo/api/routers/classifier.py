@@ -55,7 +55,7 @@ async def classify_document(
         tmp_path = tmp.name
 
     try:
-        from gaik.building_blocks.doc_classifier import DocumentClassifier, get_openai_config
+        from gaik.software_components.doc_classifier import DocumentClassifier, get_openai_config
 
         config = get_openai_config(use_azure=use_azure)
         classifier = DocumentClassifier(config)
