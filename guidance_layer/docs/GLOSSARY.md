@@ -1,6 +1,6 @@
 # GAIK Toolkit Glossary
 
-An alphabetized reference of terms and concepts used in the GAIK (Generative AI Knowledge Management) Toolkit.
+An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 ---
 
