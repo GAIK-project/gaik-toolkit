@@ -94,17 +94,13 @@ pip install "gaik[rag-workflow]"
 # Everything
 pip install "gaik[all]"
 
-# CPU-only (no GPU/torch/docling) - smaller footprint for cloud deployments
-pip install "gaik[all-cpu]"
 ```
-
-> **Tip:** Use `gaik[all-cpu]` for environments without GPU support (e.g., CSC Rahti, lightweight containers). It includes all features except the heavy `docling` parser which requires PyTorch.
 
 For video processing and audio compression you'll need `ffmpeg` installed on your system (optional but recommended).
 
 ---
 
-## Core modules
+## Core Software Components
 
 ### 1. Extractor – schema‑based structured data
 
@@ -116,30 +112,6 @@ Key software components:
 - `DataExtractor` – uses that model to extract structured records from one or more documents
 - Shared helpers: `get_openai_config`, `create_openai_client` for OpenAI/Azure configuration
 
-Typical pattern:
-
-```python
-from gaik.software_components.extractor import SchemaGenerator, DataExtractor, get_openai_config
-
-config = get_openai_config(use_azure=True)
-
-generator = SchemaGenerator(config=config)
-schema = generator.generate_schema(
-    user_requirements="Extract invoice number, total amount in USD, and vendor name."
-)
-
-extractor = DataExtractor(config=config)
-results = extractor.extract(
-    extraction_model=schema,
-    requirements=generator.item_requirements,
-    user_requirements=generator.item_requirements.use_case_name,
-    documents=["Invoice #12345 from Acme Corp, Total: $1,500"],
-    save_json=True,
-    json_path="results.json",
-)
-print(results)
-```
-
 ### 2. Parsers – documents → text / markdown
 
 **Goal:** convert PDFs and other documents into clean text or markdown, ready for extraction or retrieval.
@@ -149,25 +121,7 @@ Software components:
 - `VisionParser` – LLM/vision‑based PDF → markdown (multi‑page context, table handling, custom prompts)
 - `PyMuPDFParser` – fast, local PDF text extraction (no external binaries)
 - `DoclingParser` – OCR and multi‑format parsing (for more complex documents)
-
-Example (vision‑based PDF → markdown):
-
-```python
-from gaik.software_components.parsers import VisionParser, get_openai_config
-
-config = get_openai_config(use_azure=True)
-
-parser = VisionParser(
-    openai_config=config,
-    use_context=True,
-)
-
-pages = parser.convert_pdf("invoice.pdf", dpi=150, clean_output=True)
-markdown = "
-
-".join(pages)
-parser.save_markdown(pages, "invoice.md")
-```
+- `VisionRAGParser` – combines Docling with vision models for RAG‑optimized parsing (chunked outputs with image descriptions)
 
 ### 3. Transcriber – audio / video → transcripts
 
@@ -181,21 +135,18 @@ Software components:
   - context‑aware multi‑chunk transcription
 - `TranscriptionResult` – container with save/export helpers
 
-Example:
+### 4. RAG Components – retrieval‑augmented generation
 
-```python
-from gaik.software_components.transcriber import Transcriber, get_openai_config
+**Goal:** build retrieval‑augmented generation pipelines that parse documents, store them as searchable vectors, retrieve relevant context, and generate accurate, cited answers.
 
-config = get_openai_config(use_azure=True)
-transcriber = Transcriber(
-    api_config=config,
-    output_dir="transcriber_workspace",
-)
+Software components:
 
-result = transcriber.transcribe("meeting_recording.mp3")
-print(result.enhanced_transcript or result.raw_transcript)
-result.save("output/transcripts/")
-```
+- `rag_parser_docling` – parses PDFs with Docling into chunked Documents with metadata
+- `rag_parser_vision` – combines Docling with vision models to add image descriptions into chunks
+- `embedder` – generates vector embeddings from text chunks using OpenAI/Azure models
+- `vector_store` – stores embeddings and metadata (in‑memory or Chroma persistent storage)
+- `retriever` – retrieves relevant chunks using semantic search (supports hybrid search + reranking)
+- `answer_generator` – generates answers from retrieved context with optional citations and conversation history
 
 ---
 
@@ -265,14 +216,18 @@ Supported providers & environment variables:
 
 Although the full Solution Wizard and template catalogue live outside this repo, this toolkit is designed to support patterns such as:
 
-- **Incident reporting (voice → structured incident report)**
-  `Transcriber` + `SchemaGenerator` + `DataExtractor`
-- **Invoice / PO processing (PDF → structured records)**
-  `VisionParser` / `PyMuPDFParser` + `SchemaGenerator` + `DataExtractor`
-- **Contract review (documents → clause database)**
-  Any parser + extractor with nested schemas
-- **Customer meetings (call / meeting → CRM fields + summary)**
-  `Transcriber` + extractor, optionally combined with your own task‑specific code or agents
+- **Incident reporting (voice/recording + images → structured extraction → report generation)**
+  `Transcriber` + `SchemaGenerator` + `DataExtractor` + `ReportWriter`
+- **PO and BOM processing (PDF → structured extraction → price calculation →  sales order generation)**
+  `VisionParser` / `PyMuPDFParser` + `SchemaGenerator` + `DataExtractor` + `ReportWriter`
+- **Construction Diary Creation (voice/recording + images → structured extraction → report generation)**
+`Transcriber` + `SchemaGenerator` + `DataExtractor` + `ReportWriter`
+- **Transcription and Translation of domain-specific videos (Transcription + Translation)**
+ `Transcriber` + `PostTranscriptEnhancer`
+ - **Semantic Video Search (Semantic + keyword based search within videos)**
+ `Embedder` + `vectorStore` + `HybridRetriever` + `ReRanker`
+- **Construction Site Report Generation (Multiple documents + images + audios + notes + sample report → A structured report)**
+ `Transcriber` + `DocClassifier` + `VisionRAGParser` + `ReportWriter` 
 
 At solution level, a template or SolutionWizardSpec can express these as **services** implemented by GAIK software components and modules.
 
@@ -291,30 +246,6 @@ Project documentation (work in progress) is available at:
 - https://gaik-docs.2.rahtiapp.fi/
 
 ---
-
-## Roadmap (GAIK project context)
-
-Planned / evolving directions:
-
-- Additional **software components**:
-  - document classifiers
-  - domain‑specific extractors
-  - additional parsing / enrichment utilities
-- More **software modules** for common enterprise patterns:
-  - incident reporting
-  - meeting summarization
-  - HR / recruitment workflows
-- **Layer expansion**:
-  - Strategy Layer: decision frameworks and planning tools
-  - Requirements Layer: structured requirement templates
-  - Security & Compliance Layer: governance and audit frameworks
-- Tighter integration with **template catalogues** and a **Solution Wizard** that:
-  - maps business requirements → templates
-  - selects services & components
-  - emits deployable workflows using GAIK toolkit components
-
----
-
 ## Contributing
 
 Contributions are welcome — from bug reports and documentation improvements to new software components and modules that fit the GAIK architecture.
