@@ -226,7 +226,8 @@ python side_by_side_compare.py \
   - `[I]` = Insertion
 - Aggregate statistics across all files
 
-**Sample Output:**
+**Sample Output (sample video: data/Ajokortti.mp3, model: gpt-4o-transcribe):**
+
 ```
 ==================================================
 TRANSCRIPTION ACCURACY REPORT
@@ -244,18 +245,18 @@ Substitutions:              39
 Insertions:                 1
 Deletions:                  27
 ==================================================
-
-SIDE-BY-SIDE (marked hypothesis, truncated):
-
-REF:               suojärven timon luento potilasvahingot protetiikassa siinä tulee hyvin laajasti protetiikkaa yleensä vähän vaikeusasteen arviointia ja muuta sitten
-HYP: **koulutusta[I]** suojärven timon luento potilasvahingot protetiikassa siinä tulee hyvin laajasti protetiikkaa yleensä vähän vaikeusasteen arviointia ja muuta sitten
-
-REF: on parodontologi martta martolan              luento perimplantiitista                         ja sitten implantticaseja                        semmoinen vodcast jossa peterin                kanssa käydään läpi näitä yleisiä    
-HYP: on parodontologi martta martoon**[S,C:martolan]** luento periimplantiitista**[S,C:perimplantiitista]** ja sitten implanttikeissejä**[S,C:implantticaseja]** semmoinen vodcast jossa peetterin**[S,C:peterin]** kanssa käydään läpi näitä **[D:yleisiä]**
-
-REF: ongelmia     tai     yleisimpiä ongelmia mitä implanttien kanssa voi tulla ja ne on hyvä tunnistaa ja tietää miten ne
-HYP: **[D:ongelmia]** **[D:tai]** yleisimpiä ongelmia mitä implanttien kanssa voi tulla ja ne on hyvä tunnistaa ja tietää miten ne
 ```
+
+**SIDE-BY-SIDE COMPARISON** (marked hypothesis, truncated):
+
+**REF:** suojärven timon luento potilasvahingot protetiikassa siinä tulee hyvin laajasti protetiikkaa yleensä vähän vaikeusasteen arviointia ja muuta sitten
+**HYP:** **koulutusta[I]** suojärven timon luento potilasvahingot protetiikassa siinä tulee hyvin laajasti protetiikkaa yleensä vähän vaikeusasteen arviointia ja muuta sitten
+
+**REF:** on parodontologi martta martolan luento perimplantiitista ja sitten implantticaseja semmoinen vodcast jossa peterin kanssa käydään läpi näitä yleisiä
+**HYP:** on parodontologi martta **martoon[S,C:martolan]** luento **periimplantiitista[S,C:perimplantiitista]** ja sitten **implanttikeissejä[S,C:implantticaseja]** semmoinen vodcast jossa **peetterin[S,C:peterin]** kanssa käydään läpi näitä **[D:yleisiä]**
+
+**REF:** ongelmia tai yleisimpiä ongelmia mitä implanttien kanssa voi tulla ja ne on hyvä tunnistaa ja tietää miten ne
+**HYP:** **[D:ongelmia] [D:tai]** yleisimpiä ongelmia mitä implanttien kanssa voi tulla ja ne on hyvä tunnistaa ja tietää miten ne
 
 ### Workflow 2: Enhance Transcripts with GPT-5.1
 
