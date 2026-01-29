@@ -16,7 +16,7 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 ## B
 
-**business_layer**: One of the six layers in GAIK's architecture, containing business process modeling, workflows, GenAI product canvas, workflow templates, and work systems definitions for each generic use case.
+**Business Layer**: One of the six layers in GAIK's architecture, containing business process modeling, workflows, GenAI product canvas, workflow templates, and work systems definitions for each generic use case.
 
 ## C
 
@@ -58,11 +58,11 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 **Generic Use Case**: A reusable, template-based solution pattern applicable across multiple organizations or scenarios, such as "invoice processing" or "incident reporting." Each has associated workflows, product canvases, test cases, and implementation assets.
 
-**guidance_layer**: One of the six layers in GAIK's architecture, containing documentation, best practices, development guides, process guides, configuration wizard, glossary, and the project website.
+**Guidance Layer**: One of the six layers in GAIK's architecture, containing documentation, best practices, development guides, process guides, configuration wizard, glossary, and the project website.
 
 ## I
 
-**implementation_layer**: One of the six layers in GAIK's architecture, containing executable code (software components and modules), examples, tests, deployment packages, demos, connectors, evaluation methods, and AIOps monitoring.
+**Implementation Layer**: One of the six layers in GAIK's architecture, containing executable code (software components and modules), examples, tests, deployment packages, demos, connectors, evaluation methods, and AIOps monitoring.
 
 ## K
 
@@ -78,7 +78,7 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 ## L
 
-**Layer-Based Architecture**: GAIK's comprehensive six-layer framework spanning from strategic guidance (guidance_layer, strategy_layer, requirements_layer) through business design (business_layer) to implementation (implementation_layer) and governance (security_compliance_layer).
+**Layer-Based Architecture**: GAIK's comprehensive six-layer framework spanning from strategic guidance (Guidance Layer, Strategy Layer, Requirements Layer) through business design (Business Layer) to implementation (Implementation Layer) and governance (Security Compliance Layer).
 
 ## M
 
@@ -86,9 +86,9 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 ## N
 
-**No-code Assets**: Implementation resources such as prompts, agent skills, and instructions that enable solution deployment without programming, available for each generic use case.
+**No-Code Assets**: Implementation resources such as prompts, agent skills, and instructions that enable solution deployment without programming, available for each generic use case.
 
-**No-code Implementation**: An implementation approach that uses prompts, agent configurations, and pre-built tools rather than custom code, making solutions accessible to non-developers.
+**No-Code Implementation**: An implementation approach that uses prompts, agent configurations, and pre-built tools rather than custom code, making solutions accessible to non-developers.
 
 ## P
 
@@ -98,13 +98,13 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 **Rahti**: CSC's Finnish container cloud platform (specifically CSC Rahti 2) used for deploying GAIK demonstration apps and production solutions in OpenShift-compatible environments.
 
-**requirements_layer**: One of the six layers in GAIK's architecture, containing requirements templates, test cases/evals, ground truth data, and input-output pairs for each generic use case.
+**Requirements Layer**: One of the six layers in GAIK's architecture, containing requirements templates, test cases/evals, ground truth data, and input-output pairs for each generic use case.
 
 **Roles**: Part of the security and compliance framework, defining user permissions and access levels to system functionality and data based on organizational responsibilities.
 
 ## S
 
-**security_compliance_layer**: One of the six layers in GAIK's architecture, containing security policies, privacy frameworks, compliance guidelines, authentication, roles, secrets management, and audit logging.
+**Security Compliance Layer**: One of the six layers in GAIK's architecture, containing security policies, privacy frameworks, compliance guidelines, authentication, roles, secrets management, and audit logging.
 
 **Software Components**: Low-level, atomic, reusable utilities that perform specific tasks with fine-grained control. Examples include schema generators, parsers, transcribers, and RAG components. Located in `gaik.software_components.*`.
 
@@ -116,7 +116,7 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 **Specific Use Case**: A customized implementation of a generic use case tailored to a particular organization's requirements, data, and processes.
 
-**strategy_layer**: One of the six layers in GAIK's architecture, containing strategic planning documents, lists of knowledge processes and services, value evaluation frameworks and models, use case identification frameworks, maturity assessments, and success frameworks.
+**Strategy Layer**: One of the six layers in GAIK's architecture, containing strategic planning documents, lists of knowledge processes and services, value evaluation frameworks and models, use case identification frameworks, maturity assessments, and success frameworks.
 
 ## T
 
