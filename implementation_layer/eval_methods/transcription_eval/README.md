@@ -30,8 +30,6 @@ This evaluation suite provides:
 - **`data/Ajokortti.mp3`** - Sample Finnish dental webinar audio
 - **`data/reference.txt`** - Ground truth transcript for sample audio
 - **`data/side-by-side-comparison.txt`** - Example evaluation report with aligned comparison
-- **`transcription_evaluation.pptx`** - Presentation with benchmark results and error analysis
-
 ---
 
 ## Understanding Word Error Rate (WER)
@@ -161,8 +159,6 @@ These errors have minimal impact on meaning and are often acceptable in producti
 | **Filler Insertions** | Extra discourse words | ... [I] around sentence starts | Doesn't change core meaning; reflects natural speech patterns |
 
 **Decision Criteria**: If transcript is still comprehensible and semantically correct, minor function word errors can be accepted to avoid over-correction risks.
-
-*Source: GAIK Transcription Evaluation Analysis (transcription_evaluation.pptx, slides 4-5)*
 
 ---
 
