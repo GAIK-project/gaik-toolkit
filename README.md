@@ -29,12 +29,12 @@ The GAIK Toolkit is organized into a layer-based architecture that spans from st
 
 | Layer | Purpose | Contents |
 |-------|---------|----------|
-| **guidance_layer** | Documentation, best practices, and development guides | CONTRIBUTING.md, documentation (software components & modules), project website |
-| **strategy_layer** | Strategic planning and decision-making frameworks | Strategic planning documents, decision frameworks |
-| **requirements_layer** | Requirements capture and specification | Requirement templates, user stories, acceptance criteria |
-| **business_layer** | Business process modeling and workflows | GenAI product canvas, workflow templates, work systems definitions |
-| **implementation_layer** | Executable code, examples, and tests | Source code (`gaik` package), examples, unit tests, deployment packages, connectors |
-| **security_compliance_layer** | Security policies and compliance frameworks | Security guidelines, compliance checks, audit trails |
+| **Guidance Layer** | Documentation, best practices, and development guides | CONTRIBUTING.md, documentation (software components & modules), project website |
+| **Strategy Layer** | Strategic planning and decision-making frameworks | Strategic planning documents, decision frameworks |
+| **Requirements Layer** | Requirements capture and specification | Requirement templates, user stories, acceptance criteria |
+| **Business Layer** | Business process modeling and workflows | GenAI product canvas, workflow templates, work systems definitions |
+| **Implementation Layer** | Executable code, examples, and tests | Source code (`gaik` package), examples, unit tests, deployment packages, connectors |
+| **Security Compliance Layer** | Security policies and compliance frameworks | Security guidelines, compliance checks, audit trails |
 
 This architecture ensures that GenAI solutions are built with proper governance, clear requirements, and comprehensive implementation support.
 
@@ -305,9 +305,9 @@ Planned / evolving directions:
   - meeting summarization
   - HR / recruitment workflows
 - **Layer expansion**:
-  - Strategy layer: decision frameworks and planning tools
-  - Requirements layer: structured requirement templates
-  - Security & compliance layer: governance and audit frameworks
+  - Strategy Layer: decision frameworks and planning tools
+  - Requirements Layer: structured requirement templates
+  - Security & Compliance Layer: governance and audit frameworks
 - Tighter integration with **template catalogues** and a **Solution Wizard** that:
   - maps business requirements → templates
   - selects services & components
