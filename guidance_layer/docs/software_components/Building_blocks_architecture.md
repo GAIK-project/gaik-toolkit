@@ -370,7 +370,7 @@ __all__ = [
 
 ### 3. Import Test Registration
 
-**File:** `implementation_layer/eval_methods/unit_tests/test_imports.py`
+**File:** `implementation_layer/unit_tests/test_imports.py`
 
 ```python
 def test_<new_component>_import():
@@ -563,7 +563,7 @@ See [full documentation](../../../guidance_layer/docs/software_components/<name>
 
 ### 1. Import Tests
 
-**Location:** `implementation_layer/eval_methods/unit_tests/test_imports.py`
+**Location:** `implementation_layer/unit_tests/test_imports.py`
 
 ```python
 def test_<component>_import():
@@ -601,7 +601,7 @@ def test_processing():
 
 ### 3. Integration Tests
 
-**Location:** `implementation_layer/eval_methods/unit_tests/test_<component>_integration.py`
+**Location:** `implementation_layer/unit_tests/test_<component>_integration.py`
 
 ```python
 """Integration tests for <component_name>."""
@@ -667,7 +667,7 @@ mkdir -p guidance_layer/docs/software_components
    ]
    ```
 
-3. **`implementation_layer/eval_methods/unit_tests/test_imports.py`**
+3. **`implementation_layer/unit_tests/test_imports.py`**
    ```python
    def test_<name>_import():
        """Test that <name> module can be imported."""
@@ -722,7 +722,7 @@ mkdir -p guidance_layer/docs/software_components
 
 1. **Test import**
    ```bash
-   pytest implementation_layer/eval_methods/unit_tests/test_imports.py::test_<name>_import
+   pytest implementation_layer/unit_tests/test_imports.py::test_<name>_import
    ```
 
 2. **Test installation**
@@ -870,11 +870,11 @@ def process_file(
 - [ ] Main implementation module(s)
 - [ ] Optional dependencies in `pyproject.toml`
 - [ ] Registered in `implementation_layer/implementation_layer/src/gaik/software_components/__init__.py`
-- [ ] Import test in `implementation_layer/eval_methods/unit_tests/test_imports.py`
+- [ ] Import test in `implementation_layer/unit_tests/test_imports.py`
 - [ ] Full documentation in `guidance_layer/docs/software_components/<name>.md`
 - [ ] Quick reference README in module directory
 - [ ] At least 2 examples in `implementation_layer/examples/software_components/<name>/`
-- [ ] Tests pass: `pytest implementation_layer/eval_methods/unit_tests/test_imports.py`
+- [ ] Tests pass: `pytest implementation_layer/unit_tests/test_imports.py`
 - [ ] Can be installed: `pip install gaik[<name>]`
 - [ ] Examples run successfully
 - [ ] Follows all design patterns and conventions

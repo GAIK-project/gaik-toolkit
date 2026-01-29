@@ -222,5 +222,5 @@ ignore = []
 
 # Pytest test runner configuration
 [tool.pytest.ini_options]
-testpaths = ["implementation_layer/eval_methods/unit_tests"]
+testpaths = ["implementation_layer/unit_tests"]
 addopts = ["-v", "--strict-markers"]
