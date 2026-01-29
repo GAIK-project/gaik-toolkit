@@ -1,0 +1,88 @@
+==================================================
+TRANSCRIPTION ACCURACY REPORT
+==================================================
+Word Error Rate (WER):      16.67%
+Character Error Rate (CER): 7.88%
+Spelling Error Rate:        4.98%
+Substitution Rate:          9.70%
+Deletion Rate:              6.72%
+Insertion Rate:             0.25%
+--------------------------------------------------
+Total words in reference:   402
+Correct words:              336
+Substitutions:              39
+Insertions:                 1
+Deletions:                  27
+==================================================
+
+
+SIDE-BY-SIDE (marked hypothesis, truncated):
+
+REF:               suojärven timon luento potilasvahingot protetiikassa siinä tulee hyvin laajasti protetiikkaa yleensä vähän vaikeusasteen arviointia ja muuta sitten
+HYP: koulutusta[I] suojärven timon luento potilasvahingot protetiikassa siinä tulee hyvin laajasti protetiikkaa yleensä vähän vaikeusasteen arviointia ja muuta sitten
+
+REF: on parodontologi martta martolan              luento perimplantiitista                         ja sitten implantticaseja                        semmoinen vodcast jossa peterin                kanssa käydään läpi näitä yleisiä    
+HYP: on parodontologi martta martoon[S,C:martolan] luento periimplantiitista[S,C:perimplantiitista] ja sitten implanttikeissejä[S,C:implantticaseja] semmoinen vodcast jossa peetterin[S,C:peterin] kanssa käydään läpi näitä [D:yleisiä]
+
+REF: ongelmia     tai     yleisimpiä ongelmia mitä implanttien kanssa voi tulla ja ne on hyvä tunnistaa ja tietää miten ne
+HYP: [D:ongelmia] [D:tai] yleisimpiä ongelmia mitä implanttien kanssa voi tulla ja ne on hyvä tunnistaa ja tietää miten ne
+
+REF: ratkaistaan viimeisenä on vielä sitten semmoinen osio missä on tärkeää tunnistaa nämä eivät       ole missään nimessä sellaisia mitä
+HYP: ratkaistaan viimeisenä on vielä sitten semmoinen osio missä on tärkeää tunnistaa nämä ei[S:eivät] ole missään nimessä sellaisia mitä
+
+REF: kannattaa ensimmäisenä lähteä tekemään elikkä        siellä on implantologiaa                    advanced webinaarisarja timo suojärven               ja ilkka pallosen               siinä tehdään sitten
+HYP: kannattaa ensimmäisenä lähteä tekemään eli[S:elikkä] siellä on implantologia[S,C:implantologiaa] advanced webinaarisarja timo suojärvi[S,C:suojärven] ja ilkka pallonen[S,C:pallosen] siinä tehdään sitten
+
+REF: semmoista niin            kuin                    sanotaanko                highendimplanttihoitoa                     etualueen     ja esteettisen     alueen     ja     tosi vaativia temppuja mutta ne on tärkeää tunnistaa
+HYP: semmoista highend[S:niin] implanttihoitoa[S:kuin] etualueella[S:sanotaanko] estettisalueella[S:highendimplanttihoitoa] [D:etualueen] ja [D:esteettisen] [D:alueen] [D:ja] tosi vaativia temppuja mutta ne on tärkeää tunnistaa
+
+REF: kun itse tekee että milloin missä menee se raja että milloin työ voi muuttuakin yhtäkkiä todella hankalaksi ja    
+HYP: kun itse tekee että milloin missä menee se raja että milloin työ voi muuttuakin yhtäkkiä todella hankalaksi [D:ja]
+
+REF: sitten on myös oikomishoidollisia näkökulmia timo ja virpi myller oikoja virpi keskustelevat sitten siitä aiheesta ja     miten sitä
+HYP: sitten on myös oikomishoidollisia näkökulmia timo ja virpi myller oikoja virpi keskustelevat sitten siitä aiheesta [D:ja] miten sitä
+
+REF: voidaan preproteettisesti hyödyntää teorian lopuksi on lopputentti ja sen suorittamalla sitten se ajokortin osa yksi on tehty ajokortin
+HYP: voidaan preproteettisesti hyödyntää teorian lopuksi on lopputentti ja sen suorittamalla sitten se ajokortin osa yksi on tehty ajokortin
+
+REF: osa kaksi komponentit tutuksi päivä helsingissä clarion                      hotellissa     se alkaa peterin                kertausluennolla vähän näitä perusasioita kerrataan siihen alkuun                
+HYP: osa kaksi komponentit tutuksi päivä helsingissä clarionhotellissa[S:clarion] [D:hotellissa] se alkaa peetterin[S,C:peterin] kertausluennolla vähän näitä perusasioita kerrataan siihen alkupohjalle[S:alkuun]
+
+REF: pohjalle     ja     sen jälkeen siellä on neljä implanttibrändiä mukana straumann               densply          sirona                 nobel biocare            ja camlogconelog           eli implantona                  
+HYP: [D:pohjalle] [D:ja] sen jälkeen siellä on neljä implanttibrändiä mukana strauman[S,C:straumann] niden[S:densply] splacirona[S,C:sirona] nobel pajaker[S:biocare] ja camlog[S:camlogconelog] eli implanttoona[S,C:implantona]
+
+REF: oy tutustutaan heidän komponentteihin mitä              mimmoisia     osia siellä on miten ne eroavat toisistaan ja     siellä on myös neljä
+HYP: oy tutustutaan heidän komponentteihin millaisia[S:mitä] [D:mimmoisia] osia siellä on miten ne eroavat toisistaan [D:ja] siellä on myös neljä
+
+REF: eri skanneria sitten     mukana elikkä        päästään katsomaan miten skannereilla jäljennetään ja     tosiaan päivän idea             on se että tutustutaan
+HYP: eri skanneria [D:sitten] mukana eli[S:elikkä] päästään katsomaan miten skannereilla jäljennetään [D:ja] tosiaan päivän ideana[S,C:idea] on se että tutustutaan
+
+REF: näihin osiin tutustutaan skannereihin ja päästään vähän sen harjoittelemaan niillä myös siellä paikan päällä sitten     jäljentämistä sitten sanoisin
+HYP: näihin osiin tutustutaan skannereihin ja päästään vähän sen harjoittelemaan niillä myös siellä paikan päällä [D:sitten] jäljentämistä sitten sanoisin
+
+REF: että tämän ajokortin pihvi on se osa kolme ja     se on tämä pienryhmävalmennus mestarikisälli                              valmennus     jossa sitten            peter    
+HYP: että tämän ajokortin pihvi on se osa kolme [D:ja] se on tämä pienryhmävalmennus mestarikisällivalmennus[S,C:mestarikisälli] [D:valmennus] jossa peetter[S:sitten] [D:peter]
+
+REF: ottaa kopin enintään kymmenen mahtuu mukaan elikkä        ne jotka tähän lähtee niin     kannattaa nopsaan ilmoittautua että saa paikan
+HYP: ottaa kopin enintään kymmenen mahtuu mukaan eli[S:elikkä] ne jotka tähän lähtee [D:niin] kannattaa nopsaan ilmoittautua että saa paikan
+
+REF: sieltä tässä kohderyhmänä on valmistuneet yleishammaslääkärit joilla on vähän tai ei lainkaan kokemusta implanttihoidoista                        eli ehkä ei kaikista
+HYP: sieltä tässä kohderyhmänä on valmistuneet yleishammaslääkärit joilla on vähän tai ei lainkaan kokemusta implantihoidoista[S,C:implanttihoidoista] eli ehkä ei kaikista
+
+REF: kovimmille konkareille mutta hekin ovat       toki tervetulleita tähän tiivistettynä koostumus on aloituspäivä futudentin                 tiloissa helsingissä sitten on peterin               
+HYP: kovimmille konkareille mutta hekin on[S:ovat] toki tervetulleita tähän tiivistettynä koostumus on aloituspäivä futurentin[S,C:futudentin] tiloissa helsingissä sitten on peetterin[S,C:peterin]
+
+REF: työskentelyn seuraamista privaattivastaanotolla sitten on etäsessioita peterin                kanssa ja     lopussa vielä kokoonnutaan ja jaetaan kaikki todistukset ja digitaalinen
+HYP: työskentelyn seuraamista privaattivastaanotolla sitten on etäsessioita peetterin[S,C:peterin] kanssa [D:ja] lopussa vielä kokoonnutaan ja jaetaan kaikki todistukset ja digitaalinen
+
+REF: semmoinen     paketti kaikille kesto on noin kuusiyhdeksän       kuukautta mutta nyt minä     annan peterille                  puheenvuoron kerro pikkuisen               tuosta struktuurista               
+HYP: [D:semmoinen] paketti kaikille kesto on noin 69[S:kuusiyhdeksän] kuukautta mutta nyt [D:minä] annan peetterille[S,C:peterille] puheenvuoron kerro pikkusen[S,C:pikkuisen] tuosta rakenteesta[S:struktuurista]
+
+REF: siitä     aloituspäivästä alkaen miten se menee tämä valmennus joo se koostuu teoriaosuudesta käydään muutamia asioita läpi tarkennetaan sitä
+HYP: [D:siitä] aloituspäivästä alkaen miten se menee tämä valmennus joo se koostuu teoriaosuudesta käydään muutamia asioita läpi tarkennetaan sitä
+
+REF: advanced vaativan implanttiprotetiikan ja perusimplanttiprotetiikan rajapintaa että osataan tunnistaa pikkuisen               paremmin tätä potilasvalintaa ja potilaita joita me hoidamme             
+HYP: advanced vaativan implanttiprotetiikan ja perusimplanttiprotetiikan rajapintaa että osataan tunnistaa pikkasen[S,C:pikkuisen] paremmin tätä potilasvalintaa ja potilaita joita me hoidetaan[S:hoidamme]
+
+REF: ja     sitten     toinen osa on tämä handson
+HYP: [D:ja] [D:sitten] toinen osa on tämä handson
