@@ -55,7 +55,7 @@ In code, that maps to:
 - `gaik.software_components.*` – low‑level, reusable primitives
 - `gaik.software_modules.*` – opinionated end‑to‑end pipelines that orchestrate multiple software components
 
-The higher‑level GAIK Solution Wizard (not part of this repo) will:
+The higher‑level GAIK Solution Wizard (under development) will:
 
 1. Select a template (generic pattern) for a use case
 2. Choose required services
