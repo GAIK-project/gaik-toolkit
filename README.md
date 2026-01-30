@@ -21,6 +21,8 @@ This repository provides a **complete layer-based architecture** ranging from st
 
 > If the **Solution Wizard** decides *what* workflow you need, this toolkit provides the complete architecture to guide, design, implement, and deploy it.
 
+![GAIK Architecture](images/image1.jpg)
+
 ---
 
 ## Layer-Based Architecture
