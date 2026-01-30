@@ -21,8 +21,6 @@ This repository provides a **complete layer-based architecture** ranging from st
 
 > If the **Solution Wizard** decides *what* workflow you need, this toolkit provides the complete architecture to guide, design, implement, and deploy it.
 
-![GAIK Architecture](images/image1.jpg)
-
 ---
 
 ## Layer-Based Architecture
@@ -39,6 +37,7 @@ The GAIK Toolkit is organized into a layer-based architecture that spans from st
 | **Security Compliance Layer** | Security policies and compliance frameworks | Security guidelines, compliance checks, audit trails |
 
 This architecture ensures that GenAI solutions are built with proper governance, clear requirements, and comprehensive implementation support.
+![GAIK Architecture](images/image1.jpg)
 
 ---
 
