@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     description: 'Multi-provider AI toolkit for Python with structured data extraction and document parsing. Bridging research, technology and real-world business applications.',
     images: [
       {
-        url: '/gaik-toolkit/logos/gaik_logo_medium.png',
+        url: '/logos/gaik_logo_medium.png',
         width: 512,
         height: 512,
         alt: 'GAIK - Generative AI-Enhanced Knowledge Management',
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'GAIK - Generative AI-Enhanced Knowledge Management',
     description: 'Multi-provider AI toolkit for Python with structured data extraction and document parsing.',
-    images: ['/gaik-toolkit/logos/gaik_logo_medium.png'],
+    images: ['/logos/gaik_logo_medium.png'],
   },
 };
 
