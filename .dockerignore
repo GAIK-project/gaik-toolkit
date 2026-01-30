@@ -16,7 +16,7 @@ __pycache__/
 
 # Documentation & examples (not needed in production)
 docs/
-demo/
+implementation_layer/toolkit_demo_app/
 examples/
 website/
 *.md

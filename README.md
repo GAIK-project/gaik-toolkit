@@ -243,7 +243,7 @@ Explore the examples included in the repository:
 
 - Software component examples (including RAG components): `implementation_layer/examples/software_components/`
 - Software module examples: `implementation_layer/examples/software_modules/`
-- Demos and experiments: `demo/`
+- Demos and experiments: `implementation_layer/toolkit_demo_app/`
 
 Project documentation (work in progress) is available at:
 

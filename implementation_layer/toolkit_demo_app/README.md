@@ -30,7 +30,7 @@ bun install
 2. **Install API dependencies:**
 
 ```bash
-cd ../implementation_layer/api
+cd ../../implementation_layer/api
 pip install -r requirements.txt
 ```
 
@@ -47,7 +47,7 @@ export OPENAI_API_KEY=your-key-here
 bun dev
 
 # Terminal 2: API
-cd ../implementation_layer/api
+cd ../../implementation_layer/api
 uvicorn main:app --reload
 ```
 
@@ -67,7 +67,7 @@ docker compose up --build
 ## Project Structure
 
 ```
-demo/
+toolkit_demo_app/
 ├── app/                    # Next.js pages
 │   ├── page.tsx           # Landing page
 │   ├── extractor/         # Extractor demo

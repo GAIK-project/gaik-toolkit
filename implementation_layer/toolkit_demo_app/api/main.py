@@ -10,7 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from gaik import __version__ as gaik_version
 
-# Load .env.local from demo folder
+# Load .env.local from toolkit_demo_app folder
 env_path = Path(__file__).parent.parent / ".env.local"
 load_dotenv(env_path)
 

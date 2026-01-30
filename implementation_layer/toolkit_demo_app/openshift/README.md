@@ -40,15 +40,17 @@ oc apply -f route.yaml
 ## Build & Push Images
 
 ```bash
-# Backend API
+# Backend API (runs from repo root)
 docker build -t gaik-demo-api -f implementation_layer/api/Dockerfile .
 docker tag gaik-demo-api image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo-api:latest
 docker push image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo-api:latest
 
-# Frontend
+# Frontend (runs from demo directory)
+cd implementation_layer/toolkit_demo_app
 docker build -t gaik-demo .
 docker tag gaik-demo image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo:latest
 docker push image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo:latest
+cd ../..
 ```
 
 ## Environment Variables
