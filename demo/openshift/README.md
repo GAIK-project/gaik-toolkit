@@ -41,7 +41,7 @@ oc apply -f route.yaml
 
 ```bash
 # Backend API
-docker build -t gaik-demo-api api/
+docker build -t gaik-demo-api -f implementation_layer/api/Dockerfile .
 docker tag gaik-demo-api image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo-api:latest
 docker push image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo-api:latest
 

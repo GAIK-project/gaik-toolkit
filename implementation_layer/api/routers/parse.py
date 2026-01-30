@@ -4,10 +4,10 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from api.config import get_openai_config, settings
-from api.dependencies import verify_api_key
-from api.schemas.parse import ParseResponse
-from api.utils import temp_file, validate_file_size, validate_upload
+from implementation_layer.api.config import get_openai_config, settings
+from implementation_layer.api.dependencies import verify_api_key
+from implementation_layer.api.schemas.parse import ParseResponse
+from implementation_layer.api.utils import temp_file, validate_file_size, validate_upload
 from gaik.software_components.parsers import DocxParser, PyMuPDFParser, VisionParser
 
 router = APIRouter()

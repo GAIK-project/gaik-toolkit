@@ -30,7 +30,7 @@ bun install
 2. **Install API dependencies:**
 
 ```bash
-cd api
+cd ../implementation_layer/api
 pip install -r requirements.txt
 ```
 
@@ -47,7 +47,7 @@ export OPENAI_API_KEY=your-key-here
 bun dev
 
 # Terminal 2: API
-cd api
+cd ../implementation_layer/api
 uvicorn main:app --reload
 ```
 

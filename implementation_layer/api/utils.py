@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 
-from api.config import settings
+from implementation_layer.api.config import settings
 
 
 def validate_upload(

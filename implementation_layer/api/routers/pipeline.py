@@ -8,10 +8,10 @@ from typing import Literal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from api.config import get_openai_config, settings
-from api.dependencies import verify_api_key
-from api.schemas.pipeline import DiaryResponse, IncidentReportResponse
-from api.utils import temp_file, validate_file_size, validate_upload
+from implementation_layer.api.config import get_openai_config, settings
+from implementation_layer.api.dependencies import verify_api_key
+from implementation_layer.api.schemas.pipeline import DiaryResponse, IncidentReportResponse
+from implementation_layer.api.utils import temp_file, validate_file_size, validate_upload
 
 router = APIRouter()
 
@@ -114,7 +114,7 @@ async def create_diary(
 
             # Generate PDF if requested
             if generate_pdf and result.extracted_fields:
-                from api.utils.diary_pdf import generate_diary_pdf
+                from implementation_layer.api.utils.diary_pdf import generate_diary_pdf
 
                 pdf_buffer = generate_diary_pdf(
                     extraction_data=result.extracted_fields[0],
@@ -353,7 +353,7 @@ async def _process_document_incident(
 
 def _generate_incident_pdf(job_id: str, data: list[dict]) -> None:
     """Generate PDF for incident report."""
-    from api.utils.pdf_generator import StructuredDataToPDF
+    from implementation_layer.api.utils.pdf_generator import StructuredDataToPDF
 
     pdf_generator = StructuredDataToPDF(title="Incident Report")
     pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"

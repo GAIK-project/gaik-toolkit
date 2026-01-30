@@ -20,7 +20,7 @@ demo/
 examples/
 website/
 *.md
-!api/README.md
+!implementation_layer/api/README.md
 
 # Build artifacts
 build/

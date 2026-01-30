@@ -11,8 +11,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.config import settings
-from api.routers import parse, pipeline, transcribe
+from implementation_layer.api.config import settings
+from implementation_layer.api.routers import parse, pipeline, transcribe
 
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "api.main:app",
+        "implementation_layer.api.main:app",
         host=settings.HOST,
         port=settings.PORT,
         reload=settings.DEBUG,

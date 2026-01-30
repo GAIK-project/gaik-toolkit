@@ -16,20 +16,20 @@ A lightweight REST API for audio transcription and document parsing. Uses [GAIK 
 # From project root
 cd gaik-toolkit
 pip install -e ".[all]"
-pip install -r api/requirements.txt
+pip install -r implementation_layer/api/requirements.txt
 ```
 
 ## Usage
 
 ```bash
 # Development mode
-cp api/.env.example api/.env
+cp implementation_layer/api/.env.example implementation_layer/api/.env
 # Edit .env and set API_KEY and Azure/OpenAI credentials
 
-DEBUG=true uvicorn api.main:app --reload
+DEBUG=true uvicorn implementation_layer.api.main:app --reload
 
 # Production
-uvicorn api.main:app --host 0.0.0.0 --port 8000
+uvicorn implementation_layer.api.main:app --host 0.0.0.0 --port 8000
 ```
 
 ## API Calls
@@ -56,8 +56,8 @@ curl -X POST http://localhost:8000/parse \
 ## Docker
 
 ```bash
-docker build -t gaik-api -f api/Dockerfile .
-docker run -p 8000:8000 --env-file api/.env gaik-api
+docker build -t gaik-api -f implementation_layer/api/Dockerfile .
+docker run -p 8000:8000 --env-file implementation_layer/api/.env gaik-api
 ```
 
 ## Environment Variables

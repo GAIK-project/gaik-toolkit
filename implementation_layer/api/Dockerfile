@@ -23,8 +23,8 @@ RUN useradd --create-home --shell /bin/bash --uid 1001 appuser \
     && chown -R appuser:appuser /app
 
 # Copy and install API dependencies first (for Docker layer caching)
-COPY api/requirements.txt ./api/
-RUN pip install --no-cache-dir -r api/requirements.txt
+COPY implementation_layer/api/requirements.txt ./implementation_layer/api/
+RUN pip install --no-cache-dir -r implementation_layer/api/requirements.txt
 
 # Copy the gaik package source
 COPY src/ ./src/
@@ -37,7 +37,7 @@ COPY pyproject.toml ./
 RUN pip install --no-cache-dir -e ".[transcriber]" PyMuPDF python-docx
 
 # Copy API source code
-COPY api/ ./api/
+COPY implementation_layer/api/ ./implementation_layer/api/
 
 # Create workspace directory for transcriber
 RUN mkdir -p /app/transcriber_workspace && chown -R appuser:appuser /app
@@ -53,4 +53,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 # Run the application
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "implementation_layer.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

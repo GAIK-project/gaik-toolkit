@@ -7,7 +7,7 @@
 !**/secrets.yaml.example
 
 # Internal documentation (contains internal URLs)
-api/USAGE.md
+implementation_layer/api/USAGE.md
 # Python
 __pycache__/
 *.py[cod]
