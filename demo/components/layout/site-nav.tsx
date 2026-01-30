@@ -6,8 +6,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Bot,
+  Boxes,
+  ChevronDown,
   FileSearch,
   FileText,
+  Lightbulb,
   LogOut,
   LucideIcon,
   Menu,
@@ -16,6 +19,12 @@ import {
   Tags,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
@@ -35,14 +44,38 @@ import {
 import { GitHubIcon } from "@/components/github-icon";
 import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
 
-const navItems = [
-  { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
-  { label: "RAG Builder", href: "/rag", icon: Bot },
-  { label: "Extractor", href: "/extractor", icon: FileSearch },
-  { label: "Parser", href: "/parser", icon: FileText },
-  { label: "Classifier", href: "/classifier", icon: Tags },
-  { label: "Transcriber", href: "/transcriber", icon: Mic },
-] as const;
+interface NavItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+interface NavGroup {
+  label: string;
+  icon: LucideIcon;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
+  {
+    label: "Use Cases",
+    icon: Lightbulb,
+    items: [
+      { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
+      { label: "RAG Builder", href: "/rag", icon: Bot },
+    ],
+  },
+  {
+    label: "Building Blocks",
+    icon: Boxes,
+    items: [
+      { label: "Extractor", href: "/extractor", icon: FileSearch },
+      { label: "Parser", href: "/parser", icon: FileText },
+      { label: "Classifier", href: "/classifier", icon: Tags },
+      { label: "Transcriber", href: "/transcriber", icon: Mic },
+    ],
+  },
+];
 
 interface NavLinkProps {
   href: string;
@@ -152,6 +185,55 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
   );
 }
 
+interface NavDropdownProps {
+  group: NavGroup;
+  isActive: (href: string) => boolean;
+}
+
+function NavDropdown({ group, isActive }: NavDropdownProps) {
+  const hasActiveItem = group.items.some((item) => isActive(item.href));
+  const GroupIcon = group.icon;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className={cn(
+            "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap transition",
+            hasActiveItem
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
+        >
+          <GroupIcon className="h-4 w-4" />
+          <span>{group.label}</span>
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-48">
+        {group.items.map((item) => {
+          const ItemIcon = item.icon;
+          const active = isActive(item.href);
+          return (
+            <DropdownMenuItem key={item.href} asChild>
+              <Link
+                href={item.href}
+                className={cn(
+                  "flex cursor-pointer items-center gap-2",
+                  active && "bg-accent",
+                )}
+              >
+                <ItemIcon className="h-4 w-4" />
+                {item.label}
+              </Link>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function MobileMenuButton() {
   return (
     <Button variant="outline" size="icon" className="lg:hidden">
@@ -189,14 +271,24 @@ function MobileNav({ isActive, githubPreview, isLoggedIn }: MobileNavProps) {
         <SheetHeader>
           <SheetTitle>Navigation</SheetTitle>
         </SheetHeader>
-        <nav className="mt-6 flex flex-col gap-2">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.href}
-              {...item}
-              active={isActive(item.href)}
-              variant="mobile"
-            />
+        <nav className="mt-6 flex flex-col gap-4">
+          {navGroups.map((group) => (
+            <div key={group.label}>
+              <div className="text-muted-foreground mb-2 flex items-center gap-2 px-3 text-xs font-semibold uppercase tracking-wider">
+                <group.icon className="h-4 w-4" />
+                {group.label}
+              </div>
+              <div className="flex flex-col gap-1">
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    {...item}
+                    active={isActive(item.href)}
+                    variant="mobile"
+                  />
+                ))}
+              </div>
+            </div>
           ))}
           <hr className="my-2" />
           <GitHubLink preview={githubPreview} variant="mobile" />
@@ -256,13 +348,8 @@ export function SiteNav({ githubPreview, isLoggedIn }: SiteNavProps) {
         {/* Desktop Navigation */}
         <nav aria-label="Primary" className="hidden lg:block">
           <div className="border-border/70 bg-card/70 flex items-center gap-1 rounded-full border p-1.5 shadow-sm">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.href}
-                {...item}
-                active={isActive(item.href)}
-                variant="desktop"
-              />
+            {navGroups.map((group) => (
+              <NavDropdown key={group.label} group={group} isActive={isActive} />
             ))}
           </div>
         </nav>

@@ -1,8 +1,7 @@
 ﻿# GAIK – Generative AI Knowledge Management Toolkit
 
 [![PyPI version](https://img.shields.io/pypi/v/gaik.svg)](https://pypi.org/project/gaik/)
-![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
-![Tests](https://github.com/GAIK-project/gaik-toolkit/actions/workflows/tests.yml/badge.svg)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
 This is a generative AI toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides a complete layer-based architecture for building knowledge-centric GenAI solutions, from strategic guidance to deployable implementations.
 
@@ -88,7 +87,10 @@ pip install "gaik[answer-generator]"
 # Audio/video transcription (Whisper + GPT enhancement)
 pip install "gaik[transcriber]"
 
-# Software components (pipelines)
+# Document classification
+pip install "gaik[classifier]"
+
+# Software modules (pipelines)
 pip install "gaik[audio-to-structured-data]"
 pip install "gaik[documents-to-structured-data]"
 pip install "gaik[rag-workflow]"

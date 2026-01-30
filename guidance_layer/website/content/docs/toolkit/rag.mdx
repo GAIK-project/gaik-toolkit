@@ -1,0 +1,290 @@
+---
+title: RAG Components
+description: Retrieval-augmented generation pipeline for document Q&A
+---
+
+## Overview
+
+Build retrieval-augmented generation (RAG) pipelines that parse documents, store them as searchable vectors, retrieve relevant context, and generate accurate, cited answers.
+
+## Installation
+
+Install individual components or the complete workflow:
+
+```bash
+# Individual RAG components
+pip install gaik[rag-parser-docling]
+pip install gaik[rag-parser-vision]
+pip install gaik[embedder]
+pip install gaik[vector-store]
+pip install gaik[retriever]
+pip install gaik[answer-generator]
+
+# Complete RAG workflow
+pip install gaik[rag-workflow]
+
+# Everything
+pip install gaik[all]
+```
+
+**Note:** Requires OpenAI/Azure OpenAI access. Chroma is used for vector storage.
+
+## Quick Start with RAGWorkflow
+
+The simplest way to use RAG is the high-level workflow:
+
+```python
+from gaik.software_modules.RAG_workflow import RAGWorkflow
+
+# Create workflow
+workflow = RAGWorkflow()
+
+# Index documents
+workflow.index_documents(["document.pdf", "report.pdf"])
+
+# Ask questions
+result = workflow.ask("What is the total amount?", stream=False)
+print(result.answer)
+```
+
+## RAG Components
+
+The toolkit provides modular components that can be used individually or combined:
+
+| Component | Purpose |
+|-----------|---------|
+| **rag_parser_docling** | Parse PDFs with Docling into chunked Documents with metadata |
+| **rag_parser_vision** | Docling + vision model parsing that adds image descriptions |
+| **embedder** | Generate vector embeddings using OpenAI/Azure models |
+| **vector_store** | Store embeddings (in-memory or Chroma persistent) |
+| **retriever** | Semantic search with optional hybrid + reranking |
+| **answer_generator** | Generate answers with optional citations and history |
+
+## RAGWorkflow API
+
+### Constructor
+
+```python
+workflow = RAGWorkflow(
+    api_config=None,                          # From get_openai_config()
+    use_azure=True,                           # Use Azure OpenAI
+    persist=True,                             # Persist vector store
+    persist_path="chroma_store",              # Storage path
+    collection_name="gaik_rag",               # Collection name
+    embedding_model=None,                     # Embedding model
+    retriever_top_k=5,                        # Number of results
+    retriever_threshold=None,                 # Score threshold
+    retriever_hybrid=False,                   # Enable hybrid search
+    retriever_rerank=False,                   # Enable reranking
+    citations=True,                           # Include citations
+    stream=True,                              # Stream responses
+    conversation_history=True,                # Track Q&A history
+    last_n=3                                  # History window
+)
+```
+
+### Methods
+
+```python
+# Index documents
+index_result = workflow.index_documents(
+    file_paths=["doc1.pdf", "doc2.pdf"]
+)
+
+# Ask questions
+result = workflow.ask(
+    query="What is the main topic?",
+    top_k=5,                                  # Override top_k
+    score_threshold=None,                     # Override threshold
+    filters=None,                             # Metadata filters
+    include_scores=False,                     # Include similarity scores
+    stream=False                              # Override streaming
+)
+
+print(result.answer)
+```
+
+## Features
+
+- **Vision Parsing** - Extracts text and image descriptions from PDFs
+- **Persistent Vector Store** - Chroma-backed storage for persistence
+- **Semantic Search** - Vector similarity search for relevant chunks
+- **Hybrid Search** - Optional BM25 keyword weighting
+- **Re-ranking** - Optional cross-encoder reranking for better results
+- **Citations** - Optional citation formatting in answers
+- **Conversation History** - Last-n Q/A memory for context
+
+## Individual Components
+
+### Embedder
+
+Generate vector embeddings from text:
+
+```python
+from gaik.software_components.RAG.embedder import Embedder, get_openai_config
+
+config = get_openai_config(use_azure=True)
+embedder = Embedder(config=config)
+
+texts = ["First chunk", "Second chunk"]
+embeddings, documents = embedder.embed(texts)
+```
+
+### Vector Store
+
+Store and query embeddings:
+
+```python
+from gaik.software_components.RAG.vector_store import VectorStore
+
+# In-memory store
+store = VectorStore(persist=False)
+
+# Persistent store with Chroma
+store = VectorStore(
+    persist=True,
+    persist_path="chroma_store",
+    collection_name="my_collection"
+)
+
+# Add documents
+store.add(embeddings, documents)
+
+# Query
+results = store.query(query_embedding, top_k=5)
+```
+
+### Retriever
+
+Search with semantic and hybrid options:
+
+```python
+from gaik.software_components.RAG.retriever import Retriever
+from gaik.software_components.RAG.embedder import Embedder
+from gaik.software_components.RAG.vector_store import VectorStore
+from gaik.software_components.config import get_openai_config
+
+config = get_openai_config(use_azure=True)
+embedder = Embedder(config=config)
+store = VectorStore(persist=False)
+retriever = Retriever(
+    embedder=embedder,
+    vector_store=store,
+    hybrid_search=False,      # Enable BM25 + vector search
+    re_rank=False,            # Enable cross-encoder reranking
+    top_k=5
+)
+
+# Search
+docs = retriever.search(
+    query="What is the total?",
+    top_k=3,
+    include_scores=True
+)
+```
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `AZURE_API_KEY` | Azure only | Azure OpenAI API key |
+| `AZURE_ENDPOINT` | Azure only | Azure OpenAI endpoint URL |
+| `AZURE_DEPLOYMENT` | Azure only | Azure deployment name |
+| `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
+| `AZURE_API_VERSION` | Optional | API version (default: 2025-03-01-preview) |
+
+## Complete Example
+
+```python
+from gaik.software_modules.RAG_workflow import RAGWorkflow
+from pathlib import Path
+
+# Create workflow with full configuration
+workflow = RAGWorkflow(
+    use_azure=True,
+    persist=True,
+    persist_path="./my_knowledge_base",
+    collection_name="company_docs",
+    retriever_top_k=5,
+    retriever_hybrid=True,      # Enable hybrid search
+    retriever_rerank=True,      # Enable reranking
+    citations=True,
+    conversation_history=True,
+    last_n=5
+)
+
+# Index documents
+docs_folder = Path("documents/")
+pdf_files = list(docs_folder.glob("*.pdf"))
+workflow.index_documents(pdf_files)
+
+# Interactive Q&A
+questions = [
+    "What are the main products?",
+    "What is the pricing model?",
+    "Who are the key contacts?"
+]
+
+for question in questions:
+    result = workflow.ask(question, stream=False)
+    print(f"Q: {question}")
+    print(f"A: {result.answer}\n")
+```
+
+## Building a Custom Pipeline
+
+Combine components for custom workflows:
+
+```python
+from gaik.software_components.RAG.embedder import Embedder
+from gaik.software_components.RAG.vector_store import VectorStore
+from gaik.software_components.RAG.retriever import Retriever
+from gaik.software_components.RAG.answer_generator import AnswerGenerator
+from gaik.software_components.config import get_openai_config
+
+# Initialize components
+config = get_openai_config(use_azure=True)
+embedder = Embedder(config=config)
+store = VectorStore(persist=True, persist_path="custom_store")
+retriever = Retriever(embedder=embedder, vector_store=store)
+generator = AnswerGenerator(config=config)
+
+# Add your documents
+texts = ["Document content 1...", "Document content 2..."]
+embeddings, documents = embedder.embed(texts)
+store.add(embeddings, documents)
+
+# Query
+relevant_docs = retriever.search("Your question here", top_k=3)
+answer = generator.generate(
+    query="Your question here",
+    context=relevant_docs,
+    citations=True
+)
+
+print(answer)
+```
+
+## Error Handling
+
+```python
+from gaik.software_modules.RAG_workflow import RAGWorkflow
+
+try:
+    workflow = RAGWorkflow(use_azure=True)
+    workflow.index_documents(["document.pdf"])
+    result = workflow.ask("What is the main topic?")
+except FileNotFoundError:
+    print("Document not found")
+except ValueError as e:
+    print(f"Configuration error: {e}")
+except Exception as e:
+    print(f"RAG operation failed: {e}")
+```
+
+## Next Steps
+
+- Learn about [Data Extraction](/toolkit/knowledge-extraction)
+- Explore [PDF Parsing](/toolkit/parser) for document processing
+- Check out [Transcriber](/toolkit/transcriber) for audio/video
+- View on [PyPI](https://pypi.org/project/gaik/) or [GitHub](https://github.com/GAIK-project/gaik-toolkit)

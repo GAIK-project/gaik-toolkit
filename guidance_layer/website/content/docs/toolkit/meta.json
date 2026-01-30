@@ -1,4 +1,4 @@
 {
   "title": "Toolkit",
-  "pages": ["index", "knowledge-extraction", "parser"]
+  "pages": ["index", "knowledge-extraction", "parser", "transcriber", "classifier", "rag"]
 }

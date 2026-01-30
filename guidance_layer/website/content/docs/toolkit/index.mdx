@@ -9,7 +9,7 @@ GAIK toolkit is an AI-powered toolkit for Python that provides structured data e
 
 **PyPI:** [https://pypi.org/project/gaik/](https://pypi.org/project/gaik/)
 **GitHub:** [https://github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
-**Python Support:** 3.10+
+**Python Support:** 3.11+
 
 ## Architecture
 
@@ -21,8 +21,9 @@ Individual components for specific tasks:
 
 - **[Data Extraction](/toolkit/knowledge-extraction)** - Schema generation and structured data extraction
 - **[PDF Parsers](/toolkit/parser)** - Vision-based and local document parsing
-- **Transcriber** - Audio/video transcription with Whisper
-- **Document Classifier** - AI-powered document categorization
+- **[Transcriber](/toolkit/transcriber)** - Audio/video transcription with Whisper
+- **[Document Classifier](/toolkit/classifier)** - AI-powered document categorization
+- **[RAG Components](/toolkit/rag)** - Retrieval-augmented generation pipeline
 
 ### Software Modules (High-level)
 
@@ -30,6 +31,7 @@ End-to-end pipelines that combine software components:
 
 - **DocumentsToStructuredData** - Complete document parsing + extraction pipeline
 - **AudioToStructuredData** - Audio transcription + extraction pipeline
+- **RAGWorkflow** - Document Q&A with retrieval-augmented generation
 
 ## Key Features
 
@@ -113,6 +115,9 @@ To start using the toolkit, check out the [Getting Started](/getting-started) gu
 <Cards>
   <Card title="Data Extraction" href="/toolkit/knowledge-extraction" description="Extract structured data with SchemaGenerator and DataExtractor" />
   <Card title="PDF Parsing" href="/toolkit/parser" description="Parse PDFs to Markdown" />
+  <Card title="Audio Transcription" href="/toolkit/transcriber" description="Transcribe audio and video with Whisper" />
+  <Card title="Document Classification" href="/toolkit/classifier" description="Classify documents with AI" />
+  <Card title="RAG Components" href="/toolkit/rag" description="Build retrieval-augmented generation pipelines" />
 </Cards>
 
 ## Resources

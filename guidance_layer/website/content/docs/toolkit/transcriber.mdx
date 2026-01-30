@@ -1,0 +1,228 @@
+---
+title: Transcriber
+description: Transcribe audio and video files using OpenAI Whisper with optional GPT enhancement
+---
+
+## Overview
+
+Transcribe audio and video files using OpenAI Whisper with optional GPT enhancement for improved formatting. Supports automatic chunking for long files and compression for large files.
+
+## Installation
+
+```bash
+pip install gaik[transcriber]
+# or
+pip install gaik[all]
+```
+
+**Note:** Video processing and audio compression require ffmpeg. See [System Requirements](#system-requirements) below.
+
+## System Requirements
+
+### Optional: FFmpeg
+
+The transcriber works **without ffmpeg** for basic audio transcription (.mp3, .wav, .m4a files).
+
+**FFmpeg is only needed for:**
+- Processing video files (.mp4, .avi, .mov, .mkv, etc.) - extracts audio
+- Compressing large audio files (>25MB) - reduces file size for Whisper API
+
+**Installation:**
+
+```bash
+# Windows
+winget install ffmpeg
+
+# macOS
+brew install ffmpeg
+
+# Linux (Ubuntu/Debian)
+sudo apt-get install ffmpeg
+```
+
+**Verify:**
+```bash
+ffmpeg -version
+```
+
+## Quick Start
+
+```python
+from gaik.software_components.transcriber import Transcriber, get_openai_config
+
+# Configure
+config = get_openai_config(use_azure=True)
+
+# Create transcriber
+transcriber = Transcriber(
+    api_config=config,
+    output_dir="transcripts",
+    enhanced_transcript=True  # Use GPT enhancement
+)
+
+# Transcribe
+result = transcriber.transcribe(
+    file_path="meeting.mp3",
+    custom_context="Meeting transcription"
+)
+
+# Save results
+saved_paths = result.save("output/")
+print(result.enhanced_transcript)
+```
+
+## Features
+
+- **Whisper Integration** - OpenAI Whisper for accurate speech-to-text
+- **Automatic Chunking** - Handles files > 25MB with context-aware splitting
+- **GPT Enhancement** - Optional post-processing for improved formatting
+- **Audio Formats** (no ffmpeg): mp3, wav, m4a, ogg
+- **Video Formats** (requires ffmpeg): mp4, avi, mov, mkv, flv
+- **Audio Compression** (requires ffmpeg): Automatic compression for large files
+- **Multi-Provider** - OpenAI and Azure OpenAI support
+
+## Basic API
+
+### Transcriber
+
+```python
+from gaik.software_components.transcriber import Transcriber
+
+transcriber = Transcriber(
+    api_config=dict,                          # From get_openai_config()
+    output_dir="workspace",                   # Working directory
+    compress_audio=True,                      # Enable compression
+    enhanced_transcript=True,                 # Enable GPT enhancement
+    max_size_mb=25,                           # Chunk size limit
+    max_duration_seconds=1500,                # Duration limit
+    default_prompt="..."                      # Custom Whisper prompt
+)
+
+# Transcribe file
+result = transcriber.transcribe(
+    file_path="audio.mp3",
+    custom_context="",                        # Optional context
+    use_case_name=None,                       # Optional use case name
+    compress_audio=None                       # Override compression
+)
+```
+
+### TranscriptionResult
+
+```python
+# Result object
+result.raw_transcript         # Original Whisper output
+result.enhanced_transcript    # GPT-enhanced version (if enabled)
+result.job_id                 # Unique identifier
+
+# Save to disk
+saved_paths = result.save(
+    directory="output/",
+    save_raw=True,
+    save_enhanced=True
+)
+```
+
+### Configuration
+
+```python
+from gaik.software_components.transcriber import get_openai_config
+
+# Azure OpenAI (default)
+config = get_openai_config(use_azure=True)
+
+# Standard OpenAI
+config = get_openai_config(use_azure=False)
+```
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `AZURE_API_KEY` | Azure only | Azure OpenAI API key |
+| `AZURE_ENDPOINT` | Azure only | Azure OpenAI endpoint URL |
+| `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
+| `AZURE_API_VERSION` | Optional | API version (default: 2024-12-01-preview) |
+
+## Complete Example
+
+```python
+from gaik.software_components.transcriber import Transcriber, get_openai_config
+from pathlib import Path
+
+# Configure Azure OpenAI
+config = get_openai_config(use_azure=True)
+
+# Create transcriber with full options
+transcriber = Transcriber(
+    api_config=config,
+    output_dir="workspace",
+    compress_audio=True,
+    enhanced_transcript=True,
+    max_size_mb=25,
+    max_duration_seconds=1500
+)
+
+# Transcribe with context
+result = transcriber.transcribe(
+    file_path="interview.mp4",
+    custom_context="Technical interview about Python development"
+)
+
+# Access results
+print("Raw transcript:", result.raw_transcript[:500])
+print("Enhanced:", result.enhanced_transcript[:500])
+
+# Save to files
+paths = result.save("output/", save_raw=True, save_enhanced=True)
+print("Saved to:", paths)
+```
+
+## End-to-End Pipeline
+
+For combined transcription and extraction, use the high-level pipeline:
+
+```python
+from gaik.software_modules.audio_to_structured_data import (
+    AudioToStructuredData
+)
+from pathlib import Path
+
+pipeline = AudioToStructuredData(use_azure=True)
+
+result = pipeline.run(
+    file_path=Path("meeting.mp3"),
+    user_requirements="""
+    Extract meeting information:
+    - participants: List of attendee names
+    - decisions: Key decisions made
+    - action_items: Tasks assigned with owners
+    - next_meeting: Scheduled follow-up date
+    """
+)
+
+print(result.extracted_fields)
+```
+
+## Error Handling
+
+```python
+from gaik.software_components.transcriber import Transcriber, get_openai_config
+
+try:
+    config = get_openai_config(use_azure=True)
+    transcriber = Transcriber(api_config=config)
+    result = transcriber.transcribe("audio.mp3")
+except FileNotFoundError:
+    print("Audio file not found")
+except ValueError as e:
+    print(f"Configuration error: {e}")
+except Exception as e:
+    print(f"Transcription failed: {e}")
+```
+
+## Next Steps
+
+- Learn about [Data Extraction](/toolkit/knowledge-extraction)
+- Explore [PDF Parsing](/toolkit/parser) capabilities
+- View on [PyPI](https://pypi.org/project/gaik/) or [GitHub](https://github.com/GAIK-project/gaik-toolkit)
