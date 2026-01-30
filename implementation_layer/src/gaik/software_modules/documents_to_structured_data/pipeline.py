@@ -13,12 +13,21 @@ from pathlib import Path
 from typing import Any
 
 from gaik.software_components.config import get_openai_config
-from gaik.software_components.extractor import DataExtractor, ExtractionRequirements, SchemaGenerator
+from gaik.software_components.extractor import (
+    DataExtractor,
+    ExtractionRequirements,
+    SchemaGenerator,
+)
 from gaik.software_components.extractor.schema import print_pydantic_schema
 
 # Optional parsers
 try:
-    from gaik.software_components.parsers import DoclingParser, DocxParser, PyMuPDFParser, VisionParser
+    from gaik.software_components.parsers import (
+        DoclingParser,
+        DocxParser,
+        PyMuPDFParser,
+        VisionParser,
+    )
 except ImportError:  # pragma: no cover - optional deps
     VisionParser = DoclingParser = PyMuPDFParser = DocxParser = None  # type: ignore
 

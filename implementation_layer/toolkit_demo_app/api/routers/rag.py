@@ -1,7 +1,7 @@
 """RAG router - RAG pipeline endpoints for document indexing and Q&A."""
 
+import asyncio
 import json
-import os
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator
@@ -11,6 +11,8 @@ from typing import Literal
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+from implementation_layer.toolkit_demo_app.api.utils import get_api_config
 
 router = APIRouter()
 
@@ -22,6 +24,26 @@ def sse_event(event_type: str, data: dict) -> str:
 
 # In-memory storage for RAG workflow instances (keyed by collection_id)
 RAG_INSTANCES: dict[str, object] = {}
+
+# Concurrency control: per-collection locks to prevent race conditions
+_collection_locks: dict[str, asyncio.Lock] = {}
+_global_lock = asyncio.Lock()
+
+# File size limit
+MAX_FILE_SIZE_MB = 20
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
+# Example document configuration
+EXAMPLE_PDF_PATH = Path(__file__).parent.parent.parent / "public" / "GAIK_Test_Document_Demo.pdf"
+EXAMPLE_COLLECTION_ID = "example-demo"
+
+
+async def _get_collection_lock(collection_id: str) -> asyncio.Lock:
+    """Get or create a lock for a specific collection."""
+    async with _global_lock:
+        if collection_id not in _collection_locks:
+            _collection_locks[collection_id] = asyncio.Lock()
+        return _collection_locks[collection_id]
 
 
 class Citation(BaseModel):
@@ -76,18 +98,6 @@ class StatusResponse(BaseModel):
     is_ready: bool
 
 
-def _get_api_config():
-    """Get OpenAI configuration from environment (Azure or standard)."""
-    use_azure = bool(os.getenv("AZURE_API_KEY"))
-    if not use_azure and not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(
-            status_code=500,
-            detail="Either AZURE_API_KEY or OPENAI_API_KEY environment variable must be set",
-        )
-
-    from gaik.software_components.config import get_openai_config
-
-    return get_openai_config(use_azure=use_azure)
 
 
 def _get_or_create_workflow(collection_id: str | None = None):
@@ -99,7 +109,7 @@ def _get_or_create_workflow(collection_id: str | None = None):
 
     # Create new workflow with in-memory storage (non-persistent for demo)
     new_id = str(uuid.uuid4())[:8]
-    config = _get_api_config()
+    config = get_api_config()
 
     workflow = RAGWorkflow(
         api_config=config,
@@ -128,7 +138,7 @@ async def index_documents(
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
-    # Validate file types
+    # Validate file types and sizes
     for file in files:
         if not file.filename:
             raise HTTPException(status_code=400, detail="File has no filename")
@@ -138,52 +148,70 @@ async def index_documents(
                 status_code=400,
                 detail=f"Unsupported file type: {suffix}. Only PDF files are supported.",
             )
+        # Check file size using underlying file object
+        file.file.seek(0, 2)  # Seek to end
+        file_size = file.file.tell()
+        file.file.seek(0)  # Reset to beginning
+        if file_size > MAX_FILE_SIZE_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File '{file.filename}' exceeds maximum size of {MAX_FILE_SIZE_MB}MB",
+            )
+
+    # Determine target collection ID for locking
+    target_coll_id = collection_id or str(uuid.uuid4())[:8]
+
+    # Acquire lock for this collection to prevent concurrent modifications
+    lock = await _get_collection_lock(target_coll_id)
 
     try:
-        workflow, coll_id = _get_or_create_workflow(collection_id)
-        indexed_docs: list[IndexedDocument] = []
-        total_chunks = 0
+        async with lock:
+            workflow, coll_id = _get_or_create_workflow(
+                collection_id if collection_id else target_coll_id
+            )
+            indexed_docs: list[IndexedDocument] = []
+            total_chunks = 0
 
-        for file in files:
-            # Save uploaded file temporarily
-            suffix = Path(file.filename).suffix.lower()
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                content = await file.read()
-                tmp.write(content)
-                tmp_path = tmp.name
+            for file in files:
+                # Save uploaded file temporarily
+                suffix = Path(file.filename).suffix.lower()
+                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                    content = await file.read()
+                    tmp.write(content)
+                    tmp_path = tmp.name
 
-            try:
-                # Index the document with original filename (without extension)
-                original_name = Path(file.filename).stem
-                result = workflow.index_documents([tmp_path], filenames=[original_name])
-                total_chunks += result.num_chunks
+                try:
+                    # Index the document with original filename (without extension)
+                    original_name = Path(file.filename).stem
+                    result = workflow.index_documents([tmp_path], filenames=[original_name])
+                    total_chunks += result.num_chunks
 
-                indexed_docs.append(
-                    IndexedDocument(
-                        filename=file.filename,
-                        chunk_count=result.num_chunks,
-                        status="indexed",
+                    indexed_docs.append(
+                        IndexedDocument(
+                            filename=file.filename,
+                            chunk_count=result.num_chunks,
+                            status="indexed",
+                        )
                     )
-                )
-            except Exception as e:
-                indexed_docs.append(
-                    IndexedDocument(
-                        filename=file.filename,
-                        chunk_count=0,
-                        status="error",
+                except Exception as e:
+                    indexed_docs.append(
+                        IndexedDocument(
+                            filename=file.filename,
+                            chunk_count=0,
+                            status="error",
+                        )
                     )
-                )
-                print(f"Error indexing {file.filename}: {e}")
-            finally:
-                Path(tmp_path).unlink(missing_ok=True)
+                    print(f"Error indexing {file.filename}: {e}")
+                finally:
+                    Path(tmp_path).unlink(missing_ok=True)
 
-        return IndexResponse(
-            collection_id=coll_id,
-            document_count=len(files),
-            chunk_count=total_chunks,
-            documents=indexed_docs,
-            status="success" if total_chunks > 0 else "error",
-        )
+            return IndexResponse(
+                collection_id=coll_id,
+                document_count=len(files),
+                chunk_count=total_chunks,
+                documents=indexed_docs,
+                status="success" if total_chunks > 0 else "error",
+            )
 
     except ImportError as e:
         raise HTTPException(
@@ -227,11 +255,13 @@ async def query_rag(
         )
 
         # Handle empty results gracefully
+        no_results_msg = (
+            "I couldn't find any relevant information in the indexed documents "
+            "to answer your question. Please try rephrasing or ensure relevant "
+            "documents have been indexed."
+        )
         if not result.documents:
-            return QueryResponse(
-                answer="I couldn't find any relevant information in the indexed documents to answer your question. Please try rephrasing your question or ensure the relevant documents have been indexed.",
-                sources=[],
-            )
+            return QueryResponse(answer=no_results_msg, sources=[])
 
         # Extract sources from retrieved documents
         sources: list[Source] = []
@@ -298,8 +328,6 @@ async def query_rag_stream(
             results = workflow.vector_store.search(query_embedding, top_k=top_k)
 
             # Convert to documents with optional hybrid/rerank
-            from langchain_core.documents import Document
-
             documents = [doc for doc, _score in results] if results else []
 
             # Handle empty results gracefully
@@ -312,13 +340,12 @@ async def query_rag_stream(
                 steps[1]["status"] = "completed"
                 yield sse_event("step_update", steps[1])
 
-                yield sse_event(
-                    "result",
-                    {
-                        "answer": "I couldn't find any relevant information in the indexed documents to answer your question. Please try rephrasing your question or ensure the relevant documents have been indexed.",
-                        "sources": [],
-                    },
+                no_results_msg = (
+                    "I couldn't find any relevant information in the indexed documents "
+                    "to answer your question. Please try rephrasing or ensure relevant "
+                    "documents have been indexed."
                 )
+                yield sse_event("result", {"answer": no_results_msg, "sources": []})
                 return
 
             # Extract sources
@@ -423,6 +450,9 @@ async def clear_collection(collection_id: str):
         raise HTTPException(status_code=404, detail="Collection not found")
 
     del RAG_INSTANCES[collection_id]
+    # Clean up the lock for this collection
+    if collection_id in _collection_locks:
+        del _collection_locks[collection_id]
 
     return {"status": "success", "message": f"Collection {collection_id} cleared"}
 
@@ -432,5 +462,103 @@ async def clear_all_collections():
     """Clear all RAG collections."""
     count = len(RAG_INSTANCES)
     RAG_INSTANCES.clear()
+    _collection_locks.clear()
 
     return {"status": "success", "message": f"Cleared {count} collections"}
+
+
+@router.post("/load-example", response_model=IndexResponse)
+async def load_example_document():
+    """
+    Load the pre-bundled example PDF for demo purposes.
+
+    Returns existing example collection if already loaded, otherwise indexes the example document.
+    """
+    from gaik.software_modules.RAG_workflow import RAGWorkflow
+
+    # If already loaded, return existing collection
+    if EXAMPLE_COLLECTION_ID in RAG_INSTANCES:
+        workflow = RAG_INSTANCES[EXAMPLE_COLLECTION_ID]
+        chunk_count = workflow.vector_store.count()
+        return IndexResponse(
+            collection_id=EXAMPLE_COLLECTION_ID,
+            document_count=1,
+            chunk_count=chunk_count,
+            documents=[
+                IndexedDocument(
+                    filename="GAIK_Test_Document_Demo.pdf",
+                    chunk_count=chunk_count,
+                    status="indexed",
+                )
+            ],
+            status="success",
+        )
+
+    # Verify example file exists
+    if not EXAMPLE_PDF_PATH.exists():
+        raise HTTPException(
+            status_code=500,
+            detail="Example document not found. Please contact administrator.",
+        )
+
+    # Acquire lock and index
+    lock = await _get_collection_lock(EXAMPLE_COLLECTION_ID)
+
+    async with lock:
+        # Double-check after acquiring lock (another request may have loaded it)
+        if EXAMPLE_COLLECTION_ID in RAG_INSTANCES:
+            workflow = RAG_INSTANCES[EXAMPLE_COLLECTION_ID]
+            chunk_count = workflow.vector_store.count()
+            return IndexResponse(
+                collection_id=EXAMPLE_COLLECTION_ID,
+                document_count=1,
+                chunk_count=chunk_count,
+                documents=[
+                    IndexedDocument(
+                        filename="GAIK_Test_Document_Demo.pdf",
+                        chunk_count=chunk_count,
+                        status="indexed",
+                    )
+                ],
+                status="success",
+            )
+
+        try:
+            config = get_api_config()
+            workflow = RAGWorkflow(
+                api_config=config,
+                persist=False,
+                collection_name=f"gaik_rag_{EXAMPLE_COLLECTION_ID}",
+                retriever_top_k=5,
+                citations=True,
+                stream=True,
+            )
+
+            result = workflow.index_documents(
+                [str(EXAMPLE_PDF_PATH)], filenames=["GAIK_Test_Document_Demo"]
+            )
+
+            RAG_INSTANCES[EXAMPLE_COLLECTION_ID] = workflow
+
+            return IndexResponse(
+                collection_id=EXAMPLE_COLLECTION_ID,
+                document_count=1,
+                chunk_count=result.num_chunks,
+                documents=[
+                    IndexedDocument(
+                        filename="GAIK_Test_Document_Demo.pdf",
+                        chunk_count=result.num_chunks,
+                        status="indexed",
+                    )
+                ],
+                status="success",
+            )
+
+        except ImportError as e:
+            raise HTTPException(
+                status_code=500, detail=f"Required components not installed: {e}"
+            ) from e
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to load example document: {e}"
+            ) from e

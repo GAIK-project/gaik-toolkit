@@ -129,6 +129,67 @@ const STORAGE_KEYS = {
   indexedDocuments: "rag-indexed-documents",
 } as const;
 
+/** Reusable upload dialog content - used in both header and empty state */
+interface UploadDialogContentProps {
+  pendingFiles: File[];
+  isIndexing: boolean;
+  onFileSelect: (file: File) => void;
+  onFileRemove: () => void;
+  onIndex: () => void;
+}
+
+function UploadDialogContent({
+  pendingFiles,
+  isIndexing,
+  onFileSelect,
+  onFileRemove,
+  onIndex,
+}: UploadDialogContentProps) {
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Upload className="h-5 w-5" />
+          Upload Documents
+        </DialogTitle>
+      </DialogHeader>
+      <div className="space-y-4 pt-4">
+        <FileUpload
+          accept=".pdf"
+          maxSize={20}
+          file={pendingFiles[0] || null}
+          onFileSelect={onFileSelect}
+          onFileRemove={onFileRemove}
+          disabled={isIndexing}
+        />
+        {pendingFiles.length > 0 && (
+          <Button onClick={onIndex} disabled={isIndexing} className="w-full">
+            <Sparkles className="mr-2 h-4 w-4" />
+            {isIndexing ? "Indexing..." : "Index Document"}
+          </Button>
+        )}
+      </div>
+    </DialogContent>
+  );
+}
+
+/** Renders deduplicated sources with consistent formatting */
+function SourcesList({ sources }: { sources: Source[] }) {
+  const uniqueSources = deduplicateSources(sources);
+  if (uniqueSources.length === 0) return null;
+
+  return (
+    <Sources>
+      <SourcesTrigger count={uniqueSources.length} />
+      <SourcesContent>
+        {uniqueSources.map((source, i) => (
+          <SourceItem key={i} title={formatSourceTitle(source)} />
+        ))}
+      </SourcesContent>
+    </Sources>
+  );
+}
+
 export default function RAGPage() {
   // Collection state
   const [collectionId, setCollectionId] = useState<string | null>(null);
@@ -305,6 +366,37 @@ export default function RAGPage() {
         indexedDocuments.map((d) =>
           d.status === "processing" ? { ...d, status: "error" as const } : d,
         ),
+      );
+    } finally {
+      setIsIndexing(false);
+    }
+  }
+
+  async function handleLoadExample(): Promise<void> {
+    if (isIndexing) return;
+
+    setIsIndexing(true);
+    try {
+      const response = await fetch("/api/rag/load-example", { method: "POST" });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.detail || "Failed to load example");
+      }
+
+      const data = await response.json();
+      setCollectionId(data.collection_id);
+      setIndexedDocuments(
+        data.documents.map((doc: { filename: string; chunk_count: number; status: string }) => ({
+          filename: doc.filename,
+          chunkCount: doc.chunk_count,
+          status: doc.status,
+        })),
+      );
+      toast.success("Example document loaded! Try asking a question.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load example",
       );
     } finally {
       setIsIndexing(false);
@@ -494,35 +586,13 @@ export default function RAGPage() {
                   Upload PDF
                 </Button>
               </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Upload className="h-5 w-5" />
-                    Upload Documents
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 pt-4">
-                  <FileUpload
-                    accept=".pdf"
-                    maxSize={50}
-                    file={pendingFiles[0] || null}
-                    onFileSelect={handleFileSelect}
-                    onFileRemove={handleFileRemove}
-                    disabled={isIndexing}
-                  />
-
-                  {pendingFiles.length > 0 && (
-                    <Button
-                      onClick={handleIndexDocuments}
-                      disabled={isIndexing}
-                      className="w-full"
-                    >
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      {isIndexing ? "Indexing..." : "Index Document"}
-                    </Button>
-                  )}
-                </div>
-              </DialogContent>
+              <UploadDialogContent
+                pendingFiles={pendingFiles}
+                isIndexing={isIndexing}
+                onFileSelect={handleFileSelect}
+                onFileRemove={handleFileRemove}
+                onIndex={handleIndexDocuments}
+              />
             </Dialog>
           )}
 
@@ -612,42 +682,32 @@ export default function RAGPage() {
                       Upload PDF documents to get started. You can then ask
                       questions and get AI-powered answers with citations.
                     </p>
-                    <DialogTrigger asChild>
-                      <Button size="lg" className="gap-2">
-                        <Plus className="h-5 w-5" />
-                        Upload PDF
-                      </Button>
-                    </DialogTrigger>
-                  </div>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2">
-                        <Upload className="h-5 w-5" />
-                        Upload Documents
-                      </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <FileUpload
-                        accept=".pdf"
-                        maxSize={50}
-                        file={pendingFiles[0] || null}
-                        onFileSelect={handleFileSelect}
-                        onFileRemove={handleFileRemove}
-                        disabled={isIndexing}
-                      />
-
-                      {pendingFiles.length > 0 && (
-                        <Button
-                          onClick={handleIndexDocuments}
-                          disabled={isIndexing}
-                          className="w-full"
-                        >
-                          <Sparkles className="mr-2 h-4 w-4" />
-                          {isIndexing ? "Indexing..." : "Index Document"}
+                    <div className="flex gap-3">
+                      <DialogTrigger asChild>
+                        <Button size="lg" className="gap-2">
+                          <Plus className="h-5 w-5" />
+                          Upload PDF
                         </Button>
-                      )}
+                      </DialogTrigger>
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={handleLoadExample}
+                        disabled={isIndexing}
+                      >
+                        <Sparkles className="h-5 w-5" />
+                        {isIndexing ? "Loading..." : "Try Example"}
+                      </Button>
                     </div>
-                  </DialogContent>
+                  </div>
+                  <UploadDialogContent
+                    pendingFiles={pendingFiles}
+                    isIndexing={isIndexing}
+                    onFileSelect={handleFileSelect}
+                    onFileRemove={handleFileRemove}
+                    onIndex={handleIndexDocuments}
+                  />
                 </Dialog>
               )}
             </>
@@ -660,26 +720,7 @@ export default function RAGPage() {
                 <MessageResponse>
                   {removeCitations(message.content)}
                 </MessageResponse>
-                {message.sources && message.sources.length > 0 && (
-                  <Sources>
-                    {(() => {
-                      const uniqueSources = deduplicateSources(message.sources);
-                      return (
-                        <>
-                          <SourcesTrigger count={uniqueSources.length} />
-                          <SourcesContent>
-                            {uniqueSources.map((source, i) => (
-                              <SourceItem
-                                key={i}
-                                title={formatSourceTitle(source)}
-                              />
-                            ))}
-                          </SourcesContent>
-                        </>
-                      );
-                    })()}
-                  </Sources>
-                )}
+                {message.sources && <SourcesList sources={message.sources} />}
               </MessageContent>
             </Message>
           ))}
@@ -691,26 +732,7 @@ export default function RAGPage() {
                 <MessageResponse>
                   {removeCitations(streamingAnswer.join(""))}
                 </MessageResponse>
-                {streamingSources.length > 0 && (
-                  <Sources>
-                    {(() => {
-                      const uniqueSources = deduplicateSources(streamingSources);
-                      return (
-                        <>
-                          <SourcesTrigger count={uniqueSources.length} />
-                          <SourcesContent>
-                            {uniqueSources.map((source, i) => (
-                              <SourceItem
-                                key={i}
-                                title={formatSourceTitle(source)}
-                              />
-                            ))}
-                          </SourcesContent>
-                        </>
-                      );
-                    })()}
-                  </Sources>
-                )}
+                <SourcesList sources={streamingSources} />
               </MessageContent>
             </Message>
           )}

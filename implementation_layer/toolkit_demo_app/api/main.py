@@ -8,15 +8,23 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from gaik import __version__ as gaik_version
 
-# Load .env.local from toolkit_demo_app folder
+# Load .env.local from toolkit_demo_app folder - must be before other imports
 env_path = Path(__file__).parent.parent / ".env.local"
 load_dotenv(env_path)
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from routers import classifier, extractor, parser, pipeline, rag, transcriber
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from gaik import __version__ as gaik_version  # noqa: E402
+
+from implementation_layer.toolkit_demo_app.api.routers import (  # noqa: E402
+    classifier,
+    extractor,
+    parser,
+    pipeline,
+    rag,
+    transcriber,
+)
 
 
 @asynccontextmanager
@@ -30,7 +38,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GAIK Toolkit Demo API",
-    description="REST API for GAIK toolkit components: extractor, parser, classifier, transcriber, pipeline",
+    description="REST API for GAIK toolkit components",
     version=gaik_version,
     lifespan=lifespan,
     redirect_slashes=False,

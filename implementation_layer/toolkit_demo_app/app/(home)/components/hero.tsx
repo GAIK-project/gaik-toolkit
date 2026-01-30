@@ -5,8 +5,12 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 
 export function Hero() {
+  function scrollToDemos(): void {
+    document.getElementById("demos")?.scrollIntoView({ behavior: "smooth" });
+  }
+
   return (
-    <section className="bg-card relative overflow-hidden rounded-3xl border p-8 shadow-sm md:p-12">
+    <section className="animate-in fade-in duration-500 bg-card relative overflow-hidden rounded-3xl border p-8 shadow-sm md:p-12">
       <div className="space-y-6">
         <div className="space-y-3">
           <h1 className="max-w-3xl font-serif text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl">
@@ -19,22 +23,17 @@ export function Hero() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <Link
-            href="/incident-report"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-12 items-center justify-center gap-2 rounded-md px-6 text-base font-medium shadow-md transition-all"
-          >
-            Try Incident Report
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
+          <Button asChild size="lg" className="h-12 gap-2 px-6 text-base shadow-md">
+            <Link href="/incident-report">
+              Interactive Demo
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
           <Button
             size="lg"
             variant="outline"
             className="h-12 px-6 text-base"
-            onClick={() => {
-              document
-                .getElementById("demos")
-                ?.scrollIntoView({ behavior: "smooth" });
-            }}
+            onClick={scrollToDemos}
           >
             Explore All Demos
           </Button>

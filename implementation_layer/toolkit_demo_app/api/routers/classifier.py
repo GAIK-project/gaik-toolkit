@@ -1,12 +1,13 @@
 """Classifier router - Document classification endpoints"""
 
-import os
 import tempfile
 from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
+
+from implementation_layer.toolkit_demo_app.api.utils import get_api_config
 
 router = APIRouter()
 
@@ -32,14 +33,6 @@ async def classify_document(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
 
-    # Check for API key (Azure or OpenAI)
-    use_azure = bool(os.getenv("AZURE_API_KEY"))
-    if not use_azure and not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(
-            status_code=500,
-            detail="Either AZURE_API_KEY or OPENAI_API_KEY environment variable must be set",
-        )
-
     suffix = Path(file.filename).suffix.lower()
 
     if suffix not in [".pdf", ".docx", ".png", ".jpg", ".jpeg"]:
@@ -55,9 +48,9 @@ async def classify_document(
         tmp_path = tmp.name
 
     try:
-        from gaik.software_components.doc_classifier import DocumentClassifier, get_openai_config
+        from gaik.software_components.doc_classifier import DocumentClassifier
 
-        config = get_openai_config(use_azure=use_azure)
+        config = get_api_config()
         classifier = DocumentClassifier(config)
 
         class_list = [c.strip() for c in classes.split(",")]

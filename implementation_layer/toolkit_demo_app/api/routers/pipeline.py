@@ -1,7 +1,6 @@
 """Pipeline router - End-to-end pipeline endpoints for demos."""
 
 import json
-import os
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator
@@ -11,6 +10,8 @@ from typing import Literal
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
+
+from implementation_layer.toolkit_demo_app.api.utils import get_api_config
 
 router = APIRouter()
 
@@ -69,18 +70,6 @@ class TextPipelineResponse(BaseModel):
     error: str | None = None
 
 
-def _get_api_config():
-    """Get OpenAI configuration from environment (Azure or standard)."""
-    use_azure = bool(os.getenv("AZURE_API_KEY"))
-    if not use_azure and not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(
-            status_code=500,
-            detail="Either AZURE_API_KEY or OPENAI_API_KEY environment variable must be set",
-        )
-
-    from gaik.software_components.config import get_openai_config
-
-    return get_openai_config(use_azure=use_azure)
 
 
 @router.post("/audio", response_model=AudioPipelineResponse)
@@ -131,7 +120,7 @@ async def audio_pipeline(
         tmp_path = tmp.name
 
     try:
-        config = _get_api_config()
+        config = get_api_config()
 
         # Step 2: Transcribe
         steps[1].status = "in_progress"
@@ -258,7 +247,7 @@ async def document_pipeline(
         tmp_path = tmp.name
 
     try:
-        config = _get_api_config()
+        config = get_api_config()
 
         # Step 2: Parse
         steps[1].status = "in_progress"
@@ -374,7 +363,7 @@ async def text_pipeline(
         raise HTTPException(status_code=400, detail="No text provided")
 
     try:
-        config = _get_api_config()
+        config = get_api_config()
 
         # Step 2: Extract structured data
         steps[1].status = "in_progress"
@@ -479,7 +468,7 @@ async def text_pipeline_stream(
             return
 
         try:
-            config = _get_api_config()
+            config = get_api_config()
 
             # Step 1: Generate schema
             steps[0]["status"] = "in_progress"

@@ -44,5 +44,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Handle Supabase session for all non-API routes
-  return updateSession(request);
+  const response = await updateSession(request);
+  response.headers.set("x-current-path", pathname);
+  return response;
 }

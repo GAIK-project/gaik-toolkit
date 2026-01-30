@@ -215,7 +215,7 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
   const buildingBlocks = demos.filter((demo) => !demo.featured);
 
   return (
-    <section id="demos" className="space-y-8">
+    <section id="demos" className="animate-in fade-in duration-500 delay-150 space-y-8">
       {!isUnlocked && (
         <div className="bg-muted/50 border-primary/20 flex items-center gap-3 rounded-lg border p-4">
           <Lock className="text-primary h-5 w-5 shrink-0" />

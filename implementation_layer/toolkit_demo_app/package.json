@@ -4,8 +4,8 @@
   "private": false,
   "scripts": {
     "dev": "bun --bun next dev",
-    "dev:api": "cd api && uvicorn main:app --reload --port 8000",
-    "dev:all": "concurrently --names \"next,api\" -c \"cyan,magenta\" \"bun dev\" \"bun dev:api\"",
+    "dev:api": "cd ../.. && uvicorn implementation_layer.toolkit_demo_app.api.main:app --reload --port 8000",
+    "dev:all": "cd ../.. && concurrently --names \"next,api\" -c \"cyan,magenta\" \"cd implementation_layer/toolkit_demo_app && bun dev\" \"uvicorn implementation_layer.toolkit_demo_app.api.main:app --reload --port 8000\"",
     "build": "bun --bun next build",
     "start": "bun --bun next start",
     "lint": "eslint",

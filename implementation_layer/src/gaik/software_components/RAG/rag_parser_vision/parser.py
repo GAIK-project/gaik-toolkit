@@ -269,7 +269,7 @@ class VisionRagParser:
 
     def _convert_with_vision(
         self, pdf_path: str
-    ) -> tuple["Any", str, dict[int, list[str]]]:
+    ) -> tuple[Any, str, dict[int, list[str]]]:
         if self.verbose:
             print(f"Processing PDF with vision enhancement: {pdf_path}")
 
@@ -295,7 +295,7 @@ class VisionRagParser:
 
         return result, markdown_text, descriptions_by_page
 
-    def _maybe_save_markdown(self, markdown_text: str, output_path: Optional[str]) -> None:
+    def _maybe_save_markdown(self, markdown_text: str, output_path: str | None) -> None:
         if not self.save_markdown:
             return
         if not output_path:
@@ -399,7 +399,7 @@ class VisionRagParser:
         pattern = r"!\[.*?\]\(data:image\/png;base64,[A-Za-z0-9+/=\n]+\)"
         counter = [0]  # Mutable container for closure
 
-        def replacement(_match):
+        def replacement(match):  # noqa: ARG001
             idx = counter[0]
             counter[0] += 1
             if idx in descriptions:
