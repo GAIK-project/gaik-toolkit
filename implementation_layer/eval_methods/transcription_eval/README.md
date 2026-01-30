@@ -525,7 +525,7 @@ Project: [gaik.ai](https://gaik.ai)
 - **Main README**: [README.md](../../../README.md) - See "Typical GAIK workflows this toolkit enables"
 - **Evaluation Methods Overview**: [../README.md](../README.md)
 - **Project Website**: [gaik.ai](https://gaik.ai)
-- **Documentation**: [gaik-docs.2.rahtiapp.fi](https://gaik-docs.2.rahtiapp.fi/)
+- **Documentation**: [https://gaik-project.github.io/gaik-toolkit/](https://gaik-project.github.io/gaik-toolkit/)
 
 ---
 

@@ -243,7 +243,7 @@ Explore the examples included in the repository:
 
 Project documentation (work in progress) is available at:
 
-- https://gaik-docs.2.rahtiapp.fi/
+- https://gaik-project.github.io/gaik-toolkit/
 
 ---
 ## Contributing

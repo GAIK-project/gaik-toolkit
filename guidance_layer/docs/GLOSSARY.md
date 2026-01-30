@@ -164,7 +164,7 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 - **GAIK Website**: [gaik.ai](https://gaik.ai)
 - **GitHub Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
 - **PyPI Package**: [pypi.org/project/gaik](https://pypi.org/project/gaik/)
-- **Documentation**: [gaik-docs.2.rahtiapp.fi](https://gaik-docs.2.rahtiapp.fi/)
+- **Documentation**: [https://gaik-project.github.io/gaik-toolkit/](https://gaik-project.github.io/gaik-toolkit/)
 
 ---
 
