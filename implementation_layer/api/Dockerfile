@@ -27,14 +27,14 @@ COPY implementation_layer/api/requirements.txt ./implementation_layer/api/
 RUN pip install --no-cache-dir -r implementation_layer/api/requirements.txt
 
 # Copy the gaik package source
-COPY src/ ./src/
+COPY implementation_layer/src/ ./implementation_layer/src/
 COPY pyproject.toml ./
 
 # Install gaik with only required extras (NO docling/torch)
 # - transcriber: Whisper transcription via Azure/OpenAI
 # - PyMuPDF: PDF parsing
 # - python-docx: DOCX parsing
-RUN pip install --no-cache-dir -e ".[transcriber]" PyMuPDF python-docx
+RUN pip install --no-cache-dir -e ".[transcriber]" PyMuPDF python-docx reportlab fpdf2
 
 # Copy API source code
 COPY implementation_layer/api/ ./implementation_layer/api/
