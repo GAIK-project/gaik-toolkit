@@ -15,8 +15,9 @@ function hasBody(method: string): boolean {
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Proxy API requests to backend
-  if (pathname.startsWith("/api") && !pathname.startsWith("/api/auth")) {
+  // Proxy API requests to backend (except Next.js API routes)
+  const isNextApiRoute = pathname.startsWith("/api/auth") || pathname.startsWith("/api/admin");
+  if (pathname.startsWith("/api") && !isNextApiRoute) {
     // Rate limit check (if Redis is configured)
     if (ratelimit) {
       const ip =

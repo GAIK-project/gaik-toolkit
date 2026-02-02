@@ -21,13 +21,13 @@ export type AccessRequest = {
 };
 
 async function isAdminAuthenticated(): Promise<boolean> {
-  const res = await fetch("/api/admin/auth");
+  const res = await fetch("/api/admin/auth", { credentials: "include" });
   const data = await res.json();
   return data.authenticated;
 }
 
 async function getAccessRequests(): Promise<AccessRequest[]> {
-  const res = await fetch("/api/admin/requests");
+  const res = await fetch("/api/admin/requests", { credentials: "include" });
   if (!res.ok) return [];
   return res.json();
 }
