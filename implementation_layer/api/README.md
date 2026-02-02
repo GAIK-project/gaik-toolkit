@@ -70,7 +70,3 @@ docker run -p 8000:8000 --env-file implementation_layer/api/.env gaik-api
 | `AZURE_ENDPOINT` | Azure endpoint | If USE_AZURE=true |
 | `OPENAI_API_KEY` | OpenAI API key | If USE_AZURE=false |
 | `DEBUG` | Debug mode, shows /docs | No (default: false) |
-
-## Deployment (CSC Rahti 2)
-
-Deploy as a container using the provided Dockerfile. Configure OpenShift manifests (Deployment, Service, Route, ConfigMap, Secret) according to your environment.

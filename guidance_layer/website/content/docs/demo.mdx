@@ -63,9 +63,16 @@ Lightweight FastAPI backend for transcription and parsing.
 cd implementation_layer/api
 pip install -r requirements.txt
 
-# Set environment
+# API authentication key
 export API_KEY=your-api-key
-export OPENAI_API_KEY=your-openai-key
+
+# Choose ONE provider:
+# Option 1: OpenAI
+export OPENAI_API_KEY=sk-...
+
+# Option 2: Azure OpenAI
+export AZURE_API_KEY=your-key
+export AZURE_ENDPOINT=https://your-endpoint.openai.azure.com/
 
 uvicorn main:app --reload
 ```

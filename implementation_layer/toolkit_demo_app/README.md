@@ -16,48 +16,33 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 
 - Node.js 22+ / bun
 - Python 3.11+
-- Azure OpenAI API key (or OpenAI API key)
+- OpenAI API key
 
 ### Setup
 
-1. **Clone and install frontend dependencies:**
+**Install dependencies:**
 
 ```bash
 cd implementation_layer/toolkit_demo_app
 bun install
+pip install -r api/requirements.txt
 ```
 
-2. **Install API dependencies:**
-
-```bash
-cd api
-pip install -r requirements.txt
-```
-
-3. **Configure environment:**
+**Configure environment:**
 
 ```bash
 cp .env.example .env.local
 ```
 
-Edit `.env.local` with your settings. Minimal setup for local development:
+Edit `.env.local`:
 
 ```bash
-# Backend API
 BACKEND_URL=http://localhost:8000
-
-# Azure OpenAI (required for AI features)
-AZURE_API_KEY=your-key
-AZURE_ENDPOINT=https://your-endpoint.openai.azure.com/
-AZURE_API_VERSION=2025-03-01-preview
-
-# Development mode - bypass Supabase auth
+OPENAI_API_KEY=sk-xxxxx
 BYPASS_AUTH=true
 ```
 
-See `.env.example` for all available options (Supabase auth, Redis rate limiting, PostHog analytics).
-
-4. **Run both servers:**
+**Run both servers:**
 
 ```bash
 # Terminal 1: Frontend
@@ -111,4 +96,4 @@ toolkit_demo_app/
 
 - **Frontend:** Next.js 16, React 19, Tailwind CSS, shadcn/ui
 - **Backend:** FastAPI, Python 3.11, GAIK toolkit
-- **AI:** Azure OpenAI GPT-4, Whisper
+- **AI:** OpenAI GPT-5.1, Whisper
