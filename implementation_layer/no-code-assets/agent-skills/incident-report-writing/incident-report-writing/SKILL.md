@@ -227,6 +227,51 @@ Before creating the document, view the docx skill:
 view /mnt/skills/public/docx/SKILL.md
 ```
 
+Then create a new Word document using the docx skill's "Creating a new Word document" workflow.
+
+**Document Structure:**
+
+1. **Title:** `INCIDENT REPORT` (centered, bold, large font)
+
+2. **2-Column Table:**
+   - Column 1: Field name
+   - Column 2: Extracted value
+   - Include all 17 fields in order, even if value is empty string
+
+**Table Format:**
+```
+| Field                          | Value                          |
+|--------------------------------|--------------------------------|
+| Type of form                   | [extracted value or ""]        |
+| Observation type               | [extracted value or ""]        |
+| Positive safety observation    | [extracted value or ""]        |
+| Reporter name                  | [extracted value or ""]        |
+| Reporter organization          | [extracted value or ""]        |
+| Summer employee                | [extracted value or ""]        |
+| Event date and time            | [extracted value or ""]        |
+| Building or site               | [extracted value or ""]        |
+| Detailed location              | [extracted value or ""]        |
+| Location clarification         | [extracted value or ""]        |
+| Event description              | [extracted value or ""]        |
+| Near miss                      | [extracted value or ""]        |
+| Possible consequences          | [extracted value or ""]        |
+| Direct cause of the event      | [extracted value or ""]        |
+| Corrective actions performed   | [extracted value or ""]        |
+| Corrective actions description | [extracted value or ""]        |
+| Photo mentioned                | [extracted value or ""]        |
+```
+
+**Document Formatting:**
+- Use clean, professional formatting
+- Table should have borders
+- First column (field names) should be slightly bold
+- Keep the document simple and readable
+
+### Step 5 — Save and Present
+
+1. Save the document with a descriptive filename, e.g., `IncidentReport_[Date].docx`
+2. Use `present_files` to share the document with the user
+
 ## Guardrails
 
 ### Critical Rules to Prevent Hallucination:
