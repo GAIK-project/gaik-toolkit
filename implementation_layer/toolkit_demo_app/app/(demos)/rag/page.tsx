@@ -100,7 +100,7 @@ function formatSourceTitle(source: Source): string {
     name = name.slice(0, 37) + "...";
   }
 
-  const page = source.pageNumber ? `, sivu ${source.pageNumber}` : "";
+  const page = source.pageNumber ? `, page ${source.pageNumber}` : "";
   return `${name}${page}`;
 }
 
@@ -585,11 +585,11 @@ export default function RAGPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-72">
-                <div className="p-2">
+                <div className="p-2 overflow-x-hidden">
                   <DocumentList
                     documents={indexedDocuments}
                     onRemove={handleRemoveDocument}
-                    className="max-h-48 overflow-auto"
+                    className="max-h-48 overflow-y-auto"
                   />
                 </div>
                 <DropdownMenuSeparator />
@@ -710,8 +710,8 @@ export default function RAGPage() {
                     </h2>
                     <p className="text-muted-foreground mb-6 max-w-md text-center">
                       Try our example document to see RAG in action, or upload
-                      your own PDF (max 3 pages) to ask questions and get
-                      AI-powered answers with citations.
+                      your own PDF (max 3 pages for this demo) to ask questions
+                      and get AI-powered answers with citations.
                     </p>
                     <div className="flex gap-3">
                       <ExamplePreviewDialog
