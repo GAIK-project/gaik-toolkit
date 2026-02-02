@@ -47,14 +47,14 @@ export function DocumentList({
         </span>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 overflow-hidden">
         <AnimatePresence mode="popLayout">
           {documents.map((doc, index) => (
             <motion.div
               key={doc.filename}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
               transition={{ delay: index * 0.05 }}
               className={cn(
                 "flex items-center gap-3 rounded-lg border p-3",

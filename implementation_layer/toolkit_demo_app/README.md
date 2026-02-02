@@ -14,31 +14,48 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 
 ### Prerequisites
 
-- Node.js 22+
-- Python 3.10+
-- bun
-- OpenAI API key
+- Node.js 22+ / bun
+- Python 3.11+
+- Azure OpenAI API key (or OpenAI API key)
 
-### Development
+### Setup
 
-1. **Install frontend dependencies:**
+1. **Clone and install frontend dependencies:**
 
 ```bash
+cd implementation_layer/toolkit_demo_app
 bun install
 ```
 
 2. **Install API dependencies:**
 
 ```bash
-cd ../../implementation_layer/api
+cd api
 pip install -r requirements.txt
 ```
 
-3. **Set environment variables:**
+3. **Configure environment:**
 
 ```bash
-export OPENAI_API_KEY=your-key-here
+cp .env.example .env.local
 ```
+
+Edit `.env.local` with your settings. Minimal setup for local development:
+
+```bash
+# Backend API
+BACKEND_URL=http://localhost:8000
+
+# Azure OpenAI (required for AI features)
+AZURE_API_KEY=your-key
+AZURE_ENDPOINT=https://your-endpoint.openai.azure.com/
+AZURE_API_VERSION=2025-03-01-preview
+
+# Development mode - bypass Supabase auth
+BYPASS_AUTH=true
+```
+
+See `.env.example` for all available options (Supabase auth, Redis rate limiting, PostHog analytics).
 
 4. **Run both servers:**
 
@@ -47,7 +64,7 @@ export OPENAI_API_KEY=your-key-here
 bun dev
 
 # Terminal 2: API
-cd ../../implementation_layer/api
+cd api
 uvicorn main:app --reload
 ```
 
@@ -57,10 +74,6 @@ uvicorn main:app --reload
 ### Docker
 
 ```bash
-# Set your API key
-export OPENAI_API_KEY=your-key-here
-
-# Run both services
 docker compose up --build
 ```
 
@@ -69,17 +82,18 @@ docker compose up --build
 ```
 toolkit_demo_app/
 ├── app/                    # Next.js pages
-│   ├── page.tsx           # Landing page
-│   ├── extractor/         # Extractor demo
-│   ├── parser/            # Parser demo
-│   ├── classifier/        # Classifier demo
-│   ├── transcriber/       # Transcriber demo
-│   └── rag/               # RAG Builder demo
+│   ├── (demos)/            # Demo pages
+│   │   ├── extractor/
+│   │   ├── parser/
+│   │   ├── classifier/
+│   │   ├── transcriber/
+│   │   └── rag/
+│   └── admin/              # Admin dashboard
 ├── api/                    # FastAPI backend
-│   ├── main.py            # API entry point
-│   └── routers/           # API endpoints
-├── components/            # React components
-└── docker-compose.yml     # Docker setup
+│   ├── main.py
+│   └── routers/
+├── components/             # React components
+└── docker-compose.yml
 ```
 
 ## API Endpoints
@@ -96,5 +110,5 @@ toolkit_demo_app/
 ## Tech Stack
 
 - **Frontend:** Next.js 16, React 19, Tailwind CSS, shadcn/ui
-- **Backend:** FastAPI, Python 3.11
-- **AI:** OpenAI GPT-4, Whisper
+- **Backend:** FastAPI, Python 3.11, GAIK toolkit
+- **AI:** Azure OpenAI GPT-4, Whisper

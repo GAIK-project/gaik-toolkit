@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator
@@ -63,6 +64,18 @@ else:
 EXAMPLE_PDF_PATH = _public_path / "GAIK_Test_Document_Demo.pdf"
 EXAMPLE_INDEX_PATH = _public_path / "example-index.json"
 EXAMPLE_COLLECTION_ID = "example-demo"
+
+
+def extract_page_filter(query: str) -> dict | None:
+    """Extract page number filter from query like 'page 2' or 'sivu 2'.
+
+    Returns a filter dict for VectorStore.search() if a page number is found,
+    otherwise returns None for normal semantic search.
+    """
+    match = re.search(r"(?:page|sivu)\s*(\d+)", query, re.IGNORECASE)
+    if match:
+        return {"page_number": int(match.group(1))}
+    return None
 
 
 async def _get_collection_lock(collection_id: str) -> asyncio.Lock:
@@ -379,8 +392,12 @@ async def query_rag_stream(
             yield sse_event("step_update", steps[0])
 
             # Get the retriever to search
+            # Check if query contains page number reference (e.g., "page 2", "sivu 3")
+            page_filter = extract_page_filter(question)
             query_embedding = workflow.embedder.embed_query(question)
-            results = workflow.vector_store.search(query_embedding, top_k=top_k)
+            results = workflow.vector_store.search(
+                query_embedding, top_k=top_k, filters=page_filter
+            )
 
             # Convert to documents with optional hybrid/rerank
             documents = [doc for doc, _score in results] if results else []
