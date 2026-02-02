@@ -5,6 +5,14 @@
 
 This is a generative AI toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides a complete layer-based architecture for building knowledge-centric GenAI solutions, from strategic guidance to deployable implementations.
 
+# Project Documentation
+
+Project documentation is available at:
+
+https://gaik-project.github.io/gaik-toolkit/
+
+
+# Toolkit Focus
 The toolkit focuses on three core knowledge processes in organizational workflows:
 
 - **Knowledge extraction** – extracting structured information from unstructured content (documents, PDFs, web pages, audio transcripts).
@@ -244,10 +252,6 @@ Explore the examples included in the repository:
 - Software component examples (including RAG components): `implementation_layer/examples/software_components/`
 - Software module examples: `implementation_layer/examples/software_modules/`
 - Demos and experiments: `implementation_layer/toolkit_demo_app/`
-
-Project documentation (work in progress) is available at:
-
-- https://gaik-project.github.io/gaik-toolkit/
 
 ---
 ## Contributing

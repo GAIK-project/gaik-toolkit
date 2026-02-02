@@ -1,0 +1,224 @@
+================================================================================
+                PURCHASE ORDER PROCESSING - CALCULATION BREAKDOWN
+================================================================================
+
+PROCESSING DATE: November 15, 2025
+OPERATOR: Automated Processing System
+
+================================================================================
+SOURCE DOCUMENTS
+================================================================================
+
+Purchase Order:  PO-2025-15903 (PO.pdf)
+                 Customer: AutoTech Manufacturing Corp.
+                 Date: October 12, 2025
+                 Project Code: PRJ-AT-2025-Q4B
+
+Bills of Material:
+                 BOM1.pdf - Material: AL-001 (Aluminum Angle - L Profile)
+                 BOM2.pdf - Material: SS-001 (Stainless Steel Sheet - Grade 304)
+                 BOM3.pdf - Material: CS-001 (Seamless Carbon Steel Pipe)
+
+Price List:      price list.xlsx
+                 Effective: October 01, 2025 - March 31, 2026
+
+================================================================================
+LINE ITEM #1: ALUMINUM ANGLE - L PROFILE
+================================================================================
+
+EXTRACTION (From PO)
+--------------------------------------------------------------------------------
+Material Number:         AL-001
+PO Description:          Aluminum Angle Bar
+Quantity:                200 pcs
+Delivery Date:           December 01, 2025
+PO Unit Price:           $28.50 (reference only - not used in calculations)
+
+EXTRACTION (From BOM1.pdf)
+--------------------------------------------------------------------------------
+BOM ID:                  AL-001  ✓ Match confirmed
+Type/Part Designation:   Aluminum Angle - L Profile
+Dimensions:              50 x 50 x 5 mm x 6000 mm
+Material Grade:          6061-T6
+Cutting Required:        No (0 cuts)
+Testing Lots Required:   1 lot
+Certificates Required:   1 certificate
+
+PRICE MATCHING (From price list.xlsx)
+--------------------------------------------------------------------------------
+Lookup Key:              AL-001
+Match Type:              Exact match
+Price List Row:          Row 6
+Unit Price:              $28.50
+Cutting Fee:             $5.00
+Testing Fee:             $15.00
+Cert Fee:                $25.00
+
+CALCULATION
+--------------------------------------------------------------------------------
+Material Cost:           200 × $28.50 = $5,700.00
+Cutting Cost:            $5.00 × 0 cuts = $0.00
+Testing Cost:            $15.00 × 1 lot = $15.00
+Certification Cost:      $25.00 × 1 cert = $25.00
+────────────────────────────────────────────────────────────────────────────
+LINE TOTAL:              $5,700.00 + $0.00 + $15.00 + $25.00 = $5,740.00
+────────────────────────────────────────────────────────────────────────────
+
+================================================================================
+LINE ITEM #2: STAINLESS STEEL SHEET - GRADE 304
+================================================================================
+
+EXTRACTION (From PO)
+--------------------------------------------------------------------------------
+Material Number:         SS-001
+PO Description:          Stainless Steel Sheet
+Quantity:                50 pcs
+Delivery Date:           December 05, 2025
+PO Unit Price:           $195.75 (reference only - not used in calculations)
+
+EXTRACTION (From BOM2.pdf)
+--------------------------------------------------------------------------------
+BOM ID:                  SS-001  ✓ Match confirmed
+Type/Part Designation:   Stainless Steel Sheet - Grade 304
+Dimensions:              1220 x 2440 x 3 mm
+Material Grade:          304 / 1.4301
+Cutting Required:        No (0 cuts)
+Testing Lots Required:   1 lot
+Certificates Required:   1 certificate
+
+PRICE MATCHING (From price list.xlsx)
+--------------------------------------------------------------------------------
+Lookup Key:              SS-001
+Match Type:              Exact match
+Price List Row:          Row 12
+Unit Price:              $195.75
+Cutting Fee:             $25.00
+Testing Fee:             $35.00
+Cert Fee:                $40.00
+
+CALCULATION
+--------------------------------------------------------------------------------
+Material Cost:           50 × $195.75 = $9,787.50
+Cutting Cost:            $25.00 × 0 cuts = $0.00
+Testing Cost:            $35.00 × 1 lot = $35.00
+Certification Cost:      $40.00 × 1 cert = $40.00
+────────────────────────────────────────────────────────────────────────────
+LINE TOTAL:              $9,787.50 + $0.00 + $35.00 + $40.00 = $9,862.50
+────────────────────────────────────────────────────────────────────────────
+
+================================================================================
+LINE ITEM #3: SEAMLESS CARBON STEEL PIPE
+================================================================================
+
+EXTRACTION (From PO)
+--------------------------------------------------------------------------------
+Material Number:         CS-001
+PO Description:          Steel Pipe - Seamless
+Quantity:                150 pcs
+Delivery Date:           December 10, 2025
+PO Unit Price:           $67.20 (reference only - not used in calculations)
+
+EXTRACTION (From BOM3.pdf)
+--------------------------------------------------------------------------------
+BOM ID:                  CS-001  ✓ Match confirmed
+Type/Part Designation:   Seamless Carbon Steel Pipe
+Dimensions:              NPS 2" (60.3 mm OD) x SCH 40 x 6000 mm
+Material Grade:          ASTM A106 Grade B
+Cutting Required:        No (0 cuts)
+Testing Lots Required:   1 lot
+Certificates Required:   1 certificate
+
+PRICE MATCHING (From price list.xlsx)
+--------------------------------------------------------------------------------
+Lookup Key:              CS-001
+Match Type:              Exact match
+Price List Row:          Row 18
+Unit Price:              $67.20
+Cutting Fee:             $8.00
+Testing Fee:             $20.00
+Cert Fee:                $30.00
+
+CALCULATION
+--------------------------------------------------------------------------------
+Material Cost:           150 × $67.20 = $10,080.00
+Cutting Cost:            $8.00 × 0 cuts = $0.00
+Testing Cost:            $20.00 × 1 lot = $20.00
+Certification Cost:      $30.00 × 1 cert = $30.00
+────────────────────────────────────────────────────────────────────────────
+LINE TOTAL:              $10,080.00 + $0.00 + $20.00 + $30.00 = $10,130.00
+────────────────────────────────────────────────────────────────────────────
+
+================================================================================
+ORDER TOTAL CALCULATION
+================================================================================
+
+MATERIAL SUBTOTAL
+--------------------------------------------------------------------------------
+Item 1 Material Cost:    $5,700.00
+Item 2 Material Cost:    $9,787.50
+Item 3 Material Cost:    $10,080.00
+────────────────────────────────────────────────────────────────────────────
+SUBTOTAL:                $5,700.00 + $9,787.50 + $10,080.00 = $25,567.50
+────────────────────────────────────────────────────────────────────────────
+
+VOLUME DISCOUNT
+--------------------------------------------------------------------------------
+Subtotal Amount:         $25,567.50
+Discount Tier Lookup:    $15,000 - $29,999 → 5% discount
+Discount Calculation:    $25,567.50 × 5% = $1,278.38
+────────────────────────────────────────────────────────────────────────────
+NET MATERIAL COST:       $25,567.50 - $1,278.38 = $24,289.12
+────────────────────────────────────────────────────────────────────────────
+
+FEES AGGREGATION
+--------------------------------------------------------------------------------
+Total Cutting Fees:      $0.00 + $0.00 + $0.00 = $0.00
+Total Testing Fees:      $15.00 + $35.00 + $20.00 = $70.00
+Total Cert Fees:         $25.00 + $40.00 + $30.00 = $95.00
+────────────────────────────────────────────────────────────────────────────
+TOTAL FEES:              $0.00 + $70.00 + $95.00 = $165.00
+────────────────────────────────────────────────────────────────────────────
+
+SHIPPING
+--------------------------------------------------------------------------------
+Source:                  From PO (PO.PO_Shipping)
+Shipping Amount:         $450.00
+
+TAX CALCULATION
+--------------------------------------------------------------------------------
+Taxable Base:            Net Material Cost + Total Fees
+Taxable Amount:          $24,289.12 + $165.00 = $24,454.12
+Tax Rate:                6% (from PO)
+Tax Calculation:         $24,454.12 × 6% = $1,467.25
+
+GRAND TOTAL
+--------------------------------------------------------------------------------
+Net Material Cost:       $24,289.12
++ Total Fees:            $165.00
++ Shipping:              $450.00
++ Tax:                   $1,467.25
+────────────────────────────────────────────────────────────────────────────
+GRAND TOTAL:             $26,371.37
+────────────────────────────────────────────────────────────────────────────
+
+================================================================================
+NOTES AND OBSERVATIONS
+================================================================================
+
+✓ All BOMs successfully matched with PO line items
+✓ All prices found in master price list
+✓ No cutting fees applied (all items require 0 cuts)
+✓ Testing and certification fees applied to all items
+✓ Volume discount of 5% applied based on subtotal tier
+✓ PO unit prices verified - prices match price list exactly
+✓ Tax calculated on net material cost plus fees (shipping excluded)
+
+Special Requirements Noted:
+- All materials must be accompanied by mill test certificates
+- Delivery must be scheduled 48 hours in advance
+- Materials require quality inspection upon receipt
+- BOM documentation required for each Material Number
+
+================================================================================
+END OF CALCULATION BREAKDOWN
+================================================================================
