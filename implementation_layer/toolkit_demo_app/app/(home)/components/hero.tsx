@@ -2,6 +2,7 @@
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 
@@ -11,7 +12,12 @@ export function Hero() {
   }
 
   return (
-    <section className="animate-in fade-in duration-500 bg-card relative overflow-hidden rounded-3xl border p-8 shadow-sm md:p-12">
+    <motion.section
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="bg-card relative overflow-hidden rounded-3xl border p-8 shadow-sm md:p-12"
+    >
       <div className="space-y-6">
         <div className="space-y-3">
           <h1 className="max-w-3xl font-serif text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl">
@@ -44,6 +50,6 @@ export function Hero() {
           </Button>
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 }

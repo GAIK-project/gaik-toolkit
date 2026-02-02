@@ -1,3 +1,5 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -25,8 +27,26 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08, delayChildren: 0.15 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: "easeOut" },
+  },
+};
 
 interface FeatureItem {
   label: string;
@@ -276,12 +296,18 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
   const buildingBlocks = demos.filter((demo) => !demo.featured);
 
   return (
-    <section
+    <motion.section
       id="demos"
-      className="animate-in fade-in space-y-8 delay-150 duration-500"
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      className="space-y-8"
     >
       {!isUnlocked && (
-        <div className="bg-muted/50 border-primary/20 flex items-center gap-3 rounded-lg border p-4">
+        <motion.div
+          variants={itemVariants}
+          className="bg-muted/50 border-primary/20 flex items-center gap-3 rounded-lg border p-4"
+        >
           <Lock className="text-primary h-5 w-5 shrink-0" />
           <p className="text-muted-foreground text-sm">
             <Link href="/sign-in" className="text-primary hover:underline">
@@ -293,41 +319,40 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
             </Link>
             .
           </p>
-        </div>
+        </motion.div>
       )}
 
       {/* Use Cases - Featured with Bento Grid */}
-      <div className="space-y-4">
+      <motion.div variants={itemVariants} className="space-y-4">
         <h2 className="font-serif text-2xl font-semibold md:text-3xl">
           Use Cases
         </h2>
         <div className="grid gap-6 md:grid-cols-2">
           {featuredDemos.map((demo) => (
-            <div
+            <motion.div
               key={demo.href}
+              variants={itemVariants}
               className={demo.size === "wide" ? "md:col-span-2" : ""}
             >
               <FeaturedCard demo={demo} isUnlocked={isUnlocked} />
-            </div>
+            </motion.div>
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {/* Building Blocks */}
-      <div className="space-y-4">
+      <motion.div variants={itemVariants} className="space-y-4">
         <h2 className="font-serif text-2xl font-semibold md:text-3xl">
           Building Blocks
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {buildingBlocks.map((demo) => (
-            <BuildingBlockCard
-              key={demo.href}
-              demo={demo}
-              isUnlocked={isUnlocked}
-            />
+            <motion.div key={demo.href} variants={itemVariants}>
+              <BuildingBlockCard demo={demo} isUnlocked={isUnlocked} />
+            </motion.div>
           ))}
         </div>
-      </div>
-    </section>
+      </motion.div>
+    </motion.section>
   );
 }
