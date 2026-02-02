@@ -16,12 +16,12 @@ NORMALIZATION RULES:
 •	Yes/No fields: output exactly "Yes" or "No" only if explicitly stated. Otherwise "".
 •	Keep locations as short as possible (building + area + optional clarification).
 FIELDS TO EXTRACT (with fixed options where applicable):
-1.	Type of form (English) [Choose one from: Safety observation, Safety-related initiative]
-2.	Observation type (Finnish) [Choose one from: Turvallisuus, Ympäristönsuojelu, Energiatehokkuus]
+1.	Type of form [Choose one from: Safety observation, Safety-related initiative]
+2.	Observation type [Choose one from: Safety, Environmental protection, Energy efficiency]
 3.	Positive safety observation [Choose one from: Yes]
 4.	Reporter name
 5.	Reporter organization [Choose one from: Luvata Pori Oy, Luvata Oy, Other]
-6.	Summer employee [Choose one from: Yes]
+6.	Summer employee [Choose one from: Yes, No]
 7.	Event date and time
 8.	Building or site
 9.	Detailed location
