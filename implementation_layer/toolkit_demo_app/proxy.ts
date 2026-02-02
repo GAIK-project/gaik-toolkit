@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { ratelimit } from "@/lib/rate-limit";
 import { updateSession } from "@/lib/supabase/proxy";
+import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 
@@ -11,11 +12,35 @@ function hasBody(method: string): boolean {
   return method !== "GET" && method !== "HEAD";
 }
 
-export async function proxy(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Proxy API requests to backend
   if (pathname.startsWith("/api") && !pathname.startsWith("/api/auth")) {
+    // Rate limit check (if Redis is configured)
+    if (ratelimit) {
+      const ip =
+        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+        request.headers.get("x-real-ip") ??
+        "anonymous";
+
+      const { success, limit, remaining, reset } = await ratelimit.limit(ip);
+
+      if (!success) {
+        return NextResponse.json(
+          { error: "Liian monta pyyntöä. Yritä hetken päästä uudelleen." },
+          {
+            status: 429,
+            headers: {
+              "X-RateLimit-Limit": limit.toString(),
+              "X-RateLimit-Remaining": remaining.toString(),
+              "X-RateLimit-Reset": reset.toString(),
+            },
+          },
+        );
+      }
+    }
+
     const backendPath = pathname.replace(/^\/api/, "");
     const targetUrl = `${BACKEND_URL}${backendPath}${request.nextUrl.search}`;
 

@@ -11,7 +11,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from implementation_layer.toolkit_demo_app.api.utils import get_api_config
+from ..utils import get_api_config
 
 router = APIRouter()
 
@@ -23,8 +23,8 @@ def sse_event(event_type: str, data: dict) -> str:
 # Temporary storage for generated PDFs
 PDF_STORAGE: dict[str, Path] = {}
 
-# Logo path for PDF generation
-LOGO_PATH = Path(__file__).parent.parent.parent / "public" / "logos" / "gaik_logo_medium.png"
+# Logo path for PDF generation (letter-only logo works better for PDF headers)
+LOGO_PATH = Path(__file__).parent.parent.parent / "public" / "logos" / "gaik-logo-letter-only.png"
 
 
 class PipelineStep(BaseModel):
@@ -154,18 +154,23 @@ async def audio_pipeline(
         )
 
         # Step 4: Generate PDF if requested
-        if generate_pdf and result.extracted_fields:
+        if generate_pdf:
             try:
                 steps[3].status = "in_progress"
 
-                from utils.pdf_generator import StructuredDataToPDF
+                from ..utils.pdf_generator import StructuredDataToPDF
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(
                     title=pdf_title, logo_path=logo
                 )
                 pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
-                pdf_generator.run(result.extracted_fields, pdf_path)
+
+                # Use extracted_fields if available, otherwise create from transcript
+                pdf_data = result.extracted_fields if result.extracted_fields else [
+                    {"transcript": result.transcription.enhanced_transcript or result.transcription.raw_transcript}
+                ]
+                pdf_generator.run(pdf_data, pdf_path)
 
                 PDF_STORAGE[job_id] = pdf_path
                 response.pdf_available = True
@@ -290,18 +295,23 @@ async def document_pipeline(
         )
 
         # Step 4: Generate PDF if requested
-        if generate_pdf and result.extracted_fields:
+        if generate_pdf:
             try:
                 steps[3].status = "in_progress"
 
-                from utils.pdf_generator import StructuredDataToPDF
+                from ..utils.pdf_generator import StructuredDataToPDF
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(
                     title=pdf_title, logo_path=logo
                 )
                 pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
-                pdf_generator.run(result.extracted_fields, pdf_path)
+
+                # Use extracted_fields if available, otherwise create from parsed content
+                pdf_data = result.extracted_fields if result.extracted_fields else [
+                    {"parsed_content": parsed_content or "No content extracted"}
+                ]
+                pdf_generator.run(pdf_data, pdf_path)
 
                 PDF_STORAGE[job_id] = pdf_path
                 response.pdf_available = True
@@ -395,19 +405,24 @@ async def text_pipeline(
         )
 
         # Step 3: Generate PDF if requested
-        if generate_pdf and extracted_data:
+        if generate_pdf:
             try:
                 pdf_step_idx = 2
                 steps[pdf_step_idx].status = "in_progress"
 
-                from utils.pdf_generator import StructuredDataToPDF
+                from ..utils.pdf_generator import StructuredDataToPDF
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(
                     title=pdf_title, logo_path=logo
                 )
                 pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
-                pdf_generator.run(extracted_data, pdf_path)
+
+                # Use extracted_data if available, otherwise create from input text
+                pdf_data = extracted_data if extracted_data else [
+                    {"input_text": text}
+                ]
+                pdf_generator.run(pdf_data, pdf_path)
 
                 PDF_STORAGE[job_id] = pdf_path
                 response.pdf_available = True
@@ -501,20 +516,25 @@ async def text_pipeline_stream(
 
             # Step 3: Generate PDF if requested
             pdf_available = False
-            if generate_pdf and extracted_data:
+            if generate_pdf:
                 pdf_step_idx = 2
                 steps[pdf_step_idx]["status"] = "in_progress"
                 yield sse_event("step_update", steps[pdf_step_idx])
 
                 try:
-                    from utils.pdf_generator import StructuredDataToPDF
+                    from ..utils.pdf_generator import StructuredDataToPDF
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(
                         title=pdf_title, logo_path=logo
                     )
                     pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
-                    pdf_generator.run(extracted_data, pdf_path)
+
+                    # Use extracted_data if available, otherwise create from input text
+                    pdf_data = extracted_data if extracted_data else [
+                        {"input_text": text}
+                    ]
+                    pdf_generator.run(pdf_data, pdf_path)
 
                     PDF_STORAGE[job_id] = pdf_path
                     pdf_available = True

@@ -21,6 +21,7 @@ interface ResultCardProps {
   copyContent?: string;
   className?: string;
   delay?: number;
+  feedbackSlot?: React.ReactNode;
 }
 
 export function ResultCard({
@@ -30,6 +31,7 @@ export function ResultCard({
   copyContent,
   className,
   delay = 0,
+  feedbackSlot,
 }: ResultCardProps) {
   const [copied, setCopied] = useState(false);
 
@@ -59,20 +61,23 @@ export function ResultCard({
               <CardDescription className="mt-1">{description}</CardDescription>
             )}
           </div>
-          {copyContent && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleCopy}
-              className="h-8 w-8"
-            >
-              {copied ? (
-                <Check className="h-4 w-4 text-green-600" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {feedbackSlot}
+            {copyContent && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleCopy}
+                className="h-8 w-8"
+              >
+                {copied ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>{children}</CardContent>
       </Card>

@@ -1,3 +1,4 @@
+import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { Toaster } from "@/components/ui/toaster";
 import type { Metadata } from "next";
 import { Fraunces, JetBrains_Mono, Sora } from "next/font/google";
@@ -65,8 +66,10 @@ export default function RootLayout({
       <body
         className={`${sora.variable} ${fraunces.variable} ${jetBrainsMono.variable} antialiased`}
       >
-        {children}
-        <Toaster />
+        <PostHogProvider>
+          {children}
+          <Toaster />
+        </PostHogProvider>
       </body>
     </html>
   );

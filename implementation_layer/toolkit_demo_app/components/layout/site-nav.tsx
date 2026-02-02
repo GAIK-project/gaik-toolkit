@@ -297,7 +297,7 @@ export function SiteNav({
   }
 
   return (
-    <header className="border-border/60 bg-background/80 sticky top-0 z-50 border-b backdrop-blur">
+    <header className="border-border/60 bg-card/95 sticky top-0 z-50 border-b shadow-sm backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center px-4 py-3 lg:px-6 lg:py-4">
         {/* Left: Logo */}
         <div className="flex min-w-0 flex-1 items-center">
@@ -315,7 +315,7 @@ export function SiteNav({
 
         {/* Center: Desktop Navigation */}
         <nav aria-label="Primary" className="hidden lg:block">
-          <div className="border-border/70 bg-card/70 flex items-center gap-1 rounded-full border p-1 shadow-sm">
+          <div className="border-border/70 bg-card flex items-center gap-1 rounded-full border p-1 shadow-sm">
             <NavigationMenu>
               <NavigationMenuList>
                 {navGroups.map((group) => {
@@ -346,7 +346,7 @@ export function SiteNav({
                                   <Link
                                     href={item.href}
                                     className={cn(
-                                      "hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block space-y-1 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none",
+                                      "hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full space-y-1 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none",
                                       active && "bg-primary/10 text-primary",
                                     )}
                                   >

@@ -104,6 +104,20 @@ export function AuthShell({
             {footer}
           </div>
         )}
+
+        <div className="mt-8 flex justify-center">
+          <Image
+            src={
+              isDark
+                ? "/co-funded_EN/horizontal/RGB/PNG/EN_Co-fundedbytheEU_RGB_NEG.png"
+                : "/co-funded_EN/horizontal/RGB/PNG/EN_Co-fundedbytheEU_RGB_POS.png"
+            }
+            alt="Co-funded by the European Union"
+            width={200}
+            height={45}
+            className="h-10 w-auto opacity-80"
+          />
+        </div>
       </motion.div>
     </div>
   );

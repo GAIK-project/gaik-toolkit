@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
 import { FileUpload } from "@/components/demo/file-upload";
 import {
@@ -7,6 +8,7 @@ import {
   LoadingCard,
   ResultCard,
 } from "@/components/demo/result-card";
+import { FeedbackButton } from "@/components/feedback";
 import {
   Accordion,
   AccordionContent,
@@ -27,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Database, Plus, Sparkles, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
+import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -107,7 +110,7 @@ export default function ExtractorPage() {
       formData.append("file", file);
       formData.append("parser_type", "auto");
 
-      const response = await fetch("/api/parse", {
+      const response = await apiFetch("/api/parse", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current?.signal,
@@ -123,6 +126,9 @@ export default function ExtractorPage() {
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         return null;
+      }
+      if (error instanceof RateLimitError) {
+        return null; // Toast already shown by apiFetch
       }
       toast.error(
         error instanceof Error ? error.message : "Failed to parse file",
@@ -174,7 +180,7 @@ export default function ExtractorPage() {
         fields.map((field) => [field.name, field.description]),
       );
 
-      const response = await fetch("/api/extract", {
+      const response = await apiFetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -192,9 +198,19 @@ export default function ExtractorPage() {
 
       const data = await response.json();
       setResult(data);
+
+      posthog.capture("data_extracted", {
+        input_mode: inputMode,
+        file_type: file?.type || "text",
+        file_size: file?.size || textToProcess.length,
+        fields_count: fields.length,
+        results_count: data.results?.length || 0,
+      });
+
       toast.success("Data extracted successfully!");
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
+      if (error instanceof RateLimitError) return; // Toast already shown
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
@@ -396,6 +412,7 @@ export default function ExtractorPage() {
               title="Extracted Data"
               description={`Processed ${result.document_count} document(s)`}
               copyContent={JSON.stringify(result.results, null, 2)}
+              feedbackSlot={<FeedbackButton demoType="extractor" />}
               delay={0}
             >
               {result.results.length > 0 ? (

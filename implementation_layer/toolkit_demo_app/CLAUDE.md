@@ -1,3 +1,4 @@
 - Backend API: Use gaik toolkit (https://pypi.org/project/gaik/) - see [main README](../README.md) for full documentation
 - Package managers: Use bun and uv, not npm
-- API proxy: `proxy.ts` is the Next.js 15 middleware for proxying API requests (https://nextjs.org/docs/app/getting-started/proxy)
+- API proxy: `proxy.ts` – Next.js 16 proxy for API requests (replaced middleware.ts)
+- Tailwind v4: Use `globals.css` theme variables

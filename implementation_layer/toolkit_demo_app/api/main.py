@@ -17,7 +17,7 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from gaik import __version__ as gaik_version  # noqa: E402
 
-from implementation_layer.toolkit_demo_app.api.routers import (  # noqa: E402
+from .routers import (  # noqa: E402
     classifier,
     extractor,
     parser,

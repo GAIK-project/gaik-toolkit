@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { FileUpload } from "@/components/demo/file-upload";
 import { IncidentDetails } from "@/components/demo/incident-details";
 import {
@@ -7,6 +8,7 @@ import {
   ResultCard,
   ResultText,
 } from "@/components/demo/result-card";
+import { FeedbackButton } from "@/components/feedback";
 import { StepIndicator } from "@/components/demo/step-indicator";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +41,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -145,7 +148,7 @@ export default function IncidentReportPage() {
 
         // Simulating steps for Audio (since it's not SSE in this demo version effectively)
         // In a real app, the audio endpoint ideally should stream too, but we'll adapt.
-        const response = await fetch("/api/pipeline/audio", {
+        const response = await apiFetch("/api/pipeline/audio", {
           method: "POST",
           body: formData,
           signal: abortControllerRef.current.signal,
@@ -167,13 +170,21 @@ export default function IncidentReportPage() {
           { step: 3, name: "Report Formatting", status: "completed" },
         ]);
         setResult(data);
+
+        posthog.capture("pipeline_executed", {
+          pipeline_type: "audio",
+          extraction_mode: extractionMode,
+          enhanced: enhanced,
+          generate_pdf: generatePdf,
+        });
+
         toast.success("Incident report generated!");
       } else {
         // Text mode with SSE streaming
         formData.append("text", textInput);
         formData.append("pdf_title", "Incident Report");
 
-        const response = await fetch("/api/pipeline/text/stream", {
+        const response = await apiFetch("/api/pipeline/text/stream", {
           method: "POST",
           body: formData,
           signal: abortControllerRef.current.signal,
@@ -206,6 +217,13 @@ export default function IncidentReportPage() {
               );
             } else if (event.type === "result") {
               setResult(event.data as unknown as IncidentReportResult);
+
+              posthog.capture("pipeline_executed", {
+                pipeline_type: "text",
+                extraction_mode: extractionMode,
+                generate_pdf: generatePdf,
+              });
+
               toast.success("Incident report generated!");
             } else if (event.type === "error") {
               throw new Error(
@@ -223,6 +241,7 @@ export default function IncidentReportPage() {
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
+      if (error instanceof RateLimitError) return; // Toast already shown
       toast.error(error instanceof Error ? error.message : "An error occurred");
       setPipelineSteps((prev) =>
         prev.map((s) =>
@@ -614,6 +633,7 @@ export default function IncidentReportPage() {
                   title="Incident Details"
                   description="Details extracted by AI"
                   copyContent={JSON.stringify(result.extracted_data, null, 2)}
+                  feedbackSlot={<FeedbackButton demoType="incident-report" />}
                   delay={0.1}
                 >
                   <IncidentDetails data={result.extracted_data} />

@@ -12,7 +12,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from implementation_layer.toolkit_demo_app.api.utils import get_api_config
+from ..utils import get_api_config
 
 router = APIRouter()
 
@@ -33,8 +33,12 @@ _global_lock = asyncio.Lock()
 MAX_FILE_SIZE_MB = 20
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
+# Page limit for demo (CPU environment in CSC Rahti)
+MAX_PAGES_DEMO = 3
+
 # Example document configuration
 EXAMPLE_PDF_PATH = Path(__file__).parent.parent.parent / "public" / "GAIK_Test_Document_Demo.pdf"
+EXAMPLE_INDEX_PATH = Path(__file__).parent.parent.parent / "public" / "example-index.json"
 EXAMPLE_COLLECTION_ID = "example-demo"
 
 
@@ -181,6 +185,22 @@ async def index_documents(
                     tmp_path = tmp.name
 
                 try:
+                    # Check page count for PDF files (demo limit)
+                    if suffix == ".pdf":
+                        import fitz  # PyMuPDF - already available via docling
+
+                        doc = fitz.open(tmp_path)
+                        page_count = doc.page_count
+                        doc.close()
+
+                        if page_count > MAX_PAGES_DEMO:
+                            Path(tmp_path).unlink(missing_ok=True)
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"PDF has {page_count} pages. Maximum {MAX_PAGES_DEMO} pages allowed for demo. "
+                                f"Try the Example document instead.",
+                            )
+
                     # Index the document with original filename (without extension)
                     original_name = Path(file.filename).stem
                     result = workflow.index_documents([tmp_path], filenames=[original_name])
@@ -470,11 +490,17 @@ async def clear_all_collections():
 @router.post("/load-example", response_model=IndexResponse)
 async def load_example_document():
     """
-    Load the pre-bundled example PDF for demo purposes.
+    Load the pre-indexed example document for demo purposes.
 
-    Returns existing example collection if already loaded, otherwise indexes the example document.
+    Uses pre-computed embeddings from example-index.json for instant loading.
+    Falls back to real-time indexing if pre-indexed file not found.
     """
-    from gaik.software_modules.RAG_workflow import RAGWorkflow
+    from langchain_core.documents import Document
+
+    from gaik.software_components.RAG.answer_generator import AnswerGenerator
+    from gaik.software_components.RAG.embedder import Embedder
+    from gaik.software_components.RAG.retriever import Retriever
+    from gaik.software_components.RAG.vector_store import VectorStore
 
     # If already loaded, return existing collection
     if EXAMPLE_COLLECTION_ID in RAG_INSTANCES:
@@ -494,18 +520,11 @@ async def load_example_document():
             status="success",
         )
 
-    # Verify example file exists
-    if not EXAMPLE_PDF_PATH.exists():
-        raise HTTPException(
-            status_code=500,
-            detail="Example document not found. Please contact administrator.",
-        )
-
-    # Acquire lock and index
+    # Acquire lock
     lock = await _get_collection_lock(EXAMPLE_COLLECTION_ID)
 
     async with lock:
-        # Double-check after acquiring lock (another request may have loaded it)
+        # Double-check after acquiring lock
         if EXAMPLE_COLLECTION_ID in RAG_INSTANCES:
             workflow = RAG_INSTANCES[EXAMPLE_COLLECTION_ID]
             chunk_count = workflow.vector_store.count()
@@ -525,6 +544,77 @@ async def load_example_document():
 
         try:
             config = get_api_config()
+
+            # Try to load pre-indexed data first (instant loading)
+            if EXAMPLE_INDEX_PATH.exists():
+                with open(EXAMPLE_INDEX_PATH, encoding="utf-8") as f:
+                    index_data = json.load(f)
+
+                # Create components manually for pre-indexed data
+                embedder = Embedder(config=config)
+                vector_store = VectorStore(
+                    persist=False,
+                    collection_name=f"gaik_rag_{EXAMPLE_COLLECTION_ID}",
+                )
+
+                # Load pre-computed documents and embeddings
+                documents = [
+                    Document(page_content=c["page_content"], metadata=c["metadata"])
+                    for c in index_data["chunks"]
+                ]
+                embeddings = [c["embedding"] for c in index_data["chunks"]]
+
+                vector_store.add(documents, embeddings)
+
+                # Create retriever and answer generator
+                retriever = Retriever(
+                    embedder=embedder,
+                    vector_store=vector_store,
+                    top_k=5,
+                )
+                answer_generator = AnswerGenerator(
+                    config=config,
+                    citations=True,
+                    stream=True,
+                )
+
+                # Create a minimal workflow-like object
+                class PreloadedWorkflow:
+                    def __init__(self, vs, emb, ret, ans):
+                        self.vector_store = vs
+                        self.embedder = emb
+                        self.retriever = ret
+                        self.answer_generator = ans
+
+                workflow = PreloadedWorkflow(
+                    vector_store, embedder, retriever, answer_generator
+                )
+                RAG_INSTANCES[EXAMPLE_COLLECTION_ID] = workflow
+
+                chunk_count = len(documents)
+                return IndexResponse(
+                    collection_id=EXAMPLE_COLLECTION_ID,
+                    document_count=1,
+                    chunk_count=chunk_count,
+                    documents=[
+                        IndexedDocument(
+                            filename="GAIK_Test_Document_Demo.pdf",
+                            chunk_count=chunk_count,
+                            status="indexed",
+                        )
+                    ],
+                    status="success",
+                )
+
+            # Fallback: index in real-time if pre-indexed file not found
+            from gaik.software_modules.RAG_workflow import RAGWorkflow
+
+            if not EXAMPLE_PDF_PATH.exists():
+                raise HTTPException(
+                    status_code=500,
+                    detail="Example document not found. Please contact administrator.",
+                )
+
             workflow = RAGWorkflow(
                 api_config=config,
                 persist=False,

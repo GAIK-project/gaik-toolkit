@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
 import { FileUpload } from "@/components/demo/file-upload";
 import {
   DocumentList,
@@ -64,7 +66,9 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import { FeedbackButton } from "@/components/feedback";
 import { motion } from "motion/react";
+import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -78,8 +82,9 @@ interface ChatMessage {
 
 /** Remove inline citations like [document_name, page 1] - sources are shown in Sources component */
 function removeCitations(text: string): string {
-  // Match patterns like [document_name, page 1] or [document_name, Page 1]
-  return text.replace(/\s*\[[^\]]+,\s*[Pp]age\s*\d+\]/g, "").trim();
+  // Match any bracketed citation containing document name and page references
+  // Handles: [doc, page 1], [doc, page 5-6], [doc, page 3; page 5], [doc, pages 1-3]
+  return text.replace(/\s*\[[^\]]+,\s*[Pp]ages?\s*[^\]]+\]/g, "").trim();
 }
 
 /** Format source title for display - makes document names more readable */
@@ -320,7 +325,7 @@ export default function RAGPage() {
         formData.append("collection_id", collectionId);
       }
 
-      const response = await fetch("/api/rag/index", {
+      const response = await apiFetch("/api/rag/index", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current.signal,
@@ -358,6 +363,7 @@ export default function RAGPage() {
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
+      if (error instanceof RateLimitError) return; // Toast already shown
       toast.error(
         error instanceof Error ? error.message : "Failed to index documents",
       );
@@ -377,7 +383,7 @@ export default function RAGPage() {
 
     setIsIndexing(true);
     try {
-      const response = await fetch("/api/rag/load-example", { method: "POST" });
+      const response = await apiFetch("/api/rag/load-example", { method: "POST" });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
@@ -395,6 +401,7 @@ export default function RAGPage() {
       );
       toast.success("Example document loaded! Try asking a question.");
     } catch (error) {
+      if (error instanceof RateLimitError) return; // Toast already shown
       toast.error(
         error instanceof Error ? error.message : "Failed to load example",
       );
@@ -418,6 +425,14 @@ export default function RAGPage() {
     };
     setMessages((prev) => [...prev, userMessage]);
 
+    posthog.capture("rag_query_sent", {
+      query_length: question.length,
+      has_documents: hasDocuments,
+      document_count: indexedCount,
+      search_type: searchType,
+      top_k: topK,
+    });
+
     setIsQuerying(true);
     setStreamingAnswer([]);
     setStreamingSources([]);
@@ -429,7 +444,7 @@ export default function RAGPage() {
       formData.append("top_k", String(topK));
       formData.append("search_type", searchType);
 
-      const response = await fetch("/api/rag/query/stream", {
+      const response = await apiFetch("/api/rag/query/stream", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current.signal,
@@ -498,6 +513,7 @@ export default function RAGPage() {
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
+      if (error instanceof RateLimitError) return; // Toast already shown
       toast.error(error instanceof Error ? error.message : "Query failed");
     } finally {
       setIsQuerying(false);
@@ -521,9 +537,15 @@ export default function RAGPage() {
   }
 
   function handleRemoveDocument(filename: string): void {
-    setIndexedDocuments(
-      indexedDocuments.filter((d) => d.filename !== filename),
-    );
+    const remaining = indexedDocuments.filter((d) => d.filename !== filename);
+    setIndexedDocuments(remaining);
+
+    // Clear messages if no documents remain (conversation context is gone)
+    const remainingIndexed = remaining.filter((d) => d.status === "indexed");
+    if (remainingIndexed.length === 0) {
+      setMessages([]);
+      setCollectionId(null);
+    }
   }
 
   return (
@@ -595,6 +617,9 @@ export default function RAGPage() {
               />
             </Dialog>
           )}
+
+          {/* Feedback - show when documents exist */}
+          {hasDocuments && <FeedbackButton demoType="rag" />}
 
           {/* Settings */}
           <DropdownMenu>
@@ -676,29 +701,28 @@ export default function RAGPage() {
                       <Upload className="text-primary h-12 w-12" />
                     </div>
                     <h2 className="mb-2 text-xl font-semibold">
-                      Upload your documents
+                      Get started
                     </h2>
                     <p className="text-muted-foreground mb-6 max-w-md text-center">
-                      Upload PDF documents to get started. You can then ask
-                      questions and get AI-powered answers with citations.
+                      Try our example document to see RAG in action, or upload
+                      your own PDF (max 3 pages) to ask questions and get
+                      AI-powered answers with citations.
                     </p>
                     <div className="flex gap-3">
+                      <ExamplePreviewDialog
+                        exampleUrl="/GAIK_Test_Document_Demo.pdf"
+                        exampleName="GAIK_Test_Document_Demo.pdf"
+                        onUseExampleDirect={handleLoadExample}
+                        disabled={isIndexing}
+                        buttonVariant="default"
+                        buttonSize="lg"
+                      />
                       <DialogTrigger asChild>
-                        <Button size="lg" className="gap-2">
+                        <Button size="lg" variant="outline" className="gap-2">
                           <Plus className="h-5 w-5" />
                           Upload PDF
                         </Button>
                       </DialogTrigger>
-                      <Button
-                        size="lg"
-                        variant="outline"
-                        className="gap-2"
-                        onClick={handleLoadExample}
-                        disabled={isIndexing}
-                      >
-                        <Sparkles className="h-5 w-5" />
-                        {isIndexing ? "Loading..." : "Try Example"}
-                      </Button>
                     </div>
                   </div>
                   <UploadDialogContent

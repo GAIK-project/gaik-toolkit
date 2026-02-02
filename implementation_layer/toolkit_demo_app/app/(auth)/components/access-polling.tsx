@@ -7,18 +7,9 @@ export function AccessPolling() {
   const router = useRouter();
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/access-status");
-        const data = await res.json();
-        if (data.status === "approved") {
-          clearInterval(interval);
-          router.push("/classifier");
-        }
-      } catch {
-        // ignore fetch errors
-      }
-    }, 10_000);
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 5_000);
 
     return () => clearInterval(interval);
   }, [router]);

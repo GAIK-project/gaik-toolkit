@@ -15,7 +15,10 @@ import {
 interface ExamplePreviewDialogProps {
   exampleUrl: string;
   exampleName: string;
-  onUseExample: (file: File) => void;
+  /** Called with File object after fetching (for file upload flows) */
+  onUseExample?: (file: File) => void;
+  /** Called directly without fetching file (for API-based flows like RAG) */
+  onUseExampleDirect?: () => void | Promise<void>;
   disabled?: boolean;
   buttonVariant?: "ghost" | "outline" | "default";
   buttonSize?: "sm" | "default" | "lg";
@@ -25,6 +28,7 @@ export function ExamplePreviewDialog({
   exampleUrl,
   exampleName,
   onUseExample,
+  onUseExampleDirect,
   disabled = false,
   buttonVariant = "ghost",
   buttonSize = "sm",
@@ -33,7 +37,7 @@ export function ExamplePreviewDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  async function handleOpenDialog() {
+  function handleOpenDialog() {
     setOpen(true);
     setPreviewUrl(exampleUrl);
   }
@@ -41,16 +45,26 @@ export function ExamplePreviewDialog({
   async function handleUseExample() {
     setIsLoading(true);
     try {
-      const response = await fetch(exampleUrl);
-      if (!response.ok) {
-        throw new Error("Failed to load example file");
+      // Direct callback mode (e.g., RAG which calls API directly)
+      if (onUseExampleDirect) {
+        await onUseExampleDirect();
+        setOpen(false);
+        return;
       }
-      const blob = await response.blob();
-      const file = new File([blob], exampleName, {
-        type: blob.type || "application/pdf",
-      });
-      onUseExample(file);
-      setOpen(false);
+
+      // File fetch mode (e.g., Extractor which needs the file)
+      if (onUseExample) {
+        const response = await fetch(exampleUrl);
+        if (!response.ok) {
+          throw new Error("Failed to load example file");
+        }
+        const blob = await response.blob();
+        const file = new File([blob], exampleName, {
+          type: blob.type || "application/pdf",
+        });
+        onUseExample(file);
+        setOpen(false);
+      }
     } catch (error) {
       console.error("Failed to load example:", error);
     } finally {
@@ -71,7 +85,7 @@ export function ExamplePreviewDialog({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="flex max-h-[90vh] max-w-3xl flex-col">
+        <DialogContent className="flex max-h-[90vh] w-[90vw] max-w-6xl flex-col sm:max-w-6xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -84,11 +98,11 @@ export function ExamplePreviewDialog({
             {previewUrl ? (
               <iframe
                 src={previewUrl}
-                className="h-[500px] w-full"
+                className="h-[70vh] min-h-125 w-full"
                 title="Document preview"
               />
             ) : (
-              <div className="flex h-[500px] items-center justify-center">
+              <div className="flex h-[70vh] min-h-125 items-center justify-center">
                 <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
               </div>
             )}

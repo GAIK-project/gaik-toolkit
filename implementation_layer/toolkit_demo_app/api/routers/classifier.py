@@ -5,16 +5,10 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from pydantic import BaseModel
 
-from implementation_layer.toolkit_demo_app.api.utils import get_api_config
+from ..utils import get_api_config
 
 router = APIRouter()
-
-
-class ClassifyRequest(BaseModel):
-    classes: list[str]
-    parser: Literal["pymupdf", "docx", "vision"] | None = None
 
 
 @router.post("")

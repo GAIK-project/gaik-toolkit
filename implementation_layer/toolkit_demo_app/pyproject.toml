@@ -1,0 +1,17 @@
+[project]
+name = "toolkit-demo-app"
+version = "0.1.0"
+description = "GAIK Toolkit Demo Application"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi>=0.128.0",
+    "uvicorn[standard]>=0.40.0",
+    "python-multipart>=0.0.21",
+    "python-dotenv>=1.2.1",
+    "fpdf2>=2.8.5",
+    "gaik[all-cpu]>=0.3.6",
+]
+
+[tool.uv.sources]
+gaik = { path = "../..", editable = true }

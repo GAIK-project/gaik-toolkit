@@ -1,4 +1,4 @@
-import { BookOpen, UserPlus } from "lucide-react";
+import { BookOpen, Shield, UserPlus } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -37,19 +37,28 @@ export function Footer({ githubPreview }: FooterProps) {
     <footer className="border-t">
       <div className="container mx-auto px-4 py-4">
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-          <div className="flex items-center gap-2">
-            <Link href="/" className="shrink-0">
-              <Image
-                src="/logos/gaik-logo-letter-only.png"
-                alt="GAIK"
-                width={24}
-                height={24}
-                className="h-6 w-6"
-              />
-            </Link>
-            <span className="text-muted-foreground text-sm">
-              &copy; {currentYear} GAIK Project
-            </span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Link href="/" className="shrink-0">
+                <Image
+                  src="/logos/gaik-logo-letter-only.png"
+                  alt="GAIK"
+                  width={24}
+                  height={24}
+                  className="h-6 w-6"
+                />
+              </Link>
+              <span className="text-muted-foreground text-sm">
+                &copy; {currentYear} GAIK Project
+              </span>
+            </div>
+            <Image
+              src="/co-funded_EN/horizontal/RGB/PNG/EN_Co-fundedbytheEU_RGB_POS.png"
+              alt="Co-funded by the European Union"
+              width={180}
+              height={40}
+              className="h-8 w-auto"
+            />
           </div>
 
           <nav className="text-muted-foreground flex items-center gap-4 text-sm">
@@ -85,6 +94,14 @@ export function Footer({ githubPreview }: FooterProps) {
               <BookOpen className="h-3.5 w-3.5" />
               Docs
             </a>
+            <span className="text-border">|</span>
+            <Link
+              href="/privacy"
+              className="hover:text-foreground flex items-center gap-1.5 transition-colors"
+            >
+              <Shield className="h-3.5 w-3.5" />
+              Privacy
+            </Link>
             <span className="text-border">|</span>
             <Link
               href="/sign-up"

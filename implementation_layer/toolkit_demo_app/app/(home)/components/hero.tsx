@@ -1,6 +1,7 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 
@@ -23,12 +24,16 @@ export function Hero() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <Button asChild size="lg" className="h-12 gap-2 px-6 text-base shadow-md">
-            <Link href="/incident-report">
-              Interactive Demo
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
+          <Link
+            href="/incident-report"
+            className={cn(
+              buttonVariants({ size: "lg" }),
+              "h-12 gap-2 px-6 text-base shadow-md"
+            )}
+          >
+            Interactive Demo
+            <ArrowRight className="size-4" />
+          </Link>
           <Button
             size="lg"
             variant="outline"

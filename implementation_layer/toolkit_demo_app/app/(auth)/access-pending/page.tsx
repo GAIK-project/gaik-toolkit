@@ -14,9 +14,9 @@ export default async function AccessPendingPage() {
     redirect("/sign-in");
   }
 
-  // Redirect to demo if already approved
+  // Redirect to home if already approved
   if (status === "approved") {
-    redirect("/classifier");
+    redirect("/");
   }
 
   return (

@@ -1,4 +1,12 @@
-import { Shield, Database, Eye, Scale, Mail, Building2 } from "lucide-react";
+import {
+  Shield,
+  Database,
+  Eye,
+  Scale,
+  Mail,
+  Building2,
+  BarChart3,
+} from "lucide-react";
 
 function Section({
   icon: Icon,
@@ -70,6 +78,21 @@ export function PrivacyContent() {
           Your data is stored securely using Supabase, hosted on AWS in the EU
           (Stockholm, Sweden). We retain your data only for the duration of the
           GAIK project (until January 2027) or until you request deletion.
+        </p>
+      </Section>
+
+      <Section icon={BarChart3} title="Analytics">
+        <p>
+          We use PostHog for usage analytics to improve our service. PostHog is
+          hosted in the EU (Frankfurt, Germany) and collects:
+        </p>
+        <ul className="mt-1 list-inside list-disc space-y-1">
+          <li>Page views and feature usage</li>
+          <li>Technical information (browser type, screen size)</li>
+        </ul>
+        <p className="mt-2">
+          Analytics data is used solely to improve the demo application. You can
+          opt out by enabling Do Not Track in your browser settings.
         </p>
       </Section>
 
