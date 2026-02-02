@@ -1,5 +1,6 @@
 # GAIK Demo API - Lightweight Production Dockerfile
 # Optimized for CSC Rahti 2 (no GPU/torch)
+# Build context: toolkit_demo_app/ (not api/)
 
 FROM python:3.12-slim
 
@@ -21,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 # Copy requirements first (layer caching)
-COPY requirements.txt .
+COPY api/requirements.txt .
 
 # Install PyTorch CPU-only first (prevents CUDA download ~2GB)
 RUN uv pip install --system --no-cache \
@@ -31,8 +32,12 @@ RUN uv pip install --system --no-cache \
 # Install dependencies (gaik[rag-workflow] included in requirements.txt)
 RUN uv pip install --system --no-cache -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy API application code
+COPY api/ .
+
+# Copy example files for RAG demo
+COPY public/GAIK_Test_Document_Demo.pdf ./public/
+COPY public/example-index.json ./public/
 
 # OpenShift arbitrary UID support
 # CSC Rahti 2 assigns random UIDs but always GID=0 (root group)

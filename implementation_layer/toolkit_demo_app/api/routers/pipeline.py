@@ -11,7 +11,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
-from ..utils import get_api_config
+from utils import get_api_config
 
 router = APIRouter()
 
@@ -158,7 +158,7 @@ async def audio_pipeline(
             try:
                 steps[3].status = "in_progress"
 
-                from ..utils.pdf_generator import StructuredDataToPDF
+                from utils.pdf_generator import StructuredDataToPDF
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(
@@ -299,7 +299,7 @@ async def document_pipeline(
             try:
                 steps[3].status = "in_progress"
 
-                from ..utils.pdf_generator import StructuredDataToPDF
+                from utils.pdf_generator import StructuredDataToPDF
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(
@@ -410,7 +410,7 @@ async def text_pipeline(
                 pdf_step_idx = 2
                 steps[pdf_step_idx].status = "in_progress"
 
-                from ..utils.pdf_generator import StructuredDataToPDF
+                from utils.pdf_generator import StructuredDataToPDF
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(
@@ -522,7 +522,7 @@ async def text_pipeline_stream(
                 yield sse_event("step_update", steps[pdf_step_idx])
 
                 try:
-                    from ..utils.pdf_generator import StructuredDataToPDF
+                    from utils.pdf_generator import StructuredDataToPDF
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(

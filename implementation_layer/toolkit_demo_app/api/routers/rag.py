@@ -12,7 +12,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from ..utils import get_api_config
+from utils import get_api_config
 
 router = APIRouter()
 
@@ -37,8 +37,15 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 MAX_PAGES_DEMO = 3
 
 # Example document configuration
-EXAMPLE_PDF_PATH = Path(__file__).parent.parent.parent / "public" / "GAIK_Test_Document_Demo.pdf"
-EXAMPLE_INDEX_PATH = Path(__file__).parent.parent.parent / "public" / "example-index.json"
+# In Docker: /app/routers/rag.py -> parent.parent = /app/
+# Local dev: api/routers/rag.py -> parent.parent.parent = toolkit_demo_app/
+_base_path = Path(__file__).parent.parent  # /app/ in Docker, api/ locally
+if (_base_path / "public").exists():
+    _public_path = _base_path / "public"
+else:
+    _public_path = _base_path.parent / "public"  # Fallback for local dev
+EXAMPLE_PDF_PATH = _public_path / "GAIK_Test_Document_Demo.pdf"
+EXAMPLE_INDEX_PATH = _public_path / "example-index.json"
 EXAMPLE_COLLECTION_ID = "example-demo"
 
 

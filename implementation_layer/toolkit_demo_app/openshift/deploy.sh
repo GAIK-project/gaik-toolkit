@@ -68,8 +68,8 @@ check_docker() {
 
 deploy_api() {
     echo -e "${YELLOW}Building API...${NC}"
-    cd "$REPO_ROOT"
-    docker build -t gaik-demo-api -f implementation_layer/api/Dockerfile .
+    cd "$DEMO_DIR"
+    docker build -t gaik-demo-api -f api/Dockerfile .
 
     echo -e "${YELLOW}Tagging and pushing API...${NC}"
     docker tag gaik-demo-api "$REGISTRY/$PROJECT/gaik-demo-api:latest"

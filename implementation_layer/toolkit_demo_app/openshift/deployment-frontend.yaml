@@ -43,6 +43,18 @@ spec:
                 secretKeyRef:
                   name: gaik-demo-supabase
                   key: SUPABASE_SECRET_KEY
+            - name: UPSTASH_REDIS_REST_URL
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-redis
+                  key: UPSTASH_REDIS_REST_URL
+                  optional: true
+            - name: UPSTASH_REDIS_REST_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-redis
+                  key: UPSTASH_REDIS_REST_TOKEN
+                  optional: true
           resources:
             requests:
               cpu: 100m

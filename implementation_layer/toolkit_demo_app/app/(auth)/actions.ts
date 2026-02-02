@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export type AuthResult = {
@@ -8,23 +9,37 @@ export type AuthResult = {
   success?: boolean;
 };
 
+const signUpSchema = z.object({
+  email: z.email("Please enter a valid email address."),
+  password: z.string().min(6, "Password must be at least 6 characters."),
+  name: z.string().min(1, "Please enter your full name."),
+  company: z.string().optional(),
+  useCase: z.string().optional(),
+});
+
+const signInSchema = z.object({
+  email: z.email("Please enter a valid email address."),
+  password: z.string().min(1, "Please enter your password."),
+});
+
 export async function signUp(
   _prevState: AuthResult,
   formData: FormData,
 ): Promise<AuthResult> {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const fullName = formData.get("name") as string;
-  const company = (formData.get("company") as string) || null;
-  const useCase = (formData.get("useCase") as string) || null;
+  const rawData = {
+    email: formData.get("email"),
+    password: formData.get("password"),
+    name: formData.get("name"),
+    company: formData.get("company") || undefined,
+    useCase: formData.get("useCase") || undefined,
+  };
 
-  if (!email || !password || !fullName) {
-    return { error: "Please fill in all required fields." };
+  const result = signUpSchema.safeParse(rawData);
+  if (!result.success) {
+    return { error: result.error.issues[0].message };
   }
 
-  if (password.length < 6) {
-    return { error: "Password must be at least 6 characters." };
-  }
+  const { email, password, name: fullName, company, useCase } = result.data;
 
   const supabase = await createClient();
 
@@ -72,12 +87,17 @@ export async function signIn(
   _prevState: AuthResult,
   formData: FormData,
 ): Promise<AuthResult> {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+  const rawData = {
+    email: formData.get("email"),
+    password: formData.get("password"),
+  };
 
-  if (!email || !password) {
-    return { error: "Please enter your email and password." };
+  const result = signInSchema.safeParse(rawData);
+  if (!result.success) {
+    return { error: result.error.issues[0].message };
   }
+
+  const { email, password } = result.data;
 
   const supabase = await createClient();
 

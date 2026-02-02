@@ -1,7 +1,9 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isAdminAuthenticated } from "@/lib/data/admin";
 
 const ADMIN_COOKIE_NAME = "admin_session";
 const ADMIN_COOKIE_VALUE = "authenticated";
@@ -11,26 +13,30 @@ export type AdminResult = {
   success?: boolean;
 };
 
-export type AccessRequest = {
-  id: string;
-  user_id: string;
-  email: string;
-  full_name: string;
-  company: string | null;
-  use_case: string | null;
-  status: "pending" | "approved" | "rejected";
-  created_at: string;
-};
+const adminPasswordSchema = z.object({
+  password: z.string().min(1, "Please enter the admin password."),
+});
+
+const updateStatusSchema = z.object({
+  userId: z.string().uuid("Invalid user ID."),
+  status: z.enum(["approved", "rejected"], {
+    message: "Invalid status.",
+  }),
+});
 
 export async function verifyAdminPassword(
   _prevState: AdminResult,
   formData: FormData,
 ): Promise<AdminResult> {
-  const password = formData.get("password") as string;
+  const result = adminPasswordSchema.safeParse({
+    password: formData.get("password"),
+  });
 
-  if (!password) {
-    return { error: "Please enter the admin password." };
+  if (!result.success) {
+    return { error: result.error.issues[0].message };
   }
+
+  const { password } = result.data;
 
   const adminPassword = process.env.ADMIN_PASSWORD;
   if (!adminPassword) {
@@ -53,37 +59,20 @@ export async function verifyAdminPassword(
   return { success: true };
 }
 
-export async function isAdminAuthenticated(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const adminCookie = cookieStore.get(ADMIN_COOKIE_NAME);
-  return adminCookie?.value === ADMIN_COOKIE_VALUE;
-}
-
 export async function adminLogout(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(ADMIN_COOKIE_NAME);
-}
-
-export async function getAccessRequests(): Promise<AccessRequest[]> {
-  const supabase = createServiceClient();
-
-  const { data, error } = await supabase
-    .from("access_requests")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Failed to fetch access requests:", error);
-    return [];
-  }
-
-  return data || [];
 }
 
 export async function updateAccessStatus(
   userId: string,
   status: "approved" | "rejected",
 ): Promise<AdminResult> {
+  const result = updateStatusSchema.safeParse({ userId, status });
+  if (!result.success) {
+    return { error: result.error.issues[0].message };
+  }
+
   const isAuthenticated = await isAdminAuthenticated();
   if (!isAuthenticated) {
     return { error: "Unauthorized" };
@@ -93,8 +82,8 @@ export async function updateAccessStatus(
 
   const { error } = await supabase
     .from("access_requests")
-    .update({ status })
-    .eq("user_id", userId);
+    .update({ status: result.data.status })
+    .eq("user_id", result.data.userId);
 
   if (error) {
     console.error("Failed to update access status:", error);

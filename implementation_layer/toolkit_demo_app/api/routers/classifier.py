@@ -6,7 +6,7 @@ from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from ..utils import get_api_config
+from utils import get_api_config
 
 router = APIRouter()
 

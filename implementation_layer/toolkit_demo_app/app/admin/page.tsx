@@ -4,13 +4,15 @@ import { useActionState, useEffect, useState, useTransition } from "react";
 import { Loader2, Check, X, LogOut } from "lucide-react";
 import {
   verifyAdminPassword,
-  isAdminAuthenticated,
   adminLogout,
-  getAccessRequests,
   updateAccessStatus,
   type AdminResult,
-  type AccessRequest,
 } from "./actions";
+import {
+  isAdminAuthenticated,
+  getAccessRequests,
+  type AccessRequest,
+} from "@/lib/data/admin";
 import { AuthShell } from "../(auth)/components/auth-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

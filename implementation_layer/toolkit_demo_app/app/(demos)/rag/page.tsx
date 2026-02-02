@@ -67,6 +67,7 @@ import {
   Upload,
 } from "lucide-react";
 import { FeedbackButton } from "@/components/feedback";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 import { motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
@@ -170,7 +171,11 @@ function UploadDialogContent({
         {pendingFiles.length > 0 && (
           <Button onClick={onIndex} disabled={isIndexing} className="w-full">
             <Sparkles className="mr-2 h-4 w-4" />
-            {isIndexing ? "Indexing..." : "Index Document"}
+            {isIndexing ? (
+              <Shimmer className="text-inherit">Indexing document...</Shimmer>
+            ) : (
+              "Index Document"
+            )}
           </Button>
         )}
       </div>
@@ -769,13 +774,9 @@ export default function RAGPage() {
               className="flex gap-3"
             >
               <div className="bg-muted rounded-2xl px-4 py-3">
-                <motion.span
-                  animate={{ opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="text-primary text-sm"
-                >
-                  Searching documents
-                </motion.span>
+                <Shimmer className="text-primary text-sm">
+                  Searching documents...
+                </Shimmer>
               </div>
             </motion.div>
           )}
