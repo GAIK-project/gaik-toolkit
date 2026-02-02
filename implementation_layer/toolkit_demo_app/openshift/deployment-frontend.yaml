@@ -21,6 +21,8 @@ spec:
           ports:
             - containerPort: 3000
           env:
+            # Runtime server-side variables only
+            # NEXT_PUBLIC_* vars are baked in at build time from .env.production
             - name: BACKEND_URL
               value: "http://gaik-demo-api:8000"
             - name: ADMIN_PASSWORD
@@ -28,16 +30,6 @@ spec:
                 secretKeyRef:
                   name: gaik-demo-admin
                   key: ADMIN_PASSWORD
-            - name: NEXT_PUBLIC_SUPABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: gaik-demo-supabase
-                  key: NEXT_PUBLIC_SUPABASE_URL
-            - name: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: gaik-demo-supabase
-                  key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
             - name: SUPABASE_SECRET_KEY
               valueFrom:
                 secretKeyRef:

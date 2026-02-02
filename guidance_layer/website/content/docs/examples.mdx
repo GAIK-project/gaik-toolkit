@@ -226,6 +226,40 @@ results = extractor.extract(
 print(results[0])
 ```
 
+## Industry Use Cases
+
+### Construction Site Diary
+
+Process audio recordings from construction sites into structured diary entries:
+
+```python
+from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
+from pathlib import Path
+
+pipeline = AudioToStructuredData(use_azure=True)
+
+result = pipeline.run(
+    audio_file_path=Path("site_recording.mp3"),
+    user_requirements="""
+    Extract construction diary entry:
+    - date: Recording date
+    - weather: Weather conditions mentioned
+    - workers_present: Number of workers
+    - tasks_completed: List of completed tasks
+    - issues: Any problems or delays mentioned
+    - materials_used: Materials mentioned
+    """,
+    custom_context="Finnish construction site daily report"
+)
+
+print(result.extracted_fields)
+```
+
+**Use Cases:**
+- Construction site documentation
+- Field service reports
+- Inspection recordings
+
 ## More Examples
 
 Additional examples are available in the [GitHub examples folder](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples):

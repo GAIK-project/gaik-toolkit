@@ -108,9 +108,7 @@ class StructuredDataToPDF:
         >>> result = generator.run(Invoice(customer="Acme Oy", amount=100.0), "output.pdf")
     """
 
-    def __init__(
-        self, title: str = "Document", logo_path: str | Path | None = None
-    ) -> None:
+    def __init__(self, title: str = "Document", logo_path: str | Path | None = None) -> None:
         """Initialize the PDF generator.
 
         Args:
@@ -278,9 +276,7 @@ class StructuredDataToPDF:
             else:
                 self._write_line(pdf, f"• {item}", indent)
 
-    def _write_section_header(
-        self, pdf: FPDF, text: str, indent: int = 0
-    ) -> None:
+    def _write_section_header(self, pdf: FPDF, text: str, indent: int = 0) -> None:
         """Write a section header with background styling.
 
         Args:
@@ -300,9 +296,7 @@ class StructuredDataToPDF:
         pdf.set_text_color(0, 0, 0)
         pdf.ln(1)
 
-    def _write_key_value(
-        self, pdf: FPDF, key: str, value: str, indent: int = 0
-    ) -> None:
+    def _write_key_value(self, pdf: FPDF, key: str, value: str, indent: int = 0) -> None:
         """Write a key-value pair with bold key.
 
         Args:
@@ -328,9 +322,7 @@ class StructuredDataToPDF:
         else:
             pdf.cell(0, 7, value, ln=True)
 
-    def _write_line(
-        self, pdf: FPDF, text: str, indent: int = 0, bold: bool = False
-    ) -> None:
+    def _write_line(self, pdf: FPDF, text: str, indent: int = 0, bold: bool = False) -> None:
         """Write a line of text to the PDF.
 
         Args:

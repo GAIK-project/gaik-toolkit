@@ -8,18 +8,15 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Literal
 
+try:
+    from utils import get_api_config, sse_event
+except ImportError:
+    from api.utils import get_api_config, sse_event
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from utils import get_api_config
-
 router = APIRouter()
-
-
-def sse_event(event_type: str, data: dict) -> str:
-    """Format data as an SSE event."""
-    return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
 
 
 # In-memory storage for RAG workflow instances (keyed by collection_id)
@@ -35,6 +32,25 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 # Page limit for demo (CPU environment in CSC Rahti)
 MAX_PAGES_DEMO = 3
+
+# Custom RAG prompt - friendly and flexible
+CUSTOM_RAG_PROMPT = """You are a friendly document assistant 📚
+
+Your job is to help users find information from the indexed documents.
+
+Guidelines:
+- Answer questions using the provided context
+- Be conversational and helpful - use emojis sparingly 😊
+- For greetings (Hello, Hi, etc.): respond briefly and warmly, then ask what
+  they'd like to know. Do NOT summarize or list document contents unprompted
+- Only share specific information when the user asks for it
+- Include citations [document_name, page X] when answering questions
+- If you can't find an answer, say so briefly and suggest they rephrase
+
+Context:
+{context}
+
+Question: {query}"""
 
 # Example document configuration
 # In Docker: /app/routers/rag.py -> parent.parent = /app/
@@ -109,10 +125,9 @@ class StatusResponse(BaseModel):
     is_ready: bool
 
 
-
-
 def _get_or_create_workflow(collection_id: str | None = None):
     """Get existing RAG workflow or create a new one."""
+    from gaik.software_components.RAG.answer_generator import AnswerGenerator
     from gaik.software_modules.RAG_workflow import RAGWorkflow
 
     if collection_id and collection_id in RAG_INSTANCES:
@@ -129,6 +144,16 @@ def _get_or_create_workflow(collection_id: str | None = None):
         retriever_top_k=5,
         citations=True,
         stream=True,
+    )
+
+    # Override answer generator with custom prompt
+    workflow.answer_generator = AnswerGenerator(
+        config=config,
+        citations=True,
+        stream=True,
+        prompt=CUSTOM_RAG_PROMPT,
+        conversation_history=True,
+        last_n=3,
     )
 
     RAG_INSTANCES[new_id] = workflow
@@ -204,8 +229,11 @@ async def index_documents(
                             Path(tmp_path).unlink(missing_ok=True)
                             raise HTTPException(
                                 status_code=400,
-                                detail=f"PDF has {page_count} pages. Maximum {MAX_PAGES_DEMO} pages allowed for demo. "
-                                f"Try the Example document instead.",
+                                detail=(
+                                    f"PDF has {page_count} pages. "
+                                    f"Maximum {MAX_PAGES_DEMO} pages allowed for demo. "
+                                    f"Try the Example document instead."
+                                ),
                             )
 
                     # Index the document with original filename (without extension)
@@ -502,12 +530,11 @@ async def load_example_document():
     Uses pre-computed embeddings from example-index.json for instant loading.
     Falls back to real-time indexing if pre-indexed file not found.
     """
-    from langchain_core.documents import Document
-
     from gaik.software_components.RAG.answer_generator import AnswerGenerator
     from gaik.software_components.RAG.embedder import Embedder
     from gaik.software_components.RAG.retriever import Retriever
     from gaik.software_components.RAG.vector_store import VectorStore
+    from langchain_core.documents import Document
 
     # If already loaded, return existing collection
     if EXAMPLE_COLLECTION_ID in RAG_INSTANCES:
@@ -583,6 +610,7 @@ async def load_example_document():
                     config=config,
                     citations=True,
                     stream=True,
+                    prompt=CUSTOM_RAG_PROMPT,
                 )
 
                 # Create a minimal workflow-like object
@@ -593,9 +621,7 @@ async def load_example_document():
                         self.retriever = ret
                         self.answer_generator = ans
 
-                workflow = PreloadedWorkflow(
-                    vector_store, embedder, retriever, answer_generator
-                )
+                workflow = PreloadedWorkflow(vector_store, embedder, retriever, answer_generator)
                 RAG_INSTANCES[EXAMPLE_COLLECTION_ID] = workflow
 
                 chunk_count = len(documents)

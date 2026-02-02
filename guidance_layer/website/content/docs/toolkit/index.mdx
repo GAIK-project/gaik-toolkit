@@ -3,6 +3,8 @@ title: Overview
 description: Introduction to GAIK toolkit components
 ---
 
+import { Mermaid } from '@/components/mdx/mermaid';
+
 ## What is GAIK Toolkit?
 
 GAIK toolkit is an AI-powered toolkit for Python that provides structured data extraction, document parsing, audio transcription, and document classification. It uses OpenAI models (Azure OpenAI or standard OpenAI) for intelligent document processing.
@@ -14,6 +16,42 @@ GAIK toolkit is an AI-powered toolkit for Python that provides structured data e
 ## Architecture
 
 The toolkit is organized into two layers:
+
+<Mermaid chart={`
+graph TD
+    subgraph Input
+        A[PDF/DOCX]
+        B[Audio/Video]
+        C[Text]
+    end
+
+    subgraph Software Components
+        D[Parser]
+        E[Transcriber]
+        F[SchemaGenerator]
+        G[DataExtractor]
+        H[Classifier]
+        I[RAG Components]
+    end
+
+    subgraph Output
+        J[Structured Data]
+        K[Classification]
+        L[Q&A Response]
+    end
+
+    A --> D
+    B --> E
+    D --> G
+    E --> G
+    C --> F
+    F --> G
+    G --> J
+    A --> H
+    H --> K
+    A --> I
+    I --> L
+`} />
 
 ### Software Components (Low-level)
 

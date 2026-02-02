@@ -1,4 +1,4 @@
-"""Pipeline router - End-to-end pipeline endpoints for demos."""
+"""Diary router - Construction diary (Työmaapäiväkirja) workflow endpoints."""
 
 import tempfile
 import uuid
@@ -16,11 +16,36 @@ from pydantic import BaseModel
 
 router = APIRouter()
 
+
 # Temporary storage for generated PDFs
 PDF_STORAGE: dict[str, Path] = {}
 
-# Logo path for PDF generation (letter-only logo works better for PDF headers)
+# Logo path for PDF generation (use GAIK logo)
 LOGO_PATH = Path(__file__).parent.parent.parent / "public" / "logos" / "gaik-logo-letter-only.png"
+
+# Finnish construction diary extraction requirements
+DIARY_REQUIREMENTS = """Extract the following fields from the Finnish construction diary:
+(Työmaapäiväkirja)
+- Kohde (Project/Subject)
+- Laatija (Author name)
+- Päivämäärä (Date in dd.mm.yyyy format)
+- Työviikko (Week number)
+- Sää (Weather conditions: temperature, wind, humidity)
+- Resurssit - Henkilöstö (Personnel: supervisors, workers, subcontractors, total)
+- Päivän työt (Omat työt) (Day's work tasks - list all)
+- Päivän tapahtumat (Day's events)
+- Liitteet (Attachments: number and type)
+- Valvojan huomiot (Supervisor's observations)
+- Päivän poikkeamat (Day's deviations/exceptions)
+- Aloitetut työvaiheet (Started work phases - list)
+- Käynnissä olevat työvaiheet (Ongoing work phases - list)
+- Päättyneet työvaiheet (Completed work phases - list)
+- Keskeytyneet työvaiheet (Interrupted work phases - list)
+- Pyydetyt lisäajat (Requested extensions)
+- Tehdyt katselmukset (Completed inspections)
+- Valvojan huomautukset (Supervisor's remarks)
+- Valvojan allekirjoitus (Supervisor's signature)
+- Vastaavan allekirjoitus (Responsible person's signature)"""
 
 
 class PipelineStep(BaseModel):
@@ -32,24 +57,13 @@ class PipelineStep(BaseModel):
     message: str | None = None
 
 
-class AudioPipelineResponse(BaseModel):
-    """Response from audio pipeline."""
+class DiaryPipelineResponse(BaseModel):
+    """Response from diary pipeline."""
 
     job_id: str
     steps: list[PipelineStep]
     raw_transcript: str | None = None
     enhanced_transcript: str | None = None
-    extracted_data: list[dict] | None = None
-    pdf_available: bool = False
-    error: str | None = None
-
-
-class DocumentPipelineResponse(BaseModel):
-    """Response from document pipeline."""
-
-    job_id: str
-    steps: list[PipelineStep]
-    parsed_content: str | None = None
     extracted_data: list[dict] | None = None
     pdf_available: bool = False
     error: str | None = None
@@ -66,22 +80,18 @@ class TextPipelineResponse(BaseModel):
     error: str | None = None
 
 
-@router.post("/audio", response_model=AudioPipelineResponse)
-async def audio_pipeline(
+@router.post("/audio", response_model=DiaryPipelineResponse)
+async def diary_audio_pipeline(
     file: UploadFile = File(...),
-    user_requirements: str = Form(...),
-    generate_pdf: bool = Form(False),
-    pdf_title: str = Form("Extracted Data Report"),
+    generate_pdf: bool = Form(True),
     enhanced: bool = Form(True),
     compress_audio: bool = Form(True),
 ):
     """
-    Run the complete audio pipeline: Transcribe -> Extract -> (PDF).
+    Process audio recording of a construction diary entry.
 
     - **file**: Audio/video file (mp3, wav, mp4, m4a, etc.)
-    - **user_requirements**: What data to extract from the transcript
     - **generate_pdf**: Whether to generate a PDF report
-    - **pdf_title**: Title for the generated PDF report
     - **enhanced**: Whether to enhance transcript with LLM
     - **compress_audio**: Whether to compress audio before sending
     """
@@ -90,11 +100,11 @@ async def audio_pipeline(
     # Initialize steps
     steps = [
         PipelineStep(step=1, name="Upload", status="completed"),
-        PipelineStep(step=2, name="Transcribe", status="pending"),
-        PipelineStep(step=3, name="Extract", status="pending"),
+        PipelineStep(step=2, name="Transcribing", status="pending"),
+        PipelineStep(step=3, name="Extracting", status="pending"),
     ]
     if generate_pdf:
-        steps.append(PipelineStep(step=4, name="Generate PDF", status="pending"))
+        steps.append(PipelineStep(step=4, name="Generating PDF", status="pending"))
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
@@ -125,7 +135,7 @@ async def audio_pipeline(
 
         result = pipeline.run(
             file_path=tmp_path,
-            user_requirements=user_requirements,
+            user_requirements=DIARY_REQUIREMENTS,
             transcriber_ctor={
                 "enhanced_transcript": enhanced,
                 "compress_audio": compress_audio,
@@ -139,7 +149,7 @@ async def audio_pipeline(
         steps[2].status = "completed"
         steps[2].message = f"Extracted {len(result.extracted_fields)} items"
 
-        response = AudioPipelineResponse(
+        response = DiaryPipelineResponse(
             job_id=job_id,
             steps=steps,
             raw_transcript=result.transcription.raw_transcript,
@@ -155,7 +165,7 @@ async def audio_pipeline(
                 from utils.pdf_generator import StructuredDataToPDF
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
-                pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
+                pdf_generator = StructuredDataToPDF(title="Construction Site Diary", logo_path=logo)
                 pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
 
                 # Use extracted_fields if available, otherwise create from transcript
@@ -191,7 +201,7 @@ async def audio_pipeline(
                 step.message = str(e)
                 break
 
-        return AudioPipelineResponse(
+        return DiaryPipelineResponse(
             job_id=job_id,
             steps=steps,
             error=str(e),
@@ -200,47 +210,30 @@ async def audio_pipeline(
         Path(tmp_path).unlink(missing_ok=True)
 
 
-@router.post("/document", response_model=DocumentPipelineResponse)
-async def document_pipeline(
+@router.post("/audio/stream")
+async def diary_audio_pipeline_stream(
     file: UploadFile = File(...),
-    user_requirements: str = Form(...),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision"] = Form("auto"),
-    generate_pdf: bool = Form(False),
-    pdf_title: str = Form("Extracted Data Report"),
+    generate_pdf: bool = Form(True),
+    enhanced: bool = Form(True),
+    compress_audio: bool = Form(True),
 ):
     """
-    Run the complete document pipeline: Parse -> Extract -> (PDF).
+    Process audio recording with SSE streaming progress updates.
 
-    - **file**: Document file (PDF, DOCX)
-    - **user_requirements**: What data to extract from the document
-    - **parser_type**: Parser to use (auto, pymupdf, docx, vision)
-    - **generate_pdf**: Whether to generate a PDF report
-    - **pdf_title**: Title for the generated PDF report
+    Returns Server-Sent Events with progress updates and final result.
     """
     job_id = str(uuid.uuid4())
-
-    # Initialize steps
-    steps = [
-        PipelineStep(step=1, name="Upload", status="completed"),
-        PipelineStep(step=2, name="Parse", status="pending"),
-        PipelineStep(step=3, name="Extract", status="pending"),
-    ]
-    if generate_pdf:
-        steps.append(PipelineStep(step=4, name="Generate PDF", status="pending"))
 
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
 
     suffix = Path(file.filename).suffix.lower()
-    if suffix not in [".pdf", ".docx"]:
+    supported = [".mp3", ".wav", ".m4a", ".mp4", ".webm", ".ogg", ".flac"]
+    if suffix not in supported:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {suffix}. Use PDF or DOCX.",
+            detail=f"Unsupported file type: {suffix}. Supported: {', '.join(supported)}",
         )
-
-    # Auto-detect parser type
-    if parser_type == "auto":
-        parser_type = "docx" if suffix == ".docx" else "pymupdf"
 
     # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -248,123 +241,139 @@ async def document_pipeline(
         tmp.write(content)
         tmp_path = tmp.name
 
-    try:
-        config = get_api_config()
-
-        # Step 2: Parse
-        steps[1].status = "in_progress"
-
-        from gaik.software_modules.documents_to_structured_data import (
-            DocumentsToStructuredData,
-        )
-
-        # Map parser_type to pipeline parser_choice
-        parser_map = {
-            "pymupdf": "pymupdf",
-            "docx": "docx",
-            "vision": "vision_parser",
-        }
-        parser_choice = parser_map.get(parser_type, "pymupdf")
-
-        pipeline = DocumentsToStructuredData(api_config=config)
-
-        result = pipeline.run(
-            file_path=tmp_path,
-            user_requirements=user_requirements,
-            parser_choice=parser_choice,
-        )
-
-        steps[1].status = "completed"
-        steps[1].message = "Document parsed"
-
-        # Step 3: Extract (already done by pipeline.run)
-        steps[2].status = "completed"
-        steps[2].message = f"Extracted {len(result.extracted_fields)} items"
-
-        # Get parsed content
-        parsed_content = result.parsed_documents[0] if result.parsed_documents else None
-
-        response = DocumentPipelineResponse(
-            job_id=job_id,
-            steps=steps,
-            parsed_content=parsed_content,
-            extracted_data=result.extracted_fields,
-        )
-
-        # Step 4: Generate PDF if requested
+    async def event_generator() -> AsyncGenerator[str, None]:
+        steps = [
+            {"step": 1, "name": "Uploading", "status": "completed"},
+            {"step": 2, "name": "Transcribing", "status": "pending"},
+            {"step": 3, "name": "Extracting", "status": "pending"},
+        ]
         if generate_pdf:
-            try:
-                steps[3].status = "in_progress"
+            steps.append({"step": 4, "name": "Generating PDF", "status": "pending"})
 
-                from utils.pdf_generator import StructuredDataToPDF
+        # Send initial steps
+        yield sse_event("steps", {"steps": steps})
 
-                logo = LOGO_PATH if LOGO_PATH.exists() else None
-                pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+        try:
+            config = get_api_config()
 
-                # Use extracted_fields if available, otherwise create from parsed content
-                pdf_data = (
-                    result.extracted_fields
-                    if result.extracted_fields
-                    else [{"parsed_content": parsed_content or "No content extracted"}]
-                )
-                pdf_generator.run(pdf_data, pdf_path)
+            # Step 2: Transcribe + Extract
+            steps[1]["status"] = "in_progress"
+            yield sse_event("step_update", steps[1])
 
-                PDF_STORAGE[job_id] = pdf_path
-                response.pdf_available = True
-                steps[3].status = "completed"
-                steps[3].message = "PDF generated"
-            except Exception as e:
-                steps[3].status = "error"
-                steps[3].message = f"PDF generation failed: {e}"
+            from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
 
-        return response
+            pipeline = AudioToStructuredData(api_config=config)
 
-    except ImportError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
-        ) from e
-    except Exception as e:
-        # Mark current step as error
-        for step in steps:
-            if step.status == "in_progress":
-                step.status = "error"
-                step.message = str(e)
-                break
+            result = pipeline.run(
+                file_path=tmp_path,
+                user_requirements=DIARY_REQUIREMENTS,
+                transcriber_ctor={
+                    "enhanced_transcript": enhanced,
+                    "compress_audio": compress_audio,
+                },
+            )
 
-        return DocumentPipelineResponse(
-            job_id=job_id,
-            steps=steps,
-            error=str(e),
-        )
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
+            steps[1]["status"] = "completed"
+            steps[1]["message"] = "Transcription complete"
+            yield sse_event("step_update", steps[1])
+
+            # Step 3: Extract (already done by pipeline.run)
+            steps[2]["status"] = "completed"
+            steps[2]["message"] = f"Extracted {len(result.extracted_fields)} items"
+            yield sse_event("step_update", steps[2])
+
+            # Step 4: Generate PDF if requested
+            pdf_available = False
+            if generate_pdf:
+                pdf_step_idx = 3
+                steps[pdf_step_idx]["status"] = "in_progress"
+                yield sse_event("step_update", steps[pdf_step_idx])
+
+                try:
+                    from utils.pdf_generator import StructuredDataToPDF
+
+                    logo = LOGO_PATH if LOGO_PATH.exists() else None
+                    pdf_generator = StructuredDataToPDF(
+                        title="Construction Site Diary", logo_path=logo
+                    )
+                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+
+                    if result.extracted_fields:
+                        pdf_data = result.extracted_fields
+                    else:
+                        transcript = (
+                            result.transcription.enhanced_transcript
+                            or result.transcription.raw_transcript
+                        )
+                        pdf_data = [{"transcript": transcript}]
+                    pdf_generator.run(pdf_data, pdf_path)
+
+                    PDF_STORAGE[job_id] = pdf_path
+                    pdf_available = True
+                    steps[pdf_step_idx]["status"] = "completed"
+                    steps[pdf_step_idx]["message"] = "PDF generated"
+                    yield sse_event("step_update", steps[pdf_step_idx])
+                except Exception as e:
+                    steps[pdf_step_idx]["status"] = "error"
+                    steps[pdf_step_idx]["message"] = f"PDF generation failed: {e}"
+                    yield sse_event("step_update", steps[pdf_step_idx])
+
+            # Send final result
+            yield sse_event(
+                "result",
+                {
+                    "job_id": job_id,
+                    "raw_transcript": result.transcription.raw_transcript,
+                    "enhanced_transcript": result.transcription.enhanced_transcript,
+                    "extracted_data": result.extracted_fields,
+                    "pdf_available": pdf_available,
+                },
+            )
+
+        except ImportError as e:
+            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+        except Exception as e:
+            for step in steps:
+                if step["status"] == "in_progress":
+                    step["status"] = "error"
+                    step["message"] = str(e)
+                    yield sse_event("step_update", step)
+                    break
+            yield sse_event("error", {"message": str(e)})
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/text", response_model=TextPipelineResponse)
-async def text_pipeline(
+async def diary_text_pipeline(
     text: str = Form(...),
-    user_requirements: str = Form(...),
-    generate_pdf: bool = Form(False),
-    pdf_title: str = Form("Extracted Data Report"),
+    generate_pdf: bool = Form(True),
 ):
     """
-    Run the text extraction pipeline: Extract structured data from text.
+    Extract structured data from text description of a construction diary entry.
 
-    - **text**: Input text to extract data from
-    - **user_requirements**: What data to extract from the text
+    - **text**: Text input containing diary information
     - **generate_pdf**: Whether to generate a PDF report
-    - **pdf_title**: Title for the generated PDF report
     """
     job_id = str(uuid.uuid4())
 
     # Initialize steps
     steps = [
         PipelineStep(step=1, name="Input", status="completed"),
-        PipelineStep(step=2, name="Extract", status="pending"),
+        PipelineStep(step=2, name="Extracting", status="pending"),
     ]
     if generate_pdf:
-        steps.append(PipelineStep(step=3, name="Generate PDF", status="pending"))
+        steps.append(PipelineStep(step=3, name="Generating PDF", status="pending"))
 
     if not text or not text.strip():
         raise HTTPException(status_code=400, detail="No text provided")
@@ -378,16 +387,16 @@ async def text_pipeline(
         from gaik.software_components.extractor.extractor import DataExtractor
         from gaik.software_components.extractor.schema import SchemaGenerator
 
-        # Step 1: Generate schema from user requirements
+        # Generate schema from diary requirements
         generator = SchemaGenerator(config=config)
-        extraction_model = generator.generate_schema(user_requirements)
+        extraction_model = generator.generate_schema(DIARY_REQUIREMENTS)
 
-        # Step 2: Extract data using the generated schema
+        # Extract data using the generated schema
         extractor = DataExtractor(config=config)
         extracted_data = extractor.extract(
             extraction_model=extraction_model,
             requirements=generator.item_requirements,
-            user_requirements=user_requirements,
+            user_requirements=DIARY_REQUIREMENTS,
             documents=[text],
         )
 
@@ -410,10 +419,9 @@ async def text_pipeline(
                 from utils.pdf_generator import StructuredDataToPDF
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
-                pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
+                pdf_generator = StructuredDataToPDF(title="Construction Site Diary", logo_path=logo)
                 pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
 
-                # Use extracted_data if available, otherwise create from input text
                 pdf_data = extracted_data if extracted_data else [{"input_text": text}]
                 pdf_generator.run(pdf_data, pdf_path)
 
@@ -432,7 +440,6 @@ async def text_pipeline(
             status_code=500, detail=f"Required components not installed: {e}"
         ) from e
     except Exception as e:
-        # Mark current step as error
         for step in steps:
             if step.status == "in_progress":
                 step.status = "error"
@@ -447,14 +454,12 @@ async def text_pipeline(
 
 
 @router.post("/text/stream")
-async def text_pipeline_stream(
+async def diary_text_pipeline_stream(
     text: str = Form(...),
-    user_requirements: str = Form(...),
-    generate_pdf: bool = Form(False),
-    pdf_title: str = Form("Extracted Data Report"),
+    generate_pdf: bool = Form(True),
 ):
     """
-    Run the text extraction pipeline with SSE streaming progress updates.
+    Extract structured data from text with SSE streaming progress updates.
 
     Returns Server-Sent Events with progress updates and final result.
     """
@@ -462,11 +467,11 @@ async def text_pipeline_stream(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         steps = [
-            {"step": 1, "name": "Analyzing Requirements", "status": "pending"},
+            {"step": 1, "name": "Analyzing Text", "status": "pending"},
             {"step": 2, "name": "Extracting Details", "status": "pending"},
         ]
         if generate_pdf:
-            steps.append({"step": 3, "name": "Generate PDF", "status": "pending"})
+            steps.append({"step": 3, "name": "Generating PDF", "status": "pending"})
 
         # Send initial steps
         yield sse_event("steps", {"steps": steps})
@@ -486,7 +491,7 @@ async def text_pipeline_stream(
             from gaik.software_components.extractor.schema import SchemaGenerator
 
             generator = SchemaGenerator(config=config)
-            extraction_model = generator.generate_schema(user_requirements)
+            extraction_model = generator.generate_schema(DIARY_REQUIREMENTS)
 
             steps[0]["status"] = "completed"
             yield sse_event("step_update", steps[0])
@@ -499,7 +504,7 @@ async def text_pipeline_stream(
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
                 requirements=generator.item_requirements,
-                user_requirements=user_requirements,
+                user_requirements=DIARY_REQUIREMENTS,
                 documents=[text],
             )
 
@@ -518,10 +523,11 @@ async def text_pipeline_stream(
                     from utils.pdf_generator import StructuredDataToPDF
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
-                    pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
+                    pdf_generator = StructuredDataToPDF(
+                        title="Construction Site Diary", logo_path=logo
+                    )
                     pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
 
-                    # Use extracted_data if available, otherwise create from input text
                     pdf_data = extracted_data if extracted_data else [{"input_text": text}]
                     pdf_generator.run(pdf_data, pdf_path)
 
@@ -549,7 +555,6 @@ async def text_pipeline_stream(
         except ImportError as e:
             yield sse_event("error", {"message": f"Required components not installed: {e}"})
         except Exception as e:
-            # Mark current step as error
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
@@ -570,7 +575,7 @@ async def text_pipeline_stream(
 
 
 @router.get("/pdf/{job_id}")
-async def download_pdf(job_id: str):
+async def download_diary_pdf(job_id: str):
     """Download a generated PDF by job ID."""
     if job_id not in PDF_STORAGE:
         raise HTTPException(status_code=404, detail="PDF not found")
@@ -583,5 +588,5 @@ async def download_pdf(job_id: str):
     return FileResponse(
         path=pdf_path,
         media_type="application/pdf",
-        filename=f"extracted_data_{job_id[:8]}.pdf",
+        filename=f"tyomaapaivakira_{job_id[:8]}.pdf",
     )

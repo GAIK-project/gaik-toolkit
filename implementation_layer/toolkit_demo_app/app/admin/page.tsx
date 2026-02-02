@@ -8,11 +8,29 @@ import {
   updateAccessStatus,
   type AdminResult,
 } from "./actions";
-import {
-  isAdminAuthenticated,
-  getAccessRequests,
-  type AccessRequest,
-} from "@/lib/data/admin";
+
+export type AccessRequest = {
+  id: string;
+  user_id: string;
+  email: string;
+  full_name: string;
+  company: string | null;
+  use_case: string | null;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+};
+
+async function isAdminAuthenticated(): Promise<boolean> {
+  const res = await fetch("/api/admin/auth");
+  const data = await res.json();
+  return data.authenticated;
+}
+
+async function getAccessRequests(): Promise<AccessRequest[]> {
+  const res = await fetch("/api/admin/requests");
+  if (!res.ok) return [];
+  return res.json();
+}
 import { AuthShell } from "../(auth)/components/auth-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

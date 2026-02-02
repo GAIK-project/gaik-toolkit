@@ -32,6 +32,7 @@ import {
   Boxes,
   FileSearch,
   FileText,
+  HardHat,
   Lightbulb,
   LogOut,
   LucideIcon,
@@ -43,7 +44,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 interface NavItem {
   label: string;
@@ -63,6 +64,7 @@ const navGroups: NavGroup[] = [
     icon: Lightbulb,
     items: [
       { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
+      { label: "Construction Diary", href: "/diary", icon: HardHat },
       { label: "RAG Builder", href: "/rag", icon: Bot },
     ],
   },
@@ -144,7 +146,7 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
         href={GITHUB_REPO_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-xs transition-all sm:inline-flex"
+        className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-xs transition-all lg:inline-flex"
       >
         <GitHubIcon className="h-4 w-4" />
         GitHub
@@ -162,7 +164,7 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
             href={GITHUB_REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-xs transition-all sm:inline-flex"
+            className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-xs transition-all lg:inline-flex"
           >
             <GitHubIcon className="h-4 w-4" />
             GitHub
@@ -200,14 +202,17 @@ async function handleSignOut(): Promise<void> {
   }
 }
 
-function MobileMenuButton() {
+const MobileMenuButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<typeof Button>
+>(function MobileMenuButton(props, ref) {
   return (
-    <Button variant="outline" size="icon" className="lg:hidden">
+    <Button ref={ref} variant="outline" size="icon" className="md:hidden" {...props}>
       <Menu className="h-5 w-5" />
       <span className="sr-only">Open menu</span>
     </Button>
   );
-}
+});
 
 interface MobileNavProps {
   isActive: (href: string) => boolean;
@@ -237,14 +242,15 @@ function MobileNav({ isActive, githubPreview, isLoggedIn }: MobileNavProps) {
         <SheetHeader>
           <SheetTitle>Navigation</SheetTitle>
         </SheetHeader>
-        <nav className="mt-6 flex flex-col gap-4">
-          {navGroups.map((group) => (
-            <div key={group.label}>
-              <div className="text-muted-foreground mb-2 flex items-center gap-2 px-3 text-xs font-semibold tracking-wider uppercase">
+        <nav className="mt-4 flex flex-col gap-1">
+          {navGroups.map((group, index) => (
+            <div key={group.label} className={index > 0 ? "mt-2" : ""}>
+              {index > 0 && <hr className="mb-3 border-border/60" />}
+              <div className="text-primary/80 mb-2 flex items-center gap-2 px-3 py-1 text-xs font-semibold tracking-wider uppercase">
                 <group.icon className="h-4 w-4" />
                 {group.label}
               </div>
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-0.5 pl-2">
                 {group.items.map((item) => (
                   <NavLink
                     key={item.href}
@@ -256,20 +262,21 @@ function MobileNav({ isActive, githubPreview, isLoggedIn }: MobileNavProps) {
               </div>
             </div>
           ))}
-          <hr className="my-2" />
-          <GitHubLink preview={githubPreview} variant="mobile" />
+          <hr className="my-3 border-border/60" />
+          <div className="px-2">
+            <GitHubLink preview={githubPreview} variant="mobile" />
+          </div>
           {isLoggedIn && (
-            <>
-              <hr className="my-2" />
+            <div className="px-2">
               <button
                 type="button"
-                className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
+                className="text-muted-foreground hover:bg-muted hover:text-foreground flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
                 onClick={handleSignOut}
               >
                 <LogOut className="h-5 w-5" />
                 Sign out
               </button>
-            </>
+            </div>
           )}
         </nav>
       </SheetContent>
@@ -298,7 +305,7 @@ export function SiteNav({
 
   return (
     <header className="border-border/60 bg-card/95 sticky top-0 z-50 border-b shadow-sm backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center px-4 py-3 lg:px-6 lg:py-4">
+      <div className="mx-auto flex max-w-6xl items-center px-4 py-3 md:px-6 md:py-4">
         {/* Left: Logo */}
         <div className="flex min-w-0 flex-1 items-center">
           <Link href="/" className="shrink-0">
@@ -307,14 +314,14 @@ export function SiteNav({
               alt="GAIK"
               width={40}
               height={40}
-              className="h-9 w-9 lg:h-10 lg:w-10"
+              className="h-9 w-9 md:h-10 md:w-10"
               priority
             />
           </Link>
         </div>
 
         {/* Center: Desktop Navigation */}
-        <nav aria-label="Primary" className="hidden lg:block">
+        <nav aria-label="Primary" className="hidden md:block">
           <div className="border-border/70 bg-card flex items-center gap-1 rounded-full border p-1 shadow-sm">
             <NavigationMenu>
               <NavigationMenuList>
@@ -379,7 +386,7 @@ export function SiteNav({
             <Button
               variant="ghost"
               size="sm"
-              className="text-muted-foreground hover:text-foreground hidden gap-1.5 sm:inline-flex"
+              className="text-muted-foreground hover:text-foreground hidden gap-1.5 lg:inline-flex"
               onClick={handleSignOut}
             >
               <LogOut className="h-4 w-4" />

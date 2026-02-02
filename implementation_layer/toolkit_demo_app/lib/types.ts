@@ -7,6 +7,7 @@
  */
 export type DemoType =
   | "classifier"
+  | "construction-diary"
   | "extractor"
   | "parser"
   | "transcriber"

@@ -134,7 +134,7 @@ export default function ParserPage() {
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
         {/* Input Section */}
         <div className="space-y-6">
           <Card>

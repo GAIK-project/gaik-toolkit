@@ -2,7 +2,7 @@
 
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { FileUpload } from "@/components/demo/file-upload";
-import { IncidentDetails } from "@/components/demo/incident-details";
+import { DiaryDetails } from "@/components/demo/diary-details";
 import {
   EmptyStateCard,
   ResultCard,
@@ -22,79 +22,102 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { parseSSEEvents, type SSEStep } from "@/lib/sse";
 import {
-  AlertTriangle,
   ChevronDown,
   ChevronUp,
   ClipboardPaste,
   Download,
   FileText,
+  HardHat,
   Keyboard,
   Loader2,
   Mic,
-  PenLine,
   Settings2,
   Sparkles,
-  Wand2,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
-const DEFAULT_INCIDENT_SCHEMA = `Extract the following from the incident report:
-- Incident date and time
-- Location of incident
-- Brief description of what happened
-- People involved (names, roles if mentioned)
-- Injuries or damages reported
-- Immediate actions taken
-- Witness information (if any)`;
+const EXAMPLE_ENGLISH = `Construction Site Diary
 
-const EXAMPLE_INCIDENT_TEXT = `Incident Report
+Project: Riverside Office Complex - Phase 2 Renovation
+Author: John Smith, Site Supervisor
+Date: January 15, 2025
+Week: 3
 
-Date: 12 January 2026
-Location: Warehouse Area B
+Weather: Temperature 5°C, wind 3 m/s, partly cloudy
 
-Description:
-An employee slipped on a wet floor near the loading dock while carrying empty boxes. No warning sign was in place at the time.
+Personnel:
+- Site supervisors: 2 persons
+- Workers: 5 persons
+- Subcontractors: 6 persons (electrical and plumbing)
+- Total: 13 persons
 
-Injury:
-Minor bruising to the right arm. No medical treatment required.
+Today's work:
+- Continued interior demolition on 3rd floor
+- Electrical wiring installation on 2nd floor
+- Plumbing rough-in started in basement
+- Site safety inspection completed
 
-Immediate Action Taken:
-The area was cleaned and warning signs were placed. The employee was advised to rest and report any further discomfort.
+Started work phases: Plumbing installation basement
+Ongoing phases: Interior demolition, Electrical installation
+Completed phases: Asbestos removal, Initial site prep
 
-Preventive Measures:
-Regular floor inspections and immediate placement of warning signs when surfaces are wet.`;
+Supervisor observations: Work progressing on schedule. Safety compliance excellent.`;
 
-interface IncidentReportResult {
+const EXAMPLE_FINNISH = `Työmaapäiväkirja
+
+Kohde: Asunto Oy Tampereen Puistokatu 15 peruskorjaus
+Laatija: Matti Virtanen, työnjohtaja
+Päivämäärä: 8.1.2025
+Työviikko: 2
+
+Sää: Lämpötila -3 astetta, tuuli 2 m/s, pilvinen
+
+Henkilöstö:
+- Työnjohtajat: 2 henkilöä
+- Työntekijät: 3 henkilöä
+- Alihankkijat: 4 henkilöä (sähköurakoitsija)
+- Yhteensä: 9 henkilöä
+
+Päivän työt:
+- Sisäpurkutyöt jatkuvat 2. kerroksessa
+- Sähkövetojen asennus 1. kerroksessa
+- Työmaan aitauksen tarkistus
+
+Aloitetut työvaiheet: Sähköasennukset 1. kerros
+Käynnissä olevat: Sisäpurku, Rungon purku
+Päättyneet: Asbestipurku
+
+Valvojan huomiot: Ei huomautettavaa, työt etenevät aikataulussa`;
+
+// Finnish audio example path
+const EXAMPLE_AUDIO_PATH = "/diary-demo/diary.mp3";
+
+interface DiaryResult {
   job_id: string;
   raw_transcript: string | null;
   enhanced_transcript: string | null;
-  input_text: string | null; // For text pipeline
+  input_text: string | null;
   extracted_data: Record<string, unknown>[] | null;
   pdf_available: boolean;
   error?: string | null;
 }
 
-export default function IncidentReportPage() {
+export default function DiaryPage() {
   const [inputMode, setInputMode] = useState<"audio" | "text">("audio");
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [textInput, setTextInput] = useState("");
-  // Advanced settings state
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [extractionMode, setExtractionMode] = useState<"auto" | "custom">(
-    "auto",
-  );
-  const [customSchema, setCustomSchema] = useState(DEFAULT_INCIDENT_SCHEMA);
   const [enhanced, setEnhanced] = useState(true);
   const [generatePdf, setGeneratePdf] = useState(true);
 
-  const [result, setResult] = useState<IncidentReportResult | null>(null);
+  const [result, setResult] = useState<DiaryResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pipelineSteps, setPipelineSteps] = useState<SSEStep[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -102,8 +125,22 @@ export default function IncidentReportPage() {
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
     };
-  }, []);
+  }, [audioUrl]);
+
+  // Create object URL when audio file changes
+  useEffect(() => {
+    if (audioFile) {
+      const url = URL.createObjectURL(audioFile);
+      setAudioUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setAudioUrl(null);
+    }
+  }, [audioFile]);
 
   const hasInput = inputMode === "audio" ? !!audioFile : !!textInput.trim();
 
@@ -126,29 +163,19 @@ export default function IncidentReportPage() {
         message: "Starting pipeline...",
       },
       { step: 2, name: "Data Extraction", status: "pending" },
-      { step: 3, name: "Report Formatting", status: "pending" },
+      { step: 3, name: "Generating PDF", status: "pending" },
     ]);
 
     try {
-      const userRequirements =
-        extractionMode === "auto"
-          ? "Extract all relevant incident details automatically including date, time, location, description, people involved, injuries, damages, and actions taken."
-          : customSchema;
-
       const formData = new FormData();
-      formData.append("user_requirements", userRequirements);
       formData.append("generate_pdf", String(generatePdf));
 
-      // Use SSE streaming for text mode, regular fetch for audio
       if (inputMode === "audio" && audioFile) {
         formData.append("file", audioFile);
         formData.append("enhanced", String(enhanced));
         formData.append("compress_audio", "true");
-        formData.append("pdf_title", "Incident Report");
 
-        // Simulating steps for Audio (since it's not SSE in this demo version effectively)
-        // In a real app, the audio endpoint ideally should stream too, but we'll adapt.
-        const response = await apiFetch("/api/pipeline/audio", {
+        const response = await apiFetch("/api/diary/audio", {
           method: "POST",
           body: formData,
           signal: abortControllerRef.current.signal,
@@ -157,34 +184,31 @@ export default function IncidentReportPage() {
         if (!response.ok) {
           const errorMessage = await response
             .json()
-            .then((err) => err.detail || "Failed to process input")
-            .catch(() => "Failed to process input");
+            .then((err) => err.detail || "Failed to process audio")
+            .catch(() => "Failed to process audio");
           throw new Error(errorMessage);
         }
 
         const data = await response.json();
-        // Manually complete steps on success
         setPipelineSteps([
           { step: 1, name: "Processing Audio", status: "completed" },
           { step: 2, name: "Data Extraction", status: "completed" },
-          { step: 3, name: "Report Formatting", status: "completed" },
+          { step: 3, name: "Generating PDF", status: "completed" },
         ]);
         setResult(data);
 
         posthog.capture("pipeline_executed", {
-          pipeline_type: "audio",
-          extraction_mode: extractionMode,
+          pipeline_type: "diary_audio",
           enhanced: enhanced,
           generate_pdf: generatePdf,
         });
 
-        toast.success("Incident report generated!");
+        toast.success("Construction diary processed!");
       } else {
         // Text mode with SSE streaming
         formData.append("text", textInput);
-        formData.append("pdf_title", "Incident Report");
 
-        const response = await apiFetch("/api/pipeline/text/stream", {
+        const response = await apiFetch("/api/diary/text/stream", {
           method: "POST",
           body: formData,
           signal: abortControllerRef.current.signal,
@@ -216,15 +240,14 @@ export default function IncidentReportPage() {
                 prev.map((s) => (s.step === update.step ? update : s)),
               );
             } else if (event.type === "result") {
-              setResult(event.data as unknown as IncidentReportResult);
+              setResult(event.data as unknown as DiaryResult);
 
               posthog.capture("pipeline_executed", {
-                pipeline_type: "text",
-                extraction_mode: extractionMode,
+                pipeline_type: "diary_text",
                 generate_pdf: generatePdf,
               });
 
-              toast.success("Incident report generated!");
+              toast.success("Construction diary processed!");
             } else if (event.type === "error") {
               throw new Error(
                 (event.data.message as string) || "Processing failed",
@@ -232,7 +255,6 @@ export default function IncidentReportPage() {
             }
           }
 
-          // Clear processed events from buffer
           const lastEventEnd = buffer.lastIndexOf("\n\n");
           if (lastEventEnd !== -1) {
             buffer = buffer.slice(lastEventEnd + 2);
@@ -241,7 +263,7 @@ export default function IncidentReportPage() {
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
-      if (error instanceof RateLimitError) return; // Toast already shown
+      if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
       setPipelineSteps((prev) =>
         prev.map((s) =>
@@ -256,20 +278,35 @@ export default function IncidentReportPage() {
   }
 
   function openPdfDownload(jobId: string): void {
-    window.open(`/api/pipeline/pdf/${jobId}`, "_blank");
+    window.open(`/api/diary/pdf/${jobId}`, "_blank");
   }
 
   function resetDemo(): void {
     setAudioFile(null);
+    setAudioUrl(null);
     setTextInput("");
     setResult(null);
     setPipelineSteps([]);
   }
 
-  function loadExampleText(): void {
+  function loadExampleText(language: "en" | "fi"): void {
     setInputMode("text");
-    setTextInput(EXAMPLE_INCIDENT_TEXT);
+    setTextInput(language === "en" ? EXAMPLE_ENGLISH : EXAMPLE_FINNISH);
     setResult(null);
+  }
+
+  async function loadExampleAudio(): Promise<void> {
+    try {
+      const response = await fetch(EXAMPLE_AUDIO_PATH);
+      const blob = await response.blob();
+      const file = new File([blob], "diary-example.mp3", { type: "audio/mpeg" });
+      setInputMode("audio");
+      setAudioFile(file);
+      setResult(null);
+      toast.success("Finnish audio example loaded");
+    } catch {
+      toast.error("Failed to load audio example");
+    }
   }
 
   return (
@@ -280,11 +317,11 @@ export default function IncidentReportPage() {
     >
       <header className="mb-8 pl-1">
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-          <AlertTriangle className="h-8 w-8 text-amber-500" />
-          Incident Reporting
+          <HardHat className="h-8 w-8 text-amber-500" />
+          Construction Diary
         </h1>
         <p className="text-muted-foreground mt-2 text-lg">
-          Easily report incidents via voice or text. AI handles the rest.
+          Record daily construction site activities via voice or text. AI extracts structured data.
         </p>
       </header>
 
@@ -315,14 +352,14 @@ export default function IncidentReportPage() {
                 <Mic className="h-6 w-6" />
               </div>
               <div>
-                <span className="block font-medium">Audio Report</span>
+                <span className="block font-medium">Audio Recording</span>
                 <span className="text-muted-foreground text-xs">
                   Record or upload
                 </span>
               </div>
               {inputMode === "audio" && (
                 <motion.div
-                  layoutId="active-indicator"
+                  layoutId="diary-active-indicator"
                   className="bg-primary absolute -bottom-2 h-1 w-12 rounded-full"
                 />
               )}
@@ -351,14 +388,14 @@ export default function IncidentReportPage() {
                 <Keyboard className="h-6 w-6" />
               </div>
               <div>
-                <span className="block font-medium">Text Report</span>
+                <span className="block font-medium">Text Entry</span>
                 <span className="text-muted-foreground text-xs">
                   Type description
                 </span>
               </div>
               {inputMode === "text" && (
                 <motion.div
-                  layoutId="active-indicator"
+                  layoutId="diary-active-indicator"
                   className="bg-primary absolute -bottom-2 h-1 w-12 rounded-full"
                 />
               )}
@@ -374,29 +411,75 @@ export default function IncidentReportPage() {
                   </CardTitle>
                   <CardDescription>
                     {inputMode === "audio"
-                      ? "Upload an audio recording of the incident."
-                      : "Provide a detailed description of the event."}
+                      ? "Upload an audio recording of the daily diary entry."
+                      : "Provide a description of the construction site activities."}
                   </CardDescription>
                 </div>
-                {inputMode === "text" && (
-                  <Button variant="ghost" size="sm" onClick={loadExampleText}>
-                    <ClipboardPaste className="mr-2 h-4 w-4" />
-                    Load Example
-                  </Button>
-                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {inputMode === "audio" ? (
-                <FileUpload
-                  accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac"
-                  maxSize={50}
-                  onFileSelect={setAudioFile}
-                  onFileRemove={resetDemo}
-                  disabled={isLoading}
-                />
+                <div className="space-y-4">
+                  <FileUpload
+                    accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac"
+                    maxSize={50}
+                    onFileSelect={setAudioFile}
+                    onFileRemove={resetDemo}
+                    disabled={isLoading}
+                  />
+                  {/* Load Example Audio Button */}
+                  {!audioFile && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={loadExampleAudio}
+                      disabled={isLoading}
+                      className="w-full"
+                    >
+                      <ClipboardPaste className="mr-2 h-4 w-4" />
+                      Load Example (Finnish)
+                    </Button>
+                  )}
+                  {/* Audio Player Preview */}
+                  {audioUrl && (
+                    <div className="bg-muted/30 rounded-lg border p-4">
+                      <p className="text-muted-foreground mb-2 text-sm font-medium">
+                        Preview before processing:
+                      </p>
+                      <audio controls className="w-full">
+                        <source src={audioUrl} type={audioFile?.type} />
+                        Your browser does not support the audio element.
+                      </audio>
+                    </div>
+                  )}
+                </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-4">
+                  {/* Load Example Buttons */}
+                  {!textInput && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadExampleText("en")}
+                        disabled={isLoading}
+                        className="flex-1"
+                      >
+                        <ClipboardPaste className="mr-2 h-4 w-4" />
+                        English Example
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadExampleText("fi")}
+                        disabled={isLoading}
+                        className="flex-1"
+                      >
+                        <ClipboardPaste className="mr-2 h-4 w-4" />
+                        Finnish Example
+                      </Button>
+                    </div>
+                  )}
                   <div
                     className={cn(
                       "rounded-lg border-2 transition-colors",
@@ -408,10 +491,10 @@ export default function IncidentReportPage() {
                     <Textarea
                       value={textInput}
                       onChange={(e) => setTextInput(e.target.value)}
-                      placeholder="Describe the incident: Date, location, who was involved, injuries, and actions taken..."
+                      placeholder="Describe the day's activities: Project name, weather, personnel, work completed, started/ongoing/completed work phases, supervisor observations..."
                       disabled={isLoading}
-                      rows={8}
-                      className="placeholder:text-muted-foreground/60 min-h-[180px] resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                      rows={10}
+                      className="placeholder:text-muted-foreground/60 min-h-[220px] resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                     />
                   </div>
                   {textInput && (
@@ -453,81 +536,38 @@ export default function IncidentReportPage() {
                       className="overflow-hidden"
                     >
                       <div className="space-y-4 border-t p-4 pt-4">
-                        <div className="space-y-4">
-                          <Label>Extraction Mode</Label>
-                          <ToggleGroup
-                            type="single"
-                            value={extractionMode}
-                            onValueChange={(val) =>
-                              val && setExtractionMode(val as "auto" | "custom")
-                            }
-                            className="justify-start"
-                          >
-                            <ToggleGroupItem value="auto" className="gap-2">
-                              <Wand2 className="h-4 w-4" />
-                              Automatic
-                            </ToggleGroupItem>
-                            <ToggleGroupItem value="custom" className="gap-2">
-                              <PenLine className="h-4 w-4" />
-                              Custom Fields
-                            </ToggleGroupItem>
-                          </ToggleGroup>
-                          <p className="text-muted-foreground text-xs">
-                            {extractionMode === "auto"
-                              ? "AI automatically identifies all relevant details."
-                              : "Define specific questions or fields you want answered."}
-                          </p>
-                        </div>
-
-                        {extractionMode === "custom" && (
-                          <div className="space-y-2">
-                            <Label htmlFor="schema">Fields to Extract</Label>
-                            <Textarea
-                              id="schema"
-                              value={customSchema}
-                              onChange={(e) => setCustomSchema(e.target.value)}
-                              placeholder="E.g., What was the weather? Was safety gear worn? Estimate repair costs..."
+                        {inputMode === "audio" && (
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="enhanced">
+                                Enhanced Transcript
+                              </Label>
+                              <p className="text-muted-foreground text-xs">
+                                Clean up grammar and filler words
+                              </p>
+                            </div>
+                            <Switch
+                              id="enhanced"
+                              checked={enhanced}
+                              onCheckedChange={setEnhanced}
                               disabled={isLoading}
-                              rows={4}
-                              className="font-mono text-sm"
                             />
                           </div>
                         )}
 
-                        <div className="space-y-4 pt-2">
-                          {inputMode === "audio" && (
-                            <div className="flex items-center justify-between">
-                              <div className="space-y-0.5">
-                                <Label htmlFor="enhanced">
-                                  Enhanced Transcript
-                                </Label>
-                                <p className="text-muted-foreground text-xs">
-                                  Clean up grammar and filler words
-                                </p>
-                              </div>
-                              <Switch
-                                id="enhanced"
-                                checked={enhanced}
-                                onCheckedChange={setEnhanced}
-                                disabled={isLoading}
-                              />
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-0.5">
-                              <Label htmlFor="pdf">Generate PDF Report</Label>
-                              <p className="text-muted-foreground text-xs">
-                                Create downloadable PDF file
-                              </p>
-                            </div>
-                            <Switch
-                              id="pdf"
-                              checked={generatePdf}
-                              onCheckedChange={setGeneratePdf}
-                              disabled={isLoading}
-                            />
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label htmlFor="pdf">Generate PDF Report</Label>
+                            <p className="text-muted-foreground text-xs">
+                              Create downloadable PDF file
+                            </p>
                           </div>
+                          <Switch
+                            id="pdf"
+                            checked={generatePdf}
+                            onCheckedChange={setGeneratePdf}
+                            disabled={isLoading}
+                          />
                         </div>
                       </div>
                     </motion.div>
@@ -542,7 +582,7 @@ export default function IncidentReportPage() {
                 size="lg"
               >
                 <Sparkles className="mr-2 h-4 w-4" />
-                {isLoading ? "Processing..." : "Generate Incident Report"}
+                {isLoading ? "Processing..." : "Generate Diary Entry"}
               </Button>
             </CardContent>
           </Card>
@@ -563,7 +603,7 @@ export default function IncidentReportPage() {
                         AI is working...
                       </h3>
                       <p className="text-muted-foreground text-sm">
-                        Please wait while we process your incident report.
+                        Please wait while we process your diary entry.
                       </p>
                     </div>
                   </div>
@@ -630,13 +670,13 @@ export default function IncidentReportPage() {
 
               {result.extracted_data && result.extracted_data.length > 0 && (
                 <ResultCard
-                  title="Incident Details"
-                  description="Details extracted by AI"
+                  title="Diary Details"
+                  description="Extracted construction diary fields"
                   copyContent={JSON.stringify(result.extracted_data, null, 2)}
-                  feedbackSlot={<FeedbackButton demoType="incident-report" />}
+                  feedbackSlot={<FeedbackButton demoType="construction-diary" />}
                   delay={0.1}
                 >
-                  <IncidentDetails data={result.extracted_data} />
+                  <DiaryDetails data={result.extracted_data} />
                 </ResultCard>
               )}
 
@@ -649,7 +689,7 @@ export default function IncidentReportPage() {
                         PDF Report Ready
                       </h4>
                       <p className="text-muted-foreground text-sm">
-                        Download the official report
+                        Download the construction diary report
                       </p>
                     </div>
                     <Button
@@ -669,8 +709,8 @@ export default function IncidentReportPage() {
             <EmptyStateCard
               message={
                 inputMode === "audio"
-                  ? "Your generated report will appear here."
-                  : "Submit your details to see the magic happen."
+                  ? "Your processed diary entry will appear here."
+                  : "Submit your diary details to see the extracted data."
               }
             />
           )}

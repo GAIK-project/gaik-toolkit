@@ -4,9 +4,11 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
+try:
+    from utils import get_api_config
+except ImportError:
+    from api.utils import get_api_config
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-
-from utils import get_api_config
 
 router = APIRouter()
 

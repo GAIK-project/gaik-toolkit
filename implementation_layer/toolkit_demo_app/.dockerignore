@@ -1,12 +1,14 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+.venv/
 
 # Build output
 .next/
 out/
 build/
 dist/
+tsconfig.tsbuildinfo
 
 # Python
 api/.venv/
@@ -26,6 +28,7 @@ api/**/__pycache__/
 .vscode/
 *.swp
 *.swo
+CLAUDE.md
 
 # Git
 .git/
@@ -39,16 +42,23 @@ docker-compose*
 # Documentation
 *.md
 LICENSE
+docs/
 
 # Testing
 coverage/
 .nyc_output/
 
-# Videos
+# Large media files
 public/video/
+
+# OpenShift configs (not needed in image)
+openshift/
+
+# Workspace/temp
+transcriber_workspace/
 
 # Misc
 .DS_Store
 Thumbs.db
 *.log
-transcriber_workspace/
+bun.lock

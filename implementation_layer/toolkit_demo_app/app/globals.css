@@ -290,6 +290,31 @@
     @apply bg-background text-foreground font-sans;
     letter-spacing: var(--tracking-normal);
   }
+
+  /* Custom scrollbar - thin & modern */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--primary) / 0.4;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--primary) / 0.7;
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(from var(--primary) l c h / 0.4) transparent;
+  }
 }
 
 @layer components {

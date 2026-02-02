@@ -3,10 +3,15 @@
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
-import { isAdminAuthenticated } from "@/lib/data/admin";
 
 const ADMIN_COOKIE_NAME = "admin_session";
 const ADMIN_COOKIE_VALUE = "authenticated";
+
+async function isAdminAuthenticated(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const adminCookie = cookieStore.get(ADMIN_COOKIE_NAME);
+  return adminCookie?.value === ADMIN_COOKIE_VALUE;
+}
 
 export type AdminResult = {
   error?: string;

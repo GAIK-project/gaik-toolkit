@@ -15,12 +15,15 @@ import {
   FileText,
   FileUp,
   FolderKanban,
+  Globe,
+  HardHat,
   Lock,
   type LucideIcon,
   MessageSquareQuote,
   Mic,
   Search,
   Sparkles,
+  Users,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -36,6 +39,7 @@ interface Demo {
   href: string;
   icon: LucideIcon;
   featured?: boolean;
+  size?: "large" | "wide";
   image?: string;
   featureList?: FeatureItem[];
 }
@@ -48,6 +52,7 @@ const demos: Demo[] = [
     href: "/incident-report",
     icon: AlertTriangle,
     featured: true,
+    size: "large",
     image: "/incident-report-v1.png",
     featureList: [
       { label: "Speak or Type", icon: Mic },
@@ -63,12 +68,29 @@ const demos: Demo[] = [
     href: "/rag",
     icon: Bot,
     featured: true,
+    size: "large",
     image: "/rag-builder-v1.png",
     featureList: [
       { label: "Upload PDFs", icon: FileUp },
       { label: "AI Search", icon: Search },
       { label: "Cited Answers", icon: MessageSquareQuote },
       { label: "Source Tracking", icon: Database },
+    ],
+  },
+  {
+    title: "Construction Diary",
+    description:
+      "Record daily construction site activities via voice or text. Extract structured data automatically.",
+    href: "/diary",
+    icon: HardHat,
+    featured: true,
+    size: "wide",
+    image: "/construction-diary-v1.png",
+    featureList: [
+      { label: "Voice or Text", icon: Mic },
+      { label: "Multilingual", icon: Globe },
+      { label: "Personnel Tracking", icon: Users },
+      { label: "PDF Export", icon: Download },
     ],
   },
   {
@@ -120,6 +142,8 @@ function FeaturedCard({
   demo: Demo;
   isUnlocked: boolean;
 }) {
+  const isWide = demo.size === "wide";
+
   const cardContent = (
     <Card className="border-primary/20 bg-card hover:border-primary/40 group relative flex h-full flex-col overflow-hidden rounded-xl border transition-colors duration-200 hover:shadow-md">
       {!isUnlocked && <LockOverlay />}
@@ -143,36 +167,73 @@ function FeaturedCard({
         </div>
       </CardHeader>
 
-      {demo.image && (
-        <CardContent className="-mt-2 overflow-hidden px-4 pt-0">
-          <div className="relative h-56 overflow-hidden rounded-lg lg:h-64">
-            <Image
-              src={demo.image}
-              alt={`${demo.title} Demo`}
-              fill
-              className="object-cover object-center"
-              style={{ objectPosition: "center 45%" }}
-            />
-          </div>
-        </CardContent>
-      )}
-
-      {demo.featureList && (
-        <CardContent className="mt-auto flex-1 pt-2 pb-6">
-          <div className="grid h-full grid-cols-2 gap-3">
-            {demo.featureList.map((feature) => (
-              <div
-                key={feature.label}
-                className="bg-muted/50 flex flex-col items-center justify-center gap-2 rounded-lg p-4"
-              >
-                <div className="bg-background flex h-10 w-10 items-center justify-center rounded-full shadow-sm">
-                  <feature.icon className="text-primary h-5 w-5" />
+      {isWide ? (
+        // Wide card layout: stacked on mobile, horizontal on tablet+
+        <CardContent className="flex flex-1 flex-col gap-4 pt-0 pb-6 sm:flex-row">
+          {demo.image && (
+            <div className="relative h-48 w-full shrink-0 overflow-hidden rounded-lg sm:h-56 sm:w-1/2">
+              <Image
+                src={demo.image}
+                alt={`${demo.title} Demo`}
+                fill
+                className="object-cover object-center"
+                style={{ objectPosition: "center 50%" }}
+              />
+            </div>
+          )}
+          {demo.featureList && (
+            <div className="grid flex-1 grid-cols-2 gap-3">
+              {demo.featureList.map((feature) => (
+                <div
+                  key={feature.label}
+                  className="bg-muted/50 flex flex-col items-center justify-center gap-2 rounded-lg p-3"
+                >
+                  <div className="bg-background flex h-9 w-9 items-center justify-center rounded-full shadow-sm">
+                    <feature.icon className="text-primary h-4 w-4" />
+                  </div>
+                  <span className="text-center text-sm font-medium">
+                    {feature.label}
+                  </span>
                 </div>
-                <span className="text-sm font-medium">{feature.label}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
+      ) : (
+        // Regular large card layout: vertical
+        <>
+          {demo.image && (
+            <CardContent className="-mt-2 overflow-hidden px-4 pt-0">
+              <div className="relative h-56 overflow-hidden rounded-lg lg:h-64">
+                <Image
+                  src={demo.image}
+                  alt={`${demo.title} Demo`}
+                  fill
+                  className="object-cover object-center"
+                  style={{ objectPosition: "center 45%" }}
+                />
+              </div>
+            </CardContent>
+          )}
+
+          {demo.featureList && (
+            <CardContent className="mt-auto flex-1 pt-2 pb-6">
+              <div className="grid h-full grid-cols-2 gap-3">
+                {demo.featureList.map((feature) => (
+                  <div
+                    key={feature.label}
+                    className="bg-muted/50 flex flex-col items-center justify-center gap-2 rounded-lg p-4"
+                  >
+                    <div className="bg-background flex h-10 w-10 items-center justify-center rounded-full shadow-sm">
+                      <feature.icon className="text-primary h-5 w-5" />
+                    </div>
+                    <span className="text-sm font-medium">{feature.label}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
+        </>
       )}
     </Card>
   );
@@ -215,7 +276,10 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
   const buildingBlocks = demos.filter((demo) => !demo.featured);
 
   return (
-    <section id="demos" className="animate-in fade-in duration-500 delay-150 space-y-8">
+    <section
+      id="demos"
+      className="animate-in fade-in space-y-8 delay-150 duration-500"
+    >
       {!isUnlocked && (
         <div className="bg-muted/50 border-primary/20 flex items-center gap-3 rounded-lg border p-4">
           <Lock className="text-primary h-5 w-5 shrink-0" />
@@ -232,14 +296,19 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
         </div>
       )}
 
-      {/* Use Cases - Featured */}
+      {/* Use Cases - Featured with Bento Grid */}
       <div className="space-y-4">
         <h2 className="font-serif text-2xl font-semibold md:text-3xl">
           Use Cases
         </h2>
         <div className="grid gap-6 md:grid-cols-2">
           {featuredDemos.map((demo) => (
-            <FeaturedCard key={demo.href} demo={demo} isUnlocked={isUnlocked} />
+            <div
+              key={demo.href}
+              className={demo.size === "wide" ? "md:col-span-2" : ""}
+            >
+              <FeaturedCard demo={demo} isUnlocked={isUnlocked} />
+            </div>
           ))}
         </div>
       </div>

@@ -1,0 +1,109 @@
+---
+title: Demo & API
+description: Interactive demo application and REST API for GAIK toolkit
+---
+
+## Interactive Demo
+
+Try GAIK toolkit components with our interactive demo application.
+
+**Source:** [GitHub - toolkit_demo_app](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/toolkit_demo_app)
+
+### Extractor
+
+Extract structured data from documents using natural language descriptions.
+
+![Extractor Demo](/demo-images/extractor.png)
+
+### Parser
+
+Parse PDFs and Word documents to Markdown.
+
+![Parser Demo](/demo-images/parser.png)
+
+### Classifier
+
+Classify documents into custom categories with AI.
+
+![Classifier Demo](/demo-images/classifier.png)
+
+### Transcriber
+
+Transcribe audio/video files with Whisper.
+
+![Transcriber Demo](/demo-images/transcriber.png)
+
+### RAG Builder
+
+Build Q&A pipelines with document upload.
+
+![RAG Demo](/demo-images/rag.png)
+
+### Run Locally
+
+```bash
+git clone https://github.com/GAIK-project/gaik-toolkit.git
+cd gaik-toolkit/implementation_layer/toolkit_demo_app
+
+# Install dependencies
+bun install
+pip install -e "../../[all]"
+
+# Set API key
+export OPENAI_API_KEY=your-key
+
+# Run
+bun dev  # Frontend: http://localhost:3000
+```
+
+---
+
+## REST API
+
+Lightweight FastAPI backend for transcription and parsing.
+
+**Source:** [GitHub - api](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/api)
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/transcribe` | POST | Whisper transcription |
+| `/parse` | POST | PDF/DOCX parsing |
+
+### Quick Start
+
+```bash
+cd implementation_layer/api
+pip install -r requirements.txt
+
+# Set environment
+export API_KEY=your-api-key
+export OPENAI_API_KEY=your-openai-key
+
+uvicorn main:app --reload
+```
+
+### Example Calls
+
+```bash
+# Transcribe audio
+curl -X POST http://localhost:8000/transcribe \
+  -H "X-API-Key: your-api-key" \
+  -F "file=@meeting.mp3" \
+  -F "enhanced=true"
+
+# Parse PDF
+curl -X POST http://localhost:8000/parse \
+  -H "X-API-Key: your-api-key" \
+  -F "file=@document.pdf" \
+  -F "parser_type=pymupdf"
+```
+
+### Docker
+
+```bash
+docker build -t gaik-api -f implementation_layer/api/Dockerfile .
+docker run -p 8000:8000 -e API_KEY=secret -e OPENAI_API_KEY=sk-... gaik-api
+```

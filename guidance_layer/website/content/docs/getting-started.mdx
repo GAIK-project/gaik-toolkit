@@ -7,14 +7,27 @@ description: Quick start guide for GAIK toolkit
 
 Install GAIK toolkit using pip. The package supports Python 3.11+.
 
+### Full Installation
+
 ```bash
-# All features
+# All features (includes ML/GPU dependencies like PyTorch, docling)
 pip install gaik[all]
 
-# Or install specific components
-pip install gaik[parser]      # PDF parsing only
-pip install gaik[transcriber] # Audio transcription only
+# CPU-only version (lighter, no PyTorch/ML dependencies)
+pip install gaik[all-cpu]
 ```
+
+### Specific Components
+
+```bash
+pip install gaik[parser]           # PDF parsing (with docling ML)
+pip install gaik[parser-cpu]       # PDF parsing (PyMuPDF only, lighter)
+pip install gaik[transcriber]      # Audio transcription (requires ffmpeg)
+pip install gaik[classifier]       # Document classification
+pip install gaik[rag-workflow]     # Complete RAG pipeline
+```
+
+> **Note:** The `all-cpu` variant is recommended for CI/CD pipelines or environments without GPU support.
 
 ## Environment Setup
 

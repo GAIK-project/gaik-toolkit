@@ -1,29 +1,21 @@
-"use server";
-
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 
 const ADMIN_COOKIE_NAME = "admin_session";
 const ADMIN_COOKIE_VALUE = "authenticated";
 
-export type AccessRequest = {
-  id: string;
-  user_id: string;
-  email: string;
-  full_name: string;
-  company: string | null;
-  use_case: string | null;
-  status: "pending" | "approved" | "rejected";
-  created_at: string;
-};
-
-export async function isAdminAuthenticated(): Promise<boolean> {
+/**
+ * GET /api/admin/requests - Get all access requests (admin only)
+ */
+export async function GET() {
+  // Check admin authentication
   const cookieStore = await cookies();
   const adminCookie = cookieStore.get(ADMIN_COOKIE_NAME);
-  return adminCookie?.value === ADMIN_COOKIE_VALUE;
-}
+  if (adminCookie?.value !== ADMIN_COOKIE_VALUE) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-export async function getAccessRequests(): Promise<AccessRequest[]> {
   const supabase = createServiceClient();
 
   const { data, error } = await supabase
@@ -33,8 +25,11 @@ export async function getAccessRequests(): Promise<AccessRequest[]> {
 
   if (error) {
     console.error("Failed to fetch access requests:", error);
-    return [];
+    return NextResponse.json(
+      { error: "Failed to fetch access requests" },
+      { status: 500 },
+    );
   }
 
-  return data || [];
+  return NextResponse.json(data || []);
 }

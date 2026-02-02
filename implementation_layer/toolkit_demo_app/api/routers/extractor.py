@@ -1,9 +1,11 @@
 """Extractor router - Data extraction endpoints"""
 
+try:
+    from utils import get_api_config
+except ImportError:
+    from api.utils import get_api_config
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-
-from utils import get_api_config
 
 router = APIRouter()
 

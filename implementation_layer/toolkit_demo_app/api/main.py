@@ -13,18 +13,31 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent.parent / ".env.local"
 load_dotenv(env_path)
 
+try:
+    # Docker: routers/ is in same directory as main.py
+    from routers import (  # noqa: E402
+        classifier,
+        diary,
+        extractor,
+        parser,
+        pipeline,
+        rag,
+        transcriber,
+    )
+except ImportError:
+    # Local dev: running from project root with api.main:app
+    from api.routers import (  # noqa: E402
+        classifier,
+        diary,
+        extractor,
+        parser,
+        pipeline,
+        rag,
+        transcriber,
+    )
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from gaik import __version__ as gaik_version  # noqa: E402
-
-from routers import (  # noqa: E402
-    classifier,
-    extractor,
-    parser,
-    pipeline,
-    rag,
-    transcriber,
-)
 
 
 @asynccontextmanager
@@ -64,6 +77,7 @@ app.include_router(extractor.router, prefix="/extract", tags=["Extractor"])
 app.include_router(transcriber.router, prefix="/transcribe", tags=["Transcriber"])
 app.include_router(pipeline.router, prefix="/pipeline", tags=["Pipeline"])
 app.include_router(rag.router, prefix="/rag", tags=["RAG"])
+app.include_router(diary.router, prefix="/diary", tags=["Diary"])
 
 
 @app.get("/health")
@@ -86,5 +100,6 @@ async def root():
             "transcribe": "/transcribe - Audio/video transcription",
             "pipeline": "/pipeline - End-to-end pipelines (audio/document to structured data)",
             "rag": "/rag - RAG pipeline (document indexing and Q&A with citations)",
+            "diary": "/diary - Construction diary (Työmaapäiväkirja) workflow",
         },
     }
