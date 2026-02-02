@@ -1,6 +1,6 @@
 # Incident Report Writing Skill for Claude Desktop
 
-Transform workplace incident and safety observation audio recordings into structured JSON reports — automatically.
+Transform workplace incident and safety observation audio recordings into structured reports — automatically.
 
 ---
 
@@ -10,7 +10,7 @@ This skill extracts structured information from employee or supervisor audio rec
 
 - **Transcribe** the audio recording using Whisper AI
 - **Extract** 17 standardized fields for incident reporting
-- **Generate** a formatted JSON document with all extracted data
+- **Present** structured data with all extracted information
 - **Validate** data against predefined fixed-option lists
 
 ### Extracted Fields
@@ -87,15 +87,14 @@ Process incident report from C:\path\to\your\audio-file.mp3 using incident-repor
 
 1. Claude transcribes the audio
 2. Extracts 17 fields from the transcript
-3. Creates a JSON document with all extracted data
-4. Validates data against fixed-option lists
-5. Presents the JSON output
+3. Validates data against fixed-option lists
+4. Presents the extracted data in a structured format
 
 ---
 
 ## Example Output
 
-The generated JSON contains:
+The extracted data includes all 17 fields. Here's an example in JSON format:
 
 ```json
 {
@@ -123,7 +122,7 @@ The generated JSON contains:
 - Fields not mentioned in audio are left empty (no guessing)
 - Fixed-option fields are validated against predefined lists
 - Brief, factual extraction with tight keywords
-- JSON format ready for system integration
+- Structured format ready for system integration
 - Date/time formatting with zero-padding
 
 ---
@@ -286,8 +285,7 @@ incident-report-writing/
 3. **Transcription** — MCP server calls OpenAI Whisper API to transcribe audio
 4. **Extraction** — Claude analyzes transcript and extracts 17 structured fields
 5. **Validation** — Fixed-option fields validated against predefined lists
-6. **JSON Generation** — JSON document created with all extracted data
-7. **Presentation** — JSON output presented to user
+6. **Presentation** — Structured data presented to user
 
 ### Dependencies
 
