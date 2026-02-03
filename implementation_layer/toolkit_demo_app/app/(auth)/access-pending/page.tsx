@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { signOut } from "../actions";
+import { signOut } from "@/app/(auth)/actions";
 import { getAccessStatus } from "@/data/auth";
 import { AuthShell } from "../components/auth-shell";
 import { Button } from "@/components/ui/button";

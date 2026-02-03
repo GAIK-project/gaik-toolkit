@@ -242,7 +242,7 @@ interface DemoCardsProps {
 
 function LockOverlay() {
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/50 opacity-100 md:opacity-0 md:transition-opacity md:group-hover:opacity-100">
       <div className="flex flex-col items-center gap-2 text-white">
         <Lock className="h-8 w-8" />
         <span className="text-sm font-medium">Sign in to access</span>

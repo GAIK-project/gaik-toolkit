@@ -562,23 +562,23 @@ export default function RAGPage() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="flex h-[calc(100vh-12rem)] flex-col"
+      className="flex h-[calc(100vh-10rem)] flex-col sm:h-[calc(100vh-12rem)]"
     >
       {/* Header */}
-      <header className="mb-4 flex items-center justify-between">
+      <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Bot className="text-primary h-7 w-7" />
+          <Bot className="text-primary h-6 w-6 sm:h-7 sm:w-7" />
           <div>
-            <h1 className="font-serif text-2xl font-semibold tracking-tight">
+            <h1 className="font-serif text-xl font-semibold tracking-tight sm:text-2xl">
               RAG Builder
             </h1>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-muted-foreground hidden text-sm sm:block">
               Ask questions about your documents
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Document status badge - only show when documents exist */}
           {hasDocuments && (
             <DropdownMenu>
@@ -588,7 +588,7 @@ export default function RAGPage() {
                   {indexedCount} doc{indexedCount !== 1 ? "s" : ""} indexed
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuContent align="end" className="w-64 sm:w-72">
                 <div className="overflow-x-hidden p-2">
                   <DocumentList
                     documents={indexedDocuments}

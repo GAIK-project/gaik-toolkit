@@ -117,17 +117,7 @@ export default function IncidentReportPage() {
     setResult(null);
     setPipelineSteps([]);
 
-    // Initialize steps for immediate feedback
-    setPipelineSteps([
-      {
-        step: 1,
-        name: inputMode === "audio" ? "Processing Audio" : "Analyzing Text",
-        status: "in_progress",
-        message: "Starting pipeline...",
-      },
-      { step: 2, name: "Data Extraction", status: "pending" },
-      { step: 3, name: "Report Formatting", status: "pending" },
-    ]);
+    // Steps are sent by backend via SSE
 
     try {
       const userRequirements =
@@ -139,104 +129,74 @@ export default function IncidentReportPage() {
       formData.append("user_requirements", userRequirements);
       formData.append("generate_pdf", String(generatePdf));
 
-      // Use SSE streaming for text mode, regular fetch for audio
+      // Both audio and text use SSE streaming
       if (inputMode === "audio" && audioFile) {
         formData.append("file", audioFile);
         formData.append("enhanced", String(enhanced));
         formData.append("compress_audio", "true");
         formData.append("pdf_title", "Incident Report");
-
-        // Simulating steps for Audio (since it's not SSE in this demo version effectively)
-        // In a real app, the audio endpoint ideally should stream too, but we'll adapt.
-        const response = await apiFetch("/api/pipeline/audio", {
-          method: "POST",
-          body: formData,
-          signal: abortControllerRef.current.signal,
-        });
-
-        if (!response.ok) {
-          const errorMessage = await response
-            .json()
-            .then((err) => err.detail || "Failed to process input")
-            .catch(() => "Failed to process input");
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json();
-        // Manually complete steps on success
-        setPipelineSteps([
-          { step: 1, name: "Processing Audio", status: "completed" },
-          { step: 2, name: "Data Extraction", status: "completed" },
-          { step: 3, name: "Report Formatting", status: "completed" },
-        ]);
-        setResult(data);
-
-        posthog.capture("pipeline_executed", {
-          pipeline_type: "audio",
-          extraction_mode: extractionMode,
-          enhanced: enhanced,
-          generate_pdf: generatePdf,
-        });
-
-        toast.success("Incident report generated!");
       } else {
-        // Text mode with SSE streaming
         formData.append("text", textInput);
         formData.append("pdf_title", "Incident Report");
+      }
 
-        const response = await apiFetch("/api/pipeline/text/stream", {
-          method: "POST",
-          body: formData,
-          signal: abortControllerRef.current.signal,
-        });
+      const endpoint =
+        inputMode === "audio"
+          ? "/api/pipeline/audio/stream"
+          : "/api/pipeline/text/stream";
 
-        if (!response.ok) {
-          throw new Error("Failed to process input");
+      const response = await apiFetch(endpoint, {
+        method: "POST",
+        body: formData,
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to process input");
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = parseSSEEvents(buffer);
+
+        for (const event of events) {
+          if (event.type === "steps") {
+            setPipelineSteps(event.data.steps as unknown as SSEStep[]);
+          } else if (event.type === "step_update") {
+            const update = event.data as unknown as SSEStep;
+            setPipelineSteps((prev) =>
+              prev.map((s) => (s.step === update.step ? update : s)),
+            );
+          } else if (event.type === "result") {
+            setResult(event.data as unknown as IncidentReportResult);
+
+            posthog.capture("pipeline_executed", {
+              pipeline_type: inputMode,
+              extraction_mode: extractionMode,
+              generate_pdf: generatePdf,
+            });
+
+            toast.success("Incident report generated!");
+          } else if (event.type === "error") {
+            throw new Error(
+              (event.data.message as string) || "Processing failed",
+            );
+          }
         }
 
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error("No response body");
-
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const events = parseSSEEvents(buffer);
-
-          for (const event of events) {
-            if (event.type === "steps") {
-              setPipelineSteps(event.data.steps as unknown as SSEStep[]);
-            } else if (event.type === "step_update") {
-              const update = event.data as unknown as SSEStep;
-              setPipelineSteps((prev) =>
-                prev.map((s) => (s.step === update.step ? update : s)),
-              );
-            } else if (event.type === "result") {
-              setResult(event.data as unknown as IncidentReportResult);
-
-              posthog.capture("pipeline_executed", {
-                pipeline_type: "text",
-                extraction_mode: extractionMode,
-                generate_pdf: generatePdf,
-              });
-
-              toast.success("Incident report generated!");
-            } else if (event.type === "error") {
-              throw new Error(
-                (event.data.message as string) || "Processing failed",
-              );
-            }
-          }
-
-          // Clear processed events from buffer
-          const lastEventEnd = buffer.lastIndexOf("\n\n");
-          if (lastEventEnd !== -1) {
-            buffer = buffer.slice(lastEventEnd + 2);
-          }
+        // Clear processed events from buffer
+        const lastEventEnd = buffer.lastIndexOf("\n\n");
+        if (lastEventEnd !== -1) {
+          buffer = buffer.slice(lastEventEnd + 2);
         }
       }
     } catch (error) {

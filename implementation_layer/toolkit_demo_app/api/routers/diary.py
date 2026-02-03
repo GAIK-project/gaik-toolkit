@@ -252,43 +252,83 @@ async def diary_audio_pipeline_stream(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         steps = [
-            {"step": 1, "name": "Uploading", "status": "completed"},
-            {"step": 2, "name": "Transcribing", "status": "pending"},
-            {"step": 3, "name": "Extracting", "status": "pending"},
+            {"step": 1, "name": "Transcription", "status": "pending"},
+            {"step": 2, "name": "Schema Generation", "status": "pending"},
+            {"step": 3, "name": "Data Extraction", "status": "pending"},
         ]
         if generate_pdf:
-            steps.append({"step": 4, "name": "Generating PDF", "status": "pending"})
+            steps.append({"step": 4, "name": "Report Formatting", "status": "pending"})
 
         # Send initial steps
         yield sse_event("steps", {"steps": steps})
 
         try:
+            import io
+            from contextlib import redirect_stdout
+
+            from gaik.software_components.extractor import DataExtractor, SchemaGenerator
+            from gaik.software_components.extractor.schema import print_pydantic_schema
+            from gaik.software_components.transcriber import Transcriber
+
             config = get_api_config()
 
-            # Step 2: Transcribe + Extract
+            # Step 1: Transcription
+            steps[0]["status"] = "in_progress"
+            steps[0]["message"] = "Converting audio to text..."
+            yield sse_event("step_update", steps[0])
+
+            transcriber = Transcriber(
+                api_config=config,
+                enhanced_transcript=enhanced,
+                compress_audio=compress_audio,
+            )
+            transcription = transcriber.transcribe(file_path=tmp_path)
+
+            steps[0]["status"] = "completed"
+            steps[0]["message"] = "Transcription complete"
+            yield sse_event("step_update", steps[0])
+
+            # Step 2: Schema Generation (capture reasoning output)
             steps[1]["status"] = "in_progress"
+            steps[1]["message"] = "Analyzing requirements..."
             yield sse_event("step_update", steps[1])
 
-            from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
-
-            pipeline = AudioToStructuredData(api_config=config)
-
-            result = pipeline.run(
-                file_path=tmp_path,
-                user_requirements=DIARY_REQUIREMENTS,
-                transcriber_ctor={
-                    "enhanced_transcript": enhanced,
-                    "compress_audio": compress_audio,
-                },
-            )
+            reasoning_buffer = io.StringIO()
+            with redirect_stdout(reasoning_buffer):
+                schema_generator = SchemaGenerator(config=config)
+                extraction_model = schema_generator.generate_schema(DIARY_REQUIREMENTS)
+            reasoning_output = reasoning_buffer.getvalue()
 
             steps[1]["status"] = "completed"
-            steps[1]["message"] = "Transcription complete"
             yield sse_event("step_update", steps[1])
 
-            # Step 3: Extract (already done by pipeline.run)
+            # Step 3: Data Extraction
+            steps[2]["status"] = "in_progress"
+            steps[2]["message"] = "Extracting diary data..."
+            yield sse_event("step_update", steps[2])
+
+            documents = [transcription.enhanced_transcript or transcription.raw_transcript]
+            extractor = DataExtractor(config=config)
+            extracted_data = extractor.extract(
+                extraction_model=extraction_model,
+                requirements=schema_generator.item_requirements,
+                user_requirements=DIARY_REQUIREMENTS,
+                documents=documents,
+            )
+
+            # Capture schema for UI display
+            schema_buffer = io.StringIO()
+            with redirect_stdout(schema_buffer):
+                print_pydantic_schema(extraction_model, title="Generated Extraction Schema")
+            schema_str = schema_buffer.getvalue()
+
             steps[2]["status"] = "completed"
-            steps[2]["message"] = f"Extracted {len(result.extracted_fields)} items"
+            steps[2]["message"] = f"Extracted {len(extracted_data)} items"
+            steps[2]["details"] = {
+                "type": "schema",
+                "title": "Generated Pydantic Schema",
+                "content": reasoning_output + "\n" + schema_str,  # Include reasoning!
+            }
             yield sse_event("step_update", steps[2])
 
             # Step 4: Generate PDF if requested
@@ -296,6 +336,7 @@ async def diary_audio_pipeline_stream(
             if generate_pdf:
                 pdf_step_idx = 3
                 steps[pdf_step_idx]["status"] = "in_progress"
+                steps[pdf_step_idx]["message"] = "Generating report..."
                 yield sse_event("step_update", steps[pdf_step_idx])
 
                 try:
@@ -307,12 +348,11 @@ async def diary_audio_pipeline_stream(
                     )
                     pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
 
-                    if result.extracted_fields:
-                        pdf_data = result.extracted_fields
+                    if extracted_data:
+                        pdf_data = extracted_data
                     else:
                         transcript = (
-                            result.transcription.enhanced_transcript
-                            or result.transcription.raw_transcript
+                            transcription.enhanced_transcript or transcription.raw_transcript
                         )
                         pdf_data = [{"transcript": transcript}]
                     pdf_generator.run(pdf_data, pdf_path)
@@ -332,9 +372,9 @@ async def diary_audio_pipeline_stream(
                 "result",
                 {
                     "job_id": job_id,
-                    "raw_transcript": result.transcription.raw_transcript,
-                    "enhanced_transcript": result.transcription.enhanced_transcript,
-                    "extracted_data": result.extracted_fields,
+                    "raw_transcript": transcription.raw_transcript,
+                    "enhanced_transcript": transcription.enhanced_transcript,
+                    "extracted_data": extracted_data,
                     "pdf_available": pdf_available,
                 },
             )

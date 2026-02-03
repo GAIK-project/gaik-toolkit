@@ -446,6 +446,178 @@ async def text_pipeline(
         )
 
 
+@router.post("/audio/stream")
+async def audio_pipeline_stream(
+    file: UploadFile = File(...),
+    user_requirements: str = Form(...),
+    generate_pdf: bool = Form(False),
+    pdf_title: str = Form("Extracted Data Report"),
+    enhanced: bool = Form(True),
+    compress_audio: bool = Form(True),
+):
+    """
+    Run the audio pipeline with SSE streaming progress updates.
+
+    Returns Server-Sent Events with progress updates and final result.
+    """
+    job_id = str(uuid.uuid4())
+
+    # Validate file first
+    if not file.filename:
+
+        async def error_gen() -> AsyncGenerator[str, None]:
+            yield sse_event("error", {"message": "No filename provided"})
+
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    suffix = Path(file.filename).suffix.lower()
+    supported = [".mp3", ".wav", ".m4a", ".mp4", ".webm", ".ogg", ".flac"]
+    if suffix not in supported:
+
+        async def error_gen() -> AsyncGenerator[str, None]:
+            yield sse_event("error", {"message": f"Unsupported file type: {suffix}"})
+
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    # Save uploaded file
+    content = await file.read()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        steps = [
+            {"step": 1, "name": "Transcription", "status": "pending"},
+            {"step": 2, "name": "Schema Generation", "status": "pending"},
+            {"step": 3, "name": "Data Extraction", "status": "pending"},
+        ]
+        if generate_pdf:
+            steps.append({"step": 4, "name": "Report Formatting", "status": "pending"})
+
+        # Send initial steps
+        yield sse_event("steps", {"steps": steps})
+
+        try:
+            config = get_api_config()
+
+            # Step 1: Transcription
+            steps[0]["status"] = "in_progress"
+            steps[0]["message"] = "Converting audio to text..."
+            yield sse_event("step_update", steps[0])
+
+            from gaik.software_components.transcriber import Transcriber
+
+            transcriber = Transcriber(
+                api_config=config,
+                enhanced_transcript=enhanced,
+                compress_audio=compress_audio,
+            )
+            transcription = transcriber.transcribe(file_path=tmp_path)
+
+            steps[0]["status"] = "completed"
+            steps[0]["message"] = "Transcription complete"
+            yield sse_event("step_update", steps[0])
+
+            # Step 2: Schema Generation
+            steps[1]["status"] = "in_progress"
+            steps[1]["message"] = "Analyzing requirements..."
+            yield sse_event("step_update", steps[1])
+
+            from gaik.software_components.extractor import DataExtractor, SchemaGenerator
+
+            schema_generator = SchemaGenerator(config=config)
+            extraction_model = schema_generator.generate_schema(user_requirements)
+
+            steps[1]["status"] = "completed"
+            yield sse_event("step_update", steps[1])
+
+            # Step 3: Data Extraction
+            steps[2]["status"] = "in_progress"
+            steps[2]["message"] = "Extracting incident data..."
+            yield sse_event("step_update", steps[2])
+
+            documents = [transcription.enhanced_transcript or transcription.raw_transcript]
+            extractor = DataExtractor(config=config)
+            extracted_data = extractor.extract(
+                extraction_model=extraction_model,
+                requirements=schema_generator.item_requirements,
+                user_requirements=user_requirements,
+                documents=documents,
+            )
+
+            steps[2]["status"] = "completed"
+            steps[2]["message"] = f"Extracted {len(extracted_data)} items"
+            yield sse_event("step_update", steps[2])
+
+            # Step 4: PDF Generation (if requested)
+            pdf_available = False
+            if generate_pdf:
+                steps[3]["status"] = "in_progress"
+                steps[3]["message"] = "Generating report..."
+                yield sse_event("step_update", steps[3])
+
+                try:
+                    from utils.pdf_generator import StructuredDataToPDF
+
+                    logo = LOGO_PATH if LOGO_PATH.exists() else None
+                    pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
+                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+
+                    if extracted_data:
+                        pdf_data = extracted_data
+                    else:
+                        transcript = (
+                            transcription.enhanced_transcript or transcription.raw_transcript
+                        )
+                        pdf_data = [{"transcript": transcript}]
+                    pdf_generator.run(pdf_data, pdf_path)
+
+                    PDF_STORAGE[job_id] = pdf_path
+                    pdf_available = True
+                    steps[3]["status"] = "completed"
+                    steps[3]["message"] = "PDF generated"
+                    yield sse_event("step_update", steps[3])
+                except Exception as e:
+                    steps[3]["status"] = "error"
+                    steps[3]["message"] = f"PDF generation failed: {e}"
+                    yield sse_event("step_update", steps[3])
+
+            # Send final result
+            yield sse_event(
+                "result",
+                {
+                    "job_id": job_id,
+                    "raw_transcript": transcription.raw_transcript,
+                    "enhanced_transcript": transcription.enhanced_transcript,
+                    "extracted_data": extracted_data,
+                    "pdf_available": pdf_available,
+                },
+            )
+
+        except ImportError as e:
+            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+        except Exception as e:
+            for step in steps:
+                if step["status"] == "in_progress":
+                    step["status"] = "error"
+                    step["message"] = str(e)
+                    yield sse_event("step_update", step)
+                    break
+            yield sse_event("error", {"message": str(e)})
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.post("/text/stream")
 async def text_pipeline_stream(
     text: str = Form(...),

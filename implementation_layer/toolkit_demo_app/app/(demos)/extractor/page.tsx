@@ -340,20 +340,20 @@ export default function ExtractorPage() {
                           ))}
                         </div>
 
-                        <div className="mt-2 flex gap-2">
+                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                           <Input
                             value={newFieldName}
                             onChange={(e) => setNewFieldName(e.target.value)}
                             placeholder="Field name"
                             disabled={isLoading}
-                            className="flex-1"
+                            className="w-full sm:flex-1"
                           />
                           <Input
                             value={newFieldDesc}
                             onChange={(e) => setNewFieldDesc(e.target.value)}
                             placeholder="Description"
                             disabled={isLoading}
-                            className="flex-1"
+                            className="w-full sm:flex-1"
                           />
                           <Button
                             variant="secondary"
@@ -364,6 +364,7 @@ export default function ExtractorPage() {
                               !newFieldName.trim() ||
                               !newFieldDesc.trim()
                             }
+                            className="self-end sm:self-auto"
                           >
                             <Plus className="h-4 w-4" />
                           </Button>

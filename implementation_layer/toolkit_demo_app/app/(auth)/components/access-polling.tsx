@@ -8,7 +8,11 @@ export function AccessPolling() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      router.refresh();
+      try {
+        router.refresh();
+      } catch (error) {
+        console.error("Access polling failed:", error);
+      }
     }, 5_000);
 
     return () => clearInterval(interval);

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { Loader2 } from "lucide-react";
-import { signUp, type AuthResult } from "../actions";
+import { signUp, type AuthResult } from "@/app/(auth)/actions";
 import { AuthShell } from "../components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

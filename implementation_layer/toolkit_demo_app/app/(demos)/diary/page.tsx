@@ -3,6 +3,7 @@
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { FileUpload } from "@/components/demo/file-upload";
 import { DiaryDetails } from "@/components/demo/diary-details";
+import { ProcessingDetails } from "@/components/demo/processing-details";
 import {
   EmptyStateCard,
   ResultCard,
@@ -120,6 +121,9 @@ export default function DiaryPage() {
   const [result, setResult] = useState<DiaryResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pipelineSteps, setPipelineSteps] = useState<SSEStep[]>([]);
+  const [processingMetadata, setProcessingMetadata] = useState<{
+    schema?: string;
+  } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -153,6 +157,7 @@ export default function DiaryPage() {
     setIsLoading(true);
     setResult(null);
     setPipelineSteps([]);
+    setProcessingMetadata(null);
 
     // Initialize steps for immediate feedback
     setPipelineSteps([
@@ -176,7 +181,8 @@ export default function DiaryPage() {
         formData.append("enhanced", String(enhanced));
         formData.append("compress_audio", "true");
 
-        const response = await apiFetch("/api/diary/audio", {
+        // Use streaming endpoint for real-time progress updates
+        const response = await apiFetch("/api/diary/audio/stream", {
           method: "POST",
           body: formData,
           signal: abortControllerRef.current.signal,
@@ -190,27 +196,57 @@ export default function DiaryPage() {
           throw new Error(errorMessage);
         }
 
-        const data = await response.json();
-        setPipelineSteps([
-          { step: 1, name: "Transcribing Audio", status: "completed" },
-          {
-            step: 2,
-            name: "Generating Extraction Schema",
-            status: "completed",
-          },
-          { step: 3, name: "Extracting Structured Data", status: "completed" },
-          { step: 4, name: "Generating PDF", status: "completed" },
-        ]);
-        setResult(data);
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error("No response body");
 
-        posthog.capture("pipeline_executed", {
-          pipeline_type: "diary_audio",
-          enhanced: enhanced,
-          generate_pdf: generatePdf,
-        });
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-        toast.success("Construction diary processed!");
-      } else {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const events = parseSSEEvents(buffer);
+
+          for (const event of events) {
+            if (event.type === "steps") {
+              setPipelineSteps(event.data.steps as unknown as SSEStep[]);
+            } else if (event.type === "step_update") {
+              const update = event.data as unknown as SSEStep;
+              setPipelineSteps((prev) =>
+                prev.map((s) => (s.step === update.step ? update : s)),
+              );
+              // Capture schema from step details
+              if (update.details?.content) {
+                setProcessingMetadata((prev) => ({
+                  ...prev,
+                  schema: update.details?.content,
+                }));
+              }
+            } else if (event.type === "result") {
+              setResult(event.data as unknown as DiaryResult);
+
+              posthog.capture("pipeline_executed", {
+                pipeline_type: "diary_audio",
+                enhanced: enhanced,
+                generate_pdf: generatePdf,
+              });
+
+              toast.success("Construction diary processed!");
+            } else if (event.type === "error") {
+              throw new Error(
+                (event.data.message as string) || "Processing failed",
+              );
+            }
+          }
+
+          const lastEventEnd = buffer.lastIndexOf("\n\n");
+          if (lastEventEnd !== -1) {
+            buffer = buffer.slice(lastEventEnd + 2);
+          }
+        }
+      } else if (inputMode === "text" && textInput.trim()) {
         // Text mode with SSE streaming
         formData.append("text", textInput);
 
@@ -245,6 +281,13 @@ export default function DiaryPage() {
               setPipelineSteps((prev) =>
                 prev.map((s) => (s.step === update.step ? update : s)),
               );
+              // Capture schema from step details
+              if (update.details?.content) {
+                setProcessingMetadata((prev) => ({
+                  ...prev,
+                  schema: update.details?.content,
+                }));
+              }
             } else if (event.type === "result") {
               setResult(event.data as unknown as DiaryResult);
 
@@ -293,6 +336,7 @@ export default function DiaryPage() {
     setTextInput("");
     setResult(null);
     setPipelineSteps([]);
+    setProcessingMetadata(null);
   }
 
   function loadExampleText(language: "en" | "fi"): void {
@@ -609,10 +653,13 @@ export default function DiaryPage() {
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold">
-                        AI is working...
+                        {pipelineSteps.find((s) => s.status === "in_progress")
+                          ?.name || "AI is working..."}
                       </h3>
                       <p className="text-muted-foreground text-sm">
-                        Please wait while we process your diary entry.
+                        {pipelineSteps.find((s) => s.status === "in_progress")
+                          ?.message ||
+                          "Please wait while we process your diary entry."}
                       </p>
                     </div>
                   </div>
@@ -667,6 +714,10 @@ export default function DiaryPage() {
                     />
                   )}
                 </ResultCard>
+              )}
+
+              {processingMetadata?.schema && (
+                <ProcessingDetails schema={processingMetadata.schema} />
               )}
 
               {result.extracted_data && result.extracted_data.length > 0 && (

@@ -226,7 +226,7 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
         href={GITHUB_REPO_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border shadow-xs transition-all lg:inline-flex"
+        className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border shadow-xs transition-all xl:inline-flex"
         aria-label="GitHub"
       >
         <GitHubIcon className="h-4 w-4" />
@@ -244,7 +244,7 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
             href={GITHUB_REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border shadow-xs transition-all lg:inline-flex"
+            className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border shadow-xs transition-all xl:inline-flex"
             aria-label="GitHub"
           >
             <GitHubIcon className="h-4 w-4" />
@@ -324,7 +324,7 @@ function MobileNav({ isActive, githubPreview, isLoggedIn }: MobileNavProps) {
       <SheetTrigger asChild>
         <MobileMenuButton />
       </SheetTrigger>
-      <SheetContent side="right" className="flex w-72 flex-col">
+      <SheetContent side="right" className="flex w-[85vw] max-w-72 flex-col sm:w-72">
         <SheetHeader className="shrink-0">
           <SheetTitle>Navigation</SheetTitle>
         </SheetHeader>
