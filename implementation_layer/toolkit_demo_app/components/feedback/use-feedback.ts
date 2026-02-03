@@ -21,7 +21,10 @@ function getLocalFeedback(demoType: DemoType): FeedbackFormData | null {
 
 function setLocalFeedback(demoType: DemoType, data: FeedbackFormData): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(`${STORAGE_KEY_PREFIX}${demoType}`, JSON.stringify(data));
+  localStorage.setItem(
+    `${STORAGE_KEY_PREFIX}${demoType}`,
+    JSON.stringify(data),
+  );
 }
 
 export function useFeedback(demoType: DemoType): UseFeedbackReturn {
@@ -112,7 +115,7 @@ export function useFeedback(demoType: DemoType): UseFeedbackReturn {
       setFeedback(result as Feedback);
       return true;
     },
-    [demoType, userId]
+    [demoType, userId],
   );
 
   return {

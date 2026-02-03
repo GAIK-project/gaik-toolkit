@@ -2,11 +2,18 @@
  * Server-Sent Events (SSE) parsing utilities
  */
 
+export interface SSEStepDetails {
+  type: "schema" | "code" | "extraction";
+  title: string;
+  content: string;
+}
+
 export interface SSEStep {
   step: number;
   name: string;
   status: "pending" | "in_progress" | "completed" | "error";
   message?: string;
+  details?: SSEStepDetails;
 }
 
 export interface SSEEvent {

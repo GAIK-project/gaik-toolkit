@@ -99,7 +99,7 @@ export function FeedbackDialog({
               disabled={isSubmitting}
               rows={3}
             />
-            <p className="text-xs text-muted-foreground text-right">
+            <p className="text-muted-foreground text-right text-xs">
               {comment.length}/{MAX_COMMENT_LENGTH}
             </p>
           </div>

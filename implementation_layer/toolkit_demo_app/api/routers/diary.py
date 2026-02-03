@@ -48,6 +48,14 @@ DIARY_REQUIREMENTS = """Extract the following fields from the Finnish constructi
 - Vastaavan allekirjoitus (Responsible person's signature)"""
 
 
+class PipelineStepDetails(BaseModel):
+    """Details for a pipeline step (e.g., generated schema)."""
+
+    type: Literal["schema", "code", "extraction"]
+    title: str
+    content: str
+
+
 class PipelineStep(BaseModel):
     """A single step in the pipeline."""
 
@@ -55,6 +63,7 @@ class PipelineStep(BaseModel):
     name: str
     status: Literal["pending", "in_progress", "completed", "error"]
     message: str | None = None
+    details: PipelineStepDetails | None = None
 
 
 class DiaryPipelineResponse(BaseModel):
@@ -468,10 +477,11 @@ async def diary_text_pipeline_stream(
     async def event_generator() -> AsyncGenerator[str, None]:
         steps = [
             {"step": 1, "name": "Analyzing Text", "status": "pending"},
-            {"step": 2, "name": "Extracting Details", "status": "pending"},
+            {"step": 2, "name": "Generating Extraction Schema", "status": "pending"},
+            {"step": 3, "name": "Extracting Structured Data", "status": "pending"},
         ]
         if generate_pdf:
-            steps.append({"step": 3, "name": "Generating PDF", "status": "pending"})
+            steps.append({"step": 4, "name": "Generating PDF", "status": "pending"})
 
         # Send initial steps
         yield sse_event("steps", {"steps": steps})
@@ -481,24 +491,50 @@ async def diary_text_pipeline_stream(
             return
 
         try:
+            import io
+            from contextlib import redirect_stdout
+
             config = get_api_config()
 
-            # Step 1: Generate schema
+            # Step 1: Analyzing text
             steps[0]["status"] = "in_progress"
             yield sse_event("step_update", steps[0])
 
             from gaik.software_components.extractor.extractor import DataExtractor
-            from gaik.software_components.extractor.schema import SchemaGenerator
+            from gaik.software_components.extractor.schema import (
+                SchemaGenerator,
+                print_pydantic_schema,
+            )
+
+            steps[0]["status"] = "completed"
+            steps[0]["message"] = "Text received"
+            yield sse_event("step_update", steps[0])
+
+            # Step 2: Generate schema
+            steps[1]["status"] = "in_progress"
+            yield sse_event("step_update", steps[1])
 
             generator = SchemaGenerator(config=config)
             extraction_model = generator.generate_schema(DIARY_REQUIREMENTS)
 
-            steps[0]["status"] = "completed"
-            yield sse_event("step_update", steps[0])
+            # Capture generated schema as string for logging
+            schema_buffer = io.StringIO()
+            with redirect_stdout(schema_buffer):
+                print_pydantic_schema(extraction_model, title="Generated Extraction Schema")
+            schema_str = schema_buffer.getvalue()
 
-            # Step 2: Extract data
-            steps[1]["status"] = "in_progress"
+            steps[1]["status"] = "completed"
+            steps[1]["message"] = "Schema generated"
+            steps[1]["details"] = {
+                "type": "schema",
+                "title": "Generated Pydantic Schema",
+                "content": schema_str,
+            }
             yield sse_event("step_update", steps[1])
+
+            # Step 3: Extract data
+            steps[2]["status"] = "in_progress"
+            yield sse_event("step_update", steps[2])
 
             extractor = DataExtractor(config=config)
             extracted_data = extractor.extract(
@@ -508,14 +544,14 @@ async def diary_text_pipeline_stream(
                 documents=[text],
             )
 
-            steps[1]["status"] = "completed"
-            steps[1]["message"] = f"Extracted {len(extracted_data)} items"
-            yield sse_event("step_update", steps[1])
+            steps[2]["status"] = "completed"
+            steps[2]["message"] = f"Extracted {len(extracted_data)} items"
+            yield sse_event("step_update", steps[2])
 
-            # Step 3: Generate PDF if requested
+            # Step 4: Generate PDF if requested
             pdf_available = False
             if generate_pdf:
-                pdf_step_idx = 2
+                pdf_step_idx = 3
                 steps[pdf_step_idx]["status"] = "in_progress"
                 yield sse_event("step_update", steps[pdf_step_idx])
 

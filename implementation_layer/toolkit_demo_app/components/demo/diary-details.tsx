@@ -89,7 +89,10 @@ export function DiaryDetails({ data, className }: DiaryDetailsProps) {
                     <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                       Project
                     </p>
-                    <p className="truncate font-medium" title={entry.kohde || undefined}>
+                    <p
+                      className="truncate font-medium"
+                      title={entry.kohde || undefined}
+                    >
                       {entry.kohde || "N/A"}
                     </p>
                   </div>
@@ -104,7 +107,10 @@ export function DiaryDetails({ data, className }: DiaryDetailsProps) {
                     <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                       Author
                     </p>
-                    <p className="truncate font-medium" title={entry.laatija || undefined}>
+                    <p
+                      className="truncate font-medium"
+                      title={entry.laatija || undefined}
+                    >
                       {entry.laatija || "N/A"}
                     </p>
                   </div>
@@ -115,7 +121,7 @@ export function DiaryDetails({ data, className }: DiaryDetailsProps) {
             {/* Weather */}
             {entry.saa && (
               <div className="bg-card flex items-start space-x-4 rounded-xl border p-4 shadow-sm">
-                <div className="bg-blue-500/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
                   <Cloud className="h-5 w-5 text-blue-500" />
                 </div>
                 <div>
@@ -154,7 +160,11 @@ export function DiaryDetails({ data, className }: DiaryDetailsProps) {
                   </h3>
                 </div>
                 <div className="bg-muted/30 text-card-foreground rounded-xl border p-5 leading-relaxed shadow-sm">
-                  {renderList(entry.paivan_tyot_omat_tyot, "No work recorded", true)}
+                  {renderList(
+                    entry.paivan_tyot_omat_tyot,
+                    "No work recorded",
+                    true,
+                  )}
                 </div>
               </div>
             )}
@@ -162,56 +172,60 @@ export function DiaryDetails({ data, className }: DiaryDetailsProps) {
             {/* Work Phases Grid */}
             <div className="grid gap-4 md:grid-cols-2">
               {/* Started Work Phases (Aloitetut työvaiheet) */}
-              {entry.aloitetut_tyovaiheet && hasContent(entry.aloitetut_tyovaiheet) && (
-                <div className="bg-card rounded-xl border shadow-sm">
-                  <div className="flex items-center gap-2 border-b p-4">
-                    <PlayCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
-                    <h3 className="font-medium">Started Phases</h3>
+              {entry.aloitetut_tyovaiheet &&
+                hasContent(entry.aloitetut_tyovaiheet) && (
+                  <div className="bg-card rounded-xl border shadow-sm">
+                    <div className="flex items-center gap-2 border-b p-4">
+                      <PlayCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
+                      <h3 className="font-medium">Started Phases</h3>
+                    </div>
+                    <div className="p-4">
+                      {renderList(entry.aloitetut_tyovaiheet, "None")}
+                    </div>
                   </div>
-                  <div className="p-4">
-                    {renderList(entry.aloitetut_tyovaiheet, "None")}
-                  </div>
-                </div>
-              )}
+                )}
 
               {/* Ongoing Work Phases (Käynnissä olevat) */}
-              {entry.kaynnissa_olevat_tyovai && hasContent(entry.kaynnissa_olevat_tyovai) && (
-                <div className="bg-card rounded-xl border shadow-sm">
-                  <div className="flex items-center gap-2 border-b p-4">
-                    <Play className="h-4 w-4 text-blue-600 dark:text-blue-500" />
-                    <h3 className="font-medium">Ongoing Phases</h3>
+              {entry.kaynnissa_olevat_tyovai &&
+                hasContent(entry.kaynnissa_olevat_tyovai) && (
+                  <div className="bg-card rounded-xl border shadow-sm">
+                    <div className="flex items-center gap-2 border-b p-4">
+                      <Play className="h-4 w-4 text-blue-600 dark:text-blue-500" />
+                      <h3 className="font-medium">Ongoing Phases</h3>
+                    </div>
+                    <div className="p-4">
+                      {renderList(entry.kaynnissa_olevat_tyovai, "None")}
+                    </div>
                   </div>
-                  <div className="p-4">
-                    {renderList(entry.kaynnissa_olevat_tyovai, "None")}
-                  </div>
-                </div>
-              )}
+                )}
 
               {/* Completed Work Phases (Päättyneet) */}
-              {entry.paattyneet_tyovai && hasContent(entry.paattyneet_tyovai) && (
-                <div className="bg-card rounded-xl border shadow-sm">
-                  <div className="flex items-center gap-2 border-b p-4">
-                    <StopCircle className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                    <h3 className="font-medium">Completed Phases</h3>
+              {entry.paattyneet_tyovai &&
+                hasContent(entry.paattyneet_tyovai) && (
+                  <div className="bg-card rounded-xl border shadow-sm">
+                    <div className="flex items-center gap-2 border-b p-4">
+                      <StopCircle className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                      <h3 className="font-medium">Completed Phases</h3>
+                    </div>
+                    <div className="p-4">
+                      {renderList(entry.paattyneet_tyovai, "None")}
+                    </div>
                   </div>
-                  <div className="p-4">
-                    {renderList(entry.paattyneet_tyovai, "None")}
-                  </div>
-                </div>
-              )}
+                )}
 
               {/* Interrupted Work Phases (Keskeytyneet) */}
-              {entry.keskeytyneet_tyovai && hasContent(entry.keskeytyneet_tyovai) && (
-                <div className="bg-card rounded-xl border shadow-sm">
-                  <div className="flex items-center gap-2 border-b p-4">
-                    <Pause className="h-4 w-4 text-orange-600 dark:text-orange-500" />
-                    <h3 className="font-medium">Interrupted Phases</h3>
+              {entry.keskeytyneet_tyovai &&
+                hasContent(entry.keskeytyneet_tyovai) && (
+                  <div className="bg-card rounded-xl border shadow-sm">
+                    <div className="flex items-center gap-2 border-b p-4">
+                      <Pause className="h-4 w-4 text-orange-600 dark:text-orange-500" />
+                      <h3 className="font-medium">Interrupted Phases</h3>
+                    </div>
+                    <div className="p-4">
+                      {renderList(entry.keskeytyneet_tyovai, "None")}
+                    </div>
                   </div>
-                  <div className="p-4">
-                    {renderList(entry.keskeytyneet_tyovai, "None")}
-                  </div>
-                </div>
-              )}
+                )}
             </div>
 
             {/* Events and Deviations */}

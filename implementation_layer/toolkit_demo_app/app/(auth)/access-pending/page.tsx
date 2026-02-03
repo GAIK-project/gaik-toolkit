@@ -36,8 +36,8 @@ export default async function AccessPendingPage() {
         </div>
 
         <p className="text-muted-foreground text-sm">
-          Your request will be reviewed shortly. You can wait here — we'll
-          redirect you automatically when approved.
+          Your request will be reviewed shortly. We'll send you an email when
+          your access has been approved.
         </p>
 
         <form action={signOut}>

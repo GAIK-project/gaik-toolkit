@@ -516,12 +516,14 @@ async def clear_collection(collection_id: str):
     """
     Clear a RAG collection and free resources.
 
+    Idempotent: returns success even if collection doesn't exist
+    (e.g., after server restart when client still has old collection ID).
+
     - **collection_id**: The collection to clear
     """
-    if collection_id not in RAG_INSTANCES:
-        raise HTTPException(status_code=404, detail="Collection not found")
+    if collection_id in RAG_INSTANCES:
+        del RAG_INSTANCES[collection_id]
 
-    del RAG_INSTANCES[collection_id]
     # Clean up the lock for this collection
     if collection_id in _collection_locks:
         del _collection_locks[collection_id]

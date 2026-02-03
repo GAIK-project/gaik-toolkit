@@ -73,7 +73,6 @@ export async function updateSession(request: NextRequest) {
 
   // Handle protected demo routes
   if (isProtectedRoute(pathname)) {
-
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = "/sign-in";

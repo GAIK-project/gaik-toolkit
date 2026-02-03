@@ -16,7 +16,8 @@ export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Proxy API requests to backend (except Next.js API routes)
-  const isNextApiRoute = pathname.startsWith("/api/auth") || pathname.startsWith("/api/admin");
+  const isNextApiRoute =
+    pathname.startsWith("/api/auth") || pathname.startsWith("/api/admin");
   if (pathname.startsWith("/api") && !isNextApiRoute) {
     // Rate limit check (if Redis is configured)
     if (ratelimit) {

@@ -20,18 +20,12 @@ export async function apiFetch(
     const resetTime = parseInt(
       response.headers.get("X-RateLimit-Reset") || "0",
     );
-    const secondsLeft = Math.max(
-      1,
-      Math.ceil((resetTime - Date.now()) / 1000),
-    );
+    const secondsLeft = Math.max(1, Math.ceil((resetTime - Date.now()) / 1000));
 
-    toast.error(
-      `Liian monta pyyntöä! Odota ${secondsLeft} sekuntia.`,
-      {
-        duration: 5000,
-        icon: "⏳",
-      },
-    );
+    toast.error(`Liian monta pyyntöä! Odota ${secondsLeft} sekuntia.`, {
+      duration: 5000,
+      icon: "⏳",
+    });
 
     throw new RateLimitError(resetTime);
   }

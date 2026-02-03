@@ -40,7 +40,10 @@ const buttonVariants = cva(
 const Button = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button"> & VariantProps<typeof buttonVariants>
->(function Button({ className, variant = "default", size = "default", ...props }, ref) {
+>(function Button(
+  { className, variant = "default", size = "default", ...props },
+  ref,
+) {
   return (
     <button
       ref={ref}

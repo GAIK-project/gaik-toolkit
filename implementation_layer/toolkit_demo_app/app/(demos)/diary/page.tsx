@@ -9,7 +9,7 @@ import {
   ResultText,
 } from "@/components/demo/result-card";
 import { FeedbackButton } from "@/components/feedback";
-import { StepIndicator } from "@/components/demo/step-indicator";
+import { PipelineLogViewer } from "@/components/demo/pipeline-log-viewer";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -158,12 +158,13 @@ export default function DiaryPage() {
     setPipelineSteps([
       {
         step: 1,
-        name: inputMode === "audio" ? "Processing Audio" : "Analyzing Text",
+        name: inputMode === "audio" ? "Transcribing Audio" : "Analyzing Text",
         status: "in_progress",
         message: "Starting pipeline...",
       },
-      { step: 2, name: "Data Extraction", status: "pending" },
-      { step: 3, name: "Generating PDF", status: "pending" },
+      { step: 2, name: "Generating Extraction Schema", status: "pending" },
+      { step: 3, name: "Extracting Structured Data", status: "pending" },
+      { step: 4, name: "Generating PDF", status: "pending" },
     ]);
 
     try {
@@ -191,9 +192,14 @@ export default function DiaryPage() {
 
         const data = await response.json();
         setPipelineSteps([
-          { step: 1, name: "Processing Audio", status: "completed" },
-          { step: 2, name: "Data Extraction", status: "completed" },
-          { step: 3, name: "Generating PDF", status: "completed" },
+          { step: 1, name: "Transcribing Audio", status: "completed" },
+          {
+            step: 2,
+            name: "Generating Extraction Schema",
+            status: "completed",
+          },
+          { step: 3, name: "Extracting Structured Data", status: "completed" },
+          { step: 4, name: "Generating PDF", status: "completed" },
         ]);
         setResult(data);
 
@@ -299,7 +305,9 @@ export default function DiaryPage() {
     try {
       const response = await fetch(EXAMPLE_AUDIO_PATH);
       const blob = await response.blob();
-      const file = new File([blob], "diary-example.mp3", { type: "audio/mpeg" });
+      const file = new File([blob], "diary-example.mp3", {
+        type: "audio/mpeg",
+      });
       setInputMode("audio");
       setAudioFile(file);
       setResult(null);
@@ -321,7 +329,8 @@ export default function DiaryPage() {
           Construction Diary
         </h1>
         <p className="text-muted-foreground mt-2 text-lg">
-          Record daily construction site activities via voice or text. AI extracts structured data.
+          Record daily construction site activities via voice or text. AI
+          extracts structured data.
         </p>
       </header>
 
@@ -610,15 +619,7 @@ export default function DiaryPage() {
 
                   {pipelineSteps.length > 0 && (
                     <div className="bg-muted/30 rounded-lg border p-4">
-                      <StepIndicator
-                        steps={pipelineSteps.map((s) => ({
-                          id: String(s.step),
-                          name: s.name,
-                          status: s.status,
-                          message: s.message,
-                        }))}
-                        orientation="vertical"
-                      />
+                      <PipelineLogViewer steps={pipelineSteps} />
                     </div>
                   )}
                 </div>
@@ -673,7 +674,9 @@ export default function DiaryPage() {
                   title="Diary Details"
                   description="Extracted construction diary fields"
                   copyContent={JSON.stringify(result.extracted_data, null, 2)}
-                  feedbackSlot={<FeedbackButton demoType="construction-diary" />}
+                  feedbackSlot={
+                    <FeedbackButton demoType="construction-diary" />
+                  }
                   delay={0.1}
                 >
                   <DiaryDetails data={result.extracted_data} />

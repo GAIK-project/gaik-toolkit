@@ -28,18 +28,31 @@ import {
 import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
 import { cn } from "@/lib/utils";
 import {
+  AudioWaveform,
   Bot,
   Boxes,
+  Cpu,
+  Database,
+  ExternalLink,
+  FileBarChart,
+  FileCode,
+  FileOutput,
   FileSearch,
   FileText,
+  GraduationCap,
   HardHat,
+  Headset,
   Lightbulb,
   LogOut,
   LucideIcon,
   Menu,
+  MessageSquare,
   Mic,
+  Puzzle,
   ShieldAlert,
   Tags,
+  Video,
+  Wand2,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -50,6 +63,8 @@ interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
+  comingSoon?: boolean;
+  external?: boolean;
 }
 
 interface NavGroup {
@@ -65,7 +80,31 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
       { label: "Construction Diary", href: "/diary", icon: HardHat },
-      { label: "RAG Builder", href: "/rag", icon: Bot },
+      // Coming Soon
+      {
+        label: "Customer Assistant",
+        href: "#",
+        icon: Headset,
+        comingSoon: true,
+      },
+      {
+        label: "Learning Assistant",
+        href: "#",
+        icon: GraduationCap,
+        comingSoon: true,
+      },
+      {
+        label: "Semantic Video Search",
+        href: "#",
+        icon: Video,
+        comingSoon: true,
+      },
+      {
+        label: "Sales Proposal",
+        href: "#",
+        icon: FileBarChart,
+        comingSoon: true,
+      },
     ],
   },
   {
@@ -76,6 +115,47 @@ const navGroups: NavGroup[] = [
       { label: "Parser", href: "/parser", icon: FileText },
       { label: "Classifier", href: "/classifier", icon: Tags },
       { label: "Transcriber", href: "/transcriber", icon: Mic },
+    ],
+  },
+  {
+    label: "Software Modules",
+    icon: Puzzle,
+    items: [
+      // Coming Soon (left column)
+      {
+        label: "Audio → Structured",
+        href: "#",
+        icon: AudioWaveform,
+        comingSoon: true,
+      },
+      // Active (right column, top - easy to reach)
+      { label: "RAG Builder", href: "/rag", icon: Bot },
+      {
+        label: "Document → Structured",
+        href: "#",
+        icon: FileOutput,
+        comingSoon: true,
+      },
+      { label: "Embedder", href: "#", icon: Cpu, comingSoon: true },
+      { label: "Vector Database", href: "#", icon: Database, comingSoon: true },
+    ],
+  },
+  {
+    label: "No-code Assets",
+    icon: FileCode,
+    items: [
+      {
+        label: "Prompts",
+        href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts",
+        icon: MessageSquare,
+        external: true,
+      },
+      {
+        label: "Agent Skills",
+        href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills",
+        icon: Wand2,
+        external: true,
+      },
     ],
   },
 ];
@@ -146,10 +226,10 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
         href={GITHUB_REPO_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-xs transition-all lg:inline-flex"
+        className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border shadow-xs transition-all lg:inline-flex"
+        aria-label="GitHub"
       >
         <GitHubIcon className="h-4 w-4" />
-        GitHub
       </a>
     ) : (
       linkContent
@@ -164,10 +244,10 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
             href={GITHUB_REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 shrink-0 items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium shadow-xs transition-all lg:inline-flex"
+            className="bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border shadow-xs transition-all lg:inline-flex"
+            aria-label="GitHub"
           >
             <GitHubIcon className="h-4 w-4" />
-            GitHub
           </a>
         ) : (
           linkContent
@@ -207,7 +287,13 @@ const MobileMenuButton = React.forwardRef<
   React.ComponentProps<typeof Button>
 >(function MobileMenuButton(props, ref) {
   return (
-    <Button ref={ref} variant="outline" size="icon" className="md:hidden" {...props}>
+    <Button
+      ref={ref}
+      variant="outline"
+      size="icon"
+      className="md:hidden"
+      {...props}
+    >
       <Menu className="h-5 w-5" />
       <span className="sr-only">Open menu</span>
     </Button>
@@ -245,24 +331,59 @@ function MobileNav({ isActive, githubPreview, isLoggedIn }: MobileNavProps) {
         <nav className="mt-4 flex flex-col gap-1">
           {navGroups.map((group, index) => (
             <div key={group.label} className={index > 0 ? "mt-2" : ""}>
-              {index > 0 && <hr className="mb-3 border-border/60" />}
+              {index > 0 && <hr className="border-border/60 mb-3" />}
               <div className="text-primary/80 mb-2 flex items-center gap-2 px-3 py-1 text-xs font-semibold tracking-wider uppercase">
                 <group.icon className="h-4 w-4" />
                 {group.label}
               </div>
               <div className="flex flex-col gap-0.5 pl-2">
-                {group.items.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    {...item}
-                    active={isActive(item.href)}
-                    variant="mobile"
-                  />
-                ))}
+                {group.items.map((item) => {
+                  // Coming Soon items
+                  if (item.comingSoon) {
+                    return (
+                      <div
+                        key={item.label}
+                        className="text-muted-foreground/60 flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium"
+                      >
+                        <item.icon className="h-5 w-5" />
+                        {item.label}
+                        <span className="bg-muted ml-auto rounded px-1.5 py-0.5 text-[10px]">
+                          Soon
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  // External links
+                  if (item.external) {
+                    return (
+                      <a
+                        key={item.label}
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
+                      >
+                        <item.icon className="h-5 w-5" />
+                        {item.label}
+                        <ExternalLink className="text-muted-foreground/60 ml-auto h-4 w-4" />
+                      </a>
+                    );
+                  }
+
+                  return (
+                    <NavLink
+                      key={item.href}
+                      {...item}
+                      active={isActive(item.href)}
+                      variant="mobile"
+                    />
+                  );
+                })}
               </div>
             </div>
           ))}
-          <hr className="my-3 border-border/60" />
+          <hr className="border-border/60 my-3" />
           <div className="px-2">
             <GitHubLink preview={githubPreview} variant="mobile" />
           </div>
@@ -321,32 +442,92 @@ export function SiteNav({
         </div>
 
         {/* Center: Desktop Navigation */}
-        <nav aria-label="Primary" className="hidden md:block">
-          <div className="border-border/70 bg-card flex items-center gap-1 rounded-full border p-1 shadow-sm">
+        <nav aria-label="Primary" className="hidden min-w-0 shrink md:block">
+          <div className="border-border/70 bg-card flex items-center gap-0.5 rounded-full border p-1 shadow-sm lg:gap-1">
             <NavigationMenu>
               <NavigationMenuList>
-                {navGroups.map((group) => {
+                {navGroups.map((group, index) => {
                   const isGroupActive = group.items.some((item) =>
                     isActive(item.href),
                   );
+                  // Align dropdown: first half opens right, second half opens left
+                  const dropdownAlign =
+                    index < navGroups.length / 2 ? "start" : "end";
                   return (
                     <NavigationMenuItem key={group.label}>
                       <NavigationMenuTrigger
                         className={cn(
-                          "h-10 rounded-full bg-transparent px-5 text-sm font-medium transition-colors",
+                          "h-9 rounded-full bg-transparent px-3 text-sm font-medium whitespace-nowrap transition-colors lg:h-10 lg:px-4",
                           isGroupActive
                             ? "bg-primary/10 text-primary hover:bg-primary/15 data-[state=open]:bg-primary/15"
                             : "hover:bg-muted data-[state=open]:bg-muted",
                         )}
                       >
-                        <group.icon className="mr-2 h-4 w-4" />
-                        {group.label}
+                        <group.icon className="mr-1.5 h-4 w-4 lg:mr-2" />
+                        <span className="hidden lg:inline">{group.label}</span>
+                        <span className="lg:hidden">
+                          {group.label === "Use Cases"
+                            ? "Cases"
+                            : group.label === "Software Components"
+                              ? "Components"
+                              : group.label === "Software Modules"
+                                ? "Modules"
+                                : group.label === "No-code Assets"
+                                  ? "Assets"
+                                  : group.label}
+                        </span>
                       </NavigationMenuTrigger>
-                      <NavigationMenuContent>
+                      <NavigationMenuContent align={dropdownAlign}>
                         <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
                           {group.items.map((item) => {
                             const ItemIcon = item.icon;
                             const active = isActive(item.href);
+
+                            // Coming Soon items
+                            if (item.comingSoon) {
+                              return (
+                                <li key={item.label}>
+                                  <div className="block h-full cursor-not-allowed space-y-1 rounded-md p-3 leading-none opacity-50">
+                                    <div className="text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium">
+                                      <ItemIcon className="h-4 w-4" />
+                                      {item.label}
+                                      <span className="bg-muted ml-auto rounded px-1.5 py-0.5 text-[10px] font-normal">
+                                        Soon
+                                      </span>
+                                    </div>
+                                    <p className="text-muted-foreground/70 line-clamp-2 text-sm leading-snug">
+                                      Coming soon
+                                    </p>
+                                  </div>
+                                </li>
+                              );
+                            }
+
+                            // External links
+                            if (item.external) {
+                              return (
+                                <li key={item.label}>
+                                  <NavigationMenuLink asChild>
+                                    <a
+                                      href={item.href}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full space-y-1 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none"
+                                    >
+                                      <div className="flex items-center gap-2 text-sm leading-none font-medium">
+                                        <ItemIcon className="h-4 w-4" />
+                                        {item.label}
+                                        <ExternalLink className="text-muted-foreground ml-auto h-3 w-3" />
+                                      </div>
+                                      <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
+                                        View on GitHub
+                                      </p>
+                                    </a>
+                                  </NavigationMenuLink>
+                                </li>
+                              );
+                            }
+
                             return (
                               <li key={item.href}>
                                 <NavigationMenuLink asChild>

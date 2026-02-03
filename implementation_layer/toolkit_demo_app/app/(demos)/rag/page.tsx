@@ -388,7 +388,9 @@ export default function RAGPage() {
 
     setIsIndexing(true);
     try {
-      const response = await apiFetch("/api/rag/load-example", { method: "POST" });
+      const response = await apiFetch("/api/rag/load-example", {
+        method: "POST",
+      });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
@@ -398,11 +400,13 @@ export default function RAGPage() {
       const data = await response.json();
       setCollectionId(data.collection_id);
       setIndexedDocuments(
-        data.documents.map((doc: { filename: string; chunk_count: number; status: string }) => ({
-          filename: doc.filename,
-          chunkCount: doc.chunk_count,
-          status: doc.status,
-        })),
+        data.documents.map(
+          (doc: { filename: string; chunk_count: number; status: string }) => ({
+            filename: doc.filename,
+            chunkCount: doc.chunk_count,
+            status: doc.status,
+          }),
+        ),
       );
       toast.success("Example document loaded! Try asking a question.");
     } catch (error) {
@@ -585,7 +589,7 @@ export default function RAGPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-72">
-                <div className="p-2 overflow-x-hidden">
+                <div className="overflow-x-hidden p-2">
                   <DocumentList
                     documents={indexedDocuments}
                     onRemove={handleRemoveDocument}
@@ -705,9 +709,7 @@ export default function RAGPage() {
                     <div className="bg-primary/10 mb-6 rounded-full p-6">
                       <Upload className="text-primary h-12 w-12" />
                     </div>
-                    <h2 className="mb-2 text-xl font-semibold">
-                      Get started
-                    </h2>
+                    <h2 className="mb-2 text-xl font-semibold">Get started</h2>
                     <p className="text-muted-foreground mb-6 max-w-md text-center">
                       Try our example document to see RAG in action, or upload
                       your own PDF (max 3 pages for this demo) to ask questions

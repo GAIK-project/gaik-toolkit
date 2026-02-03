@@ -21,7 +21,7 @@ export function FeedbackButton({ demoType }: FeedbackButtonProps) {
     const success = await saveFeedback(data);
     if (success) {
       toast.success(
-        feedback?.id ? "Feedback updated!" : "Thanks for your feedback!"
+        feedback?.id ? "Feedback updated!" : "Thanks for your feedback!",
       );
     } else {
       toast.error("Failed to save feedback. Please try again.");
@@ -44,8 +44,8 @@ export function FeedbackButton({ demoType }: FeedbackButtonProps) {
         onClick={() => setDialogOpen(true)}
         className={
           hasExistingFeedback
-            ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-            : "text-muted-foreground hover:text-amber-600 hover:bg-amber-50"
+            ? "text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+            : "text-muted-foreground hover:bg-amber-50 hover:text-amber-600"
         }
       >
         {hasExistingFeedback ? (

@@ -34,7 +34,7 @@ export function Hero() {
             href="/incident-report"
             className={cn(
               buttonVariants({ size: "lg" }),
-              "h-12 gap-2 px-6 text-base shadow-md"
+              "h-12 gap-2 px-6 text-base shadow-md",
             )}
           >
             Interactive Demo

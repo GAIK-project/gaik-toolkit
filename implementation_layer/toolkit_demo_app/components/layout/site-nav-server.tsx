@@ -21,5 +21,11 @@ export async function SiteNavServer() {
     // ignore auth errors
   }
 
-  return <SiteNav pathname={pathname} githubPreview={githubPreview} isLoggedIn={isLoggedIn} />;
+  return (
+    <SiteNav
+      pathname={pathname}
+      githubPreview={githubPreview}
+      isLoggedIn={isLoggedIn}
+    />
+  );
 }

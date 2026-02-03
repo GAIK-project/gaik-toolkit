@@ -37,6 +37,7 @@ except ImportError:
     )
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
 from gaik import __version__ as gaik_version  # noqa: E402
 
 
