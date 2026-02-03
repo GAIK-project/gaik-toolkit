@@ -63,7 +63,7 @@ The GAIK Toolkit is organized into a layer-based architecture that spans from st
 
 This architecture ensures that GenAI solutions are built with proper governance, clear requirements, and comprehensive implementation support.
 
-![GAIK Architecture](images/image1.jpg)
+![GAIK Architecture](images/Toolkit_layers.jpg)
 
 
 
