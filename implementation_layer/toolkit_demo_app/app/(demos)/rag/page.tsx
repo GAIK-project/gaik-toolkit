@@ -776,7 +776,12 @@ export default function RAGPage() {
               className="flex gap-3"
             >
               <div className="bg-muted rounded-2xl px-4 py-3">
-                <Shimmer className="text-primary text-sm">
+                <Shimmer
+                  color="var(--color-primary)"
+                  shimmerColor="var(--color-primary-foreground)"
+                  spread={4}
+                  className="text-sm"
+                >
                   Searching documents...
                 </Shimmer>
               </div>
