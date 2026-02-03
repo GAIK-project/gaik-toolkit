@@ -607,10 +607,10 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
         />
       </motion.div>
 
-      {/* Building Blocks */}
+      {/* Software Components */}
       <motion.div variants={itemVariants} className="space-y-4">
         <h2 className="font-serif text-2xl font-semibold md:text-3xl">
-          Building Blocks
+          Software Components
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {buildingBlocks.map((demo) => (
