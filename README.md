@@ -54,12 +54,12 @@ The GAIK Toolkit is organized into a layer-based architecture that spans from st
 
 | Layer | Purpose | Contents |
 |-------|---------|----------|
-| **Strategy Layer** | Identification and selection of use cases, GenAI adoption readiness assessment and preparation, business value evaluation | Use case selection framework,  |
-| **Requirements Layer** | Requirements capture and specification | Requirement templates, user stories, acceptance criteria |
-| **Business Layer** | Use case definition, workflow and work system analysis and redesign | GenAI product canvas, workflow templates, work systems definitions |
-| **Implementation Layer** | Executable code, examples, and tests | Source code (`gaik` package), examples, unit tests, deployment packages, connectors |
+| **Strategy Layer** | Identification and selection of use cases, GenAI adoption readiness assessment and preparation, business value evaluation | Use case selection framework, Value evaluation framework, AI maturity assessment tool, GenAI success canvas  |
+| **Requirements Layer** | Requirements capture and specification | Requirement templates, test cases |
+| **Business Layer** | Use case definition, workflow and work system analysis and redesign | GenAI product canvas, Workflow templates, Work systems definitions |
+| **Implementation Layer** | Solution development either via no-code or code-based approach, solution performance evaluation, integration, and monitoring | Reusable software components and modules for system development, (`gaik` code package), no-code assets, evaluation methods, unit tests, deployment packages, connectors |
 | **Security Compliance Layer** | Security policies and compliance frameworks | Security guidelines, compliance checks, audit trails |
-| **Guidance Layer** | Documentation, best practices, and development guides | CONTRIBUTING.md, documentation (software components & modules), project website |
+| **Guidance Layer** | Guides and automates the process of solution development and implementation for KM (how to select and assemble building blocks) | Process and guide for GenAI solution implementation, Configuration wizard, Glossary |
 
 This architecture ensures that GenAI solutions are built with proper governance, clear requirements, and comprehensive implementation support.
 
