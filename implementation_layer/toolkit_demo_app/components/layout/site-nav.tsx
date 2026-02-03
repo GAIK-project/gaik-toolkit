@@ -82,27 +82,45 @@ const navGroups: NavGroup[] = [
       { label: "Construction Diary", href: "/diary", icon: HardHat },
       // Coming Soon
       {
-        label: "Customer Assistant",
+        label: "Dental Transcription",
         href: "#",
-        icon: Headset,
+        icon: Mic,
         comingSoon: true,
       },
       {
-        label: "Learning Assistant",
+        label: "Purchase Order Processing",
         href: "#",
-        icon: GraduationCap,
+        icon: FileBarChart,
         comingSoon: true,
       },
       {
-        label: "Semantic Video Search",
+        label: "Semantic Dental Video Search",
         href: "#",
         icon: Video,
         comingSoon: true,
       },
       {
-        label: "Sales Proposal",
+        label: "Customer Onboarding",
+        href: "#",
+        icon: Headset,
+        comingSoon: true,
+      },
+      {
+        label: "Report Writing",
+        href: "#",
+        icon: FileText,
+        comingSoon: true,
+      },
+      {
+        label: "Sales Proposal Generation",
         href: "#",
         icon: FileBarChart,
+        comingSoon: true,
+      },
+      {
+        label: "Learning Plans",
+        href: "#",
+        icon: GraduationCap,
         comingSoon: true,
       },
     ],
@@ -115,20 +133,20 @@ const navGroups: NavGroup[] = [
       { label: "Parser", href: "/parser", icon: FileText },
       { label: "Classifier", href: "/classifier", icon: Tags },
       { label: "Transcriber", href: "/transcriber", icon: Mic },
+      { label: "Embedder", href: "#", icon: Cpu, comingSoon: true },
+      { label: "Vector Database", href: "#", icon: Database, comingSoon: true },
     ],
   },
   {
     label: "Software Modules",
     icon: Puzzle,
     items: [
-      // Coming Soon (left column)
       {
         label: "Audio → Structured",
         href: "#",
         icon: AudioWaveform,
         comingSoon: true,
       },
-      // Active (right column, top - easy to reach)
       { label: "RAG Builder", href: "/rag", icon: Bot },
       {
         label: "Document → Structured",
@@ -136,8 +154,6 @@ const navGroups: NavGroup[] = [
         icon: FileOutput,
         comingSoon: true,
       },
-      { label: "Embedder", href: "#", icon: Cpu, comingSoon: true },
-      { label: "Vector Database", href: "#", icon: Database, comingSoon: true },
     ],
   },
   {

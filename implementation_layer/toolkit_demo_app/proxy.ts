@@ -59,6 +59,19 @@ export default async function proxy(request: NextRequest) {
         duplex: "half",
       });
 
+      // For SSE streaming responses, pass through directly
+      if (response.headers.get("content-type")?.includes("text/event-stream")) {
+        return new Response(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+          },
+        });
+      }
+
       return new NextResponse(response.body, {
         status: response.status,
         statusText: response.statusText,

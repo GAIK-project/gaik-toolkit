@@ -225,7 +225,7 @@ export default function ExtractorPage() {
       <header className="mb-8">
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Database className="h-8 w-8" />
-          Data Extractor
+          Extractor
         </h1>
         <p className="text-muted-foreground mt-2">
           Automatically find and list important details from any document

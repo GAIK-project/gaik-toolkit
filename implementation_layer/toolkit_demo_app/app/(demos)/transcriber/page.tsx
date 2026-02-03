@@ -129,7 +129,7 @@ export default function TranscriberPage() {
       <header className="mb-8">
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Mic className="h-8 w-8" />
-          Speech to Text
+          Transcriber
         </h1>
         <p className="text-muted-foreground mt-2">
           Convert voice recordings and videos into clear, written text

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  compress: false, // Required for SSE streaming - prevents gzip buffering
   reactCompiler: true,
   output: "standalone",
   images: {

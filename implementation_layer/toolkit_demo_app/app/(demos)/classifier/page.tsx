@@ -159,7 +159,7 @@ export default function ClassifierPage() {
       <header className="mb-8">
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Tags className="h-8 w-8" />
-          Document Sorter
+          Classifier
         </h1>
         <p className="text-muted-foreground mt-2">
           Automatically sort documents into categories using AI

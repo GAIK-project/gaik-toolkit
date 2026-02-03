@@ -74,6 +74,7 @@ interface Demo {
   image?: string;
   imagePosition?: string;
   featureList?: FeatureItem[];
+  comingSoon?: boolean;
 }
 
 // Use Cases (featured demos)
@@ -138,45 +139,60 @@ const moduleDemos: Demo[] = [
 // Building Blocks (software components)
 const buildingBlocks: Demo[] = [
   {
-    title: "Data Extraction",
+    title: "Extractor",
     description:
       "Automatically find and list important details from any document",
     href: "/extractor",
     icon: FileSearch,
   },
   {
-    title: "Document Reader",
+    title: "Parser",
     description: "Read text and layout from PDF and Word files accurately",
     href: "/parser",
     icon: FileText,
   },
   {
-    title: "Document Sorter",
+    title: "Classifier",
     description: "Automatically sort your files into the right folders",
     href: "/classifier",
     icon: FolderKanban,
   },
   {
-    title: "Speech to Text",
+    title: "Transcriber",
     description: "Convert voice recordings and videos into clear, written text",
     href: "/transcriber",
     icon: Mic,
+  },
+  {
+    title: "Embedder",
+    description: "Convert text into vector embeddings for semantic search",
+    href: "#",
+    icon: Cpu,
+    comingSoon: true,
+  },
+  {
+    title: "Vector Database",
+    description: "Store and query vector embeddings efficiently",
+    href: "#",
+    icon: Database,
+    comingSoon: true,
   },
 ];
 
 // Coming Soon items
 const comingSoonUseCases = [
-  { title: "Customer Assistant", icon: Headset },
-  { title: "Learning Assistant", icon: GraduationCap },
-  { title: "Semantic Video Search", icon: Video },
-  { title: "Sales Proposal", icon: FileBarChart },
+  { title: "Dental Transcription", icon: Mic },
+  { title: "Purchase Order Processing", icon: FileBarChart },
+  { title: "Semantic Dental Video Search", icon: Video },
+  { title: "Customer Onboarding", icon: Headset },
+  { title: "Report Writing", icon: FileText },
+  { title: "Sales Proposal Generation", icon: FileBarChart },
+  { title: "Learning Plans", icon: GraduationCap },
 ];
 
 const comingSoonModules = [
   { title: "Audio → Structured Data", icon: AudioWaveform },
   { title: "Document → Structured Data", icon: FileOutput },
-  { title: "Embedder", icon: Cpu },
-  { title: "Vector Database", icon: Database },
 ];
 
 // No-code Assets data with full details
@@ -368,6 +384,26 @@ function BuildingBlockCard({
   demo: Demo;
   isUnlocked: boolean;
 }) {
+  // Coming soon items are not clickable
+  if (demo.comingSoon) {
+    return (
+      <Card className="bg-card group relative h-full overflow-hidden rounded-xl border opacity-60">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="bg-primary/5 mb-3 flex h-10 w-10 items-center justify-center rounded-lg">
+              <demo.icon className="text-primary h-5 w-5" />
+            </div>
+            <span className="bg-muted rounded px-1.5 py-0.5 text-[10px]">
+              Soon
+            </span>
+          </div>
+          <CardTitle className="text-lg">{demo.title}</CardTitle>
+          <CardDescription>{demo.description}</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
     <Link href={isUnlocked ? demo.href : "/sign-in"} className="block h-full">
       <Card className="bg-card hover:border-primary/40 group relative h-full overflow-hidden rounded-xl border transition-colors duration-200 hover:shadow-md">
@@ -612,9 +648,9 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
         <h2 className="font-serif text-2xl font-semibold md:text-3xl">
           Software Components
         </h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {buildingBlocks.map((demo) => (
-            <motion.div key={demo.href} variants={itemVariants}>
+            <motion.div key={demo.title} variants={itemVariants}>
               <BuildingBlockCard demo={demo} isUnlocked={isUnlocked} />
             </motion.div>
           ))}
