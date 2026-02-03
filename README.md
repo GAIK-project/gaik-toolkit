@@ -3,13 +3,23 @@
 [![PyPI version](https://img.shields.io/pypi/v/gaik.svg)](https://pypi.org/project/gaik/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
-This is a generative AI toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides a complete layer-based architecture for building knowledge-centric GenAI solutions, from strategic guidance to deployable implementations.
+This is a generative AI toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides a complete set of components and guidance for building knowledge-centric GenAI solutions, from strategic directions to deployable implementations.
 
 # Project Documentation
 
 Project documentation is available at:
 
 https://gaik-project.github.io/gaik-toolkit/
+
+# Why the toolkit is needed
+
+**Generative AI has significant potential to increase the productivity of knowledge work** 
+- Example experiments: consultants using AI were significantly more productive – they completed 12.2% more tasks on average, and completed tasks 25.1% more quickly (Dell'Acqua, 2023) 
+- Example cases from practice: Customer-support agents at a large firm selling business-process software demonstrated a 15% increase in productivity when assisted by generative AI (Brynjolfsson, 2025).
+
+**However, tangible business value from Generative AI implementation projects is still limited**
+- “only 26% of companies have advanced beyond the proof-of-concept stage to generate value” Source: BCG’s report (de Bellefonds et al, 2024). 
+- “Despite $30–40 billion in enterprise investment into GenAI, 95% of organizations are getting zero return.” Source: MIT report (Challapally et al, 2025).
 
 
 # Toolkit Focus
