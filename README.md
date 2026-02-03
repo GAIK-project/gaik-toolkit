@@ -37,9 +37,9 @@ The GAIK Toolkit is organized into a layer-based architecture that spans from st
 | Layer | Purpose | Contents |
 |-------|---------|----------|
 | **Guidance Layer** | Documentation, best practices, and development guides | CONTRIBUTING.md, documentation (software components & modules), project website |
-| **Strategy Layer** | Strategic planning and decision-making frameworks | Strategic planning documents, decision frameworks |
+| **Strategy Layer** | Identification and selection of use cases, GenAI adoption readiness assessment and preparation, business value evaluation | Strategic planning documents, decision frameworks |
 | **Requirements Layer** | Requirements capture and specification | Requirement templates, user stories, acceptance criteria |
-| **Business Layer** | Business process modeling and workflows | GenAI product canvas, workflow templates, work systems definitions |
+| **Business Layer** | Use case definition, workflow and work system analysis and redesign | GenAI product canvas, workflow templates, work systems definitions |
 | **Implementation Layer** | Executable code, examples, and tests | Source code (`gaik` package), examples, unit tests, deployment packages, connectors |
 | **Security Compliance Layer** | Security policies and compliance frameworks | Security guidelines, compliance checks, audit trails |
 
