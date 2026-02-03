@@ -46,10 +46,6 @@ The following **generic use cases** are defined as the top priority at the momen
 | **Knowledge synthesis** | A. Sales proposal generation<br>B. Report preparation<br>C. … |
 
 
-This repository provides a **complete layer-based architecture** ranging from strategic guidance and business requirements to implementation and security compliance.
-
-> If the **Solution Wizard** decides *what* workflow you need, this toolkit provides the complete architecture to guide, design, implement, and deploy it.
-
 ---
 
 ## Layer-Based Architecture
@@ -58,12 +54,12 @@ The GAIK Toolkit is organized into a layer-based architecture that spans from st
 
 | Layer | Purpose | Contents |
 |-------|---------|----------|
-| **Guidance Layer** | Documentation, best practices, and development guides | CONTRIBUTING.md, documentation (software components & modules), project website |
-| **Strategy Layer** | Identification and selection of use cases, GenAI adoption readiness assessment and preparation, business value evaluation | Strategic planning documents, decision frameworks |
+| **Strategy Layer** | Identification and selection of use cases, GenAI adoption readiness assessment and preparation, business value evaluation | Use case selection framework,  |
 | **Requirements Layer** | Requirements capture and specification | Requirement templates, user stories, acceptance criteria |
 | **Business Layer** | Use case definition, workflow and work system analysis and redesign | GenAI product canvas, workflow templates, work systems definitions |
 | **Implementation Layer** | Executable code, examples, and tests | Source code (`gaik` package), examples, unit tests, deployment packages, connectors |
 | **Security Compliance Layer** | Security policies and compliance frameworks | Security guidelines, compliance checks, audit trails |
+| **Guidance Layer** | Documentation, best practices, and development guides | CONTRIBUTING.md, documentation (software components & modules), project website |
 
 This architecture ensures that GenAI solutions are built with proper governance, clear requirements, and comprehensive implementation support.
 
