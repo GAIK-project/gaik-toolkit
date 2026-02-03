@@ -2,6 +2,19 @@
 [![PyPI version](https://img.shields.io/pypi/v/gaik.svg)](https://pypi.org/project/gaik/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
+## Two approaches for Generative AI solution implementation
+
+Two approaches for Generative AI solution implementation are supported by the toolkit:
+1. Code-based
+2. No-code
+
+## Code-based implementation 
+
+The key parts of the code-based implementation layer includes:
+
+- **Software components** – reusable utilities such as `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`, and RAG components like `rag_parser_docling`, `rag_parser_vision`, `embedder`, `vector_store`, `retriever`, `answer_generator`
+- **Software modules** – end‑to‑end pipelines combining the software components such as "audio → structured data", "documents → structured data", and "RAG workflow"
+
 ## Architecture overview
 
 GAIK distinguishes three levels:
