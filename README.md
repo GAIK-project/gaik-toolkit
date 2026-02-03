@@ -21,8 +21,24 @@ https://gaik-project.github.io/gaik-toolkit/
 - “only 26% of companies have advanced beyond the proof-of-concept stage to generate value” Source: BCG’s report (de Bellefonds et al, 2024). 
 - “Despite $30–40 billion in enterprise investment into GenAI, 95% of organizations are getting zero return.” Source: MIT report (Challapally et al, 2025).
 
+Adopting Generative AI and creating value from **it is especially challenging for small and medium-sized enterprises (SMEs)**, which lack the technical expertise and capabilities to implement GenAI solutions effectively. The literature review of Oldemeyer et al. (2024) identified the following three most frequent challenges for SMEs in the AI implementation in the industrial sector: knowledge, costs, and the low maturity level in digitalization.
+
+# Overall approach
+Companies can deal with GenAI challenges by combining reusable building blocks with clear guidelines.
+Instead of designing solutions from scratch, teams assemble existing components and follow proven ways of working. 
+This makes it easier to turn ideas into real results, while reducing implementation time, risk, and required resources, and improving overall solution quality.
 
 # Toolkit Focus
+The knowledge management perspective for structuring GenAI development and implementation activities.
+
+| Capability | Description | Illustration |
+|-----------|-------------|--------------|
+| **Knowledge capture** | Extract needed information from business documents, videos, voice recordings, emails, and meeting recordings | ![Knowledge capture](images/Knowledge capture image.png) |
+| **Knowledge access** | Intelligent access to organizational knowledge (document repositories, databases, wikis, CRMs) |  |
+| **Knowledge synthesis** | Automatic generation of business reports, sales proposals, marketing materials, project proposals |  |
+
+If you want, I can also:
+
 The toolkit focuses on three core knowledge processes in organizational workflows:
 
 - **Knowledge extraction** – extracting structured information from unstructured content (documents, PDFs, web pages, audio transcripts).
