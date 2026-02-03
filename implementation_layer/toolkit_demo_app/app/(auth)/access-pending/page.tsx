@@ -36,13 +36,13 @@ export default async function AccessPendingPage() {
         </div>
 
         <p className="text-muted-foreground text-sm">
-          We review requests manually to ensure quality access. You will receive
-          an email once your request has been processed.
+          Your request will be reviewed shortly. You can wait here — we'll
+          redirect you automatically when approved.
         </p>
 
         <form action={signOut}>
           <Button variant="outline" className="w-full" type="submit">
-            Sign out
+            Sign out and return later
           </Button>
         </form>
       </div>
