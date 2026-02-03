@@ -34,8 +34,8 @@ The knowledge management perspective for structuring GenAI development and imple
 | Capability | Description | Illustration |
 |-----------|-------------|--------------|
 | **Knowledge capture** | Extract needed information from business documents, videos, voice recordings, emails, and meeting recordings | ![Knowledge capture](images/Knowledge_capture_image.jpg) |
-| **Knowledge access** | Intelligent access to organizational knowledge (document repositories, databases, wikis, CRMs) |  |
-| **Knowledge synthesis** | Automatic generation of business reports, sales proposals, marketing materials, project proposals |  |
+| **Knowledge access** | Intelligent access to organizational knowledge (document repositories, databases, wikis, CRMs) | ![Knowledge access](images/Knowledge_access_image.jpg) |
+| **Knowledge synthesis** | Automatic generation of business reports, sales proposals, marketing materials, project proposals | ![Knowledge synthesis](images/Knowledge_synthesis_image.jpg) |
 
 If you want, I can also:
 
