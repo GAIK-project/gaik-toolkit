@@ -4,15 +4,12 @@ import tempfile
 import uuid
 from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Literal
-
 try:
     from utils import get_api_config, sse_event
 except ImportError:
     from api.utils import get_api_config, sse_event
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -230,105 +227,6 @@ async def diary_audio_pipeline_stream(
             "X-Accel-Buffering": "no",
         },
     )
-
-
-@router.post("/text", response_model=TextPipelineResponse)
-async def diary_text_pipeline(
-    text: str = Form(...),
-    generate_pdf: bool = Form(True),
-):
-    """
-    Extract structured data from text description of a construction diary entry.
-
-    - **text**: Text input containing diary information
-    - **generate_pdf**: Whether to generate a PDF report
-    """
-    job_id = str(uuid.uuid4())
-
-    # Initialize steps
-    steps = [
-        PipelineStep(step=1, name="Input", status="completed"),
-        PipelineStep(step=2, name="Extracting", status="pending"),
-    ]
-    if generate_pdf:
-        steps.append(PipelineStep(step=3, name="Generating PDF", status="pending"))
-
-    if not text or not text.strip():
-        raise HTTPException(status_code=400, detail="No text provided")
-
-    try:
-        config = get_api_config()
-
-        # Step 2: Extract structured data
-        steps[1].status = "in_progress"
-
-        from gaik.software_components.extractor.extractor import DataExtractor
-        from gaik.software_components.extractor.schema import SchemaGenerator
-
-        # Generate schema from diary requirements
-        generator = SchemaGenerator(config=config)
-        extraction_model = generator.generate_schema(DIARY_REQUIREMENTS)
-
-        # Extract data using the generated schema
-        extractor = DataExtractor(config=config)
-        extracted_data = extractor.extract(
-            extraction_model=extraction_model,
-            requirements=generator.item_requirements,
-            user_requirements=DIARY_REQUIREMENTS,
-            documents=[text],
-        )
-
-        steps[1].status = "completed"
-        steps[1].message = f"Extracted {len(extracted_data)} items"
-
-        response = TextPipelineResponse(
-            job_id=job_id,
-            steps=steps,
-            input_text=text,
-            extracted_data=extracted_data,
-        )
-
-        # Step 3: Generate PDF if requested
-        if generate_pdf:
-            try:
-                pdf_step_idx = 2
-                steps[pdf_step_idx].status = "in_progress"
-
-                from utils.pdf_generator import StructuredDataToPDF
-
-                logo = LOGO_PATH if LOGO_PATH.exists() else None
-                pdf_generator = StructuredDataToPDF(title="Construction Site Diary", logo_path=logo)
-                pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
-
-                pdf_data = extracted_data if extracted_data else [{"input_text": text}]
-                pdf_generator.run(pdf_data, pdf_path)
-
-                PDF_STORAGE[job_id] = pdf_path
-                response.pdf_available = True
-                steps[pdf_step_idx].status = "completed"
-                steps[pdf_step_idx].message = "PDF generated"
-            except Exception as e:
-                steps[pdf_step_idx].status = "error"
-                steps[pdf_step_idx].message = f"PDF generation failed: {e}"
-
-        return response
-
-    except ImportError as e:
-        raise HTTPException(
-            status_code=500, detail=f"Required components not installed: {e}"
-        ) from e
-    except Exception as e:
-        for step in steps:
-            if step.status == "in_progress":
-                step.status = "error"
-                step.message = str(e)
-                break
-
-        return TextPipelineResponse(
-            job_id=job_id,
-            steps=steps,
-            error=str(e),
-        )
 
 
 @router.post("/text/stream")
