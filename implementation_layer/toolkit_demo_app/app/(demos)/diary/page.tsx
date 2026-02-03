@@ -159,18 +159,7 @@ export default function DiaryPage() {
     setPipelineSteps([]);
     setProcessingMetadata(null);
 
-    // Initialize steps for immediate feedback
-    setPipelineSteps([
-      {
-        step: 1,
-        name: inputMode === "audio" ? "Transcribing Audio" : "Analyzing Text",
-        status: "in_progress",
-        message: "Starting pipeline...",
-      },
-      { step: 2, name: "Generating Extraction Schema", status: "pending" },
-      { step: 3, name: "Extracting Structured Data", status: "pending" },
-      { step: 4, name: "Generating PDF", status: "pending" },
-    ]);
+    // Steps are sent by backend via SSE
 
     try {
       const formData = new FormData();

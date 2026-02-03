@@ -520,10 +520,13 @@ export default function IncidentReportPage() {
                     </div>
                     <div>
                       <h3 className="text-lg font-semibold">
-                        AI is working...
+                        {pipelineSteps.find((s) => s.status === "in_progress")
+                          ?.name || "AI is working..."}
                       </h3>
                       <p className="text-muted-foreground text-sm">
-                        Please wait while we process your incident report.
+                        {pipelineSteps.find((s) => s.status === "in_progress")
+                          ?.message ||
+                          "Please wait while we process your incident report."}
                       </p>
                     </div>
                   </div>
