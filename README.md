@@ -31,17 +31,28 @@ This makes it easier to turn ideas into real results, while reducing implementat
 # Toolkit Focus
 The knowledge management perspective for structuring GenAI development and implementation activities.
 
-The toolkit focuses on three core knowledge processes in organizational workflows:
+The toolkit focuses on three core knowledge processes in organizations:
 | Knowledge process | Description | Illustration |
 |-----------|-------------|--------------|
 | **Knowledge capture** | Extract needed information from business documents, videos, voice recordings, emails, and meeting recordings | ![Knowledge capture](images/Knowledge_capture_image.jpg) |
 | **Knowledge access** | Intelligent access to organizational knowledge (document repositories, databases, wikis, CRMs) | ![Knowledge access](images/Knowledge_access_image.jpg) |
 | **Knowledge synthesis** | Automatic generation of business reports, sales proposals, marketing materials, project proposals | ![Knowledge synthesis](images/Knowledge_synthesis_image.jpg) |
 
-Internally, these capabilities are exposed as:
+The following generic use cases are defined as the top priority at the moment:
 
-- **Software components** – reusable utilities such as `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`, and RAG components like `rag_parser_docling`, `rag_parser_vision`, `embedder`, `vector_store`, `retriever`, `answer_generator`
-- **Software modules** – end‑to‑end pipelines combining the software components such as "audio → structured data", "documents → structured data", and "RAG workflow"
+| Knowledge process | Generic use cases |
+|------------------|------------------|
+| **Knowledge capture** | A. Incident reporting in industry (e.g., for equipment, buildings)  
+B. Creating construction site diaries  
+C. Creation of transcripts and closed captions in various languages for instructional videos and podcasts  
+D. … |
+| **Knowledge access** | A. Customer assistant for complex products and services  
+B. Semantic audio and video search for medical instructions  
+C. Learning assistant |
+| **Knowledge synthesis** | A. Sales proposal generation  
+B. Report preparation  
+C. … |
+
 
 This repository provides a **complete layer-based architecture** ranging from strategic guidance and business requirements to implementation and security compliance.
 
