@@ -366,10 +366,13 @@ export default function DocumentStructuredPage() {
                   copyContent={result.parsed_content}
                   delay={0}
                 >
-                  <ResultText>
-                    {result.parsed_content.slice(0, 500)}
-                    {result.parsed_content.length > 500 && "..."}
-                  </ResultText>
+                  <ResultText
+                    content={
+                      result.parsed_content.length > 500
+                        ? result.parsed_content.slice(0, 500) + "..."
+                        : result.parsed_content
+                    }
+                  />
                 </ResultCard>
               )}
 
@@ -393,10 +396,10 @@ export default function DocumentStructuredPage() {
                         <div className="divide-y rounded-md border">
                           {Object.entries(item).map(([key, value]) => (
                             <div key={key} className="flex items-start gap-4 p-3">
-                              <span className="min-w-32 text-sm font-medium">
+                              <span className="min-w-32 shrink-0 text-sm font-medium text-amber-700 dark:text-amber-500">
                                 {formatFieldName(key)}
                               </span>
-                              <span className="text-muted-foreground text-sm">
+                              <span className="text-muted-foreground min-w-0 wrap-break-word text-sm">
                                 {value !== null && value !== undefined
                                   ? String(value)
                                   : "-"}

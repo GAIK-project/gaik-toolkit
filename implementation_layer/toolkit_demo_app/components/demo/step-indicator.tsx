@@ -5,7 +5,8 @@ import { Check, Circle, CircleDot, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface Step {
-  id: string;
+  id?: string;
+  step?: number;
   name: string;
   status: "pending" | "in_progress" | "completed" | "error";
   message?: string | null;
@@ -34,7 +35,7 @@ export function StepIndicator({
     >
       {steps.map((step, index) => (
         <div
-          key={step.id}
+          key={step.id ?? step.step ?? index}
           className={cn(
             "flex items-center",
             isHorizontal ? "flex-1" : "flex-row gap-3",
@@ -60,6 +61,7 @@ export function StepIndicator({
             >
               {step.status === "completed" && (
                 <motion.div
+                  key="completed"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
@@ -68,11 +70,11 @@ export function StepIndicator({
                 </motion.div>
               )}
               {step.status === "in_progress" && (
-                <CircleDot className="h-4 w-4" />
+                <CircleDot key="in_progress" className="h-4 w-4" />
               )}
-              {step.status === "error" && <X className="h-4 w-4" />}
+              {step.status === "error" && <X key="error" className="h-4 w-4" />}
               {step.status === "pending" && (
-                <Circle className="h-3 w-3 fill-current" />
+                <Circle key="pending" className="h-3 w-3 fill-current" />
               )}
             </motion.div>
 
@@ -165,7 +167,7 @@ export function StepIndicatorCompact({
       <div className="flex gap-1">
         {steps.map((step, index) => (
           <motion.div
-            key={step.id}
+            key={step.id ?? step.step ?? index}
             className={cn(
               "h-1.5 flex-1 rounded-full",
               step.status === "completed" && "bg-green-500",

@@ -330,8 +330,9 @@ export default function AudioStructuredPage() {
 
           {result && !isLoading && (
             <>
-              {/* Transcript */}
-              {(result.raw_transcript || result.enhanced_transcript) && (
+              {/* Transcript - only show if there's actual content */}
+              {(result.enhanced_transcript && result.enhanced_transcript.trim() !== "") ||
+               (result.raw_transcript && result.raw_transcript.trim() !== "") ? (
                 <ResultCard
                   title="Transcript"
                   description="Audio transcription"
@@ -342,7 +343,7 @@ export default function AudioStructuredPage() {
                     {result.enhanced_transcript || result.raw_transcript}
                   </ResultText>
                 </ResultCard>
-              )}
+              ) : null}
 
               {/* Extracted Data */}
               {result.extracted_data && result.extracted_data.length > 0 && (
