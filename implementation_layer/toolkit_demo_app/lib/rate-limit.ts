@@ -19,8 +19,8 @@ function createRateLimiter(): Ratelimit | null {
 
   return new Ratelimit({
     redis: new Redis({ url, token }),
-    // 100 req/min allows ~5 req/min per user with 20 users behind same IP (NAT)
-    limiter: Ratelimit.slidingWindow(100, "1 m"),
+    // 10 req/min per IP
+    limiter: Ratelimit.slidingWindow(10, "1 m"),
     analytics: true,
     prefix: "gaik-demo",
   });

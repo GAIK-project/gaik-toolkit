@@ -155,7 +155,7 @@ const moduleDemos: Demo[] = [
     href: "/rag",
     icon: Bot,
     featured: true,
-    size: "large",
+    size: "wide",
     image: "/rag-builder-v1.png",
     imagePosition: "center 50%",
     featureList: [

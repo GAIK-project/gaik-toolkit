@@ -214,13 +214,13 @@ export default function AudioStructuredPage() {
 
           {/* Advanced Settings */}
           <Card>
-            <CardHeader className="cursor-pointer" onClick={() => setShowAdvanced(!showAdvanced)}>
+            <CardHeader className="cursor-pointer py-3 px-4" onClick={() => setShowAdvanced(!showAdvanced)}>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Advanced Settings</CardTitle>
+                <CardTitle className="text-sm font-medium">Advanced Settings</CardTitle>
                 {showAdvanced ? (
-                  <ChevronUp className="h-4 w-4" />
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
                 ) : (
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 )}
               </div>
             </CardHeader>
@@ -233,10 +233,10 @@ export default function AudioStructuredPage() {
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-3 px-4 pt-0 pb-4">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label htmlFor="enhanced">Enhanced Transcript</Label>
+                        <Label htmlFor="enhanced" className="text-sm">Enhanced Transcript</Label>
                         <p className="text-muted-foreground text-xs">
                           Improve transcript with punctuation and formatting
                         </p>
@@ -251,7 +251,7 @@ export default function AudioStructuredPage() {
 
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label htmlFor="generate-pdf">Generate PDF Report</Label>
+                        <Label htmlFor="generate-pdf" className="text-sm">Generate PDF Report</Label>
                         <p className="text-muted-foreground text-xs">
                           Create a downloadable PDF with extracted data
                         </p>
