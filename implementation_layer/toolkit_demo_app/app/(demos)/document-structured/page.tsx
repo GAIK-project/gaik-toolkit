@@ -35,6 +35,7 @@ import {
   Download,
   FileOutput,
   Loader2,
+  Settings2,
   Sparkles,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
