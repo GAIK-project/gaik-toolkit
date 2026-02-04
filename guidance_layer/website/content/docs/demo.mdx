@@ -7,35 +7,61 @@ description: Interactive demo application and REST API for GAIK toolkit
 
 Try GAIK toolkit components with our interactive demo application.
 
+<Callout type="info">
+**Try the Live Demo:** [gaik-demo.2.rahtiapp.fi](https://gaik-demo.2.rahtiapp.fi/)
+</Callout>
+
 **Source:** [GitHub - toolkit_demo_app](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/toolkit_demo_app)
+
+---
+
+## Software Modules
+
+End-to-end pipelines that combine multiple software components.
+
+### Audio → Structured
+
+Transcribe audio/video and extract structured data in one pipeline. [Try it live →](https://gaik-demo.2.rahtiapp.fi/audio-structured)
+
+![Audio to Structured Demo](/demo-images/audio-structured.png)
+
+### Document → Structured
+
+Parse documents and extract structured data in one pipeline. [Try it live →](https://gaik-demo.2.rahtiapp.fi/document-structured)
+
+![Document to Structured Demo](/demo-images/document-structured.png)
+
+---
+
+## Software Components
 
 ### Extractor
 
-Extract structured data from documents using natural language descriptions.
+Extract structured data from documents using natural language descriptions. [Try it live →](https://gaik-demo.2.rahtiapp.fi/extractor)
 
 ![Extractor Demo](/demo-images/extractor.png)
 
 ### Parser
 
-Parse PDFs and Word documents to Markdown.
+Parse PDFs and Word documents to Markdown. [Try it live →](https://gaik-demo.2.rahtiapp.fi/parser)
 
 ![Parser Demo](/demo-images/parser.png)
 
 ### Classifier
 
-Classify documents into custom categories with AI.
+Classify documents into custom categories with AI. [Try it live →](https://gaik-demo.2.rahtiapp.fi/classifier)
 
 ![Classifier Demo](/demo-images/classifier.png)
 
 ### Transcriber
 
-Transcribe audio/video files with Whisper.
+Transcribe audio/video files with Whisper. [Try it live →](https://gaik-demo.2.rahtiapp.fi/transcriber)
 
 ![Transcriber Demo](/demo-images/transcriber.png)
 
 ### RAG Builder
 
-Build Q&A pipelines with document upload.
+Build Q&A pipelines with document upload. [Try it live →](https://gaik-demo.2.rahtiapp.fi/rag)
 
 ![RAG Demo](/demo-images/rag.png)
 
@@ -49,13 +75,13 @@ Real-world examples demonstrating GAIK toolkit in action.
 
 ### Incident Reporting
 
-Report incidents via voice or text. AI handles the rest.
+Report incidents via voice or text. AI handles the rest. [Try it live →](https://gaik-demo.2.rahtiapp.fi/incident-report)
 
 ![Incident Reporting Demo](/demo-images/incident.png)
 
 ### Construction Diary
 
-Record daily construction site activities via voice or text. AI extracts structured data.
+Record daily construction site activities via voice or text. AI extracts structured data. [Try it live →](https://gaik-demo.2.rahtiapp.fi/diary)
 
 ![Construction Diary Demo](/demo-images/diary.png)
 
@@ -117,3 +143,12 @@ curl -X POST http://localhost:8000/parse \
 docker build -t gaik-api -f implementation_layer/api/Dockerfile .
 docker run -p 8000:8000 -e API_KEY=secret -e OPENAI_API_KEY=sk-... gaik-api
 ```
+
+---
+
+## No-code Assets
+
+Ready-to-use prompts and agent skills for AI workflows.
+
+- **[Prompts](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts)** - Curated prompts for document processing and extraction
+- **[Agent Skills](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills)** - Reusable agent skills for AI workflows

@@ -9,6 +9,10 @@ import { Mermaid } from '@/components/mdx/mermaid';
 
 GAIK toolkit is an AI-powered toolkit for Python that provides structured data extraction, document parsing, audio transcription, and document classification. It uses OpenAI models (Azure OpenAI or standard OpenAI) for intelligent document processing.
 
+<Callout type="info">
+**Try the Live Demo:** [gaik-demo.2.rahtiapp.fi](https://gaik-demo.2.rahtiapp.fi/)
+</Callout>
+
 **PyPI:** [https://pypi.org/project/gaik/](https://pypi.org/project/gaik/)
 **GitHub:** [https://github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
 **Python Support:** 3.11+
@@ -67,9 +71,9 @@ Individual components for specific tasks:
 
 End-to-end pipelines that combine software components:
 
-- **DocumentsToStructuredData** - Complete document parsing + extraction pipeline
-- **AudioToStructuredData** - Audio transcription + extraction pipeline
-- **RAGWorkflow** - Document Q&A with retrieval-augmented generation
+- **[Audio → Structured](/toolkit/audio-structured)** - Audio transcription + extraction pipeline
+- **[Document → Structured](/toolkit/document-structured)** - Document parsing + extraction pipeline
+- **[RAG Components](/toolkit/rag)** - Document Q&A with retrieval-augmented generation
 
 ## Key Features
 
@@ -155,6 +159,8 @@ To start using the toolkit, check out the [Getting Started](/getting-started) gu
   <Card title="PDF Parsing" href="/toolkit/parser" description="Parse PDFs to Markdown" />
   <Card title="Audio Transcription" href="/toolkit/transcriber" description="Transcribe audio and video with Whisper" />
   <Card title="Document Classification" href="/toolkit/classifier" description="Classify documents with AI" />
+  <Card title="Audio → Structured" href="/toolkit/audio-structured" description="Transcribe and extract data in one pipeline" />
+  <Card title="Document → Structured" href="/toolkit/document-structured" description="Parse and extract data in one pipeline" />
   <Card title="RAG Components" href="/toolkit/rag" description="Build retrieval-augmented generation pipelines" />
 </Cards>
 

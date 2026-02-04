@@ -1,0 +1,218 @@
+---
+title: Document → Structured
+description: Parse documents and extract structured data in one pipeline
+---
+
+## Overview
+
+The DocumentsToStructuredData pipeline combines document parsing with structured data extraction. Parse PDFs, Word documents, and images, then extract specific information using natural language requirements - all in one step.
+
+<Callout type="info">
+**Try it live:** [gaik-demo.2.rahtiapp.fi/document-structured](https://gaik-demo.2.rahtiapp.fi/document-structured)
+</Callout>
+
+![Document to Structured Demo](/demo-images/document-structured.png)
+
+## Installation
+
+```bash
+pip install "gaik[all]"
+```
+
+## Quick Start
+
+```python
+from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData
+from pathlib import Path
+
+# Create pipeline
+pipeline = DocumentsToStructuredData(use_azure=True)
+
+# Process document and extract data
+result = pipeline.run(
+    file_path=Path("invoice.pdf"),
+    user_requirements="""
+    Extract invoice data:
+    - invoice_number: Invoice ID
+    - vendor_name: Company name
+    - date: Invoice date
+    - line_items: List of items with description, quantity, price
+    - total_amount: Total invoice amount
+    """
+)
+
+print(result.extracted_fields)
+```
+
+## How It Works
+
+The pipeline combines two software components:
+
+1. **[Parser](/toolkit/parser)** - Converts documents to Markdown
+2. **[Extractor](/toolkit/knowledge-extraction)** - Extracts structured data using GPT
+
+```
+PDF/DOCX/Image → Parser → Markdown → Schema Generation → Data Extraction → Structured JSON
+```
+
+## Parser Options
+
+| Parser | Best For | Requirements |
+|--------|----------|--------------|
+| `vision_parser` | Complex layouts, tables, images | Azure OpenAI with GPT-4 Vision |
+| `pymupdf` | Fast local processing | None |
+| `docling` | High accuracy, tables | Local (slower) |
+
+## API Reference
+
+### DocumentsToStructuredData
+
+```python
+from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData
+
+pipeline = DocumentsToStructuredData(
+    use_azure=True  # Use Azure OpenAI (or False for standard OpenAI)
+)
+```
+
+### run()
+
+```python
+result = pipeline.run(
+    file_path=Path("document.pdf"),  # Path to document
+    user_requirements="...",          # Natural language extraction requirements
+    parser_choice="vision_parser"     # Parser: vision_parser, pymupdf, docling
+)
+```
+
+### DocumentsToStructuredDataResult
+
+```python
+result.markdown_content    # Parsed document as Markdown
+result.extraction_model    # Generated Pydantic schema
+result.extracted_fields    # Extracted data as dict
+result.item_requirements   # Field-level requirements used
+
+# Save all outputs
+result.save("output/")
+```
+
+## Use Cases
+
+### Invoice Processing
+
+```python
+result = pipeline.run(
+    file_path=Path("invoice.pdf"),
+    user_requirements="""
+    Extract invoice information:
+    - invoice_number: Unique invoice ID
+    - vendor: Company name and address
+    - date: Invoice date
+    - due_date: Payment due date
+    - line_items: Products/services with quantity and price
+    - subtotal: Amount before tax
+    - tax: Tax amount
+    - total: Final total
+    """,
+    parser_choice="vision_parser"
+)
+```
+
+### Contract Analysis
+
+```python
+result = pipeline.run(
+    file_path=Path("contract.pdf"),
+    user_requirements="""
+    Extract contract details:
+    - parties: Names of contracting parties
+    - effective_date: When contract starts
+    - termination_date: When contract ends
+    - key_terms: Important conditions
+    - payment_terms: Payment schedule and amounts
+    - obligations: Main responsibilities of each party
+    """,
+    parser_choice="vision_parser"
+)
+```
+
+### Resume Parsing
+
+```python
+result = pipeline.run(
+    file_path=Path("resume.pdf"),
+    user_requirements="""
+    Extract candidate information:
+    - name: Full name
+    - email: Email address
+    - phone: Phone number
+    - education: Schools, degrees, years
+    - experience: Jobs with company, title, dates, description
+    - skills: Technical and soft skills
+    """,
+    parser_choice="pymupdf"
+)
+```
+
+### Form Processing
+
+```python
+result = pipeline.run(
+    file_path=Path("application_form.pdf"),
+    user_requirements="""
+    Extract form data:
+    - applicant_name: Full name
+    - date_of_birth: Birth date
+    - address: Full address
+    - application_type: Type of application
+    - answers: Responses to form questions
+    """,
+    parser_choice="vision_parser"
+)
+```
+
+## Supported Formats
+
+| Format | Extensions | Notes |
+|--------|------------|-------|
+| PDF | .pdf | All parsers supported |
+| Word | .docx | All parsers supported |
+| Images | .png, .jpg, .jpeg | Vision parser only |
+
+## Batch Processing
+
+Process multiple documents:
+
+```python
+from pathlib import Path
+
+pipeline = DocumentsToStructuredData(use_azure=True)
+
+documents = Path("invoices/").glob("*.pdf")
+results = []
+
+for doc in documents:
+    result = pipeline.run(
+        file_path=doc,
+        user_requirements="Extract invoice number, vendor, date, and total"
+    )
+    results.append({
+        "file": doc.name,
+        "data": result.extracted_fields
+    })
+```
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `AZURE_API_KEY` | Azure only | Azure OpenAI API key |
+| `AZURE_ENDPOINT` | Azure only | Azure OpenAI endpoint |
+| `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
+
+## Next Steps
+
+- Learn about the [Parser](/toolkit/parser) component
+- Explore [Data Extraction](/toolkit/knowledge-extraction)
+- Try [Audio → Structured](/toolkit/audio-structured) for audio files

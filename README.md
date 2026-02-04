@@ -11,6 +11,8 @@ Project documentation is available at:
 
 https://gaik-project.github.io/gaik-toolkit/
 
+**Live Demo:** https://gaik-demo.2.rahtiapp.fi/
+
 # Why the toolkit is needed
 
 **Generative AI has significant potential to increase the productivity of knowledge work** 

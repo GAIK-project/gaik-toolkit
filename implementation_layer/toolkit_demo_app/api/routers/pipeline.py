@@ -790,6 +790,205 @@ async def text_pipeline_stream(
     )
 
 
+@router.post("/document/stream")
+async def document_pipeline_stream(
+    file: UploadFile = File(...),
+    user_requirements: str = Form(...),
+    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus"] = Form("auto"),
+    generate_pdf: bool = Form(False),
+    pdf_title: str = Form("Extracted Data Report"),
+):
+    """
+    Run the document pipeline with SSE streaming progress updates.
+
+    Returns Server-Sent Events with progress updates and final result.
+    """
+    job_id = str(uuid.uuid4())
+
+    # Validate file first
+    if not file.filename:
+
+        async def error_gen() -> AsyncGenerator[str, None]:
+            yield sse_event("error", {"message": "No filename provided"})
+
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    suffix = Path(file.filename).suffix.lower()
+    supported_docs = [".pdf", ".docx"]
+    supported_images = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif", ".webp"]
+
+    if suffix not in supported_docs + supported_images:
+
+        async def error_gen() -> AsyncGenerator[str, None]:
+            yield sse_event("error", {"message": f"Unsupported file type: {suffix}"})
+
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    # Auto-detect parser type
+    actual_parser_type = parser_type
+    if parser_type == "auto":
+        if suffix == ".docx":
+            actual_parser_type = "docx"
+        elif suffix in supported_images:
+            actual_parser_type = "vision"
+        else:
+            actual_parser_type = "pymupdf"
+
+    # Validate file size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE_BYTES:
+
+        async def error_gen() -> AsyncGenerator[str, None]:
+            yield sse_event("error", {"message": f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB"})
+
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    # Save uploaded file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        steps = [
+            {"step": 1, "name": "Parsing Document", "status": "pending"},
+            {"step": 2, "name": "Schema Generation", "status": "pending"},
+            {"step": 3, "name": "Data Extraction", "status": "pending"},
+        ]
+        if generate_pdf:
+            steps.append({"step": 4, "name": "Report Formatting", "status": "pending"})
+
+        # Send initial steps
+        yield sse_event("steps", {"steps": steps})
+
+        try:
+            config = get_api_config()
+
+            # Step 1: Parse document
+            steps[0]["status"] = "in_progress"
+            steps[0]["message"] = "Parsing document content..."
+            yield sse_event("step_update", steps[0])
+
+            from gaik.software_components.parsers import DocxParser, PyMuPDFParser, VisionParser
+
+            # Create parser based on type
+            if actual_parser_type == "vision" or actual_parser_type == "vision_plus":
+                parser = VisionParser(openai_config=config)
+                parsed_content = parser.convert_pdf(tmp_path)
+                # convert_pdf returns list of pages, join them
+                if isinstance(parsed_content, list):
+                    parsed_content = "\n\n".join(parsed_content)
+            elif actual_parser_type == "docx":
+                parser = DocxParser()
+                parsed_content = parser.parse_docx(tmp_path)
+            else:
+                # Default: pymupdf
+                parser = PyMuPDFParser()
+                parsed_content = parser.parse_pdf(tmp_path)
+
+            steps[0]["status"] = "completed"
+            steps[0]["message"] = "Document parsed"
+            yield sse_event("step_update", steps[0])
+
+            # Step 2: Schema Generation
+            steps[1]["status"] = "in_progress"
+            steps[1]["message"] = "Analyzing requirements..."
+            yield sse_event("step_update", steps[1])
+
+            from gaik.software_components.extractor import DataExtractor, SchemaGenerator
+
+            schema_generator = SchemaGenerator(config=config)
+            extraction_model = schema_generator.generate_schema(user_requirements)
+
+            steps[1]["status"] = "completed"
+            yield sse_event("step_update", steps[1])
+
+            # Step 3: Data Extraction
+            steps[2]["status"] = "in_progress"
+            steps[2]["message"] = "Extracting structured data..."
+            yield sse_event("step_update", steps[2])
+
+            extractor = DataExtractor(config=config)
+            extracted_data = extractor.extract(
+                extraction_model=extraction_model,
+                requirements=schema_generator.item_requirements,
+                user_requirements=user_requirements,
+                documents=[parsed_content],
+            )
+
+            steps[2]["status"] = "completed"
+            steps[2]["message"] = f"Extracted {len(extracted_data)} items"
+            yield sse_event("step_update", steps[2])
+
+            # Step 4: PDF Generation (if requested)
+            pdf_available = False
+            if generate_pdf:
+                steps[3]["status"] = "in_progress"
+                steps[3]["message"] = "Generating report..."
+                yield sse_event("step_update", steps[3])
+
+                try:
+                    try:
+                        from utils.pdf_generator import StructuredDataToPDF
+                    except ImportError:
+                        from api.utils.pdf_generator import StructuredDataToPDF
+
+                    logo = LOGO_PATH if LOGO_PATH.exists() else None
+                    pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
+                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+
+                    pdf_data = (
+                        extracted_data
+                        if extracted_data
+                        else [{"parsed_content": parsed_content or "No content extracted"}]
+                    )
+                    pdf_generator.run(pdf_data, pdf_path)
+
+                    PDF_STORAGE[job_id] = pdf_path
+                    PDF_TIMESTAMPS[job_id] = datetime.now()
+                    pdf_available = True
+                    steps[3]["status"] = "completed"
+                    steps[3]["message"] = "PDF generated"
+                    yield sse_event("step_update", steps[3])
+                except Exception as e:
+                    steps[3]["status"] = "error"
+                    steps[3]["message"] = f"PDF generation failed: {e}"
+                    yield sse_event("step_update", steps[3])
+
+            # Send final result
+            yield sse_event(
+                "result",
+                {
+                    "job_id": job_id,
+                    "parsed_content": parsed_content,
+                    "extracted_data": extracted_data,
+                    "pdf_available": pdf_available,
+                },
+            )
+
+        except ImportError as e:
+            yield sse_event("error", {"message": f"Required components not installed: {e}"})
+        except Exception as e:
+            for step in steps:
+                if step["status"] == "in_progress":
+                    step["status"] = "error"
+                    step["message"] = str(e)
+                    yield sse_event("step_update", step)
+                    break
+            yield sse_event("error", {"message": str(e)})
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/pdf/{job_id}")
 async def download_pdf(job_id: str):
     """Download a generated PDF by job ID."""

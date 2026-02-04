@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { parseSSEEvents, type SSEStep } from "@/lib/sse";
+import { processSSEStream, type SSEStep } from "@/lib/sse";
 import {
   ChevronDown,
   ChevronUp,
@@ -91,17 +91,7 @@ export default function DocumentStructuredPage() {
 
     setIsLoading(true);
     setResult(null);
-
-    // Initialize steps
-    const initialSteps: SSEStep[] = [
-      { step: 1, name: "Parsing Document", status: "in_progress", message: "Reading document content..." },
-      { step: 2, name: "Schema Generation", status: "pending" },
-      { step: 3, name: "Data Extraction", status: "pending" },
-    ];
-    if (generatePdf) {
-      initialSteps.push({ step: 4, name: "Report Formatting", status: "pending" });
-    }
-    setPipelineSteps(initialSteps);
+    setPipelineSteps([]);
 
     try {
       const formData = new FormData();
@@ -111,45 +101,47 @@ export default function DocumentStructuredPage() {
       formData.append("generate_pdf", String(generatePdf));
       formData.append("pdf_title", "Document Structured Data");
 
-      const response = await apiFetch("/api/pipeline/document", {
+      const response = await apiFetch("/api/pipeline/document/stream", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(error?.detail ?? "Failed to process document");
+        throw new Error("Failed to process document");
       }
 
-      const data = await response.json();
-      setResult(data as DocumentStructuredResult);
+      let streamError: Error | null = null;
 
-      // Update steps based on response
-      const finalSteps: SSEStep[] = data.steps || [
-        { step: 1, name: "Parsing Document", status: "completed", message: "Document parsed" },
-        { step: 2, name: "Schema Generation", status: "completed" },
-        { step: 3, name: "Data Extraction", status: "completed", message: "Extracted data" },
-      ];
-      if (generatePdf && data.pdf_available) {
-        finalSteps.push({ step: 4, name: "Report Formatting", status: "completed", message: "PDF generated" });
-      }
-      setPipelineSteps(finalSteps);
-
-      posthog.capture("document_structured_executed", {
-        parser_type: parserType,
-        generate_pdf: generatePdf,
+      await processSSEStream<DocumentStructuredResult>(response, {
+        onSteps: (steps) => setPipelineSteps(steps),
+        onStepUpdate: (update) => {
+          setPipelineSteps((prev) =>
+            prev.map((s) => (s.step === update.step ? update : s))
+          );
+        },
+        onResult: (data) => {
+          setResult(data);
+          posthog.capture("document_structured_executed", {
+            parser_type: parserType,
+            generate_pdf: generatePdf,
+          });
+          toast.success("Document processed successfully!");
+        },
+        onError: (message) => {
+          streamError = new Error(message);
+        },
       });
 
-      toast.success("Document processed successfully!");
+      if (streamError) throw streamError;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       if (error instanceof RateLimitError) return;
 
       // Mark current step as error
-      setPipelineSteps(prev =>
-        prev.map((step, idx) =>
-          step.status === "in_progress" || (idx === 0 && step.status === "pending")
+      setPipelineSteps((prev) =>
+        prev.map((step) =>
+          step.status === "in_progress"
             ? { ...step, status: "error" as const, message: error instanceof Error ? error.message : "Processing failed" }
             : step
         )
@@ -272,7 +264,7 @@ export default function DocumentStructuredPage() {
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <CardContent className="space-y-3 px-4 pt-0 pb-4">
+                  <CardContent className="space-y-4 px-4 pt-0 pb-4">
                     <div className="space-y-1.5">
                       <Label htmlFor="parser-type" className="text-sm">Parser Type</Label>
                       <Select
@@ -350,6 +342,17 @@ export default function DocumentStructuredPage() {
             </Card>
           )}
 
+          {isLoading && pipelineSteps.length === 0 && (
+            <Card>
+              <CardContent className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
+                  <p className="text-muted-foreground mt-2">Starting document processing...</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {result && !isLoading && (
             <>
               {/* Parsed Content */}
@@ -389,15 +392,27 @@ export default function DocumentStructuredPage() {
                         )}
                         <div className="divide-y rounded-md border">
                           {Object.entries(item).map(([key, value]) => (
-                            <div key={key} className="flex items-start gap-4 p-3">
-                              <span className="min-w-32 shrink-0 text-sm font-medium text-amber-700 dark:text-amber-500">
+                            <div key={key} className="grid grid-cols-[180px_1fr] gap-4 p-3">
+                              <span className="text-sm font-medium text-amber-700 dark:text-amber-500">
                                 {formatFieldName(key)}
                               </span>
-                              <span className="text-muted-foreground min-w-0 wrap-break-word text-sm">
-                                {value !== null && value !== undefined
-                                  ? String(value)
-                                  : "-"}
-                              </span>
+                              <div className="text-muted-foreground text-sm">
+                                {value === null || value === undefined ? (
+                                  "-"
+                                ) : Array.isArray(value) ? (
+                                  <ul className="list-disc list-inside space-y-1">
+                                    {value.map((item, i) => (
+                                      <li key={i}>{String(item)}</li>
+                                    ))}
+                                  </ul>
+                                ) : typeof value === "object" ? (
+                                  <pre className="whitespace-pre-wrap text-xs bg-muted/50 p-2 rounded">
+                                    {JSON.stringify(value, null, 2)}
+                                  </pre>
+                                ) : (
+                                  <span className="wrap-break-word">{String(value)}</span>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>

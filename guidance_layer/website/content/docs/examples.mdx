@@ -239,7 +239,7 @@ from pathlib import Path
 pipeline = AudioToStructuredData(use_azure=True)
 
 result = pipeline.run(
-    audio_file_path=Path("site_recording.mp3"),
+    file_path=Path("site_recording.mp3"),
     user_requirements="""
     Extract construction diary entry:
     - date: Recording date
@@ -248,8 +248,7 @@ result = pipeline.run(
     - tasks_completed: List of completed tasks
     - issues: Any problems or delays mentioned
     - materials_used: Materials mentioned
-    """,
-    custom_context="Finnish construction site daily report"
+    """
 )
 
 print(result.extracted_fields)
