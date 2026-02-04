@@ -2,7 +2,23 @@
 
 import os
 
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
+
+# File size limits
+MAX_FILE_SIZE_MB = 20
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
+
+async def validate_file_size(file: UploadFile) -> bytes:
+    """Validate file size and return content if valid."""
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB",
+        )
+    await file.seek(0)
+    return content
 
 
 def get_api_config():

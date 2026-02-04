@@ -50,7 +50,7 @@ export function StepIndicator({
               className={cn(
                 "relative flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors",
                 step.status === "completed" &&
-                  "border-green-500 bg-green-500 text-white",
+                  "border-success bg-success text-success-foreground",
                 step.status === "in_progress" &&
                   "border-primary/60 bg-primary/10 text-primary",
                 step.status === "error" &&
@@ -82,8 +82,8 @@ export function StepIndicator({
             {isHorizontal && (
               <span
                 className={cn(
-                  "text-sm font-medium whitespace-nowrap",
-                  step.status === "completed" && "text-green-600",
+                  "text-xs font-medium text-center",
+                  step.status === "completed" && "text-success",
                   step.status === "in_progress" && "text-primary",
                   step.status === "error" && "text-destructive",
                   step.status === "pending" && "text-muted-foreground",
@@ -100,7 +100,7 @@ export function StepIndicator({
               <span
                 className={cn(
                   "text-sm font-medium",
-                  step.status === "completed" && "text-green-600",
+                  step.status === "completed" && "text-success",
                   step.status === "in_progress" && "text-primary",
                   step.status === "error" && "text-destructive",
                   step.status === "pending" && "text-muted-foreground",
@@ -123,7 +123,7 @@ export function StepIndicator({
                 className={cn(
                   "h-0.5 w-full rounded-full transition-colors",
                   step.status === "completed"
-                    ? "bg-green-500"
+                    ? "bg-success"
                     : "bg-muted-foreground/20",
                 )}
               />
@@ -170,7 +170,7 @@ export function StepIndicatorCompact({
             key={step.id ?? step.step ?? index}
             className={cn(
               "h-1.5 flex-1 rounded-full",
-              step.status === "completed" && "bg-green-500",
+              step.status === "completed" && "bg-success",
               step.status === "in_progress" && "bg-primary",
               step.status === "error" && "bg-destructive",
               step.status === "pending" && "bg-muted",

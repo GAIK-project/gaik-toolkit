@@ -231,6 +231,7 @@ export default function AudioStructuredPage() {
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
                 >
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -302,6 +303,17 @@ export default function AudioStructuredPage() {
             </Card>
           )}
 
+          {isLoading && pipelineSteps.length === 0 && (
+            <Card>
+              <CardContent className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
+                  <p className="text-muted-foreground mt-2">Starting audio processing...</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {result && !isLoading && (
             <>
               {/* Transcript - only show if there's actual content */}
@@ -343,7 +355,7 @@ export default function AudioStructuredPage() {
                               <span className="min-w-32 text-sm font-medium">
                                 {formatFieldName(key)}
                               </span>
-                              <span className="text-muted-foreground text-sm">
+                              <span className="text-muted-foreground min-w-0 wrap-break-word text-sm">
                                 {value !== null && value !== undefined
                                   ? String(value)
                                   : "-"}

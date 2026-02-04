@@ -270,6 +270,7 @@ export default function DocumentStructuredPage() {
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
                 >
                   <CardContent className="space-y-4">
                     <div className="space-y-2">

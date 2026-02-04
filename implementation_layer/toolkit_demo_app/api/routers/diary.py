@@ -3,19 +3,21 @@
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import datetime
 from pathlib import Path
+
 try:
-    from utils import get_api_config, sse_event
+    from utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, get_api_config, sse_event
 except ImportError:
-    from api.utils import get_api_config, sse_event
+    from api.utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, get_api_config, sse_event
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
 router = APIRouter()
 
-
 # Temporary storage for generated PDFs
 PDF_STORAGE: dict[str, Path] = {}
+PDF_TIMESTAMPS: dict[str, datetime] = {}
 
 # Logo path for PDF generation (use GAIK logo)
 LOGO_PATH = Path(__file__).parent.parent.parent / "public" / "logos" / "gaik-logo-letter-only.png"
@@ -70,9 +72,15 @@ async def diary_audio_pipeline_stream(
             detail=f"Unsupported file type: {suffix}. Supported: {', '.join(supported)}",
         )
 
-    # Save uploaded file temporarily
+    # Save uploaded file temporarily and validate size
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB",
+        )
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
 
@@ -184,6 +192,7 @@ async def diary_audio_pipeline_stream(
                     pdf_generator.run(pdf_data, pdf_path)
 
                     PDF_STORAGE[job_id] = pdf_path
+                    PDF_TIMESTAMPS[job_id] = datetime.now()
                     pdf_available = True
                     steps[pdf_step_idx]["status"] = "completed"
                     steps[pdf_step_idx]["message"] = "PDF generated"
@@ -335,6 +344,7 @@ async def diary_text_pipeline_stream(
                     pdf_generator.run(pdf_data, pdf_path)
 
                     PDF_STORAGE[job_id] = pdf_path
+                    PDF_TIMESTAMPS[job_id] = datetime.now()
                     pdf_available = True
                     steps[pdf_step_idx]["status"] = "completed"
                     steps[pdf_step_idx]["message"] = "PDF generated"

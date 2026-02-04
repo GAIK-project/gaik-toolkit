@@ -37,7 +37,7 @@ export function PipelineLogViewer({ steps }: PipelineLogViewerProps) {
             className={cn(
               "rounded-lg border transition-colors",
               step.status === "completed" &&
-                "border-green-500/30 bg-green-500/5",
+                "border-success/30 bg-success/5",
               step.status === "in_progress" && "border-primary/30 bg-primary/5",
               step.status === "error" &&
                 "border-destructive/30 bg-destructive/5",
@@ -57,7 +57,7 @@ export function PipelineLogViewer({ steps }: PipelineLogViewerProps) {
               <div
                 className={cn(
                   "h-2 w-2 shrink-0 rounded-full",
-                  step.status === "completed" && "bg-green-500",
+                  step.status === "completed" && "bg-success",
                   step.status === "in_progress" && "bg-primary animate-pulse",
                   step.status === "error" && "bg-destructive",
                   step.status === "pending" && "bg-muted-foreground/30",

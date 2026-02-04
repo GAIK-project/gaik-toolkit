@@ -4,6 +4,10 @@ import os
 import tempfile
 from pathlib import Path
 
+try:
+    from utils import validate_file_size
+except ImportError:
+    from api.utils import validate_file_size
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
@@ -52,9 +56,9 @@ async def transcribe_audio(
             detail=f"Unsupported file type: {suffix}. Supported: {', '.join(supported)}",
         )
 
-    # Save uploaded file temporarily
+    # Validate file size and save temporarily
+    content = await validate_file_size(file)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
 

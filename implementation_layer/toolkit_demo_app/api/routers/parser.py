@@ -5,6 +5,10 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
+try:
+    from utils import validate_file_size
+except ImportError:
+    from api.utils import validate_file_size
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 router = APIRouter()
@@ -34,9 +38,9 @@ async def parse_document(
             detail=f"Unsupported file type: {suffix}. Supported: {', '.join(supported_docs + supported_images)}",
         )
 
-    # Save uploaded file temporarily
+    # Validate file size and save temporarily
+    content = await validate_file_size(file)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
 

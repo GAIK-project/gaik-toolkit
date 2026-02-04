@@ -5,9 +5,9 @@ from pathlib import Path
 from typing import Literal
 
 try:
-    from utils import get_api_config
+    from utils import get_api_config, validate_file_size
 except ImportError:
-    from api.utils import get_api_config
+    from api.utils import get_api_config, validate_file_size
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 router = APIRouter()
@@ -37,9 +37,9 @@ async def classify_document(
             detail=f"Unsupported file type: {suffix}",
         )
 
-    # Save uploaded file temporarily
+    # Validate file size and save temporarily
+    content = await validate_file_size(file)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
 

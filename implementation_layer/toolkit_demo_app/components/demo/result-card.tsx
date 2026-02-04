@@ -71,7 +71,7 @@ export function ResultCard({
                 className="h-8 w-8"
               >
                 {copied ? (
-                  <Check className="h-4 w-4 text-green-600" />
+                  <Check className="h-4 w-4 text-success" />
                 ) : (
                   <Copy className="h-4 w-4" />
                 )}
@@ -145,9 +145,9 @@ export function ConfidenceBar({ value, label, className }: ConfidenceBarProps) {
   const percentage = Math.round(value * 100);
 
   function getColor(): string {
-    if (percentage >= 80) return "bg-green-500";
-    if (percentage >= 60) return "bg-yellow-500";
-    return "bg-red-500";
+    if (percentage >= 80) return "bg-success";
+    if (percentage >= 60) return "bg-warning";
+    return "bg-destructive";
   }
 
   return (

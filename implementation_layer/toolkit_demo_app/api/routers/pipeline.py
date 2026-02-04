@@ -1,23 +1,46 @@
 """Pipeline router - End-to-end pipeline endpoints for demos."""
 
+import asyncio
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
 try:
-    from utils import get_api_config, sse_event
+    from utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, get_api_config, sse_event, validate_file_size
 except ImportError:
-    from api.utils import get_api_config, sse_event
+    from api.utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, get_api_config, sse_event, validate_file_size
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 router = APIRouter()
 
-# Temporary storage for generated PDFs
+PDF_CLEANUP_AFTER_HOURS = 1
+
+# Temporary storage for generated PDFs (path and creation time)
 PDF_STORAGE: dict[str, Path] = {}
+PDF_TIMESTAMPS: dict[str, datetime] = {}
+
+
+async def cleanup_old_pdfs():
+    """Background task to clean up old PDFs."""
+    while True:
+        await asyncio.sleep(3600)  # Check every hour
+        cutoff = datetime.now() - timedelta(hours=PDF_CLEANUP_AFTER_HOURS)
+        jobs_to_delete = []
+        for job_id, timestamp in list(PDF_TIMESTAMPS.items()):
+            if timestamp < cutoff:
+                jobs_to_delete.append(job_id)
+        for job_id in jobs_to_delete:
+            if job_id in PDF_STORAGE:
+                path = PDF_STORAGE[job_id]
+                path.unlink(missing_ok=True)
+                del PDF_STORAGE[job_id]
+            if job_id in PDF_TIMESTAMPS:
+                del PDF_TIMESTAMPS[job_id]
 
 # Logo path for PDF generation (letter-only logo works better for PDF headers)
 LOGO_PATH = Path(__file__).parent.parent.parent / "public" / "logos" / "gaik-logo-letter-only.png"
@@ -107,9 +130,9 @@ async def audio_pipeline(
             detail=f"Unsupported file type: {suffix}. Supported: {', '.join(supported)}",
         )
 
-    # Save uploaded file temporarily
+    # Validate file size and save temporarily
+    content = await validate_file_size(file)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
 
@@ -170,6 +193,7 @@ async def audio_pipeline(
                 pdf_generator.run(pdf_data, pdf_path)
 
                 PDF_STORAGE[job_id] = pdf_path
+                PDF_TIMESTAMPS[job_id] = datetime.now()
                 response.pdf_available = True
                 steps[3].status = "completed"
                 steps[3].message = "PDF generated"
@@ -250,9 +274,9 @@ async def document_pipeline(
         else:
             parser_type = "pymupdf"
 
-    # Save uploaded file temporarily
+    # Validate file size and save temporarily
+    content = await validate_file_size(file)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
 
@@ -320,6 +344,7 @@ async def document_pipeline(
                 pdf_generator.run(pdf_data, pdf_path)
 
                 PDF_STORAGE[job_id] = pdf_path
+                PDF_TIMESTAMPS[job_id] = datetime.now()
                 response.pdf_available = True
                 steps[3].status = "completed"
                 steps[3].message = "PDF generated"
@@ -427,6 +452,7 @@ async def text_pipeline(
                 pdf_generator.run(pdf_data, pdf_path)
 
                 PDF_STORAGE[job_id] = pdf_path
+                PDF_TIMESTAMPS[job_id] = datetime.now()
                 response.pdf_available = True
                 steps[pdf_step_idx].status = "completed"
                 steps[pdf_step_idx].message = "PDF generated"
@@ -488,8 +514,14 @@ async def audio_pipeline_stream(
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
-    # Save uploaded file
+    # Validate file size
     content = await file.read()
+    if len(content) > MAX_FILE_SIZE_BYTES:
+        async def error_gen() -> AsyncGenerator[str, None]:
+            yield sse_event("error", {"message": f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB"})
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    # Save uploaded file
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
@@ -585,6 +617,7 @@ async def audio_pipeline_stream(
                     pdf_generator.run(pdf_data, pdf_path)
 
                     PDF_STORAGE[job_id] = pdf_path
+                    PDF_TIMESTAMPS[job_id] = datetime.now()
                     pdf_available = True
                     steps[3]["status"] = "completed"
                     steps[3]["message"] = "PDF generated"
@@ -713,6 +746,7 @@ async def text_pipeline_stream(
                     pdf_generator.run(pdf_data, pdf_path)
 
                     PDF_STORAGE[job_id] = pdf_path
+                    PDF_TIMESTAMPS[job_id] = datetime.now()
                     pdf_available = True
                     steps[pdf_step_idx]["status"] = "completed"
                     steps[pdf_step_idx]["message"] = "PDF generated"

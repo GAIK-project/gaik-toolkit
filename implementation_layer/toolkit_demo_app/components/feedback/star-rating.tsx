@@ -28,8 +28,8 @@ export function StarRating({ value, onChange, disabled }: StarRatingProps) {
             className={cn(
               "size-6 transition-colors",
               star <= value
-                ? "fill-yellow-400 text-yellow-400"
-                : "text-muted-foreground hover:text-yellow-400",
+                ? "fill-warning text-warning"
+                : "text-muted-foreground hover:text-warning",
             )}
           />
         </button>

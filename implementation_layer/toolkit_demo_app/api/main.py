@@ -4,10 +4,18 @@ GAIK Toolkit Demo API
 FastAPI backend that provides REST endpoints for the GAIK toolkit components.
 """
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 # Load .env.local from toolkit_demo_app folder - must be before other imports
 env_path = Path(__file__).parent.parent / ".env.local"
@@ -35,8 +43,9 @@ except ImportError:
         rag,
         transcriber,
     )
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
 
 from gaik import __version__ as gaik_version  # noqa: E402
 
@@ -44,10 +53,10 @@ from gaik import __version__ as gaik_version  # noqa: E402
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("GAIK Demo API starting...")
+    logger.info("GAIK Demo API starting...")
     yield
     # Shutdown
-    print("GAIK Demo API shutting down...")
+    logger.info("GAIK Demo API shutting down...")
 
 
 app = FastAPI(
@@ -58,18 +67,24 @@ app = FastAPI(
     redirect_slashes=False,
 )
 
-# CORS for Next.js frontend
+# CORS for Next.js frontend (allowing all origins for cluster-internal usage)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://gaik-demo.2.rahtiapp.fi",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler for unhandled errors."""
+    logger.error(f"Unhandled error: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 # Include routers
 app.include_router(parser.router, prefix="/parse", tags=["Parser"])
