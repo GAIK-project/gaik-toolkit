@@ -10,15 +10,15 @@ Extract structured invoice data using VisionParser.
 """Extract invoice data from PDF using VisionParser + Extractor."""
 import json
 from pathlib import Path
-from gaik.building_blocks.parsers import VisionParser, get_openai_config
-from gaik.building_blocks.extractor import SchemaGenerator, DataExtractor
+from gaik.software_components.parsers import VisionParser, get_openai_config
+from gaik.software_components.extractor import SchemaGenerator, DataExtractor
 
 # Configuration
 config = get_openai_config(use_azure=True)
 
 # Step 1: Parse PDF to markdown
-parser = VisionParser(openai_config=config, use_context=True)
-pages = parser.convert_pdf("invoice.pdf", dpi=150, clean_output=True)
+parser = VisionParser(openai_config=config, clean_output=True)
+pages = parser.convert_pdf("invoice.pdf")
 document_text = "\n\n".join(pages)
 
 # Step 2: Generate schema from requirements
@@ -105,7 +105,7 @@ Classify documents in a folder into predefined categories.
 ```python
 """Classify documents into categories."""
 from pathlib import Path
-from gaik.building_blocks.doc_classifier import DocumentClassifier, get_openai_config
+from gaik.software_components.doc_classifier import DocumentClassifier, get_openai_config
 
 config = get_openai_config(use_azure=True)
 classifier = DocumentClassifier(config=config)
@@ -286,13 +286,13 @@ Define extraction schema manually without natural language generation.
 
 ```python
 """Use manually defined schema for precise control over extraction."""
-from gaik.building_blocks.extractor import (
+from gaik.software_components.extractor import (
     DataExtractor,
     ExtractionRequirements,
     FieldSpec,
     get_openai_config,
 )
-from gaik.building_blocks.parsers import PyMuPDFParser
+from gaik.software_components.parsers import PyMuPDFParser
 
 config = get_openai_config(use_azure=True)
 
@@ -345,13 +345,12 @@ requirements = ExtractionRequirements(
 )
 
 # Create Pydantic model from requirements
-from gaik.building_blocks.extractor.helpers import create_extraction_model
+from gaik.software_components.extractor.helpers import create_extraction_model
 schema = create_extraction_model(requirements)
 
 # Parse document
 parser = PyMuPDFParser()
-result = parser.parse_document("order_confirmation.pdf")
-document_text = result["text_content"]
+document_text = parser.parse_pdf("order_confirmation.pdf")
 
 # Extract with manual schema
 extractor = DataExtractor(config=config)

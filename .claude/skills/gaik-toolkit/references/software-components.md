@@ -2,18 +2,18 @@
 
 End-to-end pipelines that compose building blocks into workflows.
 
-**Source:** `gaik.software_components.*`
+**Source:** `gaik.software_modules.*`
 
 ## AudioToStructuredData
 
 Complete audio extraction pipeline: Audio -> Transcript -> Schema -> Structured JSON
 
-**Source:** `gaik.software_components.audio_to_structured_data`
+**Source:** `gaik.software_modules.audio_to_structured_data`
 
 ### Constructor
 
 ```python
-from gaik.software_components.audio_to_structured_data import AudioToStructuredData
+from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
 
 pipeline = AudioToStructuredData(
     api_config=None,       # Optional: pass config dict
@@ -92,12 +92,12 @@ Structured JSON Records
 
 Complete document extraction pipeline: PDF/Image/DOCX -> Parsed Text -> Schema -> Structured JSON
 
-**Source:** `gaik.software_components.documents_to_structured_data`
+**Source:** `gaik.software_modules.documents_to_structured_data`
 
 ### Constructor
 
 ```python
-from gaik.software_components.documents_to_structured_data import DocumentsToStructuredData
+from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData
 
 pipeline = DocumentsToStructuredData(
     api_config=None,       # Optional: pass config dict
@@ -226,7 +226,7 @@ if existing:
 
 ```python
 from pathlib import Path
-from gaik.software_components.documents_to_structured_data import DocumentsToStructuredData
+from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData
 
 pipeline = DocumentsToStructuredData(use_azure=True)
 schema_dir = Path("schemas/")
@@ -269,7 +269,7 @@ for pdf in Path("invoices/").glob("invoice_*.pdf"):
 ### Custom Schema Definition
 
 ```python
-from gaik.building_blocks.extractor import ExtractionRequirements, FieldSpec
+from gaik.software_components.extractor import ExtractionRequirements, FieldSpec
 from pydantic import create_model
 
 # Define fields manually
@@ -286,7 +286,7 @@ requirements = ExtractionRequirements(
 
 # Create Pydantic model from requirements
 # (Usually done by SchemaGenerator, but can be manual)
-from gaik.building_blocks.extractor.helpers import create_extraction_model
+from gaik.software_components.extractor.helpers import create_extraction_model
 schema = create_extraction_model(requirements)
 
 # Use in pipeline
@@ -304,13 +304,13 @@ result = pipeline.run(
 
 ```python
 # Audio pipeline
-from gaik.software_components.audio_to_structured_data import (
+from gaik.software_modules.audio_to_structured_data import (
     AudioToStructuredData,
     PipelineResult,
 )
 
 # Document pipeline
-from gaik.software_components.documents_to_structured_data import (
+from gaik.software_modules.documents_to_structured_data import (
     DocumentsToStructuredData,
     PipelineResult,
 )

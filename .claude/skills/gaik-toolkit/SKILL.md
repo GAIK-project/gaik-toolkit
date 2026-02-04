@@ -1,6 +1,6 @@
 ---
 name: gaik-toolkit
-version: "1.1.0"
+version: "1.2.0"
 description: |
   GAIK (Generative AI Knowledge Management Toolkit) development guidance.
   Use when working with: structured data extraction from documents/PDFs/audio,
@@ -94,7 +94,7 @@ OPENAI_MODEL=gpt-4o
 All components use `get_openai_config()`:
 
 ```python
-from gaik.building_blocks.extractor import get_openai_config
+from gaik.software_components.extractor import get_openai_config
 
 config = get_openai_config(use_azure=True)   # Azure OpenAI
 config = get_openai_config(use_azure=False)  # Standard OpenAI
@@ -107,7 +107,7 @@ config = get_openai_config(use_azure=False)  # Standard OpenAI
 Generate Pydantic schema from natural language, then extract structured data:
 
 ```python
-from gaik.building_blocks.extractor import (
+from gaik.software_components.extractor import (
     SchemaGenerator, DataExtractor, get_openai_config
 )
 
@@ -134,23 +134,22 @@ results = extractor.extract(
 ### VisionParser (PDF to Markdown via LLM)
 
 ```python
-from gaik.building_blocks.parsers import VisionParser, get_openai_config
+from gaik.software_components.parsers import VisionParser, get_openai_config
 
 config = get_openai_config(use_azure=True)
-parser = VisionParser(openai_config=config, use_context=True)
+parser = VisionParser(openai_config=config, clean_output=True)
 
-pages = parser.convert_pdf("document.pdf", dpi=150, clean_output=True)
-parser.save_markdown(pages, "output.md")
+pages = parser.convert_pdf("document.pdf")
+# pages is a list of markdown strings, one per page
 ```
 
 ### PyMuPDFParser (Fast Local PDF)
 
 ```python
-from gaik.building_blocks.parsers import PyMuPDFParser, parse_pdf
+from gaik.software_components.parsers import PyMuPDFParser, parse_pdf
 
 parser = PyMuPDFParser()
-result = parser.parse_document("document.pdf")
-text = result["text_content"]
+text = parser.parse_pdf("document.pdf")
 
 # Or convenience function:
 text = parse_pdf("document.pdf")
@@ -159,11 +158,10 @@ text = parse_pdf("document.pdf")
 ### DocxParser (Word Documents)
 
 ```python
-from gaik.building_blocks.parsers import DocxParser, parse_docx
+from gaik.software_components.parsers import DocxParser, parse_docx
 
 parser = DocxParser()
-result = parser.parse_document("document.docx")
-text = result["text_content"]
+text = parser.parse_docx("document.docx")
 
 # Or convenience function:
 text = parse_docx("document.docx")
@@ -172,20 +170,16 @@ text = parse_docx("document.docx")
 ### DoclingParser (Advanced OCR + Multi-format)
 
 ```python
-from gaik.building_blocks.parsers import DoclingParser, parse_document
+from gaik.software_components.parsers import DoclingParser, parse_document
 
 parser = DoclingParser()
-result = parser.parse_document("complex_document.pdf")
-text = result["text_content"]
-
-# Or convenience function:
 text = parse_document("complex_document.pdf")
 ```
 
 ### Transcriber (Audio/Video)
 
 ```python
-from gaik.building_blocks.transcriber import Transcriber, get_openai_config
+from gaik.software_components.transcriber import Transcriber, get_openai_config
 
 config = get_openai_config(use_azure=True)
 transcriber = Transcriber(
@@ -202,7 +196,7 @@ result.save("output/")
 ### DocumentClassifier
 
 ```python
-from gaik.building_blocks.doc_classifier import DocumentClassifier, get_openai_config
+from gaik.software_components.doc_classifier import DocumentClassifier, get_openai_config
 
 config = get_openai_config(use_azure=True)
 classifier = DocumentClassifier(config=config)
@@ -219,8 +213,8 @@ result = classifier.classify(
 #### Embedder (Text Embeddings)
 
 ```python
-from gaik.building_blocks.RAG.embedder import Embedder
-from gaik.building_blocks.config import get_openai_config
+from gaik.software_components.RAG.embedder import Embedder
+from gaik.software_components.config import get_openai_config
 
 config = get_openai_config(use_azure=True)
 embedder = Embedder(config=config, model="text-embedding-3-large")
@@ -235,7 +229,7 @@ query_embedding = embedder.embed_query("What is the main topic?")
 #### VectorStore (Embeddings Storage)
 
 ```python
-from gaik.building_blocks.RAG.vector_store import VectorStore
+from gaik.software_components.RAG.vector_store import VectorStore
 
 # In-memory storage
 store = VectorStore(persist=False)
@@ -258,7 +252,7 @@ results = store.search(query_embedding, top_k=5)
 #### Retriever (Semantic + Hybrid Search)
 
 ```python
-from gaik.building_blocks.RAG.retriever import Retriever
+from gaik.software_components.RAG.retriever import Retriever
 
 retriever = Retriever(
     embedder=embedder,
@@ -277,7 +271,7 @@ documents = retriever.search(
 #### AnswerGenerator (RAG Response)
 
 ```python
-from gaik.building_blocks.RAG.answer_generator import AnswerGenerator
+from gaik.software_components.RAG.answer_generator import AnswerGenerator
 
 generator = AnswerGenerator(
     config=config,
@@ -294,12 +288,12 @@ for chunk in generator.generate("What is the summary?", documents, stream=True):
 #### VisionRagParser (PDF to RAG Chunks)
 
 ```python
-from gaik.building_blocks.RAG.rag_parser_vision import VisionRagParser
+from gaik.software_components.RAG.rag_parser_vision import VisionRagParser
 
 parser = VisionRagParser(vision_config=config)
 
 # Get LangChain Document chunks with vision-enhanced image descriptions
-chunks = parser.convert_pdf_to_chunks_with_vision("document.pdf")
+chunks = parser.parse("document.pdf")
 # Each chunk has: page_content, metadata (source, document_name, page_number, heading)
 ```
 
@@ -310,7 +304,7 @@ chunks = parser.convert_pdf_to_chunks_with_vision("document.pdf")
 Audio -> Transcript -> Schema -> Structured JSON:
 
 ```python
-from gaik.software_components.audio_to_structured_data import AudioToStructuredData
+from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
 
 pipeline = AudioToStructuredData(use_azure=True)
 
@@ -330,7 +324,7 @@ print(result.transcription.enhanced_transcript)
 PDF/Image/DOCX -> Parsed Text -> Schema -> Structured JSON:
 
 ```python
-from gaik.software_components.documents_to_structured_data import DocumentsToStructuredData
+from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData
 
 pipeline = DocumentsToStructuredData(use_azure=True)
 
@@ -355,7 +349,7 @@ print(result.extracted_fields)
 End-to-end RAG: PDF -> Parse -> Embed -> Store -> Retrieve -> Answer:
 
 ```python
-from gaik.software_components.RAG_workflow import RAGWorkflow
+from gaik.software_modules.RAG_workflow import RAGWorkflow
 
 # Initialize workflow
 workflow = RAGWorkflow(

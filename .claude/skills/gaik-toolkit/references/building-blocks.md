@@ -2,14 +2,14 @@
 
 Detailed API documentation for GAIK building blocks.
 
-**Source:** `gaik.building_blocks.*`
+**Source:** `gaik.software_components.*`
 
 ## Configuration
 
 ### get_openai_config()
 
 ```python
-from gaik.building_blocks.config import get_openai_config, create_openai_client
+from gaik.software_components.config import get_openai_config, create_openai_client
 
 # Get configuration dict
 config = get_openai_config(use_azure=True)
@@ -42,14 +42,14 @@ client = create_openai_client(config)
 
 ## Extractor Module
 
-**Source:** `gaik.building_blocks.extractor`
+**Source:** `gaik.software_components.extractor`
 
 ### SchemaGenerator
 
 Generates Pydantic models from natural language requirements.
 
 ```python
-from gaik.building_blocks.extractor import SchemaGenerator
+from gaik.software_components.extractor import SchemaGenerator
 
 generator = SchemaGenerator(config=config)
 schema = generator.generate_schema(user_requirements: str)
@@ -65,7 +65,7 @@ schema = generator.generate_schema(user_requirements: str)
 Extracts structured data using generated schemas.
 
 ```python
-from gaik.building_blocks.extractor import DataExtractor
+from gaik.software_components.extractor import DataExtractor
 
 extractor = DataExtractor(config=config)
 results = extractor.extract(
@@ -85,7 +85,7 @@ results = extractor.extract(
 Container for parsed extraction requirements.
 
 ```python
-from gaik.building_blocks.extractor import ExtractionRequirements, FieldSpec
+from gaik.software_components.extractor import ExtractionRequirements, FieldSpec
 
 requirements = ExtractionRequirements(
     use_case_name="InvoiceExtraction",
@@ -125,30 +125,20 @@ Individual field specification.
 
 ## Parsers Module
 
-**Source:** `gaik.building_blocks.parsers`
+**Source:** `gaik.software_components.parsers`
 
 ### VisionParser
 
 LLM/vision-based PDF to markdown conversion.
 
 ```python
-from gaik.building_blocks.parsers import VisionParser
+from gaik.software_components.parsers import VisionParser, get_openai_config
 
-parser = VisionParser(
-    openai_config=config,
-    use_context=True,      # Multi-page context awareness
-    max_tokens=16000,      # Max output tokens
-    temperature=0.0,       # Deterministic output
-)
+config = get_openai_config(use_azure=True)
+parser = VisionParser(openai_config=config, clean_output=True)
 
-pages = parser.convert_pdf(
-    pdf_path: str,
-    dpi=150,               # Image resolution
-    clean_output=True,     # Remove artifacts
-    custom_prompt=None,    # Optional custom extraction prompt
-)
-
-parser.save_markdown(pages, "output.md")
+pages = parser.convert_pdf("document.pdf")
+# pages is a list of markdown strings, one per page
 ```
 
 **Returns:** `List[str]` - Markdown content per page
@@ -158,53 +148,45 @@ parser.save_markdown(pages, "output.md")
 Fast local PDF text extraction.
 
 ```python
-from gaik.building_blocks.parsers import PyMuPDFParser, parse_pdf
+from gaik.software_components.parsers import PyMuPDFParser, parse_pdf
 
 parser = PyMuPDFParser()
-result = parser.parse_document(file_path: str)
+text = parser.parse_pdf("document.pdf")
 
-# Convenience function
-text = parse_pdf(file_path: str)
+# Or convenience function
+text = parse_pdf("document.pdf")
 ```
 
-**Returns:**
-```python
-{
-    "text_content": str,
-    "metadata": {
-        "pages": int,
-        "word_count": int,
-    }
-}
-```
+**Returns:** `str` - Extracted text content
 
 ### DocxParser
 
 Word document extraction.
 
 ```python
-from gaik.building_blocks.parsers import DocxParser, parse_docx
+from gaik.software_components.parsers import DocxParser, parse_docx
 
 parser = DocxParser()
-result = parser.parse_document(file_path: str)
+text = parser.parse_docx("document.docx")
 
-# Convenience function
-text = parse_docx(file_path: str)
+# Or convenience function
+text = parse_docx("document.docx")
 ```
+
+**Returns:** `str` - Extracted text content
 
 ### DoclingParser
 
 Advanced multi-format parsing with OCR. Requires `gaik[parser]` (not parser-cpu).
 
 ```python
-from gaik.building_blocks.parsers import DoclingParser, parse_document
+from gaik.software_components.parsers import DoclingParser, parse_document
 
 parser = DoclingParser()
-result = parser.parse_document(file_path: str)
-
-# Convenience function
-text = parse_document(file_path: str)
+text = parse_document("complex_document.pdf")
 ```
+
+**Returns:** `str` - Extracted text content
 
 **Supported formats:** PDF, images (.png, .jpg, .jpeg), Word docs
 
@@ -212,14 +194,14 @@ text = parse_document(file_path: str)
 
 ## Transcriber Module
 
-**Source:** `gaik.building_blocks.transcriber`
+**Source:** `gaik.software_components.transcriber`
 
 ### Transcriber
 
 Audio/video transcription with optional GPT enhancement.
 
 ```python
-from gaik.building_blocks.transcriber import Transcriber
+from gaik.software_components.transcriber import Transcriber
 
 transcriber = Transcriber(
     api_config=config,
@@ -258,14 +240,14 @@ Result container with save helpers.
 
 ## Document Classifier Module
 
-**Source:** `gaik.building_blocks.doc_classifier`
+**Source:** `gaik.software_components.doc_classifier`
 
 ### DocumentClassifier
 
 Single-label document classification.
 
 ```python
-from gaik.building_blocks.doc_classifier import DocumentClassifier
+from gaik.software_components.doc_classifier import DocumentClassifier
 
 classifier = DocumentClassifier(config=config)
 
@@ -295,7 +277,7 @@ results = classifier.classify(
 
 ```python
 # Extractor
-from gaik.building_blocks.extractor import (
+from gaik.software_components.extractor import (
     SchemaGenerator,
     DataExtractor,
     ExtractionRequirements,
@@ -304,7 +286,7 @@ from gaik.building_blocks.extractor import (
 )
 
 # Parsers
-from gaik.building_blocks.parsers import (
+from gaik.software_components.parsers import (
     VisionParser,
     PyMuPDFParser,
     DocxParser,
@@ -316,20 +298,20 @@ from gaik.building_blocks.parsers import (
 )
 
 # Transcriber
-from gaik.building_blocks.transcriber import (
+from gaik.software_components.transcriber import (
     Transcriber,
     TranscriptionResult,
     get_openai_config,
 )
 
 # Classifier
-from gaik.building_blocks.doc_classifier import (
+from gaik.software_components.doc_classifier import (
     DocumentClassifier,
     get_openai_config,
 )
 
 # Shared config
-from gaik.building_blocks.config import (
+from gaik.software_components.config import (
     get_openai_config,
     create_openai_client,
 )
