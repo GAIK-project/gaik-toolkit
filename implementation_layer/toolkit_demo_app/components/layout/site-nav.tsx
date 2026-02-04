@@ -49,6 +49,8 @@ import {
   MessageSquare,
   Mic,
   Puzzle,
+  Search,
+  SearchCode,
   ShieldAlert,
   Tags,
   Video,
@@ -82,7 +84,7 @@ const navGroups: NavGroup[] = [
       { label: "Construction Diary", href: "/diary", icon: HardHat },
       // Coming Soon
       {
-        label: "Dental Transcription",
+        label: "Dental transcription and close captioning",
         href: "#",
         icon: Mic,
         comingSoon: true,
@@ -100,7 +102,7 @@ const navGroups: NavGroup[] = [
         comingSoon: true,
       },
       {
-        label: "Customer Onboarding",
+        label: "Customer onboarding and sales assistant",
         href: "#",
         icon: Headset,
         comingSoon: true,
@@ -118,7 +120,7 @@ const navGroups: NavGroup[] = [
         comingSoon: true,
       },
       {
-        label: "Learning Plans",
+        label: "Learning plans & recommendations",
         href: "#",
         icon: GraduationCap,
         comingSoon: true,
@@ -133,6 +135,8 @@ const navGroups: NavGroup[] = [
       { label: "Parser", href: "/parser", icon: FileText },
       { label: "Classifier", href: "/classifier", icon: Tags },
       { label: "Transcriber", href: "/transcriber", icon: Mic },
+      { label: "Retriever", href: "#", icon: Search, comingSoon: true },
+      { label: "Query Engine", href: "#", icon: SearchCode, comingSoon: true },
       { label: "Embedder", href: "#", icon: Cpu, comingSoon: true },
       { label: "Vector Database", href: "#", icon: Database, comingSoon: true },
     ],
@@ -143,17 +147,15 @@ const navGroups: NavGroup[] = [
     items: [
       {
         label: "Audio → Structured",
-        href: "#",
+        href: "/audio-structured",
         icon: AudioWaveform,
-        comingSoon: true,
       },
-      { label: "RAG Builder", href: "/rag", icon: Bot },
       {
         label: "Document → Structured",
-        href: "#",
+        href: "/document-structured",
         icon: FileOutput,
-        comingSoon: true,
       },
+      { label: "RAG Builder", href: "/rag", icon: Bot },
     ],
   },
   {

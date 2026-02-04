@@ -33,6 +33,7 @@ import {
   MessageSquareQuote,
   Mic,
   Search,
+  SearchCode,
   Sparkles,
   Users,
   Video,
@@ -118,6 +119,36 @@ const useCaseDemos: Demo[] = [
 // Software Modules (moved RAG here)
 const moduleDemos: Demo[] = [
   {
+    title: "Audio → Structured Data",
+    description:
+      "Transcribe audio files and automatically extract structured data",
+    href: "/audio-structured",
+    icon: AudioWaveform,
+    featured: true,
+    size: "large",
+    featureList: [
+      { label: "Upload Audio", icon: FileUp },
+      { label: "Auto Transcribe", icon: Mic },
+      { label: "Extract Data", icon: Sparkles },
+      { label: "PDF Export", icon: Download },
+    ],
+  },
+  {
+    title: "Document → Structured Data",
+    description:
+      "Parse PDF, Word documents, and images to automatically extract structured data",
+    href: "/document-structured",
+    icon: FileOutput,
+    featured: true,
+    size: "large",
+    featureList: [
+      { label: "Upload Docs", icon: FileUp },
+      { label: "Auto Parse", icon: FileText },
+      { label: "Extract Data", icon: Sparkles },
+      { label: "PDF Export", icon: Download },
+    ],
+  },
+  {
     title: "RAG Builder",
     description:
       "Index PDF documents and ask questions with AI-powered citations",
@@ -147,7 +178,7 @@ const buildingBlocks: Demo[] = [
   },
   {
     title: "Parser",
-    description: "Read text and layout from PDF and Word files accurately",
+    description: "Read text and layout from PDF, Word files, and images accurately",
     href: "/parser",
     icon: FileText,
   },
@@ -162,6 +193,20 @@ const buildingBlocks: Demo[] = [
     description: "Convert voice recordings and videos into clear, written text",
     href: "/transcriber",
     icon: Mic,
+  },
+  {
+    title: "Retriever",
+    description: "Search and retrieve relevant documents from vector database",
+    href: "#",
+    icon: Search,
+    comingSoon: true,
+  },
+  {
+    title: "Query Engine",
+    description: "Process queries and return answers with relevant context",
+    href: "#",
+    icon: SearchCode,
+    comingSoon: true,
   },
   {
     title: "Embedder",
@@ -181,19 +226,16 @@ const buildingBlocks: Demo[] = [
 
 // Coming Soon items
 const comingSoonUseCases = [
-  { title: "Dental Transcription", icon: Mic },
+  { title: "Dental transcription and close captioning", icon: Mic },
   { title: "Purchase Order Processing", icon: FileBarChart },
   { title: "Semantic Dental Video Search", icon: Video },
-  { title: "Customer Onboarding", icon: Headset },
+  { title: "Customer onboarding and sales assistant", icon: Headset },
   { title: "Report Writing", icon: FileText },
   { title: "Sales Proposal Generation", icon: FileBarChart },
-  { title: "Learning Plans", icon: GraduationCap },
+  { title: "Learning plans & recommendations", icon: GraduationCap },
 ];
 
-const comingSoonModules = [
-  { title: "Audio → Structured Data", icon: AudioWaveform },
-  { title: "Document → Structured Data", icon: FileOutput },
-];
+const comingSoonModules: { title: string; icon: LucideIcon }[] = [];
 
 // No-code Assets data with full details
 const noCodeAssets = {
@@ -637,10 +679,12 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
             </motion.div>
           ))}
         </div>
-        <ComingSoonSection
-          title="More Modules Coming"
-          items={comingSoonModules}
-        />
+        {comingSoonModules.length > 0 && (
+          <ComingSoonSection
+            title="More Modules Coming"
+            items={comingSoonModules}
+          />
+        )}
       </motion.div>
 
       {/* Software Components */}

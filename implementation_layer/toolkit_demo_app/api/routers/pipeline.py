@@ -204,14 +204,14 @@ async def audio_pipeline(
 async def document_pipeline(
     file: UploadFile = File(...),
     user_requirements: str = Form(...),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision"] = Form("auto"),
+    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus"] = Form("auto"),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
 ):
     """
     Run the complete document pipeline: Parse -> Extract -> (PDF).
 
-    - **file**: Document file (PDF, DOCX)
+    - **file**: Document file (PDF, DOCX, or image)
     - **user_requirements**: What data to extract from the document
     - **parser_type**: Parser to use (auto, pymupdf, docx, vision)
     - **generate_pdf**: Whether to generate a PDF report
@@ -232,15 +232,23 @@ async def document_pipeline(
         raise HTTPException(status_code=400, detail="No filename provided")
 
     suffix = Path(file.filename).suffix.lower()
-    if suffix not in [".pdf", ".docx"]:
+    supported_docs = [".pdf", ".docx"]
+    supported_images = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif", ".webp"]
+
+    if suffix not in supported_docs + supported_images:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {suffix}. Use PDF or DOCX.",
+            detail=f"Unsupported file type: {suffix}. Supported: {', '.join(supported_docs + supported_images)}",
         )
 
     # Auto-detect parser type
     if parser_type == "auto":
-        parser_type = "docx" if suffix == ".docx" else "pymupdf"
+        if suffix == ".docx":
+            parser_type = "docx"
+        elif suffix in supported_images:
+            parser_type = "vision"
+        else:
+            parser_type = "pymupdf"
 
     # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -263,6 +271,7 @@ async def document_pipeline(
             "pymupdf": "pymupdf",
             "docx": "docx",
             "vision": "vision_parser",
+            "vision_plus": "vision_rag",
         }
         parser_choice = parser_map.get(parser_type, "pymupdf")
 

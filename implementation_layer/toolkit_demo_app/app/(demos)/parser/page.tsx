@@ -7,7 +7,6 @@ import {
   EmptyStateCard,
   LoadingCard,
   ResultCard,
-  ResultJson,
   ResultText,
 } from "@/components/demo/result-card";
 import { FeedbackButton } from "@/components/feedback";
@@ -46,9 +45,21 @@ interface ParseResult {
   metadata: Record<string, unknown>;
 }
 
+// Helper function to format parser names
+function formatParserName(parser: string): string {
+  const parserNames: Record<string, string> = {
+    auto: "Auto-detect",
+    pymupdf: "PyMuPDF",
+    docx: "DOCX",
+    vision: "Vision",
+    vision_plus: "Vision+",
+  };
+  return parserNames[parser] || parser;
+}
+
 export default function ParserPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [parserType, setParserType] = useState<string>("auto");
+  const [parserType, setParserType] = useState<"auto" | "pymupdf" | "docx" | "vision" | "vision_plus">("auto");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ParseResult | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -130,7 +141,7 @@ export default function ParserPage() {
           Parser
         </h1>
         <p className="text-muted-foreground mt-2">
-          Read text and layout from PDF and Word files accurately
+          Read text and layout from PDF, Word files, and images accurately
         </p>
       </header>
 
@@ -143,7 +154,7 @@ export default function ParserPage() {
                 <div>
                   <CardTitle>Upload Document</CardTitle>
                   <CardDescription>
-                    Select a PDF or DOCX file to read
+                    Select a PDF, DOCX, or image file to read
                   </CardDescription>
                 </div>
                 <ExamplePreviewDialog
@@ -156,7 +167,7 @@ export default function ParserPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <FileUpload
-                accept=".pdf,.docx"
+                accept=".pdf,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.tif,.webp"
                 maxSize={10}
                 file={file}
                 onFileSelect={setFile}
@@ -185,9 +196,10 @@ export default function ParserPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="auto">Auto-detect</SelectItem>
-                          <SelectItem value="pymupdf">PyMuPDF (PDF)</SelectItem>
-                          <SelectItem value="docx">DOCX Parser</SelectItem>
-                          <SelectItem value="vision">Vision</SelectItem>
+                          <SelectItem value="pymupdf">PyMuPDF (Fast, text-based)</SelectItem>
+                          <SelectItem value="docx">DOCX (Word documents)</SelectItem>
+                          <SelectItem value="vision">Vision (AI-powered, handles images)</SelectItem>
+                          <SelectItem value="vision_plus">Vision+ (Enhanced RAG parsing)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -215,7 +227,7 @@ export default function ParserPage() {
             <>
               <ResultCard
                 title="Document Content"
-                description={`Read using ${result.parser} method`}
+                description={`Parsed using ${formatParserName(result.parser)} parser • ${result.filename}`}
                 copyContent={result.text_content}
                 feedbackSlot={<FeedbackButton demoType="parser" />}
                 delay={0}
@@ -225,17 +237,6 @@ export default function ParserPage() {
                   maxHeight="400px"
                 />
               </ResultCard>
-
-              {Object.keys(result.metadata).length > 0 && (
-                <ResultCard
-                  title="Metadata"
-                  description="Document metadata"
-                  copyContent={JSON.stringify(result.metadata, null, 2)}
-                  delay={0.1}
-                >
-                  <ResultJson data={result.metadata} maxHeight="200px" />
-                </ResultCard>
-              )}
             </>
           )}
 

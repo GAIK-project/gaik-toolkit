@@ -27,11 +27,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Database, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Database, FileCode2, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+
+// Helper function to format field names
+function formatFieldName(key: string): string {
+  return key
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
 interface Field {
   name: string;
@@ -43,6 +51,19 @@ interface ExtractResult {
   document_count: number;
 }
 
+interface GeneratedSchema {
+  schema_code: string;
+  schema_name: string;
+  structure_type: string;
+  schema_id: string;
+  fields: Array<{
+    name: string;
+    type: string;
+    description: string;
+    required: boolean;
+  }>;
+}
+
 const DEFAULT_FIELDS: Field[] = [
   { name: "company_name", description: "Name of the company or organization" },
   { name: "total_amount", description: "Total amount or price" },
@@ -51,16 +72,28 @@ const DEFAULT_FIELDS: Field[] = [
 
 export default function ExtractorPage() {
   const [inputMode, setInputMode] = useState<"text" | "file">("text");
+  const [extractionMode, setExtractionMode] = useState<"fields" | "plain-language">("fields");
   const [documentText, setDocumentText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [userRequirements, setUserRequirements] = useState(
     "Extract key information from this document",
   );
+  const [plainLanguageRequirements, setPlainLanguageRequirements] = useState(
+    "Extract invoice number, sender name, receiver name, purchase order number, date of invoice, subtotal, discount, tax, and grand total from the invoice."
+  );
+
+  // Clear generated schema when requirements change
+  function handleRequirementsChange(value: string): void {
+    setPlainLanguageRequirements(value);
+    setGeneratedSchema(null);
+  }
   const [fields, setFields] = useState<Field[]>(DEFAULT_FIELDS);
   const [newFieldName, setNewFieldName] = useState("");
   const [newFieldDesc, setNewFieldDesc] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [isGeneratingSchema, setIsGeneratingSchema] = useState(false);
+  const [generatedSchema, setGeneratedSchema] = useState<GeneratedSchema | null>(null);
   const [result, setResult] = useState<ExtractResult | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -98,6 +131,46 @@ export default function ExtractorPage() {
 
   function handleRemoveField(name: string): void {
     setFields(fields.filter((f) => f.name !== name));
+  }
+
+  async function handleGenerateSchema(): Promise<void> {
+    if (!plainLanguageRequirements.trim()) {
+      toast.error("Please provide extraction requirements");
+      return;
+    }
+
+    setIsGeneratingSchema(true);
+    setGeneratedSchema(null);
+
+    try {
+      const response = await apiFetch("/api/extract/generate-schema", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_requirements: plainLanguageRequirements,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.detail ?? "Failed to generate schema");
+      }
+
+      const data = await response.json();
+      setGeneratedSchema(data);
+
+      posthog.capture("schema_generated", {
+        structure_type: data.structure_type,
+        fields_count: data.fields?.length || 0,
+      });
+
+      toast.success("Schema generated successfully!");
+    } catch (error) {
+      if (error instanceof RateLimitError) return;
+      toast.error(error instanceof Error ? error.message : "Failed to generate schema");
+    } finally {
+      setIsGeneratingSchema(false);
+    }
   }
 
   async function parseFile(): Promise<string | null> {
@@ -161,34 +234,65 @@ export default function ExtractorPage() {
       return;
     }
 
-    if (!userRequirements.trim()) {
-      toast.error("Please provide extraction requirements");
-      return;
-    }
+    // Validate requirements based on extraction mode
+    if (extractionMode === "fields") {
+      if (!userRequirements.trim()) {
+        toast.error("Please provide extraction requirements");
+        return;
+      }
 
-    if (fields.length === 0) {
-      toast.error("Please add at least one field to extract");
-      return;
+      if (fields.length === 0) {
+        toast.error("Please add at least one field to extract");
+        return;
+      }
+    } else {
+      // Plain language mode
+      if (!plainLanguageRequirements.trim()) {
+        toast.error("Please provide extraction requirements");
+        return;
+      }
+
+      if (!generatedSchema) {
+        toast.error("Please generate schema first");
+        return;
+      }
     }
 
     setIsLoading(true);
     setResult(null);
 
     try {
-      const fieldsMap = Object.fromEntries(
-        fields.map((field) => [field.name, field.description]),
-      );
+      let response: Response;
 
-      const response = await apiFetch("/api/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          documents: [textToProcess],
-          user_requirements: userRequirements,
-          fields: fieldsMap,
-        }),
-        signal: abortControllerRef.current.signal,
-      });
+      if (extractionMode === "fields") {
+        // Fields mode - use original endpoint
+        const fieldsMap = Object.fromEntries(
+          fields.map((field) => [field.name, field.description]),
+        );
+
+        response = await apiFetch("/api/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            documents: [textToProcess],
+            user_requirements: userRequirements,
+            fields: fieldsMap,
+          }),
+          signal: abortControllerRef.current.signal,
+        });
+      } else {
+        // Plain language mode - use schema generation endpoint
+        response = await apiFetch("/api/extract/plain-language", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            documents: [textToProcess],
+            user_requirements: plainLanguageRequirements,
+            schema_id: generatedSchema?.schema_id || null,
+          }),
+          signal: abortControllerRef.current.signal,
+        });
+      }
 
       if (!response.ok) {
         const error = await response.json().catch(() => null);
@@ -200,9 +304,10 @@ export default function ExtractorPage() {
 
       posthog.capture("data_extracted", {
         input_mode: inputMode,
+        extraction_mode: extractionMode,
         file_type: file?.type || "text",
         file_size: file?.size || textToProcess.length,
-        fields_count: fields.length,
+        fields_count: extractionMode === "fields" ? fields.length : generatedSchema?.fields.length || 0,
         results_count: data.results?.length || 0,
       });
 
@@ -299,20 +404,42 @@ export default function ExtractorPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      {/* Extraction Mode Selector */}
                       <div className="space-y-2">
-                        <Label htmlFor="requirements">Requirements</Label>
-                        <Textarea
-                          id="requirements"
-                          value={userRequirements}
-                          onChange={(e) => setUserRequirements(e.target.value)}
-                          placeholder="Describe what data to extract..."
-                          disabled={isLoading}
-                          rows={2}
-                        />
+                        <Label>Extraction Mode</Label>
+                        <Tabs
+                          value={extractionMode}
+                          onValueChange={(v) => setExtractionMode(v as "fields" | "plain-language")}
+                        >
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="fields">Fields</TabsTrigger>
+                            <TabsTrigger value="plain-language">Plain Language</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                        <p className="text-muted-foreground text-xs">
+                          {extractionMode === "fields"
+                            ? "Define specific fields to extract from documents"
+                            : "Describe extraction requirements in natural language"}
+                        </p>
                       </div>
 
-                      <div className="space-y-2">
-                        <Label>Fields to Extract</Label>
+                      {/* Fields Mode */}
+                      {extractionMode === "fields" && (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="requirements">Requirements</Label>
+                            <Textarea
+                              id="requirements"
+                              value={userRequirements}
+                              onChange={(e) => setUserRequirements(e.target.value)}
+                              placeholder="Describe what data to extract..."
+                              disabled={isLoading}
+                              rows={2}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>Fields to Extract</Label>
                         <div className="max-h-48 space-y-2 overflow-auto">
                           {fields.map((field) => (
                             <div
@@ -370,6 +497,82 @@ export default function ExtractorPage() {
                           </Button>
                         </div>
                       </div>
+                        </>
+                      )}
+
+                      {/* Plain Language Mode */}
+                      {extractionMode === "plain-language" && (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="plain-requirements">Extraction Requirements</Label>
+                            <Textarea
+                              id="plain-requirements"
+                              value={plainLanguageRequirements}
+                              onChange={(e) => handleRequirementsChange(e.target.value)}
+                              placeholder="Describe in natural language what data to extract and the structure..."
+                              disabled={isLoading || isGeneratingSchema}
+                              rows={8}
+                            />
+                          </div>
+
+                          <Button
+                            onClick={handleGenerateSchema}
+                            disabled={isLoading || isGeneratingSchema || !plainLanguageRequirements.trim()}
+                            variant="secondary"
+                            className="w-full"
+                          >
+                            {isGeneratingSchema ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Generating Schema...
+                              </>
+                            ) : (
+                              <>
+                                <FileCode2 className="mr-2 h-4 w-4" />
+                                Generate Schema
+                              </>
+                            )}
+                          </Button>
+
+                          {/* Display Generated Schema */}
+                          {generatedSchema && (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label>Generated Schema</Label>
+                                <span className="text-muted-foreground text-xs">
+                                  This schema will be reused for extraction
+                                </span>
+                              </div>
+                              <div className="rounded-md border bg-muted/50 p-4">
+                                <div className="mb-2 flex items-center justify-between">
+                                  <span className="text-sm font-medium">
+                                    {generatedSchema.schema_name}
+                                  </span>
+                                  <span className="text-muted-foreground text-xs">
+                                    {generatedSchema.structure_type}
+                                  </span>
+                                </div>
+                                <pre className="max-h-64 overflow-auto rounded bg-background p-3 text-xs">
+                                  <code>{generatedSchema.schema_code}</code>
+                                </pre>
+                                <div className="mt-3 space-y-1">
+                                  <p className="text-xs font-medium">Fields:</p>
+                                  <div className="space-y-1">
+                                    {generatedSchema.fields.map((field, idx) => (
+                                      <div key={idx} className="text-xs text-muted-foreground">
+                                        <span className="font-mono">{field.name}</span>
+                                        <span className="mx-1">:</span>
+                                        <span>{field.type}</span>
+                                        {field.required && <span className="ml-1 text-orange-500">*</span>}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </CardContent>
                   </Card>
                 </AccordionContent>
@@ -382,7 +585,9 @@ export default function ExtractorPage() {
             disabled={
               isLoading ||
               isParsing ||
-              fields.length === 0 ||
+              isGeneratingSchema ||
+              (extractionMode === "fields" && fields.length === 0) ||
+              (extractionMode === "plain-language" && !generatedSchema) ||
               (inputMode === "text" && !documentText.trim()) ||
               (inputMode === "file" && !file)
             }
@@ -427,8 +632,8 @@ export default function ExtractorPage() {
                       <div className="divide-y rounded-md border">
                         {Object.entries(item).map(([key, value]) => (
                           <div key={key} className="flex items-start gap-4 p-3">
-                            <span className="min-w-32 font-mono text-sm font-medium">
-                              {key}
+                            <span className="min-w-32 text-sm font-medium">
+                              {formatFieldName(key)}
                             </span>
                             <span className="text-muted-foreground text-sm">
                               {value !== null && value !== undefined

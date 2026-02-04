@@ -13,22 +13,25 @@ router = APIRouter()
 @router.post("")
 async def parse_document(
     file: UploadFile = File(...),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision"] = Form("auto"),
+    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus"] = Form("auto"),
 ):
     """
-    Parse a document (PDF or DOCX) and extract text content.
+    Parse a document (PDF, DOCX, or image) and extract text content.
 
-    - **file**: The document file to parse
-    - **parser_type**: Parser to use (auto, pymupdf, docx, vision)
+    - **file**: The document or image file to parse
+    - **parser_type**: Parser to use (auto, pymupdf, docx, vision, vision_plus)
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
 
     suffix = Path(file.filename).suffix.lower()
+    supported_docs = [".pdf", ".docx"]
+    supported_images = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif", ".webp"]
 
-    if suffix not in [".pdf", ".docx"]:
+    if suffix not in supported_docs + supported_images:
         raise HTTPException(
-            status_code=400, detail=f"Unsupported file type: {suffix}. Use PDF or DOCX."
+            status_code=400,
+            detail=f"Unsupported file type: {suffix}. Supported: {', '.join(supported_docs + supported_images)}",
         )
 
     # Save uploaded file temporarily
@@ -40,7 +43,12 @@ async def parse_document(
     try:
         # Auto-detect parser type
         if parser_type == "auto":
-            parser_type = "docx" if suffix == ".docx" else "pymupdf"
+            if suffix == ".docx":
+                parser_type = "docx"
+            elif suffix in supported_images:
+                parser_type = "vision"
+            else:
+                parser_type = "pymupdf"
 
         if parser_type == "docx":
             from gaik.software_components.parsers import DocxParser
@@ -61,6 +69,24 @@ async def parse_document(
             # VisionParser uses convert_pdf() which returns list of markdown pages
             markdown_pages = parser.convert_pdf(tmp_path)
             result = {"text_content": "\n\n".join(markdown_pages), "metadata": {}}
+        elif parser_type == "vision_plus":
+            from gaik.software_components.config import get_openai_config
+            from gaik.software_components.RAG.rag_parser_vision import VisionRagParser
+
+            vision_config = get_openai_config(use_azure=bool(os.getenv("AZURE_API_KEY")))
+            parser = VisionRagParser(
+                vision_config=vision_config,
+                verbose=False,
+                save_markdown=False,
+                enable_ocr=False,
+                enable_table_structure=True,
+                enable_formula_enrichment=False,
+            )
+            # Convert to markdown (we don't need the chunks)
+            markdown, _chunks = parser.convert_doc_to_chunks_with_vision(
+                tmp_path, return_markdown=True
+            )
+            result = {"text_content": markdown, "metadata": {"parser": "vision_plus"}}
         else:
             raise HTTPException(status_code=400, detail=f"Unknown parser: {parser_type}")
 
