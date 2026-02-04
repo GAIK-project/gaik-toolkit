@@ -10,6 +10,12 @@ import {
 } from "@/components/demo/result-card";
 import { FeedbackButton } from "@/components/feedback";
 import { StepIndicator } from "@/components/demo/step-indicator";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,15 +36,12 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import {
-  ChevronDown,
-  ChevronUp,
   Download,
   FileOutput,
   Loader2,
-  Settings2,
   Sparkles,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { formatFieldName } from "@/lib/utils";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
@@ -63,7 +66,6 @@ export default function DocumentStructuredPage() {
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [userRequirements, setUserRequirements] = useState(DEFAULT_REQUIREMENTS);
   const [parserType, setParserType] = useState<"auto" | "pymupdf" | "docx" | "vision" | "vision_plus">("auto");
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [generatePdf, setGeneratePdf] = useState(false);
 
   const [result, setResult] = useState<DocumentStructuredResult | null>(null);
@@ -245,69 +247,54 @@ export default function DocumentStructuredPage() {
           </Card>
 
           {/* Advanced Settings */}
-          <Card>
-            <CardHeader className="cursor-pointer py-3 px-4" onClick={() => setShowAdvanced(!showAdvanced)}>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Advanced Settings</CardTitle>
-                {showAdvanced ? (
-                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                )}
-              </div>
-            </CardHeader>
-            <AnimatePresence>
-              {showAdvanced && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <CardContent className="space-y-4 px-4 pt-0 pb-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="parser-type" className="text-sm">Parser Type</Label>
-                      <Select
-                        value={parserType}
-                        onValueChange={(value: typeof parserType) => setParserType(value)}
-                        disabled={isLoading}
-                      >
-                        <SelectTrigger id="parser-type">
-                          <SelectValue placeholder="Select parser" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="auto">Auto-detect</SelectItem>
-                          <SelectItem value="pymupdf">PyMuPDF (Fast, text-based)</SelectItem>
-                          <SelectItem value="vision">Vision (AI-powered, handles images)</SelectItem>
-                          <SelectItem value="vision_plus">Vision+ (Enhanced RAG parsing)</SelectItem>
-                          <SelectItem value="docx">DOCX (Word documents)</SelectItem>
-                        </SelectContent>
-                      </Select>
+          <Accordion type="single" collapsible className="rounded-xl border bg-card shadow-sm">
+            <AccordionItem value="advanced" className="border-0">
+              <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">
+                Advanced Settings
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="parser-type" className="text-sm">Parser Type</Label>
+                    <Select
+                      value={parserType}
+                      onValueChange={(value: typeof parserType) => setParserType(value)}
+                      disabled={isLoading}
+                    >
+                      <SelectTrigger id="parser-type">
+                        <SelectValue placeholder="Select parser" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto-detect</SelectItem>
+                        <SelectItem value="pymupdf">PyMuPDF (Fast, text-based)</SelectItem>
+                        <SelectItem value="vision">Vision (AI-powered, handles images)</SelectItem>
+                        <SelectItem value="vision_plus">Vision+ (Enhanced RAG parsing)</SelectItem>
+                        <SelectItem value="docx">DOCX (Word documents)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-muted-foreground text-xs">
+                      Choose how to parse your document
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="generate-pdf" className="text-sm">Generate PDF Report</Label>
                       <p className="text-muted-foreground text-xs">
-                        Choose how to parse your document
+                        Create a downloadable PDF with extracted data
                       </p>
                     </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="generate-pdf" className="text-sm">Generate PDF Report</Label>
-                        <p className="text-muted-foreground text-xs">
-                          Create a downloadable PDF with extracted data
-                        </p>
-                      </div>
-                      <Switch
-                        id="generate-pdf"
-                        checked={generatePdf}
-                        onCheckedChange={setGeneratePdf}
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </CardContent>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </Card>
+                    <Switch
+                      id="generate-pdf"
+                      checked={generatePdf}
+                      onCheckedChange={setGeneratePdf}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
 
           <Button
             onClick={handleSubmit}

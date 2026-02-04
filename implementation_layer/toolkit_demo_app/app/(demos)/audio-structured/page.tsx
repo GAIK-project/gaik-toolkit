@@ -11,6 +11,12 @@ import { FeedbackButton } from "@/components/feedback";
 import { StepIndicator } from "@/components/demo/step-indicator";
 import { Button } from "@/components/ui/button";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -23,13 +29,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import {
   AudioWaveform,
-  ChevronDown,
-  ChevronUp,
   Download,
   Loader2,
   Sparkles,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { motion } from "motion/react";
 import { formatFieldName } from "@/lib/utils";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
@@ -54,7 +58,6 @@ interface AudioStructuredResult {
 export default function AudioStructuredPage() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [userRequirements, setUserRequirements] = useState(DEFAULT_REQUIREMENTS);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [enhanced, setEnhanced] = useState(true);
   const [generatePdf, setGeneratePdf] = useState(false);
 
@@ -213,61 +216,46 @@ export default function AudioStructuredPage() {
           </Card>
 
           {/* Advanced Settings */}
-          <Card>
-            <CardHeader className="cursor-pointer py-3 px-4" onClick={() => setShowAdvanced(!showAdvanced)}>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-medium">Advanced Settings</CardTitle>
-                {showAdvanced ? (
-                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                )}
-              </div>
-            </CardHeader>
-            <AnimatePresence>
-              {showAdvanced && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <CardContent className="space-y-3 px-4 pt-0 pb-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="enhanced" className="text-sm">Enhanced Transcript</Label>
-                        <p className="text-muted-foreground text-xs">
-                          Improve transcript with punctuation and formatting
-                        </p>
-                      </div>
-                      <Switch
-                        id="enhanced"
-                        checked={enhanced}
-                        onCheckedChange={setEnhanced}
-                        disabled={isLoading}
-                      />
+          <Accordion type="single" collapsible className="rounded-xl border bg-card shadow-sm">
+            <AccordionItem value="advanced" className="border-0">
+              <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">
+                Advanced Settings
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="enhanced" className="text-sm">Enhanced Transcript</Label>
+                      <p className="text-muted-foreground text-xs">
+                        Improve transcript with punctuation and formatting
+                      </p>
                     </div>
+                    <Switch
+                      id="enhanced"
+                      checked={enhanced}
+                      onCheckedChange={setEnhanced}
+                      disabled={isLoading}
+                    />
+                  </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="generate-pdf" className="text-sm">Generate PDF Report</Label>
-                        <p className="text-muted-foreground text-xs">
-                          Create a downloadable PDF with extracted data
-                        </p>
-                      </div>
-                      <Switch
-                        id="generate-pdf"
-                        checked={generatePdf}
-                        onCheckedChange={setGeneratePdf}
-                        disabled={isLoading}
-                      />
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="generate-pdf" className="text-sm">Generate PDF Report</Label>
+                      <p className="text-muted-foreground text-xs">
+                        Create a downloadable PDF with extracted data
+                      </p>
                     </div>
-                  </CardContent>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </Card>
+                    <Switch
+                      id="generate-pdf"
+                      checked={generatePdf}
+                      onCheckedChange={setGeneratePdf}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
 
           <Button
             onClick={handleSubmit}
