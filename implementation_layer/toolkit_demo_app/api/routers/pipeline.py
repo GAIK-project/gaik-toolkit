@@ -566,7 +566,10 @@ async def audio_pipeline_stream(
                 yield sse_event("step_update", steps[3])
 
                 try:
-                    from utils.pdf_generator import StructuredDataToPDF
+                    try:
+                        from utils.pdf_generator import StructuredDataToPDF
+                    except ImportError:
+                        from api.utils.pdf_generator import StructuredDataToPDF
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
@@ -696,7 +699,10 @@ async def text_pipeline_stream(
                 yield sse_event("step_update", steps[pdf_step_idx])
 
                 try:
-                    from utils.pdf_generator import StructuredDataToPDF
+                    try:
+                        from utils.pdf_generator import StructuredDataToPDF
+                    except ImportError:
+                        from api.utils.pdf_generator import StructuredDataToPDF
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)

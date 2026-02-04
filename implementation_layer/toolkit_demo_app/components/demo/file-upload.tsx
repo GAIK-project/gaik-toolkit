@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Upload, File, X, CheckCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
 
 interface FileUploadProps {
   accept?: string;
@@ -115,12 +115,6 @@ export function FileUpload({
     setError(null);
     onFileRemove?.();
   }, [onFileRemove]);
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
 
   return (
     <div className={cn("w-full", className)}>

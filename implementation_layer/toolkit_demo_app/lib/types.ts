@@ -12,7 +12,9 @@ export type DemoType =
   | "parser"
   | "transcriber"
   | "incident-report"
-  | "rag";
+  | "rag"
+  | "audio-structured"
+  | "document-structured";
 
 /**
  * User feedback stored in the database

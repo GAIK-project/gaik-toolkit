@@ -38,17 +38,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { formatFieldName } from "@/lib/utils";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-
-// Helper function to format field names
-function formatFieldName(key: string): string {
-  return key
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
 
 const DEFAULT_REQUIREMENTS = `Extract the following from the document:
 - Document title or heading

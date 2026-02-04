@@ -20,7 +20,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { parseSSEEvents, type SSEStep } from "@/lib/sse";
+import { processSSEStream, type SSEStep } from "@/lib/sse";
 import {
   AudioWaveform,
   ChevronDown,
@@ -30,17 +30,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
+import { formatFieldName } from "@/lib/utils";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-
-// Helper function to format field names
-function formatFieldName(key: string): string {
-  return key
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
 
 const DEFAULT_REQUIREMENTS = `Extract the following from the audio:
 - Key topics discussed
@@ -107,48 +100,29 @@ export default function AudioStructuredPage() {
         throw new Error("Failed to process audio");
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response body");
+      let streamError: Error | null = null;
 
-      const decoder = new TextDecoder();
-      let buffer = "";
+      await processSSEStream<AudioStructuredResult>(response, {
+        onSteps: (steps) => setPipelineSteps(steps),
+        onStepUpdate: (update) => {
+          setPipelineSteps((prev) =>
+            prev.map((s) => (s.step === update.step ? update : s)),
+          );
+        },
+        onResult: (data) => {
+          setResult(data);
+          posthog.capture("audio_structured_executed", {
+            generate_pdf: generatePdf,
+            enhanced: enhanced,
+          });
+          toast.success("Audio processed successfully!");
+        },
+        onError: (message) => {
+          streamError = new Error(message);
+        },
+      });
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const events = parseSSEEvents(buffer);
-
-        for (const event of events) {
-          if (event.type === "steps") {
-            setPipelineSteps(event.data.steps as unknown as SSEStep[]);
-          } else if (event.type === "step_update") {
-            const update = event.data as unknown as SSEStep;
-            setPipelineSteps((prev) =>
-              prev.map((s) => (s.step === update.step ? update : s)),
-            );
-          } else if (event.type === "result") {
-            setResult(event.data as unknown as AudioStructuredResult);
-
-            posthog.capture("audio_structured_executed", {
-              generate_pdf: generatePdf,
-              enhanced: enhanced,
-            });
-
-            toast.success("Audio processed successfully!");
-          } else if (event.type === "error") {
-            throw new Error(
-              (event.data.message as string) || "Processing failed",
-            );
-          }
-        }
-
-        const lastEventEnd = buffer.lastIndexOf("\n\n");
-        if (lastEventEnd !== -1) {
-          buffer = buffer.slice(lastEventEnd + 2);
-        }
-      }
+      if (streamError) throw streamError;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       if (error instanceof RateLimitError) return;
@@ -339,9 +313,10 @@ export default function AudioStructuredPage() {
                   copyContent={result.enhanced_transcript || result.raw_transcript || ""}
                   delay={0}
                 >
-                  <ResultText>
-                    {result.enhanced_transcript || result.raw_transcript}
-                  </ResultText>
+                  <ResultText
+                    content={result.enhanced_transcript || result.raw_transcript || ""}
+                    maxHeight="200px"
+                  />
                 </ResultCard>
               ) : null}
 

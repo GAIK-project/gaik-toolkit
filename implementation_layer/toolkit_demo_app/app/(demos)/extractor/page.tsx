@@ -29,17 +29,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Database, FileCode2, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
+import { formatFieldName } from "@/lib/utils";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-
-// Helper function to format field names
-function formatFieldName(key: string): string {
-  return key
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
 
 interface Field {
   name: string;

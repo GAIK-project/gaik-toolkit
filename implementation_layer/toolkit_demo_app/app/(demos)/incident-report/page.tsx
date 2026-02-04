@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
-import { parseSSEEvents, type SSEStep } from "@/lib/sse";
+import { processSSEStream, type SSEStep } from "@/lib/sse";
 import {
   AlertTriangle,
   ChevronDown,
@@ -155,50 +155,30 @@ export default function IncidentReportPage() {
         throw new Error("Failed to process input");
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response body");
+      let streamError: Error | null = null;
 
-      const decoder = new TextDecoder();
-      let buffer = "";
+      await processSSEStream<IncidentReportResult>(response, {
+        onSteps: (steps) => setPipelineSteps(steps),
+        onStepUpdate: (update) => {
+          setPipelineSteps((prev) =>
+            prev.map((s) => (s.step === update.step ? update : s)),
+          );
+        },
+        onResult: (data) => {
+          setResult(data);
+          posthog.capture("pipeline_executed", {
+            pipeline_type: inputMode,
+            extraction_mode: extractionMode,
+            generate_pdf: generatePdf,
+          });
+          toast.success("Incident report generated!");
+        },
+        onError: (message) => {
+          streamError = new Error(message);
+        },
+      });
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const events = parseSSEEvents(buffer);
-
-        for (const event of events) {
-          if (event.type === "steps") {
-            setPipelineSteps(event.data.steps as unknown as SSEStep[]);
-          } else if (event.type === "step_update") {
-            const update = event.data as unknown as SSEStep;
-            setPipelineSteps((prev) =>
-              prev.map((s) => (s.step === update.step ? update : s)),
-            );
-          } else if (event.type === "result") {
-            setResult(event.data as unknown as IncidentReportResult);
-
-            posthog.capture("pipeline_executed", {
-              pipeline_type: inputMode,
-              extraction_mode: extractionMode,
-              generate_pdf: generatePdf,
-            });
-
-            toast.success("Incident report generated!");
-          } else if (event.type === "error") {
-            throw new Error(
-              (event.data.message as string) || "Processing failed",
-            );
-          }
-        }
-
-        // Clear processed events from buffer
-        const lastEventEnd = buffer.lastIndexOf("\n\n");
-        if (lastEventEnd !== -1) {
-          buffer = buffer.slice(lastEventEnd + 2);
-        }
-      }
+      if (streamError) throw streamError;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       if (error instanceof RateLimitError) return; // Toast already shown

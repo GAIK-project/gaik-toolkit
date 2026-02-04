@@ -188,7 +188,7 @@ export default function ParserPage() {
                       <Label>Parser Type</Label>
                       <Select
                         value={parserType}
-                        onValueChange={setParserType}
+                        onValueChange={(value: typeof parserType) => setParserType(value)}
                         disabled={isLoading}
                       >
                         <SelectTrigger>

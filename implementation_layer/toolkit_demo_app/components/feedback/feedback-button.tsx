@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Star, Pencil } from "lucide-react";
+import { Star } from "lucide-react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { FeedbackDialog } from "./feedback-dialog";

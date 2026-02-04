@@ -55,3 +55,65 @@ export function parseSSEEvents(text: string): SSEEvent[] {
   }
   return events;
 }
+
+/**
+ * Callback handlers for SSE stream processing
+ */
+export interface SSEStreamHandlers<TResult> {
+  onSteps?: (steps: SSEStep[]) => void;
+  onStepUpdate?: (step: SSEStep) => void;
+  onResult?: (result: TResult) => void;
+  onError?: (message: string) => void;
+  /** Handle custom event types not covered by standard handlers */
+  onCustomEvent?: (event: SSEEvent) => void;
+}
+
+/**
+ * Process an SSE response stream with standardized event handling
+ *
+ * Handles common event types: steps, step_update, result, error
+ * Custom events can be handled via onCustomEvent callback
+ */
+export async function processSSEStream<TResult>(
+  response: Response,
+  handlers: SSEStreamHandlers<TResult>,
+): Promise<void> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const events = parseSSEEvents(buffer);
+
+    for (const event of events) {
+      switch (event.type) {
+        case "steps":
+          handlers.onSteps?.(event.data.steps as unknown as SSEStep[]);
+          break;
+        case "step_update":
+          handlers.onStepUpdate?.(event.data as unknown as SSEStep);
+          break;
+        case "result":
+          handlers.onResult?.(event.data as unknown as TResult);
+          break;
+        case "error":
+          handlers.onError?.((event.data.message as string) || "Processing failed");
+          break;
+        default:
+          handlers.onCustomEvent?.(event);
+      }
+    }
+
+    // Clear processed events from buffer
+    const lastEventEnd = buffer.lastIndexOf("\n\n");
+    if (lastEventEnd !== -1) {
+      buffer = buffer.slice(lastEventEnd + 2);
+    }
+  }
+}
