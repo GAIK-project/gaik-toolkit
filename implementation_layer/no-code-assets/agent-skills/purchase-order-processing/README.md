@@ -16,7 +16,7 @@ This skill helps you **process purchase orders** and generate complete sales ord
 
 ---
 
-![Purchase Order Processing Workflow](images/PO-skill.png)
+<img src="images/PO-skill.png" alt="Purchase Order Processing Workflow" width="70%">
 ---
 
 ### Example Use Cases
