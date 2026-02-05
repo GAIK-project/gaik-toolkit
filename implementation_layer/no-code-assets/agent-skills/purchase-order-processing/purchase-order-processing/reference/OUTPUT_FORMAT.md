@@ -79,14 +79,18 @@ ORDER DETAILS
 
 PRICING SUMMARY
 --------------------------------------------------------------------------------
-Subtotal:                                                        ${Subtotal}
+Material Subtotal:                                               ${Subtotal}
 Volume Discount ({Discount_Rate}%):                            -${Discount}
-Total Testing/Cert:                                              ${Fees}
-Total Shipping Cost:                                             ${Shipping}
+Net Material Cost:                                               ${Net_Material_Cost}
+Total Testing/Cert Fees:                                         ${Total_Fees}
+Shipping:                                                        ${Shipping}
 Tax ({Tax_Rate}%):                                               ${Tax}
 ────────────────────────────────────────────────────────────────────────────
 TOTAL:                                                           ${Grand_Total}
 ────────────────────────────────────────────────────────────────────────────
+
+NOTE: This is the default format. If a sample_order.docx is provided,
+      extract and match its exact format instead.
 
 
 SPECIAL INSTRUCTIONS
@@ -144,11 +148,28 @@ For questions or concerns, please contact our sales team.
 - Add separators (═══) above and below table content
 
 #### Currency Formatting
-- Always include `$` symbol
-- Use comma separators for thousands (e.g., `$1,234.56`)
-- Always show exactly 2 decimal places
-- Negative values use minus sign prefix (e.g., `-$1,278.38`)
-- Right-align currency values in columns
+
+**REQUIRED FORMAT (match sample exactly):**
+- **Dollar sign:** Always prefix with $ symbol
+- **Thousands separator:** Always use comma (e.g., $25,567.50, NOT $25567.50)
+- **Decimal places:** Always show exactly 2 decimal places
+  - Even for whole dollars: $450.00 (NOT $450)
+  - For cents: $1,278.38 (NOT $1,278.4)
+- **Negative values:** Minus sign BEFORE dollar sign
+  - Correct: -$1,278.38
+  - Incorrect: $-1,278.38 or ($1,278.38)
+- **Right-alignment:** In tables, right-align all currency values
+- **No spaces:** No space between $ and digits ($450.00, NOT $ 450.00)
+
+**Examples:**
+✓ Correct: $25,567.50
+✗ Wrong: $25567.50 (missing comma)
+✗ Wrong: $25,567.5 (missing trailing zero)
+✗ Wrong: 25,567.50 (missing dollar sign)
+
+✓ Correct: -$1,278.38
+✗ Wrong: $-1,278.38 (wrong position)
+✗ Wrong: ($1,278.38) (accounting style not used)
 
 #### Conditional Display
 - **Volume Discount:** Hide the row entirely if discount is 0%

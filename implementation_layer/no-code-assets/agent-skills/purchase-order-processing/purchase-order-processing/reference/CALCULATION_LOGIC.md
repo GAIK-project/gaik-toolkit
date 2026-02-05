@@ -167,6 +167,12 @@ Volume_Discount = $25,567.50 × 0.05 = $1,278.38
 Net_Material_Cost = $25,567.50 - $1,278.38 = $24,289.12
 ```
 
+**IMPORTANT - OUTPUT FIELD:**
+This is a REQUIRED field that MUST appear in the pricing summary output.
+- **Label:** "Net Material Cost:"
+- **Purpose:** Shows the material cost after applying volume discount
+- **Display:** Always include this field between "Volume Discount" and "Total Testing/Cert Fees" in the pricing summary
+
 ---
 
 ## Fees Aggregation
@@ -235,10 +241,10 @@ ELSE:
 
 ### Taxable Amount
 ```
-Taxable_Amount = Net_Material_Cost + Total_Fees
+Taxable_Amount = Net_Material_Cost + Total_Fees + Shipping
 ```
 
-**Note:** Shipping is typically NOT taxable (jurisdiction-dependent).
+**Note:** Tax is applied to the net material cost (after discount), all fees, and shipping.
 
 ### Tax Amount
 ```
@@ -249,9 +255,12 @@ Tax_Amount = Taxable_Amount × Tax_Rate
 
 **Example:**
 ```
-Taxable_Amount = $24,289.12 + $150.00 = $24,439.12
+Net_Material_Cost = $24,289.12
+Total_Fees = $165.00
+Shipping = $450.00
+Taxable_Amount = $24,289.12 + $165.00 + $450.00 = $24,904.12
 Tax_Rate = 6%
-Tax_Amount = $24,439.12 × 0.06 = $1,466.35
+Tax_Amount = $24,904.12 × 0.06 = $1,494.25
 ```
 
 ---

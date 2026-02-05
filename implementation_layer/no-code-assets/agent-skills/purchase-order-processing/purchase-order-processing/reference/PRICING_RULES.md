@@ -144,13 +144,11 @@ Tax_Rate = 6%
 Tax is applied to:
 - Net Material Cost (after discount)
 - Total Fees (cutting + testing + certification)
-
-Tax is NOT applied to:
-- Shipping (unless specified by jurisdiction)
+- Shipping
 
 ### Tax Formula
 ```
-Taxable_Amount = Net_Material_Cost + Total_Fees
+Taxable_Amount = Net_Material_Cost + Total_Fees + Shipping
 Tax_Amount = Taxable_Amount × Tax_Rate
 ```
 

@@ -233,18 +233,48 @@ Aggregate all fees (cutting, testing, certification), add shipping from PO, calc
 Create the Sales Order document using format from `reference/OUTPUT_FORMAT.md`.
 
 #### 6.1 Determine Output Format
-- IF `sample_sales_order/sample_order.docx` exists → Use DOCX skill to create a .docx output, inferring format from sample and matching its style
-- ELSE → Refer to `reference/OUTPUT_FORMAT.md` for default format guidelines
+- IF `sample_sales_order/sample_order.docx` exists:
+  1. Use DOCX skill to READ the sample document
+  2. Extract the EXACT pricing summary structure:
+     - Field labels (verbatim)
+     - Field order (must be preserved)
+     - Currency formatting rules
+     - Punctuation (colons, parentheses)
+  3. Use this as the TEMPLATE for output
+  4. MATCH every detail: labels, order, formatting
+- ELSE → Use default format from `reference/OUTPUT_FORMAT.md`
 
 #### 6.2 Generate Document Sections
+
 Create the following sections as specified in `reference/OUTPUT_FORMAT.md`:
 - **Header:** SO number, order date, customer PO reference, payment/shipping terms
 - **Customer Information:** Bill To and Ship To addresses
 - **Line Items Table:** All items with enriched details from BOMs
-- **Pricing Summary:** Subtotal, discount, fees, shipping, tax, grand total
-- **Special Instructions:** Copy requirements from PO
+- **Special Instructions:** Copy verbatim ALL special instructions and/or requirements from the Purchase Order. Include every instruction exactly as written in the PO. DO NOT paraphrase, summarize, or omit any instructions. 
 - **Approval Section:** Signature lines (if using template)
-**IMPORTANT:** DO NOT create any additional field. Nor drop any field. 
+
+**PRICING SUMMARY:**
+
+Generate pricing summary as specified in `reference/OUTPUT_FORMAT.md` (lines 82-93).
+
+If sample_order.docx exists, extract and match its exact format.
+Otherwise, use the default format from OUTPUT_FORMAT.md.
+
+**CRITICAL CURRENCY FORMATTING REQUIREMENT:**
+ALL currency values MUST include comma separators for thousands.
+- ✓ Correct: $25,567.50, $1,278.38, $26,398.37
+- ✗ Wrong: $25567.50, $1278.38, $26398.37 (missing commas)
+
+**Requirements:**
+- Include all required fields in exact order (see OUTPUT_FORMAT.md template)
+- Match field labels exactly (including punctuation)
+- Apply currency formatting rules (see OUTPUT_FORMAT.md lines 146-168)
+- DO NOT skip, add, or rearrange fields
+
+**See `reference/OUTPUT_FORMAT.md`** for:
+- Complete pricing summary template (lines 82-93)
+- Currency formatting requirements (lines 146-168)
+- Field descriptions and formatting rules 
 
 #### 6.3 Save Output
 - Filename format: `SO-[number]_[Customer_Name]_[Date].[extension]`
@@ -316,7 +346,7 @@ view /mnt/skills/public/docx/SKILL.md skill to generate the docx files.
 - Validate BOM references match PO references
 - Flag unmatched items clearly for manual review
 - Show price comparison if PO prices differ significantly from calculated
-- Preserve all special instructions from PO
+- Copy verbatim ALL special instructions from PO (do not paraphrase or omit)
 - Generate unique SO numbers
 
 ### DO NOT:
@@ -331,6 +361,21 @@ view /mnt/skills/public/docx/SKILL.md skill to generate the docx files.
 - Price not found → Flag item, show "PRICE TBD"
 - Invalid data format → Report specific error, ask for correction
 - Calculation discrepancy → Show warning with details
+
+### Sample Format Compliance:
+- When sample_order.docx exists, STRICTLY match its format
+- Extract exact field labels including:
+  - Punctuation (colons, parentheses, hyphens)
+  - Capitalization (Material Subtotal vs material subtotal)
+  - Abbreviations (Cert vs Certificate)
+- Preserve field order exactly as shown in sample
+- Match currency formatting:
+  - Dollar signs, commas, decimal places
+  - Negative value formatting
+- DO NOT skip fields present in sample
+- DO NOT add fields not in sample
+- DO NOT rearrange field order
+- If unsure, read the sample again to verify
 
 ---
 

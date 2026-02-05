@@ -196,3 +196,42 @@ If your PO uses "PART NO." instead of "MATERIAL NUMBER":
 ```
 
 The skill will look for "PART NO." column but store it as Material_Number internally.
+
+---
+
+## Sample Order Format Fields (Optional)
+
+When `sample_sales_order/sample_order.docx` exists, extract these format specifications:
+
+### Pricing Summary Format
+| Field | Extract From Sample | Required | Purpose |
+|-------|---------------------|----------|---------|
+| Field_Labels | Pricing summary section | Yes | Exact label text to use |
+| Field_Order | Pricing summary section | Yes | Sequence of fields top to bottom |
+| Currency_Format | All price fields | Yes | $ placement, commas, decimals |
+| Punctuation | Field labels | Yes | Colons, parentheses, hyphens |
+| Alignment | Table structure | Yes | Left/right alignment |
+
+**Extraction Method:**
+1. Read sample_order.docx using DOCX skill
+2. Locate "PRICING SUMMARY" or equivalent section
+3. Extract each field label verbatim (including punctuation)
+4. Note field order (preserve exactly)
+5. Observe currency formatting pattern (dollar signs, commas, decimals)
+6. Use as template for output generation
+
+**Required Fields to Extract:**
+- Material Subtotal
+- Volume Discount (with percentage in parentheses)
+- Net Material Cost
+- Total Testing/Cert Fees
+- Shipping
+- Tax (with percentage in parentheses)
+- TOTAL
+
+**Format Specifications to Preserve:**
+- Label capitalization (e.g., "Material Subtotal" not "material subtotal")
+- Colon placement after field labels
+- Percentage notation in parentheses: (5%), (6%)
+- Currency alignment (right-aligned values)
+- Separator lines between sections
