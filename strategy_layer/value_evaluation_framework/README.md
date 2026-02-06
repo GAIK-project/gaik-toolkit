@@ -6,10 +6,15 @@ The framework is based on the idea that GenAI is a strategic enabler of knowledg
 Value dimensions
 
 The framework distinguishes several complementary value dimensions, which together provide a holistic view of GenAI impact:
+
 **Informational value** – improvements in insight, understanding, and decision quality
+
 **Operational value** – changes in speed, flow, and quality of work
+
 **Economic value** – productivity gains, time savings, and cost impacts
+
 **Social value** – collaboration, trust, shared understanding, and culture
+
 **Emotional value** – user confidence, sense of agency, and meaningful work
 
 Each value dimension can be assessed independently, but real GenAI value typically emerges from their combined effects: Value × knowledge processes
