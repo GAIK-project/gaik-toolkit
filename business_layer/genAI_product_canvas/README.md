@@ -12,4 +12,4 @@ Content under development.
 
 ## Resources
 
-- [GenAI Product Canvas Presentation](GenAI_product_canvas_v0.1.pptx) - PowerPoint presentation with detailed canvas templates and examples
+- [📥 GenAI Product Canvas Presentation](GenAI_product_canvas_v0.1.pptx?raw=true) (PowerPoint download) - Detailed canvas templates and examples
