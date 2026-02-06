@@ -1,159 +1,79 @@
 ---
-title: Introduction
+title: GAIK – Generative AI Knowledge Management Toolkit
 description: GAIK - GenAI toolkit for smarter knowledge work
 ---
 
-<div style={{textAlign: 'center', margin: '2rem 0'}}>
-  <img src="/gaik-toolkit/logos/SVG/gaik_logo_big_fitted.svg" alt="GAIK Logo" style={{maxWidth: '600px', width: '100%', height: 'auto'}} />
-</div>
+# GAIK – Generative AI Knowledge Management Toolkit
 
-## GenAI Toolkit for Smarter Knowledge Work
+[![PyPI version](https://img.shields.io/pypi/v/gaik.svg)](https://pypi.org/project/gaik/)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
 This is a generative AI toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides a complete set of components and guidance for building knowledge-centric GenAI solutions, from strategic directions to deployable implementations.
 
-GAIK toolkit provides reusable, modular components for building GenAI-powered knowledge management solutions. Extract structured data from documents, parse PDFs, transcribe audio, and classify documents - all with natural language descriptions.
+# Project Documentation
 
-```bash
-pip install "gaik[all]"
-```
+Project documentation is available at:
 
-**[PyPI](https://pypi.org/project/gaik/)** | **[GitHub](https://github.com/GAIK-project/gaik-toolkit)** | **Python 3.10+**
+https://gaik-project.github.io/gaik-toolkit/
 
-## Quick Example
+**Live Demo:** https://gaik-demo.2.rahtiapp.fi/
 
-```python
-from gaik.software_components.extractor import (
-    SchemaGenerator, DataExtractor, get_openai_config
-)
+# Why the toolkit is needed
 
-# Configure OpenAI (Azure or standard)
-config = get_openai_config(use_azure=True)
+**Generative AI has significant potential to increase the productivity of knowledge work**
+- Example experiments: consultants using AI were significantly more productive – they completed 12.2% more tasks on average, and completed tasks 25.1% more quickly (Dell'Acqua, 2023)
+- Example cases from practice: Customer-support agents at a large firm selling business-process software demonstrated a 15% increase in productivity when assisted by generative AI (Brynjolfsson, 2025).
 
-# Generate schema from natural language
-generator = SchemaGenerator(config=config)
-schema = generator.generate_schema(
-    user_requirements="Extract invoice number, vendor, and total amount"
-)
+**However, tangible business value from Generative AI implementation projects is still limited**
+- "only 26% of companies have advanced beyond the proof-of-concept stage to generate value" Source: BCG's report (de Bellefonds et al, 2024).
+- "Despite $30–40 billion in enterprise investment into GenAI, 95% of organizations are getting zero return." Source: MIT report (Challapally et al, 2025).
 
-# Extract data
-extractor = DataExtractor(config=config)
-results = extractor.extract(
-    extraction_model=schema,
-    requirements=generator.item_requirements,
-    user_requirements="Extract invoice data",
-    documents=["Invoice #12345 from Acme Corp. Total: $1,500"]
-)
+Adopting Generative AI and creating value from **it is especially challenging for small and medium-sized enterprises (SMEs)**, which lack the technical expertise and capabilities to implement GenAI solutions effectively. The literature review of Oldemeyer et al. (2024) identified the following three most frequent challenges for SMEs in the AI implementation in the industrial sector: knowledge, costs, and the low maturity level in digitalization.
 
-print(results)  # [{'invoice_number': '12345', 'vendor': 'Acme Corp', 'total_amount': 1500}]
-```
+# Overall approach
+Companies can deal with GenAI challenges by combining reusable building blocks with clear guidelines.
+Instead of designing solutions from scratch, teams assemble existing components and follow proven ways of working.
+This makes it easier to turn ideas into real results, while reducing implementation time, risk, and required resources, and improving overall solution quality.
 
-## Key Features
+# Toolkit Focus
+The knowledge management perspective for structuring GenAI development and implementation activities.
 
-| Component | Description |
-|-----------|-------------|
-| **Data Extraction** | Extract structured data using natural language requirements |
-| **PDF Parsing** | Vision-based and local PDF to Markdown conversion |
-| **Audio Transcription** | Whisper-powered transcription with GPT enhancement |
-| **Document Classification** | AI-powered document categorization |
+The toolkit focuses on three core **knowledge processes** in organizations:
+| Knowledge process | Description | Illustration |
+|-----------|-------------|--------------|
+| **Knowledge capture** | Extract needed information from business documents, videos, voice recordings, emails, and meeting recordings | ![Knowledge capture](https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/images/Knowledge_capture_image.jpg) |
+| **Knowledge access** | Intelligent access to organizational knowledge (document repositories, databases, wikis, CRMs) | ![Knowledge access](https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/images/Knowledge_access_image.jpg) |
+| **Knowledge synthesis** | Automatic generation of business reports, sales proposals, marketing materials, project proposals | ![Knowledge synthesis](https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/images/Knowledge_synthesis_image.jpg) |
 
-## Architecture
-
-The toolkit is organized into two layers:
-
-### Software Components (Low-level)
-
-Individual components for specific tasks - use these when you need fine-grained control:
-
-- **SchemaGenerator** + **DataExtractor** - Dynamic schema generation and extraction
-- **VisionParser** / **PyMuPDFParser** / **DoclingParser** - PDF parsing options
-- **Transcriber** - Audio/video transcription
-- **DocumentClassifier** - Document categorization
-
-### Software Modules (High-level)
-
-End-to-end pipelines that combine software components:
-
-- **DocumentsToStructuredData** - Parse documents and extract structured data
-- **AudioToStructuredData** - Transcribe audio and extract structured data
-
-## Knowledge Management Focus
-
-GAIK addresses three fundamental knowledge management processes:
-
-**Knowledge Capture** - Extract information from business documents, videos, voice recordings, emails, and meeting recordings.
-
-**Knowledge Access** - Quick, precise, and intelligent access to organizational knowledge.
-
-**Knowledge Generation** - Auto-generate reports, proposals, and documentation.
-
-## Modular Component Architecture
-
-Each component is designed as an independently deployable unit that can:
-
-- Function standalone or integrate with other components
-- Work as services, endpoints, or Model Context Protocols (MCPs)
-- Scale from simple scripts to production pipelines
-
-## Get Started
-
-<Cards>
-  <Card
-    title="Live Demo"
-    href="https://gaik-demo.2.rahtiapp.fi/"
-    description="Try GAIK toolkit components interactively"
-  />
-  <Card
-    title="Getting Started"
-    href="/getting-started"
-    description="Installation and environment setup"
-  />
-  <Card
-    title="Toolkit"
-    href="/toolkit"
-    description="Component documentation and API reference"
-  />
-  <Card
-    title="Examples"
-    href="/examples"
-    description="Real-world use cases and patterns"
-  />
-</Cards>
-
-## No-code Assets
-
-Ready-to-use prompts and agent skills for common knowledge management tasks:
-
-<Cards>
-  <Card
-    title="Prompts"
-    href="https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts"
-    description="Curated prompts for document processing and extraction"
-  />
-  <Card
-    title="Agent Skills"
-    href="https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills"
-    description="Reusable agent skills for AI workflows"
-  />
-</Cards>
-
-## About GAIK
-
-GAIK (Generative AI-Enhanced Knowledge Management) is a research project exploring how generative AI can transform knowledge management in businesses.
-
-### Project Facts
-
-| | |
+The following **generic use cases** are defined as the top priority at the moment:
+| Knowledge process | Generic use cases |
 |---|---|
-| **Project Lead** | Haaga-Helia University of Applied Sciences |
-| **Duration** | February 2025 - January 2027 |
-| **Co-funding** | European Regional Development Fund (ERDF) |
+| **Knowledge capture** | A. Incident reporting in industry (e.g., for equipment, buildings)<br/>B. Creating construction site diaries<br/>C. Creation of transcripts and closed captions in various languages for instructional videos and podcasts<br/>D. … |
+| **Knowledge access** | A. Customer assistant for complex products and services<br/>B. Semantic audio and video search for medical instructions<br/>C. Learning assistant |
+| **Knowledge synthesis** | A. Sales proposal generation<br/>B. Report preparation<br/>C. … |
 
-### Partners
 
-**Academic:** University of Helsinki, Tampere University
+---
 
-**Industry:** Azets Insight Oy, Luvata Oy, QAdental
+## Layer-Based Architecture
 
-**International Research:** TIB Leibniz Information Centre (Germany), 3IA Cote d'Azur (France), MCI The Entrepreneurial School (Austria)
+The GAIK Toolkit is organized into a layer-based architecture that spans from strategic planning to implementation and security:
 
-Learn more at **[gaik.ai](https://gaik.ai/)**
+| Layer | Purpose | Contents |
+|-------|---------|----------|
+| **Strategy Layer** | Identification and selection of use cases, GenAI adoption readiness assessment and preparation, business value evaluation | Use case selection framework, Value evaluation framework, AI maturity assessment tool, GenAI success canvas  |
+| **Requirements Layer** | Requirements capture and specification | Requirement templates, test cases |
+| **Business Layer** | Use case definition, workflow and work system analysis and redesign | GenAI product canvas, Workflow templates, Work systems definitions |
+| **Implementation Layer** | Solution development either via no-code or code-based approach, solution performance evaluation, integration, and monitoring | Reusable software components and modules for system development, (`gaik` code package), no-code assets, evaluation methods, unit tests, deployment packages, connectors |
+| **Security Compliance Layer** | Security policies and compliance frameworks | Security guidelines, compliance checks, audit trails |
+| **Guidance Layer** | Guides and automates the process of solution development and implementation for KM (how to select and assemble building blocks) | Process and guide for GenAI solution implementation, Configuration wizard, Glossary |
+
+This architecture ensures that GenAI solutions are built with proper governance, clear requirements, and comprehensive implementation support.
+
+![GAIK Architecture](https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/images/Toolkit_layers.jpg)
+
+
+
+## License
+
+This project is licensed under the MIT License – see `LICENSE` for details.
