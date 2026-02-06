@@ -24,11 +24,15 @@ Each value dimension can be assessed independently, but real GenAI value typical
 To make the evaluation concrete, the framework assesses each value dimension across selected knowledge processes (such as knowledge capture, access, and synthesis). This is typically done using a value–knowledge process matrix, which highlights strengths, gaps, and bottlenecks.
 Color-coding (for example, green / yellow / red) supports structured discussion and helps executives quickly see where GenAI creates value and where further improvement is needed.
 
-
+- **Value evaluation framework** - [Download Raw File (Value_evaluation_framework_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/Value_evaluation_framework_v0.1.pptx)
 
 **Reference value evaluation models for selected use cases**
 
 For selected generic use cases, the toolkit provides reference value evaluation models that apply the value evaluation framework in a concrete business context. These models show how different types of value—such as operational, informational, economic, social, and emotional value—emerge from the use of GenAI in a specific use case.
 
 Each reference model links GenAI-enabled capabilities to changes in work practices, decision-making, and user experience, making value assumptions explicit and comparable. Organizations can use these models as starting points to evaluate expected benefits, identify value drivers, and adapt the evaluation to their own context.
+
+## Status
+
+This framework is currently under development. Content will be added as the GAIK project evolves.
 
