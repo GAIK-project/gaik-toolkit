@@ -17,6 +17,8 @@ The framework distinguishes several complementary value dimensions, which togeth
 
 **Emotional value** – user confidence, sense of agency, and meaningful work
 
+![Value Evaluation Framework](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/images/Value_evaluation_framework.jpg)
+
 Each value dimension can be assessed independently, but real GenAI value typically emerges from their combined effects: Value × knowledge processes
 
 To make the evaluation concrete, the framework assesses each value dimension across selected knowledge processes (such as knowledge capture, access, and synthesis). This is typically done using a value–knowledge process matrix, which highlights strengths, gaps, and bottlenecks.
