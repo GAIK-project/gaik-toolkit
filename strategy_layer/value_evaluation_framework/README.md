@@ -26,11 +26,15 @@ Color-coding (for example, green / yellow / red) supports structured discussion 
 
 - **Value evaluation framework** - [Download Raw File (Value_evaluation_framework_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/Value_evaluation_framework_v0.1.pptx)
 
+
 **Reference value evaluation models for selected use cases**
 
 For selected generic use cases, the toolkit provides reference value evaluation models that apply the value evaluation framework in a concrete business context. These models show how different types of value—such as operational, informational, economic, social, and emotional value—emerge from the use of GenAI in a specific use case.
 
 Each reference model links GenAI-enabled capabilities to changes in work practices, decision-making, and user experience, making value assumptions explicit and comparable. Organizations can use these models as starting points to evaluate expected benefits, identify value drivers, and adapt the evaluation to their own context.
+
+The **Value evaluation model: Incident reporting** - [Download Raw File (Value_evaluation_model_for Incident_reporting_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/Value_evaluation_model_for%20Incident_reporting_v0.1.pptx) illustrates how the framework can be applied to a concrete use case.
+
 
 ## Status
 
