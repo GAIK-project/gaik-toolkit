@@ -11,7 +11,7 @@ Beyond individual workflows, the business layer also supports work system analys
 
 ## Resources
 
-- [GenAI Product Canvas Presentation](business_layer/genAI_product_canvas/GenAI_product_canvas_v0.1.pptx) - PowerPoint presentation with detailed canvas templates and examples
+- [GenAI Product Canvas Presentation](https://github.com/GAIK-project/gaik-toolkit/blob/main/business_layer/genAI_product_canvas/GenAI_product_canvas_v0.1.pptx) - PowerPoint presentation with detailed canvas templates and examples
 
 ## Status
 
