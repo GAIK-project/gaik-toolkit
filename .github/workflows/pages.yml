@@ -1,4 +1,5 @@
 name: Deploy Docs to GitHub Pages
+# Trigger fresh deployment after artifact cleanup
 
 on:
   push:
