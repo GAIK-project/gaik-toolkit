@@ -21,24 +21,32 @@ export default async function proxy(request: NextRequest) {
   if (pathname.startsWith("/api") && !isNextApiRoute) {
     // Rate limit check (if Redis is configured)
     if (ratelimit) {
-      const ip =
-        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-        request.headers.get("x-real-ip") ??
-        "anonymous";
+      try {
+        const ip =
+          request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+          request.headers.get("x-real-ip") ??
+          "anonymous";
 
-      const { success, limit, remaining, reset } = await ratelimit.limit(ip);
+        const { success, limit, remaining, reset } =
+          await ratelimit.limit(ip);
 
-      if (!success) {
-        return NextResponse.json(
-          { error: "Liian monta pyyntöä. Yritä hetken päästä uudelleen." },
-          {
-            status: 429,
-            headers: {
-              "X-RateLimit-Limit": limit.toString(),
-              "X-RateLimit-Remaining": remaining.toString(),
-              "X-RateLimit-Reset": reset.toString(),
+        if (!success) {
+          return NextResponse.json(
+            { error: "Liian monta pyyntöä. Yritä hetken päästä uudelleen." },
+            {
+              status: 429,
+              headers: {
+                "X-RateLimit-Limit": limit.toString(),
+                "X-RateLimit-Remaining": remaining.toString(),
+                "X-RateLimit-Reset": reset.toString(),
+              },
             },
-          },
+          );
+        }
+      } catch (error) {
+        console.warn(
+          "[rate-limit] Redis unavailable, skipping rate limit:",
+          error instanceof Error ? error.message : error,
         );
       }
     }

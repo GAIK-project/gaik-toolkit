@@ -20,8 +20,8 @@ function createRateLimiter(): Ratelimit | null {
   return new Ratelimit({
     redis: new Redis({ url, token }),
     // 10 req/min per IP
-    limiter: Ratelimit.slidingWindow(10, "1 m"),
-    analytics: true,
+    limiter: Ratelimit.fixedWindow(10, "1 m"),
+    analytics: false,
     prefix: "gaik-demo",
   });
 }
