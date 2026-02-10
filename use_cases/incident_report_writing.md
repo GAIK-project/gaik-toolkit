@@ -18,24 +18,26 @@ The canvas provides a shared understanding of what the GenAI solution does and w
 
 flowchart TB
 
-%% ===== Top Row =====
+%% ===== Context & Need =====
 subgraph C1["Context & Need"]
   A1["Name<br/><b>Incident reporting assistant</b>"]
   A2["Knowledge processes<br/>Knowledge capture + Knowledge synthesis"]
   A3["Business need<br/>Incidents such as broken equipment, water leaks, or spills occasionally occur on company premises and must be reported quickly so they can be resolved. Currently, employees must go to a computer and complete a web form in system X, which slows down the incident-reporting process."]
 end
 
+%% ===== Solution & Users =====
 subgraph C2["Solution & Users"]
   B1["Task<br/><b>Incident reporting</b>"]
   B2["User/-s<br/>Everyone in the company"]
   B3["Solution<br/>The new AI-driven solution will enable employees to report incidents quickly through voice input on their mobile phones from different locations (including outdoors). The process will involve recording verbal descriptions of incidents, capturing images of hazards, and converting this information into a structured incident report that can be saved directly to the system X."]
 end
 
-%% ===== Bottom Row =====
+%% ===== Inputs =====
 subgraph C3["Inputs"]
-  D1["1. Voice input (verbal description of an incident)<br/>2. Images (photos), maybe with annotations<br/>3. Template/-s for incident reports (list/-s of questions)<br/>4. Reference data (list of equipment, list of facilities, list of incident types and severity levels)"]
+  D1["Input<br/>1. Voice input (verbal description of an incident)<br/>2. Images (photos), maybe with annotations<br/>3. Template/-s for incident reports (list/-s of questions)<br/>4. Reference data (list of equipment, list of facilities, list of incident types and severity levels)"]
 end
 
+%% ===== Outputs & Value =====
 subgraph C4["Outputs & Value"]
   E1["Output<br/><b>Incident report (filled in template)</b>"]
   E2["Expected benefits / value<br/>1. Faster response time<br/>2. Increased accuracy and consistency<br/>3. Improved safety<br/>4. Better compliance and documentation"]
