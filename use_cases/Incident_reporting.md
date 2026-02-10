@@ -30,7 +30,7 @@ flowchart LR
 
 ### 1. Transcriber
 
-Converts an audio recording into text using OpenAI's speech-to-text model, with an optional GPT enhancement step that cleans up the raw transcript — correcting speech artefacts and improving readability.
+Converts an audio recording into text using OpenAI's speech-to-text model, with an enhancement step that cleans up the raw transcript — correcting speech artefacts and improving readability.
 
 ```mermaid
 flowchart LR
@@ -39,7 +39,7 @@ flowchart LR
     subgraph B["Transcriber"]
         direction TB
         W["Transcription Model<br/>Speech-to-Text"]
-        G["GPT Enhancement<br/>Clean & Format"]
+        G["Enhancement<br/>Clean & Format"]
         W --> G
     end
 
@@ -121,12 +121,12 @@ flowchart TD
     IN1("🎙️ Audio File") --> MOD
     IN2("📋 User Requirements") --> MOD
 
-    subgraph MOD["Audio to Structured Data Module"]
+    subgraph MOD["Audio-to-Structured-Data Module"]
         direction TB
 
         subgraph T["Step 1 · Transcriber"]
             direction LR
-            W["Transcription Model<br/>Speech-to-Text"] --> G["GPT<br/>Enhancement"]
+            W["Transcription Model<br/>Speech-to-Text"] --> G["Transcript<br/>Enhancement"]
         end
 
         subgraph X["Step 2 · Extractor"]
