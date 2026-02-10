@@ -183,6 +183,24 @@ The same pipeline applies to any domain requiring structured extraction from spo
 
 ---
 
+## Evaluation Methods
+
+The quality of this use case is evaluated by assessing each software component independently:
+
+### Transcriber Evaluation
+
+Transcription quality is measured using standard metrics such as **Word Error Rate (WER)**, which quantifies the accuracy of the speech-to-text conversion. The evaluation also includes comparison of various transcription models and methods to enhance the raw transcript as a post-transcription step.
+
+> 📊 **Transcription evaluation methods:** [`implementation_layer/eval_methods/transcription_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/transcription_eval)
+
+### Extractor Evaluation
+
+The quality of structured information extraction is evaluated through **cosine similarity ratio**, which measures how accurately the extracted fields match the expected values. This method assesses both the semantic correctness and completeness of the extracted data.
+
+> 📊 **Extraction evaluation methods:** [`implementation_layer/eval_methods/extraction_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval)
+
+---
+
 ## Related Resources
 
 | Resource | Link |
