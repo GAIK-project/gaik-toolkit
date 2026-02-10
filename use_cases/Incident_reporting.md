@@ -121,7 +121,7 @@ flowchart TD
     IN1("🎙️ Audio File") --> MOD
     IN2("📋 User Requirements") --> MOD
 
-    subgraph MOD["Audio-to-Structured-Data Module"]
+    subgraph MOD["Audio-to-Structured-Data"]
         direction TB
 
         subgraph T["Step 1 · Transcriber"]
