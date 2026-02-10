@@ -139,7 +139,7 @@ flowchart TD
 
     MOD --> O1("📄 Raw Transcript")
     MOD --> O2("✨ Enhanced Transcript")
-    MOD --> O3("✅ Structured incident Fields")
+    MOD --> O3("✅ Structured incident Report")
     MOD --> O4("🗂️ Reusable Schema")
 
     style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
