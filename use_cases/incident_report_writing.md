@@ -65,7 +65,7 @@ This logic is captured in a prompt template, which acts like a digital reporting
 
 What happens in daily work
 
-Step 1 – Reporting by voice
+**Step 1 – Reporting by voice**
 An employee or supervisor records a short voice message describing:
 an incident
 a near miss
@@ -74,9 +74,8 @@ or a safety-related initiative
 
 No form, no typing, no computer required.
 
-Step 2 – Automatic structuring (no-code logic)
+**Step 2 – Automatic structuring (no-code logic)**
 The prompt template converts the spoken description into a standardized incident report, following strict business rules.
-
 For example, the assistant is instructed to:
 extract only information explicitly mentioned
 classify the report using fixed categories (e.g. Safety observation, Near miss: Yes/No)
