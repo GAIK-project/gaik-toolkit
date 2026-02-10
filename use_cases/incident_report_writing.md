@@ -56,9 +56,13 @@ The no-code layer shows how a GenAI solution can be used in everyday work withou
 What the business user sets up (once)
 
 A safety manager defines a reporting template, not code. Conceptually, it says:
+
 “These are the fields our incident report must contain”
+
 “These are the only allowed options for key fields”
+
 “Do not guess or invent missing information”
+
 “If something is not said, leave it empty”
 
 This logic is captured in a prompt template, which acts like a digital reporting policy.
