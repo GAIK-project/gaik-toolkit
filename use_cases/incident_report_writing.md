@@ -16,34 +16,54 @@ Concrete example fragments reflected in the use case design include:
 
 The canvas provides a shared understanding of what the GenAI solution does and why it is valuable, without digging into technical implementation details.
 
-```mermaid
 flowchart TB
 
-subgraph C1["Context & Need"]
-  A1["Name\nIncident reporting assistant"]
-  A2["Knowledge processes\nKnowledge capture + Knowledge synthesis"]
-  A3["Business need\nIncidents such as broken equipment, water leaks, or spills occasionally occur on company premises and must be reported quickly so they can be resolved. Currently, employees must go to a computer and complete a web form in system X, which slows down the incident-reporting process."]
+%% --- Row 1 (two columns) ---
+subgraph R1[""]
+direction LR
+
+  subgraph C1["Context & Need"]
+  direction TB
+    A1["Name<br/>Incident reporting assistant"]
+    A2["Knowledge processes<br/>Knowledge capture + Knowledge synthesis"]
+    A3["Business need<br/>Incidents such as broken equipment, water leaks, or spills occasionally occur on company premises and must be reported quickly so they can be resolved. Currently, employees must go to a computer and complete a web form in system X, which slows down the incident-reporting process."]
+  end
+
+  subgraph C2["Solution & Users"]
+  direction TB
+    B1["Task<br/>Incident reporting"]
+    B2["User/-s<br/>Everyone in the company"]
+    B3["Solution<br/>The new AI-driven solution will enable employees to report incidents quickly through voice input on their mobile phones from different locations (including outdoors). The process will involve recording verbal descriptions of incidents, capturing images of hazards, and converting this information into a structured incident report that can be saved directly to the system X."]
+  end
 end
 
-subgraph C2["Solution & Users"]
-  B1["Task\nIncident reporting"]
-  B2["User/-s\nEveryone in the company"]
-  B3["Solution\nThe new AI-driven solution will enable employees to report incidents quickly through voice input on their mobile phones from different locations (including outdoors). The process will involve recording verbal descriptions of incidents, capturing images of hazards, and converting this information into a structured incident report that can be saved directly to the system X."]
+%% --- Row 2 (two columns) ---
+subgraph R2[""]
+direction LR
+
+  subgraph C3["Inputs"]
+  direction TB
+    D1["Input<br/>1. Voice input (verbal description of an incident)<br/>2. Images (photos), maybe with annotations<br/>3. Template/-s for incident reports (list/-s of questions)<br/>4. Reference data (list of equipment, list of facilities, list of incident types and severity levels)"]
+  end
+
+  subgraph C4["Output & Benefits"]
+  direction TB
+    E1["Output<br/>Incident report (filled in template)"]
+    E2["Expected benefits / value<br/>1. Faster response time<br/>2. Increased accuracy and consistency<br/>3. Improved safety<br/>4. Better compliance and documentation"]
+  end
 end
 
-subgraph C3["Inputs"]
-  D1["Input\n1. Voice input (verbal description of an incident)\n2. Images (photos), maybe with annotations\n3. Template/-s for incident reports (list/-s of questions)\n4. Reference data (list of equipment, list of facilities, list of incident types and severity levels)"]
-end
+%% --- Invisible links to keep the 2x2 grid stable ---
+C1 --- C2
+C3 --- C4
+C1 --- C3
+C2 --- C4
 
-subgraph C4["Outputs & Value"]
-  E1["Output\nIncident report (filled in template)"]
-  E2["Expected benefits / value\n1. Faster response time\n2. Increased accuracy and consistency\n3. Improved safety\n4. Better compliance and documentation"]
-end
+linkStyle 0 stroke:transparent;
+linkStyle 1 stroke:transparent;
+linkStyle 2 stroke:transparent;
+linkStyle 3 stroke:transparent;
 
-C1 --> C2
-C2 --> C3
-C3 --> C4
-```
 
 
 - **Reference GenAI Product Description for Incident Reporting** - [Download Raw File (GenAI_product_canvas_Incident reporting_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/business_layer/genAI_product_canvas/GenAI_product_canvas_Incident%20reporting_v0.1.pptx)
