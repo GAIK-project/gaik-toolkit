@@ -1,4 +1,4 @@
-# Incident reporting generic use case (cross-cutting use case)
+# Incident Reporting Generic Use Case (Cross-Cutting Use Case)
 
 The incident reporting use case illustrates how the toolkit connects use case design, value evaluation, and implementation into a single GenAI-enabled solution for safety and incident management.
 
