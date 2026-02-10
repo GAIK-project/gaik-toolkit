@@ -25,8 +25,8 @@ The GAIK toolkit provides software components that handle each part of the proce
 
 ```mermaid
 flowchart LR
-    A("🎙️ Audio Recording") --> B["Audio to Structured Data\nSoftware Module"]
-    C("📋 Field Requirements\nPlain language description") --> B
+    A("🎙️ Audio Recording") --> B["Audio to Structured Data<br/>Software Module"]
+    C("📋 Field Requirements<br/>Plain language description") --> B
     B --> D("✅ Structured Incident Report")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -54,17 +54,17 @@ The Transcriber converts an audio recording into text. It uses OpenAI transcript
 
 ```mermaid
 flowchart LR
-    A("🎙️ Audio File\ne.g. incident_recording.mp3") --> B
+    A("🎙️ Audio File<br/>e.g. incident_recording.mp3") --> B
 
     subgraph B["Transcriber"]
         direction TB
-        W["Whisper\nSpeech-to-Text"]
-        G["GPT Enhancement\nClean & Format"]
+        W["Whisper<br/>Speech-to-Text"]
+        G["GPT Enhancement<br/>Clean & Format"]
         W --> G
     end
 
-    B --> C("📄 Raw Transcript\nDirect Whisper output")
-    B --> D("✨ Enhanced Transcript\nFormatted, readable text")
+    B --> C("📄 Raw Transcript<br/>Direct Whisper output")
+    B --> D("✨ Enhanced Transcript<br/>Formatted, readable text")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style C fill:#fefce8,stroke:#ca8a04,color:#713f12
@@ -100,13 +100,13 @@ It is composed of three internal steps:
 ```mermaid
 flowchart TD
     A("📄 Transcript Text") --> E
-    B("📋 User Requirements\nPlain language field definitions") --> RP
+    B("📋 User Requirements<br/>Plain language field definitions") --> RP
 
     subgraph EXT["Extractor"]
         direction TB
-        RP["Requirement Parser\nIdentify fields & constraints"]
-        SG["Schema Generator\nBuild typed data schema"]
-        DE["Data Extractor\nLLM-powered field extraction"]
+        RP["Requirement Parser<br/>Identify fields & constraints"]
+        SG["Schema Generator<br/>Build typed data schema"]
+        DE["Data Extractor<br/>LLM-powered field extraction"]
         RP --> SG --> DE
     end
 
@@ -114,8 +114,8 @@ flowchart TD
     RP -.->|"parsed fields"| SG
     SG -.->|"typed schema"| DE
 
-    EXT --> C("✅ Structured Fields\nReport type, observer, location…")
-    EXT --> D("🗂️ Generated Schema\nReusable for future reports")
+    EXT --> C("✅ Structured Fields<br/>Report type, observer, location…")
+    EXT --> D("🗂️ Generated Schema<br/>Reusable for future reports")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -175,12 +175,12 @@ flowchart TD
 
         subgraph T["Step 1 · Transcriber"]
             direction LR
-            W["Whisper\nSpeech-to-Text"] --> G["GPT\nEnhancement"]
+            W["Whisper<br/>Speech-to-Text"] --> G["GPT<br/>Enhancement"]
         end
 
         subgraph X["Step 2 · Extractor"]
             direction LR
-            RP["Requirement\nParser"] --> SG["Schema\nGenerator"] --> DE["Data\nExtractor"]
+            RP["Requirement<br/>Parser"] --> SG["Schema<br/>Generator"] --> DE["Data<br/>Extractor"]
         end
 
         T -->|"transcript text"| X
