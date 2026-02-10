@@ -47,4 +47,62 @@ The same model can be used both before implementation (to evaluate expected valu
 The source version of the **Value evaluation model: Incident reporting** - [Download Raw File (Value_evaluation_model_for Incident_reporting_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/Value_evaluation_model_for%20Incident_reporting_v0.1.pptx) 
 “Lower admin effort”, “Accident cost avoidance”, “Productivity gains”
 
+**Implementation layer using No-Code**
 
+Incident reporting can be supported by Generative AI using no-code approach.
+
+The no-code layer shows how a GenAI solution can be used in everyday work without building software. Business users work with ready-made templates and rules that define what information should be captured and how the result should look.
+
+What the business user sets up (once)
+
+A safety manager defines a reporting template, not code. Conceptually, it says:
+“These are the fields our incident report must contain”
+“These are the only allowed options for key fields”
+“Do not guess or invent missing information”
+“If something is not said, leave it empty”
+
+This logic is captured in a prompt template, which acts like a digital reporting policy.
+
+What happens in daily work
+
+Step 1 – Reporting by voice
+An employee or supervisor records a short voice message describing:
+an incident
+a near miss
+a safety observation
+or a safety-related initiative
+
+No form, no typing, no computer required.
+
+Step 2 – Automatic structuring (no-code logic)
+The prompt template converts the spoken description into a standardized incident report, following strict business rules.
+
+For example, the assistant is instructed to:
+extract only information explicitly mentioned
+classify the report using fixed categories (e.g. Safety observation, Near miss: Yes/No)
+keep descriptions short and factual
+ensure dates, locations, and causes follow a consistent format
+
+From a business perspective, this is equivalent to enforcing rules like:
+“If the speaker does not mention a date, leave the date field empty.”
+“If the cause does not match our predefined categories, do not fill it in.”
+“Never add explanations or extra text.”
+
+Example of what the business gets out
+
+Instead of free text, the output is a ready-to-use structured report, aligned with the company’s reporting form:
+
+Type of form: Safety observation
+Event date and time: 15.03.2024 14:30
+Location: Building A, Assembly line
+Near miss: Yes
+Direct cause: 5S
+Corrective actions performed: Yes
+
+Anything not mentioned in the voice report is intentionally left blank.
+
+This makes the result:
+easy to paste into an existing system
+safe to store in a database
+reliable for analytics and reporting
+suitable for audits and compliance
