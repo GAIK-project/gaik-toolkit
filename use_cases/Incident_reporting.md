@@ -8,57 +8,6 @@ This use case lets an employee **record a voice message** at the scene, and the 
 
 ---
 
-## GenAI Product Canvas
-
-```mermaid
-%%{init: {'theme':'base', 'themeVariables': { 'fontSize':'14px'}}}%%
-graph TB
-    subgraph CONTEXT["<b>CONTEXT & NEED</b>"]
-        direction TB
-        CN1["<b>Name:</b> Incident Reporting Assistant"]
-        CN2["<b>Knowledge Process:</b> Knowledge Capture"]
-        CN3["<b>Business Need:</b> Reduce reporting friction.<br/>Enable real-time incident capture at the scene.<br/>Improve data completeness and accuracy."]
-    end
-
-    subgraph SOLUTION["<b>SOLUTION & VALUE</b>"]
-        direction TB
-        SV1["<b>Task:</b> Incident Reporting"]
-        SV2["<b>Users:</b> All employees (factory workers,<br/>field staff, supervisors)"]
-        SV3["<b>Solution:</b> Voice-driven GenAI assistant that<br/>transcribes spoken incident descriptions and<br/>automatically extracts structured report fields<br/>using natural language requirements."]
-    end
-
-    subgraph INPUTS["<b>INPUTS</b>"]
-        direction TB
-        IN1["• Audio recording (incident description)"]
-        IN2["• Field requirements (plain language)"]
-        IN3["• Optional: photos/videos"]
-        IN4["• Optional: reference data/templates"]
-    end
-
-    subgraph OUTPUTS["<b>OUTPUT & BENEFITS</b>"]
-        direction TB
-        OUT1["<b>Output:</b> Structured incident report<br/>with all required fields filled"]
-        OUT2["<b>Expected Benefits:</b>"]
-        OUT3["• Faster reporting (seconds vs. minutes)"]
-        OUT4["• Higher reporting rates"]
-        OUT5["• Improved data quality and consistency"]
-        OUT6["• Reduced administrative burden"]
-        OUT7["• Better safety insights from complete data"]
-    end
-
-    CONTEXT ~~~ SOLUTION
-    INPUTS ~~~ OUTPUTS
-
-    style CONTEXT fill:#e0f2fe,stroke:#0369a1,stroke-width:3px,color:#0c4a6e
-    style SOLUTION fill:#fef3c7,stroke:#d97706,stroke-width:3px,color:#78350f
-    style INPUTS fill:#ddd6fe,stroke:#7c3aed,stroke-width:3px,color:#4c1d95
-    style OUTPUTS fill:#d1fae5,stroke:#059669,stroke-width:3px,color:#065f46
-```
-
-> 📄 **Full Product Canvas:** [Download PowerPoint](https://github.com/GAIK-project/gaik-toolkit/blob/main/business_layer/genAI_product_canvas/GenAI_product_canvas_Incident%20reporting_v0.1.pptx)
-
----
-
 ## How GAIK Toolkit Enables This Use Case
 
 Two software components — **Transcriber** and **Extractor** — are combined into the **Audio to Structured Data** module to handle this use case end-to-end.
