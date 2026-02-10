@@ -37,10 +37,9 @@ Emotional value:
 “Higher confidence”, “Increased trust”, “Less reporting friction”
 → Outcome: Employees feel safer and heard
 
-Social value:
-“Shared safety responsibility”, “Stronger safety culture”, “Corporate responsibility”
+The same model can be used both before implementation (to evaluate expected value) and after deployment (to monitor realized value across different dimensions).
 
-Financial value:
+The **Value evaluation model: Incident reporting** - [Download Raw File (Value_evaluation_model_for Incident_reporting_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/Value_evaluation_model_for%20Incident_reporting_v0.1.pptx) 
 “Lower admin effort”, “Accident cost avoidance”, “Productivity gains”
 
-The same model can be used both before implementation (to evaluate expected value) and after deployment (to monitor realized value across different dimensions).
+
