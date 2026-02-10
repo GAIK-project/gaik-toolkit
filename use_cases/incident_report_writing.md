@@ -16,6 +16,8 @@ Concrete example fragments reflected in the use case design include:
 
 The canvas provides a shared understanding of what the GenAI solution does and why it is valuable, without digging into technical implementation details.
 
+```mermaid
+
 flowchart TB
 
 subgraph R1[""]
@@ -60,6 +62,8 @@ linkStyle 0 stroke:transparent;
 linkStyle 1 stroke:transparent;
 linkStyle 2 stroke:transparent;
 linkStyle 3 stroke:transparent;
+
+` ````
 
 
 
