@@ -99,7 +99,7 @@ It is composed of three internal steps:
 
 ```mermaid
 flowchart TD
-    A("📄 Transcript Text") --> E
+    A("📄 Transcript Text") --> DE
     B("📋 User Requirements<br/>Plain language field definitions") --> RP
 
     subgraph EXT["Extractor"]
