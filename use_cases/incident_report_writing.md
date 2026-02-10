@@ -1,8 +1,7 @@
-# Incident reporting use case
-
-Incident reporting (cross-cutting use case)
+# Incident reporting generic use case (cross-cutting use case)
 
 The incident reporting use case illustrates how the toolkit connects use case design, value evaluation, and implementation into a single GenAI-enabled solution for safety and incident management.
+
 
 **Business layer – use case specification**
 
@@ -19,6 +18,7 @@ The canvas provides a shared understanding of what the GenAI solution does and w
 ![GenAI Product Description for Incident Reporting](https://github.com/GAIK-project/gaik-toolkit/blob/main/images/genai_product_canvas_incident_reporting.png)
 
 - **Reference GenAI Product Description for Incident Reporting** - [Download Raw File (GenAI_product_canvas_Incident reporting_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/business_layer/genAI_product_canvas/GenAI_product_canvas_Incident%20reporting_v0.1.pptx)
+
 
 **Strategy layer – value evaluation and monitoring**
 
