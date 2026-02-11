@@ -276,6 +276,7 @@ Example output for an incident recording:
 > 📁 [`implementation_layer/examples/software_modules/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules)
 
 To test the incident report writing use case, please visit the [GAIK demo link](https://gaik-demo.2.rahtiapp.fi/). Access is available upon registration request.
+
 ---
 
 ## Adaptable to Other Domains
