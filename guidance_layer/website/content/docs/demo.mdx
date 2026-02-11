@@ -69,7 +69,7 @@ For local setup instructions, see the [toolkit_demo_app README](https://github.c
 
 ---
 
-## Use Cases
+## Software Demos
 
 Real-world examples demonstrating GAIK toolkit in action.
 
@@ -85,65 +85,7 @@ Record daily construction site activities via voice or text. AI extracts structu
 
 ![Construction Diary Demo](/demo-images/diary.png)
 
----
-
-## REST API
-
-Lightweight FastAPI backend for transcription and parsing.
-
-**Source:** [GitHub - api](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/api)
-
-### Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/transcribe` | POST | Whisper transcription |
-| `/parse` | POST | PDF/DOCX parsing |
-
-### Quick Start
-
-```bash
-cd implementation_layer/api
-pip install -r requirements.txt
-
-# API authentication key
-export API_KEY=your-api-key
-
-# Choose ONE provider:
-# Option 1: OpenAI
-export OPENAI_API_KEY=sk-...
-
-# Option 2: Azure OpenAI
-export AZURE_API_KEY=your-key
-export AZURE_ENDPOINT=https://your-endpoint.openai.azure.com/
-
-uvicorn main:app --reload
-```
-
-### Example Calls
-
-```bash
-# Transcribe audio
-curl -X POST http://localhost:8000/transcribe \
-  -H "X-API-Key: your-api-key" \
-  -F "file=@meeting.mp3" \
-  -F "enhanced=true"
-
-# Parse PDF
-curl -X POST http://localhost:8000/parse \
-  -H "X-API-Key: your-api-key" \
-  -F "file=@document.pdf" \
-  -F "parser_type=pymupdf"
-```
-
-### Docker
-
-```bash
-docker build -t gaik-api -f implementation_layer/api/Dockerfile .
-docker run -p 8000:8000 -e API_KEY=secret -e OPENAI_API_KEY=sk-... gaik-api
-```
-
+For software demos, please visit the [GAIK demo link](https://gaik-demo.2.rahtiapp.fi/). Access is available upon registration request.
 ---
 
 ## No-code Assets

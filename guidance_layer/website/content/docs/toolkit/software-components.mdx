@@ -1,0 +1,66 @@
+---
+title: Software Components
+description: Reusable low-level components in the implementation layer
+---
+
+## Software Components
+
+Software components are low-level, reusable building blocks for focused tasks.
+Each component can be used directly or composed into higher-level modules.
+
+### Data Extraction
+
+Generates schemas from requirements and extracts structured fields from text or
+documents.
+
+- **Implementation code**: [implementation_layer/src/gaik/software_components/extractor](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor)
+- **Usage examples**: [implementation_layer/examples/software_components/extractor](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/extractor)
+
+### Document Parsing
+
+Parses PDFs and documents into clean text or markdown for downstream tasks.
+
+- **Implementation code**: [implementation_layer/src/gaik/software_components/parsers](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/parsers)
+- **Usage examples**: [implementation_layer/examples/software_components/parsers](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/parsers)
+
+### Transcribing
+
+Converts audio and video files into raw and enhanced transcripts.
+
+- **Implementation code**: [implementation_layer/src/gaik/software_components/transcriber](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber)
+- **Usage examples**: [implementation_layer/examples/software_components/transcriber](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/transcriber)
+
+### Document Classification
+
+Classifies documents into predefined categories with confidence scores.
+
+- **Implementation code**: [implementation_layer/src/gaik/software_components/doc_classifier](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/doc_classifier)
+- **Usage examples**: [implementation_layer/examples/software_components/classifier](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/classifier)
+
+### RAG Components
+
+Components for retrieval-augmented generation pipelines:
+parsing, embedding, vector storage, retrieval, and answer generation.
+
+- **Implementation code**: [implementation_layer/src/gaik/software_components/RAG](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG)
+- **Usage examples**: [implementation_layer/examples/software_components/RAG](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/RAG)
+
+### Source Location
+
+- `implementation_layer/src/gaik/software_components/`
+
+### Example Locations
+
+- `implementation_layer/examples/software_components/extractor/`
+- `implementation_layer/examples/software_components/parsers/`
+- `implementation_layer/examples/software_components/transcriber/`
+- `implementation_layer/examples/software_components/classifier/`
+- `implementation_layer/examples/software_components/RAG/`
+
+### Typical Usage
+
+Use software components when you need:
+
+- tight control over each step
+- custom orchestration
+- independent testing of each capability

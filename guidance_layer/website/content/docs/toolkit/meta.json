@@ -1,4 +1,4 @@
 {
   "title": "Implementation Layer",
-  "pages": ["index", "getting-started", "knowledge-extraction", "parser", "transcriber", "classifier", "audio-structured", "document-structured", "rag"]
+  "pages": ["index", "getting-started", "software-components", "software-modules", "knowledge-extraction", "parser", "transcriber", "classifier", "audio-structured", "document-structured", "rag"]
 }
