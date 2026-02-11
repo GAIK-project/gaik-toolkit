@@ -18,7 +18,7 @@ Use software modules when you want a complete, working pipeline with minimal int
 ## Overview
 
 | Module | Input | Processing steps | Output |
-| --- | --- | --- | --- |
+| --- | --- | --- |
 | Audio-to-Structured-Data | Audio / Video | Transcribe → Extract | Structured fields from spoken content |
 | Document-to-Structured-Data | PDF / DOCX | Parse → Extract | Structured fields from document content |
 
@@ -44,67 +44,7 @@ flowchart LR
     style C fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 `} />
 
----
-
-#### Step 1 · Transcriber
-
-Converts the audio recording into plain text. The speech-to-text model produces a raw transcript, which is optionally refined by a GPT enhancement step that fixes punctuation, removes filler words, and improves readability.
-
-<Mermaid chart={`
-flowchart LR
-    A("🎙️ Audio / Video File") --> B
-
-    subgraph B["Transcriber"]
-        direction TB
-        W["Speech-to-Text Model<br/>(Whisper)"]
-        G["Transcript Enhancement<br/>Clean & Format"]
-        W --> G
-    end
-
-    B --> C("📄 Raw Transcript")
-    B --> D("✨ Enhanced Transcript")
-
-    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style C fill:#fefce8,stroke:#ca8a04,color:#713f12
-    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
-    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
-`} />
-
-> **Example:** A site worker records a 90-second voice note describing a water leak in the storage room. The Transcriber produces a clean, readable transcript: *"At 14:30, a water leak was noticed in storage room B. The pipe near the east wall was dripping onto electrical equipment. Area was cordoned off immediately."*
-
----
-
-#### Step 2 · Extractor
-
-Reads the transcript alongside your plain-language field requirements. A Requirement Parser identifies the fields and any constraints, a Schema Generator builds a typed schema, and a Data Extractor fills each field using an LLM.
-
-<Mermaid chart={`
-flowchart TD
-    A("✨ Enhanced Transcript") --> DE
-    B("📋 User Requirements<br/>Plain language field definitions") --> RP
-
-    subgraph EXT["Extractor"]
-        direction TB
-        RP["Requirement Parser<br/>Identify fields & constraints"]
-        SG["Schema Generator<br/>Build typed data schema"]
-        DE["Data Extractor<br/>LLM-powered field extraction"]
-        RP -.->|"parsed fields"| SG
-        SG -.->|"typed schema"| DE
-    end
-
-    EXT --> C("✅ Structured Fields")
-    EXT --> D("🗂️ Reusable Schema")
-
-    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style C fill:#dcfce7,stroke:#16a34a,color:#14532d
-    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
-    style EXT fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
-`} />
-
-> **Example:** From the transcript above, the Extractor fills the incident report fields: *Event type: Water leak · Location: Storage room B · Time: 14:30 · Severity: Yes · Immediate action: Area cordoned off · Equipment affected: Electrical equipment near east wall.*
-
----
+> **Example:** A site worker records a 90-second voice note describing a water leak in the storage room. The module produces both a clean transcript (*"At 14:30, a water leak was noticed in storage room B..."*) and extracted incident fields: *Event type: Water leak · Location: Storage room B · Time: 14:30 · Severity: Yes · Immediate action: Area cordoned off.*
 
 **What the module returns:**
 
@@ -155,64 +95,7 @@ flowchart LR
     style C fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 `} />
 
----
-
-#### Step 1 · Document Parser
-
-Converts the source document into clean, structured markdown. Two parsing strategies are available: a vision-based parser that uses GPT to interpret complex page layouts and tables, and local parsers (PyMuPDF, Docling) for faster, lower-cost processing of simpler documents.
-
-<Mermaid chart={`
-flowchart LR
-    A("📄 Document<br/>PDF / DOCX") --> B
-
-    subgraph B["Document Parser"]
-        direction TB
-        V["Vision Parser<br/>GPT-based layout parsing"]
-        L["Local Parser<br/>PyMuPDF / Docling"]
-    end
-
-    B --> C("📝 Markdown Text<br/>Tables & structure preserved")
-
-    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style C fill:#dcfce7,stroke:#16a34a,color:#14532d
-    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
-`} />
-
-> **Example:** A scanned 8-page supplier invoice PDF with embedded tables is parsed by the Vision Parser into clean markdown. All line items, quantities, and amounts are preserved in a readable table structure, ready for extraction.
-
----
-
-#### Step 2 · Extractor
-
-Reads the parsed markdown alongside your plain-language field requirements. A Requirement Parser identifies the fields and any constraints, a Schema Generator builds a typed schema, and a Data Extractor fills each field using an LLM.
-
-<Mermaid chart={`
-flowchart TD
-    A("📝 Parsed Markdown") --> DE
-    B("📋 User Requirements<br/>Plain language field definitions") --> RP
-
-    subgraph EXT["Extractor"]
-        direction TB
-        RP["Requirement Parser<br/>Identify fields & constraints"]
-        SG["Schema Generator<br/>Build typed data schema"]
-        DE["Data Extractor<br/>LLM-powered field extraction"]
-        RP -.->|"parsed fields"| SG
-        SG -.->|"typed schema"| DE
-    end
-
-    EXT --> C("✅ Structured Fields")
-    EXT --> D("🗂️ Reusable Schema")
-
-    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style C fill:#dcfce7,stroke:#16a34a,color:#14532d
-    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
-    style EXT fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
-`} />
-
-> **Example:** From the parsed invoice markdown, the Extractor fills the required fields: *Invoice number: INV-20241103 · Supplier: Acme Components Ltd · Total (excl. VAT): €4,820.00 · Due date: 30.11.2024 · Line items: 3.*
-
----
+> **Example:** A scanned 8-page supplier invoice PDF with embedded tables is parsed into clean markdown, then the Extractor fills the required fields: *Invoice number: INV-20241103 · Supplier: Acme Components Ltd · Total (excl. VAT): €4,820.00 · Due date: 30.11.2024 · Line items: 3.*
 
 **What the module returns:**
 
