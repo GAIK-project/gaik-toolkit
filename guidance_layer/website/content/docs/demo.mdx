@@ -3,12 +3,14 @@ title: Demo & API
 description: Interactive demo application and REST API for GAIK toolkit
 ---
 
-## Interactive Demo
+## Interactive Demo Application
 
-Try GAIK toolkit components with our interactive demo application.
+The GAIK interactive demo provides hands-on access to all toolkit components, modules, and real-world use case implementations. Explore each capability through a user-friendly web interface — upload files, test processing pipelines, and see results in real-time without any setup or installation required.
 
 <Callout type="info">
 **Try the Live Demo:** [gaik-demo.2.rahtiapp.fi](https://gaik-demo.2.rahtiapp.fi/)
+
+Access is available upon registration request.
 </Callout>
 
 **Source:** [GitHub - toolkit_demo_app](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/toolkit_demo_app)
@@ -17,17 +19,27 @@ Try GAIK toolkit components with our interactive demo application.
 
 ## Software Modules
 
-End-to-end pipelines that combine multiple software components.
+End-to-end pipelines demonstrating complete workflows from input to structured output. These modules combine multiple software components into single, production-ready solutions.
 
-### Audio → Structured
+### Audio → Structured Data
 
-Transcribe audio/video and extract structured data in one pipeline. [Try it live →](https://gaik-demo.2.rahtiapp.fi/audio-structured)
+Upload an audio or video file and define your field requirements in plain language. The module transcribes the content and extracts structured data in one unified pipeline, returning both the transcript and validated fields.
+
+**Demonstrates:** Complete voice-to-data workflow combining transcription and intelligent extraction.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/audio-structured)
 
 ![Audio to Structured Demo](/demo-images/audio-structured.png)
 
-### Document → Structured
+---
 
-Parse documents and extract structured data in one pipeline. [Try it live →](https://gaik-demo.2.rahtiapp.fi/document-structured)
+### Document → Structured Data
+
+Upload a PDF or Word document and specify what data you need to extract. The module parses the document to markdown and extracts structured fields according to your requirements, supporting both simple and complex layouts.
+
+**Demonstrates:** End-to-end document processing with configurable extraction logic.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/document-structured)
 
 ![Document to Structured Demo](/demo-images/document-structured.png)
 
@@ -35,53 +47,93 @@ Parse documents and extract structured data in one pipeline. [Try it live →](h
 
 ## Software Components
 
+Individual building blocks that can be used standalone or combined into custom pipelines. Each component demonstrates a specific capability in the knowledge extraction and processing workflow.
+
 ### Extractor
 
-Extract structured data from documents using natural language descriptions. [Try it live →](https://gaik-demo.2.rahtiapp.fi/extractor)
+Describe the fields you need in plain language, and the Extractor generates a schema and fills it from your source text. No code, no predefined templates — just natural language requirements converted into structured output.
+
+**Key capability:** Schema-free structured extraction using natural language field definitions.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/extractor)
 
 ![Extractor Demo](/demo-images/extractor.png)
 
-### Parser
+---
 
-Parse PDFs and Word documents to Markdown. [Try it live →](https://gaik-demo.2.rahtiapp.fi/parser)
+### Document Parser
+
+Transform PDFs and Word documents into clean, structured markdown. Choose between vision-based parsing for complex layouts or local parsing for speed. Tables, headings, and formatting are preserved.
+
+**Key capability:** Multi-strategy document parsing with structure preservation.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/parser)
 
 ![Parser Demo](/demo-images/parser.png)
 
-### Classifier
+---
 
-Classify documents into custom categories with AI. [Try it live →](https://gaik-demo.2.rahtiapp.fi/classifier)
+### Document Classifier
+
+Define custom categories in natural language and the classifier assigns each document to the most appropriate category using AI-powered semantic understanding.
+
+**Key capability:** Zero-shot document classification with custom, user-defined categories.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/classifier)
 
 ![Classifier Demo](/demo-images/classifier.png)
 
+---
+
 ### Transcriber
 
-Transcribe audio/video files with Whisper. [Try it live →](https://gaik-demo.2.rahtiapp.fi/transcriber)
+Upload audio or video files and receive accurate transcriptions powered by OpenAI Whisper. Optional GPT-based enhancement cleans up the transcript for improved readability.
+
+**Key capability:** High-quality speech-to-text with optional post-processing enhancement.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/transcriber)
 
 ![Transcriber Demo](/demo-images/transcriber.png)
 
+---
+
 ### RAG Builder
 
-Build Q&A pipelines with document upload. [Try it live →](https://gaik-demo.2.rahtiapp.fi/rag)
+Upload document collections and build an intelligent Q&A system. The RAG Builder indexes your documents, enabling semantic search and contextual answer generation with source citations.
+
+**Key capability:** Complete retrieval-augmented generation pipeline with persistent vector storage.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/rag)
 
 ![RAG Demo](/demo-images/rag.png)
 
-For local setup instructions, see the [toolkit_demo_app README](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/toolkit_demo_app).
+For local setup instructions and deployment options, see the [toolkit_demo_app README](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/toolkit_demo_app).
 
 ---
 
-## Software Demos
+## Real-World Use Case Demos
 
-Real-world examples demonstrating GAIK toolkit in action.
+Full application examples demonstrating how GAIK toolkit components solve specific business problems. These demos showcase complete user experiences from data capture to structured report generation.
 
 ### Incident Reporting
 
-Report incidents via voice or text. AI handles the rest. [Try it live →](https://gaik-demo.2.rahtiapp.fi/incident-report)
+Field workers report safety incidents or equipment issues via voice recording or text input. The system automatically transcribes, extracts structured incident fields, and generates a formatted report — reducing manual data entry and ensuring consistent documentation.
+
+**Business value:** Faster incident capture, improved compliance, reduced administrative overhead.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/incident-report)
 
 ![Incident Reporting Demo](/demo-images/incident.png)
 
+---
+
 ### Construction Diary
 
-Record daily construction site activities via voice or text. AI extracts structured data. [Try it live →](https://gaik-demo.2.rahtiapp.fi/diary)
+Site workers record daily activities, observations, and progress notes via voice or text. The AI extracts structured information (tasks completed, materials used, weather conditions, issues) and generates standardized diary entries.
+
+**Business value:** Streamlined site documentation, improved project tracking, audit-ready records.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/diary)
 
 ![Construction Diary Demo](/demo-images/diary.png)
 
@@ -91,9 +143,26 @@ To test the software demos, visit the [GAIK demo link](https://gaik-demo.2.rahti
 
 ---
 
-## No-code Assets
+## No-Code Assets
 
-Ready-to-use prompts and agent skills for AI workflows.
+Ready-to-use prompt templates and agent skills that enable rapid deployment without custom development. These assets provide pre-configured workflows for common knowledge management tasks.
 
-- **[Prompts](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts)** - Curated prompts for document processing and extraction
-- **[Agent Skills](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills)** - Reusable agent skills for AI workflows
+### Prompt Templates
+
+Curated prompt collections for document processing, data extraction, and report generation. Each template includes task instructions, business rules, and sample data for immediate use.
+
+**Browse templates:** [implementation_layer/no-code-assets/prompts](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts)
+
+### Agent Skills
+
+Fully packaged, ready-to-run solution bundles for specific use cases. Each skill includes prompts, sample data, setup scripts, and workflow artifacts — everything needed for operational deployment.
+
+**Browse skills:** [implementation_layer/no-code-assets/agent-skills](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills)
+
+---
+
+## API Access
+
+The GAIK demo application exposes REST APIs for all software components and modules, enabling programmatic access and integration into existing systems. API documentation and usage examples are available in the demo application.
+
+For API specifications and integration guides, visit the [toolkit_demo_app documentation](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/toolkit_demo_app).
