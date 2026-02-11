@@ -27,8 +27,8 @@ flowchart LR
 
     subgraph B["Transcriber"]
         direction TB
-        W["Speech-to-Text Model<br/>(Whisper)"]
-        G["GPT Enhancement<br/>Clean & Format"]
+        W["Speech-to-Text Model"]
+        G["Transcript Enhancement"]
         W --> G
     end
 
@@ -189,40 +189,173 @@ flowchart LR
 
 ### RAG Components
 
-The RAG (Retrieval-Augmented Generation) components provide a modular pipeline for building document-grounded question answering systems. Documents are parsed, chunked, and embedded into a vector store. At query time, a retriever finds the most relevant chunks, and an answer generator produces a response grounded in that content — with optional citations. Each block in the pipeline can be used independently or assembled into a complete Q&A workflow.
+The RAG (Retrieval-Augmented Generation) components provide a modular pipeline for building document-grounded question answering systems. Rather than a single monolithic tool, the RAG pipeline is split into five composable blocks — each with a clear responsibility. You can use individual blocks where needed or assemble the full pipeline for a complete Q&A system grounded in your own documents.
+
+**Pipeline overview:**
 
 <Mermaid chart={`
-flowchart TD
-    A("📄 Documents") --> PA
+flowchart LR
+    A("📄 Documents") --> B["Parser"]
+    B -->|"text chunks"| C["Embedder"]
+    C -->|"vectors"| D["Vector Store"]
+    D -->|"indexed knowledge"| E["Retriever"]
+    F("❓ User Question") --> E
+    E -->|"relevant chunks"| G["Answer Generator"]
+    G --> H("💬 Grounded Answer")
 
-    subgraph RAG["RAG Components"]
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style F fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style H fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+    style C fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+    style D fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+    style E fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+    style G fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+---
+
+#### 1 · RAG Parser
+
+Extracts text from source documents and splits it into manageable chunks with preserved metadata (page number, source file, section heading). The chunks serve as the unit of indexing and retrieval throughout the rest of the pipeline.
+
+<Mermaid chart={`
+flowchart LR
+    A("📄 Source Documents<br/>PDF, DOCX, TXT") --> B
+
+    subgraph B["Parser"]
         direction TB
-        PA["Parser<br/>Extract text from documents"]
-        EM["Embedder<br/>Convert text to vectors"]
-        VS["Vector Store<br/>Index & store embeddings"]
-        RT["Retriever<br/>Find relevant chunks"]
-        AG["Answer Generator<br/>LLM-powered response"]
-        PA --> EM --> VS
-        VS --> RT --> AG
+        E["Text Extraction<br/>Convert to plain text"]
+        C["Chunking<br/>Split into indexed segments"]
+        E --> C
     end
 
-    Q("❓ User Question") --> RT
-    RAG --> R("💬 Grounded Answer<br/>with citations")
+    B --> O("📦 Text Chunks<br/>with source metadata")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+> **Example:** A company safety manual (150 pages) is parsed into ~600 chunks. Each chunk carries its page number and section title so answers can be traced back to the source.
+
+---
+
+#### 2 · Embedder
+
+Converts each text chunk into a dense numerical vector using an embedding model. Semantically similar chunks produce similar vectors, enabling meaning-based search rather than keyword matching.
+
+<Mermaid chart={`
+flowchart LR
+    A("📦 Text Chunks") --> B
+
+    subgraph B["Embedder"]
+        direction TB
+        M["Embedding Model<br/>Text → Dense Vector"]
+    end
+
+    B --> O("🔢 Vector Embeddings<br/>e.g. [0.12, -0.45, 0.78, ...]")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+> **Example:** The chunk *"All incidents must be reported within 24 hours of occurrence"* is embedded as a vector. A question like *"What is the deadline for incident reporting?"* produces a similar vector — enabling a match even though no keywords are shared.
+
+---
+
+#### 3 · Vector Store
+
+Stores and indexes all embeddings for fast similarity search at query time. The vector store persists the knowledge base between sessions, so documents only need to be processed once and can be queried repeatedly.
+
+<Mermaid chart={`
+flowchart LR
+    A("🔢 Vector Embeddings<br/>+ Text Chunks") --> B
+
+    subgraph B["Vector Store"]
+        direction TB
+        I["Index Embeddings<br/>Build similarity index"]
+        S["Persistent Storage<br/>Save for reuse"]
+        I --> S
+    end
+
+    B --> O("🗄️ Searchable Knowledge Base<br/>Ready for retrieval")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+> **Example:** A product documentation knowledge base is indexed once and reused across hundreds of daily queries without reprocessing the source documents.
+
+---
+
+#### 4 · Retriever
+
+Accepts a user question, embeds it, and searches the vector store for the most semantically relevant chunks. Optionally reranks results to improve precision before passing them to the answer generator.
+
+<Mermaid chart={`
+flowchart LR
+    A("❓ User Question") --> B
+    VS("🗄️ Vector Store") --> B
+
+    subgraph B["Retriever"]
+        direction TB
+        Q["Embed Question<br/>Convert to vector"]
+        S["Semantic Search<br/>Find nearest chunks"]
+        R["Reranking<br/>(optional)"]
+        Q --> S --> R
+    end
+
+    B --> O("📋 Relevant Chunks<br/>+ Source references")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style VS fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+> **Example:** The question *"What PPE is required in the assembly area?"* retrieves the three most relevant policy chunks from a 200-page safety manual, even if the manual never uses the exact word "PPE".
+
+---
+
+#### 5 · Answer Generator
+
+Takes the retrieved chunks and the original question and uses an LLM to compose a coherent, factual answer. The response is grounded strictly in the retrieved content, and source citations are included so the answer can be verified.
+
+<Mermaid chart={`
+flowchart LR
+    A("📋 Retrieved Chunks<br/>+ Source references") --> B
+    Q("❓ User Question") --> B
+
+    subgraph B["Answer Generator"]
+        direction TB
+        P["Prompt Assembly<br/>Question + context chunks"]
+        L["LLM Reasoning<br/>Generate grounded response"]
+        P --> L
+    end
+
+    B --> O("💬 Grounded Answer<br/>with citations")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style Q fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style R fill:#dcfce7,stroke:#16a34a,color:#14532d
-    style RAG fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+    style O fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 `} />
+
+> **Example:** Given the retrieved policy chunks, the answer generator responds: *"According to the Safety Manual (Section 4.2), employees in the assembly area must wear safety glasses, steel-toed boots, and high-visibility vests at all times."*
+
+---
 
 **Key features:**
 - Fully modular — use individual blocks or assemble the full pipeline
 - Metadata-preserving chunking for accurate source attribution
-- Optional reranking to improve retrieval relevance
-- Citation-aware answer generation for trustworthy outputs
+- Optional reranking to improve retrieval precision
+- Citation-aware answer generation for trustworthy, verifiable outputs
 
 **Potential applications:**
-- Internal knowledge base and policy Q&A
+- Internal knowledge base and company policy Q&A
 - Technical documentation and product manual assistants
 - Regulatory and compliance document lookup
 - Customer support knowledge retrieval
