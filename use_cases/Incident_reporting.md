@@ -1,9 +1,9 @@
-# Incident Reporting Generic Use Case (Cross-Cutting Use Case)
+﻿# Incident Reporting Generic Use Case (Cross-Cutting Use Case)
 
 The incident reporting use case illustrates how the toolkit connects use case design, value evaluation, and implementation into a single GenAI-enabled solution for safety and incident management.
 
 
-## Business layer – use case specification
+## Business layer â€“ use case specification
 
 At the business layer, the use case is specified using the GenAI product canvas. The focus is on improving how incidents, near misses, safety observations, and safety-related initiatives are reported in operational environments. The canvas clarifies the purpose of the solution (supporting incident reporting as part of daily work), the main users (employees and supervisors), and the expected outcomes.
 
@@ -21,7 +21,7 @@ The canvas provides a shared understanding of what the GenAI solution does and w
 
 
 
-## Strategy layer – value evaluation and monitoring
+## Strategy layer â€“ value evaluation and monitoring
 
 At the strategy layer, the value evaluation model for incident reporting applies the [Value Evaluation Framework](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/README.md) 
 to this generic use case and makes value assumptions explicit.
@@ -29,23 +29,23 @@ to this generic use case and makes value assumptions explicit.
 Example value fragments from the model include:
 
 Functional value (primary):
-“Faster reporting”, “Less effort”, “Complete, standardized reports”, “Accessible on-site”
-→ Outcome: More incidents reported, faster fixes
+â€œFaster reportingâ€, â€œLess effortâ€, â€œComplete, standardized reportsâ€, â€œAccessible on-siteâ€
+â†’ Outcome: More incidents reported, faster fixes
 
 Informational value:
-“Better incident data”, “Improved insights”, “Stronger analytics”
-→ Outcome: Smarter prevention decisions
+â€œBetter incident dataâ€, â€œImproved insightsâ€, â€œStronger analyticsâ€
+â†’ Outcome: Smarter prevention decisions
 
 Emotional value:
-“Higher confidence”, “Increased trust”, “Less reporting friction”
-→ Outcome: Employees feel safer and heard
+â€œHigher confidenceâ€, â€œIncreased trustâ€, â€œLess reporting frictionâ€
+â†’ Outcome: Employees feel safer and heard
 
 The same model can be used both before implementation (to evaluate expected value) and after deployment (to monitor realized value across different dimensions).
 
 ![Value evaluation model: Incident reporting](https://github.com/GAIK-project/gaik-toolkit/blob/main/images/Value_evaluation_Incident%20reporting.jpg)
 
 The source version of the **Value evaluation model: Incident reporting** - [Download Raw File (Value_evaluation_model_for Incident_reporting_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/Value_evaluation_model_for%20Incident_reporting_v0.1.pptx) 
-“Lower admin effort”, “Accident cost avoidance”, “Productivity gains”
+â€œLower admin effortâ€, â€œAccident cost avoidanceâ€, â€œProductivity gainsâ€
 
 ## Implementation layer using No-Code
 
@@ -61,16 +61,16 @@ The no-code layer shows how a GenAI solution can be used in everyday work withou
 What the business user sets up (once):
 
 A safety manager defines a reporting template, not code. Conceptually, it says:
-- “These are the fields our incident report must contain”
-- “These are the only allowed options for key fields”
-- “Do not guess or invent missing information”
-- “If something is not said, leave it empty”
+- â€œThese are the fields our incident report must containâ€
+- â€œThese are the only allowed options for key fieldsâ€
+- â€œDo not guess or invent missing informationâ€
+- â€œIf something is not said, leave it emptyâ€
 
 This logic is captured in a prompt template, which acts like a digital reporting policy.
 
 What happens in daily work:
 
-**Step 1 – Reporting by voice**
+**Step 1 â€“ Reporting by voice**
 An employee or supervisor records a short voice message describing:
 - an incident
 - a safety observation
@@ -78,7 +78,7 @@ An employee or supervisor records a short voice message describing:
 
 No form, no typing, no computer required.
 
-**Step 2 – Automatic structuring (no-code logic)**
+**Step 2 â€“ Automatic structuring (no-code logic)**
 The prompt template converts the spoken description into a standardized incident report, following strict business rules. For example, the assistant is instructed to:
 
 - extract only information explicitly mentioned
@@ -88,13 +88,13 @@ The prompt template converts the spoken description into a standardized incident
 
 From a business perspective, this is equivalent to enforcing rules like:
 
-- “If the speaker does not mention a date, leave the date field empty.”
-- “If the cause does not match our predefined categories, do not fill it in.”
-- “Never add explanations or extra text.”
+- â€œIf the speaker does not mention a date, leave the date field empty.â€
+- â€œIf the cause does not match our predefined categories, do not fill it in.â€
+- â€œNever add explanations or extra text.â€
 
 Example of what the business gets out:
 
-Instead of free text, the output is a ready-to-use structured report, aligned with the company’s reporting form:
+Instead of free text, the output is a ready-to-use structured report, aligned with the companyâ€™s reporting form:
 
 - Type of form: Safety observation
 - Event date and time: 15.03.2024 14:30
@@ -114,13 +114,13 @@ This makes the result:
 
 ## Implementation Layer Using Code-Based Method. 
 
-Two software components — **Transcriber** and **Extractor** — are combined into the **Audio to Structured Data** module to handle this use case end-to-end.
+Two software components â€” **Transcriber** and **Extractor** â€” are combined into the **Audio to Structured Data** module to handle this use case end-to-end.
 
 ```mermaid
 flowchart LR
-    A("🎙️ Audio Recording") --> B["Audio to Structured Data"]
-    C("📋 Field Requirements<br/>Plain language description") --> B
-    B --> D("✅ Structured Incident Report")
+    A("ðŸŽ™ï¸ Audio Recording") --> B["Audio to Structured Data"]
+    C("ðŸ“‹ Field Requirements<br/>Plain language description") --> B
+    B --> D("âœ… Structured Incident Report")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style C fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -134,11 +134,11 @@ flowchart LR
 
 ### 1. Transcriber
 
-Converts an audio recording into text using OpenAI's speech-to-text model, with an enhancement step that cleans up the raw transcript — correcting speech artefacts and improving readability.
+Converts an audio recording into text using OpenAI's speech-to-text model, with an enhancement step that cleans up the raw transcript â€” correcting speech artefacts and improving readability.
 
 ```mermaid
 flowchart LR
-    A("🎙️ Audio File<br/>e.g. incident_recording.mp3") --> B
+    A("ðŸŽ™ï¸ Audio File<br/>e.g. incident_recording.mp3") --> B
 
     subgraph B["Transcriber"]
         direction TB
@@ -147,8 +147,8 @@ flowchart LR
         W --> G
     end
 
-    B --> C("📄 Raw Transcript<br/>Direct output of transcription model")
-    B --> D("✨ Enhanced Transcript<br/>Formatted, readable text")
+    B --> C("ðŸ“„ Raw Transcript<br/>Direct output of transcription model")
+    B --> D("âœ¨ Enhanced Transcript<br/>Formatted, readable text")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style C fill:#fefce8,stroke:#ca8a04,color:#713f12
@@ -156,7 +156,7 @@ flowchart LR
     style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 ```
 
-> 📁 [`implementation_layer/src/gaik/software_components/transcriber/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber)
+> ðŸ“ [`implementation_layer/src/gaik/software_components/transcriber/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber)
 
 ---
 
@@ -164,12 +164,12 @@ flowchart LR
 
 Takes the transcript and a plain-language field specification, then returns structured data. Internally it runs three steps: the **Requirement Parser** identifies fields and constraints from your description; the **Schema Generator** builds a typed data schema; the **Data Extractor** uses an LLM to fill in each field from the transcript.
 
-The schema is generated once and **saved for reuse** — future reports skip regeneration entirely.
+The schema is generated once and **saved for reuse** â€” future reports skip regeneration entirely.
 
 ```mermaid
 flowchart TD
-    A("📄 Transcript Text") --> DE
-    B("📋 User Requirements<br/>Plain language field definitions") --> RP
+    A("ðŸ“„ Transcript Text") --> DE
+    B("ðŸ“‹ User Requirements<br/>Plain language field definitions") --> RP
 
     subgraph EXT["Extractor"]
         direction TB
@@ -180,8 +180,8 @@ flowchart TD
         SG -.->|"typed schema"| DE
     end
 
-    EXT --> C("✅ Structured Fields<br/>Report type, observer, location…")
-    EXT --> D("🗂️ Generated Schema<br/>Reusable for future reports")
+    EXT --> C("âœ… Structured Fields<br/>Report type, observer, locationâ€¦")
+    EXT --> D("ðŸ—‚ï¸ Generated Schema<br/>Reusable for future reports")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -190,24 +190,24 @@ flowchart TD
     style EXT fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 ```
 
-> 📁 [`implementation_layer/src/gaik/software_components/extractor/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor)
+> ðŸ“ [`implementation_layer/src/gaik/software_components/extractor/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor)
 
 ---
 
 ## Defining What to Extract: User Requirements
 
-Fields are specified in plain language — no code, no schema configuration. Each line names a field and optionally defines allowed values or extraction rules:
+Fields are specified in plain language â€” no code, no schema configuration. Each line names a field and optionally defines allowed values or extraction rules:
 
 ```
 Extract the following fields from the incident report.
-- Raportin tyyppi [Choose one from: Turvallisuus, Ympäristönsuojelu, Energiatehokkuus, ""]
+- Raportin tyyppi [Choose one from: Turvallisuus, YmpÃ¤ristÃ¶nsuojelu, Energiatehokkuus, ""]
 - Tarkkailijan nimi
 - Tarkkailijaorganisaatio [ABC Pori Oy; Helsinki Oy; Other]
-- Tarkkailija on kesätyöntekijä [output "Yes" only if explicitly stated that the reporter is a summer employee; otherwise ""]
+- Tarkkailija on kesÃ¤tyÃ¶ntekijÃ¤ [output "Yes" only if explicitly stated that the reporter is a summer employee; otherwise ""]
 - Tapahtuma-aika [date text exactly as written in source; do not normalize to ISO]
 - Sijaintitiedot
 - Kuva [number of photos uploaded; if none mentioned, output ""]
-- Tapahtuma oli vakava [Kyllä, Ei]
+- Tapahtuma oli vakava [KyllÃ¤, Ei]
 - Tapahtuma-alueen kuvaus
 - Mahdolliset seuraukset
 - Toteutetut toimenpiteet
@@ -216,7 +216,7 @@ Extract the following fields from the incident report.
 Output rules:
 - Return every schema field.
 - For missing/unknown/not stated values, always return "".
-- Never output null, None, N/A, or "--tyhjä".
+- Never output null, None, N/A, or "--tyhjÃ¤".
 - Keep Finnish wording close to the source when possible.
 ```
 
@@ -224,22 +224,22 @@ Output rules:
 
 ## Software Module: Audio to Structured Data
 
-Packages both components into a single workflow. Provide an audio file and field requirements — the module returns transcripts, structured fields, and the reusable schema.
+Packages both components into a single workflow. Provide an audio file and field requirements â€” the module returns transcripts, structured fields, and the reusable schema.
 
 ```mermaid
 flowchart TD
-    IN1("🎙️ Audio File") --> MOD
-    IN2("📋 User Requirements") --> MOD
+    IN1("ðŸŽ™ï¸ Audio File") --> MOD
+    IN2("ðŸ“‹ User Requirements") --> MOD
 
     subgraph MOD["Audio-to-Structured-Data"]
         direction TB
 
-        subgraph T["Step 1 · Transcriber"]
+        subgraph T["Step 1 Â· Transcriber"]
             direction LR
             W["Transcription Model<br/>Speech-to-Text"] --> G["Transcript<br/>Enhancement"]
         end
 
-        subgraph X["Step 2 · Extractor"]
+        subgraph X["Step 2 Â· Extractor"]
             direction LR
             RP["Requirement<br/>Parser"] --> SG["Schema<br/>Generator"] --> DE["Data<br/>Extractor"]
         end
@@ -247,10 +247,10 @@ flowchart TD
         T -->|"transcript text"| X
     end
 
-    MOD --> O1("📄 Raw Transcript")
-    MOD --> O2("✨ Enhanced Transcript")
-    MOD --> O3("✅ Structured incident Report")
-    MOD --> O4("🗂️ Reusable Schema")
+    MOD --> O1("ðŸ“„ Raw Transcript")
+    MOD --> O2("âœ¨ Enhanced Transcript")
+    MOD --> O3("âœ… Structured incident Report")
+    MOD --> O4("ðŸ—‚ï¸ Reusable Schema")
 
     style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style IN2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -272,15 +272,15 @@ Example output for an incident recording:
 
 
 
-> 📁 [`implementation_layer/src/gaik/software_modules/audio_to_structured_data/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data)
-> 📁 [`implementation_layer/examples/software_modules/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules)
+> ðŸ“ [`implementation_layer/src/gaik/software_modules/audio_to_structured_data/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data)
+> ðŸ“ [`implementation_layer/examples/software_modules/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules)
 
-To test the use case of incident report writing, please visit the [GAIK demo link] (https://gaik-demo.2.rahtiapp.fi/). The access to the use case can be obtained by sending a registration request.
+To test the incident report writing use case, please visit the [GAIK demo link](https://gaik-demo.2.rahtiapp.fi/). Access is available upon registration request.
 ---
 
 ## Adaptable to Other Domains
 
-The same pipeline applies to any domain requiring structured extraction from spoken descriptions — only the **User Requirements** definition changes:
+The same pipeline applies to any domain requiring structured extraction from spoken descriptions â€” only the **User Requirements** definition changes:
 
 - Construction site diaries, field service reports, quality inspection notes, healthcare incident reports
 
@@ -294,13 +294,13 @@ The quality of this use case is evaluated by assessing each software component i
 
 Transcription quality is measured using standard metrics such as **Word Error Rate (WER)**, which quantifies the accuracy of the speech-to-text conversion. The evaluation also includes comparison of various transcription models and methods to enhance the raw transcript as a post-transcription step.
 
-> 📊 **Transcription evaluation methods:** [`implementation_layer/eval_methods/transcription_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/transcription_eval)
+> ðŸ“Š **Transcription evaluation methods:** [`implementation_layer/eval_methods/transcription_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/transcription_eval)
 
 ### Extractor Evaluation
 
 The quality of structured information extraction is evaluated through **cosine similarity ratio**, which measures how accurately the extracted fields match the expected values. This method assesses both the semantic correctness and completeness of the extracted data.
 
-> 📊 **Extraction evaluation methods:** [`implementation_layer/eval_methods/extraction_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval)
+> ðŸ“Š **Extraction evaluation methods:** [`implementation_layer/eval_methods/extraction_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval)
 
 ---
 
@@ -308,9 +308,10 @@ The quality of structured information extraction is evaluated through **cosine s
 
 | Resource | Link |
 |----------|------|
-| Transcriber component | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber) |
-| Extractor component | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor) |
-| Audio to Structured Data module | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data) |
-| Module usage examples | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules) |
-| GenAI Product Canvas (Incident Reporting) | [Download →](https://github.com/GAIK-project/gaik-toolkit/blob/main/business_layer/genAI_product_canvas/GenAI_product_canvas_Incident%20reporting_v0.1.pptx) |
-| Implementation Layer overview | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer) |
+| Transcriber component | [GitHub â†’](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber) |
+| Extractor component | [GitHub â†’](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor) |
+| Audio to Structured Data module | [GitHub â†’](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data) |
+| Module usage examples | [GitHub â†’](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules) |
+| GenAI Product Canvas (Incident Reporting) | [Download â†’](https://github.com/GAIK-project/gaik-toolkit/blob/main/business_layer/genAI_product_canvas/GenAI_product_canvas_Incident%20reporting_v0.1.pptx) |
+| Implementation Layer overview | [GitHub â†’](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer) |
+
