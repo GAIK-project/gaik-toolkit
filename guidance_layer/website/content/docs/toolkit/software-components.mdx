@@ -15,45 +15,6 @@ See also: [No-Code Assets](/toolkit/no-code-assets) for prompt templates and pac
 Use software components when you need fine-grained control over each processing step, when a predefined module doesn't fit your requirements, or when integrating GenAI capabilities into an existing system.
 </Callout>
 
-## Overview
-
-<Mermaid chart={`
-flowchart TD
-    subgraph IN["Inputs"]
-        A("🎙️ Audio / Video")
-        B("📄 Documents")
-        C("📝 Text / Requirements")
-    end
-
-    subgraph SC["Software Components"]
-        T["Transcriber"]
-        P["Document Parser"]
-        E["Extractor"]
-        DC["Doc Classifier"]
-        R["RAG Components"]
-    end
-
-    subgraph OUT["Outputs"]
-        O1("📄 Transcript")
-        O2("📝 Markdown Text")
-        O3("✅ Structured Fields")
-        O4("🏷️ Document Class")
-        O5("💬 Q&A Response")
-    end
-
-    A --> T --> O1
-    B --> P --> O2
-    O1 --> E
-    O2 --> E
-    C --> E --> O3
-    B --> DC --> O4
-    B --> R --> O5
-
-    style IN fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style SC fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
-    style OUT fill:#dcfce7,stroke:#16a34a,color:#14532d
-`} />
-
 ---
 
 ### Transcriber
