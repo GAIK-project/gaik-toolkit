@@ -3,10 +3,32 @@ title: Software Modules
 description: End-to-end pipelines composed from software components
 ---
 
+import { Mermaid } from '@/components/mdx/mermaid';
+
 ## Software Modules
 
-Software modules are higher-level, end-to-end pipelines that combine software
-components for common workflows.
+Software modules are end-to-end pipelines composed from software components.
+They reduce orchestration work by packaging common workflows.
+
+<Callout type="info">
+Use software modules when you want production-ready workflow behavior with
+minimal integration code.
+</Callout>
+
+| Module | Primary input | Output style |
+| --- | --- | --- |
+| Audio-to-Structured-Data | Audio/Video | Structured fields from spoken content |
+| Document-to-Structured-Data | Documents (PDF/DOCX) | Structured fields from document content |
+
+## Pipeline View
+
+<Mermaid chart={`
+flowchart LR
+    A[Input] --> B[Software Module]
+    B --> C[Parsed/Transcribed Content]
+    C --> D[Schema-based Extraction]
+    D --> E[Structured Output]
+`} />
 
 ### Audio-to-Structured-Data
 
@@ -18,8 +40,8 @@ Main features:
 - Requirements-driven output fields
 - Useful for voice-first reporting and logging scenarios
 
-Examples focus on turning spoken recordings into structured records with
-predefined fields.
+Examples focus on converting spoken recordings into structured records based on
+task-specific field requirements.
 
 - **Implementation code**: [implementation_layer/src/gaik/software_modules/audio_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data)
 - **Usage examples**: [implementation_layer/examples/software_modules/audio_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/audio_to_structured_data)
@@ -34,16 +56,8 @@ Main features:
 - Supports configurable parser choices for source documents
 - Produces schema-aligned structured outputs directly from files
 
-Examples cover processing PDFs/documents and generating ready-to-use extracted
-fields.
+Examples cover processing PDFs/documents into ready-to-use extracted fields with
+parser selection and schema reuse patterns.
 
 - **Implementation code**: [implementation_layer/src/gaik/software_modules/documents_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/documents_to_structured_data)
 - **Usage examples**: [implementation_layer/examples/software_modules/documents_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/documents_to_structured_data)
-
-### Typical Usage
-
-Use software modules when you need:
-
-- faster delivery with standard workflows
-- less orchestration code
-- consistent pipeline behavior across projects
