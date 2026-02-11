@@ -45,7 +45,7 @@ flowchart LR
 
 ### Prompt Templates
 
-Prompt templates encode a specific task as a reusable, configurable prompt. Each template defines what the LLM should do, what rules to apply, and what the output must look like — acting as a digital reporting policy that any user can invoke. They are bundled with sample input data and usage guidance so teams can validate and adapt them immediately without setup friction.
+Prompt templates encode a specific task as a reusable, configurable prompt. Each template defines what the LLM should do, what rules to apply, and what the output must look like — acting as a digital reporting policy that any user can invoke. A template contains three elements: task instructions specifying what to extract or generate, business rules encoding allowed values and edge-case handling, and sample data for immediate testing and validation. Teams can adapt them to new domains simply by editing field names and allowed values, with no code changes required.
 
 <Mermaid chart={`
 flowchart LR
@@ -64,6 +64,8 @@ flowchart LR
     style C fill:#dcfce7,stroke:#16a34a,color:#14532d
     style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 `} />
+
+> **Example:** A safety manager takes the incident-report prompt template, updates the severity categories to match their company's five-tier classification, and pastes it into their AI assistant. Site workers dictate voice notes on their phones; the template extracts event type, location, time, severity, and immediate actions — returning a completed incident report in seconds, without any developer involvement.
 
 **Key features:**
 - Self-contained prompt packs with task instructions, rules, and sample data
@@ -87,7 +89,7 @@ flowchart LR
 
 ### Agent Skills
 
-Agent skills are fully self-contained, ready-to-run solution packages for a specific use case. Each skill folder includes task instructions, prompt resources, setup scripts, sample data, and all supporting workflow artifacts — everything required to deploy and run the use case out of the box. They are more complete than prompt templates and designed for direct operational use, not just experimentation.
+Agent skills are fully self-contained, ready-to-run solution packages for a specific use case. Each skill folder includes task instructions, prompt resources, setup scripts, sample data, and all supporting workflow artifacts — everything required to deploy and run the use case out of the box. Unlike prompt templates, which are single prompts for manual use, agent skills are structured for direct operational deployment in Claude Desktop or similar AI environments. They are domain-adaptable by editing reference files: update field names, pricing rules, or output formats to match your organization without rewriting logic.
 
 <Mermaid chart={`
 flowchart TD
@@ -110,10 +112,12 @@ flowchart TD
     style SK fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 `} />
 
+> **Example:** A procurement team installs the purchase-order-processing skill and adds their company's price list to the reference folder. Claude reads an incoming purchase order and bills of material, matches material numbers, looks up prices, applies volume discounts, and saves a complete sales order document — all triggered by a single natural-language request: *"Process the PO in this folder."*
+
 **Key features:**
 - Fully packaged — includes prompts, sample data, setup scripts, and supporting files
 - Deployable without custom software development
-- Domain-adaptable by editing templates and allowed values
+- Domain-adaptable by editing reference files and allowed values
 
 **Available skill packs:**
 - Construction diary creation
