@@ -260,7 +260,7 @@ flowchart TD
 Example output for an incident recording:
 
 <p>
-  <img src="../images/incident1.png" width="48%" />
+  <img src="../images/incident1.png" width="50%" />
   <img src="../images/incident2.png" width="48%" />
 </p>
 
