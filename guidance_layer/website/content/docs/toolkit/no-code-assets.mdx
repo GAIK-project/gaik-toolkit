@@ -7,75 +7,129 @@ import { Mermaid } from '@/components/mdx/mermaid';
 
 ## No-Code Assets
 
-No-code assets provide prebuilt templates and packaged workflow skills that help
-teams configure common use cases without implementing full pipelines from
-scratch.
+No-code assets are the fastest way to deploy a GenAI capability without writing code. They package domain knowledge, task instructions, and business rules into reusable templates and skill folders that any team member can configure and run. Business users can adapt them to their own terminology and reporting formats; developers can use them as a starting point before scaling to full software components or modules.
 
 <Callout type="info">
-Use these assets to accelerate prototyping, domain adaptation, and guided setup
-before moving to full software component/module customization.
+Start here when you want to validate a use case quickly or deploy a working solution without custom development. When you need more control over processing logic, the same workflow can be scaled to software components or modules.
 </Callout>
+
+## Overview
 
 | Asset type | Best for | Typical outputs |
 | --- | --- | --- |
-| Prompt Templates | Fast prompt-driven experiments | Prompt files, sample data, task guidance |
-| Agent Skills | Reusable use-case workflows | Skill packages, setup scripts, workflow assets |
+| Prompt Templates | Fast, prompt-driven use-case validation | Structured outputs from voice or text input |
+| Agent Skills | Fully packaged, ready-to-run use-case workflows | Complete skill deployments with sample data and setup |
 
-## At a Glance
-
-<Cards>
-  <Card title="Prompt Templates" description="Reusable prompt packs with task-specific instructions and sample data." />
-  <Card title="Agent Skills" description="Packaged skill folders for concrete use-case execution patterns." />
-  <Card title="No-Code Assets Root" description="Single location for all no-code assets in the implementation layer." />
-</Cards>
-
-## Usage Flow
+## How No-Code Assets Fit In
 
 <Mermaid chart={`
 flowchart LR
-    A[Choose Use Case] --> B[Select Prompt Template or Agent Skill]
-    B --> C[Adapt Inputs and Instructions]
-    C --> D[Run and Validate Output]
-    D --> E[Scale to Components/Modules if Needed]
+    A("💡 Use Case Idea") --> B
+
+    subgraph B["No-Code Assets"]
+        direction TB
+        PT["Prompt Template<br/>Task instructions + rules"]
+        AS["Agent Skill<br/>Packaged workflow"]
+    end
+
+    B --> C("✅ Working Output<br/>No custom code needed")
+    C --> D("⚙️ Scale Up<br/>Software Components<br/>or Modules if needed")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style D fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 `} />
+
+---
 
 ### Prompt Templates
 
-Prompt templates are task-specific prompt packs with sample input data and
-usage guidance.
+Prompt templates encode a specific task as a reusable, configurable prompt. Each template defines what the LLM should do, what rules to apply, and what the output must look like — acting as a digital reporting policy that any user can invoke. They are bundled with sample input data and usage guidance so teams can validate and adapt them immediately without setup friction.
 
-Main features:
-- Reusable prompt files per use case
-- Sample data for quick validation
-- Low-effort adaptation for new domains
+<Mermaid chart={`
+flowchart LR
+    A("🗣️ User Input<br/>Voice / Text") --> B
 
-Current prompt packs include:
+    subgraph B["Prompt Template"]
+        direction TB
+        I["Task Instructions<br/>What to extract / generate"]
+        R["Business Rules<br/>Allowed values, edge cases"]
+        S["Sample Data<br/>For testing and validation"]
+    end
+
+    B --> C("📋 Structured Output<br/>Following defined rules")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- Self-contained prompt packs with task instructions, rules, and sample data
+- Adaptable to new domains by editing field names and allowed values
+- Validate the use case quickly before committing to a full implementation
+
+**Available prompt packs:**
 - Construction diary creation
 - Incident report writing
 - Purchase-order processing
 
-- **Assets repository path**: [implementation_layer/no-code-assets/prompts](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts)
-- **What examples are about**: prompt customization and validation with bundled sample transcripts/data.
+**Potential applications:**
+- Rapid prototyping of reporting and data capture workflows
+- Deploying structured extraction in teams without developer support
+- Domain adaptation of existing use cases (e.g. adapting incident reporting to a new industry)
+- Piloting GenAI capabilities before investing in software development
+
+- **Assets path**: [implementation_layer/no-code-assets/prompts](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts)
+
+---
 
 ### Agent Skills
 
-Agent skills are reusable, packaged skill folders for end-to-end use-case
-execution patterns.
+Agent skills are fully self-contained, ready-to-run solution packages for a specific use case. Each skill folder includes task instructions, prompt resources, setup scripts, sample data, and all supporting workflow artifacts — everything required to deploy and run the use case out of the box. They are more complete than prompt templates and designed for direct operational use, not just experimentation.
 
-Main features:
-- Skill-specific instructions and prompt resources
-- Setup scripts and supporting files
-- Included sample data and workflow artifacts
+<Mermaid chart={`
+flowchart TD
+    IN("🗣️ Voice / Text Input") --> SK
 
-Current skill packs include:
-- Construction-diary-creation
-- Incident-report-writing
-- Purchase-order-processing
-- Report-writing-skill
+    subgraph SK["Agent Skill Package"]
+        direction TB
+        PR["Prompt & Instructions<br/>Task-specific rules"]
+        SD["Sample Data<br/>Domain examples"]
+        SC["Setup Scripts<br/>Configuration & assets"]
+        WF["Workflow Artifacts<br/>Supporting files"]
+    end
 
-- **Assets repository path**: [implementation_layer/no-code-assets/agent-skills](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills)
-- **What examples are about**: runnable skill setups with domain assets, setup scripts, and workflow-oriented instructions.
+    SK --> O1("📋 Structured Report")
+    SK --> O2("📁 Workflow-ready Output")
 
-### Root Folder
+    style IN fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style SK fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
 
-- **No-code assets root**: [implementation_layer/no-code-assets](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets)
+**Key features:**
+- Fully packaged — includes prompts, sample data, setup scripts, and supporting files
+- Deployable without custom software development
+- Domain-adaptable by editing templates and allowed values
+
+**Available skill packs:**
+- Construction diary creation
+- Incident report writing
+- Purchase-order processing
+- Report writing skill
+
+**Potential applications:**
+- Operational deployment of incident and safety reporting in industrial settings
+- On-site field work diary automation for construction and maintenance teams
+- Purchase order capture and validation in procurement workflows
+- Structured report generation for management and compliance purposes
+- Rapid use-case delivery in organizations without dedicated AI development teams
+
+- **Assets path**: [implementation_layer/no-code-assets/agent-skills](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills)
+
+---
+
+> 📁 **No-code assets root**: [implementation_layer/no-code-assets](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets)

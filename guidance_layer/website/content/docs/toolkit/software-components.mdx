@@ -7,108 +7,266 @@ import { Mermaid } from '@/components/mdx/mermaid';
 
 ## Software Components
 
-Software components are reusable, low-level capabilities. You can use them
-individually or compose them into larger pipelines.
+Software components are the core building blocks of the GAIK implementation layer. Each component encapsulates one well-defined capability — speech-to-text, document parsing, structured extraction, classification, or retrieval. They are designed to be used standalone or composed into custom pipelines, giving developers precise control over every step of a knowledge processing workflow.
 
 See also: [No-Code Assets](/toolkit/no-code-assets) for prompt templates and packaged skills.
 
 <Callout type="info">
-Use software components when you need fine-grained control over parsing,
-transformation, validation, and orchestration.
+Use software components when you need fine-grained control over each processing step, when a predefined module doesn't fit your requirements, or when integrating GenAI capabilities into an existing system.
 </Callout>
 
-| Scope | What you control | Typical outcome |
-| --- | --- | --- |
-| Component-level | Parser/model/settings per step | Flexible custom workflows |
-| Module-level | A full predefined pipeline | Faster implementation |
+## Overview
 
-## At a Glance
+<Mermaid chart={`
+flowchart TD
+    subgraph IN["Inputs"]
+        A("🎙️ Audio / Video")
+        B("📄 Documents")
+        C("📝 Text / Requirements")
+    end
 
-<Cards>
-  <Card title="Data Extraction" description="Schema generation and structured field extraction from unstructured content." />
-  <Card title="Document Parsing" description="Document-to-text/markdown conversion with parser options." />
-  <Card title="Transcribing" description="Audio/video transcription with optional cleanup and enhancement." />
-  <Card title="Document Classification" description="Document categorization with class outputs and confidence." />
-  <Card title="RAG Components" description="Composable retrieval pipeline blocks for grounded question answering." />
-</Cards>
+    subgraph SC["Software Components"]
+        T["Transcriber"]
+        P["Document Parser"]
+        E["Extractor"]
+        DC["Doc Classifier"]
+        R["RAG Components"]
+    end
 
-## Component Flow
+    subgraph OUT["Outputs"]
+        O1("📄 Transcript")
+        O2("📝 Markdown Text")
+        O3("✅ Structured Fields")
+        O4("🏷️ Document Class")
+        O5("💬 Q&A Response")
+    end
+
+    A --> T --> O1
+    B --> P --> O2
+    O1 --> E
+    O2 --> E
+    C --> E --> O3
+    B --> DC --> O4
+    B --> R --> O5
+
+    style IN fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style SC fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+    style OUT fill:#dcfce7,stroke:#16a34a,color:#14532d
+`} />
+
+---
+
+### Transcriber
+
+The Transcriber converts spoken audio or video recordings into written text. It uses OpenAI's Whisper model for accurate speech-to-text transcription and optionally applies a GPT-based post-processing step to clean up the raw output — fixing punctuation, removing filler words, and improving overall readability. It handles long recordings automatically through chunked processing, making it suitable for real-world audio captured in noisy or uncontrolled environments.
 
 <Mermaid chart={`
 flowchart LR
-    A[Input Data] --> B[Software Component]
-    B --> C[Structured Output]
-    C --> D[Your Custom Logic]
+    A("🎙️ Audio / Video File") --> B
+
+    subgraph B["Transcriber"]
+        direction TB
+        W["Speech-to-Text Model<br/>(Whisper)"]
+        G["GPT Enhancement<br/>Clean & Format"]
+        W --> G
+    end
+
+    B --> C("📄 Raw Transcript")
+    B --> D("✨ Enhanced Transcript")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 `} />
 
-### Data Extraction
+**Key features:**
+- Whisper-based transcription with high accuracy across languages
+- Optional GPT enhancement for clean, readable output
+- Automatic chunking for recordings of any length
+- Supports MP3, WAV, M4A, OGG, and video formats
 
-Converts unstructured text into validated structured output. The workflow is:
-requirements -> schema -> extraction.
+**Potential applications:**
+- Workplace incident and safety observation reporting
+- Construction site and field service diaries
+- Meeting and interview transcription
+- Medical dictation and clinical notes
+- Customer call recording analysis
+- Lecture and training material capture
 
-Main features:
-- Dynamic schema generation from plain-language requirements
-- Type-safe extraction outputs
-- Reusable schema for repeated workloads
+- **Implementation code**: [software_components/transcriber](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber)
+- **Usage examples**: [examples/transcriber](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/transcriber)
 
-Examples show invoice-like extraction and batch extraction across multiple
-documents.
+---
 
-- **Implementation code**: [implementation_layer/src/gaik/software_components/extractor](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor)
-- **Usage examples**: [implementation_layer/examples/software_components/extractor](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/extractor)
+### Document Parser
 
-### Document Parsing
+The Document Parser converts PDF, DOCX, and other file types into clean, structured markdown text. It offers two parsing strategies: a vision-based parser that uses GPT to interpret page layouts, tables, and visual structure; and local parsers (PyMuPDF, Docling) that process documents without API calls. The parsed markdown output preserves tables, headings, and multi-page structure, making it a reliable input for downstream extraction or indexing.
 
-Parses documents into normalized text/markdown for extraction and indexing.
+<Mermaid chart={`
+flowchart LR
+    A("📄 Document<br/>PDF / DOCX") --> B
 
-Main features:
-- Vision-based and local parsing options
-- Markdown-ready output
-- Multi-page processing support
+    subgraph B["Document Parser"]
+        direction TB
+        V["Vision Parser<br/>GPT-based layout parsing"]
+        L["Local Parser<br/>PyMuPDF / Docling"]
+    end
 
-Examples cover parser selection and PDF-to-markdown style conversions.
+    B --> C("📝 Markdown Text<br/>Tables & structure preserved")
 
-- **Implementation code**: [implementation_layer/src/gaik/software_components/parsers](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/parsers)
-- **Usage examples**: [implementation_layer/examples/software_components/parsers](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/parsers)
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
 
-### Transcribing
+**Key features:**
+- Vision-based and local parsing options to suit different accuracy and cost requirements
+- Preserves tables, headings, and document structure in markdown output
+- Multi-page processing with consistent formatting
+- Suitable for both simple forms and complex, visually rich documents
 
-Transcribes audio/video into raw text and optionally enhanced transcript text.
+**Potential applications:**
+- Invoice, receipt, and purchase order digitization
+- Contract and legal document preprocessing
+- Technical manual and product specification extraction
+- Research paper and report indexing
+- Compliance document analysis
+- HR form and CV processing
 
-Main features:
-- Whisper-based transcription pipeline
-- Optional transcript enhancement
-- Chunked processing for longer recordings
+- **Implementation code**: [software_components/parsers](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/parsers)
+- **Usage examples**: [examples/parsers](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/parsers)
 
-Examples include direct file transcription and context-guided transcript runs.
+---
 
-- **Implementation code**: [implementation_layer/src/gaik/software_components/transcriber](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber)
-- **Usage examples**: [implementation_layer/examples/software_components/transcriber](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/transcriber)
+### Extractor
 
-### Document Classification
+The Extractor turns any unstructured text — transcripts, parsed documents, or free-form notes — into validated, structured records. What makes it distinctive is how extraction is configured: instead of writing code or defining a database schema, you describe what you need in plain language. A Requirement Parser interprets your field definitions, a Schema Generator builds a type-safe Pydantic model, and a Data Extractor uses an LLM to populate each field. The generated schema is saved and reused for future runs, eliminating the cost and latency of regenerating it each time.
 
-Assigns documents to predefined classes to support routing and filtering.
+<Mermaid chart={`
+flowchart TD
+    A("📄 Text / Transcript") --> DE
+    B("📋 User Requirements<br/>Plain language field definitions") --> RP
 
-Main features:
-- Multi-class categorization
-- Confidence-scored predictions
-- Standalone pre-processing capability
+    subgraph EXT["Extractor"]
+        direction TB
+        RP["Requirement Parser<br/>Identify fields & constraints"]
+        SG["Schema Generator<br/>Build typed data schema"]
+        DE["Data Extractor<br/>LLM-powered field extraction"]
+        RP -.->|"parsed fields"| SG
+        SG -.->|"typed schema"| DE
+    end
 
-Examples show folder-level classification and confidence-based review.
+    EXT --> C("✅ Structured Fields")
+    EXT --> D("🗂️ Reusable Schema")
 
-- **Implementation code**: [implementation_layer/src/gaik/software_components/doc_classifier](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/doc_classifier)
-- **Usage examples**: [implementation_layer/examples/software_components/classifier](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/classifier)
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style EXT fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- Plain-language requirements replace manual schema definition
+- Type-safe extraction with full Pydantic validation
+- Supports constrained fields, allowed values, and conditional rules
+- Schema persistence for efficient batch processing
+
+**Potential applications:**
+- Incident and safety report field extraction from voice or text
+- Invoice and purchase order data capture
+- Contract clause and obligation extraction
+- Survey and form response structuring
+- Quality inspection data recording
+- HR and recruitment data extraction from CVs
+
+- **Implementation code**: [software_components/extractor](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor)
+- **Usage examples**: [examples/extractor](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/extractor)
+
+---
+
+### Document Classifier
+
+The Document Classifier assigns a predefined label to a document based on its content. It uses an LLM to evaluate the document against a user-defined set of classes and returns both the predicted class and a confidence score. It is most useful as a preprocessing step in multi-document pipelines — routing each document to the appropriate extraction schema, storage location, or downstream process before any further processing begins.
+
+<Mermaid chart={`
+flowchart LR
+    A("📄 Document") --> B
+    C("🏷️ Class Definitions<br/>e.g. invoice, contract, report") --> B
+
+    subgraph B["Document Classifier"]
+        direction TB
+        M["LLM Classification<br/>Match document to class"]
+    end
+
+    B --> D("🏷️ Predicted Class<br/>+ Confidence Score")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- Define any set of classes in plain language — no training required
+- Returns confidence scores for review and threshold-based routing
+- Works as a standalone step or as a gate before extraction
+
+**Potential applications:**
+- Incoming document triage and routing in finance or legal workflows
+- Email and attachment categorization
+- Insurance claim and case type detection
+- Archive tagging and document library organization
+- Regulatory filing type identification
+- Preprocessing step for multi-schema extraction pipelines
+
+- **Implementation code**: [software_components/doc_classifier](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/doc_classifier)
+- **Usage examples**: [examples/classifier](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/classifier)
+
+---
 
 ### RAG Components
 
-Provides composable building blocks for retrieval-augmented generation.
+The RAG (Retrieval-Augmented Generation) components provide a modular pipeline for building document-grounded question answering systems. Documents are parsed, chunked, and embedded into a vector store. At query time, a retriever finds the most relevant chunks, and an answer generator produces a response grounded in that content — with optional citations. Each block in the pipeline can be used independently or assembled into a complete Q&A workflow.
 
-Main features:
-- Parser, embedder, vector store, retriever, and answer generator
-- Metadata-preserving chunking and retrieval
-- Optional reranking and citation-aware answering
+<Mermaid chart={`
+flowchart TD
+    A("📄 Documents") --> PA
 
-Examples include parser-to-retriever chains and complete RAG Q&A flows.
+    subgraph RAG["RAG Components"]
+        direction TB
+        PA["Parser<br/>Extract text from documents"]
+        EM["Embedder<br/>Convert text to vectors"]
+        VS["Vector Store<br/>Index & store embeddings"]
+        RT["Retriever<br/>Find relevant chunks"]
+        AG["Answer Generator<br/>LLM-powered response"]
+        PA --> EM --> VS
+        VS --> RT --> AG
+    end
 
-- **Implementation code**: [implementation_layer/src/gaik/software_components/RAG](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG)
-- **Usage examples**: [implementation_layer/examples/software_components/RAG](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/RAG)
+    Q("❓ User Question") --> RT
+    RAG --> R("💬 Grounded Answer<br/>with citations")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style Q fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style R fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style RAG fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- Fully modular — use individual blocks or assemble the full pipeline
+- Metadata-preserving chunking for accurate source attribution
+- Optional reranking to improve retrieval relevance
+- Citation-aware answer generation for trustworthy outputs
+
+**Potential applications:**
+- Internal knowledge base and policy Q&A
+- Technical documentation and product manual assistants
+- Regulatory and compliance document lookup
+- Customer support knowledge retrieval
+- Contract and legal clause search
+- Training material and onboarding knowledge assistants
+
+- **Implementation code**: [software_components/RAG](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG)
+- **Usage examples**: [examples/RAG](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/RAG)

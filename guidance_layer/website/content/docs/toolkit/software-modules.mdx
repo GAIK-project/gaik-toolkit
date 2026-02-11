@@ -7,59 +7,154 @@ import { Mermaid } from '@/components/mdx/mermaid';
 
 ## Software Modules
 
-Software modules are end-to-end pipelines composed from software components.
-They reduce orchestration work by packaging common workflows.
+Software modules are production-ready, end-to-end pipelines that combine software components into a single, configurable workflow. They eliminate the need to wire components together manually — you provide the input and your field requirements, and the module handles transcription or parsing, schema generation, and structured extraction in one step.
 
 See also: [No-Code Assets](/toolkit/no-code-assets) for prompt templates and packaged skills.
 
 <Callout type="info">
-Use software modules when you want production-ready workflow behavior with
-minimal integration code.
+Use software modules when you want a complete, working pipeline with minimal integration code. Each module is designed to cover the most common GenAI knowledge capture scenarios out of the box.
 </Callout>
 
-| Module | Primary input | Output style |
-| --- | --- | --- |
-| Audio-to-Structured-Data | Audio/Video | Structured fields from spoken content |
-| Document-to-Structured-Data | Documents (PDF/DOCX) | Structured fields from document content |
+## Overview
 
-## Pipeline View
+| Module | Input | Processing steps | Output |
+| --- | --- | --- | --- |
+| Audio-to-Structured-Data | Audio / Video | Transcribe → Extract | Structured fields from spoken content |
+| Document-to-Structured-Data | PDF / DOCX | Parse → Extract | Structured fields from document content |
 
-<Mermaid chart={`
-flowchart LR
-    A[Input] --> B[Software Module]
-    B --> C[Parsed/Transcribed Content]
-    C --> D[Schema-based Extraction]
-    D --> E[Structured Output]
-`} />
+---
 
 ### Audio-to-Structured-Data
 
-End-to-end pipeline that combines transcription and extraction to convert audio
-or video input into structured output.
+This module bridges the gap between spoken language and structured data. It combines the Transcriber and Extractor components into a single pipeline: audio is transcribed to text, and the text is then processed against your field requirements to produce validated, structured output. Both the transcript and the extracted fields are returned together, giving downstream systems everything they need in one call. The generated schema is persisted and reused on subsequent runs, making repeated processing fast and cost-efficient.
 
-Main features:
-- Single workflow for transcript generation and structured extraction
-- Requirements-driven output fields
-- Useful for voice-first reporting and logging scenarios
+<Mermaid chart={`
+flowchart TD
+    IN1("🎙️ Audio / Video File") --> MOD
+    IN2("📋 User Requirements<br/>Plain language field definitions") --> MOD
 
-Examples focus on converting spoken recordings into structured records based on
-task-specific field requirements.
+    subgraph MOD["Audio-to-Structured-Data Module"]
+        direction TB
 
-- **Implementation code**: [implementation_layer/src/gaik/software_modules/audio_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data)
-- **Usage examples**: [implementation_layer/examples/software_modules/audio_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/audio_to_structured_data)
+        subgraph T["Step 1 · Transcriber"]
+            direction LR
+            W["Speech-to-Text<br/>(Whisper)"] --> G["Transcript<br/>Enhancement"]
+        end
+
+        subgraph X["Step 2 · Extractor"]
+            direction LR
+            RP["Requirement<br/>Parser"] --> SG["Schema<br/>Generator"] --> DE["Data<br/>Extractor"]
+        end
+
+        T -->|"transcript text"| X
+    end
+
+    MOD --> O1("📄 Raw Transcript")
+    MOD --> O2("✨ Enhanced Transcript")
+    MOD --> O3("✅ Structured Fields")
+    MOD --> O4("🗂️ Reusable Schema")
+
+    style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style IN2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style O2 fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style O3 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O4 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style MOD fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+    style T fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style X fill:#faf5ff,stroke:#9333ea,color:#2e1065
+`} />
+
+**What the module returns:**
+
+| Output | Description |
+| --- | --- |
+| Raw Transcript | Verbatim speech-to-text output |
+| Enhanced Transcript | GPT-refined, readable version |
+| Structured Fields | All defined fields extracted and validated |
+| Reusable Schema | Pydantic schema saved for future runs |
+
+**Key features:**
+- Single entry point for voice-to-data workflows
+- Plain-language field requirements — no code or schema definition needed
+- Returns both the transcript and extracted data for full traceability
+- Schema reuse eliminates redundant processing on repeated runs
+
+**Potential applications:**
+- Workplace incident and safety observation reporting
+- Construction site and field work diary entries
+- Field service and maintenance activity logging
+- Quality inspection and audit recordings
+- Medical and clinical dictation capture
+- Sales call notes and customer interaction summaries
+- Meeting minutes and action item extraction
+
+- **Implementation code**: [software_modules/audio_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data)
+- **Usage examples**: [examples/audio_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/audio_to_structured_data)
+
+---
 
 ### Document-to-Structured-Data
 
-End-to-end pipeline that combines document parsing and extraction to convert
-documents into structured output.
+This module turns static documents into structured, queryable data. It combines the Document Parser and Extractor components: a document is first converted to clean markdown, then processed against your field requirements to extract exactly the data you need. The module supports both vision-based and local parsing strategies, making it adaptable to a wide range of document types — from clean digital PDFs to visually complex, multi-column layouts.
 
-Main features:
-- Combined parser + extractor workflow in one module
-- Supports configurable parser choices for source documents
-- Produces schema-aligned structured outputs directly from files
+<Mermaid chart={`
+flowchart TD
+    IN1("📄 Document<br/>PDF / DOCX") --> MOD
+    IN2("📋 User Requirements<br/>Plain language field definitions") --> MOD
 
-Examples cover processing PDFs/documents into ready-to-use extracted fields with
-parser selection and schema reuse patterns.
+    subgraph MOD["Document-to-Structured-Data Module"]
+        direction TB
 
-- **Implementation code**: [implementation_layer/src/gaik/software_modules/documents_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/documents_to_structured_data)
-- **Usage examples**: [implementation_layer/examples/software_modules/documents_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/documents_to_structured_data)
+        subgraph P["Step 1 · Document Parser"]
+            direction LR
+            VP["Vision Parser<br/>or Local Parser"] --> MD["Markdown<br/>Text"]
+        end
+
+        subgraph X["Step 2 · Extractor"]
+            direction LR
+            RP["Requirement<br/>Parser"] --> SG["Schema<br/>Generator"] --> DE["Data<br/>Extractor"]
+        end
+
+        P -->|"parsed text"| X
+    end
+
+    MOD --> O1("📝 Parsed Markdown")
+    MOD --> O2("✅ Structured Fields")
+    MOD --> O3("🗂️ Reusable Schema")
+
+    style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style IN2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O3 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style MOD fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+    style P fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style X fill:#faf5ff,stroke:#9333ea,color:#2e1065
+`} />
+
+**What the module returns:**
+
+| Output | Description |
+| --- | --- |
+| Parsed Markdown | Document content converted to clean, structured markdown |
+| Structured Fields | All defined fields extracted and validated |
+| Reusable Schema | Pydantic schema saved for future runs |
+
+**Key features:**
+- Configurable parser choice — vision-based for complex layouts, local for speed and cost efficiency
+- Plain-language field requirements eliminate manual schema work
+- Returns both parsed text and extracted data for full traceability
+- Schema reuse supports efficient batch processing across large document sets
+
+**Potential applications:**
+- Invoice and purchase order data capture from PDFs
+- Contract and agreement key term extraction
+- Technical specification and datasheet processing
+- Research report and regulatory filing analysis
+- CV and job application data extraction
+- Insurance and financial form digitization
+- Product catalogue and pricing data ingestion
+
+- **Implementation code**: [software_modules/documents_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/documents_to_structured_data)
+- **Usage examples**: [examples/documents_to_structured_data](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/documents_to_structured_data)
