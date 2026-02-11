@@ -1,0 +1,81 @@
+---
+title: No-Code Assets
+description: Prompt templates and reusable agent skills for rapid use-case setup
+---
+
+import { Mermaid } from '@/components/mdx/mermaid';
+
+## No-Code Assets
+
+No-code assets provide prebuilt templates and packaged workflow skills that help
+teams configure common use cases without implementing full pipelines from
+scratch.
+
+<Callout type="info">
+Use these assets to accelerate prototyping, domain adaptation, and guided setup
+before moving to full software component/module customization.
+</Callout>
+
+| Asset type | Best for | Typical outputs |
+| --- | --- | --- |
+| Prompt Templates | Fast prompt-driven experiments | Prompt files, sample data, task guidance |
+| Agent Skills | Reusable use-case workflows | Skill packages, setup scripts, workflow assets |
+
+## At a Glance
+
+<Cards>
+  <Card title="Prompt Templates" description="Reusable prompt packs with task-specific instructions and sample data." />
+  <Card title="Agent Skills" description="Packaged skill folders for concrete use-case execution patterns." />
+  <Card title="No-Code Assets Root" description="Single location for all no-code assets in the implementation layer." />
+</Cards>
+
+## Usage Flow
+
+<Mermaid chart={`
+flowchart LR
+    A[Choose Use Case] --> B[Select Prompt Template or Agent Skill]
+    B --> C[Adapt Inputs and Instructions]
+    C --> D[Run and Validate Output]
+    D --> E[Scale to Components/Modules if Needed]
+`} />
+
+### Prompt Templates
+
+Prompt templates are task-specific prompt packs with sample input data and
+usage guidance.
+
+Main features:
+- Reusable prompt files per use case
+- Sample data for quick validation
+- Low-effort adaptation for new domains
+
+Current prompt packs include:
+- Construction diary creation
+- Incident report writing
+- Purchase-order processing
+
+- **Assets repository path**: [implementation_layer/no-code-assets/prompts](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts)
+- **What examples are about**: prompt customization and validation with bundled sample transcripts/data.
+
+### Agent Skills
+
+Agent skills are reusable, packaged skill folders for end-to-end use-case
+execution patterns.
+
+Main features:
+- Skill-specific instructions and prompt resources
+- Setup scripts and supporting files
+- Included sample data and workflow artifacts
+
+Current skill packs include:
+- Construction-diary-creation
+- Incident-report-writing
+- Purchase-order-processing
+- Report-writing-skill
+
+- **Assets repository path**: [implementation_layer/no-code-assets/agent-skills](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills)
+- **What examples are about**: runnable skill setups with domain assets, setup scripts, and workflow-oriented instructions.
+
+### Root Folder
+
+- **No-code assets root**: [implementation_layer/no-code-assets](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets)
