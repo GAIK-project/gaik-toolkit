@@ -1,4 +1,4 @@
 {
   "title": "Documentation",
-  "pages": ["index", "demo", "business-layer", "guidance-layer", "toolkit", "requirements-layer", "security-compliance-layer", "strategy-layer", "examples"]
+  "pages": ["index", "demo", "business-layer", "guidance-layer", "toolkit", "requirements-layer", "security-compliance-layer", "strategy-layer"]
 }
