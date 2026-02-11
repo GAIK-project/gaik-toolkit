@@ -261,7 +261,7 @@ Example output for an incident recording:
 
 <p>
   <img src="../images/incident1.png" width="45%" height="45%" />
-  <img src="../images/incident2.png" width="45%" height="45%" />
+  <img src="../images/incident2.png" width="45%" height="40%" />
 </p>
 
 ```
