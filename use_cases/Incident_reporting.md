@@ -200,18 +200,24 @@ Fields are specified in plain language — no code, no schema configuration. Eac
 
 ```
 Extract the following fields from the incident report.
-- Report type [Choose one from: Safety, Environmental protection, Energy efficiency, ""]
-- Observer name
-- Observer organization [ABC Pori Oy; ABC Helsinki Oy; Other]
-- Observer is a summer employee [output "Yes" only if it is explicitly stated that the reporter is a summer employee; otherwise ""]
-- Event time [date text exactly as written in source; do not normalize to ISO]
-- Location information
-- Photo count [number of photos uploaded; if none mentioned, output ""]
-- The event was serious [Yes, No]
-- Description of the event area
-- Possible consequences
-- Implemented measures
-- Proposal
+- Raportin tyyppi [Choose one from: Turvallisuus, Ympäristönsuojelu, Energiatehokkuus, ""]
+- Tarkkailijan nimi
+- Tarkkailijaorganisaatio [ABC Pori Oy; Helsinki Oy; Other]
+- Tarkkailija on kesätyöntekijä [output "Yes" only if explicitly stated that the reporter is a summer employee; otherwise ""]
+- Tapahtuma-aika [date text exactly as written in source; do not normalize to ISO]
+- Sijaintitiedot
+- Kuva [number of photos uploaded; if none mentioned, output ""]
+- Tapahtuma oli vakava [Kyllä, Ei]
+- Tapahtuma-alueen kuvaus
+- Mahdolliset seuraukset
+- Toteutetut toimenpiteet
+- Ehdotus
+
+Output rules:
+- Return every schema field.
+- For missing/unknown/not stated values, always return "".
+- Never output null, None, N/A, or "--tyhjä".
+- Keep Finnish wording close to the source when possible.
 ```
 
 ---
@@ -264,20 +270,7 @@ Example output for an incident recording:
   <img src="../images/incident2.png" width="45%" height="40%" />
 </p>
 
-```
-Report type:               Safety
-Observer name:             Anna Virtanen
-Observer organization:     ABC Pori Oy
-Observer is summer employee: ""
-Event time:                15.3.2024 klo 14:30
-Location information:      Halli 3, linja B, puristimen alue
-Photo count:               2
-The event was serious:     Yes
-Description of event area: Hydrauliputki vaurioitunut, öljyvuoto lattialla
-Possible consequences:     Liukastumisriski, tulipaloriski
-Implemented measures:      Alue eristetty, öljy imeytetty
-Proposal:                  Hydrauliputki tarkistettava ennen käyttöönottoa
-```
+
 
 > 📁 [`implementation_layer/src/gaik/software_modules/audio_to_structured_data/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data)
 > 📁 [`implementation_layer/examples/software_modules/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules)
