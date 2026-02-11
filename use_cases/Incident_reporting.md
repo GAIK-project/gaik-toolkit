@@ -259,6 +259,11 @@ flowchart TD
 
 Example output for an incident recording:
 
+<p>
+  <img src="https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/images/incident1.png" width="48%" />
+  <img src="https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/images/incident2.png" width="48%" />
+</p>
+
 ```
 Report type:               Safety
 Observer name:             Anna Virtanen
