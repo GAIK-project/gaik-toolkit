@@ -275,6 +275,7 @@ Example output for an incident recording:
 > 📁 [`implementation_layer/src/gaik/software_modules/audio_to_structured_data/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data)
 > 📁 [`implementation_layer/examples/software_modules/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules)
 
+To test the use case of incident report writing, please visit the [GAIK demo link] (https://gaik-demo.2.rahtiapp.fi/). The access to the use case can be obtained by sending a registration request.
 ---
 
 ## Adaptable to Other Domains
