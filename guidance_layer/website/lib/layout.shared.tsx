@@ -26,8 +26,34 @@ export function baseOptions(): BaseLayoutProps {
     // see https://fumadocs.dev/docs/ui/navigation/links
     links: [
       {
-        text: "GitHub",
+        text: (
+          <>
+            <img
+              src="/gaik-toolkit/logos/github.png"
+              alt="GitHub"
+              width="24"
+              height="24"
+              style={{ display: "inline-block", marginRight: "6px", verticalAlign: "middle" }}
+            />
+            GitHub
+          </>
+        ),
         url: "https://github.com/GAIK-project/gaik-toolkit",
+      },
+      {
+        text: (
+          <>
+            <img
+              src="/gaik-toolkit/logos/pypi.png"
+              alt="PyPI"
+              width="24"
+              height="24"
+              style={{ display: "inline-block", marginRight: "6px", verticalAlign: "middle" }}
+            />
+            PyPI
+          </>
+        ),
+        url: "https://pypi.org/project/gaik/",
       },
     ],
     sidebar: {
