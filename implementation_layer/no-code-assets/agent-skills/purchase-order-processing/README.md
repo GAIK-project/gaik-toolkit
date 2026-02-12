@@ -2,6 +2,8 @@
 
 Transform your purchase orders and bills of material into accurate, priced sales orders — automatically.
 
+**For a detailed explanation of the design and development of this code, see the related article on [*Data Science Collective*](https://medium.com/data-science-collective/i-created-a-claude-skill-for-processing-complex-purchase-orders-9f14f10308cd)**
+
 ---
 
 ## What Does This Skill Do?
