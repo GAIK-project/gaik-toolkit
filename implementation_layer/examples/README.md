@@ -60,6 +60,3 @@ uv run python examples/software_components/classifier/classification_example.py
 python examples/software_components/classifier/classification_example.py
 ```
 
-## Documentation
-
-See [docs/](../docs/) for full API documentation.
