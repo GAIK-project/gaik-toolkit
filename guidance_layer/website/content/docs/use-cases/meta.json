@@ -1,0 +1,14 @@
+﻿{
+  "title": "Use Cases",
+  "pages": [
+    "incident-reporting",
+    "purchase-order-processing",
+    "dental-transcription-close-captioning",
+    "semantic-dental-video-search",
+    "dental-learning-assistant",
+    "report-writing",
+    "construction-site-diary-creation",
+    "sales-proposal-generation",
+    "customer-onboarding-sales-assistant"
+  ]
+}
