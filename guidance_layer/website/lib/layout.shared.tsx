@@ -39,5 +39,5 @@ export function baseOptions(): BaseLayoutProps {
         />
       ),
     },
-  };
+  } as BaseLayoutProps;
 }
