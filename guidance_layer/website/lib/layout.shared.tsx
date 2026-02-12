@@ -15,8 +15,8 @@ export function baseOptions(): BaseLayoutProps {
           <img
             src="/gaik-toolkit/logos/gaik-logo-letter-only.png"
             alt="GAIK logo"
-            width="44"
-            height="44"
+            width="56"
+            height="56"
             style={{ display: "inline-block", marginRight: "8px" }}
           />
           GAIK
