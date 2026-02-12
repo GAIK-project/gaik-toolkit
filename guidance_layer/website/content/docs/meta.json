@@ -1,4 +1,15 @@
-{
+﻿{
   "title": "Documentation",
-  "pages": ["index", "demo", "business-layer", "guidance-layer", "toolkit", "requirements-layer", "security-compliance-layer", "strategy-layer", "use-cases"]
+  "pages": [
+    "github",
+    "index",
+    "strategy-layer",
+    "business-layer",
+    "toolkit",
+    "guidance-layer",
+    "requirements-layer",
+    "security-compliance-layer",
+    "use-cases",
+    "demo"
+  ]
 }

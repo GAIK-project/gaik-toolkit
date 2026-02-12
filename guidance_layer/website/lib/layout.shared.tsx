@@ -1,4 +1,4 @@
-import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
+﻿import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 
 /**
  * Shared layout configurations
@@ -14,10 +14,10 @@ export function baseOptions(): BaseLayoutProps {
         <>
           <img
             src="/gaik-toolkit/logos/gaik-logo-letter-only.png"
-            alt="Logo"
-            width="24"
-            height="24"
-            style={{ display: 'inline-block', marginRight: '8px' }}
+            alt="GAIK logo"
+            width="34"
+            height="34"
+            style={{ display: "inline-block", marginRight: "8px" }}
           />
           GAIK
         </>
@@ -26,9 +26,18 @@ export function baseOptions(): BaseLayoutProps {
     // see https://fumadocs.dev/docs/ui/navigation/links
     links: [
       {
-        text: 'GitHub',
-        url: 'https://github.com/GAIK-project/gaik-toolkit',
+        text: "GitHub",
+        url: "https://github.com/GAIK-project/gaik-toolkit",
       },
     ],
+    sidebar: {
+      footer: (
+        <img
+          src="/gaik-toolkit/logos/eu_logo.png"
+          alt="Co-funded by European Union"
+          style={{ width: "100%", height: "auto" }}
+        />
+      ),
+    },
   };
 }
