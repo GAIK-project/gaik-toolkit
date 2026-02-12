@@ -30,5 +30,5 @@ python extraction_example_4.py
 
 ## Related Documentation
 
-- [Extractor Component](../../../src/gaik/software_components/extractor)
+- [Extractor Component](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor)
 - [Software Components Overview](https://gaik-project.github.io/gaik-toolkit/toolkit/software-components#extractor)

@@ -37,7 +37,7 @@ The pipeline returns:
 
 ## Related Documentation
 
-- [Audio-to-Structured-Data Module](../../../src/gaik/software_modules/audio_to_structured_data)
+- [Audio-to-Structured-Data Module](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data)
 - [Software Modules Overview](https://gaik-project.github.io/gaik-toolkit/toolkit/software-modules#audio-to-structured-data)
-- [Transcriber Component](../../../src/gaik/software_components/transcriber)
-- [Extractor Component](../../../src/gaik/software_components/extractor)
+- [Transcriber Component](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber)
+- [Extractor Component](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor)

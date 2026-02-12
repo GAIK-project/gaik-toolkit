@@ -43,6 +43,6 @@ python pipeline_example.py
 
 ## Related Documentation
 
-- [RAG-Workflow Module](../../../src/gaik/software_modules/RAG_workflow)
+- [RAG-Workflow Module](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/RAG_workflow)
 - [Software Modules Overview](https://gaik-project.github.io/gaik-toolkit/toolkit/software-modules#rag-workflow)
-- [RAG Components](../../../src/gaik/software_components/RAG)
+- [RAG Components](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG)

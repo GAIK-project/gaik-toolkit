@@ -28,5 +28,5 @@ python demo_vision_simple.py
 
 ## Related Documentation
 
-- [Document Parser Component](../../../src/gaik/software_components/parsers)
+- [Document Parser Component](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/parsers)
 - [Software Components Overview](https://gaik-project.github.io/gaik-toolkit/toolkit/software-components#document-parser)

@@ -33,6 +33,6 @@ python answer_generator_example.py
 
 ## Related Documentation
 
-- [RAG Components](../../../src/gaik/software_components/RAG)
+- [RAG Components](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG)
 - [Software Components Overview](https://gaik-project.github.io/gaik-toolkit/toolkit/software-components#rag-components)
-- [RAG-Workflow Module](../../software_modules/RAG_workflow)
+- [RAG-Workflow Module](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/RAG_workflow)

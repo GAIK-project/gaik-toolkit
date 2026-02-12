@@ -51,5 +51,5 @@ export OPENAI_API_KEY="your-key-here"
 ## Related Documentation
 
 - [Software Modules Overview](https://gaik-project.github.io/gaik-toolkit/toolkit/software-modules)
-- [Module Source Code](../../src/gaik/software_modules)
+- [Module Source Code](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules)
 - [Software Components Examples](../software_components) - For individual component usage

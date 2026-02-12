@@ -20,5 +20,5 @@ python transcriber_example.py
 
 ## Related Documentation
 
-- [Transcriber Component](../../../src/gaik/software_components/transcriber)
+- [Transcriber Component](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber)
 - [Software Components Overview](https://gaik-project.github.io/gaik-toolkit/toolkit/software-components#transcriber)

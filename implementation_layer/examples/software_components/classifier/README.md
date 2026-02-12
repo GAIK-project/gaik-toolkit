@@ -20,5 +20,5 @@ python classification_example.py
 
 ## Related Documentation
 
-- [Document Classifier Component](../../../src/gaik/software_components/classifier)
+- [Document Classifier Component](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/classifier)
 - [Software Components Overview](https://gaik-project.github.io/gaik-toolkit/toolkit/software-components#document-classifier)

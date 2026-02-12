@@ -35,7 +35,7 @@ The pipeline returns:
 
 ## Related Documentation
 
-- [Documents-to-Structured-Data Module](../../../src/gaik/software_modules/documents_to_structured_data)
+- [Documents-to-Structured-Data Module](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/documents_to_structured_data)
 - [Software Modules Overview](https://gaik-project.github.io/gaik-toolkit/toolkit/software-modules#document-to-structured-data)
-- [Document Parser Component](../../../src/gaik/software_components/parsers)
-- [Extractor Component](../../../src/gaik/software_components/extractor)
+- [Document Parser Component](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/parsers)
+- [Extractor Component](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor)
