@@ -1,0 +1,133 @@
+---
+title: Transcription Evaluation
+description: Assessing audio-to-text conversion quality
+---
+
+## The Problem
+
+When converting spoken audio or video recordings into written text, accuracy is critical for business applications like incident reporting, meeting documentation, or content transcription. Poor transcription quality can lead to misunderstandings, missing information, or incorrect data extraction.
+
+Key challenges include:
+- **Speech recognition errors** - Words misheard or completely missed
+- **Technical terminology** - Domain-specific terms transcribed incorrectly
+- **Name and brand confusion** - Proper nouns garbled or misspelled
+- **Language complexity** - Morphologically complex languages (like Finnish) with case inflections and compounds
+- **Audio quality variations** - Background noise, accents, or poor recording conditions
+
+---
+
+## How We Evaluate
+
+Transcription quality is measured by comparing the AI-generated transcript against a verified reference transcript (ground truth). The primary metric is **Word Error Rate (WER)**, which calculates the percentage of words that were incorrectly transcribed.
+
+### Understanding Word Error Rate (WER)
+
+WER measures three types of errors:
+- **Substitutions** - Words replaced with incorrect words (*"Hello world" → "Hello word"*)
+- **Deletions** - Words completely missed (*"Hello world" → "Hello"*)
+- **Insertions** - Extra words added that weren't spoken (*"Hello world" → "Hello the world"*)
+
+**WER Interpretation:**
+- **Below 5%** - Excellent quality, suitable for professional documentation
+- **5-10%** - Very good, acceptable for most business applications
+- **10-20%** - Good, usable for general transcription needs
+- **20-30%** - Fair, may require manual review
+- **Above 30%** - Poor, significant corrections needed
+
+### Enhancement Evaluation
+
+Beyond basic transcription, we evaluate enhancement techniques that improve transcript quality through:
+- **Spelling correction** - Fixing misspelled technical terms and proper nouns
+- **Consistency normalization** - Standardizing hyphenation and compound words
+- **Context-based repair** - Inserting missing function words and fixing grammatical errors
+
+---
+
+## Benchmarking Results
+
+We evaluated multiple transcription models on Finnish dental webinar audio containing technical terminology, proper nouns, and professional content.
+
+### Model Performance
+
+| Model | Word Error Rate | Assessment |
+|-------|----------------|-----------|
+| WhisperX (large) Enhanced | **15.98%** | Best overall performance |
+| WhisperX (large-v3) Enhanced | 16.06% | Excellent, production-ready |
+| gpt-4o-transcribe Enhanced | 17.04% | Very good, reliable |
+| WhisperX (medium) Enhanced | 24.02% | Good, resource-efficient |
+| WhisperX (small) Enhanced | 24.70% | Acceptable with enhancement |
+
+### Key Findings
+
+- **Enhancement Impact**: Post-transcription enhancement consistently reduces error rates by 1.5-3 percentage points
+- **Spelling Improvement**: Enhancement reduces spelling errors by 0.5-3.5%
+- **Best for Production**: WhisperX (large-v3) and gpt-4o-transcribe offer the best balance of accuracy and reliability
+- **Cost-Optimized**: WhisperX (small) with enhancement provides acceptable quality at lower computational cost
+
+---
+
+## Error Classification
+
+Transcription errors fall into different categories based on how they can be addressed:
+
+### Fixable Through Enhancement
+
+These errors can be corrected after transcription:
+- **Brand and product names** - Straumann → Strauman
+- **Person names** - Martola → Martoon
+- **Technical terms** - peri-implantiitti variations
+- **Number formatting** - Converting "twenty" ↔ "20"
+- **Compound word splitting** - Inconsistent hyphenation
+
+### Require Better Models
+
+These errors need improved transcription models:
+- **Large phrase omissions** - Entire sentences missing
+- **Catastrophic mishearings** - Complete misunderstanding of context
+
+### Acceptable Minor Errors
+
+Some errors have minimal impact and are acceptable in production:
+- **Missing function words** - Small words like "and", "that", "it"
+- **Extra filler words** - Additional discourse markers that don't change meaning
+
+---
+
+## Real-World Applications
+
+Transcription evaluation supports these GAIK use cases:
+
+- **Incident Reporting** - Converting voice-recorded safety observations into structured reports
+- **Construction Site Diaries** - Transcribing daily field observations and progress notes
+- **Meeting Documentation** - Creating accurate records of discussions and decisions
+- **Content Localization** - Transcribing instructional videos for translation
+
+---
+
+## Quality Considerations
+
+When evaluating transcription quality for your specific use case, consider:
+
+**Domain Terminology** - How well does the model handle your industry's specific vocabulary?
+
+**Language Requirements** - Does the solution support your language's complexity (inflections, compounds, dialects)?
+
+**Audio Conditions** - What quality level can you expect given your recording environment?
+
+**Cost vs. Quality** - What error rate is acceptable given your budget and use case criticality?
+
+**Enhancement Value** - Will post-processing improvement justify the additional computational cost?
+
+---
+
+## Getting Started
+
+To evaluate transcription quality in your own context:
+
+1. Create reference transcripts for a sample of your typical audio content
+2. Test different transcription models and compare their Word Error Rates
+3. Evaluate if enhancement techniques improve quality for your domain
+4. Define acceptable quality thresholds based on your use case requirements
+5. Monitor quality over time as content and conditions evolve
+
+For technical implementation details and evaluation tools, visit the [GAIK GitHub repository](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/transcription_eval).

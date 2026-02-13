@@ -1,0 +1,11 @@
+{
+  "title": "Evaluation Methods",
+  "pages": [
+    "index",
+    "transcription-eval",
+    "extraction-eval",
+    "rag-eval",
+    "report-writing-eval",
+    "translation-eval"
+  ]
+}
