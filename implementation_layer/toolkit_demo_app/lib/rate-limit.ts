@@ -19,8 +19,8 @@ function createRateLimiter(): Ratelimit | null {
 
   return new Ratelimit({
     redis: new Redis({ url, token }),
-    // 10 req/min per IP
-    limiter: Ratelimit.fixedWindow(10, "1 m"),
+    // 30 req/min per IP (POST only — see proxy.ts)
+    limiter: Ratelimit.fixedWindow(30, "1 m"),
     analytics: false,
     prefix: "gaik-demo",
   });

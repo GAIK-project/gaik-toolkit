@@ -19,8 +19,8 @@ export default async function proxy(request: NextRequest) {
   const isNextApiRoute =
     pathname.startsWith("/api/auth") || pathname.startsWith("/api/admin");
   if (pathname.startsWith("/api") && !isNextApiRoute) {
-    // Rate limit check (if Redis is configured)
-    if (ratelimit) {
+    // Rate limit only POST requests (heavy processing endpoints)
+    if (ratelimit && request.method === "POST") {
       try {
         const ip =
           request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
