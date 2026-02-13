@@ -6,16 +6,6 @@
                   "business-layer",
                   "toolkit",
                   "guidance-layer",
-                  {
-                    "type": "page",
-                    "title": "↳ How to Start",
-                    "url": "/guidance-layer#how-to-start-with-the-toolkit"
-                  },
-                  {
-                    "type": "page",
-                    "title": "↳ Company Support",
-                    "url": "/guidance-layer#gaik-support-for-companies"
-                  },
                   "requirements-layer",
                   "security-compliance-layer",
                   "use-cases",
