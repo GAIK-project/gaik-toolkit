@@ -114,10 +114,14 @@ rag-workflow = [
     "gaik[answer-generator]",
 ]
 
-# Audio/video transcription
+# Audio/video transcription (sequential, PyDub-based)
 transcriber = [
     "pydub>=0.25.1",
 ]
+
+# Parallel audio/video transcription (FFmpeg-based, no extra Python deps)
+# Requires ffmpeg + ffprobe on $PATH as system dependencies
+parallel-transcriber = []
 
 # Document classification
 classifier = [
@@ -130,6 +134,7 @@ all = [
     "gaik[extract]",
     "gaik[parser]",
     "gaik[transcriber]",
+    "gaik[parallel-transcriber]",
     "gaik[classifier]",
     "gaik[rag-parser-docling]",
     "gaik[rag-parser-vision]",
@@ -168,6 +173,7 @@ all-cpu = [
     "gaik[extract]",
     "gaik[parser-cpu]",
     "gaik[transcriber]",
+    "gaik[parallel-transcriber]",
     "gaik[classifier]",
     "gaik[audio-to-structured-data]",
     "gaik[documents-to-structured-data-cpu]",
