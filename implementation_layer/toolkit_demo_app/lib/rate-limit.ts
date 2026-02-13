@@ -3,7 +3,7 @@ import { Redis } from "@upstash/redis";
 
 /**
  * Rate limiter using Upstash Redis
- * Fixed window: 30 requests per minute per IP (POST only, see proxy.ts)
+ * Fixed window: 15 POST requests per minute per IP (see proxy.ts)
  * Falls back to no rate limiting if Redis is not configured (dev environment)
  */
 function createRateLimiter(): Ratelimit | null {
@@ -19,8 +19,8 @@ function createRateLimiter(): Ratelimit | null {
 
   return new Ratelimit({
     redis: new Redis({ url, token }),
-    // 30 req/min per IP (POST only — see proxy.ts)
-    limiter: Ratelimit.fixedWindow(30, "1 m"),
+    // 15 POST req/min per IP (see proxy.ts)
+    limiter: Ratelimit.fixedWindow(15, "1 m"),
     analytics: false,
     prefix: "gaik-demo",
   });
