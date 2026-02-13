@@ -55,6 +55,21 @@ export function baseOptions(): BaseLayoutProps {
         ),
         url: "https://pypi.org/project/gaik/",
       },
+      {
+        text: (
+          <>
+            <img
+              src="/gaik-toolkit/images/toolkit.png"
+              alt="Toolkit Demo"
+              width="24"
+              height="24"
+              style={{ display: "inline-block", marginRight: "6px", verticalAlign: "middle" }}
+            />
+            Toolkit Demo
+          </>
+        ),
+        url: "https://gaik-demo.2.rahtiapp.fi/",
+      },
     ],
     sidebar: {
       footer: (
