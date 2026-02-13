@@ -114,6 +114,10 @@ class ParallelTranscriber:
         audio_path: Path | None = None
         temp_audio: Path | None = None  # track extracted audio for cleanup
 
+        # Fail fast if the file is a video without an audio stream
+        if has_video_stream(file_path) and not has_audio_stream(file_path):
+            raise ValueError(f"File contains video but no audio stream: {file_path}")
+
         try:
             # ── Stage 1: video → audio extraction ──────────────────────
             if has_video_stream(file_path) and has_audio_stream(file_path):
