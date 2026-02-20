@@ -1,5 +1,7 @@
 """Basic import tests to ensure package structure is correct."""
 
+import pytest
+
 
 def test_gaik_import():
     """Test that gaik package can be imported."""
@@ -48,6 +50,14 @@ def test_vector_store_import():
     from gaik.software_components.RAG import vector_store
 
     assert vector_store is not None
+
+
+def test_pg_vector_store_import():
+    """Test that pg_vector_store module can be imported (requires psycopg)."""
+    pytest.importorskip("psycopg")
+    from gaik.software_components.RAG import pg_vector_store
+
+    assert pg_vector_store is not None
 
 
 def test_retriever_import():

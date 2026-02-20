@@ -5,6 +5,7 @@ __all__ = [
     "rag_parser_vision",
     "embedder",
     "vector_store",
+    "pg_vector_store",
     "retriever",
     "answer_generator",
 ]

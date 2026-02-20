@@ -11,6 +11,8 @@ contract based on `langchain_core.documents.Document`.
   descriptions into chunk text.
 - **embedder**: Generate embeddings from text chunks using OpenAI/Azure models.
 - **vector_store**: Store embeddings and metadata (in-memory or Chroma persistent).
+- **pg_vector_store**: PostgreSQL-backed vector store with semantic, keyword, and
+  hybrid search (pgvector + FTS + RRF).
 - **retriever**: Retrieve relevant chunks (semantic, optional hybrid + rerank).
 - **answer_generator**: Generate answers from retrieved context with optional
   citations and conversation history.

@@ -56,6 +56,12 @@ vector-store = [
     "chromadb>=0.5.0",
 ]
 
+# PostgreSQL vector store (pgvector + FTS hybrid search)
+pg-vector-store = [
+    "psycopg[binary]>=3.1",
+    "langchain-core>=0.2.0",
+]
+
 retriever = [
     "gaik[embedder]",
     "gaik[vector-store]",
@@ -140,6 +146,7 @@ all = [
     "gaik[rag-parser-vision]",
     "gaik[embedder]",
     "gaik[vector-store]",
+    "gaik[pg-vector-store]",
     "gaik[retriever]",
     "gaik[answer-generator]",
     "gaik[rag-workflow]",
@@ -177,6 +184,7 @@ all-cpu = [
     "gaik[classifier]",
     "gaik[audio-to-structured-data]",
     "gaik[documents-to-structured-data-cpu]",
+    "gaik[pg-vector-store]",
     "gaik[rag-workflow]",
 ]
 
