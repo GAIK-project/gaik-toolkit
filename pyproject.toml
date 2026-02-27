@@ -219,9 +219,9 @@ version_scheme = "no-guess-dev"
 local_scheme = "no-local-version"
 
 
-# Include type hints marker file (py.typed included in package)
+# Include type hints marker file and SQL reference scripts in package
 [tool.setuptools.package-data]
-gaik = ["py.typed"]
+gaik = ["py.typed", "**/*.sql"]
 
 # Ruff linter/formatter settings (not installed, used when running `ruff check`)
 [tool.ruff]
