@@ -17,7 +17,7 @@ GenAI implementation activities are structured along two lenses: 1. Solution len
 
 This document describes a structured, decision-driven process for implementing a Generative AI (GenAI) solution, from early exploration to real business value creation.
 
-![GenAI solution implementation process] (https://github.com/GAIK-project/gaik-toolkit/blob/main/images/GenAI_solution_implementation_process.jpg)
+![GenAI solution implementation process](https://github.com/GAIK-project/gaik-toolkit/blob/main/images/GenAI_solution_implementation_process.jpg)
 > **Fig. 1** illustrates the end-to-end GenAI solution implementation process, including phases, key activities, and decision points.
 
 ---
