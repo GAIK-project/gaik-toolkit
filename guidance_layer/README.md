@@ -15,97 +15,75 @@ This process integrates activities across all other layers of the toolkit, ensur
 
 GenAI implementation activities are structured along two lenses: 1. Solution lens (or use case lens), 2. Organization lens
 
-This document describes a structured, decision-driven process for implementing a Generative AI (GenAI) solution, from early exploration to real business value creation.
-
 ![GenAI solution implementation process](https://github.com/GAIK-project/gaik-toolkit/blob/main/images/GenAI_solution_implementation_process.jpg)
-> **Fig. 1** illustrates the end-to-end GenAI solution implementation process, including phases, key activities, and decision points.
+**Fig. 1** The end-to-end GenAI solution implementation process, including phases, key activities, and decision points.
 
 ---
-
 
 ## Overview
 
-From the solution (use case) lens the process consists of **three phases** that guide an organization from initial exploration to value creation with GenAI. It starts from the organization’s **strategic goals** and **concrete problems or challenges**, and progresses through demos, a proof-of-concept (PoC), and finally a **Minimum Viable Product (MVP)**.
-
+From the solution (use case) lens the process consists of **three phases** that guide an organization from initial exploration to value creation with GenAI. It starts from the organization’s strategic goals and concrete problems or challenges, and progresses through **demos**, a **proof-of-concept (PoC)**, and finally a **Minimum Viable Product (MVP)**.
 Progress between phases is governed by **decision points** (shown as purple diamonds in Fig. 1), ensuring that further investment is made only when sufficient value and feasibility are demonstrated.
-
----
-
-## Input: Business Context
-
-The process is initiated by:
-- The organization’s strategic goals  
-- The organization’s problems and challenges  
-
-These inputs define *why* GenAI is being explored and guide all subsequent design, implementation, and evaluation decisions.
-
----
 
 ## Phase 1 – Explore via Demos
 
 **Purpose:** Rapid learning and shared understanding.
 
-### Key activities
+**Key activities:**
 - Explore demo GenAI use cases  
 - Explore demo designs  
 - Run demos  
 - Learn about opportunities and potential solution value  
 
-### Outcome
+**Outcome:**
 A shared understanding of what GenAI can do, which use cases are relevant, and whether there is enough potential value to proceed.
 
-### Decision Point D1
+**Decision Point D1:**
 At the first decision point, stakeholders decide whether to:
 - Proceed to a Proof-of-Concept (PoC)
 - Refine the problem or use case
 - Stop the initiative
 
----
-
 ## Phase 2 – Test via Proof-of-Concept (PoC)
 
 **Purpose:** Validate feasibility and value in a realistic organizational context.
 
-### Key activities
+**Key activities**
 - Customize the GenAI use case  
 - Customize the PoC design  
 - Build and deploy the PoC  
 - Evaluate, monitor, and analyze PoC results  
 
-### Outcome
+**Outcome**
 Evidence regarding:
 - Technical feasibility  
 - Quality and reliability of outputs  
 - Business relevance and early value  
 
-### Decision Point D2
+**Decision Point D2**
 At the second decision point, stakeholders decide whether to:
 - Proceed to an MVP
 - Rework or extend the PoC
 - Stop the initiative due to limited value or high risk
 
----
-
 ## Phase 3 – Create Value via Minimum Viable Product (MVP)
 
 **Purpose:** Transform validated ideas into tangible business value.
 
-### Key activities
+**Key activities**
 - Refine the GenAI use case based on PoC learnings  
 - Design the MVP and the surrounding work system (processes, roles, governance)  
 - Build and implement the MVP  
 - Evaluate, monitor, and analyze MVP performance  
 
-### Outcome
+**Outcome**
 A working GenAI solution embedded in real operations and delivering measurable value.
 
-### Decision Point D3
+**Decision Point D3**
 At the final decision point, stakeholders decide whether to:
 - Scale the solution further
 - Integrate it into core systems and operations
 - Iterate on the MVP or discontinue the solution
-
----
 
 ## Summary
 
@@ -115,6 +93,25 @@ This process is:
 - Structured to ensure that investment increases only when learning, feasibility, and value are demonstrated  
 
 The decision points act as safeguards, helping organizations move from experimentation to sustainable value creation with GenAI.
+
+## Organization Lens: GenAI Implementation at Scale
+
+In addition to developing individual GenAI solutions, organizations must address GenAI implementation from an **organization-wide lens**. This lens focuses on alignment, coordination, and value creation across multiple initiatives.
+
+**Identify and Select AI Use Cases:** Organizations identify and prioritize GenAI use cases in line with strategic goals and business priorities, forming a coherent portfolio of initiatives.
+
+**Plan and Coordinate AI Projects:** GenAI initiatives are planned and coordinated across teams to ensure alignment, efficient use of resources, and consistency across projects.
+
+**Assess and Build Organizational AI Readiness:** Organizations assess and strengthen their readiness for GenAI adoption, covering technology, data, skills, governance, and ways of working.
+
+**Measure and Manage Business Value:** Business value from GenAI is measured and managed at an organizational level to guide investment decisions and ensure alignment with strategic objectives.
+
+## Relationship Between Solution Lens and Organization Lens
+
+- The **solution lens** focuses on developing and validating individual GenAI solutions.  
+- The **organization lens** ensures coherence, scalability, and value across all GenAI initiatives.  
+
+Together, both lenses enable structured and sustainable GenAI adoption.
 
 ---
 
