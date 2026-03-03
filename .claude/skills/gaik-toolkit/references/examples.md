@@ -58,7 +58,7 @@ Transcribe and extract structured data from a medical consultation recording.
 
 ```python
 """Transcribe medical consultation and extract patient data."""
-from gaik.software_components.audio_to_structured_data import AudioToStructuredData
+from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
 
 pipeline = AudioToStructuredData(use_azure=True)
 
@@ -159,7 +159,7 @@ Process multiple invoices efficiently by reusing the schema.
 """Process multiple invoices with schema reuse for efficiency."""
 import json
 from pathlib import Path
-from gaik.software_components.documents_to_structured_data import DocumentsToStructuredData
+from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData
 
 pipeline = DocumentsToStructuredData(use_azure=True)
 invoice_dir = Path("invoices/")
@@ -234,7 +234,7 @@ Transcribe a meeting and extract action items, decisions, and attendees.
 
 ```python
 """Extract structured meeting notes from audio recording."""
-from gaik.software_components.audio_to_structured_data import AudioToStructuredData
+from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
 import json
 
 pipeline = AudioToStructuredData(use_azure=True)
@@ -375,7 +375,7 @@ Basic FastAPI endpoint for document extraction.
 from fastapi import FastAPI, UploadFile, HTTPException
 from tempfile import NamedTemporaryFile
 from pathlib import Path
-from gaik.software_components.documents_to_structured_data import DocumentsToStructuredData
+from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData
 
 app = FastAPI()
 pipeline = DocumentsToStructuredData(use_azure=True)
@@ -415,6 +415,84 @@ async def extract_document(
 
 ---
 
+## Example 8: Parallel Transcription of Long Video
+
+Transcribe a long video file using the production-grade parallel transcriber.
+
+```python
+"""Parallel transcription of a long video with FFmpeg chunking."""
+from gaik.software_components.parallel_transcriber import (
+    ParallelTranscriber, TranscriptionConfig, TranscriptionModel,
+)
+from gaik.software_components.config import get_openai_config
+
+config = get_openai_config(use_azure=True)
+tc = TranscriptionConfig(
+    chunk_duration_minutes=15,
+    transcription_workers=4,
+    model=TranscriptionModel.WHISPER,
+    response_format="srt",
+)
+
+transcriber = ParallelTranscriber(config, tc)
+
+def on_progress(stage, current, total, message):
+    print(f"[{stage}] {current}/{total}: {message}")
+
+result = transcriber.transcribe("long_lecture.mp4", progress_callback=on_progress)
+
+# Save SRT file
+output_path = result.save("output/")
+print(f"Saved to {output_path}")
+print(f"Duration: {result.total_duration_seconds / 60:.1f} minutes")
+print(f"Chunks processed: {result.total_chunks}")
+
+# Get plain text (strips SRT formatting)
+print(result.plain_text[:500])
+```
+
+---
+
+## Example 9: RAG with PostgreSQL Vector Store
+
+Full RAG pipeline using PgVectorStore with hybrid search.
+
+```python
+"""Full RAG pipeline using PostgreSQL vector store with hybrid search."""
+from gaik.software_components.config import get_openai_config
+from gaik.software_components.RAG.embedder import Embedder
+from gaik.software_components.RAG.pg_vector_store import PgVectorStore
+from gaik.software_components.RAG.retriever import Retriever
+from gaik.software_components.RAG.answer_generator import AnswerGenerator
+from gaik.software_components.RAG.rag_parser_docling import parse_pdf_to_chunks_with_metadata
+
+config = get_openai_config(use_azure=True)
+
+# Parse documents into chunks
+chunks = parse_pdf_to_chunks_with_metadata("report.pdf")
+
+# Embed chunks
+embedder = Embedder(config=config, model="text-embedding-3-large")
+embeddings, docs = embedder.embed(chunks)
+
+# Store in PostgreSQL
+with PgVectorStore("postgresql://postgres:pass@localhost/ragdb", embedding_dim=3072) as store:
+    store.setup()
+    store.add(docs, embeddings)
+    print(f"Stored {store.count()} chunks")
+
+    # Retriever wraps PgVectorStore (same interface as VectorStore)
+    retriever = Retriever(embedder=embedder, vector_store=store, top_k=5)
+    relevant = retriever.search("What are the key findings?", include_scores=True)
+
+    # Generate answer with citations
+    generator = AnswerGenerator(config=config, citations=True, stream=False)
+    answer = generator.generate("What are the key findings?", relevant)
+    print(answer)
+```
+
+---
+
 ## Tips
 
 1. **Use schema persistence** for batch processing - generate once, reuse many times
@@ -422,3 +500,5 @@ async def extract_document(
 3. **Enable enhanced transcription** for better quality meeting notes
 4. **Use custom_context** in transcription to improve accuracy for domain-specific terms
 5. **Set `use_azure=True`** for production - Azure OpenAI typically has better rate limits
+6. **Use ParallelTranscriber** for long audio/video files - significantly faster than sequential
+7. **Use PgVectorStore** for production RAG - persistent, scalable, supports hybrid search

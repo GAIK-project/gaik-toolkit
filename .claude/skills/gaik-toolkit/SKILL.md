@@ -1,12 +1,7 @@
 ---
 name: gaik-toolkit
-version: "1.2.0"
-description: |
-  GAIK (Generative AI Knowledge Management Toolkit) development guidance.
-  Use when working with: structured data extraction from documents/PDFs/audio,
-  schema generation, document parsing (VisionParser, PyMuPDFParser, DoclingParser),
-  audio transcription with Whisper, document classification, or end-to-end pipelines
-  (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow).
+version: "1.3.0"
+description: GAIK (Generative AI Knowledge Management Toolkit) development guidance. Use when working with structured data extraction from documents/PDFs/audio, schema generation, document parsing (VisionParser, PyMuPDFParser, DoclingParser), audio transcription with Whisper, parallel transcription (ParallelTranscriber), document classification, RAG pipelines (Embedder, VectorStore, PgVectorStore, Retriever, AnswerGenerator), or end-to-end pipelines (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow).
 ---
 
 # GAIK Toolkit
@@ -16,8 +11,9 @@ Python toolkit for knowledge extraction, capture, and generation. Use when worki
 - Schema generation from natural language requirements
 - Document parsing (PDF, DOCX, images)
 - Audio/video transcription with Whisper + GPT enhancement
+- **Parallel transcription** with FFmpeg chunking (ParallelTranscriber)
 - Document classification
-- **RAG pipelines**: embedder, vector store, retriever, answer generator
+- **RAG pipelines**: embedder, vector store (Chroma / PostgreSQL), retriever, answer generator
 - End-to-end pipelines: AudioToStructuredData, DocumentsToStructuredData, **RAGWorkflow**
 
 ## Quick Links
@@ -43,8 +39,11 @@ pip install "gaik[parser]"
 # Document parsing (CPU-only, no docling/torch)
 pip install "gaik[parser-cpu]"
 
-# Audio/video transcription
+# Audio/video transcription (sequential)
 pip install "gaik[transcriber]"
+
+# Parallel transcription (FFmpeg-based, requires ffmpeg on $PATH)
+pip install "gaik[parallel-transcriber]"
 
 # Document classification
 pip install "gaik[classifier]"
@@ -56,6 +55,7 @@ pip install "gaik[documents-to-structured-data]"
 # RAG building blocks
 pip install "gaik[embedder]"
 pip install "gaik[vector-store]"
+pip install "gaik[pg-vector-store]"
 pip install "gaik[retriever]"
 pip install "gaik[answer-generator]"
 pip install "gaik[rag-parser-docling]"
@@ -79,14 +79,14 @@ pip install "gaik[all-cpu]"
 ```bash
 AZURE_API_KEY=your-key
 AZURE_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_DEPLOYMENT=gpt-4o
+AZURE_DEPLOYMENT=gpt-5.1
 AZURE_API_VERSION=2025-03-01-preview
 ```
 
 **OpenAI:**
 ```bash
 OPENAI_API_KEY=your-key
-OPENAI_MODEL=gpt-4o
+OPENAI_MODEL=gpt-5.1
 ```
 
 ## Configuration Pattern
@@ -94,10 +94,11 @@ OPENAI_MODEL=gpt-4o
 All components use `get_openai_config()`:
 
 ```python
-from gaik.software_components.extractor import get_openai_config
+from gaik.software_components.config import get_openai_config, create_openai_client
 
 config = get_openai_config(use_azure=True)   # Azure OpenAI
 config = get_openai_config(use_azure=False)  # Standard OpenAI
+client = create_openai_client(config)        # OpenAI/AzureOpenAI client
 ```
 
 ## Building Blocks
@@ -193,6 +194,28 @@ print(result.enhanced_transcript or result.raw_transcript)
 result.save("output/")
 ```
 
+### ParallelTranscriber (Production-grade Parallel Transcription)
+
+Production parallel transcription using FFmpeg chunking. Requires `ffmpeg` + `ffprobe` on `$PATH`.
+
+```python
+from gaik.software_components.parallel_transcriber import (
+    ParallelTranscriber, TranscriptionConfig, TranscriptionModel,
+)
+from gaik.software_components.config import get_openai_config
+
+config = get_openai_config(use_azure=True)
+tc = TranscriptionConfig(chunk_duration_minutes=15, model=TranscriptionModel.WHISPER)
+transcriber = ParallelTranscriber(config, tc)
+
+result = transcriber.transcribe("long_interview.mp4")
+print(result.plain_text)
+result.save("output/")
+```
+
+Models: `TranscriptionModel.WHISPER`, `TranscriptionModel.GPT4O_DIARIZE` (with speaker diarization).
+Supports thread-safe cancellation via `SimpleCancellation` and progress callbacks.
+
 ### DocumentClassifier
 
 ```python
@@ -226,7 +249,7 @@ embeddings, docs = embedder.embed(["Document text 1", "Document text 2"])
 query_embedding = embedder.embed_query("What is the main topic?")
 ```
 
-#### VectorStore (Embeddings Storage)
+#### VectorStore (In-Memory + Chroma)
 
 ```python
 from gaik.software_components.RAG.vector_store import VectorStore
@@ -249,6 +272,27 @@ results = store.search(query_embedding, top_k=5)
 # Returns: [(Document, score), ...]
 ```
 
+#### PgVectorStore (PostgreSQL + pgvector)
+
+Production PostgreSQL vector store with semantic, keyword, and hybrid search.
+
+```python
+from gaik.software_components.RAG.pg_vector_store import PgVectorStore
+
+with PgVectorStore("postgresql://user:pass@host:5432/db", embedding_dim=3072) as store:
+    store.setup()  # Create extensions, table, indexes (idempotent)
+    ids = store.add(documents, embeddings)
+
+    # 4 search methods
+    results = store.search_semantic(query_vec, top_k=5, threshold=0.7)
+    results = store.search_keyword("search terms", top_k=5)
+    results = store.search_hybrid(query_vec, "search terms", top_k=5)
+    results = store.search_hybrid_weighted(query_vec, "terms", semantic_weight=0.7)
+```
+
+Requires: PostgreSQL with `pgvector`, `pg_trgm`, `unaccent` extensions.
+Drop-in compatible with `Retriever` (same `search()` interface as `VectorStore`).
+
 #### Retriever (Semantic + Hybrid Search)
 
 ```python
@@ -256,7 +300,7 @@ from gaik.software_components.RAG.retriever import Retriever
 
 retriever = Retriever(
     embedder=embedder,
-    vector_store=store,
+    vector_store=store,       # VectorStore or PgVectorStore
     hybrid_search=True,  # Combine vector + BM25
     re_rank=True,        # Cross-encoder reranking
     top_k=5,
@@ -293,8 +337,22 @@ from gaik.software_components.RAG.rag_parser_vision import VisionRagParser
 parser = VisionRagParser(vision_config=config)
 
 # Get LangChain Document chunks with vision-enhanced image descriptions
-chunks = parser.parse("document.pdf")
+chunks = parser.convert_doc_to_chunks_with_vision("document.pdf")
 # Each chunk has: page_content, metadata (source, document_name, page_number, heading)
+```
+
+#### DoclingRagParser (Structure-aware RAG Chunks)
+
+```python
+from gaik.software_components.RAG.rag_parser_docling import DoclingRagParser
+
+parser = DoclingRagParser(enable_ocr=True, ocr_engine="tesseract_cli")
+
+# Convert PDF to markdown
+markdown = parser.convert_pdf_to_markdown("document.pdf")
+
+# Convert PDF to LangChain Document chunks (HierarchicalChunker)
+chunks = parser.convert_pdf_to_chunks_with_metadata("document.pdf")
 ```
 
 ## Software Components (End-to-End Pipelines)
@@ -408,12 +466,12 @@ if existing:
 | Level | Concept | Examples |
 |-------|---------|----------|
 | **Service** | Logical capability | `speech_to_text`, `document_parsing`, `information_extraction`, `rag` |
-| **Building block** | Atomic toolkit class/function | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `Embedder`, `VectorStore`, `Retriever`, `AnswerGenerator` |
+| **Building block** | Atomic toolkit class/function | `Transcriber`, `ParallelTranscriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `Embedder`, `VectorStore`, `PgVectorStore`, `Retriever`, `AnswerGenerator`, `VisionRagParser`, `DoclingRagParser` |
 | **Software component** | Composed, workflow-ready unit | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow` |
 
 ## Maintenance Notes
 
-This skill is designed for gaik-toolkit v0.3.x. Update when:
+This skill documents gaik-toolkit. Update when:
 - New building blocks or software components are added
 - Import paths change in `implementation_layer/src/gaik/`
 - Major API changes occur
@@ -432,5 +490,6 @@ python .claude/skills/gaik-toolkit/scripts/fetch_pypi_readme.py --version  # Ver
 ## Detailed References
 
 - [Building Blocks API](references/building-blocks.md) - Detailed API for all building blocks
+- [RAG Building Blocks](references/rag.md) - RAG components API reference
 - [Software Components](references/software-components.md) - Pipeline patterns and options
 - [Examples](references/examples.md) - Complete working examples

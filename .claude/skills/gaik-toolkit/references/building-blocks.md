@@ -238,6 +238,104 @@ Result container with save helpers.
 
 ---
 
+## Parallel Transcriber Module
+
+**Source:** `gaik.software_components.parallel_transcriber`
+
+**Install:** `pip install "gaik[parallel-transcriber]"`
+
+**System dependency:** `ffmpeg` + `ffprobe` on `$PATH`
+
+### ParallelTranscriber
+
+Production-grade parallel transcription using FFmpeg chunking and Azure OpenAI Whisper / GPT-4o Transcribe.
+
+```python
+from gaik.software_components.parallel_transcriber import (
+    ParallelTranscriber, TranscriptionConfig, TranscriptionModel,
+    SimpleCancellation,
+)
+from gaik.software_components.config import get_openai_config
+
+api_cfg = get_openai_config(use_azure=True)
+config = TranscriptionConfig(
+    chunk_duration_minutes=15,
+    transcription_workers=3,
+    model=TranscriptionModel.WHISPER,
+)
+transcriber = ParallelTranscriber(api_cfg, config)
+
+result = transcriber.transcribe("interview.mp4")
+print(result.plain_text)
+result.save("output/")
+```
+
+**transcribe() parameters:**
+- `file_path` - Path to audio/video file
+- `check_cancelled` - Callable that raises `TranscriptionCancelled` to abort (optional)
+- `progress_callback` - `(stage, current, total, message)` callback. Stages: `"extracting"`, `"splitting"`, `"transcribing"`, `"merging"`, `"complete"`
+
+### TranscriptionConfig
+
+All tuneable parameters with sensible defaults.
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `chunk_duration_minutes` | int | 20 | Chunk duration for splitting |
+| `chunk_overlap_seconds` | float | 15.0 | Overlap between chunks |
+| `max_single_file_mb` | float | 24.0 | Max file size for single-pass |
+| `gpt4o_chunk_duration_minutes` | int | 23 | Chunk duration for GPT-4o (25 min API limit) |
+| `transcription_workers` | int | 3 | Parallel transcription threads |
+| `ffmpeg_split_workers` | int | 3 | Parallel FFmpeg split threads |
+| `api_timeout_seconds` | int | 180 | API call timeout |
+| `max_retries` | int | 2 | Max retry attempts |
+| `max_429_retries` | int | 4 | Max rate-limit retries |
+| `audio_bitrate` | str | `"128k"` | Audio encoding bitrate |
+| `audio_sample_rate` | int | 16000 | Audio sample rate |
+| `response_format` | str | `"srt"` | Output: `text`, `srt`, `vtt`, `json`, `verbose_json` |
+| `language` | str\|None | None | Language (None for auto-detect) |
+| `model` | TranscriptionModel | WHISPER | WHISPER or GPT4O_DIARIZE |
+
+**Class method:** `TranscriptionConfig.from_env()` - Build config from environment variables.
+
+### TranscriptionModel
+
+```python
+class TranscriptionModel(StrEnum):
+    WHISPER = "whisper"
+    GPT4O_DIARIZE = "gpt-4o-transcribe-diarize"
+```
+
+### TranscriptionResult
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `content` | str | Raw transcription content (SRT/text/VTT) |
+| `format` | str | Output format used |
+| `language` | str | Detected or specified language |
+| `model_used` | str | Model that was used |
+| `total_chunks` | int | Number of chunks processed |
+| `total_duration_seconds` | float | Total audio duration |
+
+**Properties:**
+- `result.plain_text` - Extract plain text, stripping SRT/VTT formatting
+
+**Methods:**
+- `result.save(path, encoding="utf-8")` - Save to file (auto-selects extension). Returns `Path`.
+
+### SimpleCancellation
+
+Thread-safe cancellation for long-running transcriptions.
+
+```python
+cancel = SimpleCancellation()
+result = transcriber.transcribe("file.mp4", check_cancelled=cancel.check)
+# From another thread:
+cancel.cancel()
+```
+
+---
+
 ## Document Classifier Module
 
 **Source:** `gaik.software_components.doc_classifier`
@@ -308,6 +406,16 @@ from gaik.software_components.transcriber import (
 from gaik.software_components.doc_classifier import (
     DocumentClassifier,
     get_openai_config,
+)
+
+# Parallel Transcriber
+from gaik.software_components.parallel_transcriber import (
+    ParallelTranscriber,
+    TranscriptionConfig,
+    TranscriptionModel,
+    TranscriptionResult,
+    SimpleCancellation,
+    TranscriptionCancelled,
 )
 
 # Shared config

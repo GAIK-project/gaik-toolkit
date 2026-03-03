@@ -298,6 +298,23 @@ result = pipeline.run(
 )
 ```
 
+### Using PgVectorStore Instead of Chroma
+
+`PgVectorStore` has a `search()` method compatible with `VectorStore`, so it works as a drop-in with the `Retriever` in custom RAG pipelines:
+
+```python
+from gaik.software_components.RAG.pg_vector_store import PgVectorStore
+from gaik.software_components.RAG.retriever import Retriever
+
+store = PgVectorStore("postgresql://user:pass@host/db", embedding_dim=3072)
+store.setup()
+
+# Works the same as VectorStore with Retriever
+retriever = Retriever(embedder=embedder, vector_store=store, top_k=5)
+```
+
+See [RAG Building Blocks](rag.md) for full PgVectorStore API.
+
 ---
 
 ## Import Patterns
