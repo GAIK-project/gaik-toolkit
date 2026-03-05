@@ -55,7 +55,7 @@ export function InstallSnippet() {
                 <ArrowUpRight className="h-4 w-4" />
               </a>
               <a
-                href="https://github.com/GAIK-project/gaik-toolkit/tree/main/examples"
+                href="https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex h-auto flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all"
