@@ -27,9 +27,9 @@ def main() -> None:
         output_dir=".",  
         enhanced_transcript=False,  # GPT enhancement
         transcription_model="whisper_local",  # Force local transcription backend
-        local_api_base="http://myedge-unique-label.swedencentral.cloudapp.azure.com:8080",  # Local whisper base URL
-        local_api_key="4FGR26D5G1CGE",  # API key sent to local whisper service
-        language="auto",  # Language code, or "auto" for detection
+        local_api_base=""http://YOUR_ADDRESS:8080"",  # Local whisper base URL
+        local_api_key="YOUR_KEY",  # API key sent to local whisper service
+        language="auto",  # Language code. "auto" for detection. "fi" for Finnish.
         diarization=False,  # Enable/disable speaker diarization
         speaker_count=None,  # Exact speaker count if known
         min_speakers=None,  # Minimum speakers for diarization range
