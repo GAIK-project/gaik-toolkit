@@ -123,7 +123,9 @@ rag-workflow = [
 # Audio/video transcription (sequential, PyDub-based)
 transcriber = [
     "pydub>=0.25.1",
+    "requests>=2.31.0",
 ]
+
 
 # Parallel audio/video transcription (FFmpeg-based, no extra Python deps)
 # Requires ffmpeg + ffprobe on $PATH as system dependencies
@@ -238,3 +240,5 @@ ignore = []
 [tool.pytest.ini_options]
 testpaths = ["implementation_layer/unit_tests"]
 addopts = ["-v", "--strict-markers"]
+
+

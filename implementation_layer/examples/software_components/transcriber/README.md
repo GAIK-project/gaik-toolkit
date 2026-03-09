@@ -1,21 +1,26 @@
-# Transcriber Example
+﻿# Transcriber Example
 
-This example demonstrates how to use the Transcriber component to convert audio and video files into text using speech-to-text models.
+Examples for the Transcriber software component.
 
 ## Files
 
-- `transcriber_example.py` - Complete example showing audio transcription with optional enhancement
+- `transcriber_example.py` - Azure/OpenAI transcription example with optional enhancement
+- `transcriber_exmaple_local_model.py` - local whisper service example using `transcription_model="whisper_local"`
 
-## What This Example Shows
+## What These Examples Show
 
-- How to transcribe audio/video files using OpenAI Whisper
-- How to optionally enhance transcripts for better readability (removing filler words, fixing punctuation)
-- How to access both raw and enhanced transcript outputs
+- API-based transcription with OpenAI/Azure
+- Local transcription service usage with runtime endpoint/key
+- Accessing raw and enhanced transcript outputs
 
 ## Usage
 
 ```bash
 python transcriber_example.py
+```
+
+```bash
+python transcriber_exmaple_local_model.py
 ```
 
 ## Related Documentation

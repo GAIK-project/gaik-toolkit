@@ -1,0 +1,56 @@
+﻿"""Example for local transcription model usage with Transcriber.
+
+Edit the configuration values below and run the script directly.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+# Add GAIK package to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
+
+from gaik.software_components.transcriber import Transcriber, get_openai_config
+
+# ------------------------------------------------------------------
+# Configure these values before running
+# ------------------------------------------------------------------
+AUDIO_FILE = Path("Sample.m4a")
+
+def main() -> None:
+    # API config is still required for optional enhancement step.
+    config = get_openai_config(use_azure=True)
+
+    transcriber = Transcriber(
+        api_config=config,  # OpenAI/Azure config
+        output_dir=".",  
+        enhanced_transcript=False,  # GPT enhancement
+        transcription_model="whisper_local",  # Force local transcription backend
+        local_api_base="http://myedge-unique-label.swedencentral.cloudapp.azure.com:8080",  # Local whisper base URL
+        local_api_key="4FGR26D5G1CGE",  # API key sent to local whisper service
+        language="auto",  # Language code, or "auto" for detection
+        diarization=False,  # Enable/disable speaker diarization
+        speaker_count=None,  # Exact speaker count if known
+        min_speakers=None,  # Minimum speakers for diarization range
+        max_speakers=None,  # Maximum speakers for diarization range
+        initial_prompt=None,  # Optional prompt hint for the local transcriber
+    )
+
+    result = transcriber.transcribe(file_path=AUDIO_FILE)
+
+    print("\nTranscription finished!")
+    print("\n--- Raw Transcript ---\n")
+    print(result.raw_transcript)
+
+    if result.enhanced_transcript is not None:
+        print("\n--- Enhanced Transcript ---\n")
+        print(result.enhanced_transcript)
+    else:
+        print("\nEnhanced transcript not available (enhancement disabled).")
+
+
+if __name__ == "__main__":
+    main()
+
+

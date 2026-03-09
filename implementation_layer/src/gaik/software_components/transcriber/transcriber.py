@@ -1,4 +1,4 @@
-"""Reusable transcription package entry point."""
+﻿"""Reusable transcription package entry point."""
 
 from __future__ import annotations
 
@@ -16,10 +16,13 @@ import openai
 from openai import AzureOpenAI
 from pydub import AudioSegment
 
+from .whisper_local import transcribe as whisper_local_transcribe
+
 DEFAULT_PROMPT = (
     "Detect the language and extract transcript in the same language. "
     "The audio could be in any language, such as English, Finnish, Swedish, etc."
 )
+ALLOWED_TRANSCRIPTION_MODELS = {"whisper", "gpt-4o-transcribe", "whisper_local"}
 
 
 @dataclass
@@ -75,6 +78,15 @@ class Transcriber:
         max_size_mb: int = 25,
         max_duration_seconds: int = 1500,
         default_prompt: str = DEFAULT_PROMPT,
+        transcription_model: str | None = None,
+        language: str = "auto",
+        diarization: bool = False,
+        speaker_count: int | None = None,
+        min_speakers: int | None = None,
+        max_speakers: int | None = None,
+        initial_prompt: str | None = None,
+        local_api_base: str | None = None,
+        local_api_key: str | None = None,
     ) -> None:
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
@@ -83,6 +95,15 @@ class Transcriber:
         self.max_size_mb = max_size_mb
         self.max_duration_seconds = max_duration_seconds
         self.default_prompt = default_prompt
+        self.transcription_model = transcription_model
+        self.language = language
+        self.diarization = diarization
+        self.speaker_count = speaker_count
+        self.min_speakers = min_speakers
+        self.max_speakers = max_speakers
+        self.initial_prompt = initial_prompt
+        self.local_api_base = local_api_base
+        self.local_api_key = local_api_key
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
 
     def transcribe(
@@ -111,9 +132,19 @@ class Transcriber:
         prompt = self.default_prompt + (("\n" + custom_context) if custom_context else "")
         print(f"Transcribing prompt: {prompt}")
 
-        # Simplified: do not extract/compress audio. Use original file if <= 25MB,
-        # otherwise chunk via PyDub (which can decode both audio and video containers).
-        raw_transcript = self._transcribe_input(input_path, prompt)
+        effective_model = self._resolve_transcription_model()
+        self._warn_ignored_local_options(effective_model)
+
+        if effective_model == "whisper_local":
+            raw_transcript = self._transcribe_input_local(input_path)
+        else:
+            # Simplified: do not extract/compress audio. Use original file if <= 25MB,
+            # otherwise chunk via PyDub (which can decode both audio and video containers).
+            raw_transcript = self._transcribe_input_remote(
+                input_path=input_path,
+                prompt=prompt,
+                transcription_model=effective_model,
+            )
 
         enhanced_text: str | None = None
         if self.enhanced_transcript:
@@ -137,7 +168,84 @@ class Transcriber:
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         return hashlib.md5(f"{file_path.stem}_{timestamp}".encode()).hexdigest()[:10]
 
-    def _transcribe_input(self, input_path: Path, prompt: str) -> str:
+    def _resolve_transcription_model(self) -> str:
+        use_azure = bool(self.api_config.get("use_azure", False))
+
+        if self.transcription_model is None:
+            return "whisper-1" if use_azure else "whisper"
+
+        if self.transcription_model not in ALLOWED_TRANSCRIPTION_MODELS:
+            allowed = ", ".join(sorted(ALLOWED_TRANSCRIPTION_MODELS))
+            raise ValueError(
+                f"Invalid transcription_model '{self.transcription_model}'. "
+                f"Allowed values: {allowed}"
+            )
+
+        if self.transcription_model == "whisper_local":
+            return "whisper_local"
+
+        if self.transcription_model == "gpt-4o-transcribe":
+            return "gpt-4o-transcribe"
+
+        # explicit transcription_model == "whisper"
+        return "whisper-1" if use_azure else "whisper"
+
+    def _warn_ignored_local_options(self, effective_model: str) -> None:
+        if effective_model == "whisper_local":
+            return
+
+        has_local_overrides = any(
+            [
+                self.language != "auto",
+                self.diarization is not False,
+                self.speaker_count is not None,
+                self.min_speakers is not None,
+                self.max_speakers is not None,
+                self.initial_prompt is not None,
+                self.local_api_base is not None,
+                self.local_api_key is not None,
+            ]
+        )
+        if has_local_overrides:
+            print(
+                "Local transcription options are ignored unless "
+                "transcription_model='whisper_local'."
+            )
+
+    def _transcribe_input_local(self, input_path: Path) -> str:
+        if not self.local_api_base:
+            raise ValueError(
+                "local_api_base is required when transcription_model='whisper_local'."
+            )
+        if not self.local_api_key:
+            raise ValueError(
+                "local_api_key is required when transcription_model='whisper_local'."
+            )
+
+        result = whisper_local_transcribe(
+            audio_path=input_path,
+            api_base=self.local_api_base,
+            key=self.local_api_key,
+            language=self.language,
+            diarization=self.diarization,
+            speaker_count=self.speaker_count,
+            min_speakers=self.min_speakers,
+            max_speakers=self.max_speakers,
+            initial_prompt=self.initial_prompt,
+        )
+
+        text = (result.get("text") or "").strip()
+        if not text:
+            segments = result.get("segments", [])
+            text = " ".join(
+                segment.get("text", "").strip() for segment in segments if segment.get("text")
+            ).strip()
+
+        return text
+
+    def _transcribe_input_remote(
+        self, input_path: Path, prompt: str, transcription_model: str
+    ) -> str:
         """
         If input <= max_size_mb: single-pass transcription using the original file
         (audio OR video container supported by the API).
@@ -153,20 +261,22 @@ class Transcriber:
                 self.max_duration_seconds,
                 audio,
                 base_prompt=prompt,
+                transcription_model=transcription_model,
             )
 
         print("Transcribing in a single request (original file)...")
-        return self._single_pass_transcription(input_path, prompt)
+        return self._single_pass_transcription(input_path, prompt, transcription_model)
 
     def _needs_chunking(self, file_path: Path) -> bool:
         size_mb = file_path.stat().st_size / (1024 * 1024)
         return size_mb > self.max_size_mb
 
-    def _single_pass_transcription(self, file_path: Path, prompt: str) -> str:
+    def _single_pass_transcription(
+        self, file_path: Path, prompt: str, transcription_model: str
+    ) -> str:
         """
         Single-pass transcription of the original file (audio OR video).
         """
-        transcription_model = self.api_config.get("transcription_model", "whisper-1")
         use_azure = bool(self.api_config.get("use_azure", False))
         api_key = self.api_config.get("api_key")
 
@@ -289,12 +399,14 @@ def split_and_transcribe_with_context(
     max_duration_seconds=1500,
     audio=None,
     base_prompt: str = DEFAULT_PROMPT,
+    transcription_model: str | None = None,
 ):
     """Split audio into chunks and transcribe with rolling context."""
 
     use_azure = bool(api_config.get("use_azure", False))
     api_key = api_config.get("api_key")
-    transcription_model = api_config.get("transcription_model", "whisper-1")
+    if transcription_model is None:
+        transcription_model = api_config.get("transcription_model", "whisper-1")
 
     if audio is None:
         audio = AudioSegment.from_file(audio_path)
@@ -408,3 +520,5 @@ def format_timestamp(seconds):
     minutes = int(seconds // 60)
     seconds = int(seconds % 60)
     return f"{minutes:02d}:{seconds:02d}"
+
+
