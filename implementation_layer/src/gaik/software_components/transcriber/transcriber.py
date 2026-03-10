@@ -32,6 +32,9 @@ class TranscriptionResult:
     raw_transcript: str
     enhanced_transcript: str | None
     job_id: str
+    segments: list[dict] | None = None
+    srt_content: str | None = None
+    vtt_content: str | None = None
 
     def save(
         self,
@@ -135,8 +138,17 @@ class Transcriber:
         effective_model = self._resolve_transcription_model()
         self._warn_ignored_local_options(effective_model)
 
+        segments: list[dict] | None = None
+        srt_content: str | None = None
+        vtt_content: str | None = None
+
         if effective_model == "whisper_local":
-            raw_transcript = self._transcribe_input_local(input_path)
+            raw_transcript, segments = self._transcribe_input_local(input_path)
+            if segments:
+                from .srt_utils import segments_to_srt, segments_to_vtt
+
+                srt_content = segments_to_srt(segments)
+                vtt_content = segments_to_vtt(segments)
         else:
             # Simplified: do not extract/compress audio. Use original file if <= 25MB,
             # otherwise chunk via PyDub (which can decode both audio and video containers).
@@ -159,6 +171,9 @@ class Transcriber:
             raw_transcript=raw_transcript,
             enhanced_transcript=enhanced_text,
             job_id=job_id,
+            segments=segments,
+            srt_content=srt_content,
+            vtt_content=vtt_content,
         )
 
     # ------------------------------------------------------------------
@@ -212,7 +227,8 @@ class Transcriber:
                 "transcription_model='whisper_local'."
             )
 
-    def _transcribe_input_local(self, input_path: Path) -> str:
+    def _transcribe_input_local(self, input_path: Path) -> tuple[str, list[dict] | None]:
+        """Transcribe via local Whisper and return (text, segments)."""
         if not self.local_api_base:
             raise ValueError(
                 "local_api_base is required when transcription_model='whisper_local'."
@@ -234,14 +250,14 @@ class Transcriber:
             initial_prompt=self.initial_prompt,
         )
 
+        segments = result.get("segments") or []
         text = (result.get("text") or "").strip()
-        if not text:
-            segments = result.get("segments", [])
+        if not text and segments:
             text = " ".join(
                 segment.get("text", "").strip() for segment in segments if segment.get("text")
             ).strip()
 
-        return text
+        return text, segments or None
 
     def _transcribe_input_remote(
         self, input_path: Path, prompt: str, transcription_model: str

@@ -57,3 +57,22 @@ try:
     )
 except ImportError:
     pass
+
+# SRT/VTT subtitle utilities (no extra dependencies)
+from .srt_utils import (
+    chunk_segments,
+    parse_srt,
+    segments_to_srt,
+    segments_to_vtt,
+)
+from .srt_utils import format_timestamp as format_timestamp_display
+
+__all__.extend(
+    [
+        "segments_to_srt",
+        "segments_to_vtt",
+        "parse_srt",
+        "chunk_segments",
+        "format_timestamp_display",
+    ]
+)
