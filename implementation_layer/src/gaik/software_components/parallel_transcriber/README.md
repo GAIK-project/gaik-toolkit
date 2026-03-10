@@ -124,6 +124,8 @@ Use `TranscriptionConfig.from_env()` to read all parameters from environment var
 ```python
 result.content                  # Raw transcription content
 result.format                   # "srt", "vtt", "text", etc.
+result.language                 # Language code or "auto"
+result.model_used               # Model string (e.g. "whisper")
 result.plain_text               # Extracted plain text (strips SRT formatting)
 result.total_chunks             # Number of chunks used
 result.total_duration_seconds   # Audio duration
@@ -154,20 +156,38 @@ result = transcriber.transcribe(
 
 ## Environment Variables
 
+### Azure / OpenAI credentials
+
 | Variable | Description |
 |----------|-------------|
 | `AZURE_API_KEY` | Azure OpenAI API key |
 | `AZURE_ENDPOINT` | Azure OpenAI endpoint URL |
 | `OPENAI_API_KEY` | Standard OpenAI API key |
-| `CHUNK_DURATION_MINUTES` | Override chunk length |
-| `CHUNK_OVERLAP_SECONDS` | Override overlap duration |
-| `TRANSCRIPTION_WORKERS` | Override API parallelism |
-| `FFMPEG_SPLIT_WORKERS` | Override FFmpeg parallelism |
-| `RESPONSE_FORMAT` | Override output format |
-| `TRANSCRIPTION_LANGUAGE` | Override language |
-| `TRANSCRIPTION_MODEL` | `whisper` or `gpt-4o-transcribe-diarize` |
 
-See `TranscriptionConfig.from_env()` docstring for the full list.
+### Pipeline parameters (`TranscriptionConfig.from_env()`)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CHUNK_DURATION_MINUTES` | 20 | Nominal chunk length (minutes) |
+| `CHUNK_OVERLAP_SECONDS` | 15.0 | Overlap between adjacent chunks |
+| `MAX_SINGLE_FILE_MB` | 24.0 | Max file size before chunking |
+| `GPT4O_CHUNK_DURATION_MINUTES` | 23 | Chunk length for GPT-4o (25 min API limit − 2 min margin) |
+| `TRANSCRIPTION_WORKERS` | 3 | Parallel API calls (Whisper) |
+| `FFMPEG_SPLIT_WORKERS` | 3 | Parallel FFmpeg encode processes |
+| `FFMPEG_THREADS_PER_PROCESS` | 1 | FFmpeg threads per subprocess (alias: `FFMPEG_THREADS`) |
+| `GPT4O_CHUNK_PARALLELISM` | 4 | Parallel API calls (GPT-4o Diarize) |
+| `FFMPEG_CHUNK_TIMEOUT_SECONDS` | 3600 | Timeout per FFmpeg chunk encode |
+| `API_TIMEOUT_SECONDS` | 180 | API call timeout (alias: `AZURE_OPENAI_TIMEOUT_SECONDS`) |
+| `MAX_RETRIES` | 2 | Retries for transient errors |
+| `RETRY_BASE_DELAY_SECONDS` | 1.0 | Base delay between retries |
+| `MAX_429_RETRIES` | 4 | Extra retries for rate limits |
+| `AUDIO_BITRATE` | 128k | FFmpeg audio bitrate |
+| `AUDIO_SAMPLE_RATE` | 16000 | FFmpeg audio sample rate |
+| `AUDIO_CHANNELS` | 1 | FFmpeg audio channels |
+| `RESPONSE_FORMAT` | srt | Output format (srt/vtt/text/json) |
+| `TRANSCRIPTION_LANGUAGE` | auto | Language code or auto-detect |
+| `WHISPER_PROMPT` | — | Optional Whisper prompt |
+| `TRANSCRIPTION_MODEL` | whisper | `whisper` or `gpt-4o-transcribe-diarize` |
 
 ---
 

@@ -11,7 +11,7 @@ Automatically convert dental lectures, training videos, and podcasts into accura
 
 The transcription pipeline processes audio through several stages:
 
-1. **Audio is split into chunks** — Large files are divided into overlapping segments (~15 minutes each) for parallel processing
+1. **Audio is split into chunks** — Large files are divided into overlapping segments (~20 minutes each) for parallel processing
 2. **Each chunk is transcribed** — Multiple chunks are transcribed simultaneously using Azure OpenAI Whisper, significantly reducing total processing time
 3. **Results are merged** — Overlapping regions are deduplicated to produce seamless, continuous output
 4. **Optional: Enhancement** — A language model corrects domain-specific dental terminology and formatting errors
