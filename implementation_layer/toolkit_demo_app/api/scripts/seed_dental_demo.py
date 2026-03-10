@@ -72,7 +72,7 @@ def download_video(url: str, out_dir: Path) -> tuple[Path, str]:
     video_path = out_dir / "video.mp4"
     cmd = [
         *ytdlp,
-        "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "-f", "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[height<=480]",
         "--merge-output-format", "mp4",
         "-o", str(video_path),
         url,
@@ -124,7 +124,11 @@ def upload_to_allas(local_path: Path, s3_key: str) -> None:
         aws_access_key_id=os.getenv("ALLAS_ACCESS_KEY_ID"),
         aws_secret_access_key=os.getenv("ALLAS_SECRET_ACCESS_KEY"),
         region_name="regionOne",
-        config=BotoConfig(s3={"addressing_style": "path"}),
+        config=BotoConfig(
+            s3={"addressing_style": "path"},
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        ),
     )
 
     bucket = os.getenv("ALLAS_BUCKET_NAME", "toolkit-demo-app")

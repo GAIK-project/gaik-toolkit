@@ -196,7 +196,11 @@ async def get_playback_url(video_id: str):
             aws_access_key_id=access_key,
             aws_secret_access_key=secret_key,
             region_name="regionOne",
-            config=BotoConfig(s3={"addressing_style": "path"}),
+            config=BotoConfig(
+                s3={"addressing_style": "path"},
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+            ),
         )
 
         video_key = f"dental-demo/{video_id}/video.mp4"
@@ -231,7 +235,11 @@ async def get_thumbnail_url(video_id: str):
             aws_access_key_id=access_key,
             aws_secret_access_key=secret_key,
             region_name="regionOne",
-            config=BotoConfig(s3={"addressing_style": "path"}),
+            config=BotoConfig(
+                s3={"addressing_style": "path"},
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+            ),
         )
 
         thumb_key = f"dental-demo/{video_id}/thumbnail.jpg"
