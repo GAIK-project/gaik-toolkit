@@ -47,18 +47,19 @@ GAIK provides six parser options, each optimized for different use cases:
 **Use DoclingParser when:**
 - OCR is required for scanned documents
 - Multi-format support needed (PDF, images, etc.)
-- Advanced table extraction with OCR
-- GPU acceleration available
+- You need advanced table extraction 
+- You have CUDA-enabled GPU available for fast processing (otherwise slow)
+
 
 **Use VisionPlusParser when:**
-- You need Docling extraction plus image interpretation
-- You need markdown + metadata output only
-- You do not need chunk generation
+- You need advanced Docling parsing with image interpretation
+- You need image interpretation at correct places in the parsed output
+- You need advanced table extraction
 
 **Use DoclingApiClientParser when:**
-- You need parsing through the Haaga-Helia hosted service
+- You need fast Docling parsing with GPU acceleration through the Haaga-Helia hosted service
 - You have API access credentials from Haaga-Helia
-- You want parsed markdown + metadata returned directly (no local save by parser)
+- You want parsed markdown + metadata 
 
 ---
 
