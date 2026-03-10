@@ -49,16 +49,29 @@ def _video_id(url: str) -> str:
     return hashlib.md5(url.encode()).hexdigest()[:12]
 
 
+def _ytdlp_cmd() -> list[str]:
+    """Return yt-dlp command prefix, using python -m fallback on Windows."""
+    if shutil.which("yt-dlp"):
+        try:
+            subprocess.run(["yt-dlp", "--version"], capture_output=True, timeout=5, check=True)
+            return ["yt-dlp"]
+        except (PermissionError, OSError):
+            pass
+    return [sys.executable, "-m", "yt_dlp"]
+
+
 def download_video(url: str, out_dir: Path) -> tuple[Path, str]:
     """Download video with yt-dlp. Returns (video_path, title)."""
+    ytdlp = _ytdlp_cmd()
+
     # First get metadata for the title
-    title_cmd = ["yt-dlp", "--get-title", url]
+    title_cmd = [*ytdlp, "--get-title", url]
     title_result = subprocess.run(title_cmd, capture_output=True, text=True, timeout=60)
     title = title_result.stdout.strip() if title_result.returncode == 0 else "Untitled"
 
     video_path = out_dir / "video.mp4"
     cmd = [
-        "yt-dlp",
+        *ytdlp,
         "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "--merge-output-format", "mp4",
         "-o", str(video_path),
@@ -223,10 +236,18 @@ def main():
     print("=" * 60)
 
     # Check prerequisites
-    for tool in ["yt-dlp", "ffmpeg"]:
-        if not shutil.which(tool):
-            print(f"ERROR: {tool} not found in PATH")
-            sys.exit(1)
+    if not shutil.which("ffmpeg"):
+        print("ERROR: ffmpeg not found in PATH")
+        sys.exit(1)
+
+    # Verify yt-dlp works (handles Windows permission issues)
+    try:
+        ytdlp = _ytdlp_cmd()
+        subprocess.run([*ytdlp, "--version"], capture_output=True, timeout=10, check=True)
+        print(f"Using yt-dlp via: {' '.join(ytdlp)}")
+    except Exception as e:
+        print(f"ERROR: yt-dlp not available - {e}")
+        sys.exit(1)
 
     required_envs = ["LOCAL_WHISPER_BASE", "LOCAL_WHISPER_KEY"]
     for env in required_envs:
