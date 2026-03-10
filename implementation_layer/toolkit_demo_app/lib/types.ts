@@ -14,7 +14,9 @@ export type DemoType =
   | "incident-report"
   | "rag"
   | "audio-structured"
-  | "document-structured";
+  | "dental-transcription"
+  | "document-structured"
+  | "video-search";
 
 /**
  * User feedback stored in the database

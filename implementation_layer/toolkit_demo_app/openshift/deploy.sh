@@ -37,12 +37,14 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 print_usage() {
-    echo "Usage: ./deploy.sh [api|frontend|all]"
+    echo "Usage: ./deploy.sh [api|frontend|all|db|seed]"
     echo ""
     echo "Commands:"
     echo "  api       Build and deploy backend API"
     echo "  frontend  Build and deploy frontend"
-    echo "  all       Deploy both api and frontend"
+    echo "  all       Deploy db, api, and frontend"
+    echo "  db        Deploy PostgreSQL + pgvector database"
+    echo "  seed      Run dental demo seed script"
     echo ""
     echo "Prerequisites:"
     echo "  oc login https://api.2.rahti.csc.fi:6443"
@@ -90,6 +92,30 @@ deploy_frontend() {
     echo -e "${GREEN}Frontend deployed successfully${NC}"
 }
 
+deploy_db() {
+    echo -e "${YELLOW}Deploying PostgreSQL + pgvector...${NC}"
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+    if [ -z "${POSTGRESQL_PASSWORD:-}" ]; then
+        echo -e "${RED}Error: POSTGRESQL_PASSWORD env var required${NC}"
+        echo "Run: export POSTGRESQL_PASSWORD=your_secure_password"
+        exit 1
+    fi
+
+    # Apply manifest with password substitution
+    envsubst < "$SCRIPT_DIR/pgvector.yaml" | oc apply -f - -n "$PROJECT"
+
+    echo -e "${GREEN}pgvector deployed. Set DATABASE_URL on API deployment:${NC}"
+    echo "  oc set env deployment/gaik-demo-api DATABASE_URL=postgresql://postgres:\${POSTGRESQL_PASSWORD}@pgvector-demo:5432/gaik_demo -n $PROJECT"
+}
+
+run_seed() {
+    echo -e "${YELLOW}Running dental demo seed script...${NC}"
+    cd "$DEMO_DIR"
+    python api/scripts/seed_dental_demo.py
+    echo -e "${GREEN}Seed complete${NC}"
+}
+
 # Main
 if [ $# -eq 0 ]; then
     print_usage
@@ -106,7 +132,14 @@ case "$1" in
     frontend)
         deploy_frontend
         ;;
+    db)
+        deploy_db
+        ;;
+    seed)
+        run_seed
+        ;;
     all)
+        deploy_db
         deploy_api
         deploy_frontend
         ;;

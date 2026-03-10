@@ -82,23 +82,21 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
       { label: "Construction Diary", href: "/diary", icon: HardHat },
-      // Coming Soon
       {
-        label: "Dental transcription and close captioning",
-        href: "#",
+        label: "Dental Transcription & Captioning",
+        href: "/dental-transcription",
         icon: Mic,
-        comingSoon: true,
       },
+      {
+        label: "Semantic Dental Video Search",
+        href: "/video-search",
+        icon: Video,
+      },
+      // Coming Soon
       {
         label: "Purchase Order Processing",
         href: "#",
         icon: FileBarChart,
-        comingSoon: true,
-      },
-      {
-        label: "Semantic Dental Video Search",
-        href: "#",
-        icon: Video,
         comingSoon: true,
       },
       {

@@ -1,6 +1,5 @@
 ---
 name: gaik-toolkit
-version: "1.3.0"
 description: GAIK (Generative AI Knowledge Management Toolkit) development guidance. Use when working with structured data extraction from documents/PDFs/audio, schema generation, document parsing (VisionParser, PyMuPDFParser, DoclingParser), audio transcription with Whisper, parallel transcription (ParallelTranscriber), document classification, RAG pipelines (Embedder, VectorStore, PgVectorStore, Retriever, AnswerGenerator), or end-to-end pipelines (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow).
 ---
 
@@ -19,11 +18,57 @@ Python toolkit for knowledge extraction, capture, and generation. Use when worki
 ## Quick Links
 
 - **Documentation**: https://gaik-project.github.io/gaik-toolkit/
+- **Live Demo**: https://gaik-demo.2.rahtiapp.fi/ (registration required)
 - **GitHub**: https://github.com/GAIK-project/gaik-toolkit
-- **Source Code**: https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik
-- **Docs Source**: https://github.com/GAIK-project/gaik-toolkit/tree/main/website/content/docs
+- **Source Code**: `implementation_layer/src/gaik/`
 - **PyPI**: https://pypi.org/project/gaik/
 - **PyPI JSON API**: https://pypi.org/pypi/gaik/json
+
+## Repository Structure
+
+The toolkit is organized in a layer-based architecture:
+
+| Path | Description |
+|------|-------------|
+| `implementation_layer/src/gaik/` | Python package source (building blocks + software modules) |
+| `implementation_layer/toolkit_demo_app/` | Next.js + FastAPI interactive demo app (bun + uv) |
+| `guidance_layer/website/` | Documentation website (Fumadocs/Next.js, deployed to GitHub Pages) |
+| `guidance_layer/website/content/docs/` | Documentation source (`.mdx` files) |
+| `guidance_layer/website/content/docs/use-cases/` | Use-case documentation |
+| `guidance_layer/website/content/docs/toolkit/evals/` | Evaluation methods (extraction, RAG, transcription, translation) |
+| `implementation_layer/no-code-assets/` | Prompt templates and agent skills for no-code usage |
+| `strategy_layer/` | Value evaluation framework, AI maturity assessment |
+| `business_layer/` | GenAI product canvas templates |
+
+## Toolkit Demo App
+
+Interactive web application at `implementation_layer/toolkit_demo_app/`. Provides UI for all toolkit components.
+
+- **Tech stack**: Next.js 16 + FastAPI, bun + uv, Tailwind v4, shadcn/ui
+- **Live**: https://gaik-demo.2.rahtiapp.fi/
+- **See**: `implementation_layer/toolkit_demo_app/CLAUDE.md` for dev conventions
+
+**Demo features:**
+- Extractor (schema-free structured extraction)
+- Document Parser (multi-backend PDF/DOCX parsing)
+- Document Classifier (zero-shot classification)
+- Transcriber (Whisper + GPT enhancement)
+- RAG Builder (document upload, indexing, Q&A with citations)
+- Incident Reporting demo (voice -> structured report)
+- Construction Diary demo (voice notes -> diary entries)
+
+## Documentation Website
+
+Source at `guidance_layer/website/`, built with Fumadocs (Next.js). Content in `.mdx` files under `guidance_layer/website/content/docs/`.
+
+**Key doc pages:**
+- `index.mdx` - Toolkit overview, knowledge processes, layer architecture
+- `demo.mdx` - Demo app feature descriptions
+- `toolkit/software-components.mdx` - Building blocks documentation
+- `toolkit/software-modules.mdx` - Software modules documentation
+- `toolkit/evals/` - Evaluation methods (extraction, RAG, transcription, translation, report writing)
+- `toolkit/no-code-assets.mdx` - Prompt templates and agent skills
+- `use-cases/*.mdx` - Use case documentation
 
 ## Installation
 
@@ -204,9 +249,9 @@ from gaik.software_components.parallel_transcriber import (
 )
 from gaik.software_components.config import get_openai_config
 
-config = get_openai_config(use_azure=True)
+api_config = get_openai_config(use_azure=True)
 tc = TranscriptionConfig(chunk_duration_minutes=15, model=TranscriptionModel.WHISPER)
-transcriber = ParallelTranscriber(config, tc)
+transcriber = ParallelTranscriber(api_config, tc)
 
 result = transcriber.transcribe("long_interview.mp4")
 print(result.plain_text)
@@ -469,6 +514,25 @@ if existing:
 | **Building block** | Atomic toolkit class/function | `Transcriber`, `ParallelTranscriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `Embedder`, `VectorStore`, `PgVectorStore`, `Retriever`, `AnswerGenerator`, `VisionRagParser`, `DoclingRagParser` |
 | **Software component** | Composed, workflow-ready unit | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow` |
 
+## Use Cases
+
+The toolkit has documented use cases in `guidance_layer/website/content/docs/use-cases/`. These demonstrate real-world applications across industries:
+
+| Use Case | Status | Components Used |
+|----------|--------|-----------------|
+| **Dental Transcription & Close Captioning** | Documented | ParallelTranscriber, TranscriptionConfig |
+| **Semantic Dental Video Search** | Documented | Embedder, PgVectorStore, Retriever (hybrid search) |
+| **Incident Reporting** | Documented | AudioToStructuredData (voice -> structured report) |
+| **Dental Learning Assistant** | Coming soon | RAGWorkflow (Q&A over course content) |
+| **Purchase Order Processing** | Coming soon | DocumentsToStructuredData |
+| **Construction Site Diary Creation** | Coming soon | AudioToStructuredData (voice notes -> diary) |
+| **Report Writing** | Coming soon | AnswerGenerator, RAGWorkflow |
+| **Sales Proposal Generation** | Coming soon | DocumentsToStructuredData, RAGWorkflow |
+| **Customer Onboarding & Sales Assistant** | Coming soon | RAGWorkflow |
+
+**Use-case docs source:** `guidance_layer/website/content/docs/use-cases/`
+**Published docs:** https://gaik-project.github.io/gaik-toolkit/
+
 ## Maintenance Notes
 
 This skill documents gaik-toolkit. Update when:
@@ -492,4 +556,4 @@ python .claude/skills/gaik-toolkit/scripts/fetch_pypi_readme.py --version  # Ver
 - [Building Blocks API](references/building-blocks.md) - Detailed API for all building blocks
 - [RAG Building Blocks](references/rag.md) - RAG components API reference
 - [Software Components](references/software-components.md) - Pipeline patterns and options
-- [Examples](references/examples.md) - Complete working examples
+- [Examples](references/examples.md) - Complete working examples (invoice extraction, medical transcription, meeting notes, batch processing, RAG with PostgreSQL, parallel transcription, FastAPI integration)

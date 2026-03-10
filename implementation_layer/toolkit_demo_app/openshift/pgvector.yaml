@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: List
+items:
+  # Secret for database credentials
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: pgvector-demo
+      namespace: gaik
+    type: Opaque
+    stringData:
+      database-user: postgres
+      database-password: "${POSTGRESQL_PASSWORD}"
+      database-name: gaik_demo
+
+  # PersistentVolumeClaim for data storage
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: pgvector-demo-data
+      namespace: gaik
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 2Gi
+
+  # Deployment for PostgreSQL with pgvector
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: pgvector-demo
+      namespace: gaik
+      labels:
+        app: pgvector-demo
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: pgvector-demo
+      strategy:
+        type: Recreate
+      template:
+        metadata:
+          labels:
+            app: pgvector-demo
+        spec:
+          containers:
+            - name: postgresql
+              image: docker.io/pgvector/pgvector:pg17
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 5432
+                  protocol: TCP
+              env:
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: pgvector-demo
+                      key: database-user
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: pgvector-demo
+                      key: database-password
+                - name: POSTGRES_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: pgvector-demo
+                      key: database-name
+                - name: PGDATA
+                  value: /var/lib/postgresql/data/pgdata
+              volumeMounts:
+                - name: postgresql-data
+                  mountPath: /var/lib/postgresql/data
+              resources:
+                limits:
+                  memory: 512Mi
+                requests:
+                  memory: 256Mi
+              livenessProbe:
+                exec:
+                  command:
+                    - /bin/sh
+                    - -c
+                    - pg_isready -U postgres
+                initialDelaySeconds: 30
+                timeoutSeconds: 5
+                periodSeconds: 10
+              readinessProbe:
+                exec:
+                  command:
+                    - /bin/sh
+                    - -c
+                    - pg_isready -U postgres
+                initialDelaySeconds: 5
+                timeoutSeconds: 5
+                periodSeconds: 10
+          volumes:
+            - name: postgresql-data
+              persistentVolumeClaim:
+                claimName: pgvector-demo-data
+
+  # Service to expose PostgreSQL
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: pgvector-demo
+      namespace: gaik
+      labels:
+        app: pgvector-demo
+    spec:
+      ports:
+        - name: postgresql
+          port: 5432
+          targetPort: 5432
+      selector:
+        app: pgvector-demo
+      type: ClusterIP

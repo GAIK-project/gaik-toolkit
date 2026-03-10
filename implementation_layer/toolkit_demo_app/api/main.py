@@ -25,23 +25,27 @@ try:
     # Docker: routers/ is in same directory as main.py
     from routers import (  # noqa: E402
         classifier,
+        dental_transcription,
         diary,
         extractor,
         parser,
         pipeline,
         rag,
         transcriber,
+        video_search,
     )
 except ImportError:
     # Local dev: running from project root with api.main:app
     from api.routers import (  # noqa: E402
         classifier,
+        dental_transcription,
         diary,
         extractor,
         parser,
         pipeline,
         rag,
         transcriber,
+        video_search,
     )
 from fastapi import FastAPI, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
@@ -94,6 +98,12 @@ app.include_router(transcriber.router, prefix="/transcribe", tags=["Transcriber"
 app.include_router(pipeline.router, prefix="/pipeline", tags=["Pipeline"])
 app.include_router(rag.router, prefix="/rag", tags=["RAG"])
 app.include_router(diary.router, prefix="/diary", tags=["Diary"])
+app.include_router(
+    dental_transcription.router,
+    prefix="/dental-transcribe",
+    tags=["Dental Transcription"],
+)
+app.include_router(video_search.router, prefix="/video-search", tags=["Video Search"])
 
 
 @app.get("/health")
@@ -117,5 +127,7 @@ async def root():
             "pipeline": "/pipeline - End-to-end pipelines (audio/document to structured data)",
             "rag": "/rag - RAG pipeline (document indexing and Q&A with citations)",
             "diary": "/diary - Construction diary (Työmaapäiväkirja) workflow",
+            "dental-transcribe": "/dental-transcribe - Dental transcription with SRT/VTT subtitles",
+            "video-search": "/video-search - Semantic dental video search (pgvector)",
         },
     }
