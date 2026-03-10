@@ -25,7 +25,7 @@ def main() -> None:
         print("Place a PDF file in examples/software_components/parsers and retry.")
         return
 
-    config = get_openai_config(use_azure=True)
+    config = get_openai_config(use_azure=False)
     parser = VisionPlusParser(
         vision_config=config,
         enable_ocr=False,
