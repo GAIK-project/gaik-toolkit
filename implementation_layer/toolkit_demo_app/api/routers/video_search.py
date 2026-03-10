@@ -1,6 +1,5 @@
 """Semantic dental video search router - Hybrid search over transcribed video segments."""
 
-import json
 import logging
 import os
 from collections.abc import AsyncGenerator
@@ -281,7 +280,6 @@ async def search_videos(
     try:
         from gaik.software_components.RAG.pg_vector_store.video_search_helpers import (
             format_search_results,
-            format_timestamp,
         )
 
         if search_type == "keyword":

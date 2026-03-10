@@ -105,14 +105,19 @@ deploy_db() {
     # Apply manifest with password substitution
     envsubst < "$SCRIPT_DIR/pgvector.yaml" | oc apply -f - -n "$PROJECT"
 
-    echo -e "${GREEN}pgvector deployed. Set DATABASE_URL on API deployment:${NC}"
-    echo "  oc set env deployment/gaik-demo-api DATABASE_URL=postgresql://postgres:\${POSTGRESQL_PASSWORD}@pgvector-demo:5432/gaik_demo -n $PROJECT"
+    # Set DATABASE_URL on API deployment
+    echo -e "${YELLOW}Setting DATABASE_URL on API deployment...${NC}"
+    oc set env deployment/gaik-demo-api \
+        "DATABASE_URL=postgresql://postgres:${POSTGRESQL_PASSWORD}@pgvector-demo:5432/gaik_demo" \
+        -n "$PROJECT"
+
+    echo -e "${GREEN}pgvector deployed and DATABASE_URL configured${NC}"
 }
 
 run_seed() {
     echo -e "${YELLOW}Running dental demo seed script...${NC}"
     cd "$DEMO_DIR"
-    python api/scripts/seed_dental_demo.py
+    uv run python api/scripts/seed_dental_demo.py
     echo -e "${GREEN}Seed complete${NC}"
 }
 

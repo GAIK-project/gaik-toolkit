@@ -4,6 +4,7 @@ GAIK Toolkit Demo API
 FastAPI backend that provides REST endpoints for the GAIK toolkit components.
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -21,9 +22,15 @@ logger = logging.getLogger(__name__)
 env_path = Path(__file__).parent.parent / ".env.local"
 load_dotenv(env_path)
 
+from fastapi import FastAPI, Request  # noqa: E402, I001
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
+
+from gaik import __version__ as gaik_version  # noqa: E402
+
 try:
     # Docker: routers/ is in same directory as main.py
-    from routers import (  # noqa: E402
+    from routers import (
         classifier,
         dental_transcription,
         diary,
@@ -36,7 +43,7 @@ try:
     )
 except ImportError:
     # Local dev: running from project root with api.main:app
-    from api.routers import (  # noqa: E402
+    from api.routers import (
         classifier,
         dental_transcription,
         diary,
@@ -47,19 +54,16 @@ except ImportError:
         transcriber,
         video_search,
     )
-from fastapi import FastAPI, Request  # noqa: E402
-from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from fastapi.responses import JSONResponse  # noqa: E402
-
-from gaik import __version__ as gaik_version  # noqa: E402
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("GAIK Demo API starting...")
+    cleanup_task = asyncio.create_task(dental_transcription._cleanup_old_subtitles())
     yield
     # Shutdown
+    cleanup_task.cancel()
     logger.info("GAIK Demo API shutting down...")
 
 

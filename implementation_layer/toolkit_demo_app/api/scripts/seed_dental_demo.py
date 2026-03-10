@@ -72,7 +72,9 @@ def download_video(url: str, out_dir: Path) -> tuple[Path, str]:
     video_path = out_dir / "video.mp4"
     cmd = [
         *ytdlp,
-        "-f", "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best[height<=480]",
+        "-f",
+        "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]"
+        "/best[height<=480][ext=mp4]/best[height<=480]",
         "--merge-output-format", "mp4",
         "-o", str(video_path),
         url,
@@ -167,7 +169,6 @@ def process_video(url: str, work_dir: Path) -> dict | None:
         return None
 
     segments = result.get("segments", [])
-    raw_text = (result.get("text") or "").strip()
     print(f"  Got {len(segments)} segments")
 
     # 4. Generate SRT
