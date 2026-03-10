@@ -18,12 +18,12 @@ GAIK provides six parser options, each optimized for different use cases:
 
 | Parser | Use Case | Speed | Requirements |
 |--------|----------|-------|--------------|
-| [VisionParser](vision.md) | High-quality PDF/image parsing with table extraction | Slow | OpenAI/Azure API |
-| [PyMuPDFParser](pymupdf.md) | Fast PDF text extraction | Fast | None (local) |
-| [DocxParser](docx.md) | Word document parsing | Fast | None (local) |
-| [DoclingParser](docling.md) | Advanced OCR with multi-format support | Medium | Optional GPU |
-| `VisionPlusParser` | Docling + Vision markdown parsing with metadata, no chunking | Medium | OpenAI/Azure + Docling |
-| `DoclingApiClientParser` | Remote parsing via Haaga-Helia Docling service | Medium | API_BASE + PASSWORD |
+| `VisionParser` | High-quality PDF/image parsing with table extraction | Slow | OpenAI/Azure API |
+| `PyMuPDFParser` | Fast PDF text extraction | Fast | None (local) |
+| `DocxParser` | Word document parsing | Fast | None (local) |
+| `DoclingParser` | Advanced OCR with multi-format support | Medium | Optional GPU |
+| `VisionPlusParser` | Docling + Vision LLM for advanced parsing | Medium | OpenAI/Azure + Docling |
+| `DoclingApiClientParser` | Remote Docling parsing via Haaga-Helia Docling service | Fast | API_BASE + PASSWORD |
 
 ### Quick Comparison
 
@@ -99,3 +99,4 @@ See [implementation_layer/examples/software_components/parsers/](../../implement
 ## License
 
 MIT - see [LICENSE](../../LICENSE)
+
