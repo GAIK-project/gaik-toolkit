@@ -224,11 +224,27 @@ const buildingBlocks: Demo[] = [
   },
 ];
 
+// New use cases (smaller cards below featured)
+const newUseCases: Demo[] = [
+  {
+    title: "Dental Transcription & Captioning",
+    description:
+      "Upload audio or video to transcribe with Whisper and generate SRT/VTT subtitles",
+    href: "/dental-transcription",
+    icon: Mic,
+  },
+  {
+    title: "Semantic Video Search",
+    description:
+      "Search indexed education videos by meaning — find exact moments with hybrid search",
+    href: "/video-search",
+    icon: Video,
+  },
+];
+
 // Coming Soon items
 const comingSoonUseCases = [
-  { title: "Dental transcription and close captioning", icon: Mic },
   { title: "Purchase Order Processing", icon: FileBarChart },
-  { title: "Semantic Dental Video Search", icon: Video },
   { title: "Customer onboarding and sales assistant", icon: Headset },
   { title: "Report Writing", icon: FileText },
   { title: "Sales Proposal Generation", icon: FileBarChart },
@@ -648,6 +664,13 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
               className={demo.size === "wide" ? "md:col-span-2" : ""}
             >
               <FeaturedCard demo={demo} isUnlocked={isUnlocked} />
+            </motion.div>
+          ))}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {newUseCases.map((demo) => (
+            <motion.div key={demo.href} variants={itemVariants}>
+              <BuildingBlockCard demo={demo} isUnlocked={isUnlocked} />
             </motion.div>
           ))}
         </div>
