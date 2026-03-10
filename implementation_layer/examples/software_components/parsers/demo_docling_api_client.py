@@ -19,8 +19,8 @@ from gaik.software_components.parsers.docling_api_client import DoclingApiClient
 # Configure these values before running
 # ------------------------------------------------------------------
 DOCUMENT_PATH = Path(__file__).parent / "sample_report.pdf"
-API_BASE = os.getenv("API_BASE", "http://myedge-unique-label.swedencentral.cloudapp.azure.com:8080")
-PASSWORD = os.getenv("PASSWORD", "4FGR26D5G1CGE")
+API_BASE = os.getenv("API_BASE", "")
+PASSWORD = os.getenv("PASSWORD", "")
 
 
 def main() -> None:
