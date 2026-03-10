@@ -9,7 +9,8 @@
     "build": "bun --bun next build",
     "start": "bun --bun next start",
     "lint": "eslint",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "db:tunnel": "oc port-forward svc/pgvector-demo 5432:5432 -n gaik"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
