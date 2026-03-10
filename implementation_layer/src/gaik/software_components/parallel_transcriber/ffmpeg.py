@@ -287,6 +287,8 @@ def split_into_chunks(
 ) -> list[dict]:
     """Split an audio file into chunks using parallel FFmpeg processes.
 
+    Failed chunks are retried sequentially before giving up.
+
     Args:
         audio_file_path: Source audio (or video when *strip_video* is True).
         specs: List of :class:`ChunkSpec` from :func:`compute_chunk_specs`.
@@ -299,14 +301,28 @@ def split_into_chunks(
         sorted by chunk index.
 
     Raises:
-        RuntimeError: If no chunks are successfully created.
+        RuntimeError: If ffmpeg is not available or no chunks are created.
     """
+    if not check_ffmpeg_available():
+        raise RuntimeError("ffmpeg/ffprobe not found on PATH")
+
     cfg = config or TranscriptionConfig()
     audio_file_path = str(audio_file_path)
     total_specs = len(specs)
     max_workers = max(1, min(total_specs, cfg.ffmpeg_split_workers))
+    output_dir = specs[0].chunk_path.parent
 
-    def _encode_chunk(spec: ChunkSpec) -> dict | None:
+    logger.info(
+        "Splitting %d chunks (workers=%d, threads_per=%d, temp=%s)",
+        total_specs,
+        max_workers,
+        cfg.ffmpeg_threads_per_process,
+        output_dir,
+    )
+
+    def _encode_chunk(spec: ChunkSpec) -> dict:
+        """Encode a single chunk. Returns dict with 'file'+'metadata' on success,
+        or 'error'+'index' on failure."""
         if check_cancelled:
             check_cancelled()
 
@@ -365,17 +381,17 @@ def split_into_chunks(
             _stdout, stderr = process.communicate(timeout=cfg.ffmpeg_chunk_timeout_seconds)
 
             if process.returncode != 0:
-                logger.error("Chunk %d failed: FFmpeg exit %d", spec.index + 1, process.returncode)
-                logger.error("stderr: %s", stderr[:500])
-                return None
+                msg = f"FFmpeg exit {process.returncode}: {stderr[:300]}"
+                logger.error("Chunk %d failed: %s", spec.index + 1, msg)
+                return {"error": msg, "index": spec.index}
 
             chunk_path = spec.chunk_path
             if not chunk_path.exists():
-                logger.error("Chunk %d was not created", spec.index + 1)
-                return None
+                msg = "FFmpeg did not create output file"
+                logger.error("Chunk %d: %s", spec.index + 1, msg)
+                return {"error": msg, "index": spec.index}
 
             chunk_size_mb = chunk_path.stat().st_size / (1024 * 1024)
-            # Skip tiny chunks (< 0.1 MB) unless it's the last one
             if chunk_size_mb <= 0.1 and not spec.is_last:
                 logger.warning(
                     "Chunk %d too small (%.1f MB), skipping",
@@ -383,7 +399,7 @@ def split_into_chunks(
                     chunk_size_mb,
                 )
                 chunk_path.unlink(missing_ok=True)
-                return None
+                return {"error": f"chunk too small ({chunk_size_mb:.2f} MB)", "index": spec.index}
 
             logger.info(
                 "Chunk %d/%d: %s (%.1f MB)",
@@ -411,27 +427,51 @@ def split_into_chunks(
             except Exception:
                 pass
             spec.chunk_path.unlink(missing_ok=True)
-            return None
+            return {"error": "FFmpeg timed out", "index": spec.index}
         except Exception as exc:
             logger.error("Error creating chunk %d: %s", spec.index + 1, exc)
             spec.chunk_path.unlink(missing_ok=True)
-            return None
+            return {"error": f"{type(exc).__name__}: {exc}", "index": spec.index}
 
-    logger.info("Splitting %d chunks in parallel (workers=%d)", total_specs, max_workers)
-
+    # ── Parallel pass ─────────────────────────────────────────────
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         results = list(executor.map(_encode_chunk, specs))
 
-    successful = sorted(
-        (r for r in results if r is not None),
-        key=lambda r: r["metadata"]["index"],
+    successful = [r for r in results if "file" in r]
+    failed = [r for r in results if "error" in r]
+
+    # ── Sequential retry for failed chunks ────────────────────────
+    if failed:
+        logger.warning(
+            "%d/%d chunks failed in parallel pass, retrying sequentially",
+            len(failed),
+            total_specs,
+        )
+        still_failed = []
+        for fail_result in failed:
+            spec = specs[fail_result["index"]]
+            retry = _encode_chunk(spec)
+            if "file" in retry:
+                logger.info("Chunk %d recovered on retry", spec.index + 1)
+                successful.append(retry)
+            else:
+                still_failed.append(retry)
+        failed = still_failed
+
+    successful.sort(key=lambda r: r["metadata"]["index"])
+
+    logger.info(
+        "Chunk splitting complete: %d succeeded, %d failed",
+        len(successful),
+        len(failed),
     )
 
     if not successful:
-        raise RuntimeError("No chunks were successfully created")
+        error_msgs = [r["error"] for r in failed]
+        detail = "; ".join(error_msgs[:5]) if error_msgs else "unknown"
+        raise RuntimeError(f"No chunks created. Errors: {detail}")
 
     # Save metadata for overlap deduplication
-    output_dir = specs[0].chunk_path.parent
     metadata_path = output_dir / "chunk_metadata.json"
     metadata_path.write_text(
         json.dumps(
@@ -443,7 +483,6 @@ def split_into_chunks(
         )
     )
 
-    logger.info("Created %d chunks successfully", len(successful))
     return successful
 
 
