@@ -8,13 +8,13 @@ Convert PDFs and Word documents to structured text using multiple parsing backen
 pip install gaik[parser]
 ```
 
-**Note:** Requires OpenAI or Azure OpenAI API access for vision-based parsing
+**Note:** Vision parsing requires OpenAI or Azure OpenAI API access.
 
 ---
 
 ## Available Parsers
 
-GAIK provides four different parsers, each optimized for different use cases:
+GAIK provides six parser options, each optimized for different use cases:
 
 | Parser | Use Case | Speed | Requirements |
 |--------|----------|-------|--------------|
@@ -22,6 +22,8 @@ GAIK provides four different parsers, each optimized for different use cases:
 | [PyMuPDFParser](pymupdf.md) | Fast PDF text extraction | Fast | None (local) |
 | [DocxParser](docx.md) | Word document parsing | Fast | None (local) |
 | [DoclingParser](docling.md) | Advanced OCR with multi-format support | Medium | Optional GPU |
+| `VisionPlusParser` | Docling + Vision markdown parsing with metadata, no chunking | Medium | OpenAI/Azure + Docling |
+| `DoclingApiClientParser` | Remote parsing via Haaga-Helia Docling service | Medium | API_BASE + PASSWORD |
 
 ### Quick Comparison
 
@@ -48,11 +50,21 @@ GAIK provides four different parsers, each optimized for different use cases:
 - Advanced table extraction with OCR
 - GPU acceleration available
 
+**Use VisionPlusParser when:**
+- You need Docling extraction plus image interpretation
+- You need markdown + metadata output only
+- You do not need chunk generation
+
+**Use DoclingApiClientParser when:**
+- You need parsing through the Haaga-Helia hosted service
+- You have API access credentials from Haaga-Helia
+- You want parsed markdown + metadata returned directly (no local save by parser)
+
 ---
 
 ## Environment Variables
 
-For VisionParser only:
+For VisionParser/VisionPlusParser only:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -62,7 +74,12 @@ For VisionParser only:
 | `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
 | `AZURE_API_VERSION` | Optional | API version (default: 2024-02-15-preview) |
 
-**Note:** PyMuPDFParser, DocxParser, and DoclingParser do not require API keys.
+For DoclingApiClientParser (Haaga-Helia service):
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `API_BASE` | Yes | Service base URL provided by Haaga-Helia |
+| `PASSWORD` | Yes | Service password provided by Haaga-Helia |
 
 ---
 
@@ -82,9 +99,3 @@ See [implementation_layer/examples/software_components/parsers/](../../implement
 ## License
 
 MIT - see [LICENSE](../../LICENSE)
-
-
-
-
-
-

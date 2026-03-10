@@ -1,4 +1,4 @@
-"""Document and PDF Parsers
+﻿"""Document and PDF Parsers
 
 This module provides multiple document parsing options:
 
@@ -16,16 +16,12 @@ Local Parsing:
 Advanced Parsing:
     - DoclingParser: Advanced document parsing with OCR, table extraction, and multi-format support
     - parse_document: Convenience function for Docling parsing
+    - VisionPlusParser: Docling + vision parsing that returns markdown + metadata (no chunking)
+    - parse_document_with_vision_plus: Convenience wrapper for VisionPlusParser
 
-Example:
-    >>> from gaik.software_components.parsers import VisionParser, get_openai_config
-    >>> config = get_openai_config(use_azure=True)
-    >>> parser = VisionParser(openai_config=config, clean_output=True)
-    >>> pages = parser.convert_pdf("document.pdf")
-
-    >>> from gaik.software_components.parsers import DocxParser
-    >>> docx_parser = DocxParser()
-    >>> result = docx_parser.parse_document("document.docx")
+Remote Client Parsing:
+    - DoclingApiClientParser: Client parser for remote Docling parsing service
+    - parse_document_via_api: Convenience wrapper for remote parsing calls
 """
 
 __all__ = []
@@ -59,5 +55,21 @@ try:
     from .docling import DoclingParser, parse_document
 
     __all__.extend(["DoclingParser", "parse_document"])
+except ImportError:
+    pass
+
+# Vision+ advanced parsing (requires docling + openai)
+try:
+    from .visionPlus import VisionPlusParser, parse_document_with_vision_plus
+
+    __all__.extend(["VisionPlusParser", "parse_document_with_vision_plus"])
+except ImportError:
+    pass
+
+# Remote client parsing (requires requests)
+try:
+    from .docling_api_client import DoclingApiClientParser, parse_document_via_api
+
+    __all__.extend(["DoclingApiClientParser", "parse_document_via_api"])
 except ImportError:
     pass

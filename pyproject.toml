@@ -80,6 +80,7 @@ parser = [
     "python-docx>=1.2.0",
     "docling==2.64.1",
     "psutil",
+    "requests>=2.31.0",
 ]
 
 # RAG docling parser
@@ -240,5 +241,7 @@ ignore = []
 [tool.pytest.ini_options]
 testpaths = ["implementation_layer/unit_tests"]
 addopts = ["-v", "--strict-markers"]
+
+
 
 
