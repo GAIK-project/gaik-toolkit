@@ -1,6 +1,6 @@
 ---
 name: gaik-toolkit
-description: GAIK (Generative AI Knowledge Management Toolkit) development guidance. Use when working with structured data extraction from documents/PDFs/audio, schema generation, document parsing (VisionParser, PyMuPDFParser, DoclingParser), audio transcription with Whisper, parallel transcription (ParallelTranscriber), document classification, RAG pipelines (Embedder, VectorStore, PgVectorStore, Retriever, AnswerGenerator), or end-to-end pipelines (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow).
+description: GAIK (Generative AI Knowledge Management Toolkit) development guidance. Use when working with structured data extraction from documents/PDFs/audio, schema generation, document parsing (VisionParser, PyMuPDFParser, DoclingParser), audio transcription with Whisper, parallel transcription (ParallelTranscriber), SRT/VTT subtitle generation (srt_utils), document classification, RAG pipelines (Embedder, VectorStore, PgVectorStore, Retriever, AnswerGenerator), semantic video search (video_search_helpers), or end-to-end pipelines (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow).
 ---
 
 # GAIK Toolkit
@@ -56,6 +56,8 @@ Interactive web application at `implementation_layer/toolkit_demo_app/`. Provide
 - RAG Builder (document upload, indexing, Q&A with citations)
 - Incident Reporting demo (voice -> structured report)
 - Construction Diary demo (voice notes -> diary entries)
+- Dental Transcription & Captioning (local Whisper -> SRT/VTT subtitles)
+- Semantic Dental Video Search (pgvector hybrid search over pre-seeded videos)
 
 ## Documentation Website
 
@@ -237,6 +239,47 @@ transcriber = Transcriber(
 result = transcriber.transcribe("meeting.mp3")
 print(result.enhanced_transcript or result.raw_transcript)
 result.save("output/")
+```
+
+### SRT/VTT Subtitle Utilities
+
+Generate, parse, and chunk subtitle files from Whisper transcription segments:
+
+```python
+from gaik.software_components.transcriber import (
+    segments_to_srt, segments_to_vtt, parse_srt, chunk_segments,
+)
+
+# Generate subtitles from Whisper segments [{start, end, text}, ...]
+srt_content = segments_to_srt(segments)
+vtt_content = segments_to_vtt(segments)
+
+# Parse SRT back to structured segments
+parsed = parse_srt(srt_content)
+
+# Group short cues into 30-60s chunks for semantic search embedding
+chunks = chunk_segments(parsed, target_seconds=45)
+```
+
+### Video Search Helpers (PgVectorStore)
+
+Thin helper layer for video search on top of PgVectorStore:
+
+```python
+from gaik.software_components.RAG.pg_vector_store import (
+    PgVectorStore, ingest_video_segments, format_search_results,
+)
+
+store = PgVectorStore(db_url, table_name="video_segments", embedding_dim=1536)
+store.setup()
+
+# Ingest chunked segments with video metadata
+ids = ingest_video_segments(store, embedder, video_title="Lecture 1", video_id="abc123", segments=chunks)
+
+# Format search results with timestamps
+results = store.search_hybrid(query_vec, query_text, top_k=10)
+formatted = format_search_results(results)
+# Returns: [{text, video_title, video_id, start_seconds, end_seconds, timestamp, score}, ...]
 ```
 
 ### ParallelTranscriber (Production-grade Parallel Transcription)
@@ -511,7 +554,7 @@ if existing:
 | Level | Concept | Examples |
 |-------|---------|----------|
 | **Service** | Logical capability | `speech_to_text`, `document_parsing`, `information_extraction`, `rag` |
-| **Building block** | Atomic toolkit class/function | `Transcriber`, `ParallelTranscriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `Embedder`, `VectorStore`, `PgVectorStore`, `Retriever`, `AnswerGenerator`, `VisionRagParser`, `DoclingRagParser` |
+| **Building block** | Atomic toolkit class/function | `Transcriber`, `ParallelTranscriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `Embedder`, `VectorStore`, `PgVectorStore`, `Retriever`, `AnswerGenerator`, `VisionRagParser`, `DoclingRagParser`, `srt_utils`, `video_search_helpers` |
 | **Software component** | Composed, workflow-ready unit | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow` |
 
 ## Use Cases
