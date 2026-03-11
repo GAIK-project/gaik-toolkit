@@ -32,6 +32,13 @@ RUN uv pip install --system --no-cache \
 # Install dependencies (gaik[rag-workflow] included in requirements.txt)
 RUN uv pip install --system --no-cache -r requirements.txt
 
+# Patch: copy docling_api_client into installed gaik parsers package
+# (remove once gaik >0.3.10 is published to PyPI with this module)
+COPY api/patches/docling_api_client.py /tmp/docling_api_client.py
+RUN GAIK_LOC=$(pip show gaik | grep "^Location:" | cut -d' ' -f2) && \
+    cp /tmp/docling_api_client.py "$GAIK_LOC/gaik/software_components/parsers/" && \
+    rm /tmp/docling_api_client.py
+
 # Copy API application code
 COPY api/ .
 
