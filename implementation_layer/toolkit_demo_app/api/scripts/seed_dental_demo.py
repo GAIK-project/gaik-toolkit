@@ -11,6 +11,7 @@ Reads config from .env.local (LOCAL_WHISPER_BASE, LOCAL_WHISPER_KEY, DATABASE_UR
 from __future__ import annotations
 
 import hashlib
+import mimetypes
 import os
 import shutil
 import subprocess
@@ -42,6 +43,20 @@ VIDEOS = [
 ]
 
 ALLAS_PREFIX = "dental-demo"
+
+
+def _content_type_for(path: Path) -> str:
+    """Return an explicit MIME type for uploaded demo assets."""
+    suffix = path.suffix.lower()
+    if suffix == ".mp4":
+        return "video/mp4"
+    if suffix in {".jpg", ".jpeg"}:
+        return "image/jpeg"
+    if suffix == ".srt":
+        return "text/plain; charset=utf-8"
+
+    guessed, _ = mimetypes.guess_type(path.name)
+    return guessed or "application/octet-stream"
 
 
 def _video_id(url: str) -> str:
@@ -134,8 +149,14 @@ def upload_to_allas(local_path: Path, s3_key: str) -> None:
     )
 
     bucket = os.getenv("ALLAS_BUCKET_NAME", "toolkit-demo-app")
-    s3.upload_file(str(local_path), bucket, s3_key)
-    print(f"  Uploaded: s3://{bucket}/{s3_key}")
+    content_type = _content_type_for(local_path)
+    s3.upload_file(
+        str(local_path),
+        bucket,
+        s3_key,
+        ExtraArgs={"ContentType": content_type},
+    )
+    print(f"  Uploaded: s3://{bucket}/{s3_key} ({content_type})")
 
 
 def process_video(url: str, work_dir: Path) -> dict | None:
@@ -190,6 +211,7 @@ def process_video(url: str, work_dir: Path) -> dict | None:
         upload_to_allas(srt_path, f"{prefix}/subtitles.srt")
         if thumb_path.exists():
             upload_to_allas(thumb_path, f"{prefix}/thumbnail.jpg")
+        print(f"  Media prefix ready: s3://{os.getenv('ALLAS_BUCKET_NAME', 'toolkit-demo-app')}/{prefix}")
     except Exception as e:
         print(f"  WARNING: Upload failed - {e}")
         print("  Continuing with embedding anyway...")
@@ -230,7 +252,7 @@ def process_video(url: str, work_dir: Path) -> dict | None:
             segments=chunks,
             extra_metadata={"thumbnail_key": f"{ALLAS_PREFIX}/{vid}/thumbnail.jpg"},
         )
-        print(f"  Stored {len(ids)} chunks in database")
+        print(f"  Stored {len(ids)} chunks in database for video_id={vid}")
 
     return {"video_id": vid, "title": title, "segments": len(segments), "chunks": len(ids)}
 

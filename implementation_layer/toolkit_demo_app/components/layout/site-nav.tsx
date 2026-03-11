@@ -83,12 +83,12 @@ const navGroups: NavGroup[] = [
       { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
       { label: "Construction Diary", href: "/diary", icon: HardHat },
       {
-        label: "Dental Transcription & Captioning",
+        label: "Video Transcription & Captioning",
         href: "/dental-transcription",
         icon: Mic,
       },
       {
-        label: "Semantic Dental Video Search",
+        label: "Semantic Video Search",
         href: "/video-search",
         icon: Video,
       },

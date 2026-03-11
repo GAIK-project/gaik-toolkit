@@ -9,6 +9,7 @@ import {
 } from "@/components/demo/result-card";
 import { FeedbackButton } from "@/components/feedback";
 import { StepIndicator } from "@/components/demo/step-indicator";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,13 +29,19 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import {
+  ArrowRight,
   Download,
+  ExternalLink,
   FileText,
   Loader2,
   Mic,
+  Sparkles,
   Subtitles,
+  Video,
+  Wand2,
 } from "lucide-react";
 import { motion } from "motion/react";
+import Link from "next/link";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -47,19 +54,116 @@ interface TranscriptionResult {
   segments_count: number;
 }
 
+interface ExampleDemo extends TranscriptionResult {
+  video_id: string;
+  title: string;
+  source_url: string;
+  video_url: string;
+}
+
+function exampleResultPayload(exampleDemo: ExampleDemo): TranscriptionResult {
+  return {
+    job_id: exampleDemo.job_id,
+    raw_transcript: exampleDemo.raw_transcript,
+    srt_content: exampleDemo.srt_content,
+    vtt_content: exampleDemo.vtt_content,
+    segments_count: exampleDemo.segments_count,
+  };
+}
+
+const workflowItems = [
+  {
+    title: "Upload or open the example",
+    description: "Use your own file or inspect the ready-made lecture clip.",
+  },
+  {
+    title: "Whisper turns speech into text",
+    description:
+      "The backend produces transcript, SRT, and VTT subtitle files.",
+  },
+  {
+    title: "Reuse it in video search",
+    description: "The same subtitle output can power searchable video moments.",
+  },
+];
+
 export default function DentalTranscriptionPage() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [language, setLanguage] = useState("auto");
   const [result, setResult] = useState<TranscriptionResult | null>(null);
+  const [activeTab, setActiveTab] = useState("transcript");
   const [isLoading, setIsLoading] = useState(false);
   const [pipelineSteps, setPipelineSteps] = useState<SSEStep[]>([]);
+  const [exampleDemo, setExampleDemo] = useState<ExampleDemo | null>(null);
+  const [exampleLoading, setExampleLoading] = useState(true);
+  const [exampleError, setExampleError] = useState<string | null>(null);
+  const [exampleTrackUrl, setExampleTrackUrl] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    loadExampleDemo();
+
     return () => {
       abortControllerRef.current?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    if (!exampleDemo?.vtt_content) {
+      setExampleTrackUrl(null);
+      return;
+    }
+
+    const blob = new Blob([exampleDemo.vtt_content], { type: "text/vtt" });
+    const url = URL.createObjectURL(blob);
+    setExampleTrackUrl(url);
+
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [exampleDemo]);
+
+  async function loadExampleDemo(): Promise<void> {
+    setExampleLoading(true);
+    setExampleError(null);
+
+    try {
+      const response = await apiFetch("/api/dental-transcribe/example");
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ detail: "Failed to load example" }));
+        throw new Error(
+          errorData.detail || errorData.error || "Failed to load example",
+        );
+      }
+
+      const data = await response.json();
+      const nextExampleDemo = {
+        job_id: "example-demo",
+        raw_transcript: data.raw_transcript,
+        srt_content: data.srt_content,
+        vtt_content: data.vtt_content,
+        segments_count: data.segments_count,
+        video_id: data.video_id,
+        title: data.title,
+        source_url: data.source_url,
+        video_url: data.video_url,
+      };
+
+      setExampleDemo(nextExampleDemo);
+      setResult((current) => current ?? exampleResultPayload(nextExampleDemo));
+      setActiveTab((current) =>
+        current === "subtitles" ? current : "transcript",
+      );
+    } catch (error) {
+      setExampleError(
+        error instanceof Error ? error.message : "Failed to load example demo",
+      );
+    } finally {
+      setExampleLoading(false);
+    }
+  }
 
   async function handleSubmit(): Promise<void> {
     if (isLoading || !audioFile) return;
@@ -69,6 +173,7 @@ export default function DentalTranscriptionPage() {
 
     setIsLoading(true);
     setResult(null);
+    setActiveTab("transcript");
     setPipelineSteps([]);
 
     try {
@@ -92,11 +197,12 @@ export default function DentalTranscriptionPage() {
         onSteps: (steps) => setPipelineSteps(steps),
         onStepUpdate: (update) => {
           setPipelineSteps((prev) =>
-            prev.map((s) => (s.step === update.step ? update : s)),
+            prev.map((step) => (step.step === update.step ? update : step)),
           );
         },
         onResult: (data) => {
           setResult(data);
+          setActiveTab("transcript");
           posthog.capture("dental_transcription_completed", {
             language,
             segments_count: data.segments_count,
@@ -114,10 +220,10 @@ export default function DentalTranscriptionPage() {
       if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
       setPipelineSteps((prev) =>
-        prev.map((s) =>
-          s.status === "in_progress"
-            ? { ...s, status: "error", message: "Failed" }
-            : s,
+        prev.map((step) =>
+          step.status === "in_progress"
+            ? { ...step, status: "error", message: "Failed" }
+            : step,
         ),
       );
     } finally {
@@ -129,6 +235,21 @@ export default function DentalTranscriptionPage() {
     setAudioFile(null);
     setResult(null);
     setPipelineSteps([]);
+    setActiveTab("transcript");
+  }
+
+  function useExampleOutput(): void {
+    if (!exampleDemo) return;
+
+    setAudioFile(null);
+    setIsLoading(false);
+    setPipelineSteps([
+      { step: 1, name: "Transcription", status: "completed" },
+      { step: 2, name: "Subtitle Generation", status: "completed" },
+    ]);
+    setResult(exampleResultPayload(exampleDemo));
+    setActiveTab("subtitles");
+    toast.success("Example transcript loaded");
   }
 
   function downloadFile(
@@ -138,10 +259,10 @@ export default function DentalTranscriptionPage() {
   ): void {
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
     URL.revokeObjectURL(url);
   }
 
@@ -151,31 +272,65 @@ export default function DentalTranscriptionPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <header className="mb-8 pl-1">
-        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-          <Mic className="h-8 w-8 text-blue-500" />
-          Dental Transcription & Close Captioning
-        </h1>
-        <p className="text-muted-foreground mt-2 text-lg">
-          Upload dental education audio or video. Get transcripts and subtitle
-          files for close captioning.
-        </p>
+      <header className="mb-8 grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
+        <div className="space-y-4 pl-1">
+          <Badge
+            variant="outline"
+            className="border-primary/25 bg-primary/5 text-primary"
+          >
+            AI Subtitle Demo
+          </Badge>
+          <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
+            <Mic className="text-primary h-8 w-8" />
+            Video Transcription & Subtitles
+          </h1>
+          <p className="text-muted-foreground max-w-2xl text-lg leading-relaxed">
+            Upload a recording or open the ready-made example. This demo turns
+            speech into a readable transcript and subtitle files you can reuse
+            in players, captions, or semantic video search.
+          </p>
+        </div>
+
+        <Card className="border-primary/20 bg-card/95 shadow-md">
+          <CardContent className="space-y-3 p-5">
+            {workflowItems.map((item, index) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.08 * index }}
+                className="flex items-start gap-3"
+              >
+                <div className="bg-primary/10 text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                  {index + 1}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{item.title}</p>
+                  <p className="text-muted-foreground text-sm">
+                    {item.description}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </CardContent>
+        </Card>
       </header>
 
-      <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
-        {/* Left: Input */}
+      <div className="grid gap-6 md:gap-8 lg:grid-cols-[1fr_1.15fr]">
         <div className="space-y-6">
           <Card className="shadow-md">
             <CardHeader className="pb-4">
-              <CardTitle>Audio / Video Input</CardTitle>
+              <CardTitle>Upload Your Own File</CardTitle>
               <CardDescription>
-                Upload a dental lecture, procedure video, or audio recording.
+                Add an audio or video file and the app will generate transcript,
+                SRT, and VTT subtitle files.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <FileUpload
                 accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac,.mov"
                 maxSize={50}
+                file={audioFile}
                 onFileSelect={setAudioFile}
                 onFileRemove={resetDemo}
                 disabled={isLoading}
@@ -205,24 +360,160 @@ export default function DentalTranscriptionPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Transcribing...
+                    Transcribing…
                   </>
                 ) : (
                   <>
                     <Subtitles className="mr-2 h-4 w-4" />
-                    Transcribe & Generate Subtitles
+                    Generate Transcript & Subtitles
                   </>
                 )}
               </Button>
+
+              <div className="bg-muted/35 border-border/70 rounded-2xl border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">Need a quick demo?</p>
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      Open the ready-made lecture example on the right and load
+                      its transcript instantly.
+                    </p>
+                  </div>
+                  <Wand2 className="text-primary mt-0.5 h-4 w-4 shrink-0" />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
           <FeedbackButton demoType="dental-transcription" />
         </div>
 
-        {/* Right: Results */}
         <div className="space-y-6">
-          {/* Progress */}
+          <Card className="border-primary/20 overflow-hidden shadow-md">
+            <CardHeader className="pb-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Video className="text-primary h-5 w-5" />
+                    Ready-made Example
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    A lecture clip already stored in Allas with matching
+                    subtitles, so you can inspect the end result immediately.
+                  </CardDescription>
+                </div>
+                <Badge variant="secondary">
+                  {result?.job_id === "example-demo"
+                    ? "Loaded by default"
+                    : "Instant preview"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {exampleLoading ? (
+                <div className="bg-muted flex aspect-video items-center justify-center rounded-xl">
+                  <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+                </div>
+              ) : exampleError ? (
+                <div className="bg-destructive/5 border-destructive/20 rounded-xl border p-4">
+                  <p className="text-sm font-medium">Example unavailable</p>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    {exampleError}
+                  </p>
+                  <p className="text-muted-foreground mt-2 text-xs">
+                    For local development, verify that the FastAPI backend is
+                    running and that the Allas environment variables are loaded.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-3"
+                    onClick={loadExampleDemo}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : exampleDemo ? (
+                <div className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
+                  <div className="overflow-hidden rounded-xl bg-black">
+                    <video
+                      key={exampleDemo.video_url}
+                      src={exampleDemo.video_url}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="aspect-video w-full"
+                    >
+                      {exampleTrackUrl && (
+                        <track
+                          default
+                          kind="captions"
+                          src={exampleTrackUrl}
+                          srcLang="fi"
+                          label="Finnish captions"
+                        />
+                      )}
+                    </video>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="bg-muted/35 border-border/70 rounded-xl border p-3">
+                      <p className="text-sm font-semibold">
+                        {exampleDemo.title}
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-sm">
+                        {exampleDemo.segments_count} subtitle segments ready to
+                        preview or download.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                      <div className="bg-card rounded-xl border p-3 shadow-xs">
+                        <p className="text-xs font-semibold tracking-wide uppercase">
+                          Output
+                        </p>
+                        <p className="text-muted-foreground mt-1 text-sm">
+                          Transcript + SRT + VTT
+                        </p>
+                      </div>
+                      <div className="bg-card rounded-xl border p-3 shadow-xs">
+                        <p className="text-xs font-semibold tracking-wide uppercase">
+                          Reuse
+                        </p>
+                        <p className="text-muted-foreground mt-1 text-sm">
+                          Subtitle tracks, captioning, and video search
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <Button onClick={useExampleOutput} className="w-full">
+                        {result?.job_id === "example-demo"
+                          ? "Reload Example Output"
+                          : "Show Example Output"}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" asChild className="w-full">
+                        <a
+                          href={exampleDemo.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Original YouTube Source
+                          <ExternalLink className="ml-2 h-4 w-4" />
+                        </a>
+                      </Button>
+                      <Button variant="ghost" asChild className="w-full">
+                        <Link href="/video-search">
+                          See how subtitles power video search
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+
           {isLoading && pipelineSteps.length > 0 && (
             <Card className="shadow-md">
               <CardHeader className="pb-2">
@@ -234,10 +525,9 @@ export default function DentalTranscriptionPage() {
             </Card>
           )}
 
-          {/* Results */}
           {result && (
             <div className="space-y-4">
-              <Tabs defaultValue="transcript">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="w-full">
                   <TabsTrigger value="transcript" className="flex-1">
                     <FileText className="mr-2 h-4 w-4" />
@@ -251,7 +541,16 @@ export default function DentalTranscriptionPage() {
 
                 <TabsContent value="transcript">
                   <ResultCard
-                    title="Transcript"
+                    title={
+                      result.job_id === "example-demo"
+                        ? "Example Transcript"
+                        : "Transcript"
+                    }
+                    description={
+                      result.job_id === "example-demo"
+                        ? "Pre-generated result from the example lecture video."
+                        : undefined
+                    }
                     copyContent={result.raw_transcript}
                   >
                     <ResultText content={result.raw_transcript} />
@@ -270,7 +569,6 @@ export default function DentalTranscriptionPage() {
                 </TabsContent>
               </Tabs>
 
-              {/* Download buttons */}
               <Card className="shadow-md">
                 <CardContent className="flex flex-wrap gap-3 pt-6">
                   <Button
@@ -314,14 +612,19 @@ export default function DentalTranscriptionPage() {
                     <Download className="mr-2 h-4 w-4" />
                     Subtitles (.vtt)
                   </Button>
+                  <Button variant="ghost" asChild>
+                    <Link href="/video-search">
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Open Semantic Video Search
+                    </Link>
+                  </Button>
                 </CardContent>
               </Card>
             </div>
           )}
 
-          {/* Empty state */}
           {!result && !isLoading && (
-            <EmptyStateCard message="Upload an audio or video file to get started. The transcript and subtitle files will appear here." />
+            <EmptyStateCard message="Upload your own file or load the ready-made example to inspect transcript and subtitle output here." />
           )}
         </div>
       </div>

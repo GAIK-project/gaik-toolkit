@@ -1,4 +1,4 @@
-"""Dental transcription router - Audio/video transcription with SRT/VTT subtitle generation."""
+"""Video transcription router - Audio/video transcription with SRT/VTT subtitle generation."""
 
 import asyncio
 import os
@@ -21,6 +21,36 @@ router = APIRouter()
 SRT_STORAGE: dict[str, tuple[str, str]] = {}  # job_id -> (srt_content, vtt_content)
 SRT_TIMESTAMPS: dict[str, datetime] = {}
 CLEANUP_HOURS = 1
+EXAMPLE_VIDEO_ID = "99b5e26d14b5"
+EXAMPLE_VIDEO_TITLE = "Kielitaito tuo etulyöntiaseman työelämässä"
+EXAMPLE_SOURCE_URL = "https://www.youtube.com/watch?v=0Ijh-3oF0_U"
+
+
+def _create_s3_client():
+    bucket = os.getenv("ALLAS_BUCKET_NAME")
+    endpoint = os.getenv("ALLAS_ENDPOINT_URL")
+    access_key = os.getenv("ALLAS_ACCESS_KEY_ID")
+    secret_key = os.getenv("ALLAS_SECRET_ACCESS_KEY")
+
+    if not all([bucket, endpoint, access_key, secret_key]):
+        raise HTTPException(status_code=503, detail="S3/Allas storage not configured")
+
+    import boto3
+    from botocore.config import Config as BotoConfig
+
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        region_name="regionOne",
+        config=BotoConfig(
+            s3={"addressing_style": "path"},
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        ),
+    )
+    return s3, bucket
 
 
 async def _cleanup_old_subtitles():
@@ -177,6 +207,51 @@ async def dental_transcription_stream(
             Path(tmp_path).unlink(missing_ok=True)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get("/example")
+async def dental_transcription_example():
+    """Return a ready-made example video and subtitles for the demo page."""
+    try:
+        s3, bucket = _create_s3_client()
+        prefix = f"dental-demo/{EXAMPLE_VIDEO_ID}"
+        video_key = f"{prefix}/video.mp4"
+        srt_key = f"{prefix}/subtitles.srt"
+
+        s3.head_object(Bucket=bucket, Key=video_key)
+        s3.head_object(Bucket=bucket, Key=srt_key)
+
+        srt_response = s3.get_object(Bucket=bucket, Key=srt_key)
+        srt_content = srt_response["Body"].read().decode("utf-8")
+
+        from gaik.software_components.transcriber.srt_utils import parse_srt, segments_to_vtt
+
+        segments = parse_srt(srt_content)
+        vtt_content = segments_to_vtt(segments)
+        raw_transcript = " ".join(
+            segment.get("text", "").strip() for segment in segments if segment.get("text")
+        ).strip()
+
+        video_url = s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket, "Key": video_key},
+            ExpiresIn=900,
+        )
+
+        return {
+            "video_id": EXAMPLE_VIDEO_ID,
+            "title": EXAMPLE_VIDEO_TITLE,
+            "source_url": EXAMPLE_SOURCE_URL,
+            "video_url": video_url,
+            "raw_transcript": raw_transcript,
+            "srt_content": srt_content,
+            "vtt_content": vtt_content,
+            "segments_count": len(segments),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to load example video: {exc}") from exc
 
 
 @router.get("/srt/{job_id}")

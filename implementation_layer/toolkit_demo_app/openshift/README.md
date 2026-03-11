@@ -40,18 +40,35 @@ oc apply -f route.yaml
 ## Build & Push Images
 
 ```bash
-# Backend API (runs from repo root)
-docker build -t gaik-demo-api -f implementation_layer/api/Dockerfile .
+# Backend API (runs from demo directory)
+cd implementation_layer/toolkit_demo_app
+docker build -t gaik-demo-api -f api/Dockerfile .
 docker tag gaik-demo-api image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo-api:latest
 docker push image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo-api:latest
 
 # Frontend (runs from demo directory)
-cd implementation_layer/toolkit_demo_app
 docker build -t gaik-demo .
 docker tag gaik-demo image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo:latest
 docker push image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo:latest
 cd ../..
 ```
+
+## Restore and Verify Video Search
+
+```bash
+cd implementation_layer/toolkit_demo_app/openshift
+
+# Reseed dental demo videos into Allas + pgvector
+./deploy.sh seed
+
+# Verify route, env, logs, DB state, Allas prefixes, and media probes
+./deploy.sh verify
+```
+
+Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
+- live `video-search` has zero indexed videos
+- Allas is missing any `dental-demo/<video_id>/video.mp4`, `thumbnail.jpg`, or `subtitles.srt`
+- sample playback or thumbnail endpoints fail
 
 ## Environment Variables
 

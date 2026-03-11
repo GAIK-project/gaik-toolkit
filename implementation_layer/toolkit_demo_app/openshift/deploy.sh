@@ -37,7 +37,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 print_usage() {
-    echo "Usage: ./deploy.sh [api|frontend|all|db|seed]"
+    echo "Usage: ./deploy.sh [api|frontend|all|db|seed|verify]"
     echo ""
     echo "Commands:"
     echo "  api       Build and deploy backend API"
@@ -45,6 +45,7 @@ print_usage() {
     echo "  all       Deploy db, api, and frontend"
     echo "  db        Deploy PostgreSQL + pgvector database"
     echo "  seed      Run dental demo seed script"
+    echo "  verify    Verify live video-search deployment, DB, and Allas"
     echo ""
     echo "Prerequisites:"
     echo "  oc login https://api.2.rahti.csc.fi:6443"
@@ -121,6 +122,18 @@ run_seed() {
     echo -e "${GREEN}Seed complete${NC}"
 }
 
+verify_video_search() {
+    echo -e "${YELLOW}Verifying Rahti routes and gaik-demo-api env...${NC}"
+    oc get routes -n "$PROJECT"
+    oc set env deployment/gaik-demo-api --list -n "$PROJECT"
+    oc logs deployment/gaik-demo-api -n "$PROJECT" --tail=40
+
+    echo -e "${YELLOW}Running live video-search verification...${NC}"
+    cd "$DEMO_DIR"
+    uv run python api/scripts/verify_video_search_deployment.py
+    echo -e "${GREEN}Verification complete${NC}"
+}
+
 # Main
 if [ $# -eq 0 ]; then
     print_usage
@@ -142,6 +155,9 @@ case "$1" in
         ;;
     seed)
         run_seed
+        ;;
+    verify)
+        verify_video_search
         ;;
     all)
         deploy_db

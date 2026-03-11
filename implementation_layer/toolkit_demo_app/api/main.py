@@ -105,7 +105,7 @@ app.include_router(diary.router, prefix="/diary", tags=["Diary"])
 app.include_router(
     dental_transcription.router,
     prefix="/dental-transcribe",
-    tags=["Dental Transcription"],
+    tags=["Video Transcription"],
 )
 app.include_router(video_search.router, prefix="/video-search", tags=["Video Search"])
 
@@ -131,7 +131,7 @@ async def root():
             "pipeline": "/pipeline - End-to-end pipelines (audio/document to structured data)",
             "rag": "/rag - RAG pipeline (document indexing and Q&A with citations)",
             "diary": "/diary - Construction diary (Työmaapäiväkirja) workflow",
-            "dental-transcribe": "/dental-transcribe - Dental transcription with SRT/VTT subtitles",
-            "video-search": "/video-search - Semantic dental video search (pgvector)",
+            "dental-transcribe": "/dental-transcribe - Video transcription with SRT/VTT subtitles",
+            "video-search": "/video-search - Semantic video search over subtitle-indexed content",
         },
     }

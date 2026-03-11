@@ -227,16 +227,16 @@ const buildingBlocks: Demo[] = [
 // New use cases (smaller cards below featured)
 const newUseCases: Demo[] = [
   {
-    title: "Dental Transcription & Captioning",
+    title: "Video Transcription & Captioning",
     description:
-      "Upload audio or video to transcribe with Whisper and generate SRT/VTT subtitles",
+      "Upload audio or video, or open the ready-made example, to generate subtitles and transcripts",
     href: "/dental-transcription",
     icon: Mic,
   },
   {
     title: "Semantic Video Search",
     description:
-      "Search indexed education videos by meaning — find exact moments with hybrid search",
+      "Ask in plain language and jump to the right moment in indexed videos",
     href: "/video-search",
     icon: Video,
   },
