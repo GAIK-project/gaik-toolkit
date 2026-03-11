@@ -51,7 +51,6 @@ import {
   Zap,
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -82,6 +81,30 @@ function formatMatchScore(score: number, topScore: number): string {
   if (score <= 0 || topScore <= 0) return "0%";
   return `${Math.max(1, Math.round((score / topScore) * 100))}%`;
 }
+
+const SEARCH_TYPE_INFO: Record<
+  string,
+  { icon: typeof Zap; label: string; helper: string; desc: string }
+> = {
+  hybrid: {
+    icon: Zap,
+    label: "Balanced",
+    helper: "Best default",
+    desc: "Looks at both the topic and the exact words that were said.",
+  },
+  semantic: {
+    icon: Sparkles,
+    label: "By meaning",
+    helper: "Idea match",
+    desc: "Useful when you remember the idea but not the exact wording.",
+  },
+  keyword: {
+    icon: Type,
+    label: "Exact words",
+    helper: "Literal match",
+    desc: "Useful when you know the exact term, phrase, or quote.",
+  },
+};
 
 export default function VideoSearchPage() {
   const [query, setQuery] = useState("");
@@ -267,35 +290,11 @@ export default function VideoSearchPage() {
     if (e.key === "Enter") handleSearch();
   }
 
-  const searchTypeInfo: Record<
-    string,
-    { icon: typeof Zap; label: string; helper: string; desc: string }
-  > = {
-    hybrid: {
-      icon: Zap,
-      label: "Balanced",
-      helper: "Best default",
-      desc: "Looks at both the topic and the exact words that were said.",
-    },
-    semantic: {
-      icon: Sparkles,
-      label: "By meaning",
-      helper: "Idea match",
-      desc: "Useful when you remember the idea but not the exact wording.",
-    },
-    keyword: {
-      icon: Type,
-      label: "Exact words",
-      helper: "Literal match",
-      desc: "Useful when you know the exact term, phrase, or quote.",
-    },
-  };
-
   const topScore = results.reduce(
     (maxScore, result) => Math.max(maxScore, result.score),
     0,
   );
-  const activeSearchType = searchTypeInfo[searchType];
+  const activeSearchType = SEARCH_TYPE_INFO[searchType];
   const ActiveSearchIcon = activeSearchType.icon;
 
   return (
@@ -306,85 +305,29 @@ export default function VideoSearchPage() {
         transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
         className="mx-auto max-w-4xl"
       >
-        <header className="mb-8 grid gap-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
-          <div className="space-y-4 pl-1">
-            <Badge
-              variant="outline"
-              className="border-primary/25 bg-primary/5 text-primary"
-            >
-              AI Video Search
-            </Badge>
-            <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-              <Video className="text-primary h-8 w-8" />
-              Semantic Video Search
-            </h1>
-            <p className="text-muted-foreground max-w-2xl text-lg leading-relaxed">
-              Search your indexed videos with normal language and jump straight
-              to the relevant moment. The system checks both what is being
-              discussed and the exact wording in the subtitles.
-            </p>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <div className="bg-card border-border/70 rounded-xl border px-3 py-3 shadow-xs">
-                <p className="text-sm font-medium">Ask naturally</p>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  Describe the idea you want to find.
-                </p>
-              </div>
-              <div className="bg-card border-border/70 rounded-xl border px-3 py-3 shadow-xs">
-                <p className="text-sm font-medium">See the best moments</p>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  Open the exact timestamp directly from the result list.
-                </p>
-              </div>
-              <div className="bg-card border-border/70 rounded-xl border px-3 py-3 shadow-xs">
-                <p className="text-sm font-medium">Works with subtitles</p>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  Generated transcripts can power this search workflow.
-                </p>
-              </div>
-            </div>
+        <header className="mb-6 space-y-3 pl-1">
+          <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
+            <Video className="text-primary h-8 w-8" />
+            Semantic Video Search
+          </h1>
+          <p className="text-muted-foreground max-w-2xl leading-relaxed">
+            Search your indexed videos with normal language and jump straight to
+            the relevant moment.
+          </p>
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            {[
+              "Describe what you want to find",
+              "Search compares meaning & wording",
+              "Play from the matching timestamp",
+            ].map((step, i) => (
+              <span key={step} className="flex items-center gap-1.5">
+                <span className="bg-primary/10 text-primary inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold">
+                  {i + 1}
+                </span>
+                {step}
+              </span>
+            ))}
           </div>
-
-          <Card className="border-primary/20 bg-card/95 shadow-md">
-            <CardContent className="space-y-4 p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold">What happens here</p>
-                  <p className="text-muted-foreground mt-1 text-sm">
-                    A simple three-step flow from question to playback.
-                  </p>
-                </div>
-                <Badge variant="secondary" className="shrink-0">
-                  Subtitle-powered
-                </Badge>
-              </div>
-
-              <div className="space-y-2.5">
-                {[
-                  "Describe the topic, phrase, or question you want to find.",
-                  "The search compares meaning and exact wording in the subtitle index.",
-                  "Open the best hit and start playback from the matching timestamp.",
-                ].map((step, index) => (
-                  <div
-                    key={step}
-                    className="bg-muted/35 border-border/60 flex items-start gap-3 rounded-xl border px-3 py-3"
-                  >
-                    <div className="bg-primary/10 text-primary flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
-                      {index + 1}
-                    </div>
-                    <p className="text-sm leading-relaxed">{step}</p>
-                  </div>
-                ))}
-              </div>
-
-              <Link
-                href="/dental-transcription"
-                className="text-primary inline-flex text-sm font-medium hover:underline"
-              >
-                See the transcription and subtitle example
-              </Link>
-            </CardContent>
-          </Card>
         </header>
 
         {status && (
@@ -495,7 +438,7 @@ export default function VideoSearchPage() {
                     size="sm"
                     className="bg-muted/70 border-border grid w-full max-w-[28rem] grid-cols-3 rounded-2xl border p-1 shadow-sm"
                   >
-                    {Object.entries(searchTypeInfo).map(
+                    {Object.entries(SEARCH_TYPE_INFO).map(
                       ([key, { icon: Icon, label, helper, desc }]) => (
                         <Tooltip key={key}>
                           <TooltipTrigger asChild>

@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 try:
-    from utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, sse_event
+    from utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, create_s3_client, sse_error_response, sse_event
 except ImportError:
-    from api.utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, sse_event
+    from api.utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, create_s3_client, sse_error_response, sse_event
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 
@@ -24,33 +24,6 @@ CLEANUP_HOURS = 1
 EXAMPLE_VIDEO_ID = "99b5e26d14b5"
 EXAMPLE_VIDEO_TITLE = "Kielitaito tuo etulyöntiaseman työelämässä"
 EXAMPLE_SOURCE_URL = "https://www.youtube.com/watch?v=0Ijh-3oF0_U"
-
-
-def _create_s3_client():
-    bucket = os.getenv("ALLAS_BUCKET_NAME")
-    endpoint = os.getenv("ALLAS_ENDPOINT_URL")
-    access_key = os.getenv("ALLAS_ACCESS_KEY_ID")
-    secret_key = os.getenv("ALLAS_SECRET_ACCESS_KEY")
-
-    if not all([bucket, endpoint, access_key, secret_key]):
-        raise HTTPException(status_code=503, detail="S3/Allas storage not configured")
-
-    import boto3
-    from botocore.config import Config as BotoConfig
-
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=endpoint,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name="regionOne",
-        config=BotoConfig(
-            s3={"addressing_style": "path"},
-            request_checksum_calculation="when_required",
-            response_checksum_validation="when_required",
-        ),
-    )
-    return s3, bucket
 
 
 async def _cleanup_old_subtitles():
@@ -78,47 +51,26 @@ async def dental_transcription_stream(
     job_id = str(uuid.uuid4())
 
     if not file.filename:
-
-        async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event("error", {"message": "No filename provided"})
-
-        return StreamingResponse(error_gen(), media_type="text/event-stream")
+        return sse_error_response("No filename provided")
 
     suffix = Path(file.filename).suffix.lower()
     supported = [".mp3", ".wav", ".m4a", ".mp4", ".webm", ".ogg", ".flac", ".mov"]
     if suffix not in supported:
-
-        async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event("error", {"message": f"Unsupported file type: {suffix}"})
-
-        return StreamingResponse(error_gen(), media_type="text/event-stream")
+        return sse_error_response(f"Unsupported file type: {suffix}")
 
     # Check local Whisper configuration
     local_api_base = os.getenv("LOCAL_WHISPER_BASE")
     local_api_key = os.getenv("LOCAL_WHISPER_KEY")
     if not local_api_base or not local_api_key:
-
-        async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event(
-                "error",
-                {
-                    "message": "Local Whisper service not configured. "
-                    "Set LOCAL_WHISPER_BASE and LOCAL_WHISPER_KEY environment variables."
-                },
-            )
-
-        return StreamingResponse(error_gen(), media_type="text/event-stream")
+        return sse_error_response(
+            "Local Whisper service not configured. "
+            "Set LOCAL_WHISPER_BASE and LOCAL_WHISPER_KEY environment variables."
+        )
 
     # Validate file size
     content = await file.read()
     if len(content) > MAX_FILE_SIZE_BYTES:
-
-        async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event(
-                "error", {"message": f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB"}
-            )
-
-        return StreamingResponse(error_gen(), media_type="text/event-stream")
+        return sse_error_response(f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB")
 
     # Save uploaded file
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -213,7 +165,7 @@ async def dental_transcription_stream(
 async def dental_transcription_example():
     """Return a ready-made example video and subtitles for the demo page."""
     try:
-        s3, bucket = _create_s3_client()
+        s3, bucket = create_s3_client()
         prefix = f"dental-demo/{EXAMPLE_VIDEO_ID}"
         video_key = f"{prefix}/video.mp4"
         srt_key = f"{prefix}/subtitles.srt"

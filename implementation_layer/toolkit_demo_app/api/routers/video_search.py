@@ -5,9 +5,9 @@ import os
 from collections.abc import AsyncGenerator
 
 try:
-    from utils import sse_event
+    from utils import generate_presigned_url, sse_error_response, sse_event
 except ImportError:
-    from api.utils import sse_event
+    from api.utils import generate_presigned_url, sse_error_response, sse_event
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -28,47 +28,6 @@ FTS_LANGUAGE = "simple"
 
 def _get_database_url() -> str | None:
     return os.getenv("DATABASE_URL")
-
-
-def _create_s3_client():
-    bucket = os.getenv("ALLAS_BUCKET_NAME")
-    endpoint = os.getenv("ALLAS_ENDPOINT_URL")
-    access_key = os.getenv("ALLAS_ACCESS_KEY_ID")
-    secret_key = os.getenv("ALLAS_SECRET_ACCESS_KEY")
-
-    if not all([bucket, endpoint, access_key, secret_key]):
-        raise HTTPException(status_code=503, detail="S3/Allas storage not configured")
-
-    import boto3
-    from botocore.config import Config as BotoConfig
-
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=endpoint,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name="regionOne",
-        config=BotoConfig(
-            s3={"addressing_style": "path"},
-            request_checksum_calculation="when_required",
-            response_checksum_validation="when_required",
-        ),
-    )
-    return s3, bucket
-
-
-def _ensure_object_exists(s3, bucket: str, key: str, *, label: str) -> None:
-    try:
-        s3.head_object(Bucket=bucket, Key=key)
-    except Exception as exc:
-        code = getattr(exc, "response", {}).get("Error", {}).get("Code")
-        if code in {"404", "NoSuchKey", "NotFound"}:
-            logger.warning("Missing %s object in Allas: s3://%s/%s", label, bucket, key)
-            raise HTTPException(
-                status_code=404,
-                detail=f"{label.capitalize()} media not found for video '{key.split('/')[1]}'",
-            ) from exc
-        raise
 
 
 def _get_store():
@@ -218,39 +177,13 @@ async def list_videos():
 @router.get("/videos/{video_id}/play")
 async def get_playback_url(video_id: str):
     """Generate a presigned Allas S3 URL for video playback."""
-    try:
-        s3, bucket = _create_s3_client()
-        video_key = f"dental-demo/{video_id}/video.mp4"
-        _ensure_object_exists(s3, bucket, video_key, label="video")
-        url = s3.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": bucket, "Key": video_key},
-            ExpiresIn=900,  # 15 minutes
-        )
-        return {"url": url, "expires_in": 900}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate playback URL: {e}") from e
+    return generate_presigned_url(video_id, "video.mp4", label="video")
 
 
 @router.get("/videos/{video_id}/thumbnail")
 async def get_thumbnail_url(video_id: str):
     """Generate a presigned Allas S3 URL for video thumbnail."""
-    try:
-        s3, bucket = _create_s3_client()
-        thumb_key = f"dental-demo/{video_id}/thumbnail.jpg"
-        _ensure_object_exists(s3, bucket, thumb_key, label="thumbnail")
-        url = s3.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": bucket, "Key": thumb_key},
-            ExpiresIn=900,
-        )
-        return {"url": url, "expires_in": 900}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate thumbnail URL: {e}") from e
+    return generate_presigned_url(video_id, "thumbnail.jpg", label="thumbnail")
 
 
 @router.post("/search", response_model=SearchResponse)
@@ -335,25 +268,13 @@ async def ingest_srt_stream(
     embedder = _get_embedder()
 
     if store is None:
-
-        async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event("error", {"message": "Database not configured (DATABASE_URL missing)"})
-
-        return StreamingResponse(error_gen(), media_type="text/event-stream")
+        return sse_error_response("Database not configured (DATABASE_URL missing)")
 
     if embedder is None:
-
-        async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event("error", {"message": "Embedder not configured (API key missing)"})
-
-        return StreamingResponse(error_gen(), media_type="text/event-stream")
+        return sse_error_response("Embedder not configured (API key missing)")
 
     if not file.filename:
-
-        async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event("error", {"message": "No filename provided"})
-
-        return StreamingResponse(error_gen(), media_type="text/event-stream")
+        return sse_error_response("No filename provided")
 
     srt_content = (await file.read()).decode("utf-8", errors="replace")
 

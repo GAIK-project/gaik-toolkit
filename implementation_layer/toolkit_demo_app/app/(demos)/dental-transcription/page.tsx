@@ -61,14 +61,10 @@ interface ExampleDemo extends TranscriptionResult {
   video_url: string;
 }
 
-function exampleResultPayload(exampleDemo: ExampleDemo): TranscriptionResult {
-  return {
-    job_id: exampleDemo.job_id,
-    raw_transcript: exampleDemo.raw_transcript,
-    srt_content: exampleDemo.srt_content,
-    vtt_content: exampleDemo.vtt_content,
-    segments_count: exampleDemo.segments_count,
-  };
+function exampleResultPayload(demo: ExampleDemo): TranscriptionResult {
+  const { job_id, raw_transcript, srt_content, vtt_content, segments_count } =
+    demo;
+  return { job_id, raw_transcript, srt_content, vtt_content, segments_count };
 }
 
 const workflowItems = [
@@ -127,8 +123,13 @@ export default function DentalTranscriptionPage() {
     setExampleLoading(true);
     setExampleError(null);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+
     try {
-      const response = await apiFetch("/api/dental-transcribe/example");
+      const response = await apiFetch("/api/dental-transcribe/example", {
+        signal: controller.signal,
+      });
       if (!response.ok) {
         const errorData = await response
           .json()
@@ -139,16 +140,9 @@ export default function DentalTranscriptionPage() {
       }
 
       const data = await response.json();
-      const nextExampleDemo = {
+      const nextExampleDemo: ExampleDemo = {
+        ...data,
         job_id: "example-demo",
-        raw_transcript: data.raw_transcript,
-        srt_content: data.srt_content,
-        vtt_content: data.vtt_content,
-        segments_count: data.segments_count,
-        video_id: data.video_id,
-        title: data.title,
-        source_url: data.source_url,
-        video_url: data.video_url,
       };
 
       setExampleDemo(nextExampleDemo);
@@ -157,10 +151,15 @@ export default function DentalTranscriptionPage() {
         current === "subtitles" ? current : "transcript",
       );
     } catch (error) {
-      setExampleError(
-        error instanceof Error ? error.message : "Failed to load example demo",
-      );
+      const message =
+        error instanceof DOMException && error.name === "AbortError"
+          ? "Example loading timed out. The storage service may be unavailable."
+          : error instanceof Error
+            ? error.message
+            : "Failed to load example demo";
+      setExampleError(message);
     } finally {
+      clearTimeout(timeout);
       setExampleLoading(false);
     }
   }
@@ -272,48 +271,25 @@ export default function DentalTranscriptionPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <header className="mb-8 grid gap-5 lg:grid-cols-[1.15fr_0.85fr] lg:items-start">
-        <div className="space-y-4 pl-1">
-          <Badge
-            variant="outline"
-            className="border-primary/25 bg-primary/5 text-primary"
-          >
-            AI Subtitle Demo
-          </Badge>
-          <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-            <Mic className="text-primary h-8 w-8" />
-            Video Transcription & Subtitles
-          </h1>
-          <p className="text-muted-foreground max-w-2xl text-lg leading-relaxed">
-            Upload a recording or open the ready-made example. This demo turns
-            speech into a readable transcript and subtitle files you can reuse
-            in players, captions, or semantic video search.
-          </p>
+      <header className="mb-6 space-y-3 pl-1">
+        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
+          <Mic className="text-primary h-8 w-8" />
+          Video Transcription & Subtitles
+        </h1>
+        <p className="text-muted-foreground max-w-2xl leading-relaxed">
+          Upload a recording or open the ready-made example. Whisper turns
+          speech into a transcript and subtitle files (SRT &amp; VTT).
+        </p>
+        <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          {workflowItems.map((item, i) => (
+            <span key={item.title} className="flex items-center gap-1.5">
+              <span className="bg-primary/10 text-primary inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold">
+                {i + 1}
+              </span>
+              {item.title}
+            </span>
+          ))}
         </div>
-
-        <Card className="border-primary/20 bg-card/95 shadow-md">
-          <CardContent className="space-y-3 p-5">
-            {workflowItems.map((item, index) => (
-              <motion.div
-                key={item.title}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.08 * index }}
-                className="flex items-start gap-3"
-              >
-                <div className="bg-primary/10 text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
-                  {index + 1}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">{item.title}</p>
-                  <p className="text-muted-foreground text-sm">
-                    {item.description}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </CardContent>
-        </Card>
       </header>
 
       <div className="grid gap-6 md:gap-8 lg:grid-cols-[1fr_1.15fr]">
