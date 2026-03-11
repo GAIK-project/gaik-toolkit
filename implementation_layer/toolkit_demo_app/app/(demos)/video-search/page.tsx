@@ -15,6 +15,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -608,13 +609,15 @@ export default function VideoSearchPage() {
               <DialogTitle className="pr-8 text-base leading-snug">
                 {playingVideo?.title}
               </DialogTitle>
-              {playingVideo?.timestamp && (
-                <div className="flex items-center gap-2">
+              <DialogDescription asChild>
+                {playingVideo?.timestamp ? (
                   <p className="text-muted-foreground text-sm">
                     Playing from {playingVideo.timestamp}
                   </p>
-                </div>
-              )}
+                ) : (
+                  <p className="sr-only">Video player</p>
+                )}
+              </DialogDescription>
             </DialogHeader>
             <div className="px-6 pb-6 pt-4">
               {playingVideo && (
