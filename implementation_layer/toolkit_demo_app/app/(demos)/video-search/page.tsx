@@ -435,13 +435,13 @@ export default function VideoSearchPage() {
                       <Label className="text-muted-foreground text-xs font-normal">
                         Search style
                       </Label>
-                      <TabsList className="bg-muted border-border grid h-auto grid-cols-3 rounded-xl border p-1">
+                      <TabsList className="bg-muted border-border flex h-auto w-fit rounded-xl border p-1">
                         {Object.entries(SEARCH_TYPE_INFO).map(
-                          ([key, { icon: Icon, label, helper }]) => (
+                          ([key, { icon: Icon, label }]) => (
                             <TabsTrigger
                               key={key}
                               value={key}
-                              className="h-auto gap-1.5 rounded-lg border border-transparent px-3 py-2 text-left whitespace-normal data-[state=active]:bg-background data-[state=active]:border-border data-[state=active]:shadow-sm"
+                              className="h-auto gap-1.5 rounded-lg border border-transparent px-3 py-2 whitespace-nowrap data-[state=active]:bg-background data-[state=active]:border-border data-[state=active]:shadow-sm"
                             >
                               <Icon className="h-3.5 w-3.5 shrink-0" />
                               <span className="text-sm font-medium">
