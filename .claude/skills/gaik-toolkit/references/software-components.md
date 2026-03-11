@@ -4,6 +4,14 @@ End-to-end pipelines that compose building blocks into workflows.
 
 **Source:** `gaik.software_modules.*`
 
+## Contents
+
+- [AudioToStructuredData](#audiotostructureddata) (audio -> transcript -> structured JSON)
+- [DocumentsToStructuredData](#documentstostructureddata) (document -> parsed text -> structured JSON)
+- [Schema Persistence](#schema-persistence) (save/load schemas for reuse)
+- [Common Patterns](#common-patterns) (batch processing, custom schemas, PgVectorStore)
+- [Import Patterns](#import-patterns)
+
 ## AudioToStructuredData
 
 Complete audio extraction pipeline: Audio -> Transcript -> Schema -> Structured JSON

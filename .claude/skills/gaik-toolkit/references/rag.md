@@ -4,6 +4,16 @@ Detailed API documentation for GAIK RAG building blocks.
 
 **Source:** `gaik.software_components.RAG.*`
 
+## Contents
+
+- [Embedder](#embedder) (text embeddings, batch embedding)
+- [VectorStore](#vectorstore-in-memory--chroma) (in-memory, Chroma persistence)
+- [PgVectorStore](#pgvectorstore-postgresql--pgvector) (PostgreSQL, hybrid search, RRF)
+- [Retriever](#retriever) (semantic + hybrid search, reranking)
+- [AnswerGenerator](#answergenerator) (LLM response, citations, streaming)
+- [RAG Parsers](#rag-parsers) (VisionRagParser, DoclingRagParser)
+- [Import Patterns](#import-patterns)
+
 ---
 
 ## Embedder

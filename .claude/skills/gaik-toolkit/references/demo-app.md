@@ -1,0 +1,175 @@
+# Demo App Reference
+
+Interactive web application for the GAIK toolkit at `implementation_layer/toolkit_demo_app/`.
+
+**Live:** https://gaik-demo.2.rahtiapp.fi/ (registration required)
+
+## Contents
+- [Tech Stack](#tech-stack)
+- [Dev Commands](#dev-commands)
+- [Conventions](#conventions)
+- [Project Structure](#project-structure)
+- [Demo Pages](#demo-pages)
+- [API Routes](#api-routes)
+- [Environment Variables](#environment-variables)
+- [Deployment](#deployment)
+
+## Tech Stack
+
+- **Frontend:** Next.js 16, React 19, TypeScript
+- **Backend:** FastAPI, Python 3.11+, GAIK toolkit (PyPI)
+- **Package managers:** bun (frontend), uv (backend) -- not npm/pip
+- **Styling:** Tailwind CSS v4 with `globals.css` theme variables
+- **UI components:** shadcn/ui (Radix UI primitives)
+- **Auth:** Supabase (auth + database)
+- **Rate limiting:** Upstash Redis
+- **Analytics:** PostHog
+- **Animations:** Motion (Framer Motion alternative)
+- **3D:** React Three Fiber (homepage)
+
+## Dev Commands
+
+```bash
+cd implementation_layer/toolkit_demo_app
+
+# Run both frontend + API concurrently
+bun run dev:all
+
+# Frontend only (Next.js at localhost:3000)
+bun dev
+
+# API only (FastAPI at localhost:8000)
+bun run dev:api
+# Or directly: cd api && uvicorn main:app --reload
+
+# Linting
+bun run lint
+
+# DB tunnel (port-forward to Rahti pgvector)
+bun run db:tunnel
+
+# Docker
+docker compose up --build
+```
+
+## Conventions
+
+From `implementation_layer/toolkit_demo_app/CLAUDE.md`:
+
+1. **Use gaik toolkit** from PyPI -- backend API uses `gaik` package components
+2. **Use bun and uv**, not npm/pip
+3. **API proxy:** `proxy.ts` handles Next.js 16 API proxying to FastAPI backend (replaced middleware.ts)
+4. **Tailwind v4:** Use `globals.css` theme variables for styling
+
+## Project Structure
+
+```
+toolkit_demo_app/
+├── app/
+│   ├── (home)/              # Landing page, privacy
+│   ├── (auth)/              # sign-in, sign-up, access-pending
+│   ├── (demos)/             # All demo pages (see below)
+│   ├── admin/               # Admin dashboard
+│   └── layout.tsx           # Root layout
+├── api/
+│   ├── main.py              # FastAPI app with all routers
+│   ├── routers/             # One module per feature
+│   ├── config.py            # Backend config
+│   ├── pdf_generator.py     # PDF output generation
+│   └── sse.py               # Server-sent events helper
+├── components/
+│   ├── ui/                  # shadcn/ui components
+│   ├── demo/                # Demo-specific components
+│   ├── layout/              # Header, footer, nav
+│   └── feedback/            # Feedback widgets
+├── lib/
+│   ├── api-client.ts        # Typed API client
+│   ├── sse.ts               # SSE streaming client
+│   └── supabase/            # Supabase client setup
+├── proxy.ts                 # API proxy (Next.js 16 pattern)
+├── openshift/               # Rahti/OpenShift deployment configs
+├── docker-compose.yml
+└── package.json
+```
+
+## Demo Pages
+
+All under `app/(demos)/`:
+
+| Route | Feature | Toolkit Components |
+|-------|---------|-------------------|
+| `/extractor` | Schema-free structured extraction | SchemaGenerator, DataExtractor |
+| `/parser` | Multi-backend PDF/DOCX parsing | VisionParser, PyMuPDFParser, DoclingParser, DocxParser |
+| `/classifier` | Zero-shot document classification | DocumentClassifier |
+| `/transcriber` | Whisper + GPT enhancement | Transcriber |
+| `/rag` | Document upload, indexing, Q&A with citations | RAGWorkflow |
+| `/audio-structured` | Audio -> structured data pipeline | AudioToStructuredData |
+| `/document-structured` | Document -> structured data pipeline | DocumentsToStructuredData |
+| `/incident-report` | Voice -> structured incident report | AudioToStructuredData |
+| `/diary` | Voice notes -> construction diary | AudioToStructuredData |
+| `/dental-transcription` | Audio/video -> SRT/VTT subtitles | ParallelTranscriber, srt_utils |
+| `/video-search` | Semantic video search (pgvector) | Embedder, PgVectorStore, video_search_helpers |
+
+## API Routes
+
+FastAPI backend at `api/main.py`, routers in `api/routers/`:
+
+| Prefix | Router | Description |
+|--------|--------|-------------|
+| `/parse` | `parser.py` | Document parsing (PDF, DOCX) |
+| `/classify` | `classifier.py` | Document classification |
+| `/extract` | `extractor.py` | Structured data extraction |
+| `/transcribe` | `transcriber.py` | Audio/video transcription |
+| `/pipeline` | `pipeline.py` | End-to-end pipelines (audio/document -> structured data) |
+| `/rag` | `rag.py` | RAG pipeline (indexing + Q&A with SSE streaming) |
+| `/diary` | `diary.py` | Construction diary workflow |
+| `/dental-transcribe` | `dental_transcription.py` | Dental transcription with SRT/VTT subtitles |
+| `/video-search` | `video_search.py` | Semantic dental video search (pgvector) |
+| `/health` | (in main.py) | Health check |
+
+API docs available at `http://localhost:8000/docs` (Swagger UI).
+
+## Environment Variables
+
+Create `.env.local` from `.env.example`:
+
+```bash
+# Backend URL (frontend -> API proxy)
+BACKEND_URL=http://localhost:8000
+
+# Auth bypass (local dev)
+BYPASS_AUTH=true
+
+# Azure OpenAI (for toolkit components)
+AZURE_API_KEY=your-key
+AZURE_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_DEPLOYMENT=gpt-5.1
+AZURE_API_VERSION=2025-03-01-preview
+
+# Or standard OpenAI
+OPENAI_API_KEY=your-key
+
+# Supabase (auth + database)
+NEXT_PUBLIC_SUPABASE_URL=your-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-key
+SUPABASE_SERVICE_ROLE_KEY=your-key
+
+# PostgreSQL (for PgVectorStore / video search)
+DATABASE_URL=postgresql://user:pass@host:5432/db
+
+# Upstash Redis (rate limiting)
+UPSTASH_REDIS_REST_URL=your-url
+UPSTASH_REDIS_REST_TOKEN=your-token
+
+# PostHog (analytics, optional)
+NEXT_PUBLIC_POSTHOG_KEY=your-key
+NEXT_PUBLIC_POSTHOG_HOST=your-host
+```
+
+## Deployment
+
+- **Docker:** `docker-compose.yml` builds both frontend and API
+- **OpenShift/Rahti:** Configs in `openshift/` directory
+  - `deployment-api.yaml` - API deployment (uses placeholder values -- real secrets managed in Rahti)
+  - Route configs for `gaik-demo.2.rahtiapp.fi`
+- **Deploy script:** `deploy.sh` for pushing to Rahti registry

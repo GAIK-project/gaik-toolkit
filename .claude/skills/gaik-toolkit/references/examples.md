@@ -2,6 +2,19 @@
 
 Working examples for common GAIK toolkit use cases.
 
+## Contents
+
+- [Example 1: Invoice Extraction from PDF](#example-1-invoice-extraction-from-pdf)
+- [Example 2: Medical Consultation Transcription](#example-2-medical-consultation-transcription)
+- [Example 3: Document Classification](#example-3-document-classification)
+- [Example 4: Batch Invoice Processing with Schema Reuse](#example-4-batch-invoice-processing-with-schema-reuse)
+- [Example 5: Meeting Notes Extraction](#example-5-meeting-notes-extraction)
+- [Example 6: Custom Schema with Manual Field Definition](#example-6-custom-schema-with-manual-field-definition)
+- [Example 7: FastAPI Integration](#example-7-fastapi-integration)
+- [Example 8: Parallel Transcription of Long Video](#example-8-parallel-transcription-of-long-video)
+- [Example 9: RAG with PostgreSQL Vector Store](#example-9-rag-with-postgresql-vector-store)
+- [Tips](#tips)
+
 ## Example 1: Invoice Extraction from PDF
 
 Extract structured invoice data using VisionParser.

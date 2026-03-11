@@ -4,6 +4,16 @@ Detailed API documentation for GAIK building blocks.
 
 **Source:** `gaik.software_components.*`
 
+## Contents
+
+- [Configuration](#configuration)
+- [Extractor Module](#extractor-module) (SchemaGenerator, DataExtractor, FieldSpec)
+- [Parsers Module](#parsers-module) (VisionParser, PyMuPDFParser, DocxParser, DoclingParser)
+- [Transcriber Module](#transcriber-module) (Transcriber, TranscriptionResult)
+- [Parallel Transcriber Module](#parallel-transcriber-module) (ParallelTranscriber, TranscriptionConfig)
+- [Document Classifier Module](#document-classifier-module)
+- [Import Patterns](#import-patterns)
+
 ## Configuration
 
 ### get_openai_config()
