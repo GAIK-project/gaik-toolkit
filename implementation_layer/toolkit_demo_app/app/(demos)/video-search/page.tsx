@@ -27,7 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Tooltip,
@@ -40,7 +39,6 @@ import {
   AlertCircle,
   Clock,
   Database,
-  ExternalLink,
   Film,
   Loader2,
   Play,
@@ -48,9 +46,10 @@ import {
   Sparkles,
   Type,
   Video,
+  Volume2,
   Zap,
 } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -107,13 +106,24 @@ export default function VideoSearchPage() {
     startSeconds: number;
   } | null>(null);
   const [loadingVideoId, setLoadingVideoId] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(true);
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     fetchStatus();
     fetchVideos();
   }, []);
+
+  // Auto-re-search when search type or video filter changes
+  useEffect(() => {
+    if (hasSearched && query.trim()) {
+      handleSearch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchType, videoFilter]);
 
   async function fetchStatus() {
     try {
@@ -162,6 +172,25 @@ export default function VideoSearchPage() {
 
       const data = await res.json();
       setResults(data.results || []);
+
+      // Fetch thumbnails for unique videos in results
+      if (data.results?.length > 0) {
+        const uniqueIds = [
+          ...new Set(data.results.map((r: SearchResult) => r.video_id)),
+        ] as string[];
+        for (const id of uniqueIds) {
+          if (!thumbnails[id]) {
+            apiFetch(`/api/video-search/videos/${id}/thumbnail`)
+              .then((r) => (r.ok ? r.json() : null))
+              .then(
+                (d) =>
+                  d?.url &&
+                  setThumbnails((prev) => ({ ...prev, [id]: d.url })),
+              )
+              .catch(() => {});
+          }
+        }
+      }
 
       if (data.results?.length === 0) {
         toast("No results found. Try a different query.", { icon: "🔍" });
@@ -378,12 +407,29 @@ export default function VideoSearchPage() {
           {/* Search Results */}
           {!isSearching && results.length > 0 && (
             <div className="space-y-3">
-              <p className="text-muted-foreground pl-1 text-sm font-medium">
-                {results.length} result{results.length !== 1 ? "s" : ""} found
-              </p>
+              <div className="flex flex-wrap items-center gap-3 pl-1">
+                <p className="text-muted-foreground text-sm font-medium">
+                  {results.length} result
+                  {results.length !== 1 ? "s" : ""} found
+                </p>
+                {searchType === "hybrid" && (
+                  <span className="text-muted-foreground/60 flex items-center gap-1 text-xs">
+                    <Zap className="h-3 w-3" />
+                    {(() => {
+                      const wc = query.split(/\s+/).filter(Boolean).length;
+                      if (wc <= 2)
+                        return "Weighted: 70% keyword, 30% semantic";
+                      if (wc <= 5)
+                        return "Weighted: 50% keyword, 50% semantic";
+                      return "Weighted: 30% keyword, 70% semantic";
+                    })()}
+                  </span>
+                )}
+              </div>
               {results.map((r, i) => {
                 const key = `${r.video_id}-${r.start_seconds}`;
                 const isLoading = loadingVideoId === key;
+                const thumb = thumbnails[r.video_id];
                 return (
                   <motion.div
                     key={`${key}-${i}`}
@@ -400,18 +446,31 @@ export default function VideoSearchPage() {
                       onClick={() => handleResultClick(r)}
                     >
                       <CardContent className="flex items-start gap-4 py-4">
-                        {/* Play indicator */}
+                        {/* Thumbnail / Play indicator */}
                         <div
                           className={cn(
-                            "bg-muted group-hover:bg-primary/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors",
-                            isLoading && "bg-primary/10",
+                            "bg-muted relative h-16 w-24 shrink-0 overflow-hidden rounded-md",
+                            isLoading && "opacity-80",
                           )}
                         >
-                          {isLoading ? (
-                            <Loader2 className="text-primary h-4 w-4 animate-spin" />
+                          {thumb ? (
+                            <img
+                              src={thumb}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
                           ) : (
-                            <Play className="text-muted-foreground group-hover:text-primary h-4 w-4 transition-colors" />
+                            <div className="flex h-full w-full items-center justify-center">
+                              <Video className="text-muted-foreground h-5 w-5" />
+                            </div>
                           )}
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
+                            {isLoading ? (
+                              <Loader2 className="h-5 w-5 animate-spin text-white" />
+                            ) : (
+                              <Play className="h-5 w-5 text-white drop-shadow" />
+                            )}
+                          </div>
                         </div>
 
                         {/* Content */}
@@ -462,8 +521,26 @@ export default function VideoSearchPage() {
 
           {/* Initial state — show indexed videos */}
           {!hasSearched && !isSearching && status?.database_connected && (
-            <div className="space-y-4">
-              <EmptyStateCard message="Enter a query above to find relevant moments in indexed lecture recordings. Try searching for topics like 'tekoäly oppiminen', 'johtaminen', or 'koulutus'." />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="space-y-4"
+            >
+              <Card className="border-primary/20 border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <Search className="text-muted-foreground/40 mb-3 h-10 w-10" />
+                  <p className="text-muted-foreground">
+                    Enter a query above to find relevant moments in indexed
+                    lecture recordings.
+                  </p>
+                  <p className="text-muted-foreground/60 mt-1 text-sm">
+                    Try searching for topics like &ldquo;tekoäly
+                    oppiminen&rdquo;, &ldquo;johtaminen&rdquo;, or
+                    &ldquo;koulutus&rdquo;
+                  </p>
+                </CardContent>
+              </Card>
 
               {videos.length > 0 && (
                 <Card>
@@ -492,7 +569,7 @@ export default function VideoSearchPage() {
                             searchInputRef.current?.focus();
                           }}
                         >
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex min-w-0 items-center gap-3">
                             <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
                               <Video className="text-muted-foreground h-4 w-4" />
                             </div>
@@ -512,40 +589,65 @@ export default function VideoSearchPage() {
                   </CardContent>
                 </Card>
               )}
-            </div>
+            </motion.div>
           )}
 
           <FeedbackButton demoType="video-search" />
         </div>
 
         {/* Video Player Dialog */}
-        <Dialog open={playerOpen} onOpenChange={setPlayerOpen}>
-          <DialogContent className="max-w-3xl p-0 overflow-hidden">
-            <DialogHeader className="px-6 pt-6 pb-0">
+        <Dialog
+          open={playerOpen}
+          onOpenChange={(open) => {
+            setPlayerOpen(open);
+            if (!open) setVideoLoading(true);
+          }}
+        >
+          <DialogContent className="max-w-3xl overflow-hidden p-0">
+            <DialogHeader className="px-6 pb-0 pt-6">
               <DialogTitle className="pr-8 text-base leading-snug">
                 {playingVideo?.title}
               </DialogTitle>
               {playingVideo?.timestamp && (
-                <p className="text-muted-foreground text-sm">
-                  Playing from {playingVideo.timestamp}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-muted-foreground text-sm">
+                    Playing from {playingVideo.timestamp}
+                  </p>
+                </div>
               )}
             </DialogHeader>
             <div className="px-6 pb-6 pt-4">
               {playingVideo && (
-                <video
-                  key={playingVideo.url}
-                  controls
-                  autoPlay
-                  className="aspect-video w-full rounded-lg bg-black"
-                >
-                  <source
-                    src={`${playingVideo.url}#t=${Math.floor(playingVideo.startSeconds)}`}
-                    type="video/mp4"
+                <div className="relative overflow-hidden rounded-lg bg-black">
+                  {videoLoading && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/80">
+                      <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+                    </div>
+                  )}
+                  <video
+                    ref={videoRef}
+                    key={playingVideo.url}
+                    controls
+                    autoPlay
+                    muted
+                    src={playingVideo.url}
+                    className="aspect-video w-full"
+                    onLoadedMetadata={() => {
+                      setVideoLoading(false);
+                      const video = videoRef.current;
+                      if (video && playingVideo.startSeconds > 0) {
+                        video.currentTime = playingVideo.startSeconds;
+                        video.play().catch(() => {});
+                      }
+                    }}
                   />
-                  Your browser does not support video playback.
-                </video>
+                </div>
               )}
+              <p className="text-muted-foreground/50 mt-2 flex items-center gap-1 text-xs">
+                <Volume2 className="h-3 w-3" />
+                Video starts muted for autoplay. Click the speaker icon to
+                unmute.
+              </p>
             </div>
           </DialogContent>
         </Dialog>

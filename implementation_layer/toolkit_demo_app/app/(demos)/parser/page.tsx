@@ -53,13 +53,14 @@ function formatParserName(parser: string): string {
     docx: "DOCX",
     vision: "Vision",
     vision_plus: "Vision+",
+    docling_api: "Docling API",
   };
   return parserNames[parser] || parser;
 }
 
 export default function ParserPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [parserType, setParserType] = useState<"auto" | "pymupdf" | "docx" | "vision" | "vision_plus">("auto");
+  const [parserType, setParserType] = useState<"auto" | "pymupdf" | "docx" | "vision" | "vision_plus" | "docling_api">("auto");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ParseResult | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -200,6 +201,7 @@ export default function ParserPage() {
                           <SelectItem value="docx">DOCX (Word documents)</SelectItem>
                           <SelectItem value="vision">Vision (AI-powered, handles images)</SelectItem>
                           <SelectItem value="vision_plus">Vision+ (Enhanced RAG parsing)</SelectItem>
+                          <SelectItem value="docling_api">Docling API (Remote, high quality)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

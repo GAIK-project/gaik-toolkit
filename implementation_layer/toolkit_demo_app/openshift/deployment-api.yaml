@@ -39,6 +39,18 @@ spec:
                   name: gaik-demo-api-keys
                   key: AZURE_API_VERSION
                   optional: true
+            - name: DOCLING_API_BASE
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: DOCLING_API_BASE
+                  optional: true
+            - name: DOCLING_API_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: DOCLING_API_PASSWORD
+                  optional: true
           resources:
             requests:
               cpu: 1000m
