@@ -1,0 +1,62 @@
+{
+  "model_name": "line_item_and_document_extraction_Collection",
+  "requirements": {
+    "use_case_name": "line_item_and_document_extraction",
+    "fields": [
+      {
+        "field_name": "material_number",
+        "field_type": "str",
+        "description": "Material number for the line item",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "description",
+        "field_type": "str",
+        "description": "Description of the line item material",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "quantity",
+        "field_type": "int",
+        "description": "Quantity of the line item as an integer",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "delivery_date",
+        "field_type": "date",
+        "description": "Delivery date for the line item, if available",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "purchase_order_number",
+        "field_type": "str",
+        "description": "Shared purchase order number at the document level",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "customer_name",
+        "field_type": "str",
+        "description": "Customer name at the document level",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  }
+}

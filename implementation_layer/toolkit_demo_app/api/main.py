@@ -35,6 +35,7 @@ try:
         dental_transcription,
         diary,
         extractor,
+        luvata_order,
         parser,
         pipeline,
         rag,
@@ -48,6 +49,7 @@ except ImportError:
         dental_transcription,
         diary,
         extractor,
+        luvata_order,
         parser,
         pipeline,
         rag,
@@ -108,6 +110,7 @@ app.include_router(
     tags=["Video Transcription"],
 )
 app.include_router(video_search.router, prefix="/video-search", tags=["Video Search"])
+app.include_router(luvata_order.router, tags=["Luvata Order"])
 
 
 @app.get("/health")
@@ -131,7 +134,8 @@ async def root():
             "pipeline": "/pipeline - End-to-end pipelines (audio/document to structured data)",
             "rag": "/rag - RAG pipeline (document indexing and Q&A with citations)",
             "diary": "/diary - Construction diary (Työmaapäiväkirja) workflow",
-            "dental-transcribe": "/dental-transcribe - Video transcription with SRT/VTT subtitles",
-            "video-search": "/video-search - Semantic video search over subtitle-indexed content",
+            "dental-transcribe": "/dental-transcribe - Dental transcription with SRT/VTT subtitles",
+            "video-search": "/video-search - Semantic dental video search (pgvector)",
+            "luvata-order": "/luvata-order - Luvata ABB order processing with BOM matching",
         },
     }

@@ -92,12 +92,10 @@ const navGroups: NavGroup[] = [
         href: "/video-search",
         icon: Video,
       },
-      // Coming Soon
       {
         label: "Purchase Order Processing",
-        href: "#",
+        href: "/luvata-order",
         icon: FileBarChart,
-        comingSoon: true,
       },
       {
         label: "Customer onboarding and sales assistant",

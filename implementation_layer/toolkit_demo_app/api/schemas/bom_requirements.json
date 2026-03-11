@@ -1,0 +1,71 @@
+{
+  "model_name": "material_extraction_Extraction",
+  "requirements": {
+    "use_case_name": "material_extraction",
+    "fields": [
+      {
+        "field_name": "material_id",
+        "field_type": "str",
+        "description": "Identifier of the material",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "product_type_designation",
+        "field_type": "str",
+        "description": "Product type designation of the material",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "dimensions",
+        "field_type": "str",
+        "description": "Dimensions of the material",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "material_grade",
+        "field_type": "str",
+        "description": "Material grade specification",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "cutting_required",
+        "field_type": "bool",
+        "description": "Whether cutting is required",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "testing_required",
+        "field_type": "bool",
+        "description": "Whether testing is required",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "certificates_required",
+        "field_type": "bool",
+        "description": "Whether certificates are required",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  }
+}
