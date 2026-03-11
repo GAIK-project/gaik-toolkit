@@ -241,18 +241,28 @@ export default function DentalTranscriptionPage() {
     setActiveTab("transcript");
   }
 
-  function useExampleOutput(): void {
-    if (!exampleDemo) return;
+  const [exampleApplying, setExampleApplying] = useState(false);
 
+  function useExampleOutput(): void {
+    if (!exampleDemo || exampleApplying) return;
+
+    setExampleApplying(true);
     setAudioFile(null);
     setIsLoading(false);
     setPipelineSteps([
       { step: 1, name: "Transcription", status: "completed" },
       { step: 2, name: "Subtitle Generation", status: "completed" },
     ]);
-    setResult(exampleResultPayload(exampleDemo));
-    setActiveTab("subtitles");
-    toast.success("Example transcript loaded");
+
+    setTimeout(() => {
+      setResult(exampleResultPayload(exampleDemo));
+      setActiveTab("subtitles");
+      setExampleApplying(false);
+      toast.success("Example output loaded — see transcript & subtitles above");
+      document
+        .querySelector('[data-slot="tabs-list"]')
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 600);
   }
 
   function downloadFile(
@@ -544,11 +554,24 @@ export default function DentalTranscriptionPage() {
                       </p>
                     </div>
 
-                    <Button onClick={useExampleOutput} className="w-full">
-                      {result?.job_id === "example-demo"
-                        ? "Reload Example Output"
-                        : "Load Example Output"}
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                    <Button
+                      onClick={useExampleOutput}
+                      disabled={exampleApplying}
+                      className="w-full"
+                    >
+                      {exampleApplying ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Loading…
+                        </>
+                      ) : (
+                        <>
+                          {result?.job_id === "example-demo"
+                            ? "Reload Example Output"
+                            : "Load Example Output"}
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </>
+                      )}
                     </Button>
                     <div className="flex gap-2">
                       <Button

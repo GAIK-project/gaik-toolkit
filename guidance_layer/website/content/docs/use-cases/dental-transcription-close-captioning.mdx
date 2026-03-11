@@ -1,21 +1,32 @@
 ---
-title: Dental Transcription and Close Captioning
-description: Automated transcription and multilingual captioning for dental education
+title: Video Transcription & Subtitles
+description: Automated transcription and multilingual captioning for educational video content
 ---
 
-# Dental Transcription and Close Captioning
+# Video Transcription & Subtitles
 
-Automatically convert dental lectures, training videos, and podcasts into accurate text transcriptions and synchronized subtitles. The system handles hours of audio, supports Finnish and other languages, and can translate content for multilingual audiences.
+Turn lectures, training videos, and podcasts into accurate text transcripts and synchronized subtitle files — automatically. Upload a recording and receive ready-to-use SRT and VTT subtitles, even for hours-long content in Finnish or other languages.
+
+<Callout type="info">
+**Try the Live Demo:** [gaik-demo.2.rahtiapp.fi/dental-transcription](https://gaik-demo.2.rahtiapp.fi/dental-transcription)
+
+Upload your own file or inspect a ready-made example with pre-generated subtitles.
+</Callout>
+
+![Transcription & Subtitles Demo](/demo-images/dental-transcription.png)
+
+---
+
+## Why It Matters
+
+- **Accessibility** — Subtitles make video content accessible to hearing-impaired audiences and non-native speakers
+- **Searchability** — Once transcribed, every word in a video becomes searchable (see [Semantic Video Search](/docs/use-cases/semantic-dental-video-search))
+- **Time savings** — Manual transcription takes 4–6x the audio duration; this pipeline processes content in a fraction of the time
+- **Compliance** — Many institutions require captioned video content for accessibility regulations
+
+---
 
 ## How It Works
-
-The transcription pipeline processes audio through several stages:
-
-1. **Audio is split into chunks** — Large files are divided into overlapping segments (~20 minutes each) for parallel processing
-2. **Each chunk is transcribed** — Multiple chunks are transcribed simultaneously using Azure OpenAI Whisper, significantly reducing total processing time
-3. **Results are merged** — Overlapping regions are deduplicated to produce seamless, continuous output
-4. **Optional: Enhancement** — A language model corrects domain-specific dental terminology and formatting errors
-5. **Optional: Translation** — Content can be translated to other languages while preserving original timestamps
 
 ```mermaid
 flowchart LR
@@ -33,30 +44,32 @@ flowchart LR
     style F fill:#faf5ff,stroke:#9333ea,color:#2e1065
 ```
 
+1. **Audio is split into chunks** — Large files are divided into overlapping segments (~20 minutes each) for parallel processing
+2. **Each chunk is transcribed** — Multiple chunks run simultaneously using Azure OpenAI Whisper, cutting total processing time significantly
+3. **Results are merged** — Overlapping regions are deduplicated to produce seamless, continuous output
+4. **Optional: Enhancement** — A language model corrects domain-specific terminology and formatting
+5. **Optional: Translation** — Content can be translated while preserving original timestamps
+
 ---
 
 ## Key Features
 
-- **Parallel processing** — Transcribes 3 or more chunks at the same time, handling a 2-hour lecture in a fraction of the time it would take sequentially
+- **Parallel processing** — Handles a 2-hour lecture in a fraction of sequential time by transcribing 3+ chunks simultaneously
 - **Large file support** — No practical limit on audio duration; files are automatically chunked and reassembled
-- **Multiple output formats** — Produces SRT subtitle files (with timestamps) and plain text transcripts
+- **Multiple output formats** — SRT subtitle files (with timestamps), VTT subtitles, and plain text transcripts
 - **Finnish and multilingual** — Works with Finnish, Swedish, English, and other languages supported by Whisper
-- **Speaker diarization** — Optional GPT-4o Transcribe model identifies who is speaking (useful for panel discussions or Q&A sessions)
-- **Overlap deduplication** — Chunks overlap by 15 seconds to avoid cutting words mid-sentence; duplicated text is automatically removed during merging
+- **Speaker diarization** — Optional GPT-4o Transcribe model identifies who is speaking
+- **Overlap deduplication** — 15-second overlaps between chunks avoid cutting words mid-sentence
 
 ---
 
 ## Software Component
 
-The transcription pipeline is available as a reusable component in the GAIK toolkit:
-
 ```bash
 pip install gaik[parallel-transcriber]
 ```
 
-The `ParallelTranscriber` class handles chunking, transcription, merging, and output — all configured through a simple `TranscriptionConfig` object. It requires `ffmpeg` on the system for audio processing.
-
-> **Component documentation:** [`implementation_layer/src/gaik/software_components/parallel_transcriber/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/parallel_transcriber)
+The `ParallelTranscriber` class handles chunking, transcription, merging, and output — all configured through a simple `TranscriptionConfig` object. Requires `ffmpeg` for audio processing.
 
 ---
 
@@ -67,3 +80,4 @@ The `ParallelTranscriber` class handles chunking, transcription, merging, and ou
 | ParallelTranscriber component | [GitHub](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/parallel_transcriber) |
 | Transcriber component (sequential) | [GitHub](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber) |
 | Audio to Structured Data module | [GitHub](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data) |
+| Live Demo | [dental-transcription](https://gaik-demo.2.rahtiapp.fi/dental-transcription) |

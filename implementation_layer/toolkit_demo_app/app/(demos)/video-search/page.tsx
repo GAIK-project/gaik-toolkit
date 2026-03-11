@@ -425,86 +425,71 @@ export default function VideoSearchPage() {
                 </Button>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-end gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-muted-foreground text-xs font-normal">
-                    Search style
-                  </Label>
-                  <Tabs
-                    value={searchType}
-                    onValueChange={setSearchType}
-                  >
-                    <TabsList className="bg-muted border-border grid h-auto w-full max-w-[28rem] grid-cols-3 rounded-2xl border p-1.5">
-                      {Object.entries(SEARCH_TYPE_INFO).map(
-                        ([key, { icon: Icon, label, helper }]) => (
-                          <TabsTrigger
-                            key={key}
-                            value={key}
-                            className="h-auto min-h-14 flex-col items-start gap-0.5 rounded-xl border border-transparent px-3 py-2 text-left whitespace-normal data-[state=active]:bg-background data-[state=active]:border-border data-[state=active]:shadow-md"
-                          >
-                            <span className="flex items-center gap-1.5 text-sm font-medium">
-                              <Icon className="h-3.5 w-3.5" />
-                              {label}
-                            </span>
-                            <span className="text-[11px] opacity-70">
-                              {helper}
-                            </span>
-                          </TabsTrigger>
-                        ),
-                      )}
-                    </TabsList>
-                  </Tabs>
-                </div>
-
-                {videos.length > 0 && (
-                  <div className="space-y-1.5">
-                    <Label className="text-muted-foreground text-xs font-normal">
-                      Video scope
-                    </Label>
-                    <Select value={videoFilter} onValueChange={setVideoFilter}>
-                      <SelectTrigger
-                        aria-label="Filter by Video"
-                        className={cn(
-                          "border-border/85 bg-card h-10 w-55 shadow-sm",
-                          videoFilter !== "all" &&
-                            "border-primary/40 bg-primary/5 text-foreground",
+              <div className="mt-4 space-y-3">
+                <Tabs
+                  value={searchType}
+                  onValueChange={setSearchType}
+                >
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-muted-foreground text-xs font-normal">
+                        Search style
+                      </Label>
+                      <TabsList className="bg-muted border-border grid h-auto grid-cols-3 rounded-xl border p-1">
+                        {Object.entries(SEARCH_TYPE_INFO).map(
+                          ([key, { icon: Icon, label, helper }]) => (
+                            <TabsTrigger
+                              key={key}
+                              value={key}
+                              className="h-auto gap-1.5 rounded-lg border border-transparent px-3 py-2 text-left whitespace-normal data-[state=active]:bg-background data-[state=active]:border-border data-[state=active]:shadow-sm"
+                            >
+                              <Icon className="h-3.5 w-3.5 shrink-0" />
+                              <span className="text-sm font-medium">
+                                {label}
+                              </span>
+                            </TabsTrigger>
+                          ),
                         )}
-                      >
-                        <SelectValue placeholder="All videos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All videos</SelectItem>
-                        {videos.map((video) => (
-                          <SelectItem
-                            key={video.video_id}
-                            value={video.video_id}
-                          >
-                            {video.video_title.length > 35
-                              ? `${video.video_title.slice(0, 35)}…`
-                              : video.video_title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
+                      </TabsList>
+                    </div>
 
-              <div className="bg-muted/35 border-border/70 mt-4 rounded-2xl border px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <div className="bg-primary/10 text-primary flex h-8 w-8 items-center justify-center rounded-full">
-                    <ActiveSearchIcon className="h-4 w-4" />
+                    {videos.length > 0 && (
+                      <div className="space-y-1.5">
+                        <Label className="text-muted-foreground text-xs font-normal">
+                          Video scope
+                        </Label>
+                        <Select value={videoFilter} onValueChange={setVideoFilter}>
+                          <SelectTrigger
+                            aria-label="Filter by Video"
+                            className={cn(
+                              "border-border/85 bg-card h-10 w-55 shadow-sm",
+                              videoFilter !== "all" &&
+                                "border-primary/40 bg-primary/5 text-foreground",
+                            )}
+                          >
+                            <SelectValue placeholder="All videos" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All videos</SelectItem>
+                            {videos.map((video) => (
+                              <SelectItem
+                                key={video.video_id}
+                                value={video.video_id}
+                              >
+                                {video.video_title.length > 35
+                                  ? `${video.video_title.slice(0, 35)}…`
+                                  : video.video_title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold">
-                      {activeSearchType.label}
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      {activeSearchType.helper}
-                    </p>
-                  </div>
-                </div>
-                <p className="text-muted-foreground mt-1 text-sm">
+                </Tabs>
+
+                <p className="text-muted-foreground text-xs">
+                  <ActiveSearchIcon className="mr-1 inline h-3 w-3" />
                   {activeSearchType.desc}
                 </p>
               </div>
