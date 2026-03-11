@@ -38,7 +38,6 @@ import {
   Sparkles,
   Subtitles,
   Video,
-  Wand2,
 } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
@@ -292,17 +291,17 @@ export default function DentalTranscriptionPage() {
         </div>
       </header>
 
-      <div className="grid gap-6 md:gap-8 lg:grid-cols-[1fr_1.15fr]">
-        <div className="space-y-6">
-          <Card className="shadow-md">
-            <CardHeader className="pb-4">
-              <CardTitle>Upload Your Own File</CardTitle>
-              <CardDescription>
-                Add an audio or video file and the app will generate transcript,
-                SRT, and VTT subtitle files.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+      <div className="space-y-6">
+        <Card className="shadow-md">
+          <CardHeader className="pb-4">
+            <CardTitle>Upload Your Own File</CardTitle>
+            <CardDescription>
+              Add an audio or video file and the app will generate transcript,
+              SRT, and VTT subtitle files.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-6 sm:grid-cols-[1fr_auto]">
               <FileUpload
                 accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac,.mov"
                 maxSize={50}
@@ -312,82 +311,174 @@ export default function DentalTranscriptionPage() {
                 disabled={isLoading}
               />
 
-              <div className="space-y-2">
-                <Label htmlFor="language">Language</Label>
-                <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger id="language" className="w-full">
-                    <SelectValue placeholder="Select language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">Auto-detect</SelectItem>
-                    <SelectItem value="fi">Finnish (Suomi)</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="sv">Swedish (Svenska)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                onClick={handleSubmit}
-                disabled={isLoading || !audioFile}
-                className="w-full"
-                size="lg"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Transcribing…
-                  </>
-                ) : (
-                  <>
-                    <Subtitles className="mr-2 h-4 w-4" />
-                    Generate Transcript & Subtitles
-                  </>
-                )}
-              </Button>
-
-              <div className="bg-muted/35 border-border/70 rounded-2xl border p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold">Need a quick demo?</p>
-                    <p className="text-muted-foreground mt-1 text-sm">
-                      Open the ready-made lecture example on the right and load
-                      its transcript instantly.
-                    </p>
-                  </div>
-                  <Wand2 className="text-primary mt-0.5 h-4 w-4 shrink-0" />
+              <div className="flex flex-col justify-between gap-4 sm:w-52">
+                <div className="space-y-2">
+                  <Label htmlFor="language">Language</Label>
+                  <Select value={language} onValueChange={setLanguage}>
+                    <SelectTrigger id="language" className="w-full">
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto-detect</SelectItem>
+                      <SelectItem value="fi">Finnish (Suomi)</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="sv">Swedish (Svenska)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isLoading || !audioFile}
+                  className="w-full"
+                  size="lg"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Transcribing…
+                    </>
+                  ) : (
+                    <>
+                      <Subtitles className="mr-2 h-4 w-4" />
+                      Transcribe
+                    </>
+                  )}
+                </Button>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {isLoading && pipelineSteps.length > 0 && (
+          <Card className="shadow-md">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Processing</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <StepIndicator steps={pipelineSteps} orientation="vertical" />
             </CardContent>
           </Card>
+        )}
 
-          <FeedbackButton demoType="dental-transcription" />
-        </div>
+        {result && (
+          <div className="space-y-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="w-full">
+                <TabsTrigger value="transcript" className="flex-1">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Transcript
+                </TabsTrigger>
+                <TabsTrigger value="subtitles" className="flex-1">
+                  <Subtitles className="mr-2 h-4 w-4" />
+                  Subtitles (SRT)
+                </TabsTrigger>
+              </TabsList>
 
-        <div className="space-y-6">
-          <Card className="border-primary/20 overflow-hidden shadow-md">
-            <CardHeader className="pb-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Video className="text-primary h-5 w-5" />
-                    Ready-made Example
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    A lecture clip already stored in Allas with matching
-                    subtitles, so you can inspect the end result immediately.
-                  </CardDescription>
-                </div>
-                <Badge variant="secondary">
-                  {result?.job_id === "example-demo"
-                    ? "Loaded by default"
-                    : "Instant preview"}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              <TabsContent value="transcript">
+                <ResultCard
+                  title={
+                    result.job_id === "example-demo"
+                      ? "Example Transcript"
+                      : "Transcript"
+                  }
+                  description={
+                    result.job_id === "example-demo"
+                      ? "Pre-generated result from the example lecture video."
+                      : undefined
+                  }
+                  copyContent={result.raw_transcript}
+                >
+                  <ResultText content={result.raw_transcript} />
+                </ResultCard>
+              </TabsContent>
+
+              <TabsContent value="subtitles">
+                <ResultCard
+                  title={`SRT Subtitles (${result.segments_count} segments)`}
+                  copyContent={result.srt_content}
+                >
+                  <pre className="bg-muted max-h-96 overflow-auto rounded-lg p-4 font-mono text-sm whitespace-pre-wrap wrap-break-word">
+                    {result.srt_content || "No subtitle data available."}
+                  </pre>
+                </ResultCard>
+              </TabsContent>
+            </Tabs>
+
+            <Card className="shadow-md">
+              <CardContent className="flex flex-wrap gap-3 pt-6">
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    downloadFile(
+                      result.raw_transcript,
+                      "transcript.txt",
+                      "text/plain",
+                    )
+                  }
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Transcript (.txt)
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    downloadFile(
+                      result.srt_content,
+                      "subtitles.srt",
+                      "text/plain",
+                    )
+                  }
+                  disabled={!result.srt_content}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Subtitles (.srt)
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    downloadFile(
+                      result.vtt_content,
+                      "subtitles.vtt",
+                      "text/vtt",
+                    )
+                  }
+                  disabled={!result.vtt_content}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Subtitles (.vtt)
+                </Button>
+                <Button variant="ghost" asChild>
+                  <Link href="/video-search">
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Open Semantic Video Search
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {!result && !isLoading && (
+          <EmptyStateCard message="Upload your own file or load the ready-made example to see transcript and subtitle output here." />
+        )}
+
+        <details className="group" open={!result && !isLoading ? true : undefined}>
+          <summary className="border-border/70 bg-muted/30 flex cursor-pointer list-none items-center gap-2 rounded-xl border px-4 py-3 transition-colors hover:bg-muted/60 [&::-webkit-details-marker]:hidden">
+            <ArrowRight className="text-muted-foreground h-4 w-4 transition-transform group-open:rotate-90" />
+            <Video className="text-primary h-4 w-4" />
+            <span className="text-sm font-semibold">Ready-made Example</span>
+            <span className="text-muted-foreground text-sm">
+              — lecture clip with pre-generated subtitles
+            </span>
+            {exampleLoading && (
+              <Loader2 className="text-muted-foreground ml-auto h-4 w-4 animate-spin" />
+            )}
+          </summary>
+          <Card className="border-primary/20 mt-2 overflow-hidden shadow-md">
+            <CardContent className="space-y-4 pt-5">
               {exampleLoading ? (
-                <div className="bg-muted flex aspect-video items-center justify-center rounded-xl">
+                <div className="bg-muted flex h-32 items-center justify-center rounded-xl">
                   <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
                 </div>
               ) : exampleError ? (
@@ -409,7 +500,7 @@ export default function DentalTranscriptionPage() {
                   </Button>
                 </div>
               ) : exampleDemo ? (
-                <div className="grid gap-4 xl:grid-cols-[1.3fr_0.7fr]">
+                <div className="grid gap-5 md:grid-cols-[1.4fr_1fr]">
                   <div className="overflow-hidden rounded-xl bg-black">
                     <video
                       key={exampleDemo.video_url}
@@ -431,56 +522,48 @@ export default function DentalTranscriptionPage() {
                     </video>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="flex flex-col gap-3">
                     <div className="bg-muted/35 border-border/70 rounded-xl border p-3">
                       <p className="text-sm font-semibold">
                         {exampleDemo.title}
                       </p>
                       <p className="text-muted-foreground mt-1 text-sm">
-                        {exampleDemo.segments_count} subtitle segments ready to
-                        preview or download.
+                        {exampleDemo.segments_count} subtitle segments &middot;
+                        Transcript + SRT + VTT
                       </p>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                      <div className="bg-card rounded-xl border p-3 shadow-xs">
-                        <p className="text-xs font-semibold tracking-wide uppercase">
-                          Output
-                        </p>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                          Transcript + SRT + VTT
-                        </p>
-                      </div>
-                      <div className="bg-card rounded-xl border p-3 shadow-xs">
-                        <p className="text-xs font-semibold tracking-wide uppercase">
-                          Reuse
-                        </p>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                          Subtitle tracks, captioning, and video search
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                      <Button onClick={useExampleOutput} className="w-full">
-                        {result?.job_id === "example-demo"
-                          ? "Reload Example Output"
-                          : "Show Example Output"}
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" asChild className="w-full">
+                    <Button onClick={useExampleOutput} className="w-full">
+                      {result?.job_id === "example-demo"
+                        ? "Reload Example Output"
+                        : "Load Example Output"}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                        className="flex-1"
+                      >
                         <a
                           href={exampleDemo.source_url}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          Original YouTube Source
-                          <ExternalLink className="ml-2 h-4 w-4" />
+                          YouTube Source
+                          <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
                         </a>
                       </Button>
-                      <Button variant="ghost" asChild className="w-full">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                        className="flex-1"
+                      >
                         <Link href="/video-search">
-                          See how subtitles power video search
+                          Video Search
+                          <Sparkles className="ml-1.5 h-3.5 w-3.5" />
                         </Link>
                       </Button>
                     </div>
@@ -489,120 +572,9 @@ export default function DentalTranscriptionPage() {
               ) : null}
             </CardContent>
           </Card>
+        </details>
 
-          {isLoading && pipelineSteps.length > 0 && (
-            <Card className="shadow-md">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Processing</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <StepIndicator steps={pipelineSteps} orientation="vertical" />
-              </CardContent>
-            </Card>
-          )}
-
-          {result && (
-            <div className="space-y-4">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="w-full">
-                  <TabsTrigger value="transcript" className="flex-1">
-                    <FileText className="mr-2 h-4 w-4" />
-                    Transcript
-                  </TabsTrigger>
-                  <TabsTrigger value="subtitles" className="flex-1">
-                    <Subtitles className="mr-2 h-4 w-4" />
-                    Subtitles (SRT)
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="transcript">
-                  <ResultCard
-                    title={
-                      result.job_id === "example-demo"
-                        ? "Example Transcript"
-                        : "Transcript"
-                    }
-                    description={
-                      result.job_id === "example-demo"
-                        ? "Pre-generated result from the example lecture video."
-                        : undefined
-                    }
-                    copyContent={result.raw_transcript}
-                  >
-                    <ResultText content={result.raw_transcript} />
-                  </ResultCard>
-                </TabsContent>
-
-                <TabsContent value="subtitles">
-                  <ResultCard
-                    title={`SRT Subtitles (${result.segments_count} segments)`}
-                    copyContent={result.srt_content}
-                  >
-                    <pre className="bg-muted max-h-96 overflow-auto rounded-lg p-4 font-mono text-sm">
-                      {result.srt_content || "No subtitle data available."}
-                    </pre>
-                  </ResultCard>
-                </TabsContent>
-              </Tabs>
-
-              <Card className="shadow-md">
-                <CardContent className="flex flex-wrap gap-3 pt-6">
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      downloadFile(
-                        result.raw_transcript,
-                        "transcript.txt",
-                        "text/plain",
-                      )
-                    }
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Transcript (.txt)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      downloadFile(
-                        result.srt_content,
-                        "subtitles.srt",
-                        "text/plain",
-                      )
-                    }
-                    disabled={!result.srt_content}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Subtitles (.srt)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      downloadFile(
-                        result.vtt_content,
-                        "subtitles.vtt",
-                        "text/vtt",
-                      )
-                    }
-                    disabled={!result.vtt_content}
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    Subtitles (.vtt)
-                  </Button>
-                  <Button variant="ghost" asChild>
-                    <Link href="/video-search">
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Open Semantic Video Search
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {!result && !isLoading && (
-            <EmptyStateCard message="Upload your own file or load the ready-made example to inspect transcript and subtitle output here." />
-          )}
-        </div>
+        <FeedbackButton demoType="dental-transcription" />
       </div>
     </motion.div>
   );

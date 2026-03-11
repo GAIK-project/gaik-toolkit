@@ -88,21 +88,21 @@ const SEARCH_TYPE_INFO: Record<
 > = {
   hybrid: {
     icon: Zap,
-    label: "Balanced",
-    helper: "Best default",
-    desc: "Looks at both the topic and the exact words that were said.",
+    label: "Hybrid",
+    helper: "AI + keywords",
+    desc: "Combines AI understanding with keyword matching for best results.",
   },
   semantic: {
     icon: Sparkles,
-    label: "By meaning",
-    helper: "Idea match",
-    desc: "Useful when you remember the idea but not the exact wording.",
+    label: "AI meaning",
+    helper: "Understands intent",
+    desc: "AI finds results by meaning — useful when you don't remember the exact words.",
   },
   keyword: {
     icon: Type,
     label: "Exact words",
-    helper: "Literal match",
-    desc: "Useful when you know the exact term, phrase, or quote.",
+    helper: "Traditional search",
+    desc: "Classic keyword search — finds the exact words you type.",
   },
 };
 
@@ -439,27 +439,43 @@ export default function VideoSearchPage() {
                     className="bg-muted/70 border-border grid w-full max-w-[28rem] grid-cols-3 rounded-2xl border p-1 shadow-sm"
                   >
                     {Object.entries(SEARCH_TYPE_INFO).map(
-                      ([key, { icon: Icon, label, helper, desc }]) => (
-                        <Tooltip key={key}>
-                          <TooltipTrigger asChild>
-                            <ToggleGroupItem
-                              value={key}
-                              className="text-muted-foreground hover:bg-background/80 hover:text-foreground data-[state=on]:!bg-primary data-[state=on]:!text-primary-foreground data-[state=on]:!border-primary min-h-14 min-w-0 flex-1 flex-col items-start gap-0.5 rounded-xl border border-transparent px-3 py-2 text-left whitespace-normal shadow-none data-[state=on]:shadow-md"
-                            >
-                              <span className="flex items-center gap-1.5 text-sm font-medium">
-                                <Icon className="h-3.5 w-3.5" />
-                                {label}
-                              </span>
-                              <span className="text-[11px] opacity-80">
-                                {helper}
-                              </span>
-                            </ToggleGroupItem>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">
-                            <p className="text-xs">{desc}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      ),
+                      ([key, { icon: Icon, label, helper, desc }]) => {
+                        const isActive = searchType === key;
+                        return (
+                          <Tooltip key={key}>
+                            <TooltipTrigger asChild>
+                              <ToggleGroupItem
+                                value={key}
+                                className={cn(
+                                  "min-h-14 min-w-0 flex-1 flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left whitespace-normal shadow-none transition-colors duration-150",
+                                  isActive
+                                    ? "border-primary shadow-md"
+                                    : "text-muted-foreground border-transparent hover:bg-background/80 hover:text-foreground",
+                                )}
+                                style={
+                                  isActive
+                                    ? {
+                                        backgroundColor: "var(--color-primary)",
+                                        color: "var(--color-primary-foreground)",
+                                      }
+                                    : undefined
+                                }
+                              >
+                                <span className="flex items-center gap-1.5 text-sm font-medium">
+                                  <Icon className="h-3.5 w-3.5" />
+                                  {label}
+                                </span>
+                                <span className="text-[11px] opacity-80">
+                                  {helper}
+                                </span>
+                              </ToggleGroupItem>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              <p className="text-xs">{desc}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      },
                     )}
                   </ToggleGroup>
                 </div>
@@ -589,13 +605,15 @@ export default function VideoSearchPage() {
                                 });
                               }}
                             />
-                          ) : (
+                          ) : thumbnailFailures[result.video_id] ? (
                             <div className="from-muted to-muted/70 flex h-full w-full flex-col items-center justify-center gap-1 bg-gradient-to-br px-2 text-center">
                               <Video className="text-muted-foreground h-5 w-5" />
                               <span className="text-muted-foreground/80 line-clamp-2 text-[10px] font-medium">
                                 No preview
                               </span>
                             </div>
+                          ) : (
+                            <div className="bg-muted animate-pulse h-full w-full" />
                           )}
 
                           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
@@ -660,19 +678,13 @@ export default function VideoSearchPage() {
               transition={{ delay: 0.2 }}
               className="space-y-4"
             >
-              <Card className="border-primary/20 border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <Search className="text-muted-foreground/40 mb-3 h-10 w-10" />
-                  <p className="text-muted-foreground">
-                    Search the indexed videos above to find the most relevant
-                    moment.
-                  </p>
-                  <p className="text-muted-foreground/60 mt-1 text-sm">
-                    Try searches like &ldquo;tekoäly työelämässä&rdquo;,
-                    &ldquo;kielitaito&rdquo;, or &ldquo;johtaminen&rdquo;
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="text-muted-foreground flex items-center justify-center gap-2 py-4 text-sm">
+                <Search className="h-4 w-4 opacity-40" />
+                <span>
+                  Try searches like &ldquo;tekoäly työelämässä&rdquo;,
+                  &ldquo;kielitaito&rdquo;, or &ldquo;johtaminen&rdquo;
+                </span>
+              </div>
 
               {videos.length > 0 && (
                 <Card>
