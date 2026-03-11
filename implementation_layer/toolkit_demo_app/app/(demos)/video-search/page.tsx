@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
@@ -430,54 +430,30 @@ export default function VideoSearchPage() {
                   <Label className="text-muted-foreground text-xs font-normal">
                     Search style
                   </Label>
-                  <ToggleGroup
-                    type="single"
-                    aria-label="Search Type"
+                  <Tabs
                     value={searchType}
-                    onValueChange={(value) => value && setSearchType(value)}
-                    size="sm"
-                    className="bg-muted/70 border-border grid w-full max-w-[28rem] grid-cols-3 rounded-2xl border p-1 shadow-sm"
+                    onValueChange={setSearchType}
                   >
-                    {Object.entries(SEARCH_TYPE_INFO).map(
-                      ([key, { icon: Icon, label, helper, desc }]) => {
-                        const isActive = searchType === key;
-                        return (
-                          <Tooltip key={key}>
-                            <TooltipTrigger asChild>
-                              <ToggleGroupItem
-                                value={key}
-                                className={cn(
-                                  "min-h-14 min-w-0 flex-1 flex-col items-start gap-0.5 rounded-xl border px-3 py-2 text-left whitespace-normal shadow-none transition-colors duration-150",
-                                  isActive
-                                    ? "border-primary shadow-md"
-                                    : "text-muted-foreground border-transparent hover:bg-background/80 hover:text-foreground",
-                                )}
-                                style={
-                                  isActive
-                                    ? {
-                                        backgroundColor: "var(--color-primary)",
-                                        color: "var(--color-primary-foreground)",
-                                      }
-                                    : undefined
-                                }
-                              >
-                                <span className="flex items-center gap-1.5 text-sm font-medium">
-                                  <Icon className="h-3.5 w-3.5" />
-                                  {label}
-                                </span>
-                                <span className="text-[11px] opacity-80">
-                                  {helper}
-                                </span>
-                              </ToggleGroupItem>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom">
-                              <p className="text-xs">{desc}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        );
-                      },
-                    )}
-                  </ToggleGroup>
+                    <TabsList className="bg-muted border-border grid h-auto w-full max-w-[28rem] grid-cols-3 rounded-2xl border p-1.5">
+                      {Object.entries(SEARCH_TYPE_INFO).map(
+                        ([key, { icon: Icon, label, helper }]) => (
+                          <TabsTrigger
+                            key={key}
+                            value={key}
+                            className="h-auto min-h-14 flex-col items-start gap-0.5 rounded-xl border border-transparent px-3 py-2 text-left whitespace-normal data-[state=active]:bg-background data-[state=active]:border-border data-[state=active]:shadow-md"
+                          >
+                            <span className="flex items-center gap-1.5 text-sm font-medium">
+                              <Icon className="h-3.5 w-3.5" />
+                              {label}
+                            </span>
+                            <span className="text-[11px] opacity-70">
+                              {helper}
+                            </span>
+                          </TabsTrigger>
+                        ),
+                      )}
+                    </TabsList>
+                  </Tabs>
                 </div>
 
                 {videos.length > 0 && (

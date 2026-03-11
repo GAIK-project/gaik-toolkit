@@ -9,7 +9,12 @@ import {
 } from "@/components/demo/result-card";
 import { FeedbackButton } from "@/components/feedback";
 import { StepIndicator } from "@/components/demo/step-indicator";
-import { Badge } from "@/components/ui/badge";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -311,7 +316,7 @@ export default function DentalTranscriptionPage() {
                 disabled={isLoading}
               />
 
-              <div className="flex flex-col justify-between gap-4 sm:w-52">
+              <div className="flex flex-col gap-3 sm:w-52">
                 <div className="space-y-2">
                   <Label htmlFor="language">Language</Label>
                   <Select value={language} onValueChange={setLanguage}>
@@ -463,20 +468,26 @@ export default function DentalTranscriptionPage() {
           <EmptyStateCard message="Upload your own file or load the ready-made example to see transcript and subtitle output here." />
         )}
 
-        <details className="group" open={!result && !isLoading ? true : undefined}>
-          <summary className="border-border/70 bg-muted/30 flex cursor-pointer list-none items-center gap-2 rounded-xl border px-4 py-3 transition-colors hover:bg-muted/60 [&::-webkit-details-marker]:hidden">
-            <ArrowRight className="text-muted-foreground h-4 w-4 transition-transform group-open:rotate-90" />
-            <Video className="text-primary h-4 w-4" />
-            <span className="text-sm font-semibold">Ready-made Example</span>
-            <span className="text-muted-foreground text-sm">
-              — lecture clip with pre-generated subtitles
-            </span>
-            {exampleLoading && (
-              <Loader2 className="text-muted-foreground ml-auto h-4 w-4 animate-spin" />
-            )}
-          </summary>
-          <Card className="border-primary/20 mt-2 overflow-hidden shadow-md">
-            <CardContent className="space-y-4 pt-5">
+        <Accordion
+          type="single"
+          collapsible
+          defaultValue={!result && !isLoading ? "example" : undefined}
+          className="border-border/70 rounded-xl border"
+        >
+          <AccordionItem value="example" className="border-none">
+            <AccordionTrigger className="px-4 py-3 hover:no-underline">
+              <span className="flex items-center gap-2">
+                <Video className="text-primary h-4 w-4" />
+                <span className="font-semibold">Ready-made Example</span>
+                <span className="text-muted-foreground font-normal">
+                  — lecture clip with pre-generated subtitles
+                </span>
+                {exampleLoading && (
+                  <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+                )}
+              </span>
+            </AccordionTrigger>
+            <AccordionContent className="px-4">
               {exampleLoading ? (
                 <div className="bg-muted flex h-32 items-center justify-center rounded-xl">
                   <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
@@ -570,9 +581,9 @@ export default function DentalTranscriptionPage() {
                   </div>
                 </div>
               ) : null}
-            </CardContent>
-          </Card>
-        </details>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
         <FeedbackButton demoType="dental-transcription" />
       </div>
