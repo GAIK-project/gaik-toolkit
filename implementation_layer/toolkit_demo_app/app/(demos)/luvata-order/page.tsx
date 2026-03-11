@@ -27,7 +27,7 @@ import {
   CheckCircle,
   CheckCircle2,
   Download,
-  File,
+  File as FileIcon,
   FileText,
   Loader2,
   ArrowLeft,
@@ -93,38 +93,33 @@ export default function LuvataOrderPage() {
 
   const loadExampleData = async () => {
     try {
-      // Load example files from data directory
-      const [poResp, pricingResp, bom1Resp, bom2Resp, bom3Resp] =
-        await Promise.all([
-          fetch("/data/po-bom-example/PO.pdf"),
-          fetch("/data/po-bom-example/price list.xlsx"),
-          fetch("/data/po-bom-example/BOM1.pdf"),
-          fetch("/data/po-bom-example/BOM2.pdf"),
-          fetch("/data/po-bom-example/BOM3.pdf"),
-        ]);
+      const fetchExampleFile = async (url: string) => {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch example asset: ${url} (${response.status})`);
+        }
+        return response.blob();
+      };
 
-      const poBlob = await poResp.blob();
-      const pricingBlob = await pricingResp.blob();
-      const bom1Blob = await bom1Resp.blob();
-      const bom2Blob = await bom2Resp.blob();
-      const bom3Blob = await bom3Resp.blob();
+      const [poBlob, pricingBlob, bom1Blob, bom2Blob, bom3Blob] =
+        await Promise.all([
+          fetchExampleFile("/data/po-bom-example/PO.pdf"),
+          fetchExampleFile("/data/po-bom-example/price%20list.xlsx"),
+          fetchExampleFile("/data/po-bom-example/BOM1.pdf"),
+          fetchExampleFile("/data/po-bom-example/BOM2.pdf"),
+          fetchExampleFile("/data/po-bom-example/BOM3.pdf"),
+        ]);
 
       setPoFile(new File([poBlob], "PO.pdf", { type: "application/pdf" }));
       setPricingFile(
         new File([pricingBlob], "price list.xlsx", {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        })
+        }),
       );
       setBomFiles([
-        new File([bom1Blob], "BOM1.pdf", {
-          type: "application/pdf",
-        }),
-        new File([bom2Blob], "BOM2.pdf", {
-          type: "application/pdf",
-        }),
-        new File([bom3Blob], "BOM3.pdf", {
-          type: "application/pdf",
-        }),
+        new File([bom1Blob], "BOM1.pdf", { type: "application/pdf" }),
+        new File([bom2Blob], "BOM2.pdf", { type: "application/pdf" }),
+        new File([bom3Blob], "BOM3.pdf", { type: "application/pdf" }),
       ]);
 
       toast.success("Example data loaded");
@@ -298,7 +293,7 @@ export default function LuvataOrderPage() {
                       className="flex items-center gap-3 rounded-lg border border-success/30 bg-success/10 p-4"
                     >
                       <CheckCircle className="h-5 w-5 text-success" />
-                      <File className="h-5 w-5 text-muted-foreground" />
+                      <FileIcon className="h-5 w-5 text-muted-foreground" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{file.name}</p>
                         <p className="text-xs text-muted-foreground">
