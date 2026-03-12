@@ -16,7 +16,8 @@ export type DemoType =
   | "audio-structured"
   | "dental-transcription"
   | "document-structured"
-  | "video-search";
+  | "video-search"
+  | "luvata-order";
 
 /**
  * User feedback stored in the database

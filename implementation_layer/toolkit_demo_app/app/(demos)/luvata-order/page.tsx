@@ -194,7 +194,7 @@ export default function LuvataOrderPage() {
             setProgress((prev) => Math.min(prev + 15, 90));
           } else if (event.type === "complete") {
             setProgress(100);
-            setResult(event.data as ProcessOrderResponse);
+            setResult(event.data as unknown as ProcessOrderResponse);
             setProcessing(false);
             toast.success("Order processed successfully");
             posthog.capture("luvata_order_process_completed", {
@@ -337,7 +337,7 @@ export default function LuvataOrderPage() {
               calculations
             </p>
           </div>
-          <FeedbackButton page="luvata-order" />
+          <FeedbackButton demoType="luvata-order" />
         </div>
       </div>
 
