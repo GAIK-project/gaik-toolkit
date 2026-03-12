@@ -14,18 +14,9 @@ def validate_upload(
     file: UploadFile,
     allowed_extensions: list[str],
 ) -> str:
-    """
-    Validate uploaded file has a filename and allowed extension.
+    """Validate uploaded file has a filename and allowed extension.
 
-    Args:
-        file: The uploaded file
-        allowed_extensions: List of allowed file extensions (e.g., [".pdf", ".docx"])
-
-    Returns:
-        The lowercase file extension
-
-    Raises:
-        HTTPException: If filename is missing or extension not allowed
+    Returns the lowercase file extension.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="Filename is required")
@@ -40,15 +31,7 @@ def validate_upload(
 
 
 def validate_file_size(content: bytes) -> None:
-    """
-    Validate file content does not exceed size limit.
-
-    Args:
-        content: The file content bytes
-
-    Raises:
-        HTTPException: If file exceeds MAX_FILE_SIZE_MB
-    """
+    """Validate file content does not exceed MAX_FILE_SIZE_MB."""
     max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
     if len(content) > max_bytes:
         raise HTTPException(
@@ -59,16 +42,7 @@ def validate_file_size(content: bytes) -> None:
 
 @contextmanager
 def temp_file(content: bytes, suffix: str) -> Generator[str, None, None]:
-    """
-    Context manager for temporary file handling with automatic cleanup.
-
-    Args:
-        content: File content to write
-        suffix: File extension (e.g., ".pdf")
-
-    Yields:
-        Path to the temporary file
-    """
+    """Context manager: write content to a temp file, yield its path, then clean up."""
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name

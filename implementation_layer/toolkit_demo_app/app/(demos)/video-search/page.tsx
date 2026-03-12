@@ -117,6 +117,7 @@ export default function VideoSearchPage() {
   const [videos, setVideos] = useState<VideoInfo[]>([]);
   const [status, setStatus] = useState<StatusInfo | null>(null);
   const [backendError, setBackendError] = useState<string | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
   const [playerOpen, setPlayerOpen] = useState(false);
   const [playingVideo, setPlayingVideo] = useState<{
     url: string;
@@ -186,6 +187,7 @@ export default function VideoSearchPage() {
   }, [results, thumbnailFailures, thumbnails]);
 
   async function fetchStatus() {
+    setStatusLoading(true);
     try {
       const res = await apiFetch("/api/video-search/status");
       if (!res.ok) throw new Error("Backend unreachable");
@@ -194,6 +196,8 @@ export default function VideoSearchPage() {
     } catch {
       setStatus(null);
       setBackendError("Backend unreachable");
+    } finally {
+      setStatusLoading(false);
     }
   }
 
@@ -330,7 +334,12 @@ export default function VideoSearchPage() {
           </div>
         </header>
 
-        {status && (
+        {statusLoading ? (
+          <div className="mb-6 flex items-center gap-2 text-sm">
+            <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
+            <span className="text-muted-foreground">Connecting...</span>
+          </div>
+        ) : status ? (
           <div className="mb-6 flex items-center gap-2 text-sm">
             <Database className="text-muted-foreground h-4 w-4" />
             <span
@@ -345,7 +354,7 @@ export default function VideoSearchPage() {
                 : "Database not connected"}
             </span>
           </div>
-        )}
+        ) : null}
 
         {backendError && (
           <Card className="border-destructive/20 bg-destructive/5 mb-6">
@@ -399,7 +408,7 @@ export default function VideoSearchPage() {
                     onKeyDown={handleKeyDown}
                     className="border-border/85 bg-card h-12 pl-10 text-base shadow-sm"
                     autoComplete="off"
-                    disabled={!status?.database_connected}
+                    disabled={!statusLoading && !status?.database_connected}
                   />
                 </div>
                 <Button
@@ -407,7 +416,7 @@ export default function VideoSearchPage() {
                   aria-label="Run video search"
                   onClick={handleSearch}
                   disabled={
-                    isSearching || !query.trim() || !status?.database_connected
+                    isSearching || !query.trim() || (!statusLoading && !status?.database_connected)
                   }
                   className="h-12 gap-2 px-5"
                 >
@@ -632,7 +641,7 @@ export default function VideoSearchPage() {
             <EmptyStateCard message="No results found. Try a different wording, another search style, or narrow the search to one video." />
           )}
 
-          {!hasSearched && !isSearching && status?.database_connected && (
+          {!hasSearched && !isSearching && (statusLoading || status?.database_connected) && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

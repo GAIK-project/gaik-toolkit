@@ -34,7 +34,7 @@ COPY pyproject.toml ./
 # - transcriber: Whisper transcription via Azure/OpenAI
 # - PyMuPDF: PDF parsing
 # - python-docx: DOCX parsing
-RUN pip install --no-cache-dir -e ".[transcriber]" PyMuPDF python-docx reportlab fpdf2
+RUN pip install --no-cache-dir ".[transcriber]" PyMuPDF python-docx reportlab fpdf2
 
 # Copy API source code
 COPY implementation_layer/api/ ./implementation_layer/api/

@@ -363,6 +363,7 @@ def _generate_incident_pdf(job_id: str, data: list[dict]) -> None:
 
 @router.get(
     "/pdf/{job_id}",
+    dependencies=[Depends(verify_api_key)],
     summary="Download generated PDF",
     description="Download a previously generated PDF by job ID.",
 )

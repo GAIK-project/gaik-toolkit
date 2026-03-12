@@ -1,6 +1,6 @@
 # GAIK API
 
-A lightweight REST API for audio transcription and document parsing. Uses [GAIK Toolkit](https://github.com/GAIK-project/gaik-toolkit) building blocks components.
+Lightweight REST API for audio transcription, document parsing, and structured data extraction. Uses [GAIK Toolkit](https://github.com/GAIK-project/gaik-toolkit) building blocks.
 
 ## Endpoints
 
@@ -8,12 +8,14 @@ A lightweight REST API for audio transcription and document parsing. Uses [GAIK 
 |----------|--------|-------------|
 | `/transcribe` | POST | Whisper transcription (mp3, wav, mp4, m4a, webm, ogg, flac) |
 | `/parse` | POST | PDF/DOCX parsing (pymupdf, docx, vision) |
+| `/pipeline/diary` | POST | Generate construction diary from audio |
+| `/pipeline/incident-report` | POST | Generate incident report from audio/text/document |
+| `/pipeline/pdf/{job_id}` | GET | Download generated PDF |
 | `/health` | GET | Health check |
 
 ## Installation
 
 ```bash
-# From project root
 cd gaik-toolkit
 pip install -e ".[all]"
 pip install -r implementation_layer/api/requirements.txt
@@ -22,10 +24,10 @@ pip install -r implementation_layer/api/requirements.txt
 ## Usage
 
 ```bash
-# Development mode
 cp implementation_layer/api/.env.example implementation_layer/api/.env
 # Edit .env and set API_KEY and Azure/OpenAI credentials
 
+# Development
 DEBUG=true uvicorn implementation_layer.api.main:app --reload
 
 # Production
@@ -47,10 +49,15 @@ curl -X POST http://localhost:8000/parse \
   -F "file=@document.pdf" \
   -F "parser_type=pymupdf"
 
-# DOCX parsing
-curl -X POST http://localhost:8000/parse \
+# Construction diary from audio
+curl -X POST http://localhost:8000/pipeline/diary \
   -H "X-API-Key: your-api-key" \
-  -F "file=@document.docx"
+  -F "file=@site_report.mp3"
+
+# Incident report from text
+curl -X POST http://localhost:8000/pipeline/incident-report \
+  -H "X-API-Key: your-api-key" \
+  -F "text=Employee slipped on wet floor in warehouse area B"
 ```
 
 ## Docker
