@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import posthog from "posthog-js";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
@@ -280,7 +280,7 @@ export default function LuvataOrderPage() {
       });
   }, [pricingFile]);
 
-  const documentTabs = [
+  const documentTabs = useMemo(() => [
     ...(poFile ? [{ key: "po", label: "PO", type: "pdf" as const, file: poFile }] : []),
     ...bomFiles.map((file, index) => ({
       key: `bom-${index}`,
@@ -291,7 +291,7 @@ export default function LuvataOrderPage() {
     ...(pricingFile
       ? [{ key: "pricing", label: "Pricing table", type: "sheet" as const, file: pricingFile }]
       : []),
-  ];
+  ], [poFile, bomFiles, pricingFile]);
 
   useEffect(() => {
     if (documentTabs.length === 0) {
@@ -619,7 +619,7 @@ export default function LuvataOrderPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <CheckCircle2 className="h-5 w-5 text-success" />
                 Order Summary
               </CardTitle>
             </CardHeader>
@@ -657,9 +657,9 @@ export default function LuvataOrderPage() {
 
           {/* Errors/Warnings */}
           {result.errors.length > 0 && (
-            <Card className="border-red-200 bg-red-50">
+            <Card className="border-destructive/30 bg-destructive/10">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-red-600">
+                <CardTitle className="flex items-center gap-2 text-destructive">
                   <AlertCircle className="h-5 w-5" />
                   Errors
                 </CardTitle>
@@ -667,7 +667,7 @@ export default function LuvataOrderPage() {
               <CardContent>
                 <ul className="list-disc space-y-1 pl-4">
                   {result.errors.map((error, i) => (
-                    <li key={i} className="text-sm text-red-700">
+                    <li key={i} className="text-sm text-destructive">
                       {error}
                     </li>
                   ))}
@@ -702,7 +702,7 @@ export default function LuvataOrderPage() {
                     {result.items.map((item, i) => (
                       <TableRow
                         key={i}
-                        className={item.error ? "bg-red-50" : ""}
+                        className={item.error ? "bg-destructive/10" : ""}
                       >
                         <TableCell className="font-medium">
                           {item.material}
