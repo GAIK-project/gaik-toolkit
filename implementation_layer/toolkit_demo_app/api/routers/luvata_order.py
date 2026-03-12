@@ -20,11 +20,16 @@ from fastapi.responses import Response, StreamingResponse
 from fpdf import FPDF
 from openpyxl import load_workbook
 from pydantic import BaseModel, Field
-from api.utils.config import get_api_config
-from api.utils.sse import sse_event
+try:
+    from utils.config import get_api_config
+    from utils.sse import sse_event
+except ImportError:
+    from api.utils.config import get_api_config
+    from api.utils.sse import sse_event
 from gaik.software_components.extractor import DataExtractor, SchemaGenerator, ExtractionRequirements, FieldSpec
 from gaik.software_components.extractor.schema import print_pydantic_schema
-from gaik.software_components.parsers import DoclingApiClientParser, PyMuPDFParser
+from gaik.software_components.parsers import PyMuPDFParser
+from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
 import importlib.util
 import json
 from contextlib import redirect_stdout
