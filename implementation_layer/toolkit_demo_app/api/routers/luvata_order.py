@@ -6,7 +6,6 @@ Demonstrates GAIK toolkit's extraction capabilities for real-world manufacturing
 import csv
 import os
 import io
-import pandas as pd
 from io import BytesIO
 import logging
 import re
@@ -110,8 +109,17 @@ def load_saved_requirements(path: Path) -> tuple[str, ExtractionRequirements]:
     model_name = data["model_name"]
     requirements = ExtractionRequirements(**data["requirements"])
     return model_name, requirements
-# In-memory storage for generated PDFs (temporary, with cleanup)
-pdf_storage: dict[str, bytes] = {}
+# In-memory storage for generated PDFs with TTL cleanup
+PDF_TTL_SECONDS = 3600  # 1 hour
+pdf_storage: dict[str, tuple[bytes, float]] = {}  # job_id -> (pdf_bytes, created_at)
+
+
+def _cleanup_expired_pdfs() -> None:
+    """Remove PDFs older than TTL."""
+    now = datetime.now().timestamp()
+    expired = [k for k, (_, ts) in pdf_storage.items() if now - ts > PDF_TTL_SECONDS]
+    for k in expired:
+        del pdf_storage[k]
 # ============================================================================
 # Pydantic Models
 # ============================================================================
@@ -1002,7 +1010,8 @@ async def process_order(
                 delivery_address=po.delivery_address,
                 invoicing_address=po.invoicing_address,
             )
-            pdf_storage[job_id] = pdf_bytes
+            _cleanup_expired_pdfs()
+            pdf_storage[job_id] = (pdf_bytes, datetime.now().timestamp())
             logger.info(f"Generated PDF with job_id: {job_id}")
             # Build response
             response = ProcessOrderResponse(
@@ -1029,9 +1038,10 @@ async def process_order(
 @router.get("/pdf/{job_id}")
 async def download_pdf(job_id: str, download: bool = False) -> Response:
     """Return generated order draft PDF for inline preview or download."""
-    pdf_bytes = pdf_storage.get(job_id)
-    if not pdf_bytes:
-        raise HTTPException(status_code=404, detail="PDF not found")
+    entry = pdf_storage.get(job_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="PDF not found or expired")
+    pdf_bytes = entry[0]
     disposition = "attachment" if download else "inline"
     return Response(
         content=pdf_bytes,

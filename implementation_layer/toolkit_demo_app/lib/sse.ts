@@ -34,14 +34,17 @@ export interface SSEEvent {
 export function parseSSEEvents(text: string): { events: SSEEvent[]; remaining: string } {
   const events: SSEEvent[] = [];
 
+  // Normalize \r\n and \r to \n (SSE spec allows all three)
+  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
   // Only parse complete events (terminated by \n\n)
-  const lastBoundary = text.lastIndexOf("\n\n");
+  const lastBoundary = normalized.lastIndexOf("\n\n");
   if (lastBoundary === -1) {
-    return { events: [], remaining: text };
+    return { events: [], remaining: normalized };
   }
 
-  const completePart = text.slice(0, lastBoundary);
-  const remaining = text.slice(lastBoundary + 2);
+  const completePart = normalized.slice(0, lastBoundary);
+  const remaining = normalized.slice(lastBoundary + 2);
 
   const lines = completePart.split("\n");
   let currentEvent: { type?: string; data?: string } = {};
