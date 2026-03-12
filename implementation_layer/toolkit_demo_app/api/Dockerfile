@@ -32,15 +32,6 @@ RUN uv pip install --system --no-cache \
 # Install dependencies (gaik[rag-workflow] included in requirements.txt)
 RUN uv pip install --system --no-cache -r requirements.txt
 
-# Patches: copy fixed modules into installed gaik package
-# (remove once gaik is published to PyPI with these fixes)
-COPY api/patches/docling_api_client.py /tmp/docling_api_client.py
-COPY api/patches/transcriber.py /tmp/transcriber.py
-RUN GAIK_LOC=$(pip show gaik | grep "^Location:" | cut -d' ' -f2) && \
-    cp /tmp/docling_api_client.py "$GAIK_LOC/gaik/software_components/parsers/" && \
-    cp /tmp/transcriber.py "$GAIK_LOC/gaik/software_components/transcriber/" && \
-    rm /tmp/docling_api_client.py /tmp/transcriber.py
-
 # Copy API application code
 COPY api/ .
 
