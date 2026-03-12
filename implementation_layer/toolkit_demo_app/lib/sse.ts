@@ -35,7 +35,7 @@ export function parseSSEEvents(text: string): { events: SSEEvent[]; remaining: s
   const events: SSEEvent[] = [];
 
   // Normalize \r\n and \r to \n (SSE spec allows all three)
-  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const normalized = text.replace(/\r\n|\r/g, "\n");
 
   // Only parse complete events (terminated by \n\n)
   const lastBoundary = normalized.lastIndexOf("\n\n");

@@ -3,10 +3,10 @@ Luvata Order Processing API Router
 Handles ABB purchase order processing with BOM matching and pricing calculations.
 Demonstrates GAIK toolkit's extraction capabilities for real-world manufacturing workflows.
 """
+import asyncio
 import csv
 import os
 import io
-from io import BytesIO
 import logging
 import re
 import tempfile
@@ -984,10 +984,8 @@ async def process_order(
             logger.info(f"Extracted PO: {po.po_number} with {len(po.items)} items")
             # 2. Extract BOM data
             yield sse_event("status", {"message": f"Extracting {len(bom_files)} BOMs..."})
-            boms = []
-            for bom_file in bom_files:
-                bom_data = await extract_bom_data(bom_file)
-                boms.append(bom_data)
+            boms = await asyncio.gather(*[extract_bom_data(f) for f in bom_files])
+            for bom_data in boms:
                 logger.info(f"Extracted BOM: {bom_data.material_id}")
             # 3. Parse pricing table
             yield sse_event("status", {"message": "Parsing pricing table..."})
@@ -1010,8 +1008,9 @@ async def process_order(
                 delivery_address=po.delivery_address,
                 invoicing_address=po.invoicing_address,
             )
+            now = datetime.now().timestamp()
             _cleanup_expired_pdfs()
-            pdf_storage[job_id] = (pdf_bytes, datetime.now().timestamp())
+            pdf_storage[job_id] = (pdf_bytes, now)
             logger.info(f"Generated PDF with job_id: {job_id}")
             # Build response
             response = ProcessOrderResponse(
@@ -1039,7 +1038,9 @@ async def process_order(
 async def download_pdf(job_id: str, download: bool = False) -> Response:
     """Return generated order draft PDF for inline preview or download."""
     entry = pdf_storage.get(job_id)
-    if not entry:
+    if not entry or (datetime.now().timestamp() - entry[1] > PDF_TTL_SECONDS):
+        if entry:
+            del pdf_storage[job_id]
         raise HTTPException(status_code=404, detail="PDF not found or expired")
     pdf_bytes = entry[0]
     disposition = "attachment" if download else "inline"
