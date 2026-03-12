@@ -240,11 +240,17 @@ const newUseCases: Demo[] = [
     href: "/video-search",
     icon: Video,
   },
+  {
+    title: "Purchase Order Processing",
+    description:
+      "Upload a purchase order, BOMs, and a pricing table to calculate line-item prices and generate an order draft",
+    href: "/luvata-order",
+    icon: FileBarChart,
+  },
 ];
 
 // Coming Soon items
 const comingSoonUseCases = [
-  { title: "Purchase Order Processing", icon: FileBarChart },
   { title: "Customer onboarding and sales assistant", icon: Headset },
   { title: "Report Writing", icon: FileText },
   { title: "Sales Proposal Generation", icon: FileBarChart },

@@ -38,8 +38,6 @@ router = APIRouter(prefix="/luvata-order", tags=["luvata-order"])
 # Schema directory
 SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
 SCHEMA_DIR.mkdir(exist_ok=True)
-DEBUG_MARKDOWN_DIR = Path(__file__).parent.parent / "debug_markdown"
-DEBUG_MARKDOWN_DIR.mkdir(exist_ok=True)
 def _clean_schema_dump(raw_dump: str) -> str:
     """Strip header/footer lines from print_pydantic_schema output."""
     lines = raw_dump.splitlines()
@@ -199,14 +197,6 @@ def normalize_type_designation(type_des: str) -> str:
         if len(parts) == 2 and parts[1].replace("0", "").replace(".", "") == "":
             normalized = parts[0] + "/" + parts[1].rstrip("0").rstrip(".")
     return normalized
-def _save_parsed_markdown(prefix: str, filename: str | None, markdown: str) -> Path:
-    """Persist parsed markdown for temporary debugging and inspection."""
-    source_name = Path(filename or prefix).stem
-    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", source_name).strip("_") or prefix
-    output_path = DEBUG_MARKDOWN_DIR / f"{prefix}_{safe_name}.md"
-    output_path.write_text(markdown, encoding="utf-8")
-    logger.info(f"Saved parsed markdown to {output_path}")
-    return output_path
 def _parse_document_markdown(file_path: str, original_filename: str | None, prefix: str) -> str:
     """Parse a document via remote Docling client when configured, otherwise fallback locally."""
     api_base = os.getenv("DOCLING_API_BASE") or os.getenv("API_BASE")
@@ -218,7 +208,6 @@ def _parse_document_markdown(file_path: str, original_filename: str | None, pref
             markdown = (result.get("parsed_markdown") or "").strip()
             if markdown:
                 logger.info("Parsed %s via Docling API client", original_filename or file_path)
-                _save_parsed_markdown(prefix, original_filename, markdown)
                 return markdown
             logger.warning(
                 "Docling API client returned empty markdown for %s; falling back to PyMuPDFParser",
@@ -232,7 +221,6 @@ def _parse_document_markdown(file_path: str, original_filename: str | None, pref
             )
     local_parser = PyMuPDFParser()
     markdown = local_parser.parse_pdf(file_path, use_markdown=True)
-    _save_parsed_markdown(prefix, original_filename, markdown)
     return markdown
 def _parse_quantity(raw_quantity: int | str) -> int:
     """Parse quantity robustly (supports EU/US separators)."""
@@ -1039,13 +1027,14 @@ async def process_order(
         },
     )
 @router.get("/pdf/{job_id}")
-async def download_pdf(job_id: str) -> Response:
-    """Download generated order draft PDF"""
+async def download_pdf(job_id: str, download: bool = False) -> Response:
+    """Return generated order draft PDF for inline preview or download."""
     pdf_bytes = pdf_storage.get(job_id)
     if not pdf_bytes:
         raise HTTPException(status_code=404, detail="PDF not found")
+    disposition = "attachment" if download else "inline"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=order_draft_{job_id}.pdf"},
+        headers={"Content-Disposition": f"{disposition}; filename=order_draft_{job_id}.pdf"},
     )

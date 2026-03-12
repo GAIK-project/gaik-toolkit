@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import posthog from "posthog-js";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
@@ -90,6 +90,10 @@ export default function LuvataOrderPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [result, setResult] = useState<ProcessOrderResponse | null>(null);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  const [sourceDocumentsOpen, setSourceDocumentsOpen] = useState(false);
+  const [activeDocumentTab, setActiveDocumentTab] = useState("po");
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const [pricingPreviewText, setPricingPreviewText] = useState("");
 
   const loadExampleData = async () => {
     try {
@@ -218,6 +222,82 @@ export default function LuvataOrderPage() {
       console.error(error);
     }
   };
+
+  useEffect(() => {
+    const nextUrls: Record<string, string> = {};
+    const createdUrls: string[] = [];
+
+    if (poFile) {
+      const url = URL.createObjectURL(poFile);
+      nextUrls.po = url;
+      createdUrls.push(url);
+    }
+
+    bomFiles.forEach((file, index) => {
+      const url = URL.createObjectURL(file);
+      nextUrls[`bom-${index}`] = url;
+      createdUrls.push(url);
+    });
+
+    if (pricingFile) {
+      const url = URL.createObjectURL(pricingFile);
+      nextUrls.pricing = url;
+      createdUrls.push(url);
+    }
+
+    setPreviewUrls(nextUrls);
+
+    return () => {
+      createdUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [poFile, bomFiles, pricingFile]);
+
+  useEffect(() => {
+    if (!pricingFile) {
+      setPricingPreviewText("");
+      return;
+    }
+
+    if (!pricingFile.name.toLowerCase().endsWith(".csv")) {
+      setPricingPreviewText("");
+      return;
+    }
+
+    pricingFile
+      .text()
+      .then((content) => {
+        setPricingPreviewText(content.split("\n").slice(0, 20).join("\n"));
+      })
+      .catch(() => {
+        setPricingPreviewText("");
+      });
+  }, [pricingFile]);
+
+  const documentTabs = [
+    ...(poFile ? [{ key: "po", label: "PO", type: "pdf" as const, file: poFile }] : []),
+    ...bomFiles.map((file, index) => ({
+      key: `bom-${index}`,
+      label: `BOM ${index + 1}`,
+      type: "pdf" as const,
+      file,
+    })),
+    ...(pricingFile
+      ? [{ key: "pricing", label: "Pricing table", type: "sheet" as const, file: pricingFile }]
+      : []),
+  ];
+
+  useEffect(() => {
+    if (documentTabs.length === 0) {
+      setActiveDocumentTab("po");
+      return;
+    }
+
+    if (!documentTabs.some((tab) => tab.key === activeDocumentTab)) {
+      setActiveDocumentTab(documentTabs[0].key);
+    }
+  }, [documentTabs, activeDocumentTab]);
+
+  const activeDocument = documentTabs.find((tab) => tab.key === activeDocumentTab) ?? null;
 
   const resetDemo = () => {
     setPoFile(null);
@@ -412,6 +492,95 @@ export default function LuvataOrderPage() {
         </CardContent>
       </Card>
 
+      {documentTabs.length > 0 && (
+        <Card>
+          <button
+            type="button"
+            onClick={() => setSourceDocumentsOpen((open) => !open)}
+            className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-muted/30"
+            aria-expanded={sourceDocumentsOpen}
+          >
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Source Documents</h2>
+              <p className="mt-1 text-sm text-muted-foreground">View the uploaded input documents.</p>
+            </div>
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <span>{sourceDocumentsOpen ? "Hide" : "Show"}</span>
+              <ChevronDown
+                className={`h-5 w-5 shrink-0 transition-transform ${sourceDocumentsOpen ? "rotate-180" : "rotate-0"}`}
+              />
+            </div>
+          </button>
+          {sourceDocumentsOpen && (
+            <CardContent className="space-y-4 border-t pt-5">
+              <div className="flex flex-wrap gap-2">
+                {documentTabs.map((tab) => (
+                  <Button
+                    key={tab.key}
+                    type="button"
+                    variant={activeDocumentTab === tab.key ? "default" : "outline"}
+                    className="rounded-full"
+                    onClick={() => setActiveDocumentTab(tab.key)}
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="overflow-hidden rounded-xl border bg-muted/15">
+                {activeDocument?.type === "pdf" && previewUrls[activeDocument.key] ? (
+                  <iframe
+                    title={activeDocument.label}
+                    src={`${previewUrls[activeDocument.key]}#toolbar=0`}
+                    className="h-[720px] w-full bg-white"
+                  />
+                ) : activeDocument?.type === "sheet" ? (
+                  <div className="space-y-4 p-5">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{activeDocument.file.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatFileSize(activeDocument.file.size)}
+                        </p>
+                      </div>
+                      {previewUrls[activeDocument.key] && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            window.open(previewUrls[activeDocument.key], "_blank");
+                          }}
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Open file
+                        </Button>
+                      )}
+                    </div>
+
+                    {pricingPreviewText ? (
+                      <div className="rounded-lg border bg-background p-4">
+                        <p className="mb-3 text-sm font-medium text-foreground">CSV preview</p>
+                        <pre className="overflow-x-auto whitespace-pre-wrap text-xs text-muted-foreground">
+                          {pricingPreviewText}
+                        </pre>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-dashed bg-background/70 p-6 text-sm text-muted-foreground">
+                        Spreadsheet preview is not rendered inline for this file type. Use <strong>Open file</strong> to inspect the uploaded pricing table.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-6 text-sm text-muted-foreground">
+                    No preview available for this document.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
       {/* Progress */}
       {processing && (
         <motion.div
@@ -564,13 +733,33 @@ export default function LuvataOrderPage() {
             </CardContent>
           </Card>
 
+          {result.pdf_job_id && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Draft Preview</CardTitle>
+                <CardDescription>
+                  View the generated order-draft PDF directly in the demo.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-hidden rounded-xl border bg-muted/15">
+                  <iframe
+                    title="Order Draft Preview"
+                    src={`/api/luvata-order/pdf/${result.pdf_job_id}#toolbar=0`}
+                    className="h-[720px] w-full bg-white"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Download PDF Button */}
           {result.pdf_job_id && (
             <Button
               variant="outline"
               className="w-full"
               onClick={() => {
-                window.open(`/api/luvata-order/pdf/${result.pdf_job_id}`, "_blank");
+                window.open(`/api/luvata-order/pdf/${result.pdf_job_id}?download=1`, "_blank");
               }}
             >
               <Download className="mr-2 h-4 w-4" />
