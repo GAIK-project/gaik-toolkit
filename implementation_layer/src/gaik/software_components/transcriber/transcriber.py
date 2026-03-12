@@ -184,10 +184,11 @@ class Transcriber:
         return hashlib.md5(f"{file_path.stem}_{timestamp}".encode()).hexdigest()[:10]
 
     def _resolve_transcription_model(self) -> str:
-        use_azure = bool(self.api_config.get("use_azure", False))
-
         if self.transcription_model is None:
-            return "whisper-1" if use_azure else "whisper"
+            # Use config value (e.g. "whisper" from AZURE_TRANSCRIPTION_MODEL),
+            # falling back to "whisper" which works as both Azure deployment name
+            # and OpenAI model name.
+            return self.api_config.get("transcription_model", "whisper")
 
         if self.transcription_model not in ALLOWED_TRANSCRIPTION_MODELS:
             allowed = ", ".join(sorted(ALLOWED_TRANSCRIPTION_MODELS))
@@ -202,8 +203,8 @@ class Transcriber:
         if self.transcription_model == "gpt-4o-transcribe":
             return "gpt-4o-transcribe"
 
-        # explicit transcription_model == "whisper"
-        return "whisper-1" if use_azure else "whisper"
+        # explicit transcription_model == "whisper" -> use config or "whisper"
+        return self.api_config.get("transcription_model", "whisper")
 
     def _warn_ignored_local_options(self, effective_model: str) -> None:
         if effective_model == "whisper_local":
@@ -422,7 +423,7 @@ def split_and_transcribe_with_context(
     use_azure = bool(api_config.get("use_azure", False))
     api_key = api_config.get("api_key")
     if transcription_model is None:
-        transcription_model = api_config.get("transcription_model", "whisper-1")
+        transcription_model = api_config.get("transcription_model", "whisper")
 
     if audio is None:
         audio = AudioSegment.from_file(audio_path)
