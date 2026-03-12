@@ -9,9 +9,21 @@ from pathlib import Path
 from typing import Literal
 
 try:
-    from utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, get_api_config, sse_event, validate_file_size
+    from utils import (
+        MAX_FILE_SIZE_BYTES,
+        MAX_FILE_SIZE_MB,
+        get_api_config,
+        sse_event,
+        validate_file_size,
+    )
 except ImportError:
-    from api.utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, get_api_config, sse_event, validate_file_size
+    from api.utils import (
+        MAX_FILE_SIZE_BYTES,
+        MAX_FILE_SIZE_MB,
+        get_api_config,
+        sse_event,
+        validate_file_size,
+    )
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
@@ -41,6 +53,7 @@ async def cleanup_old_pdfs():
                 del PDF_STORAGE[job_id]
             if job_id in PDF_TIMESTAMPS:
                 del PDF_TIMESTAMPS[job_id]
+
 
 # Logo path for PDF generation (letter-only logo works better for PDF headers)
 LOGO_PATH = Path(__file__).parent.parent.parent / "public" / "logos" / "gaik-logo-letter-only.png"
@@ -262,7 +275,10 @@ async def document_pipeline(
     if suffix not in supported_docs + supported_images:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {suffix}. Supported: {', '.join(supported_docs + supported_images)}",
+            detail=(
+                f"Unsupported file type: {suffix}. "
+                f"Supported: {', '.join(supported_docs + supported_images)}"
+            ),
         )
 
     # Auto-detect parser type
@@ -517,8 +533,12 @@ async def audio_pipeline_stream(
     # Validate file size
     content = await file.read()
     if len(content) > MAX_FILE_SIZE_BYTES:
+
         async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event("error", {"message": f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB"})
+            yield sse_event(
+                "error", {"message": f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB"}
+            )
+
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
     # Save uploaded file
@@ -839,7 +859,9 @@ async def document_pipeline_stream(
     if len(content) > MAX_FILE_SIZE_BYTES:
 
         async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event("error", {"message": f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB"})
+            yield sse_event(
+                "error", {"message": f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB"}
+            )
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 

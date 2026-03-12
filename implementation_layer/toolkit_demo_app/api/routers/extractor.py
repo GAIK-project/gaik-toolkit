@@ -4,10 +4,11 @@ try:
     from utils import get_api_config
 except ImportError:
     from api.utils import get_api_config
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 import hashlib
 from typing import Any
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -104,7 +105,8 @@ async def generate_schema(request: GenerateSchemaRequest):
             default_value = "None" if not field.required else "..."
             desc = field.description.replace('"', '\\"')
             schema_lines.append(
-                f'    {field.field_name}: {field_type} = Field({default_value}, description="{desc}")'
+                f"    {field.field_name}: {field_type} = "
+                f'Field({default_value}, description="{desc}")'
             )
 
         schema_code = "\n".join(schema_lines)

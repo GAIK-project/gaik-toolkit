@@ -96,6 +96,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error"},
     )
 
+
 # Include routers
 app.include_router(parser.router, prefix="/parse", tags=["Parser"])
 app.include_router(classifier.router, prefix="/classify", tags=["Classifier"])

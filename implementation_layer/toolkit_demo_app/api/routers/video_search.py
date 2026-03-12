@@ -74,6 +74,7 @@ def _get_embedder():
 
 # ---------- Models ----------
 
+
 class VideoInfo(BaseModel):
     video_id: str
     video_title: str
@@ -104,6 +105,7 @@ class StatusResponse(BaseModel):
 
 
 # ---------- Endpoints ----------
+
 
 @router.get("/status", response_model=StatusResponse)
 async def video_search_status():

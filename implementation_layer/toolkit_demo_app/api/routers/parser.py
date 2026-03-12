@@ -17,7 +17,9 @@ router = APIRouter()
 @router.post("")
 async def parse_document(
     file: UploadFile = File(...),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api"] = Form("auto"),
+    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api"] = Form(
+        "auto"
+    ),
 ):
     """
     Parse a document (PDF, DOCX, or image) and extract text content.
@@ -35,7 +37,10 @@ async def parse_document(
     if suffix not in supported_docs + supported_images:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {suffix}. Supported: {', '.join(supported_docs + supported_images)}",
+            detail=(
+                f"Unsupported file type: {suffix}. "
+                f"Supported: {', '.join(supported_docs + supported_images)}"
+            ),
         )
 
     # Validate file size and save temporarily
@@ -99,7 +104,10 @@ async def parse_document(
             if not api_base or not password:
                 raise HTTPException(
                     status_code=503,
-                    detail="Docling API not configured (DOCLING_API_BASE / DOCLING_API_PASSWORD missing)",
+                    detail=(
+                        "Docling API not configured "
+                        "(DOCLING_API_BASE / DOCLING_API_PASSWORD missing)"
+                    ),
                 )
             parser = DoclingApiClientParser(api_base=api_base, password=password)
             result_raw = parser.parse_document(tmp_path)

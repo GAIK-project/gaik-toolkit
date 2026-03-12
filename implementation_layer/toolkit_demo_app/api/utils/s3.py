@@ -58,7 +58,9 @@ def ensure_object_exists(s3, bucket: str, key: str, *, label: str) -> None:
         raise
 
 
-def generate_presigned_url(video_id: str, filename: str, *, label: str, expires_in: int = 900) -> dict:
+def generate_presigned_url(
+    video_id: str, filename: str, *, label: str, expires_in: int = 900
+) -> dict:
     """Generate a presigned S3 URL for a video asset.
 
     Args:

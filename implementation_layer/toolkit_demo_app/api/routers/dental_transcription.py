@@ -9,9 +9,21 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 try:
-    from utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, create_s3_client, sse_error_response, sse_event
+    from utils import (
+        MAX_FILE_SIZE_BYTES,
+        MAX_FILE_SIZE_MB,
+        create_s3_client,
+        sse_error_response,
+        sse_event,
+    )
 except ImportError:
-    from api.utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, create_s3_client, sse_error_response, sse_event
+    from api.utils import (
+        MAX_FILE_SIZE_BYTES,
+        MAX_FILE_SIZE_MB,
+        create_s3_client,
+        sse_error_response,
+        sse_event,
+    )
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 

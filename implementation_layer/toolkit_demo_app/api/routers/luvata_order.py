@@ -3,40 +3,50 @@ Luvata Order Processing API Router
 Handles ABB purchase order processing with BOM matching and pricing calculations.
 Demonstrates GAIK toolkit's extraction capabilities for real-world manufacturing workflows.
 """
+
 import asyncio
-import csv
-import os
 import io
 import logging
+import os
 import re
 import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
+
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 from fpdf import FPDF
 from openpyxl import load_workbook
 from pydantic import BaseModel, Field
+
 try:
     from utils.config import get_api_config
     from utils.sse import sse_event
 except ImportError:
     from api.utils.config import get_api_config
     from api.utils.sse import sse_event
-from gaik.software_components.extractor import DataExtractor, SchemaGenerator, ExtractionRequirements, FieldSpec
-from gaik.software_components.extractor.schema import print_pydantic_schema
-from gaik.software_components.parsers import PyMuPDFParser
-from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
 import importlib.util
 import json
 from contextlib import redirect_stdout
+
+from gaik.software_components.extractor import (
+    DataExtractor,
+    ExtractionRequirements,
+    SchemaGenerator,
+)
+from gaik.software_components.extractor.schema import print_pydantic_schema
+from gaik.software_components.parsers import PyMuPDFParser
+from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/luvata-order", tags=["luvata-order"])
 # Schema directory
 SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
 SCHEMA_DIR.mkdir(exist_ok=True)
+
+
 def _clean_schema_dump(raw_dump: str) -> str:
     """Strip header/footer lines from print_pydantic_schema output."""
     lines = raw_dump.splitlines()
@@ -49,6 +59,8 @@ def _clean_schema_dump(raw_dump: str) -> str:
     while body and (set(body[-1].strip()) == {"="} or not body[-1].strip()):
         body.pop()
     return "\n".join(body).strip()
+
+
 def _sanitize_schema_code(schema_code: str) -> str:
     """
     Normalize generated schema code so cached modules are self-contained.
@@ -57,10 +69,10 @@ def _sanitize_schema_code(schema_code: str) -> str:
     inside the cached module unless the whole package path is imported, and the
     referenced classes are already emitted in the same file anyway.
     """
-    schema_code = schema_code.replace(
-        "gaik.software_components.extractor.schema.", ""
-    )
+    schema_code = schema_code.replace("gaik.software_components.extractor.schema.", "")
     return schema_code
+
+
 def save_schema_to_python(model: type, path: Path) -> None:
     """Dump the generated Pydantic model into a valid Python file."""
     buffer = io.StringIO()
@@ -78,6 +90,8 @@ from pydantic import BaseModel, Field, ConfigDict
 '''
     path.write_text(template, encoding="utf-8")
     logger.info(f"Schema saved to {path}")
+
+
 def save_requirements(requirements: ExtractionRequirements, model_name: str, path: Path) -> None:
     """Save extraction requirements to JSON."""
     payload = {
@@ -86,6 +100,8 @@ def save_requirements(requirements: ExtractionRequirements, model_name: str, pat
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     logger.info(f"Requirements saved to {path}")
+
+
 def load_saved_schema(path: Path, model_name: str):
     """Load the previously saved schema module and return the model class."""
     source = path.read_text(encoding="utf-8")
@@ -103,12 +119,16 @@ def load_saved_schema(path: Path, model_name: str):
         raise
     model_cls = getattr(module, model_name)
     return model_cls
+
+
 def load_saved_requirements(path: Path) -> tuple[str, ExtractionRequirements]:
     """Load extraction requirements from JSON."""
     data = json.loads(path.read_text(encoding="utf-8"))
     model_name = data["model_name"]
     requirements = ExtractionRequirements(**data["requirements"])
     return model_name, requirements
+
+
 # In-memory storage for generated PDFs with TTL cleanup
 PDF_TTL_SECONDS = 3600  # 1 hour
 pdf_storage: dict[str, tuple[bytes, float]] = {}  # job_id -> (pdf_bytes, created_at)
@@ -120,25 +140,34 @@ def _cleanup_expired_pdfs() -> None:
     expired = [k for k, (_, ts) in pdf_storage.items() if now - ts > PDF_TTL_SECONDS]
     for k in expired:
         del pdf_storage[k]
+
+
 # ============================================================================
 # Pydantic Models
 # ============================================================================
 class POItem(BaseModel):
     """Purchase Order line item"""
+
     material: str = Field(description="Material number/code")
     description: str = Field(description="Item description")
     quantity: int = Field(description="Order quantity")
     delivery_date: str | None = Field(None, description="Requested delivery date")
+
+
 class PurchaseOrder(BaseModel):
     """Purchase Order data"""
+
     po_number: str = Field(description="Purchase order number")
     customer: str = Field(description="Customer name")
     customer_address: str | None = Field(default=None, description="Customer/buyer address block")
     delivery_address: str | None = Field(default=None, description="Delivery address block")
     invoicing_address: str | None = Field(default=None, description="Invoicing address block")
     items: list[POItem] = Field(description="Order line items")
+
+
 class BOMData(BaseModel):
     """Bill of Materials data"""
+
     material_id: str = Field(description="Material ID (e.g., AL-001)")
     type_designation: str = Field(description="Product type designation")
     dimensions: str = Field(description="Product dimensions")
@@ -146,16 +175,24 @@ class BOMData(BaseModel):
     cutting_required: bool = Field(default=False, description="Cutting service required")
     testing_required: bool = Field(default=False, description="Testing service required")
     certificates_required: bool = Field(default=False, description="Certificates required")
+
+
 class PricingRow(BaseModel):
     """Pricing table row"""
-    material_id: str | None = Field(default=None, description="Material/item identifier from the pricing table")
+
+    material_id: str | None = Field(
+        default=None, description="Material/item identifier from the pricing table"
+    )
     type_designation: str = Field(description="Product type designation")
     unit_price: float = Field(description="Base unit price (USD)")
     cutting_fee: float = Field(default=0.0, description="Cutting fee (USD)")
     testing_fee: float = Field(default=0.0, description="Testing fee (USD)")
     cert_fee: float = Field(default=0.0, description="Certificate fee (USD)")
+
+
 class EnrichedItem(BaseModel):
     """Enriched order item with calculated pricing"""
+
     material: str
     description: str
     type_designation: str | None = None
@@ -171,15 +208,21 @@ class EnrichedItem(BaseModel):
     bom_match: bool = False
     price_match: bool = False
     error: str | None = None
+
+
 class OrderSummary(BaseModel):
     """Order summary totals"""
+
     total_items: int
     total_quantity: int
     material_subtotal: float
     total_fees: float
     grand_total: float
+
+
 class ProcessOrderResponse(BaseModel):
     """Response from order processing"""
+
     success: bool
     po_number: str | None = None
     customer: str | None = None
@@ -188,6 +231,8 @@ class ProcessOrderResponse(BaseModel):
     errors: list[str] = []
     warnings: list[str] = []
     pdf_job_id: str | None = None
+
+
 # ============================================================================
 # Helper Functions
 # ============================================================================
@@ -205,6 +250,8 @@ def normalize_type_designation(type_des: str) -> str:
         if len(parts) == 2 and parts[1].replace("0", "").replace(".", "") == "":
             normalized = parts[0] + "/" + parts[1].rstrip("0").rstrip(".")
     return normalized
+
+
 def _parse_document_markdown(file_path: str, original_filename: str | None, prefix: str) -> str:
     """Parse a document via remote Docling client when configured, otherwise fallback locally."""
     api_base = os.getenv("DOCLING_API_BASE") or os.getenv("API_BASE")
@@ -230,6 +277,8 @@ def _parse_document_markdown(file_path: str, original_filename: str | None, pref
     local_parser = PyMuPDFParser()
     markdown = local_parser.parse_pdf(file_path, use_markdown=True)
     return markdown
+
+
 def _parse_quantity(raw_quantity: int | str) -> int:
     """Parse quantity robustly (supports EU/US separators)."""
     if isinstance(raw_quantity, int):
@@ -263,6 +312,8 @@ def _parse_quantity(raw_quantity: int | str) -> int:
         else:
             s = s.replace(",", ".")
     return int(float(s))
+
+
 def _extract_fee_flags_from_bom_text(text: str) -> dict[str, bool]:
     """
     Extract BOM fee flags from raw text.
@@ -279,17 +330,21 @@ def _extract_fee_flags_from_bom_text(text: str) -> dict[str, bool]:
             r"^(cert\.? required|certificates required)\s*:?$", re.IGNORECASE
         ),
     }
+
     def parse_value(value: str) -> bool | None:
         normalized = " ".join(value.lower().split())
         if not normalized:
             return None
         if normalized in {"no", "not required", "none", "n/a"}:
             return False
-        if any(token in normalized for token in ["yes", "1 lot", "1 certificate", "certificate", "lot"]):
+        if any(
+            token in normalized for token in ["yes", "1 lot", "1 certificate", "certificate", "lot"]
+        ):
             return True
         if re.search(r"\d+\s*(lot|lots|certificate|certificates)", normalized):
             return True
         return None
+
     label_positions: dict[str, list[int]] = {key: [] for key in label_patterns}
     for idx, line in enumerate(lines):
         for key, pattern in label_patterns.items():
@@ -309,7 +364,11 @@ def _extract_fee_flags_from_bom_text(text: str) -> dict[str, bool]:
     unresolved = [key for key, value in values.items() if value is None and label_positions[key]]
     if unresolved:
         ordered_labels = sorted(
-            [(positions[0], key) for key, positions in label_positions.items() if positions and values[key] is None],
+            [
+                (positions[0], key)
+                for key, positions in label_positions.items()
+                if positions and values[key] is None
+            ],
             key=lambda item: item[0],
         )
         start = min(index for index, _ in ordered_labels)
@@ -325,6 +384,8 @@ def _extract_fee_flags_from_bom_text(text: str) -> dict[str, bool]:
         "cutting_required": bool(values["cutting_required"]),
         "certificates_required": bool(values["certificates_required"]),
     }
+
+
 def _extract_po_address_block(text: str) -> tuple[str, str | None]:
     """Extract the buyer header block from parsed PO markdown."""
     lines = [line.strip() for line in text.splitlines() if line.strip()]
@@ -345,6 +406,8 @@ def _extract_po_address_block(text: str) -> tuple[str, str | None]:
     customer_name = header_lines[0] if header_lines else ""
     address_block = "\n".join(header_lines[1:]).strip() or None
     return customer_name, address_block
+
+
 def match_material_to_bom(material: str, boms: list[BOMData]) -> BOMData | None:
     """
     Match PO material number to BOM material ID.
@@ -355,6 +418,8 @@ def match_material_to_bom(material: str, boms: list[BOMData]) -> BOMData | None:
         if bom.material_id.upper().strip() == material_upper:
             return bom
     return None
+
+
 def match_type_to_pricing(
     type_designation: str, pricing_rows: list[PricingRow]
 ) -> PricingRow | None:
@@ -371,6 +436,8 @@ def match_type_to_pricing(
         if normalized_type in normalized_row or normalized_row in normalized_type:
             return row
     return None
+
+
 def match_pricing(
     material: str, type_designation: str, pricing_rows: list[PricingRow]
 ) -> PricingRow | None:
@@ -380,9 +447,9 @@ def match_pricing(
         if row.material_id and row.material_id.upper().strip() == material_upper:
             return row
     return match_type_to_pricing(type_designation, pricing_rows)
-def calculate_simple_pricing(
-    item: POItem, bom: BOMData, pricing: PricingRow
-) -> EnrichedItem:
+
+
+def calculate_simple_pricing(item: POItem, bom: BOMData, pricing: PricingRow) -> EnrichedItem:
     """
     Calculate simple unit-based pricing:
     material_subtotal = quantity × unit_price
@@ -415,6 +482,8 @@ def calculate_simple_pricing(
         bom_match=True,
         price_match=True,
     )
+
+
 def enrich_products(
     po: PurchaseOrder, boms: list[BOMData], pricing_rows: list[PricingRow]
 ) -> tuple[list[EnrichedItem], list[str]]:
@@ -444,7 +513,8 @@ def enrich_products(
         pricing = match_pricing(item.material, bom.type_designation, pricing_rows)
         if not pricing:
             error_msg = (
-                f"No pricing found for material '{item.material}' or type designation '{bom.type_designation}'"
+                f"No pricing found for material '{item.material}' "
+                f"or type designation '{bom.type_designation}'"
             )
             errors.append(error_msg)
             enriched_items.append(
@@ -464,6 +534,8 @@ def enrich_products(
         enriched_item = calculate_simple_pricing(item, bom, pricing)
         enriched_items.append(enriched_item)
     return enriched_items, errors
+
+
 def calculate_summary(items: list[EnrichedItem]) -> OrderSummary:
     """Calculate order summary totals"""
     total_items = len(items)
@@ -478,6 +550,8 @@ def calculate_summary(items: list[EnrichedItem]) -> OrderSummary:
         total_fees=round(total_fees, 2),
         grand_total=round(grand_total, 2),
     )
+
+
 async def extract_po_data(po_file: UploadFile) -> PurchaseOrder:
     """Extract purchase order data from PDF using GAIK with schema caching"""
     pdf_bytes = await po_file.read()
@@ -493,27 +567,29 @@ async def extract_po_data(po_file: UploadFile) -> PurchaseOrder:
         requirements_path = SCHEMA_DIR / "po_requirements.json"
         user_requirements = (
             "Extract purchase order number, customer or buyer name, and line items. "
-            "If available, also extract customer_address, delivery_address, and invoicing_address as text blocks. "
-            "Each item should include material number, description, quantity as integer, and delivery date if available."
+            "If available, also extract customer_address, delivery_address, "
+            "and invoicing_address as text blocks. "
+            "Each item should include material number, description, "
+            "quantity as integer, and delivery date if available."
         )
         # Check if schema exists
         if schema_path.exists() and requirements_path.exists():
             logger.info("Loading existing PO schema...")
             model_name, requirements = load_saved_requirements(requirements_path)
-            POModel = load_saved_schema(schema_path, model_name)
+            po_model = load_saved_schema(schema_path, model_name)
         else:
             logger.info("Generating new PO schema...")
             generator = SchemaGenerator(config=config)
-            POModel = generator.generate_schema(user_requirements=user_requirements)
-            
+            po_model = generator.generate_schema(user_requirements=user_requirements)
+
             # Save schema and requirements
-            save_schema_to_python(POModel, schema_path)
-            save_requirements(generator.item_requirements, POModel.__name__, requirements_path)
+            save_schema_to_python(po_model, schema_path)
+            save_requirements(generator.item_requirements, po_model.__name__, requirements_path)
             requirements = generator.item_requirements
         # Extract data
         extractor = DataExtractor(config)
         result = extractor.extract(
-            extraction_model=POModel,
+            extraction_model=po_model,
             requirements=requirements,
             user_requirements=user_requirements,
             documents=[text],
@@ -535,14 +611,31 @@ async def extract_po_data(po_file: UploadFile) -> PurchaseOrder:
             or None
         )
         delivery_address = po_data.get("delivery_address") or None
-        invoicing_address = po_data.get("invoicing_address") or po_data.get("invoice_address") or None
+        invoicing_address = (
+            po_data.get("invoicing_address") or po_data.get("invoice_address") or None
+        )
         if line_items:
             first_item = line_items[0]
-            po_number = po_number or first_item.get("purchase_order_number") or first_item.get("po_number") or ""
-            customer = customer or first_item.get("customer_name") or first_item.get("customer") or ""
-            customer_address = customer_address or first_item.get("customer_address") or first_item.get("buyer_address")
+            po_number = (
+                po_number
+                or first_item.get("purchase_order_number")
+                or first_item.get("po_number")
+                or ""
+            )
+            customer = (
+                customer or first_item.get("customer_name") or first_item.get("customer") or ""
+            )
+            customer_address = (
+                customer_address
+                or first_item.get("customer_address")
+                or first_item.get("buyer_address")
+            )
             delivery_address = delivery_address or first_item.get("delivery_address")
-            invoicing_address = invoicing_address or first_item.get("invoicing_address") or first_item.get("invoice_address")
+            invoicing_address = (
+                invoicing_address
+                or first_item.get("invoicing_address")
+                or first_item.get("invoice_address")
+            )
         customer = customer or header_customer
         customer_address = customer_address or header_address
         delivery_address = delivery_address or customer_address
@@ -568,6 +661,8 @@ async def extract_po_data(po_file: UploadFile) -> PurchaseOrder:
         )
     finally:
         Path(tmp_path).unlink(missing_ok=True)
+
+
 async def extract_bom_data(bom_file: UploadFile) -> BOMData:
     """Extract BOM data from PDF using GAIK with schema caching"""
     pdf_bytes = await bom_file.read()
@@ -583,34 +678,41 @@ async def extract_bom_data(bom_file: UploadFile) -> BOMData:
         requirements_path = SCHEMA_DIR / "bom_requirements.json"
         user_requirements = (
             "Extract material ID, product type designation, dimensions, and material grade. "
-            "Also extract the boolean flags cutting_required, testing_required, and certificates_required. "
-            "Use only the BOM fee labels and their values for these booleans: 'Testing Required:', "
-            "'Cutting Required:', and 'Cert. Required:' or 'Certificates Required:'. "
-            "The values may appear on later lines in the same order as the labels. "
-            "Map '1 lot', 'Yes', or any explicit testing quantity to testing_required=True. "
-            "Map '1 certificate', 'certificate required', 'Yes', or any explicit certificate quantity to "
+            "Also extract the boolean flags cutting_required, "
+            "testing_required, and certificates_required. "
+            "Use only the BOM fee labels and their values for these "
+            "booleans: 'Testing Required:', "
+            "'Cutting Required:', and 'Cert. Required:' "
+            "or 'Certificates Required:'. "
+            "The values may appear on later lines in the same order "
+            "as the labels. "
+            "Map '1 lot', 'Yes', or any explicit testing quantity "
+            "to testing_required=True. "
+            "Map '1 certificate', 'certificate required', 'Yes', "
+            "or any explicit certificate quantity to "
             "certificates_required=True. "
             "Map 'No' to False for the corresponding label only. "
-            "Do not infer fee flags from unrelated technical text, and do not mix testing, cutting, and "
+            "Do not infer fee flags from unrelated technical text, "
+            "and do not mix testing, cutting, and "
             "certificate values with each other."
         )
         # Check if schema exists
         if schema_path.exists() and requirements_path.exists():
             logger.info("Loading existing BOM schema...")
             model_name, requirements = load_saved_requirements(requirements_path)
-            BOMModel = load_saved_schema(schema_path, model_name)
+            bom_model = load_saved_schema(schema_path, model_name)
         else:
             logger.info("Generating new BOM schema...")
             generator = SchemaGenerator(config=config)
-            BOMModel = generator.generate_schema(user_requirements=user_requirements)
+            bom_model = generator.generate_schema(user_requirements=user_requirements)
             # Save schema and requirements
-            save_schema_to_python(BOMModel, schema_path)
-            save_requirements(generator.item_requirements, BOMModel.__name__, requirements_path)
+            save_schema_to_python(bom_model, schema_path)
+            save_requirements(generator.item_requirements, bom_model.__name__, requirements_path)
             requirements = generator.item_requirements
         # Extract data
         extractor = DataExtractor(config)
         result = extractor.extract(
-            extraction_model=BOMModel,
+            extraction_model=bom_model,
             requirements=requirements,
             user_requirements=user_requirements,
             documents=[text],
@@ -625,13 +727,18 @@ async def extract_bom_data(bom_file: UploadFile) -> BOMData:
             type_designation=bom_data.get("type_designation", ""),
             dimensions=bom_data.get("dimensions", ""),
             material_grade=bom_data.get("material_grade", ""),
-            cutting_required=fee_flags["cutting_required"] or bom_data.get("cutting_required", False),
-            testing_required=fee_flags["testing_required"] or bom_data.get("testing_required", False),
-            certificates_required=fee_flags["certificates_required"] or bom_data.get("certificates_required", False),
+            cutting_required=fee_flags["cutting_required"]
+            or bom_data.get("cutting_required", False),
+            testing_required=fee_flags["testing_required"]
+            or bom_data.get("testing_required", False),
+            certificates_required=fee_flags["certificates_required"]
+            or bom_data.get("certificates_required", False),
         )
         return bom
     finally:
         Path(tmp_path).unlink(missing_ok=True)
+
+
 async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
     """Parse pricing Excel file with dynamic header detection.
     Supports both:
@@ -641,8 +748,10 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
     content_bytes = await pricing_file.read()
     if not content_bytes:
         return []
+
     def norm(value: object) -> str:
         return re.sub(r"[^a-z0-9]+", "", str(value).lower())
+
     def to_float(value: object) -> float:
         if value is None:
             return 0.0
@@ -652,6 +761,7 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
         if not raw or raw.lower() in {"nan", "none"} or "#" in raw:
             return 0.0
         return float(raw.replace(",", "."))
+
     try:
         workbook = load_workbook(io.BytesIO(content_bytes), data_only=True)
         try:
@@ -664,9 +774,10 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
         for idx, row in enumerate(rows):
             normalized = [norm(cell) for cell in row]
             row_map = {name: i for i, name in enumerate(normalized) if name}
-            has_generic = any(k in row_map for k in ("type", "typedesignation", "partdesignation", "typepartdesignation")) and any(
-                k in row_map for k in ("unitprice", "priceperunit", "price")
-            )
+            has_generic = any(
+                k in row_map
+                for k in ("type", "typedesignation", "partdesignation", "typepartdesignation")
+            ) and any(k in row_map for k in ("unitprice", "priceperunit", "price"))
             has_abb = "type" in row_map and "conversion" in row_map and "copper" in row_map
             if has_generic or has_abb:
                 header_row_idx = idx
@@ -677,11 +788,13 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
         if header_row_idx is None:
             logger.error("Could not find required columns in Excel file")
             return []
+
         def first_col(*names: str) -> int | None:
             for name in names:
                 if name in header_map:
                     return header_map[name]
             return None
+
         item_col = first_col("itemno", "itemnumber", "materialid", "materialnumber", "id")
         type_col = first_col("type", "typedesignation", "partdesignation", "typepartdesignation")
         generic_price_col = first_col("unitprice", "priceperunit", "price")
@@ -691,8 +804,11 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
         cert_col = first_col("certificatefee", "certfee", "certificationfee")
         logger.info(
             "Matched columns - "
-            f"Item: {item_col}, Type: {type_col}, Generic Price: {generic_price_col}, ABB Price: {abb_price_col}, "
-            f"Cutting: {cutting_col}, Testing: {testing_col}, Cert: {cert_col}"
+            f"Item: {item_col}, Type: {type_col}, "
+            f"Generic Price: {generic_price_col}, "
+            f"ABB Price: {abb_price_col}, "
+            f"Cutting: {cutting_col}, "
+            f"Testing: {testing_col}, Cert: {cert_col}"
         )
         pricing_rows: list[PricingRow] = []
         for row in rows[header_row_idx + 1 :]:
@@ -709,11 +825,27 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
             try:
                 if generic_price_col is not None and generic_price_col < len(row):
                     unit_price = to_float(row[generic_price_col])
-                    cutting_fee = to_float(row[cutting_col]) if cutting_col is not None and cutting_col < len(row) else 0.0
-                    testing_fee = to_float(row[testing_col]) if testing_col is not None and testing_col < len(row) else 0.0
-                    cert_fee = to_float(row[cert_col]) if cert_col is not None and cert_col < len(row) else 0.0
+                    cutting_fee = (
+                        to_float(row[cutting_col])
+                        if cutting_col is not None and cutting_col < len(row)
+                        else 0.0
+                    )
+                    testing_fee = (
+                        to_float(row[testing_col])
+                        if testing_col is not None and testing_col < len(row)
+                        else 0.0
+                    )
+                    cert_fee = (
+                        to_float(row[cert_col])
+                        if cert_col is not None and cert_col < len(row)
+                        else 0.0
+                    )
                 else:
-                    unit_price = to_float(row[abb_price_col]) if abb_price_col is not None and abb_price_col < len(row) else 0.0
+                    unit_price = (
+                        to_float(row[abb_price_col])
+                        if abb_price_col is not None and abb_price_col < len(row)
+                        else 0.0
+                    )
                     cutting_fee = 0.0
                     testing_fee = 0.0
                     cert_fee = 0.0
@@ -737,6 +869,8 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
     except Exception as e:
         logger.error(f"Error parsing pricing file: {e}", exc_info=True)
         return []
+
+
 def generate_pdf(
     po_number: str,
     customer: str,
@@ -748,10 +882,12 @@ def generate_pdf(
 ) -> bytes:
     """Generate a structured order-draft PDF with demo-specific branding."""
     logo_path = Path(__file__).parent.parent.parent / "public" / "logo.png"
+
     def money(value: float | None) -> str:
         if value is None:
             return "-"
         return f"USD {value:,.2f}"
+
     def split_text(pdf: FPDF, value: str, width: float) -> list[str]:
         text_value = str(value or "").replace("\r", "")
         paragraphs = text_value.split("\n")
@@ -771,10 +907,14 @@ def generate_pdf(
                     current = word
             lines.append(current)
         return lines or [""]
+
     def ensure_space(pdf: FPDF, height: float) -> None:
         if pdf.get_y() + height > pdf.page_break_trigger:
             pdf.add_page()
-    def render_info_block(pdf: FPDF, x: float, y: float, width: float, title: str, body: str) -> float:
+
+    def render_info_block(
+        pdf: FPDF, x: float, y: float, width: float, title: str, body: str
+    ) -> float:
         pdf.set_xy(x, y)
         pdf.set_fill_color(245, 247, 250)
         pdf.set_draw_color(220, 225, 232)
@@ -800,6 +940,7 @@ def generate_pdf(
             pdf.cell(inner_width, line_height, line, new_x="LMARGIN", new_y="NEXT")
             pdf.set_x(x + 3)
         return box_height
+
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.add_page()
@@ -825,7 +966,9 @@ def generate_pdf(
     invoice_body = invoicing_address or customer_address or customer or "Not available"
     left_y = top_y
     left_y += render_info_block(pdf, left_x, left_y, left_width, "Buyer", buyer_body) + 4
-    left_y += render_info_block(pdf, left_x, left_y, left_width, "Delivery address", delivery_body) + 4
+    left_y += (
+        render_info_block(pdf, left_x, left_y, left_width, "Delivery address", delivery_body) + 4
+    )
     left_y += render_info_block(pdf, left_x, left_y, left_width, "Invoicing address", invoice_body)
     order_details = [
         ("Date", datetime.now().strftime("%d/%m/%Y")),
@@ -947,6 +1090,8 @@ def generate_pdf(
     if isinstance(output, str):
         return output.encode("latin1")
     return bytes(output)
+
+
 # ============================================================================
 # API Endpoints
 # ============================================================================
@@ -965,6 +1110,7 @@ async def process_order(
     4. Match and calculate pricing
     5. Return enriched order data
     """
+
     async def generate():
         try:
             # Validate inputs
@@ -1026,6 +1172,7 @@ async def process_order(
         except Exception as e:
             logger.exception("Error processing order")
             yield sse_event("error", {"message": str(e)})
+
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
@@ -1034,6 +1181,8 @@ async def process_order(
             "X-Accel-Buffering": "no",
         },
     )
+
+
 @router.get("/pdf/{job_id}")
 async def download_pdf(job_id: str, download: bool = False) -> Response:
     """Return generated order draft PDF for inline preview or download."""

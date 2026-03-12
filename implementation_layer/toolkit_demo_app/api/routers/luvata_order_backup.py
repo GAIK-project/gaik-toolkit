@@ -5,17 +5,13 @@ Handles ABB purchase order processing with BOM matching and pricing calculations
 Demonstrates GAIK toolkit's extraction capabilities for real-world manufacturing workflows.
 """
 
-import io
 import logging
-import uuid
-from pathlib import Path
 from typing import Annotated
 
+from api.utils.sse import sse_event
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
-
-from api.utils.sse import sse_event
 
 logger = logging.getLogger(__name__)
 
@@ -155,9 +151,7 @@ def match_type_to_pricing(
     return None
 
 
-def calculate_abb_pricing(
-    item: POItem, bom: BOMData, pricing: PricingRow
-) -> EnrichedItem:
+def calculate_abb_pricing(item: POItem, bom: BOMData, pricing: PricingRow) -> EnrichedItem:
     """
     Calculate ABB pricing using the formula:
     kg_per_pc = weight_per_m × (length_mm / 1000)
@@ -168,12 +162,7 @@ def calculate_abb_pricing(
     """
     kg_per_pc = pricing.weight_per_m * (bom.length_mm / 1000)
     total_kg = kg_per_pc * item.quantity
-    margin = (
-        pricing.conversion
-        + pricing.packing
-        + pricing.machining
-        + pricing.energy_surcharge
-    )
+    margin = pricing.conversion + pricing.packing + pricing.machining + pricing.energy_surcharge
     total_price = margin + pricing.copper_price
     line_total = total_kg * total_price
 
@@ -225,9 +214,7 @@ def enrich_products(
         # Match to pricing
         pricing = match_type_to_pricing(bom.type_designation, pricing_rows)
         if not pricing:
-            error_msg = (
-                f"No pricing found for type designation '{bom.type_designation}'"
-            )
+            error_msg = f"No pricing found for type designation '{bom.type_designation}'"
             errors.append(error_msg)
             enriched_items.append(
                 EnrichedItem(
@@ -305,9 +292,7 @@ async def process_order(
 
             # TODO: Implement actual extraction using GAIK toolkit
             # For now, return mock data structure
-            yield sse_event(
-                "status", {"message": "Extracting purchase order data..."}
-            )
+            yield sse_event("status", {"message": "Extracting purchase order data..."})
 
             # Mock PO data
             po = PurchaseOrder(
