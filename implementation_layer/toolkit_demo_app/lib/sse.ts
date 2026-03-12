@@ -31,9 +31,19 @@ export interface SSEEvent {
  *
  * ```
  */
-export function parseSSEEvents(text: string): SSEEvent[] {
+export function parseSSEEvents(text: string): { events: SSEEvent[]; remaining: string } {
   const events: SSEEvent[] = [];
-  const lines = text.split("\n");
+
+  // Only parse complete events (terminated by \n\n)
+  const lastBoundary = text.lastIndexOf("\n\n");
+  if (lastBoundary === -1) {
+    return { events: [], remaining: text };
+  }
+
+  const completePart = text.slice(0, lastBoundary);
+  const remaining = text.slice(lastBoundary + 2);
+
+  const lines = completePart.split("\n");
   let currentEvent: { type?: string; data?: string } = {};
 
   for (const line of lines) {
@@ -53,7 +63,20 @@ export function parseSSEEvents(text: string): SSEEvent[] {
       currentEvent = {};
     }
   }
-  return events;
+
+  // Handle last event in complete part (may not end with empty line)
+  if (currentEvent.type && currentEvent.data) {
+    try {
+      events.push({
+        type: currentEvent.type,
+        data: JSON.parse(currentEvent.data),
+      });
+    } catch {
+      // Skip invalid JSON
+    }
+  }
+
+  return { events, remaining };
 }
 
 /**
@@ -89,7 +112,8 @@ export async function processSSEStream<TResult>(
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
-    const events = parseSSEEvents(buffer);
+    const { events, remaining } = parseSSEEvents(buffer);
+    buffer = remaining;
 
     for (const event of events) {
       switch (event.type) {
@@ -108,12 +132,6 @@ export async function processSSEStream<TResult>(
         default:
           handlers.onCustomEvent?.(event);
       }
-    }
-
-    // Clear processed events from buffer
-    const lastEventEnd = buffer.lastIndexOf("\n\n");
-    if (lastEventEnd !== -1) {
-      buffer = buffer.slice(lastEventEnd + 2);
     }
   }
 }

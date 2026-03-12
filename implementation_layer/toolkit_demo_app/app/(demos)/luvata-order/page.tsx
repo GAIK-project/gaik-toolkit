@@ -39,7 +39,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import posthog from "posthog-js";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
@@ -82,6 +82,7 @@ interface ProcessOrderResponse {
 
 export default function LuvataOrderPage() {
   const router = useRouter();
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [poFile, setPoFile] = useState<File | null>(null);
   const [bomFiles, setBomFiles] = useState<File[]>([]);
   const [pricingFile, setPricingFile] = useState<File | null>(null);
@@ -94,6 +95,12 @@ export default function LuvataOrderPage() {
   const [activeDocumentTab, setActiveDocumentTab] = useState("po");
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [pricingPreviewText, setPricingPreviewText] = useState("");
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   const loadExampleData = async () => {
     try {
@@ -148,6 +155,9 @@ export default function LuvataOrderPage() {
       return;
     }
 
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+
     setProcessing(true);
     setProgress(0);
     setStatusMessage("Starting order processing...");
@@ -168,6 +178,7 @@ export default function LuvataOrderPage() {
       const response = await apiFetch("/api/luvata-order/process", {
         method: "POST",
         body: formData,
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
@@ -186,7 +197,8 @@ export default function LuvataOrderPage() {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const events = parseSSEEvents(buffer);
+        const { events, remaining } = parseSSEEvents(buffer);
+        buffer = remaining;
 
         for (const event of events) {
           if (event.type === "status") {
@@ -209,14 +221,9 @@ export default function LuvataOrderPage() {
             });
           }
         }
-
-        // Clear processed events from buffer
-        const lastEventEnd = buffer.lastIndexOf("\n\n");
-        if (lastEventEnd !== -1) {
-          buffer = buffer.slice(lastEventEnd + 2);
-        }
       }
     } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
       setProcessing(false);
       toast.error("An error occurred");
       console.error(error);
@@ -629,19 +636,19 @@ export default function LuvataOrderPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Material Subtotal</p>
                   <p className="text-lg font-semibold">
-                    ${result.summary?.material_subtotal.toFixed(2)}
+                    ${(result.summary?.material_subtotal ?? 0).toFixed(2)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Processing Fees</p>
                   <p className="text-lg font-semibold">
-                    ${result.summary?.total_fees.toFixed(2)}
+                    ${(result.summary?.total_fees ?? 0).toFixed(2)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Grand Total</p>
                   <p className="text-lg font-semibold">
-                    ${result.summary?.grand_total.toFixed(2)}
+                    ${(result.summary?.grand_total ?? 0).toFixed(2)}
                   </p>
                 </div>
               </div>

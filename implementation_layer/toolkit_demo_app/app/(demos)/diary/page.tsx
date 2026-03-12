@@ -196,7 +196,8 @@ export default function DiaryPage() {
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          const events = parseSSEEvents(buffer);
+          const { events, remaining } = parseSSEEvents(buffer);
+          buffer = remaining;
 
           for (const event of events) {
             if (event.type === "steps") {
@@ -230,10 +231,6 @@ export default function DiaryPage() {
             }
           }
 
-          const lastEventEnd = buffer.lastIndexOf("\n\n");
-          if (lastEventEnd !== -1) {
-            buffer = buffer.slice(lastEventEnd + 2);
-          }
         }
       } else if (inputMode === "text" && textInput.trim()) {
         // Text mode with SSE streaming
@@ -260,7 +257,8 @@ export default function DiaryPage() {
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          const events = parseSSEEvents(buffer);
+          const { events, remaining } = parseSSEEvents(buffer);
+          buffer = remaining;
 
           for (const event of events) {
             if (event.type === "steps") {
@@ -293,10 +291,6 @@ export default function DiaryPage() {
             }
           }
 
-          const lastEventEnd = buffer.lastIndexOf("\n\n");
-          if (lastEventEnd !== -1) {
-            buffer = buffer.slice(lastEventEnd + 2);
-          }
         }
       }
     } catch (error) {

@@ -476,7 +476,8 @@ export default function RAGPage() {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const events = parseSSEEvents(buffer);
+        const { events, remaining } = parseSSEEvents(buffer);
+        buffer = remaining;
 
         for (const event of events) {
           if (event.type === "sources") {
@@ -513,11 +514,6 @@ export default function RAGPage() {
           } else if (event.type === "error") {
             throw new Error((event.data.message as string) || "Query failed");
           }
-        }
-
-        const lastEventEnd = buffer.lastIndexOf("\n\n");
-        if (lastEventEnd !== -1) {
-          buffer = buffer.slice(lastEventEnd + 2);
         }
       }
     } catch (error) {
