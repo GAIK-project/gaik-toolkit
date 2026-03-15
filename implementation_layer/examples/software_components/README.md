@@ -16,6 +16,9 @@ Document parsing examples for PDFs and Word documents. Includes both local (PyMu
 ### [Transcriber](./transcriber)
 Audio and video transcription using OpenAI Whisper with optional transcript enhancement.
 
+### [Text-to-Speech](./text_to_speech)
+Generate spoken audio from text using OpenAI or Azure OpenAI TTS.
+
 ### [RAG Components](./RAG)
 Individual examples for each of the five RAG components: Parser, Embedder, Vector Store, Retriever, and Answer Generator.
 

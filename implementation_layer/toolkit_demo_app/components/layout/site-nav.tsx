@@ -54,6 +54,7 @@ import {
   ShieldAlert,
   Tags,
   Video,
+  Volume2,
   Wand2,
 } from "lucide-react";
 import Image from "next/image";
@@ -131,6 +132,7 @@ const navGroups: NavGroup[] = [
       { label: "Parser", href: "/parser", icon: FileText },
       { label: "Classifier", href: "/classifier", icon: Tags },
       { label: "Transcriber", href: "/transcriber", icon: Mic },
+      { label: "Text-to-Speech", href: "/text-to-speech", icon: Volume2 },
       { label: "Retriever", href: "#", icon: Search, comingSoon: true },
       { label: "Query Engine", href: "#", icon: SearchCode, comingSoon: true },
       { label: "Embedder", href: "#", icon: Cpu, comingSoon: true },

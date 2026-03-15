@@ -39,14 +39,14 @@ def get_openai_config(use_azure: bool = True) -> dict:
             "azure_audio_endpoint": azure_endpoint,
             "api_version": os.getenv("AZURE_API_VERSION", "2025-03-01-preview"),
             "model": os.getenv("AZURE_DEPLOYMENT", "gpt-5.1"),
-            "transcription_model": os.getenv("AZURE_TRANSCRIPTION_MODEL", "whisper"),
+            "transcription_model": os.getenv("AZURE_TRANSCRIPTION_MODEL", "gpt-4o-transcribe"),
         }
     else:
         return {
             "use_azure": False,
             "api_key": os.getenv("OPENAI_API_KEY"),
             "model": os.getenv("OPENAI_MODEL", "gpt-5.1-2025-11-13"),
-            "transcription_model": os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"),
+            "transcription_model": os.getenv("OPENAI_TRANSCRIPTION_MODEL", "gpt-4o-transcribe"),
         }
 
 

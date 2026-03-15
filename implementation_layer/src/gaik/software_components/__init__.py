@@ -4,6 +4,7 @@ __all__ = [
     "config",
     "extractor",
     "transcriber",
+    "text_to_speech",
     "parallel_transcriber",
     "parsers",
     "doc_classifier",

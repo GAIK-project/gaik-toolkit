@@ -77,7 +77,7 @@ class Transcriber:
         output_dir: str | Path = "transcriber_workspace",
         *,
         compress_audio: bool = True,  # kept for backward compatibility; no longer used
-        enhanced_transcript: bool = True,
+        enhanced_transcript: bool = False,
         max_size_mb: int = 25,
         max_duration_seconds: int = 1500,
         default_prompt: str = DEFAULT_PROMPT,
@@ -537,5 +537,4 @@ def format_timestamp(seconds):
     minutes = int(seconds // 60)
     seconds = int(seconds % 60)
     return f"{minutes:02d}:{seconds:02d}"
-
-
+    

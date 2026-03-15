@@ -6,6 +6,7 @@ Modules:
     - gaik.software_components.extractor: Schema generation and structured data extraction
     - gaik.software_components.parsers: Document parsing - PDFs and Word docs (vision models, PyMuPDF, python-docx, Docling)
     - gaik.software_components.transcriber: Audio/video transcription using Whisper with GPT enhancement
+    - gaik.software_components.text_to_speech: Text-to-speech generation using OpenAI/Azure OpenAI
     - gaik.software_components.doc_classifier: Document classification into predefined categories
 
 Example - Schema-based Extraction:

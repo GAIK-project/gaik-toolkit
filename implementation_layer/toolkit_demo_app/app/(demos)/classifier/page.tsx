@@ -34,8 +34,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Tags } from "lucide-react";
+import { ArrowLeft, ChevronDown, Sparkles, Tags } from "lucide-react";
 import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -50,10 +51,12 @@ interface ClassifyResult {
 const DEFAULT_CLASSES = ["invoice", "receipt", "contract", "report", "letter"];
 
 export default function ClassifierPage() {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [classes, setClasses] = useState<string[]>(DEFAULT_CLASSES);
   const [classInput, setClassInput] = useState("");
   const [parserType, setParserType] = useState<string>("auto");
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ClassifyResult | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -157,6 +160,14 @@ export default function ClassifierPage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8">
+        <Button
+          variant="ghost"
+          className="mb-4 -ml-3 gap-2"
+          onClick={() => router.push("/")}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Tags className="h-8 w-8" />
           Classifier
@@ -269,6 +280,44 @@ export default function ClassifierPage() {
                 {isLoading ? "Sorting..." : "Sort Document"}
               </Button>
             </CardContent>
+          </Card>
+
+          <Card>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-6 py-5 text-left"
+              onClick={() => setHowItWorksOpen((current) => !current)}
+            >
+              <div>
+                <CardTitle>How It Works</CardTitle>
+                <CardDescription className="mt-1">
+                  Parse the document, compare it against your category definitions, and return the most likely class.
+                </CardDescription>
+              </div>
+              <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+                {howItWorksOpen ? "Hide" : "Show"}
+                <ChevronDown className={`h-4 w-4 transition-transform ${howItWorksOpen ? "rotate-180" : ""}`} />
+              </div>
+            </button>
+            {howItWorksOpen ? (
+              <CardContent className="text-muted-foreground space-y-3 text-sm leading-6">
+                <p>
+                  <strong>1. Upload a document:</strong> Add a PDF, DOCX, or image file that you want to classify.
+                </p>
+                <p>
+                  <strong>2. Define the categories:</strong> Provide at least two classification classes. The model uses these names as the candidate labels.
+                </p>
+                <p>
+                  <strong>3. Choose the parser:</strong> Use auto-detect in most cases, PyMuPDF for text-based PDFs, or the DOCX parser for Word documents.
+                </p>
+                <p>
+                  <strong>4. Run classification:</strong> The backend parses the file, compares the content against the available classes, and returns the most likely category.
+                </p>
+                <p>
+                  <strong>5. Review the result:</strong> The output shows the predicted class, confidence score, and the model's reasoning.
+                </p>
+              </CardContent>
+            ) : null}
           </Card>
         </div>
 

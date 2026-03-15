@@ -36,23 +36,33 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import {
+  ArrowLeft,
+  ChevronDown,
   Download,
   FileOutput,
   Loader2,
   Sparkles,
 } from "lucide-react";
 import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
 import { formatFieldName } from "@/lib/utils";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 const DEFAULT_REQUIREMENTS = `Extract the following from the document:
-- Document title or heading
-- Important dates
-- Names of people or organizations
-- Key numerical values or amounts
-- Any action items or requirements`;
+- Document name 
+- Document number
+- change in annual revenue
+- Net income
+- Active customers
+- Customer retention rate  
+- Net promoter score
+- Total employees
+- Employees satisfaction index
+- key milestones achieved (few keywords)`;
+
+const DEFAULT_SCHEMA_KEY = "document_structured_business_default";
 
 interface DocumentStructuredResult {
   job_id: string;
@@ -63,10 +73,13 @@ interface DocumentStructuredResult {
 }
 
 export default function DocumentStructuredPage() {
+  const router = useRouter();
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [userRequirements, setUserRequirements] = useState(DEFAULT_REQUIREMENTS);
-  const [parserType, setParserType] = useState<"auto" | "pymupdf" | "docx" | "vision" | "vision_plus">("auto");
+  const [parserType, setParserType] = useState<"auto" | "pymupdf" | "docx" | "vision" | "vision_plus" | "docling_api">("docling_api");
   const [generatePdf, setGeneratePdf] = useState(false);
+  const [regenerateSchema, setRegenerateSchema] = useState(false);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   const [result, setResult] = useState<DocumentStructuredResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -92,6 +105,12 @@ export default function DocumentStructuredPage() {
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
+    const usingDefaultRequirements = userRequirements.trim() === DEFAULT_REQUIREMENTS.trim();
+    if (!usingDefaultRequirements && !regenerateSchema) {
+      toast.error("If you edit the extraction requirements, enable Regenerate Schema before extraction.");
+      return;
+    }
+
     setIsLoading(true);
     setResult(null);
     setPipelineSteps([]);
@@ -103,6 +122,8 @@ export default function DocumentStructuredPage() {
       formData.append("parser_type", parserType);
       formData.append("generate_pdf", String(generatePdf));
       formData.append("pdf_title", "Document Structured Data");
+      formData.append("schema_key", usingDefaultRequirements ? DEFAULT_SCHEMA_KEY : "");
+      formData.append("regenerate_schema", String(!usingDefaultRequirements && regenerateSchema));
 
       const response = await apiFetch("/api/pipeline/document/stream", {
         method: "POST",
@@ -187,6 +208,14 @@ export default function DocumentStructuredPage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8">
+        <Button
+          variant="ghost"
+          className="mb-4 -ml-3 gap-2"
+          onClick={() => router.push("/")}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <FileOutput className="h-8 w-8" />
           Document → Structured Data
@@ -241,8 +270,11 @@ export default function DocumentStructuredPage() {
                 onChange={(e) => setUserRequirements(e.target.value)}
                 placeholder="Describe what data to extract..."
                 disabled={isLoading}
-                rows={6}
+                rows={10}
               />
+              <p className="text-muted-foreground mt-2 text-xs">
+                If you edit the extraction requirements, enable Regenerate Schema before extraction. Custom regenerated schemas are used only for the current run and are not saved.
+              </p>
             </CardContent>
           </Card>
 
@@ -268,13 +300,34 @@ export default function DocumentStructuredPage() {
                         <SelectItem value="auto">Auto-detect</SelectItem>
                         <SelectItem value="pymupdf">PyMuPDF (Fast, text-based)</SelectItem>
                         <SelectItem value="vision">Vision (AI-powered, handles images)</SelectItem>
-                        <SelectItem value="vision_plus">Vision+ (Enhanced RAG parsing)</SelectItem>
+                        <SelectItem value="vision_plus">Vision+ (Text+Image Parsing)</SelectItem>
+                        <SelectItem value="docling_api">HH Parser (HH's fast Docling Parser)</SelectItem>
                         <SelectItem value="docx">DOCX (Word documents)</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-muted-foreground text-xs">
                       Choose how to parse your document
                     </p>
+                    {(parserType === "vision" || parserType === "vision_plus") && (
+                      <p className="text-muted-foreground text-xs">
+                        Vision and Vision+ parsers are limited to a maximum of 20 pages per document.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="regenerate-schema" className="text-sm">Regenerate Schema</Label>
+                      <p className="text-muted-foreground text-xs">
+                        Required when you edit the default extraction requirements. Regenerated schemas are not persisted.
+                      </p>
+                    </div>
+                    <Switch
+                      id="regenerate-schema"
+                      checked={regenerateSchema}
+                      onCheckedChange={setRegenerateSchema}
+                      disabled={isLoading}
+                    />
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -314,6 +367,47 @@ export default function DocumentStructuredPage() {
               </>
             )}
           </Button>
+
+          <Card>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-6 py-5 text-left"
+              onClick={() => setHowItWorksOpen((current) => !current)}
+            >
+              <div>
+                <CardTitle>How It Works</CardTitle>
+                <CardDescription className="mt-1">
+                  Parse the document, load or regenerate the schema, and extract structured business data.
+                </CardDescription>
+              </div>
+              <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+                {howItWorksOpen ? "Hide" : "Show"}
+                <ChevronDown className={`h-4 w-4 transition-transform ${howItWorksOpen ? "rotate-180" : ""}`} />
+              </div>
+            </button>
+            {howItWorksOpen ? (
+              <CardContent className="text-muted-foreground space-y-3 text-sm leading-6">
+                <p>
+                  This module parses uploaded documents and extracts structured information from them. The extraction task is defined in plain language, and the default example is configured for business KPI extraction from reports or similar documents.
+                </p>
+                <p>
+                  <strong>1. Upload a document:</strong> Add a PDF, DOCX, or supported image file. The selected parser reads the document content before extraction.
+                </p>
+                <p>
+                  <strong>2. Define extraction requirements:</strong> The default business requirements use a persistent saved schema. If you edit the requirements, enable <em>Regenerate Schema</em> before extraction.
+                </p>
+                <p>
+                  <strong>3. Choose the parser:</strong> Use HH Parser for remote high-quality parsing, PyMuPDF for text-based PDFs, DOCX for Word files, Vision for scanned/image-heavy documents, and Vision+ when both text and images matter in the same document. Vision and Vision+ are limited to 20 pages per PDF.
+                </p>
+                <p>
+                  <strong>4. Parse and extract:</strong> The backend parses the document, loads the saved schema when available, or generates a temporary new schema for custom requirements, and then extracts structured fields from the parsed text.
+                </p>
+                <p>
+                  <strong>5. Review the result:</strong> The result panel shows the parsed content, extracted data, and an optional PDF download when enabled.
+                </p>
+              </CardContent>
+            ) : null}
+          </Card>
         </div>
 
         {/* Results Section */}

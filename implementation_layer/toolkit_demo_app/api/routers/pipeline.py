@@ -1,17 +1,21 @@
 """Pipeline router - End-to-end pipeline endpoints for demos."""
 
 import asyncio
+
+import fitz
 import importlib.util
 import io
 import json
 import logging
+import os
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args, get_origin
 
 try:
     from utils import (
@@ -31,7 +35,7 @@ except ImportError:
     )
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -43,6 +47,82 @@ PDF_STORAGE: dict[str, Path] = {}
 PDF_TIMESTAMPS: dict[str, datetime] = {}
 SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
 SCHEMA_DIR.mkdir(exist_ok=True)
+
+
+MAX_VISION_PAGES = 20
+
+
+def _validate_vision_page_limit(file_path: str, suffix: str, parser_type: str) -> None:
+    if parser_type not in {"vision", "vision_plus"} or suffix != ".pdf":
+        return
+
+    with fitz.open(file_path) as document:
+        page_count = document.page_count
+
+    if page_count > MAX_VISION_PAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{parser_type} parser supports at most {MAX_VISION_PAGES} pages per PDF. "
+                f"Received {page_count} pages."
+            ),
+        )
+
+
+def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config: dict):
+    _validate_vision_page_limit(tmp_path, suffix, parser_type)
+
+    if parser_type == "vision":
+        from gaik.software_components.parsers import VisionParser
+
+        parser = VisionParser(openai_config=config)
+        parsed_content = parser.convert_pdf(tmp_path)
+        if isinstance(parsed_content, list):
+            parsed_content = "\n\n".join(parsed_content)
+        return parsed_content
+
+    if parser_type == "vision_plus":
+        from gaik.software_components.RAG.rag_parser_vision import VisionRagParser
+
+        parser = VisionRagParser(
+            vision_config=config,
+            verbose=False,
+            save_markdown=False,
+            enable_ocr=False,
+            enable_table_structure=True,
+            enable_formula_enrichment=False,
+        )
+        markdown, _chunks = parser.convert_doc_to_chunks_with_vision(tmp_path, return_markdown=True)
+        return markdown
+
+    if parser_type == "docling_api":
+        api_base = os.getenv("DOCLING_API_BASE")
+        password = os.getenv("DOCLING_API_PASSWORD")
+        if api_base and password:
+            try:
+                from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
+
+                parser = DoclingApiClientParser(api_base=api_base, password=password)
+                result = parser.parse_document(tmp_path)
+                parsed_markdown = result.get("parsed_markdown", "")
+                if parsed_markdown:
+                    return parsed_markdown
+                logger.warning("HH Parser returned empty markdown; falling back to PyMuPDF")
+            except Exception as exc:
+                logger.warning("HH Parser unavailable; falling back to PyMuPDF: %s", exc)
+        else:
+            logger.info("HH Parser not configured; falling back to PyMuPDF")
+
+    if parser_type == "docx":
+        from gaik.software_components.parsers import DocxParser
+
+        parser = DocxParser()
+        return parser.parse_docx(tmp_path)
+
+    from gaik.software_components.parsers import PyMuPDFParser
+
+    parser = PyMuPDFParser()
+    return parser.parse_pdf(tmp_path)
 
 
 def _clean_schema_dump(raw_dump: str) -> str:
@@ -118,6 +198,139 @@ def _load_schema(schema_key: str, user_requirements: str):
     return schema, requirements
 
 
+def _annotation_contains(annotation, target_type: type) -> bool:
+    if annotation is target_type:
+        return True
+
+    origin = get_origin(annotation)
+    if origin is None:
+        return False
+
+    return any(
+        arg is not type(None) and _annotation_contains(arg, target_type)
+        for arg in get_args(annotation)
+    )
+
+
+def _clean_numeric_string(value: str) -> str:
+    cleaned = value.strip()
+    if not cleaned:
+        return cleaned
+
+    negative = False
+    if cleaned.startswith("(") and cleaned.endswith(")"):
+        negative = True
+        cleaned = cleaned[1:-1].strip()
+
+    cleaned = cleaned.replace("$", "").replace("EUR", "").replace("eur", "")
+    cleaned = cleaned.replace(" ", "").replace(",", "")
+    cleaned = cleaned.replace("%", "")
+
+    if negative and cleaned and not cleaned.startswith("-"):
+        cleaned = f"-{cleaned}"
+    return cleaned
+
+
+def _normalize_decimal_value(value):
+    if value is None or isinstance(value, Decimal):
+        return value
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return Decimal(str(value))
+    if isinstance(value, str):
+        cleaned = _clean_numeric_string(value)
+        if cleaned in {"", "-", "N/A", "n/a", "none", "null"}:
+            return None
+        try:
+            return Decimal(cleaned)
+        except (InvalidOperation, ValueError):
+            return value
+    return value
+
+
+def _normalize_float_value(value):
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float, Decimal)):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = _clean_numeric_string(value)
+        if cleaned in {"", "-", "N/A", "n/a", "none", "null"}:
+            return None
+        try:
+            return float(cleaned)
+        except ValueError:
+            return value
+    return value
+
+
+def _normalize_int_value(value):
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, (float, Decimal)):
+        return int(value)
+    if isinstance(value, str):
+        cleaned = _clean_numeric_string(value)
+        if cleaned in {"", "-", "N/A", "n/a", "none", "null"}:
+            return None
+        try:
+            return int(float(cleaned))
+        except ValueError:
+            return value
+    return value
+
+
+def _wrap_schema_with_numeric_normalizers(schema: type[BaseModel]) -> type[BaseModel]:
+    decimal_fields = [
+        name for name, field in schema.model_fields.items()
+        if _annotation_contains(field.annotation, Decimal)
+    ]
+    float_fields = [
+        name for name, field in schema.model_fields.items()
+        if _annotation_contains(field.annotation, float)
+    ]
+    int_fields = [
+        name for name, field in schema.model_fields.items()
+        if _annotation_contains(field.annotation, int)
+    ]
+
+    if not any((decimal_fields, float_fields, int_fields)):
+        return schema
+
+    namespace: dict[str, object] = {}
+
+    if decimal_fields:
+        @field_validator(*decimal_fields, mode="before", check_fields=False)
+        @classmethod
+        def _normalize_decimal_fields(cls, value):
+            return _normalize_decimal_value(value)
+
+        namespace["_normalize_decimal_fields"] = _normalize_decimal_fields
+
+    if float_fields:
+        @field_validator(*float_fields, mode="before", check_fields=False)
+        @classmethod
+        def _normalize_float_fields(cls, value):
+            return _normalize_float_value(value)
+
+        namespace["_normalize_float_fields"] = _normalize_float_fields
+
+    if int_fields:
+        @field_validator(*int_fields, mode="before", check_fields=False)
+        @classmethod
+        def _normalize_int_fields(cls, value):
+            return _normalize_int_value(value)
+
+        namespace["_normalize_int_fields"] = _normalize_int_fields
+
+    wrapped_schema = type(f"{schema.__name__}Normalized", (schema,), namespace)
+    wrapped_schema.model_rebuild(force=True)
+    return wrapped_schema
+
+
 def _get_or_create_schema(config, user_requirements: str, schema_key: str | None, regenerate_schema: bool):
     from gaik.software_components.extractor.schema import SchemaGenerator
 
@@ -127,7 +340,7 @@ def _get_or_create_schema(config, user_requirements: str, schema_key: str | None
         if loaded is not None and not regenerate_schema:
             logger.info("Loaded existing schema for key %s", schema_key)
             schema, requirements = loaded
-            return schema, requirements, False
+            return _wrap_schema_with_numeric_normalizers(schema), requirements, False
 
     generator = SchemaGenerator(config=config)
     schema = generator.generate_schema(user_requirements)
@@ -137,7 +350,7 @@ def _get_or_create_schema(config, user_requirements: str, schema_key: str | None
         _save_schema(schema, requirements, schema_key, user_requirements)
         logger.info("Saved schema for key %s", schema_key)
 
-    return schema, requirements, True
+    return _wrap_schema_with_numeric_normalizers(schema), requirements, True
 
 
 async def cleanup_old_pdfs():
@@ -211,7 +424,7 @@ async def audio_pipeline(
     user_requirements: str = Form(...),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
-    enhanced: bool = Form(True),
+    enhanced: bool = Form(False),
     compress_audio: bool = Form(True),
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
@@ -357,7 +570,7 @@ async def audio_pipeline(
 async def document_pipeline(
     file: UploadFile = File(...),
     user_requirements: str = Form(...),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus"] = Form("auto"),
+    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api"] = Form("docling_api"),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
     schema_key: str | None = Form(None),
@@ -368,7 +581,7 @@ async def document_pipeline(
 
     - **file**: Document file (PDF, DOCX, or image)
     - **user_requirements**: What data to extract from the document
-    - **parser_type**: Parser to use (auto, pymupdf, docx, vision)
+    - **parser_type**: Parser to use (auto, pymupdf, docx, vision, vision_plus, docling_api)
     - **generate_pdf**: Whether to generate a PDF report
     - **pdf_title**: Title for the generated PDF report
     """
@@ -424,38 +637,36 @@ async def document_pipeline(
             DocumentsToStructuredData,
         )
 
-        # Map parser_type to pipeline parser_choice
-        parser_map = {
-            "pymupdf": "pymupdf",
-            "docx": "docx",
-            "vision": "vision_parser",
-            "vision_plus": "vision_rag",
-        }
-        parser_choice = parser_map.get(parser_type, "pymupdf")
+        from gaik.software_components.extractor import DataExtractor
 
-        pipeline = DocumentsToStructuredData(api_config=config)
-
-        result = pipeline.run(
-            file_path=tmp_path,
+        extraction_model, requirements, _generated_new_schema = _get_or_create_schema(
+            config=config,
             user_requirements=user_requirements,
-            parser_choice=parser_choice,
+            schema_key=schema_key,
+            regenerate_schema=regenerate_schema,
         )
+
+        parsed_content = _parse_document_content(tmp_path, suffix, parser_type, config)
 
         steps[1].status = "completed"
         steps[1].message = "Document parsed"
 
-        # Step 3: Extract (already done by pipeline.run)
-        steps[2].status = "completed"
-        steps[2].message = f"Extracted {len(result.extracted_fields)} items"
+        extractor = DataExtractor(config=config)
+        extracted_data = extractor.extract(
+            extraction_model=extraction_model,
+            requirements=requirements,
+            user_requirements=user_requirements,
+            documents=[parsed_content],
+        )
 
-        # Get parsed content
-        parsed_content = result.parsed_documents[0] if result.parsed_documents else None
+        steps[2].status = "completed"
+        steps[2].message = f"Extracted {len(extracted_data)} items"
 
         response = DocumentPipelineResponse(
             job_id=job_id,
             steps=steps,
             parsed_content=parsed_content,
-            extracted_data=result.extracted_fields,
+            extracted_data=extracted_data,
         )
 
         # Step 4: Generate PDF if requested
@@ -626,7 +837,7 @@ async def audio_pipeline_stream(
     user_requirements: str = Form(...),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
-    enhanced: bool = Form(True),
+    enhanced: bool = Form(False),
     compress_audio: bool = Form(True),
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
@@ -950,7 +1161,7 @@ async def text_pipeline_stream(
 async def document_pipeline_stream(
     file: UploadFile = File(...),
     user_requirements: str = Form(...),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus"] = Form("auto"),
+    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api"] = Form("docling_api"),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
     schema_key: str | None = Form(None),
@@ -1028,22 +1239,7 @@ async def document_pipeline_stream(
             steps[0]["message"] = "Parsing document content..."
             yield sse_event("step_update", steps[0])
 
-            from gaik.software_components.parsers import DocxParser, PyMuPDFParser, VisionParser
-
-            # Create parser based on type
-            if actual_parser_type == "vision" or actual_parser_type == "vision_plus":
-                parser = VisionParser(openai_config=config)
-                parsed_content = parser.convert_pdf(tmp_path)
-                # convert_pdf returns list of pages, join them
-                if isinstance(parsed_content, list):
-                    parsed_content = "\n\n".join(parsed_content)
-            elif actual_parser_type == "docx":
-                parser = DocxParser()
-                parsed_content = parser.parse_docx(tmp_path)
-            else:
-                # Default: pymupdf
-                parser = PyMuPDFParser()
-                parsed_content = parser.parse_pdf(tmp_path)
+            parsed_content = _parse_document_content(tmp_path, suffix, actual_parser_type, config)
 
             steps[0]["status"] = "completed"
             steps[0]["message"] = "Document parsed"

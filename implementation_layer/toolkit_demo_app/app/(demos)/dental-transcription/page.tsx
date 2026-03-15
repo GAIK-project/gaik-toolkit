@@ -34,6 +34,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import {
+  ArrowLeft,
   ArrowRight,
   Download,
   ExternalLink,
@@ -45,6 +46,7 @@ import {
   Video,
 } from "lucide-react";
 import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
@@ -88,6 +90,7 @@ const workflowItems = [
 ];
 
 export default function DentalTranscriptionPage() {
+  const router = useRouter();
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [language, setLanguage] = useState("auto");
   const [result, setResult] = useState<TranscriptionResult | null>(null);
@@ -286,6 +289,15 @@ export default function DentalTranscriptionPage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-6 space-y-3 pl-1">
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-10 w-fit rounded-xl px-3"
+          onClick={() => router.push("/")}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <Mic className="text-primary h-8 w-8" />
           Video Transcription & Subtitles

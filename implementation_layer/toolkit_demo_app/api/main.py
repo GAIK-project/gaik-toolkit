@@ -39,6 +39,7 @@ try:
         parser,
         pipeline,
         rag,
+        text_to_speech,
         transcriber,
         video_search,
     )
@@ -53,6 +54,7 @@ except ImportError:
         parser,
         pipeline,
         rag,
+        text_to_speech,
         transcriber,
         video_search,
     )
@@ -102,6 +104,7 @@ app.include_router(parser.router, prefix="/parse", tags=["Parser"])
 app.include_router(classifier.router, prefix="/classify", tags=["Classifier"])
 app.include_router(extractor.router, prefix="/extract", tags=["Extractor"])
 app.include_router(transcriber.router, prefix="/transcribe", tags=["Transcriber"])
+app.include_router(text_to_speech.router, prefix="/text-to-speech", tags=["Text-to-Speech"])
 app.include_router(pipeline.router, prefix="/pipeline", tags=["Pipeline"])
 app.include_router(rag.router, prefix="/rag", tags=["RAG"])
 app.include_router(diary.router, prefix="/diary", tags=["Diary"])
@@ -132,6 +135,7 @@ async def root():
             "classify": "/classify - Document classification",
             "extract": "/extract - Data extraction",
             "transcribe": "/transcribe - Audio/video transcription",
+            "text-to-speech": "/text-to-speech - Text-to-speech audio generation",
             "pipeline": "/pipeline - End-to-end pipelines (audio/document to structured data)",
             "rag": "/rag - RAG pipeline (document indexing and Q&A with citations)",
             "diary": "/diary - Construction diary (Työmaapäiväkirja) workflow",

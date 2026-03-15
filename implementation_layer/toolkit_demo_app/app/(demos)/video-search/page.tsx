@@ -38,6 +38,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   AlertCircle,
+  ArrowLeft,
   Clock,
   Database,
   Film,
@@ -51,6 +52,7 @@ import {
   Zap,
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -107,6 +109,7 @@ const SEARCH_TYPE_INFO: Record<
 };
 
 export default function VideoSearchPage() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [searchType, setSearchType] = useState("hybrid");
   const [videoFilter, setVideoFilter] = useState<string>("all");
@@ -310,6 +313,15 @@ export default function VideoSearchPage() {
         className="mx-auto max-w-4xl"
       >
         <header className="mb-6 space-y-3 pl-1">
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10 w-fit rounded-xl px-3"
+            onClick={() => router.push("/")}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
           <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
             <Video className="text-primary h-8 w-8" />
             Semantic Video Search

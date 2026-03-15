@@ -99,21 +99,10 @@ def transcribe(
     result = r.json()
     segments = result.get("segments", [])
 
-    if diarization:
-        print(f"\n--- TRANSCRIPT ({len(segments)} segments) ---\n")
-        for seg in segments:
-            start = seg.get("start", 0)
-            end = seg.get("end", 0)
-            speaker = seg.get("speaker", "UNK")
-            text = seg.get("text", "").strip()
-            print(f"[{start:.1f}s - {end:.1f}s] {speaker}: {text}")
-    else:
+    if not diarization:
         plain_text = (result.get("text") or "").strip()
         if not plain_text and segments:
             plain_text = " ".join(seg.get("text", "").strip() for seg in segments if seg.get("text")).strip()
-
-        print("\n--- TRANSCRIPT ---\n")
-        print(plain_text)
     elapsed_seconds = time.perf_counter() - start_time
     print(f"Time taken for transcription: {elapsed_seconds:.2f} seconds")
 

@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Database, FileCode2, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDown, Database, FileCode2, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { formatFieldName } from "@/lib/utils";
 import posthog from "posthog-js";
@@ -87,6 +87,7 @@ export default function ExtractorPage() {
   const [isParsing, setIsParsing] = useState(false);
   const [isGeneratingSchema, setIsGeneratingSchema] = useState(false);
   const [generatedSchema, setGeneratedSchema] = useState<GeneratedSchema | null>(null);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [result, setResult] = useState<ExtractResult | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -594,6 +595,44 @@ export default function ExtractorPage() {
                 : "Extracting..."
               : "Extract Data"}
           </Button>
+
+          <Card>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-6 py-5 text-left"
+              onClick={() => setHowItWorksOpen((current) => !current)}
+            >
+              <div>
+                <CardTitle>How It Works</CardTitle>
+                <CardDescription className="mt-1">
+                  Parse a document, define the target fields, and return structured extracted data.
+                </CardDescription>
+              </div>
+              <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+                {howItWorksOpen ? "Hide" : "Show"}
+                <ChevronDown className={`h-4 w-4 transition-transform ${howItWorksOpen ? "rotate-180" : ""}`} />
+              </div>
+            </button>
+            {howItWorksOpen ? (
+              <CardContent className="text-muted-foreground space-y-3 text-sm leading-6">
+                <p>
+                  <strong>1. Provide the input:</strong> Paste document text directly or upload a PDF or DOCX file. Uploaded files are parsed before extraction.
+                </p>
+                <p>
+                  <strong>2. Choose the extraction mode:</strong> Use <em>Fields</em> when you already know the exact fields to extract, or <em>Plain Language</em> when you want the system to first generate a schema from natural-language requirements.
+                </p>
+                <p>
+                  <strong>3. Define the extraction target:</strong> In field mode, add field names and descriptions. In plain-language mode, describe the output structure and generate the schema before extraction.
+                </p>
+                <p>
+                  <strong>4. Run extraction:</strong> The extractor sends the parsed text and the configured requirements to the backend and returns structured results for each document.
+                </p>
+                <p>
+                  <strong>5. Review the output:</strong> The result panel shows the extracted fields in a readable layout and also lets you copy the raw JSON response.
+                </p>
+              </CardContent>
+            ) : null}
+          </Card>
         </div>
 
         {/* Results Section */}

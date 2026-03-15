@@ -3,12 +3,14 @@
 import json
 from collections.abc import AsyncGenerator
 
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 
 
 def sse_event(event_type: str, data: dict) -> str:
     """Format data as an SSE event."""
-    return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+    encoded = jsonable_encoder(data)
+    return f"event: {event_type}\ndata: {json.dumps(encoded)}\n\n"
 
 
 def sse_error_response(message: str) -> StreamingResponse:

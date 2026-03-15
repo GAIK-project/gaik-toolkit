@@ -1,0 +1,99 @@
+{
+  "model_name": "document_kpi_extraction_Extraction",
+  "requirements": {
+    "use_case_name": "document_kpi_extraction",
+    "fields": [
+      {
+        "field_name": "document_name",
+        "field_type": "str",
+        "description": "Name or title of the document",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "document_number",
+        "field_type": "str",
+        "description": "Identifier or reference number of the document",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "change_in_annual_revenue",
+        "field_type": "float",
+        "description": "Change in annual revenue, likely expressed as a percentage or numeric difference",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "net_income",
+        "field_type": "decimal",
+        "description": "Net income amount, typically a monetary value",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "active_customers",
+        "field_type": "int",
+        "description": "Number of active customers",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "customer_retention_rate",
+        "field_type": "float",
+        "description": "Customer retention rate, typically a percentage",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "net_promoter_score",
+        "field_type": "float",
+        "description": "Net Promoter Score (NPS) value",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "total_employees",
+        "field_type": "int",
+        "description": "Total number of employees",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "employees_satisfaction_index",
+        "field_type": "float",
+        "description": "Employee satisfaction index or score",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "key_milestones_achieved",
+        "field_type": "list[str]",
+        "description": "Few keyword-style descriptions of key milestones achieved",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  },
+  "user_requirements": "Extract the following from the document:\r\n- Document name \r\n- Document number\r\n- change in annual revenue\r\n- Net income\r\n- Active customers\r\n- Customer retention rate  \r\n- Net promoter score\r\n- Total employees\r\n- Employees satisfaction index\r\n- key milestones achieved (few keywords)"
+}

@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/select";
 import { parseSSEEvents } from "@/lib/sse";
 import {
+  ArrowLeft,
   Bot,
   FileText,
   MessageSquare,
@@ -69,6 +70,7 @@ import {
 import { FeedbackButton } from "@/components/feedback";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -201,6 +203,7 @@ function SourcesList({ sources }: { sources: Source[] }) {
 }
 
 export default function RAGPage() {
+  const router = useRouter();
   // Collection state
   const [collectionId, setCollectionId] = useState<string | null>(null);
   const [indexedDocuments, setIndexedDocuments] = useState<IndexedDocument[]>(
@@ -561,20 +564,29 @@ export default function RAGPage() {
       className="flex h-[calc(100vh-10rem)] flex-col sm:h-[calc(100vh-12rem)]"
     >
       {/* Header */}
-      <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Bot className="text-primary h-6 w-6 sm:h-7 sm:w-7" />
-          <div>
-            <h1 className="font-serif text-xl font-semibold tracking-tight sm:text-2xl">
-              RAG Builder
-            </h1>
-            <p className="text-muted-foreground hidden text-sm sm:block">
-              Ask questions about your documents
-            </p>
+      <header className="mb-4">
+        <Button
+          variant="ghost"
+          className="mb-4 -ml-3 gap-2"
+          onClick={() => router.push("/")}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Bot className="text-primary h-6 w-6 sm:h-7 sm:w-7" />
+            <div>
+              <h1 className="font-serif text-xl font-semibold tracking-tight sm:text-2xl">
+                RAG Builder
+              </h1>
+              <p className="text-muted-foreground hidden text-sm sm:block">
+                Ask questions about your documents
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
           {/* Document status badge - only show when documents exist */}
           {hasDocuments && (
             <DropdownMenu>
@@ -681,6 +693,7 @@ export default function RAGPage() {
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </header>
 

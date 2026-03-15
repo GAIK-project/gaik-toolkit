@@ -1,0 +1,117 @@
+{
+  "model_name": "medical_audio_extraction_Extraction",
+  "requirements": {
+    "use_case_name": "medical_audio_extraction",
+    "fields": [
+      {
+        "field_name": "date",
+        "field_type": "date",
+        "description": "Date of the encounter mentioned in the audio",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "patient_date_of_birth",
+        "field_type": "date",
+        "description": "Patient's date of birth",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "symptoms",
+        "field_type": "list[str]",
+        "description": "Patient symptoms summarized in a few keywords",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "medical_history",
+        "field_type": "list[str]",
+        "description": "Relevant medical history summarized in a few keywords",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "examination_description",
+        "field_type": "list[str]",
+        "description": "Key findings from the physical examination in a few keywords",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "body_temperature",
+        "field_type": "float",
+        "description": "Measured body temperature",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "heart_rate",
+        "field_type": "int",
+        "description": "Measured heart rate",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "oxygen_saturation",
+        "field_type": "int",
+        "description": "Measured oxygen saturation percentage",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "procedure_performed",
+        "field_type": "list[str]",
+        "description": "Procedures performed, in a few keywords",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "diagnosis",
+        "field_type": "list[str]",
+        "description": "Diagnosis terms in a few keywords",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "prescription",
+        "field_type": "list[str]",
+        "description": "Prescribed medications or treatments in a few keywords",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "follow_up",
+        "field_type": "list[str]",
+        "description": "Follow-up plan or instructions in a few keywords",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  },
+  "user_requirements": "Extract the following from the audio:\r\n- Date\r\n- Patient's date of birth\r\n- Symptoms (in few keywords)\r\n- Medical history (in few keywords)\r\n- Examination description (in few keywords)\r\n- Body temperature / Heart Rate / Oxygen saturation\r\n- Procedure performed (in few keywords)\r\n- Diagnosis (in few keywords)\r\n- Prescription (in few keywords)\r\n- Follow-up (in few keywords)"
+}

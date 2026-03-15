@@ -33,6 +33,7 @@ import {
   MessageSquareQuote,
   Mic,
   Search,
+  Volume2,
   SearchCode,
   Sparkles,
   Users,
@@ -193,6 +194,12 @@ const buildingBlocks: Demo[] = [
     description: "Convert voice recordings and videos into clear, written text",
     href: "/transcriber",
     icon: Mic,
+  },
+  {
+    title: "Text-to-Speech",
+    description: "Generate downloadable spoken audio from text in Finnish or English",
+    href: "/text-to-speech",
+    icon: Volume2,
   },
   {
     title: "Retriever",

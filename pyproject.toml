@@ -127,6 +127,9 @@ transcriber = [
     "requests>=2.31.0",
 ]
 
+# Text-to-speech generation (core openai dependency already included)
+text-to-speech = []
+
 
 # Parallel audio/video transcription (FFmpeg-based, no extra Python deps)
 # Requires ffmpeg + ffprobe on $PATH as system dependencies
@@ -143,6 +146,7 @@ all = [
     "gaik[extract]",
     "gaik[parser]",
     "gaik[transcriber]",
+    "gaik[text-to-speech]",
     "gaik[parallel-transcriber]",
     "gaik[classifier]",
     "gaik[rag-parser-docling]",
@@ -183,6 +187,7 @@ all-cpu = [
     "gaik[extract]",
     "gaik[parser-cpu]",
     "gaik[transcriber]",
+    "gaik[text-to-speech]",
     "gaik[parallel-transcriber]",
     "gaik[classifier]",
     "gaik[audio-to-structured-data]",
