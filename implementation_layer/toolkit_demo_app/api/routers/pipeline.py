@@ -1,9 +1,14 @@
 """Pipeline router - End-to-end pipeline endpoints for demos."""
 
 import asyncio
+import importlib.util
+import io
+import json
+import logging
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -28,6 +33,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 PDF_CLEANUP_AFTER_HOURS = 1
@@ -35,6 +41,103 @@ PDF_CLEANUP_AFTER_HOURS = 1
 # Temporary storage for generated PDFs (path and creation time)
 PDF_STORAGE: dict[str, Path] = {}
 PDF_TIMESTAMPS: dict[str, datetime] = {}
+SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
+SCHEMA_DIR.mkdir(exist_ok=True)
+
+
+def _clean_schema_dump(raw_dump: str) -> str:
+    """Strip header/footer lines from print_pydantic_schema output."""
+    lines = raw_dump.splitlines()
+    start_idx = 0
+    for i, line in enumerate(lines):
+        if line.startswith("class "):
+            start_idx = i
+            break
+    body = lines[start_idx:]
+    while body and (set(body[-1].strip()) == {"="} or not body[-1].strip()):
+        body.pop()
+    return "\n".join(body).strip()
+
+
+def _schema_paths(schema_key: str) -> tuple[Path, Path]:
+    safe_key = "".join(c if c.isalnum() or c in {"_", "-"} else "_" for c in schema_key).strip("_") or "schema"
+    return SCHEMA_DIR / f"{safe_key}_schema.py", SCHEMA_DIR / f"{safe_key}_requirements.json"
+
+
+def _save_schema(schema: type, requirements, schema_key: str, user_requirements: str) -> None:
+    from gaik.software_components.extractor.schema import print_pydantic_schema
+
+    schema_path, req_path = _schema_paths(schema_key)
+
+    buffer = io.StringIO()
+    with redirect_stdout(buffer):
+        print_pydantic_schema(schema, title="Saved Schema")
+
+    schema_code = _clean_schema_dump(buffer.getvalue())
+    template = f'''"""
+Auto-generated schema module (do not edit manually).
+"""
+
+import decimal
+from decimal import Decimal
+from typing import List, Literal, Optional
+
+from pydantic import BaseModel, Field, ConfigDict
+
+{schema_code}
+'''
+    schema_path.write_text(template, encoding="utf-8")
+
+    payload = {
+        "model_name": schema.__name__,
+        "requirements": requirements.model_dump(),
+        "user_requirements": user_requirements,
+    }
+    req_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _load_schema(schema_key: str, user_requirements: str):
+    from gaik.software_components.extractor import ExtractionRequirements
+
+    schema_path, req_path = _schema_paths(schema_key)
+    if not (schema_path.exists() and req_path.exists()):
+        return None
+
+    data = json.loads(req_path.read_text(encoding="utf-8"))
+    if data.get("user_requirements") != user_requirements:
+        return None
+
+    model_name = data["model_name"]
+    requirements = ExtractionRequirements(**data["requirements"])
+
+    spec = importlib.util.spec_from_file_location(model_name, schema_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader is not None
+    spec.loader.exec_module(module)  # type: ignore[attr-defined]
+    schema = getattr(module, model_name)
+    return schema, requirements
+
+
+def _get_or_create_schema(config, user_requirements: str, schema_key: str | None, regenerate_schema: bool):
+    from gaik.software_components.extractor.schema import SchemaGenerator
+
+    loaded = None
+    if schema_key:
+        loaded = _load_schema(schema_key, user_requirements)
+        if loaded is not None and not regenerate_schema:
+            logger.info("Loaded existing schema for key %s", schema_key)
+            schema, requirements = loaded
+            return schema, requirements, False
+
+    generator = SchemaGenerator(config=config)
+    schema = generator.generate_schema(user_requirements)
+    requirements = generator.item_requirements
+
+    if schema_key and loaded is None and not regenerate_schema:
+        _save_schema(schema, requirements, schema_key, user_requirements)
+        logger.info("Saved schema for key %s", schema_key)
+
+    return schema, requirements, True
 
 
 async def cleanup_old_pdfs():
@@ -110,6 +213,8 @@ async def audio_pipeline(
     pdf_title: str = Form("Extracted Data Report"),
     enhanced: bool = Form(True),
     compress_audio: bool = Form(True),
+    schema_key: str | None = Form(None),
+    regenerate_schema: bool = Form(False),
 ):
     """
     Run the complete audio pipeline: Transcribe -> Extract -> (PDF).
@@ -159,6 +264,15 @@ async def audio_pipeline(
 
         pipeline = AudioToStructuredData(api_config=config)
 
+        schema = requirements = None
+        if schema_key:
+            schema, requirements, _generated_new_schema = _get_or_create_schema(
+                config=config,
+                user_requirements=user_requirements,
+                schema_key=schema_key,
+                regenerate_schema=regenerate_schema,
+            )
+
         result = pipeline.run(
             file_path=tmp_path,
             user_requirements=user_requirements,
@@ -166,6 +280,8 @@ async def audio_pipeline(
                 "enhanced_transcript": enhanced,
                 "compress_audio": compress_audio,
             },
+            schema=schema,
+            requirements=requirements,
         )
 
         steps[1].status = "completed"
@@ -244,6 +360,8 @@ async def document_pipeline(
     parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus"] = Form("auto"),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
+    schema_key: str | None = Form(None),
+    regenerate_schema: bool = Form(False),
 ):
     """
     Run the complete document pipeline: Parse -> Extract -> (PDF).
@@ -397,6 +515,8 @@ async def text_pipeline(
     user_requirements: str = Form(...),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
+    schema_key: str | None = Form(None),
+    regenerate_schema: bool = Form(False),
 ):
     """
     Run the text extraction pipeline: Extract structured data from text.
@@ -426,17 +546,20 @@ async def text_pipeline(
         steps[1].status = "in_progress"
 
         from gaik.software_components.extractor.extractor import DataExtractor
-        from gaik.software_components.extractor.schema import SchemaGenerator
 
-        # Step 1: Generate schema from user requirements
-        generator = SchemaGenerator(config=config)
-        extraction_model = generator.generate_schema(user_requirements)
+        # Step 1: Generate or load schema from user requirements
+        extraction_model, requirements, _generated_new_schema = _get_or_create_schema(
+            config=config,
+            user_requirements=user_requirements,
+            schema_key=schema_key,
+            regenerate_schema=regenerate_schema,
+        )
 
         # Step 2: Extract data using the generated schema
         extractor = DataExtractor(config=config)
         extracted_data = extractor.extract(
             extraction_model=extraction_model,
-            requirements=generator.item_requirements,
+            requirements=requirements,
             user_requirements=user_requirements,
             documents=[text],
         )
@@ -505,6 +628,8 @@ async def audio_pipeline_stream(
     pdf_title: str = Form("Extracted Data Report"),
     enhanced: bool = Form(True),
     compress_audio: bool = Form(True),
+    schema_key: str | None = Form(None),
+    regenerate_schema: bool = Form(False),
 ):
     """
     Run the audio pipeline with SSE streaming progress updates.
@@ -584,12 +709,17 @@ async def audio_pipeline_stream(
             steps[1]["message"] = "Analyzing requirements..."
             yield sse_event("step_update", steps[1])
 
-            from gaik.software_components.extractor import DataExtractor, SchemaGenerator
+            from gaik.software_components.extractor import DataExtractor
 
-            schema_generator = SchemaGenerator(config=config)
-            extraction_model = schema_generator.generate_schema(user_requirements)
+            extraction_model, requirements, generated_new_schema = _get_or_create_schema(
+                config=config,
+                user_requirements=user_requirements,
+                schema_key=schema_key,
+                regenerate_schema=regenerate_schema,
+            )
 
             steps[1]["status"] = "completed"
+            steps[1]["message"] = "Generated new schema" if generated_new_schema else "Loaded saved schema"
             yield sse_event("step_update", steps[1])
 
             # Step 3: Data Extraction
@@ -601,7 +731,7 @@ async def audio_pipeline_stream(
             extractor = DataExtractor(config=config)
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
-                requirements=schema_generator.item_requirements,
+                requirements=requirements,
                 user_requirements=user_requirements,
                 documents=documents,
             )
@@ -689,6 +819,8 @@ async def text_pipeline_stream(
     user_requirements: str = Form(...),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
+    schema_key: str | None = Form(None),
+    regenerate_schema: bool = Form(False),
 ):
     """
     Run the text extraction pipeline with SSE streaming progress updates.
@@ -720,12 +852,16 @@ async def text_pipeline_stream(
             yield sse_event("step_update", steps[0])
 
             from gaik.software_components.extractor.extractor import DataExtractor
-            from gaik.software_components.extractor.schema import SchemaGenerator
 
-            generator = SchemaGenerator(config=config)
-            extraction_model = generator.generate_schema(user_requirements)
+            extraction_model, requirements, generated_new_schema = _get_or_create_schema(
+                config=config,
+                user_requirements=user_requirements,
+                schema_key=schema_key,
+                regenerate_schema=regenerate_schema,
+            )
 
             steps[0]["status"] = "completed"
+            steps[0]["message"] = "Generated new schema" if generated_new_schema else "Loaded saved schema"
             yield sse_event("step_update", steps[0])
 
             # Step 2: Extract data
@@ -735,7 +871,7 @@ async def text_pipeline_stream(
             extractor = DataExtractor(config=config)
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
-                requirements=generator.item_requirements,
+                requirements=requirements,
                 user_requirements=user_requirements,
                 documents=[text],
             )
@@ -817,6 +953,8 @@ async def document_pipeline_stream(
     parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus"] = Form("auto"),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
+    schema_key: str | None = Form(None),
+    regenerate_schema: bool = Form(False),
 ):
     """
     Run the document pipeline with SSE streaming progress updates.
@@ -916,12 +1054,17 @@ async def document_pipeline_stream(
             steps[1]["message"] = "Analyzing requirements..."
             yield sse_event("step_update", steps[1])
 
-            from gaik.software_components.extractor import DataExtractor, SchemaGenerator
+            from gaik.software_components.extractor import DataExtractor
 
-            schema_generator = SchemaGenerator(config=config)
-            extraction_model = schema_generator.generate_schema(user_requirements)
+            extraction_model, requirements, generated_new_schema = _get_or_create_schema(
+                config=config,
+                user_requirements=user_requirements,
+                schema_key=schema_key,
+                regenerate_schema=regenerate_schema,
+            )
 
             steps[1]["status"] = "completed"
+            steps[1]["message"] = "Generated new schema" if generated_new_schema else "Loaded saved schema"
             yield sse_event("step_update", steps[1])
 
             # Step 3: Data Extraction
@@ -932,7 +1075,7 @@ async def document_pipeline_stream(
             extractor = DataExtractor(config=config)
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
-                requirements=schema_generator.item_requirements,
+                requirements=requirements,
                 user_requirements=user_requirements,
                 documents=[parsed_content],
             )

@@ -1,0 +1,135 @@
+{
+  "model_name": "construction_diary_extraction_Extraction",
+  "requirements": {
+    "use_case_name": "construction_diary_extraction",
+    "fields": [
+      {
+        "field_name": "project_or_site_name",
+        "field_type": "str",
+        "description": "Name of the construction project or site",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "author_or_supervisor_name",
+        "field_type": "str",
+        "description": "Name of the person authoring the diary or supervising the site",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "date",
+        "field_type": "date",
+        "description": "Date of the diary entry",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "week_number",
+        "field_type": "date",
+        "description": "Calendar week number corresponding to the diary entry date",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "weather_conditions",
+        "field_type": "str",
+        "description": "Description of the weather conditions during the day",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "personnel_and_subcontractors",
+        "field_type": "list[str]",
+        "description": "List of personnel and subcontractor entities present or involved",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "days_work_tasks",
+        "field_type": "list[str]",
+        "description": "List of work tasks performed during the day",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "days_events",
+        "field_type": "list[str]",
+        "description": "List of notable events during the day",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "started_work_phases",
+        "field_type": "list[str]",
+        "description": "Work phases that were started on this day",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "ongoing_work_phases",
+        "field_type": "list[str]",
+        "description": "Work phases that were ongoing during this day",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "completed_work_phases",
+        "field_type": "list[str]",
+        "description": "Work phases that were completed on this day",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "interrupted_work_phases",
+        "field_type": "list[str]",
+        "description": "Work phases that were interrupted or paused on this day",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "supervisor_observations_or_remarks",
+        "field_type": "str",
+        "description": "Supervisor\u2019s observations, comments, or remarks for the day",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "attachments_inspections_and_requested_extensions",
+        "field_type": "str",
+        "description": "Mention of attachments, inspections, and any requested extensions",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  },
+  "user_requirements": "Extract the following fields from the construction diary:\r\n- Project or site name\r\n- Author or supervisor name\r\n- Date and week number\r\n- Weather conditions\r\n- Personnel and subcontractors\r\n- Day's work tasks\r\n- Day's events\r\n- Started work phases\r\n- Ongoing work phases\r\n- Completed work phases\r\n- Interrupted work phases\r\n- Supervisor observations or remarks\r\n- Attachments, inspections, and requested extensions if mentioned"
+}

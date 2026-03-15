@@ -1,8 +1,13 @@
 """Diary router - Construction diary (Työmaapäiväkirja) workflow endpoints."""
 
+import importlib.util
+import io
+import json
+import logging
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator
+from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
 
@@ -13,11 +18,102 @@ except ImportError:
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Temporary storage for generated PDFs
 PDF_STORAGE: dict[str, Path] = {}
 PDF_TIMESTAMPS: dict[str, datetime] = {}
+
+SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
+SCHEMA_DIR.mkdir(exist_ok=True)
+
+
+def _clean_schema_dump(raw_dump: str) -> str:
+    lines = raw_dump.splitlines()
+    start_idx = 0
+    for i, line in enumerate(lines):
+        if line.startswith("class "):
+            start_idx = i
+            break
+    body = lines[start_idx:]
+    while body and (set(body[-1].strip()) == {"="} or not body[-1].strip()):
+        body.pop()
+    return "\n".join(body).strip()
+
+
+def _schema_paths(schema_key: str) -> tuple[Path, Path]:
+    return SCHEMA_DIR / f"{schema_key}_schema.py", SCHEMA_DIR / f"{schema_key}_requirements.json"
+
+
+def _save_schema(schema: type, requirements, schema_key: str, user_requirements: str) -> None:
+    from gaik.software_components.extractor.schema import print_pydantic_schema
+
+    schema_path, req_path = _schema_paths(schema_key)
+    buffer = io.StringIO()
+    with redirect_stdout(buffer):
+        print_pydantic_schema(schema, title="Saved Schema")
+    schema_code = _clean_schema_dump(buffer.getvalue())
+    template = "\n".join([
+        '"""',
+        'Auto-generated schema module (do not edit manually).',
+        '"""',
+        '',
+        'import decimal',
+        'from decimal import Decimal',
+        'from typing import List, Literal, Optional',
+        '',
+        'from pydantic import BaseModel, Field, ConfigDict',
+        '',
+        schema_code,
+        '',
+    ])
+    schema_path.write_text(template, encoding="utf-8")
+    payload = {
+        "model_name": schema.__name__,
+        "requirements": requirements.model_dump(),
+        "user_requirements": user_requirements,
+    }
+    req_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _load_schema(schema_key: str, user_requirements: str):
+    from gaik.software_components.extractor import ExtractionRequirements
+
+    schema_path, req_path = _schema_paths(schema_key)
+    if not (schema_path.exists() and req_path.exists()):
+        return None
+    data = json.loads(req_path.read_text(encoding="utf-8"))
+    if data.get("user_requirements") != user_requirements:
+        return None
+    model_name = data["model_name"]
+    requirements = ExtractionRequirements(**data["requirements"])
+    spec = importlib.util.spec_from_file_location(model_name, schema_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader is not None
+    spec.loader.exec_module(module)  # type: ignore[attr-defined]
+    schema = getattr(module, model_name)
+    return schema, requirements
+
+
+def _get_or_create_schema(config, user_requirements: str, schema_key: str, regenerate_schema: bool):
+    from gaik.software_components.extractor import SchemaGenerator
+
+    loaded = _load_schema(schema_key, user_requirements)
+    if loaded is not None and not regenerate_schema:
+        logger.info("Loaded existing diary schema for key %s", schema_key)
+        schema, requirements = loaded
+        return schema, requirements, False
+
+    schema_generator = SchemaGenerator(config=config)
+    extraction_model = schema_generator.generate_schema(user_requirements)
+    requirements = schema_generator.item_requirements
+
+    if loaded is None and not regenerate_schema:
+        _save_schema(extraction_model, requirements, schema_key, user_requirements)
+        logger.info("Saved diary schema for key %s", schema_key)
+
+    return extraction_model, requirements, True
 
 # Logo path for PDF generation (use GAIK logo)
 LOGO_PATH = Path(__file__).parent.parent.parent / "public" / "logos" / "gaik-logo-letter-only.png"
@@ -50,9 +146,11 @@ DIARY_REQUIREMENTS = """Extract the following fields from the Finnish constructi
 @router.post("/audio/stream")
 async def diary_audio_pipeline_stream(
     file: UploadFile = File(...),
+    user_requirements: str = Form(DIARY_REQUIREMENTS),
     generate_pdf: bool = Form(True),
     enhanced: bool = Form(True),
     compress_audio: bool = Form(True),
+    regenerate_schema: bool = Form(False),
 ):
     """
     Process audio recording with SSE streaming progress updates.
@@ -97,10 +195,7 @@ async def diary_audio_pipeline_stream(
         yield sse_event("steps", {"steps": steps})
 
         try:
-            import io
-            from contextlib import redirect_stdout
-
-            from gaik.software_components.extractor import DataExtractor, SchemaGenerator
+            from gaik.software_components.extractor import DataExtractor
             from gaik.software_components.extractor.schema import print_pydantic_schema
             from gaik.software_components.transcriber import Transcriber
 
@@ -127,13 +222,16 @@ async def diary_audio_pipeline_stream(
             steps[1]["message"] = "Analyzing requirements..."
             yield sse_event("step_update", steps[1])
 
-            reasoning_buffer = io.StringIO()
-            with redirect_stdout(reasoning_buffer):
-                schema_generator = SchemaGenerator(config=config)
-                extraction_model = schema_generator.generate_schema(DIARY_REQUIREMENTS)
-            reasoning_output = reasoning_buffer.getvalue()
+            extraction_model, requirements, generated_new_schema = _get_or_create_schema(
+                config=config,
+                user_requirements=user_requirements,
+                schema_key="construction_diary",
+                regenerate_schema=regenerate_schema,
+            )
+            reasoning_output = "Generated new schema" if generated_new_schema else "Loaded saved schema"
 
             steps[1]["status"] = "completed"
+            steps[1]["message"] = reasoning_output
             yield sse_event("step_update", steps[1])
 
             # Step 3: Data Extraction
@@ -145,8 +243,8 @@ async def diary_audio_pipeline_stream(
             extractor = DataExtractor(config=config)
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
-                requirements=schema_generator.item_requirements,
-                user_requirements=DIARY_REQUIREMENTS,
+                requirements=requirements,
+                user_requirements=user_requirements,
                 documents=documents,
             )
 
@@ -174,11 +272,14 @@ async def diary_audio_pipeline_stream(
                 yield sse_event("step_update", steps[pdf_step_idx])
 
                 try:
-                    from utils.pdf_generator import StructuredDataToPDF
+                    try:
+                        from utils.pdf_generator import StructuredDataToPDF
+                    except ImportError:
+                        from api.utils.pdf_generator import StructuredDataToPDF
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(
-                        title="Construction Site Diary", logo_path=logo
+                        title="Construction Diary", logo_path=logo
                     )
                     pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
 
@@ -241,7 +342,9 @@ async def diary_audio_pipeline_stream(
 @router.post("/text/stream")
 async def diary_text_pipeline_stream(
     text: str = Form(...),
+    user_requirements: str = Form(DIARY_REQUIREMENTS),
     generate_pdf: bool = Form(True),
+    regenerate_schema: bool = Form(False),
 ):
     """
     Extract structured data from text with SSE streaming progress updates.
@@ -267,9 +370,6 @@ async def diary_text_pipeline_stream(
             return
 
         try:
-            import io
-            from contextlib import redirect_stdout
-
             config = get_api_config()
 
             # Step 1: Analyzing text
@@ -277,10 +377,7 @@ async def diary_text_pipeline_stream(
             yield sse_event("step_update", steps[0])
 
             from gaik.software_components.extractor.extractor import DataExtractor
-            from gaik.software_components.extractor.schema import (
-                SchemaGenerator,
-                print_pydantic_schema,
-            )
+            from gaik.software_components.extractor.schema import print_pydantic_schema
 
             steps[0]["status"] = "completed"
             steps[0]["message"] = "Text received"
@@ -290,8 +387,12 @@ async def diary_text_pipeline_stream(
             steps[1]["status"] = "in_progress"
             yield sse_event("step_update", steps[1])
 
-            generator = SchemaGenerator(config=config)
-            extraction_model = generator.generate_schema(DIARY_REQUIREMENTS)
+            extraction_model, requirements, generated_new_schema = _get_or_create_schema(
+                config=config,
+                user_requirements=user_requirements,
+                schema_key="construction_diary",
+                regenerate_schema=regenerate_schema,
+            )
 
             # Capture generated schema as string for logging
             schema_buffer = io.StringIO()
@@ -300,7 +401,7 @@ async def diary_text_pipeline_stream(
             schema_str = schema_buffer.getvalue()
 
             steps[1]["status"] = "completed"
-            steps[1]["message"] = "Schema generated"
+            steps[1]["message"] = "Generated new schema" if generated_new_schema else "Loaded saved schema"
             steps[1]["details"] = {
                 "type": "schema",
                 "title": "Generated Pydantic Schema",
@@ -315,8 +416,8 @@ async def diary_text_pipeline_stream(
             extractor = DataExtractor(config=config)
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
-                requirements=generator.item_requirements,
-                user_requirements=DIARY_REQUIREMENTS,
+                requirements=requirements,
+                user_requirements=user_requirements,
                 documents=[text],
             )
 
@@ -332,11 +433,14 @@ async def diary_text_pipeline_stream(
                 yield sse_event("step_update", steps[pdf_step_idx])
 
                 try:
-                    from utils.pdf_generator import StructuredDataToPDF
+                    try:
+                        from utils.pdf_generator import StructuredDataToPDF
+                    except ImportError:
+                        from api.utils.pdf_generator import StructuredDataToPDF
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(
-                        title="Construction Site Diary", logo_path=logo
+                        title="Construction Diary", logo_path=logo
                     )
                     pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
 

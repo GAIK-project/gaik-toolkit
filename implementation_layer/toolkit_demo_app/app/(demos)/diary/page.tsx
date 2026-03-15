@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import { parseSSEEvents, type SSEStep } from "@/lib/sse";
 import {
@@ -37,6 +38,9 @@ import {
   Mic,
   Settings2,
   Sparkles,
+  Wand2,
+  PenLine,
+  RotateCcw,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import posthog from "posthog-js";
@@ -96,8 +100,23 @@ Päättyneet: Asbestipurku
 
 Valvojan huomiot: Ei huomautettavaa, työt etenevät aikataulussa`;
 
-// Finnish audio example path
-const EXAMPLE_AUDIO_PATH = "/diary-demo/diary.mp3";
+const DEFAULT_DIARY_SCHEMA = `Extract the following fields from the construction diary:
+- Project or site name
+- Author or supervisor name
+- Date and week number
+- Weather conditions
+- Personnel and subcontractors
+- Day's work tasks
+- Day's events
+- Started work phases
+- Ongoing work phases
+- Completed work phases
+- Interrupted work phases
+- Supervisor observations or remarks
+- Attachments, inspections, and requested extensions if mentioned`;
+
+// Audio example path
+const EXAMPLE_AUDIO_PATH = "/sample2.m4a";
 
 interface DiaryResult {
   job_id: string;
@@ -115,8 +134,12 @@ export default function DiaryPage() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [textInput, setTextInput] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [extractionMode, setExtractionMode] = useState<"auto" | "custom">("auto");
+  const [customSchema, setCustomSchema] = useState(DEFAULT_DIARY_SCHEMA);
   const [enhanced, setEnhanced] = useState(true);
   const [generatePdf, setGeneratePdf] = useState(true);
+  const [regenerateSchema, setRegenerateSchema] = useState(false);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   const [result, setResult] = useState<DiaryResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -162,8 +185,15 @@ export default function DiaryPage() {
     // Steps are sent by backend via SSE
 
     try {
+      const userRequirements =
+        extractionMode === "auto"
+          ? DEFAULT_DIARY_SCHEMA
+          : customSchema;
+
       const formData = new FormData();
+      formData.append("user_requirements", userRequirements);
       formData.append("generate_pdf", String(generatePdf));
+      formData.append("regenerate_schema", String(regenerateSchema));
 
       if (inputMode === "audio" && audioFile) {
         formData.append("file", audioFile);
@@ -320,6 +350,9 @@ export default function DiaryPage() {
     setResult(null);
     setPipelineSteps([]);
     setProcessingMetadata(null);
+    setExtractionMode("auto");
+    setCustomSchema(DEFAULT_DIARY_SCHEMA);
+    setRegenerateSchema(false);
   }
 
   function loadExampleText(language: "en" | "fi"): void {
@@ -331,14 +364,17 @@ export default function DiaryPage() {
   async function loadExampleAudio(): Promise<void> {
     try {
       const response = await fetch(EXAMPLE_AUDIO_PATH);
+      if (!response.ok) {
+        throw new Error(`Failed to load sample audio (${response.status})`);
+      }
       const blob = await response.blob();
-      const file = new File([blob], "diary-example.mp3", {
-        type: "audio/mpeg",
+      const file = new File([blob], "sample2.m4a", {
+        type: blob.type || "audio/mp4",
       });
       setInputMode("audio");
       setAudioFile(file);
       setResult(null);
-      toast.success("Finnish audio example loaded");
+      toast.success("Audio example loaded");
     } catch {
       toast.error("Failed to load audio example");
     }
@@ -440,7 +476,7 @@ export default function DiaryPage() {
 
           <Card className="border-t-0 shadow-md">
             <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <div>
                   <CardTitle>
                     {inputMode === "audio" ? "Audio Input" : "Text Description"}
@@ -451,6 +487,17 @@ export default function DiaryPage() {
                       : "Provide a description of the construction site activities."}
                   </CardDescription>
                 </div>
+                {(audioFile || textInput || result || pipelineSteps.length > 0) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={resetDemo}
+                    disabled={isLoading}
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Reset
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -459,8 +506,9 @@ export default function DiaryPage() {
                   <FileUpload
                     accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac"
                     maxSize={50}
+                    file={audioFile}
                     onFileSelect={setAudioFile}
-                    onFileRemove={resetDemo}
+                    onFileRemove={() => setAudioFile(null)}
                     disabled={isLoading}
                   />
                   {/* Load Example Audio Button */}
@@ -572,6 +620,47 @@ export default function DiaryPage() {
                       className="overflow-hidden"
                     >
                       <div className="space-y-4 border-t p-4 pt-4">
+                        <div className="space-y-4">
+                          <Label>Extraction Mode</Label>
+                          <ToggleGroup
+                            type="single"
+                            value={extractionMode}
+                            onValueChange={(val) =>
+                              val && setExtractionMode(val as "auto" | "custom")
+                            }
+                            className="justify-start"
+                          >
+                            <ToggleGroupItem value="auto" className="gap-2">
+                              <Wand2 className="h-4 w-4" />
+                              Automatic
+                            </ToggleGroupItem>
+                            <ToggleGroupItem value="custom" className="gap-2">
+                              <PenLine className="h-4 w-4" />
+                              Custom Fields
+                            </ToggleGroupItem>
+                          </ToggleGroup>
+                          <p className="text-muted-foreground text-xs">
+                            {extractionMode === "auto"
+                              ? "AI extracts the standard construction diary fields automatically."
+                              : "Define the specific diary fields or questions you want answered."}
+                          </p>
+                        </div>
+
+                        {extractionMode === "custom" && (
+                          <div className="space-y-2">
+                            <Label htmlFor="schema">Fields to Extract</Label>
+                            <Textarea
+                              id="schema"
+                              value={customSchema}
+                              onChange={(e) => setCustomSchema(e.target.value)}
+                              placeholder="E.g., weather delays, subcontractor issues, completed inspections, equipment usage..."
+                              disabled={isLoading}
+                              rows={4}
+                              className="font-mono text-sm"
+                            />
+                          </div>
+                        )}
+
                         {inputMode === "audio" && (
                           <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
@@ -590,6 +679,21 @@ export default function DiaryPage() {
                             />
                           </div>
                         )}
+
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <Label htmlFor="regenerate-schema">Regenerate Schema</Label>
+                            <p className="text-muted-foreground text-xs">
+                              Ignore the saved diary schema and build a new one for this request
+                            </p>
+                          </div>
+                          <Switch
+                            id="regenerate-schema"
+                            checked={regenerateSchema}
+                            onCheckedChange={setRegenerateSchema}
+                            disabled={isLoading}
+                          />
+                        </div>
 
                         <div className="flex items-center justify-between">
                           <div className="space-y-0.5">
@@ -743,13 +847,51 @@ export default function DiaryPage() {
           )}
 
           {!result && !isLoading && (
-            <EmptyStateCard
-              message={
-                inputMode === "audio"
-                  ? "Your processed diary entry will appear here."
-                  : "Submit your diary details to see the extracted data."
-              }
-            />
+            <>
+              <EmptyStateCard
+                message={
+                  inputMode === "audio"
+                    ? "Your processed diary entry will appear here."
+                    : "Submit your diary details to see the extracted data."
+                }
+              />
+
+              <Card>
+                <button
+                  type="button"
+                  onClick={() => setHowItWorksOpen((open) => !open)}
+                  className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-muted/30"
+                  aria-expanded={howItWorksOpen}
+                >
+                  <h2 className="text-lg font-semibold text-foreground">How It Works</h2>
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <span>{howItWorksOpen ? "Hide" : "Show"}</span>
+                    <ChevronDown
+                      className={`h-5 w-5 shrink-0 transition-transform ${howItWorksOpen ? "rotate-180" : "rotate-0"}`}
+                    />
+                  </div>
+                </button>
+                {howItWorksOpen && (
+                  <CardContent className="space-y-4 border-t pt-5 text-sm text-muted-foreground">
+                    <p>
+                      <strong>1. Provide the diary input:</strong> Upload an audio recording or type the daily construction diary entry directly. Use <strong>Load Example</strong> to test the built-in sample audio or example texts.
+                    </p>
+                    <p>
+                      <strong>2. Transcribe or read the content:</strong> Audio input is transcribed first. Text input is processed directly without transcription.
+                    </p>
+                    <p>
+                      <strong>3. Extract the diary fields:</strong> In automatic mode, the tool extracts the standard construction diary fields such as project, date, weather, personnel, work phases, and supervisor observations. In custom mode, it extracts the fields you define.
+                    </p>
+                    <p>
+                      <strong>4. Review the structured result:</strong> The result view shows the transcript, generated schema details, and the extracted construction diary data.
+                    </p>
+                    <p>
+                      <strong>5. Generate the final report:</strong> If enabled, the tool also creates a downloadable PDF construction diary report.
+                    </p>
+                  </CardContent>
+                )}
+              </Card>
+            </>
           )}
         </div>
       </div>

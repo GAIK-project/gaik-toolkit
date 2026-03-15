@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import {
   AlertTriangle,
+  ArrowLeft,
   ChevronDown,
   ChevronUp,
   ClipboardPaste,
@@ -39,10 +40,12 @@ import {
   Settings2,
   Sparkles,
   Wand2,
+  RotateCcw,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 const DEFAULT_INCIDENT_SCHEMA = `Extract the following from the incident report:
@@ -82,6 +85,7 @@ interface IncidentReportResult {
 }
 
 export default function IncidentReportPage() {
+  const router = useRouter();
   const [inputMode, setInputMode] = useState<"audio" | "text">("audio");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [textInput, setTextInput] = useState("");
@@ -93,10 +97,12 @@ export default function IncidentReportPage() {
   const [customSchema, setCustomSchema] = useState(DEFAULT_INCIDENT_SCHEMA);
   const [enhanced, setEnhanced] = useState(true);
   const [generatePdf, setGeneratePdf] = useState(true);
+  const [regenerateSchema, setRegenerateSchema] = useState(false);
 
   const [result, setResult] = useState<IncidentReportResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pipelineSteps, setPipelineSteps] = useState<SSEStep[]>([]);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -128,6 +134,8 @@ export default function IncidentReportPage() {
       const formData = new FormData();
       formData.append("user_requirements", userRequirements);
       formData.append("generate_pdf", String(generatePdf));
+      formData.append("schema_key", "incident_report");
+      formData.append("regenerate_schema", String(regenerateSchema));
 
       // Both audio and text use SSE streaming
       if (inputMode === "audio" && audioFile) {
@@ -204,12 +212,37 @@ export default function IncidentReportPage() {
     setTextInput("");
     setResult(null);
     setPipelineSteps([]);
+    setRegenerateSchema(false);
+  }
+
+  async function loadExampleAudio(): Promise<void> {
+    try {
+      const response = await fetch("/sample.m4a");
+      if (!response.ok) {
+        throw new Error(`Failed to load sample audio (${response.status})`);
+      }
+      const blob = await response.blob();
+      const file = new File([blob], "sample.m4a", {
+        type: blob.type || "audio/mp4",
+      });
+      setInputMode("audio");
+      setAudioFile(file);
+      setTextInput("");
+      setResult(null);
+      setPipelineSteps([]);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load example audio",
+      );
+    }
   }
 
   function loadExampleText(): void {
     setInputMode("text");
     setTextInput(EXAMPLE_INCIDENT_TEXT);
+    setAudioFile(null);
     setResult(null);
+    setPipelineSteps([]);
   }
 
   return (
@@ -219,6 +252,15 @@ export default function IncidentReportPage() {
       transition={{ duration: 0.4 }}
     >
       <header className="mb-8 pl-1">
+        <Button
+          type="button"
+          variant="ghost"
+          className="mb-4 h-10 rounded-xl px-3"
+          onClick={() => router.push("/")}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
         <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
           <AlertTriangle className="h-8 w-8 text-amber-500" />
           Incident Reporting
@@ -318,12 +360,28 @@ export default function IncidentReportPage() {
                       : "Provide a detailed description of the event."}
                   </CardDescription>
                 </div>
-                {inputMode === "text" && (
-                  <Button variant="ghost" size="sm" onClick={loadExampleText}>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={inputMode === "audio" ? loadExampleAudio : loadExampleText}
+                    disabled={isLoading}
+                  >
                     <ClipboardPaste className="mr-2 h-4 w-4" />
                     Load Example
                   </Button>
-                )}
+                  {(audioFile || textInput || result || pipelineSteps.length > 0) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={resetDemo}
+                      disabled={isLoading}
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Reset
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -331,8 +389,9 @@ export default function IncidentReportPage() {
                 <FileUpload
                   accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac"
                   maxSize={50}
+                  file={audioFile}
                   onFileSelect={setAudioFile}
-                  onFileRemove={resetDemo}
+                  onFileRemove={() => setAudioFile(null)}
                   disabled={isLoading}
                 />
               ) : (
@@ -453,6 +512,21 @@ export default function IncidentReportPage() {
                               />
                             </div>
                           )}
+
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="regenerate-schema">Regenerate Schema</Label>
+                              <p className="text-muted-foreground text-xs">
+                                Ignore the saved incident schema and build a new one for this request
+                              </p>
+                            </div>
+                            <Switch
+                              id="regenerate-schema"
+                              checked={regenerateSchema}
+                              onCheckedChange={setRegenerateSchema}
+                              disabled={isLoading}
+                            />
+                          </div>
 
                           <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
@@ -609,13 +683,51 @@ export default function IncidentReportPage() {
           )}
 
           {!result && !isLoading && (
-            <EmptyStateCard
-              message={
-                inputMode === "audio"
-                  ? "Your generated report will appear here."
-                  : "Submit your details to see the magic happen."
-              }
-            />
+            <>
+              <EmptyStateCard
+                message={
+                  inputMode === "audio"
+                    ? "Your generated report will appear here."
+                    : "Submit your details to see the magic happen."
+                }
+              />
+
+              <Card>
+                <button
+                  type="button"
+                  onClick={() => setHowItWorksOpen((open) => !open)}
+                  className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-muted/30"
+                  aria-expanded={howItWorksOpen}
+                >
+                  <h2 className="text-lg font-semibold text-foreground">How It Works</h2>
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <span>{howItWorksOpen ? "Hide" : "Show"}</span>
+                    <ChevronDown
+                      className={`h-5 w-5 shrink-0 transition-transform ${howItWorksOpen ? "rotate-180" : "rotate-0"}`}
+                    />
+                  </div>
+                </button>
+                {howItWorksOpen && (
+                  <CardContent className="space-y-4 border-t pt-5 text-sm text-muted-foreground">
+                    <p>
+                      <strong>1. Provide the incident input:</strong> Upload an audio recording or type the incident description directly. For a quick test, use <strong>Load Example</strong> to load the built-in sample audio or sample text.
+                    </p>
+                    <p>
+                      <strong>2. Transcribe or read the report:</strong> Audio input is transcribed first. Text input skips transcription and goes directly to extraction.
+                    </p>
+                    <p>
+                      <strong>3. Extract the key incident fields:</strong> The tool extracts relevant details such as incident date and time, location, description of what happened, people involved, injuries or damages, immediate actions taken, and witness information when available.
+                    </p>
+                    <p>
+                      <strong>4. Refine the output:</strong> If enabled, the transcript is enhanced for readability. You can also switch to custom extraction mode and define your own fields or questions.
+                    </p>
+                    <p>
+                      <strong>5. Generate the final report:</strong> The result view shows the transcript and structured incident details. It can also generate a downloadable PDF incident report.
+                    </p>
+                  </CardContent>
+                )}
+              </Card>
+            </>
           )}
         </div>
       </div>
