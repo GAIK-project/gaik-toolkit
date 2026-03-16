@@ -282,7 +282,6 @@ function formatFieldName(key: string): string {
     days_deviations: "Deviations",
     paivan_tyot_omat_tyot: "Today's Work",
     days_work_tasks: "Day's Work Tasks",
-    days_work_tasks: "Day's Work Tasks",
     resurssit_henkilosto: "Personnel",
     personnel_and_subcontractors: "Personnel and Subcontractors",
     kohde: "Project",
