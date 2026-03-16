@@ -4,6 +4,6 @@ python-multipart>=0.0.21
 python-dotenv>=1.2.1
 fpdf2>=2.8.5
 openpyxl>=3.1.0
-gaik[all-cpu]>=0.3.11
+gaik[all-cpu]>=0.3.12
 boto3>=1.35.0
 yt-dlp>=2024.0.0
