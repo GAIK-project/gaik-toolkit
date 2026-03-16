@@ -321,10 +321,8 @@ export default function TextToSpeechPage() {
         <div>
           {isLoading ? (
             <LoadingCard
-              title="Generating Audio"
-              description="The text is being converted into speech."
-              feedbackSlot={<FeedbackButton demoType="text-to-speech" />}
-              delay={0}
+              message="Generating Audio"
+              subMessage="The text is being converted into speech."
             />
           ) : result && audioUrl ? (
             <ResultCard
