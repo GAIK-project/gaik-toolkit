@@ -17,18 +17,11 @@ router = APIRouter()
 SUPPORTED_LANGUAGES = {"fi", "en"}
 SUPPORTED_VOICES = {
     "alloy",
-    "ash",
-    "ballad",
-    "coral",
     "echo",
     "fable",
     "nova",
     "onyx",
-    "sage",
     "shimmer",
-    "verse",
-    "marin",
-    "cedar",
 }
 MAX_TEXT_LENGTH = 1000
 
@@ -49,7 +42,7 @@ class TextToSpeechResponse(BaseModel):
 async def synthesize_text(
     text: str = Form(...),
     language: str = Form('fi'),
-    voice: str = Form('marin'),
+    voice: str = Form('alloy'),
 ):
     normalized_text = text.strip()
     if not normalized_text:

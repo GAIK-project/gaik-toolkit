@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import uuid
+
+import requests
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -21,7 +23,7 @@ SUPPORTED_RESPONSE_FORMATS = {
     "pcm": "application/octet-stream",
 }
 DEFAULT_LANGUAGE = "fi"
-DEFAULT_MODEL = "gpt-4o-mini-tts"
+DEFAULT_MODEL = "tts-hd"
 DEFAULT_VOICE = "marin"
 DEFAULT_RESPONSE_FORMAT = "mp3"
 
@@ -108,15 +110,24 @@ class TextToSpeech:
 
         resolved_instructions = self._build_instructions(language=resolved_language, instructions=instructions)
 
-        with self.client.audio.speech.with_streaming_response.create(
-            model=self.model,
-            voice=resolved_voice,
-            input=text,
-            instructions=resolved_instructions,
-            response_format=resolved_format,
-            speed=resolved_speed,
-        ) as response:
-            audio_bytes = b"".join(response.iter_bytes())
+        if self.api_config.get("use_azure", False):
+            audio_bytes = self._synthesize_with_azure_endpoint(
+                text=text,
+                voice=resolved_voice,
+                instructions=resolved_instructions,
+                response_format=resolved_format,
+                speed=resolved_speed,
+            )
+        else:
+            with self.client.audio.speech.with_streaming_response.create(
+                model=self.model,
+                voice=resolved_voice,
+                input=text,
+                instructions=resolved_instructions,
+                response_format=resolved_format,
+                speed=resolved_speed,
+            ) as response:
+                audio_bytes = b"".join(response.iter_bytes())
 
         return SpeechSynthesisResult(
             audio_bytes=audio_bytes,
@@ -132,6 +143,40 @@ class TextToSpeech:
         if self.api_config.get("use_azure", False):
             return os.getenv("AZURE_TTS_MODEL", DEFAULT_MODEL)
         return os.getenv("OPENAI_TTS_MODEL", DEFAULT_MODEL)
+
+    def _synthesize_with_azure_endpoint(
+        self,
+        *,
+        text: str,
+        voice: str,
+        instructions: str,
+        response_format: str,
+        speed: float,
+    ) -> bytes:
+        tts_endpoint = os.getenv("TTS_ENDPOINT")
+        api_key = os.getenv("AZURE_API_KEY")
+        if not tts_endpoint:
+            raise ValueError("TTS_ENDPOINT is not set for Azure text-to-speech.")
+        if not api_key:
+            raise ValueError("AZURE_API_KEY is not set for Azure text-to-speech.")
+
+        payload = {
+            "model": self.model,
+            "input": text,
+            "voice": voice,
+        }
+
+        response = requests.post(
+            tts_endpoint,
+            headers={
+                "Content-Type": "application/json",
+                "api-key": api_key,
+            },
+            json=payload,
+            timeout=120,
+        )
+        response.raise_for_status()
+        return response.content
 
     def _build_instructions(self, *, language: str, instructions: str | None) -> str:
         language_instruction = {

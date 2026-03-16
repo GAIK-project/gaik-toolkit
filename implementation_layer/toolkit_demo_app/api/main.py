@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Load .env.local from toolkit_demo_app folder - must be before other imports
 env_path = Path(__file__).parent.parent / ".env.local"
-load_dotenv(env_path)
+load_dotenv(env_path, override=True)
 
 from fastapi import FastAPI, Request  # noqa: E402, I001
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402

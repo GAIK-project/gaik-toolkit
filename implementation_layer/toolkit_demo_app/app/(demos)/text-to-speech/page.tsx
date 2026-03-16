@@ -38,21 +38,7 @@ import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 const MAX_CHARACTERS = 1000;
-const VOICES = [
-  "alloy",
-  "ash",
-  "ballad",
-  "coral",
-  "echo",
-  "fable",
-  "nova",
-  "onyx",
-  "sage",
-  "shimmer",
-  "verse",
-  "marin",
-  "cedar",
-] as const;
+const VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"] as const;
 const LANGUAGES = ["fi", "en"] as const;
 
 const EXAMPLE_TEXT = `Päivämäärä 10.04.2025.
@@ -81,7 +67,7 @@ interface TextToSpeechResult {
 export default function TextToSpeechPage() {
   const router = useRouter();
   const [text, setText] = useState("");
-  const [voice, setVoice] = useState<Voice>("marin");
+  const [voice, setVoice] = useState<Voice>("alloy");
   const [language, setLanguage] = useState<Language>("fi");
   const [isLoading, setIsLoading] = useState(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
@@ -95,7 +81,7 @@ export default function TextToSpeechPage() {
 
   function resetDemo(): void {
     setText("");
-    setVoice("marin");
+    setVoice("alloy");
     setLanguage("fi");
     setResult(null);
   }
@@ -218,7 +204,7 @@ export default function TextToSpeechPage() {
                     variant="outline"
                     size="sm"
                     onClick={resetDemo}
-                    disabled={isLoading || (!text && !result && voice === "marin" && language === "fi")}
+                    disabled={isLoading || (!text && !result && voice === "alloy" && language === "fi")}
                     className="gap-2"
                   >
                     <RotateCcw className="h-4 w-4" />
@@ -250,7 +236,10 @@ export default function TextToSpeechPage() {
                   </AccordionTrigger>
                   <AccordionContent className="space-y-4 pt-4">
                     <div className="space-y-2">
-                      <Label htmlFor="tts-language">Language</Label>
+                      <div className="space-y-1">
+                        <Label htmlFor="tts-language">Language</Label>
+                        <p className="text-muted-foreground text-xs">The model can also infer the text language automatically.</p>
+                      </div>
                       <Select value={language} onValueChange={(value: Language) => setLanguage(value)} disabled={isLoading}>
                         <SelectTrigger id="tts-language">
                           <SelectValue />
@@ -277,6 +266,7 @@ export default function TextToSpeechPage() {
                         </SelectContent>
                       </Select>
                     </div>
+
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>

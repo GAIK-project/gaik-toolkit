@@ -17,8 +17,12 @@ from gaik.software_components.text_to_speech import TextToSpeech, get_openai_con
 
 config = get_openai_config(use_azure=True)
 
-tts = TextToSpeech(api_config=config)
-result = tts.synthesize("Tama on tekstista puheeksi -esimerkki.", language="fi")
+tts = TextToSpeech(
+    api_config=config,
+    language="fi",
+    voice="alloy",
+)
+result = tts.synthesize("Tama on tekstista puheeksi -esimerkki.")
 saved_path = result.save("tts_outputs")
 print(saved_path)
 ```
@@ -36,7 +40,8 @@ from gaik.software_components.text_to_speech import TextToSpeech
 
 tts = TextToSpeech(
     api_config=config,
-    model="gpt-4o-mini-tts",
+    model="tts-hd",
+    language="en",
     voice="alloy",
     response_format="mp3",
     speed=1.0,
@@ -45,19 +50,41 @@ tts = TextToSpeech(
 
 result = tts.synthesize(
     text="Hello from GAIK.",
-    language="en",
-    instructions="Use a calm and clear speaking style.",
+    language="en",   # optional override
+    voice="alloy",   # optional override
 )
 ```
 
-## Azure / OpenAI Model Names
+## Azure Configuration
 
-By default the component uses `gpt-4o-mini-tts`.
-
-If you use Azure and your deployment name is different, set:
+When Azure mode is active, the component sends a direct HTTP request to the Azure TTS endpoint. Set these environment variables:
+- `AZURE_API_KEY`
+- `TTS_ENDPOINT`
 - `AZURE_TTS_MODEL`
 
-If you use standard OpenAI and want to override the default model name, set:
+Example:
+
+```env
+AZURE_API_KEY=...
+AZURE_TTS_MODEL=tts-hd
+TTS_ENDPOINT=https://<resource>.cognitiveservices.azure.com/openai/deployments/tts-hd/audio/speech?api-version=2025-03-01-preview
+```
+
+The Azure request payload matches this shape:
+
+```json
+{
+  "model": "tts-hd",
+  "input": "Hello from GAIK.",
+  "voice": "alloy"
+}
+```
+
+## OpenAI Configuration
+
+For non-Azure use, the component uses the OpenAI client speech API.
+
+If you want to override the default OpenAI model name, set:
 - `OPENAI_TTS_MODEL`
 
 ## Output
