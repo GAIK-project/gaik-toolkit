@@ -57,6 +57,8 @@ const DEFAULT_INCIDENT_SCHEMA = `Extract the following from the incident report:
 - Immediate actions taken
 - Witness information (if any)`;
 
+const DEFAULT_AUTO_REQUIREMENTS = "Extract all relevant incident details automatically including date, time, location, description, people involved, injuries, damages, and actions taken.";
+
 const EXAMPLE_INCIDENT_TEXT = `Incident Report
 
 Date: 12 January 2026
@@ -119,6 +121,19 @@ export default function IncidentReportPage() {
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
+    const userRequirements =
+      extractionMode === "auto"
+        ? DEFAULT_AUTO_REQUIREMENTS
+        : customSchema;
+    const usingPersistedSchema =
+      extractionMode === "auto" ||
+      customSchema.trim() === DEFAULT_INCIDENT_SCHEMA.trim();
+
+    if (!usingPersistedSchema && !regenerateSchema) {
+      toast.error("If you modify the extraction task, enable Regenerate Schema before extraction.");
+      return;
+    }
+
     setIsLoading(true);
     setResult(null);
     setPipelineSteps([]);
@@ -126,16 +141,16 @@ export default function IncidentReportPage() {
     // Steps are sent by backend via SSE
 
     try {
-      const userRequirements =
-        extractionMode === "auto"
-          ? "Extract all relevant incident details automatically including date, time, location, description, people involved, injuries, damages, and actions taken."
-          : customSchema;
 
       const formData = new FormData();
       formData.append("user_requirements", userRequirements);
       formData.append("generate_pdf", String(generatePdf));
-      formData.append("schema_key", "incident_report");
-      formData.append("regenerate_schema", String(regenerateSchema));
+      if (usingPersistedSchema) {
+        formData.append("schema_key", "incident_report");
+        formData.append("regenerate_schema", "false");
+      } else {
+        formData.append("regenerate_schema", "true");
+      }
 
       // Both audio and text use SSE streaming
       if (inputMode === "audio" && audioFile) {
@@ -490,6 +505,9 @@ export default function IncidentReportPage() {
                               rows={4}
                               className="font-mono text-sm"
                             />
+                            <p className="text-muted-foreground text-xs leading-relaxed">
+                              If you modify the extraction task, click "Regenerate Schema" and then run extraction. The generated schema will not be persisted.
+                            </p>
                           </div>
                         )}
 
@@ -517,7 +535,7 @@ export default function IncidentReportPage() {
                             <div className="space-y-0.5">
                               <Label htmlFor="regenerate-schema">Regenerate Schema</Label>
                               <p className="text-muted-foreground text-xs">
-                                Ignore the saved incident schema and build a new one for this request
+                                Use a temporary schema for this modified task without overwriting the saved incident schema
                               </p>
                             </div>
                             <Switch

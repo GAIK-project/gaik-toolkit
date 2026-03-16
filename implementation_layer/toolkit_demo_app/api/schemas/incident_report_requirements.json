@@ -1,8 +1,81 @@
 {
-  "model_name": "extract_Extraction",
+  "model_name": "incident_details_extraction_Extraction",
   "requirements": {
-    "use_case_name": "extract",
-    "fields": []
+    "use_case_name": "incident_details_extraction",
+    "fields": [
+      {
+        "field_name": "date",
+        "field_type": "date",
+        "description": "Date of the incident",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "time",
+        "field_type": "str",
+        "description": "Time of the incident",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "location",
+        "field_type": "str",
+        "description": "Location where the incident occurred",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "description",
+        "field_type": "str",
+        "description": "Narrative description of the incident",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "people_involved",
+        "field_type": "list[str]",
+        "description": "People involved in the incident",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "injuries",
+        "field_type": "str",
+        "description": "Details of any injuries resulting from the incident",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "damages",
+        "field_type": "str",
+        "description": "Details of any damages resulting from the incident",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "actions_taken",
+        "field_type": "list[str]",
+        "description": "Actions taken in response to the incident",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      }
+    ]
   },
-  "user_requirements": "Extract"
+  "user_requirements": "Extract all relevant incident details automatically including date, time, location, description, people involved, injuries, damages, and actions taken."
 }
