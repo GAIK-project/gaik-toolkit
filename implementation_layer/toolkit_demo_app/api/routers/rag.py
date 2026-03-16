@@ -39,7 +39,7 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 # Page limit for demo (CPU environment in CSC Rahti)
 MAX_PAGES_VISION_PLUS_DEMO = 10
-MAX_PAGES_OTHER_PARSERS_DEMO = 200
+MAX_PAGES_OTHER_PARSERS_DEMO = 1000
 
 # Custom RAG prompt - friendly and flexible
 CUSTOM_RAG_PROMPT = """You are a friendly document assistant 📚

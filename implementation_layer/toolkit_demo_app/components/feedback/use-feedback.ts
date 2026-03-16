@@ -57,7 +57,7 @@ export function useFeedback(demoType: DemoType): UseFeedbackReturn {
         .select("*")
         .eq("user_id", user.id)
         .eq("demo_type", demoType)
-        .single();
+        .maybeSingle();
 
       if (data) {
         setFeedback(data as Feedback);

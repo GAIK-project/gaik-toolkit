@@ -267,7 +267,7 @@ export default function RAGPage() {
   const [searchType, setSearchType] = useState<"semantic" | "hybrid">(
     "semantic",
   );
-  const [parserChoice, setParserChoice] = useState<"vision_plus" | "docling_rag" | "pymupdf">("docling_rag");
+  const parserChoice = "docling_rag";
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -279,15 +279,23 @@ export default function RAGPage() {
     if (savedCollectionId) {
       // Verify collection still exists on backend
       fetch(`/api/rag/status/${savedCollectionId}`)
-        .then((res) => {
+        .then(async (res) => {
           if (res.ok) {
-            setCollectionId(savedCollectionId);
-            if (savedDocs) {
-              try {
-                setIndexedDocuments(JSON.parse(savedDocs));
-              } catch {
-                // Invalid JSON, ignore
+            const status = await res.json();
+            if (status.is_ready) {
+              setCollectionId(savedCollectionId);
+              if (savedDocs) {
+                try {
+                  setIndexedDocuments(JSON.parse(savedDocs));
+                } catch {
+                  // Invalid JSON, ignore
+                }
               }
+            } else {
+              // Collection no longer in backend memory (server restarted)
+              localStorage.removeItem(STORAGE_KEYS.collectionId);
+              localStorage.removeItem(STORAGE_KEYS.indexedDocuments);
+              toast("Previous session expired. Please upload documents again.");
             }
           } else {
             // Collection no longer exists, clear localStorage
@@ -733,31 +741,6 @@ export default function RAGPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="parserChoice" className="text-xs">
-                    Parser
-                  </Label>
-                  <Select
-                    value={parserChoice}
-                    onValueChange={(v) =>
-                      setParserChoice(v as "vision_plus" | "docling_rag" | "pymupdf")
-                    }
-                  >
-                    <SelectTrigger id="parserChoice" className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="vision_plus">Vision+ Parser</SelectItem>
-                      <SelectItem value="docling_rag">Docling RAG Parser</SelectItem>
-                      <SelectItem value="pymupdf">PyMuPDF</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {parserChoice === "vision_plus" && (
-                  <p className="text-destructive text-xs">
-                    Demo only parses 10 pages with Vision+ parser
-                  </p>
-                )}
                 <p className="text-muted-foreground text-xs">
                   {searchType === "semantic"
                     ? "Uses vector similarity"
@@ -841,8 +824,8 @@ export default function RAGPage() {
                     <h2 className="mb-2 text-xl font-semibold">Get started</h2>
                     <p className="text-muted-foreground mb-6 max-w-md text-center">
                       Try our example document to see RAG in action, or upload
-                      your own PDF (max 10 pages for Vision+ in this demo) to ask questions
-                      and get AI-powered answers with citations.
+                      your own PDFs to ask questions and get AI-powered answers
+                      with citations.
                     </p>
                     <div className="flex gap-3">
                       <ExamplePreviewDialog
