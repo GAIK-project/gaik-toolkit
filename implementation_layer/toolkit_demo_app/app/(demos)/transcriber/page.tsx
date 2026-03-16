@@ -203,13 +203,13 @@ export default function TranscriberPage() {
 
   async function loadExampleAudio(): Promise<void> {
     try {
-      const response = await fetch("/sample.m4a");
+      const response = await fetch("/Sample11.m4a");
       if (!response.ok) {
         throw new Error(`Failed to load example data (${response.status})`);
       }
 
       const blob = await response.blob();
-      const sampleFile = new File([blob], "sample.m4a", { type: blob.type || "audio/mp4" });
+      const sampleFile = new File([blob], "Sample11.m4a", { type: blob.type || "audio/mp4" });
       setFile(sampleFile);
       setResult(null);
       toast.success("Example audio loaded");
