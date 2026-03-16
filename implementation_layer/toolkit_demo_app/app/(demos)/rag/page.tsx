@@ -132,6 +132,8 @@ function transformSources(
   }));
 }
 
+const PARSER_CHOICE = "docling_rag";
+
 const STORAGE_KEYS = {
   collectionId: "rag-collection-id",
   indexedDocuments: "rag-indexed-documents",
@@ -267,7 +269,6 @@ export default function RAGPage() {
   const [searchType, setSearchType] = useState<"semantic" | "hybrid">(
     "semantic",
   );
-  const parserChoice = "docling_rag";
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -383,7 +384,7 @@ export default function RAGPage() {
       if (collectionId) {
         formData.append("collection_id", collectionId);
       }
-      formData.append("parser_choice", parserChoice);
+      formData.append("parser_choice", PARSER_CHOICE);
 
       const response = await apiFetch("/api/rag/index", {
         method: "POST",
@@ -444,7 +445,7 @@ export default function RAGPage() {
     setIsIndexing(true);
     try {
       const formData = new FormData();
-      formData.append("parser_choice", parserChoice);
+      formData.append("parser_choice", PARSER_CHOICE);
 
       const response = await apiFetch("/api/rag/load-example", {
         method: "POST",

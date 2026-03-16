@@ -41,6 +41,12 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 MAX_PAGES_VISION_PLUS_DEMO = 10
 MAX_PAGES_OTHER_PARSERS_DEMO = 1000
 
+NO_RESULTS_MESSAGE = (
+    "I couldn't find any relevant information in the indexed documents "
+    "to answer your question. Please try rephrasing or ensure relevant "
+    "documents have been indexed."
+)
+
 # Custom RAG prompt - friendly and flexible
 CUSTOM_RAG_PROMPT = """You are a friendly document assistant 📚
 
@@ -190,7 +196,6 @@ def _build_demo_workflow(config: dict, collection_id: str) -> DemoRagWorkflow:
 
 def _parse_with_pymupdf(file_path: str | Path, document_name: str) -> list[Document]:
     import fitz
-    from langchain_core.documents import Document
 
     docs: list[Document] = []
     pdf = fitz.open(str(file_path))
@@ -231,8 +236,6 @@ def _parse_with_vision_plus(file_path: str | Path, document_name: str, config: d
 
 
 def _parse_with_docling_rag_api(file_path: str | Path, document_name: str) -> list[Document]:
-    from langchain_core.documents import Document
-
     api_base = os.getenv("DOCLING_API_BASE")
     password = os.getenv("DOCLING_API_PASSWORD")
     if not api_base or not password:
@@ -277,14 +280,6 @@ def _parse_document_to_chunks(
             print(f"Vision+ parser failed, falling back to PyMuPDF: {exc}")
             return _parse_with_pymupdf(file_path, document_name), "pymupdf"
     raise ValueError(f"Unsupported parser_choice: {parser_choice}")
-
-
-class Citation(BaseModel):
-    """A citation from a source document."""
-
-    text: str
-    document_name: str
-    page_number: str | int
 
 
 class Source(BaseModel):
@@ -506,13 +501,8 @@ async def query_rag(
         )
 
         # Handle empty results gracefully
-        no_results_msg = (
-            "I couldn't find any relevant information in the indexed documents "
-            "to answer your question. Please try rephrasing or ensure relevant "
-            "documents have been indexed."
-        )
         if not result.documents:
-            return QueryResponse(answer=no_results_msg, sources=[])
+            return QueryResponse(answer=NO_RESULTS_MESSAGE, sources=[])
 
         # Extract sources from retrieved documents
         sources: list[Source] = []
@@ -595,12 +585,7 @@ async def query_rag_stream(
                 steps[1]["status"] = "completed"
                 yield sse_event("step_update", steps[1])
 
-                no_results_msg = (
-                    "I couldn't find any relevant information in the indexed documents "
-                    "to answer your question. Please try rephrasing or ensure relevant "
-                    "documents have been indexed."
-                )
-                yield sse_event("result", {"answer": no_results_msg, "sources": []})
+                yield sse_event("result", {"answer": NO_RESULTS_MESSAGE, "sources": []})
                 return
 
             # Extract sources
@@ -734,12 +719,6 @@ async def load_example_document(
     Uses pre-computed embeddings from example-index.json for instant loading.
     Falls back to real-time indexing if pre-indexed file not found.
     """
-    from gaik.software_components.RAG.answer_generator import AnswerGenerator
-    from gaik.software_components.RAG.embedder import Embedder
-    from gaik.software_components.RAG.retriever import Retriever
-    from gaik.software_components.RAG.vector_store import VectorStore
-    from langchain_core.documents import Document
-
     example_collection_id = f"{EXAMPLE_COLLECTION_PREFIX}-{parser_choice}"
 
     # If already loaded, return existing collection
@@ -788,8 +767,6 @@ async def load_example_document(
 
             # Try to load pre-indexed data first for Vision+ only (instant loading)
             if parser_choice == "vision_plus" and EXAMPLE_INDEX_PATH.exists():
-                from langchain_core.documents import Document
-
                 with open(EXAMPLE_INDEX_PATH, encoding="utf-8") as f:
                     index_data = json.load(f)
 

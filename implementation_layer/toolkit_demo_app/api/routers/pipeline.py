@@ -1,8 +1,6 @@
 """Pipeline router - End-to-end pipeline endpoints for demos."""
 
 import asyncio
-
-import fitz
 import importlib.util
 import io
 import json
@@ -24,6 +22,7 @@ try:
         get_api_config,
         sse_event,
         validate_file_size,
+        validate_vision_page_limit,
     )
 except ImportError:
     from api.utils import (
@@ -32,6 +31,7 @@ except ImportError:
         get_api_config,
         sse_event,
         validate_file_size,
+        validate_vision_page_limit,
     )
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -49,28 +49,8 @@ SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
 SCHEMA_DIR.mkdir(exist_ok=True)
 
 
-MAX_VISION_PAGES = 10
-
-
-def _validate_vision_page_limit(file_path: str, suffix: str, parser_type: str) -> None:
-    if parser_type not in {"vision", "vision_plus"} or suffix != ".pdf":
-        return
-
-    with fitz.open(file_path) as document:
-        page_count = document.page_count
-
-    if page_count > MAX_VISION_PAGES:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"{parser_type} parser supports at most {MAX_VISION_PAGES} pages per PDF. "
-                f"Received {page_count} pages."
-            ),
-        )
-
-
 def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config: dict):
-    _validate_vision_page_limit(tmp_path, suffix, parser_type)
+    validate_vision_page_limit(tmp_path, suffix, parser_type)
 
     if parser_type == "vision":
         from gaik.software_components.parsers import VisionParser

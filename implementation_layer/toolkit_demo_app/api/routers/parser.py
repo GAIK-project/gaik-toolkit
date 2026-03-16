@@ -3,36 +3,16 @@
 import os
 import tempfile
 
-import fitz
 from pathlib import Path
 from typing import Literal
 
 try:
-    from utils import validate_file_size
+    from utils import validate_file_size, validate_vision_page_limit
 except ImportError:
-    from api.utils import validate_file_size
+    from api.utils import validate_file_size, validate_vision_page_limit
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 router = APIRouter()
-
-MAX_VISION_PAGES = 10
-
-
-def _validate_vision_page_limit(file_path: str, suffix: str, parser_type: str) -> None:
-    if parser_type not in {"vision", "vision_plus"} or suffix != ".pdf":
-        return
-
-    with fitz.open(file_path) as document:
-        page_count = document.page_count
-
-    if page_count > MAX_VISION_PAGES:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"{parser_type} parser supports at most {MAX_VISION_PAGES} pages per PDF. "
-                f"Received {page_count} pages."
-            ),
-        )
 
 
 
@@ -81,7 +61,7 @@ async def parse_document(
             else:
                 parser_type = "pymupdf"
 
-        _validate_vision_page_limit(tmp_path, suffix, parser_type)
+        validate_vision_page_limit(tmp_path, suffix, parser_type)
 
         if parser_type == "docx":
             from gaik.software_components.parsers import DocxParser

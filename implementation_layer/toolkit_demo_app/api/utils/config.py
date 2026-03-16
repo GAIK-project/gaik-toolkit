@@ -2,11 +2,15 @@
 
 import os
 
+import fitz
 from fastapi import HTTPException, UploadFile
 
 # File size limits
 MAX_FILE_SIZE_MB = 20
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
+# Vision parser page limit (CPU environment in CSC Rahti)
+MAX_VISION_PAGES = 10
 
 
 async def validate_file_size(file: UploadFile) -> bytes:
@@ -41,3 +45,21 @@ def get_api_config():
     from gaik.software_components.config import get_openai_config
 
     return get_openai_config(use_azure=use_azure)
+
+
+def validate_vision_page_limit(file_path: str, suffix: str, parser_type: str) -> None:
+    """Raise HTTPException if a vision parser PDF exceeds the page limit."""
+    if parser_type not in {"vision", "vision_plus"} or suffix != ".pdf":
+        return
+
+    with fitz.open(file_path) as document:
+        page_count = document.page_count
+
+    if page_count > MAX_VISION_PAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{parser_type} parser supports at most {MAX_VISION_PAGES} pages per PDF. "
+                f"Received {page_count} pages."
+            ),
+        )
