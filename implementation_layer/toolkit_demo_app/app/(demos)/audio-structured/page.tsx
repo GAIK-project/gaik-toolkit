@@ -69,7 +69,7 @@ export default function AudioStructuredPage() {
   const router = useRouter();
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [userRequirements, setUserRequirements] = useState(DEFAULT_REQUIREMENTS);
-  const [generatePdf, setGeneratePdf] = useState(false);
+  const [generatePdf, setGeneratePdf] = useState(true);
   const [regenerateSchema, setRegenerateSchema] = useState(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 

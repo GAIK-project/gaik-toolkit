@@ -119,6 +119,11 @@ def _clean_schema_dump(raw_dump: str) -> str:
     return "\n".join(body).strip()
 
 
+def _sanitize_schema_code(schema_code: str) -> str:
+    """Remove fully qualified extractor-schema references from cached modules."""
+    return schema_code.replace("gaik.software_components.extractor.schema.", "")
+
+
 def _schema_paths(schema_key: str) -> tuple[Path, Path]:
     safe_key = "".join(c if c.isalnum() or c in {"_", "-"} else "_" for c in schema_key).strip("_") or "schema"
     return SCHEMA_DIR / f"{safe_key}_schema.py", SCHEMA_DIR / f"{safe_key}_requirements.json"
@@ -133,7 +138,7 @@ def _save_schema(schema: type, requirements, schema_key: str, user_requirements:
     with redirect_stdout(buffer):
         print_pydantic_schema(schema, title="Saved Schema")
 
-    schema_code = _clean_schema_dump(buffer.getvalue())
+    schema_code = _sanitize_schema_code(_clean_schema_dump(buffer.getvalue()))
     template = f'''"""
 Auto-generated schema module (do not edit manually).
 """
@@ -169,6 +174,12 @@ def _load_schema(schema_key: str, user_requirements: str):
 
     model_name = data["model_name"]
     requirements = ExtractionRequirements(**data["requirements"])
+
+    source = schema_path.read_text(encoding="utf-8")
+    sanitized = _sanitize_schema_code(source)
+    if sanitized != source:
+        schema_path.write_text(sanitized, encoding="utf-8")
+        logger.info("Sanitized cached schema module: %s", schema_path)
 
     spec = importlib.util.spec_from_file_location(model_name, schema_path)
     module = importlib.util.module_from_spec(spec)

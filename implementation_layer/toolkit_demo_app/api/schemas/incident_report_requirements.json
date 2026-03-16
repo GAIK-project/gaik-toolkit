@@ -51,7 +51,7 @@
       {
         "field_name": "injuries",
         "field_type": "list[str]",
-        "description": "List or description of any injuries resulting from the incident",
+        "description": "List or description of injuries related to the incident",
         "required": false,
         "enum": null,
         "pattern": null,
@@ -60,7 +60,7 @@
       {
         "field_name": "damages",
         "field_type": "list[str]",
-        "description": "List or description of any damages resulting from the incident",
+        "description": "List or description of damages resulting from the incident",
         "required": false,
         "enum": null,
         "pattern": null,

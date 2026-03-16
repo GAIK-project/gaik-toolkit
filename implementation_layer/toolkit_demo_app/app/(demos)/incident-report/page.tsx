@@ -95,7 +95,7 @@ export default function IncidentReportPage() {
     "auto",
   );
   const [customSchema, setCustomSchema] = useState(DEFAULT_INCIDENT_SCHEMA);
-  const [enhanced, setEnhanced] = useState(true);
+  const [enhanced, setEnhanced] = useState(false);
   const [generatePdf, setGeneratePdf] = useState(true);
   const [regenerateSchema, setRegenerateSchema] = useState(false);
 

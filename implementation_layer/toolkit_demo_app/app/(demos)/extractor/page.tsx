@@ -57,6 +57,45 @@ interface GeneratedSchema {
   }>;
 }
 
+const CURRENCY_FIELD_HINTS = [
+  "amount",
+  "total",
+  "subtotal",
+  "discount",
+  "tax",
+  "price",
+  "cost",
+  "fee",
+  "balance",
+  "revenue",
+  "income",
+];
+
+function formatExtractorValue(key: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "-";
+
+  const normalizedKey = key.toLowerCase();
+  const isCurrencyField = CURRENCY_FIELD_HINTS.some((hint) => normalizedKey.includes(hint));
+  if (isCurrencyField && typeof value === "number") {
+    return `EUR ${value.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+
+  if (isCurrencyField && typeof value === "string") {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return `EUR ${numeric.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    }
+  }
+
+  return String(value);
+}
+
 const DEFAULT_FIELDS: Field[] = [
   { name: "company_name", description: "Name of the company or organization" },
   { name: "total_amount", description: "Total amount or price" },
@@ -65,7 +104,7 @@ const DEFAULT_FIELDS: Field[] = [
 
 export default function ExtractorPage() {
   const [inputMode, setInputMode] = useState<"text" | "file">("text");
-  const [extractionMode, setExtractionMode] = useState<"fields" | "plain-language">("fields");
+  const [extractionMode, setExtractionMode] = useState<"fields" | "plain-language">("plain-language");
   const [documentText, setDocumentText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [userRequirements, setUserRequirements] = useState(
@@ -127,6 +166,31 @@ export default function ExtractorPage() {
     setFields(fields.filter((f) => f.name !== name));
   }
 
+  async function generateSchemaForRequirements(): Promise<GeneratedSchema> {
+    const response = await apiFetch("/api/extract/generate-schema", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_requirements: plainLanguageRequirements,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.detail ?? "Failed to generate schema");
+    }
+
+    const data = (await response.json()) as GeneratedSchema;
+    setGeneratedSchema(data);
+
+    posthog.capture("schema_generated", {
+      structure_type: data.structure_type,
+      fields_count: data.fields?.length || 0,
+    });
+
+    return data;
+  }
+
   async function handleGenerateSchema(): Promise<void> {
     if (!plainLanguageRequirements.trim()) {
       toast.error("Please provide extraction requirements");
@@ -137,27 +201,7 @@ export default function ExtractorPage() {
     setGeneratedSchema(null);
 
     try {
-      const response = await apiFetch("/api/extract/generate-schema", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_requirements: plainLanguageRequirements,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(error?.detail ?? "Failed to generate schema");
-      }
-
-      const data = await response.json();
-      setGeneratedSchema(data);
-
-      posthog.capture("schema_generated", {
-        structure_type: data.structure_type,
-        fields_count: data.fields?.length || 0,
-      });
-
+      await generateSchemaForRequirements();
       toast.success("Schema generated successfully!");
     } catch (error) {
       if (error instanceof RateLimitError) return;
@@ -245,11 +289,6 @@ export default function ExtractorPage() {
         toast.error("Please provide extraction requirements");
         return;
       }
-
-      if (!generatedSchema) {
-        toast.error("Please generate schema first");
-        return;
-      }
     }
 
     setIsLoading(true);
@@ -275,7 +314,8 @@ export default function ExtractorPage() {
           signal: abortControllerRef.current.signal,
         });
       } else {
-        // Plain language mode - use schema generation endpoint
+        // Plain language mode - use persisted baseline schema unless the user
+        // explicitly generated a temporary schema for testing.
         response = await apiFetch("/api/extract/plain-language", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -344,8 +384,8 @@ export default function ExtractorPage() {
                   </CardDescription>
                 </div>
                 <ExamplePreviewDialog
-                  exampleUrl="/GAIK_Test_Document_Demo.pdf"
-                  exampleName="GAIK_Test_Document_Demo.pdf"
+                  exampleUrl="/invoice.pdf"
+                  exampleName="invoice.pdf"
                   onUseExample={handleUseExample}
                   disabled={isLoading || isParsing}
                 />
@@ -581,7 +621,6 @@ export default function ExtractorPage() {
               isParsing ||
               isGeneratingSchema ||
               (extractionMode === "fields" && fields.length === 0) ||
-              (extractionMode === "plain-language" && !generatedSchema) ||
               (inputMode === "text" && !documentText.trim()) ||
               (inputMode === "file" && !file)
             }
@@ -668,9 +707,7 @@ export default function ExtractorPage() {
                               {formatFieldName(key)}
                             </span>
                             <span className="text-muted-foreground text-sm">
-                              {value !== null && value !== undefined
-                                ? String(value)
-                                : "-"}
+                              {formatExtractorValue(key, value)}
                             </span>
                           </div>
                         ))}

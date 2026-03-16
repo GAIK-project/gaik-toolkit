@@ -17,6 +17,6 @@ class incident_details_extraction_Extraction(BaseModel):
     location: str | None = Field(None, description="Location where the incident occurred")
     description: str | None = Field(None, description="Narrative description of the incident")
     people_involved: list[str] | None = Field(None, description="List of people involved in the incident")
-    injuries: list[str] | None = Field(None, description="List or description of any injuries resulting from the incident")
-    damages: list[str] | None = Field(None, description="List or description of any damages resulting from the incident")
+    injuries: list[str] | None = Field(None, description="List or description of injuries related to the incident")
+    damages: list[str] | None = Field(None, description="List or description of damages resulting from the incident")
     actions_taken: list[str] | None = Field(None, description="Actions taken in response to the incident")

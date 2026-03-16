@@ -1,0 +1,90 @@
+{
+  "model_name": "invoice_extraction_ExtractionNormalized",
+  "requirements": {
+    "use_case_name": "invoice_extraction",
+    "fields": [
+      {
+        "field_name": "invoice_number",
+        "field_type": "str",
+        "description": "Invoice identifier",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "sender_name",
+        "field_type": "str",
+        "description": "Name of the invoice sender",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "receiver_name",
+        "field_type": "str",
+        "description": "Name of the invoice receiver",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "purchase_order_number",
+        "field_type": "str",
+        "description": "Related purchase order identifier",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "date_of_invoice",
+        "field_type": "date",
+        "description": "Date when the invoice was issued",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "subtotal",
+        "field_type": "decimal",
+        "description": "Invoice subtotal amount before discounts and taxes",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "discount",
+        "field_type": "decimal",
+        "description": "Discount amount applied to the invoice",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "tax",
+        "field_type": "decimal",
+        "description": "Tax amount applied to the invoice",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "grand_total",
+        "field_type": "decimal",
+        "description": "Final total amount payable on the invoice",
+        "required": false,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  },
+  "user_requirements": "Extract invoice number, sender name, receiver name, purchase order number, date of invoice, subtotal, discount, tax, and grand total from the invoice."
+}
