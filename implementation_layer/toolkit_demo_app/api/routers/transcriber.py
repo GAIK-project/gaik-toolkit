@@ -99,7 +99,6 @@ PRIMARY GOAL: Maximize spelling correctness and spelling consistency while prese
 CRITICAL SAFETY RULE (numbers):
 - Do NOT change, reinterpret, reorder, or insert any digits.
 - Do NOT turn digits into times/dates or vice versa (e.g., do NOT add "klo", do NOT rewrite "19.25" as a time unless "klo" already exists).
-- Only allow trivial formatting around units when unambiguous (e.g., "1m" → "1 m", "20%" ↔ "20 %", "37, 5" → "37,5").
 - Otherwise, leave numbers exactly as they appear.
 
 What to do (high priority):
@@ -145,7 +144,6 @@ CRITICAL SAFETY RULE (numbers):
 - Do NOT change, reinterpret, reorder, or insert any digits.
 - Do NOT turn digits into times/dates or vice versa (e.g., do NOT add "klo", do NOT rewrite "19.25" as a time unless "klo" already exists).
 - Do NOT "fix" numeric strings by guessing missing/extra digits.
-- Only allow trivial formatting around units when unambiguous (e.g., "1m" → "1 m", "20%" ↔ "20 %", "37, 5" → "37,5").
 - Otherwise, leave numbers exactly as they appear.
 
 Allowed repairs (ONLY when confident):
@@ -157,9 +155,8 @@ Allowed repairs (ONLY when confident):
    - If uncertain, do not insert.
 
 2) Fix split/merge and compounds (high value in Finnish):
-   - Merge compound words that ASR incorrectly split: "lauantai töiksi" → "lauantaitöiksi", "reaali maailmassa" → "reaalimaailmassa"
-   - Split incorrectly over-merged tokens ONLY when you can clearly identify two meaningful parts and the split does not change meaning.
-     Example: "konepajarakennuksessa" → "konepaja rakennuksessa"
+   - Merge compound words that ASR incorrectly split (e.g., "lauantai töiksi" → "lauantaitöiksi", "reaali maailmassa" → "reaalimaailmassa")
+   - Split incorrectly over-merged tokens ONLY when you can clearly identify two meaningful parts and the split does not change meaning (e.g.,"konepajarakennuksessa" → "konepaja rakennuksessa")
    - Fix broken hyphenation consistently (e.g., peri implantiitti ↔ peri-implantiitti).
    - Fix malformed loanwords/terms consistently, but do not invent new terms or names.
 
