@@ -49,7 +49,7 @@ SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
 SCHEMA_DIR.mkdir(exist_ok=True)
 
 
-MAX_VISION_PAGES = 20
+MAX_VISION_PAGES = 10
 
 
 def _validate_vision_page_limit(file_path: str, suffix: str, parser_type: str) -> None:

@@ -2,12 +2,14 @@
 
 import asyncio
 import json
+import os
 import re
 import tempfile
+import time
 import uuid
 from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 try:
     from utils import get_api_config, sse_event
@@ -16,6 +18,10 @@ except ImportError:
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+import requests
+
+from langchain_core.documents import Document
 
 router = APIRouter()
 
@@ -32,7 +38,8 @@ MAX_FILE_SIZE_MB = 20
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 # Page limit for demo (CPU environment in CSC Rahti)
-MAX_PAGES_DEMO = 3
+MAX_PAGES_VISION_PLUS_DEMO = 10
+MAX_PAGES_OTHER_PARSERS_DEMO = 200
 
 # Custom RAG prompt - friendly and flexible
 CUSTOM_RAG_PROMPT = """You are a friendly document assistant 📚
@@ -63,7 +70,7 @@ else:
     _public_path = _base_path.parent / "public"  # Fallback for local dev
 EXAMPLE_PDF_PATH = _public_path / "GAIK_Test_Document_Demo.pdf"
 EXAMPLE_INDEX_PATH = _public_path / "example-index.json"
-EXAMPLE_COLLECTION_ID = "example-demo"
+EXAMPLE_COLLECTION_PREFIX = "example-demo"
 
 
 def extract_page_filter(query: str) -> dict | None:
@@ -84,6 +91,192 @@ async def _get_collection_lock(collection_id: str) -> asyncio.Lock:
         if collection_id not in _collection_locks:
             _collection_locks[collection_id] = asyncio.Lock()
         return _collection_locks[collection_id]
+
+
+class DoclingRagApiClient:
+    def __init__(
+        self,
+        *,
+        api_base: str,
+        password: str,
+        timeout_seconds: int = 60 * 30,
+        healthcheck_timeout_seconds: int = 30,
+    ) -> None:
+        if not api_base:
+            raise ValueError("api_base is required")
+        if not password:
+            raise ValueError("password is required")
+
+        self.api_base = api_base.rstrip("/")
+        self.password = password
+        self.timeout_seconds = timeout_seconds
+        self.healthcheck_timeout_seconds = healthcheck_timeout_seconds
+
+    def parse_document(self, document_path: str | Path) -> dict[str, Any]:
+        start_time = time.perf_counter()
+        input_file = Path(document_path)
+        if not input_file.exists():
+            raise FileNotFoundError(f"Document file not found: {input_file}")
+        if input_file.suffix.lower() != ".pdf":
+            raise ValueError("Docling RAG endpoint currently supports PDF files only")
+
+        r = requests.get(f"{self.api_base}/health", timeout=self.healthcheck_timeout_seconds)
+        r.raise_for_status()
+
+        with input_file.open("rb") as f:
+            files = {"file": (input_file.name, f, "application/pdf")}
+            r = requests.post(
+                f"{self.api_base}/parsedocument_rag",
+                files=files,
+                headers={"key": self.password},
+                timeout=self.timeout_seconds,
+            )
+            if r.status_code >= 400:
+                r.raise_for_status()
+
+        payload = r.json()
+        return {
+            "source_file": payload.get("source_file") or input_file.name,
+            "chunk_count": payload.get("chunk_count") or 0,
+            "chunks": payload.get("chunks") or [],
+            "elapsed_seconds": round(time.perf_counter() - start_time, 3),
+        }
+
+
+class DemoRagWorkflow:
+    def __init__(self, *, config: dict, collection_name: str) -> None:
+        from gaik.software_components.RAG.answer_generator import AnswerGenerator
+        from gaik.software_components.RAG.embedder import Embedder
+        from gaik.software_components.RAG.retriever import Retriever
+        from gaik.software_components.RAG.vector_store import VectorStore
+
+        self.api_config = config
+        self.embedder = Embedder(config=config)
+        self.vector_store = VectorStore(
+            persist=False,
+            collection_name=collection_name,
+        )
+        self.retriever = Retriever(
+            embedder=self.embedder,
+            vector_store=self.vector_store,
+            top_k=5,
+        )
+        self.answer_generator = AnswerGenerator(
+            config=config,
+            citations=True,
+            stream=True,
+            prompt=CUSTOM_RAG_PROMPT,
+            conversation_history=True,
+            last_n=3,
+        )
+
+    def index_chunk_documents(self, documents: list[Document]) -> int:
+        embeddings, docs = self.embedder.embed(documents)
+        self.vector_store.add(docs, embeddings)
+        return len(docs)
+
+    def ask(self, query: str, *, top_k: int | None = None, stream: bool | None = None):
+        documents = self.retriever.search(query, top_k=top_k)
+        answer = self.answer_generator.generate(query, documents, stream=stream)
+        return type("RAGWorkflowResult", (), {"answer": answer, "documents": documents})()
+
+
+def _build_demo_workflow(config: dict, collection_id: str) -> DemoRagWorkflow:
+    return DemoRagWorkflow(
+        config=config,
+        collection_name=f"gaik_rag_{collection_id}",
+    )
+
+
+def _parse_with_pymupdf(file_path: str | Path, document_name: str) -> list[Document]:
+    import fitz
+    from langchain_core.documents import Document
+
+    docs: list[Document] = []
+    pdf = fitz.open(str(file_path))
+    try:
+        for index, page in enumerate(pdf, start=1):
+            text = page.get_text().strip()
+            if not text:
+                continue
+            docs.append(
+                Document(
+                    page_content=text,
+                    metadata={
+                        "source": str(file_path),
+                        "document_name": document_name,
+                        "page_number": index,
+                        "heading": None,
+                        "chunk_id": len(docs),
+                        "parser_used": "pymupdf",
+                    },
+                )
+            )
+    finally:
+        pdf.close()
+
+    if not docs:
+        raise ValueError("PyMuPDF parser produced no text chunks")
+    return docs
+
+
+def _parse_with_vision_plus(file_path: str | Path, document_name: str, config: dict) -> list[Document]:
+    from gaik.software_components.RAG.rag_parser_vision import VisionRagParser
+
+    parser = VisionRagParser(vision_config=config)
+    docs = parser.convert_doc_to_chunks_with_vision(str(file_path), document_name=document_name)
+    for doc in docs:
+        doc.metadata["parser_used"] = "vision_plus"
+    return docs
+
+
+def _parse_with_docling_rag_api(file_path: str | Path, document_name: str) -> list[Document]:
+    from langchain_core.documents import Document
+
+    api_base = os.getenv("DOCLING_API_BASE")
+    password = os.getenv("DOCLING_API_PASSWORD")
+    if not api_base or not password:
+        raise ValueError("DOCLING_API_BASE and DOCLING_API_PASSWORD must be set")
+
+    client = DoclingRagApiClient(api_base=api_base, password=password)
+    result = client.parse_document(file_path)
+    docs: list[Document] = []
+    for index, chunk in enumerate(result["chunks"]):
+        metadata = dict(chunk.get("metadata") or {})
+        metadata.setdefault("source", str(file_path))
+        metadata["document_name"] = document_name
+        metadata.setdefault("chunk_id", index)
+        metadata["parser_used"] = "docling_rag"
+        docs.append(Document(page_content=chunk.get("page_content", ""), metadata=metadata))
+
+    if not docs:
+        raise ValueError("Docling RAG parser returned no chunks")
+    return docs
+
+
+def _parse_document_to_chunks(
+    file_path: str | Path,
+    *,
+    document_name: str,
+    parser_choice: str,
+    config: dict,
+) -> tuple[list[Document], str]:
+    choice = (parser_choice or "vision_plus").lower()
+    if choice == "pymupdf":
+        return _parse_with_pymupdf(file_path, document_name), "pymupdf"
+    if choice == "docling_rag":
+        try:
+            return _parse_with_docling_rag_api(file_path, document_name), "docling_rag"
+        except Exception as exc:
+            print(f"Docling RAG parser failed, falling back to PyMuPDF: {exc}")
+            return _parse_with_pymupdf(file_path, document_name), "pymupdf"
+    if choice == "vision_plus":
+        try:
+            return _parse_with_vision_plus(file_path, document_name, config), "vision_plus"
+        except Exception as exc:
+            print(f"Vision+ parser failed, falling back to PyMuPDF: {exc}")
+            return _parse_with_pymupdf(file_path, document_name), "pymupdf"
+    raise ValueError(f"Unsupported parser_choice: {parser_choice}")
 
 
 class Citation(BaseModel):
@@ -139,36 +332,13 @@ class StatusResponse(BaseModel):
 
 
 def _get_or_create_workflow(collection_id: str | None = None):
-    """Get existing RAG workflow or create a new one."""
-    from gaik.software_components.RAG.answer_generator import AnswerGenerator
-    from gaik.software_modules.RAG_workflow import RAGWorkflow
-
+    """Get existing demo RAG workflow or create a new one."""
     if collection_id and collection_id in RAG_INSTANCES:
         return RAG_INSTANCES[collection_id], collection_id
 
-    # Create new workflow with in-memory storage (non-persistent for demo)
     new_id = str(uuid.uuid4())[:8]
     config = get_api_config()
-
-    workflow = RAGWorkflow(
-        api_config=config,
-        persist=False,  # In-memory for demo
-        collection_name=f"gaik_rag_{new_id}",
-        retriever_top_k=5,
-        citations=True,
-        stream=True,
-    )
-
-    # Override answer generator with custom prompt
-    workflow.answer_generator = AnswerGenerator(
-        config=config,
-        citations=True,
-        stream=True,
-        prompt=CUSTOM_RAG_PROMPT,
-        conversation_history=True,
-        last_n=3,
-    )
-
+    workflow = _build_demo_workflow(config, new_id)
     RAG_INSTANCES[new_id] = workflow
     return workflow, new_id
 
@@ -177,6 +347,7 @@ def _get_or_create_workflow(collection_id: str | None = None):
 async def index_documents(
     files: list[UploadFile] = File(...),
     collection_id: str | None = Form(None),
+    parser_choice: Literal["vision_plus", "docling_rag", "pymupdf"] = Form("vision_plus"),
 ):
     """
     Index PDF documents into the RAG vector store.
@@ -238,29 +409,41 @@ async def index_documents(
                         page_count = doc.page_count
                         doc.close()
 
-                        if page_count > MAX_PAGES_DEMO:
+                        max_pages = (
+                            MAX_PAGES_VISION_PLUS_DEMO
+                            if parser_choice == "vision_plus"
+                            else MAX_PAGES_OTHER_PARSERS_DEMO
+                        )
+                        if page_count > max_pages:
                             Path(tmp_path).unlink(missing_ok=True)
                             raise HTTPException(
                                 status_code=400,
                                 detail=(
                                     f"PDF has {page_count} pages. "
-                                    f"Maximum {MAX_PAGES_DEMO} pages allowed for demo. "
-                                    f"Try the Example document instead."
+                                    f"Maximum {max_pages} pages allowed for parser '{parser_choice}'. "
+                                    f"Try a smaller document or switch parser."
                                 ),
                             )
 
-                    # Index the document with original filename (without extension)
+                    # Parse and index the document with the selected parser
                     original_name = Path(file.filename).stem
-                    result = workflow.index_documents([tmp_path], filenames=[original_name])
-                    total_chunks += result.num_chunks
+                    chunks, parser_used = _parse_document_to_chunks(
+                        tmp_path,
+                        document_name=original_name,
+                        parser_choice=parser_choice,
+                        config=workflow.api_config,
+                    )
+                    num_chunks = workflow.index_chunk_documents(chunks)
+                    total_chunks += num_chunks
 
                     indexed_docs.append(
                         IndexedDocument(
                             filename=file.filename,
-                            chunk_count=result.num_chunks,
+                            chunk_count=num_chunks,
                             status="indexed",
                         )
                     )
+                    print(f"Indexed {file.filename} using parser: {parser_used}")
                 except Exception as e:
                     indexed_docs.append(
                         IndexedDocument(
@@ -542,7 +725,9 @@ async def clear_all_collections():
 
 
 @router.post("/load-example", response_model=IndexResponse)
-async def load_example_document():
+async def load_example_document(
+    parser_choice: Literal["vision_plus", "docling_rag", "pymupdf"] = Form("vision_plus"),
+):
     """
     Load the pre-indexed example document for demo purposes.
 
@@ -555,12 +740,14 @@ async def load_example_document():
     from gaik.software_components.RAG.vector_store import VectorStore
     from langchain_core.documents import Document
 
+    example_collection_id = f"{EXAMPLE_COLLECTION_PREFIX}-{parser_choice}"
+
     # If already loaded, return existing collection
-    if EXAMPLE_COLLECTION_ID in RAG_INSTANCES:
-        workflow = RAG_INSTANCES[EXAMPLE_COLLECTION_ID]
+    if example_collection_id in RAG_INSTANCES:
+        workflow = RAG_INSTANCES[example_collection_id]
         chunk_count = workflow.vector_store.count()
         return IndexResponse(
-            collection_id=EXAMPLE_COLLECTION_ID,
+            collection_id=example_collection_id,
             document_count=1,
             chunk_count=chunk_count,
             documents=[
@@ -574,15 +761,15 @@ async def load_example_document():
         )
 
     # Acquire lock
-    lock = await _get_collection_lock(EXAMPLE_COLLECTION_ID)
+    lock = await _get_collection_lock(example_collection_id)
 
     async with lock:
         # Double-check after acquiring lock
-        if EXAMPLE_COLLECTION_ID in RAG_INSTANCES:
-            workflow = RAG_INSTANCES[EXAMPLE_COLLECTION_ID]
+        if example_collection_id in RAG_INSTANCES:
+            workflow = RAG_INSTANCES[example_collection_id]
             chunk_count = workflow.vector_store.count()
             return IndexResponse(
-                collection_id=EXAMPLE_COLLECTION_ID,
+                collection_id=example_collection_id,
                 document_count=1,
                 chunk_count=chunk_count,
                 documents=[
@@ -597,55 +784,26 @@ async def load_example_document():
 
         try:
             config = get_api_config()
+            workflow = _build_demo_workflow(config, example_collection_id)
 
-            # Try to load pre-indexed data first (instant loading)
-            if EXAMPLE_INDEX_PATH.exists():
+            # Try to load pre-indexed data first for Vision+ only (instant loading)
+            if parser_choice == "vision_plus" and EXAMPLE_INDEX_PATH.exists():
+                from langchain_core.documents import Document
+
                 with open(EXAMPLE_INDEX_PATH, encoding="utf-8") as f:
                     index_data = json.load(f)
 
-                # Create components manually for pre-indexed data
-                embedder = Embedder(config=config)
-                vector_store = VectorStore(
-                    persist=False,
-                    collection_name=f"gaik_rag_{EXAMPLE_COLLECTION_ID}",
-                )
-
-                # Load pre-computed documents and embeddings
                 documents = [
                     Document(page_content=c["page_content"], metadata=c["metadata"])
                     for c in index_data["chunks"]
                 ]
                 embeddings = [c["embedding"] for c in index_data["chunks"]]
-
-                vector_store.add(documents, embeddings)
-
-                # Create retriever and answer generator
-                retriever = Retriever(
-                    embedder=embedder,
-                    vector_store=vector_store,
-                    top_k=5,
-                )
-                answer_generator = AnswerGenerator(
-                    config=config,
-                    citations=True,
-                    stream=True,
-                    prompt=CUSTOM_RAG_PROMPT,
-                )
-
-                # Create a minimal workflow-like object
-                class PreloadedWorkflow:
-                    def __init__(self, vs, emb, ret, ans):
-                        self.vector_store = vs
-                        self.embedder = emb
-                        self.retriever = ret
-                        self.answer_generator = ans
-
-                workflow = PreloadedWorkflow(vector_store, embedder, retriever, answer_generator)
-                RAG_INSTANCES[EXAMPLE_COLLECTION_ID] = workflow
+                workflow.vector_store.add(documents, embeddings)
+                RAG_INSTANCES[example_collection_id] = workflow
 
                 chunk_count = len(documents)
                 return IndexResponse(
-                    collection_id=EXAMPLE_COLLECTION_ID,
+                    collection_id=example_collection_id,
                     document_count=1,
                     chunk_count=chunk_count,
                     documents=[
@@ -658,38 +816,31 @@ async def load_example_document():
                     status="success",
                 )
 
-            # Fallback: index in real-time if pre-indexed file not found
-            from gaik.software_modules.RAG_workflow import RAGWorkflow
-
             if not EXAMPLE_PDF_PATH.exists():
                 raise HTTPException(
                     status_code=500,
                     detail="Example document not found. Please contact administrator.",
                 )
 
-            workflow = RAGWorkflow(
-                api_config=config,
-                persist=False,
-                collection_name=f"gaik_rag_{EXAMPLE_COLLECTION_ID}",
-                retriever_top_k=5,
-                citations=True,
-                stream=True,
+            chunks, parser_used = _parse_document_to_chunks(
+                EXAMPLE_PDF_PATH,
+                document_name="GAIK_Test_Document_Demo",
+                parser_choice=parser_choice,
+                config=config,
             )
+            chunk_count = workflow.index_chunk_documents(chunks)
+            print(f"Loaded example using parser: {parser_used}")
 
-            result = workflow.index_documents(
-                [str(EXAMPLE_PDF_PATH)], filenames=["GAIK_Test_Document_Demo"]
-            )
-
-            RAG_INSTANCES[EXAMPLE_COLLECTION_ID] = workflow
+            RAG_INSTANCES[example_collection_id] = workflow
 
             return IndexResponse(
-                collection_id=EXAMPLE_COLLECTION_ID,
+                collection_id=example_collection_id,
                 document_count=1,
-                chunk_count=result.num_chunks,
+                chunk_count=chunk_count,
                 documents=[
                     IndexedDocument(
                         filename="GAIK_Test_Document_Demo.pdf",
-                        chunk_count=result.num_chunks,
+                        chunk_count=chunk_count,
                         status="indexed",
                     )
                 ],

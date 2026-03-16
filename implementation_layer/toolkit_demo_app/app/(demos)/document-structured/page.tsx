@@ -310,7 +310,7 @@ export default function DocumentStructuredPage() {
                     </p>
                     {(parserType === "vision" || parserType === "vision_plus") && (
                       <p className="text-muted-foreground text-xs">
-                        Vision and Vision+ parsers are limited to a maximum of 20 pages per document.
+                        Vision and Vision+ parsers are limited to a maximum of 10 pages per document.
                       </p>
                     )}
                   </div>
@@ -397,7 +397,7 @@ export default function DocumentStructuredPage() {
                   <strong>2. Define extraction requirements:</strong> The default business requirements use a persistent saved schema. If you edit the requirements, enable <em>Regenerate Schema</em> before extraction.
                 </p>
                 <p>
-                  <strong>3. Choose the parser:</strong> Use HH Parser for remote high-quality parsing, PyMuPDF for text-based PDFs, DOCX for Word files, Vision for scanned/image-heavy documents, and Vision+ when both text and images matter in the same document. Vision and Vision+ are limited to 20 pages per PDF.
+                  <strong>3. Choose the parser:</strong> Use HH Parser for remote high-quality parsing, PyMuPDF for text-based PDFs, DOCX for Word files, Vision for scanned/image-heavy documents, and Vision+ when both text and images matter in the same document. Vision and Vision+ are limited to 10 pages per PDF.
                 </p>
                 <p>
                   <strong>4. Parse and extract:</strong> The backend parses the document, loads the saved schema when available, or generates a temporary new schema for custom requirements, and then extracts structured fields from the parsed text.

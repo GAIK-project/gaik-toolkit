@@ -2,7 +2,6 @@
 
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
-import { FileUpload } from "@/components/demo/file-upload";
 import {
   DocumentList,
   type IndexedDocument,
@@ -66,6 +65,7 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import { FeedbackButton } from "@/components/feedback";
 import { Shimmer } from "@/components/ai-elements/shimmer";
@@ -141,18 +141,28 @@ const STORAGE_KEYS = {
 interface UploadDialogContentProps {
   pendingFiles: File[];
   isIndexing: boolean;
-  onFileSelect: (file: File) => void;
-  onFileRemove: () => void;
+  onFilesSelect: (files: File[]) => void;
+  onFileRemove: (filename: string) => void;
   onIndex: () => void;
 }
 
 function UploadDialogContent({
   pendingFiles,
   isIndexing,
-  onFileSelect,
+  onFilesSelect,
   onFileRemove,
   onIndex,
 }: UploadDialogContentProps) {
+  function handleInputChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    const selected = Array.from(event.target.files || []).filter(
+      (file) => file.name.toLowerCase().endsWith(".pdf"),
+    );
+    if (selected.length > 0) {
+      onFilesSelect(selected);
+    }
+    event.target.value = "";
+  }
+
   return (
     <DialogContent>
       <DialogHeader>
@@ -162,21 +172,50 @@ function UploadDialogContent({
         </DialogTitle>
       </DialogHeader>
       <div className="space-y-4 pt-4">
-        <FileUpload
-          accept=".pdf"
-          maxSize={20}
-          file={pendingFiles[0] || null}
-          onFileSelect={onFileSelect}
-          onFileRemove={onFileRemove}
-          disabled={isIndexing}
-        />
+        <label className="flex min-h-[176px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 transition-all hover:border-primary/50 hover:bg-muted/50">
+          <Upload className="text-muted-foreground h-10 w-10" />
+          <div className="text-center">
+            <p className="font-medium">Click to upload PDFs</p>
+            <p className="text-muted-foreground mt-1 text-sm">Supports multiple PDF files (max 20MB each)</p>
+          </div>
+          <input
+            type="file"
+            accept=".pdf"
+            multiple
+            onChange={handleInputChange}
+            disabled={isIndexing}
+            className="sr-only"
+          />
+        </label>
+        {pendingFiles.length > 0 && (
+          <div className="space-y-2 rounded-lg border p-3">
+            <p className="text-sm font-medium">Pending files</p>
+            <div className="space-y-2">
+              {pendingFiles.map((file) => (
+                <div key={`${file.name}-${file.size}`} className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-2 text-sm">
+                  <span className="truncate">{file.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => onFileRemove(file.name)}
+                    disabled={isIndexing}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {pendingFiles.length > 0 && (
           <Button onClick={onIndex} disabled={isIndexing} className="w-full">
             <Sparkles className="mr-2 h-4 w-4" />
             {isIndexing ? (
-              <Shimmer className="text-inherit">Indexing document...</Shimmer>
+              <Shimmer className="text-inherit">Indexing {pendingFiles.length} document(s)...</Shimmer>
             ) : (
-              "Index Document"
+              `Index ${pendingFiles.length} Document${pendingFiles.length !== 1 ? "s" : ""}`
             )}
           </Button>
         )}
@@ -221,12 +260,14 @@ export default function RAGPage() {
   const [isQuerying, setIsQuerying] = useState(false);
   const [streamingAnswer, setStreamingAnswer] = useState<string[]>([]);
   const [streamingSources, setStreamingSources] = useState<Source[]>([]);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   // Settings state
   const [topK, setTopK] = useState(5);
   const [searchType, setSearchType] = useState<"semantic" | "hybrid">(
     "semantic",
   );
+  const [parserChoice, setParserChoice] = useState<"vision_plus" | "docling_rag" | "pymupdf">("docling_rag");
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -299,14 +340,16 @@ export default function RAGPage() {
   ).length;
   const hasDocuments = indexedCount > 0;
 
-  function handleFileSelect(file: File): void {
-    if (!pendingFiles.some((f) => f.name === file.name)) {
-      setPendingFiles([...pendingFiles, file]);
-    }
+  function handleFilesSelect(files: File[]): void {
+    setPendingFiles((current) => {
+      const existing = new Set(current.map((file) => `${file.name}-${file.size}`));
+      const additions = files.filter((file) => !existing.has(`${file.name}-${file.size}`));
+      return [...current, ...additions];
+    });
   }
 
-  function handleFileRemove(): void {
-    setPendingFiles([]);
+  function handleFileRemove(filename: string): void {
+    setPendingFiles((current) => current.filter((file) => file.name !== filename));
   }
 
   async function handleIndexDocuments(): Promise<void> {
@@ -332,6 +375,7 @@ export default function RAGPage() {
       if (collectionId) {
         formData.append("collection_id", collectionId);
       }
+      formData.append("parser_choice", parserChoice);
 
       const response = await apiFetch("/api/rag/index", {
         method: "POST",
@@ -391,8 +435,12 @@ export default function RAGPage() {
 
     setIsIndexing(true);
     try {
+      const formData = new FormData();
+      formData.append("parser_choice", parserChoice);
+
       const response = await apiFetch("/api/rag/load-example", {
         method: "POST",
+        body: formData,
       });
 
       if (!response.ok) {
@@ -628,7 +676,7 @@ export default function RAGPage() {
               <UploadDialogContent
                 pendingFiles={pendingFiles}
                 isIndexing={isIndexing}
-                onFileSelect={handleFileSelect}
+                onFilesSelect={handleFilesSelect}
                 onFileRemove={handleFileRemove}
                 onIndex={handleIndexDocuments}
               />
@@ -685,6 +733,31 @@ export default function RAGPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="parserChoice" className="text-xs">
+                    Parser
+                  </Label>
+                  <Select
+                    value={parserChoice}
+                    onValueChange={(v) =>
+                      setParserChoice(v as "vision_plus" | "docling_rag" | "pymupdf")
+                    }
+                  >
+                    <SelectTrigger id="parserChoice" className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="vision_plus">Vision+ Parser</SelectItem>
+                      <SelectItem value="docling_rag">Docling RAG Parser</SelectItem>
+                      <SelectItem value="pymupdf">PyMuPDF</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {parserChoice === "vision_plus" && (
+                  <p className="text-destructive text-xs">
+                    Demo only parses 10 pages with Vision+ parser
+                  </p>
+                )}
                 <p className="text-muted-foreground text-xs">
                   {searchType === "semantic"
                     ? "Uses vector similarity"
@@ -696,6 +769,53 @@ export default function RAGPage() {
           </div>
         </div>
       </header>
+
+      <div className="mb-4 rounded-xl border bg-white">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between px-5 py-4 text-left"
+          onClick={() => setHowItWorksOpen((current) => !current)}
+        >
+          <div>
+            <h2 className="text-base font-semibold">How It Works</h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Index documents into an in-memory vector store and query them with retrieval-augmented generation.
+            </p>
+          </div>
+          <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+            {howItWorksOpen ? "Hide" : "Show"}
+            <Upload className={`h-4 w-4 transition-transform ${howItWorksOpen ? "rotate-180" : "-rotate-90"}`} />
+          </div>
+        </button>
+        {howItWorksOpen && (
+          <div className="space-y-4 border-t px-5 py-4 text-sm leading-6">
+            <p>
+              This demo indexes one or more PDF documents into an in-memory vector store and then lets you ask questions over the indexed content. The parser determines how the PDF is converted into RAG chunks before embeddings are created and stored.
+            </p>
+            <div className="space-y-2">
+              <p><strong>1. Choose a parser:</strong></p>
+              <p>
+                <strong>Vision+ Parser:</strong> Used for high-quality parsing. It can interpret images and place their interpretation in the right location in the document flow. It is intended to extract everything from a document and produce vision-enhanced RAG chunks with metadata. In this demo, Vision+ is limited to 10 pages. Read more at <a href="https://medium.com/@umairali.khan/how-i-enhanced-doclings-image-interpretation-capabilities-641ce017bce5" target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">this article</a>.
+              </p>
+              <p>
+                <strong>Docling RAG Parser:</strong> Uses the Docling parser running at Haaga-Helia as a service. It provides high-quality parsing with metadata and returns ready-made RAG chunks through the remote parsing endpoint.
+              </p>
+              <p>
+                <strong>PyMuPDF:</strong> Fast local fallback parser that extracts page text directly. It is lighter than the other two options and is useful when you need robust local parsing without the richer image-aware or Docling-based processing.
+              </p>
+            </div>
+            <p>
+              <strong>2. Upload PDFs:</strong> You can upload one or more PDF files in the same indexing run. The selected parser is applied to each file, and the resulting chunks are embedded and stored in the same in-memory collection.
+            </p>
+            <p>
+              <strong>3. Build the vector store:</strong> Parsed chunks are embedded and added to the current in-memory vector store. This collection persists only for the running demo session.
+            </p>
+            <p>
+              <strong>4. Ask questions:</strong> After indexing, the retriever searches the stored chunks, and the answer generator produces a response with source references.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Chat area */}
       <Conversation className="flex-1 rounded-xl border bg-white">
@@ -721,7 +841,7 @@ export default function RAGPage() {
                     <h2 className="mb-2 text-xl font-semibold">Get started</h2>
                     <p className="text-muted-foreground mb-6 max-w-md text-center">
                       Try our example document to see RAG in action, or upload
-                      your own PDF (max 3 pages for this demo) to ask questions
+                      your own PDF (max 10 pages for Vision+ in this demo) to ask questions
                       and get AI-powered answers with citations.
                     </p>
                     <div className="flex gap-3">
@@ -744,7 +864,7 @@ export default function RAGPage() {
                   <UploadDialogContent
                     pendingFiles={pendingFiles}
                     isIndexing={isIndexing}
-                    onFileSelect={handleFileSelect}
+                    onFilesSelect={handleFilesSelect}
                     onFileRemove={handleFileRemove}
                     onIndex={handleIndexDocuments}
                   />

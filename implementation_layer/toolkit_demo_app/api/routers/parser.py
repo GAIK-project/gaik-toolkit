@@ -15,7 +15,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 router = APIRouter()
 
-MAX_VISION_PAGES = 20
+MAX_VISION_PAGES = 10
 
 
 def _validate_vision_page_limit(file_path: str, suffix: str, parser_type: str) -> None:

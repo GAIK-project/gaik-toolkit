@@ -228,7 +228,7 @@ export default function ParserPage() {
                       </Select>
                       {(parserType === "vision" || parserType === "vision_plus") && (
                         <p className="text-muted-foreground text-xs">
-                          Vision and Vision+ parsers are limited to a maximum of 20 pages per document.
+                          Vision and Vision+ parsers are limited to a maximum of 10 pages per document.
                         </p>
                       )}
                     </div>
@@ -273,7 +273,7 @@ export default function ParserPage() {
                   <strong>2. Choose the parser type:</strong> Use auto-detect for convenience, or pick a specific parser when you want a text-based, OCR, or combined text+image parsing workflow.
                 </p>
                 <p>
-                  <strong>3. Choose the parser for the document type:</strong> Use PyMuPDF for text-based PDFs, DOCX for Word files, Vision for scanned PDFs or image-heavy documents, Vision+ when both text and images matter in the same document, and Haaga-Helia's parser when you want a remote high-quality parsing option.
+                  <strong>3. Choose the parser for the document type:</strong> Use PyMuPDF for text-based PDFs, DOCX for Word files, Vision for scanned PDFs or image-heavy documents, Vision+ when both text and images matter in the same document (<a href="https://medium.com/@umairali.khan/how-i-enhanced-doclings-image-interpretation-capabilities-641ce017bce5" target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">read more</a>), and Haaga-Helia's parser when you want a remote high-quality parsing option.
                 </p>
                 <p>
                   <strong>4. Review the output:</strong> The result panel shows the parsed text, lets you copy it, and also lets you download the parsed content as a markdown file.
