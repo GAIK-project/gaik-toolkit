@@ -335,7 +335,7 @@ export default function LuvataOrderPage() {
 
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="flex items-center gap-2 text-3xl font-bold">
+            <h1 className="flex items-center gap-2 font-serif text-3xl font-semibold tracking-tight">
               <Package className="h-8 w-8" />
               Purchase Order Processing
             </h1>
