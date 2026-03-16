@@ -20,7 +20,7 @@ router = APIRouter()
 async def parse_document(
     file: UploadFile = File(...),
     parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api"] = Form(
-        "auto"
+        "docling_api"
     ),
 ):
     """
@@ -101,29 +101,36 @@ async def parse_document(
             )
             result = {"text_content": markdown, "metadata": {"parser": "vision_plus"}}
         elif parser_type == "docling_api":
+            from gaik.software_components.parsers import PyMuPDFParser
             from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
 
             api_base = os.getenv("DOCLING_API_BASE")
             password = os.getenv("DOCLING_API_PASSWORD")
-            if not api_base or not password:
-                raise HTTPException(
-                    status_code=503,
-                    detail=(
-                        "Docling API not configured "
-                        "(DOCLING_API_BASE / DOCLING_API_PASSWORD missing)"
-                    ),
-                )
-            parser = DoclingApiClientParser(api_base=api_base, password=password)
-            result_raw = parser.parse_document(tmp_path)
-            result = {
-                "text_content": result_raw.get("parsed_markdown", ""),
-                "metadata": {
-                    **result_raw.get("metadata", {}),
-                    "source_file": result_raw.get("source_file", ""),
-                    "elapsed_seconds": result_raw.get("elapsed_seconds"),
-                    "parser": "docling_api",
-                },
-            }
+            if api_base and password:
+                try:
+                    parser = DoclingApiClientParser(api_base=api_base, password=password)
+                    result_raw = parser.parse_document(tmp_path)
+                    parsed_markdown = result_raw.get("parsed_markdown", "")
+                    if parsed_markdown:
+                        result = {
+                            "text_content": parsed_markdown,
+                            "metadata": {
+                                **result_raw.get("metadata", {}),
+                                "source_file": result_raw.get("source_file", ""),
+                                "elapsed_seconds": result_raw.get("elapsed_seconds"),
+                                "parser": "docling_api",
+                            },
+                        }
+                    else:
+                        raise ValueError("HH Parser returned empty markdown")
+                except Exception:
+                    parser = PyMuPDFParser()
+                    result = parser.parse_document(tmp_path)
+                    result.setdefault("metadata", {})["parser"] = "pymupdf"
+            else:
+                parser = PyMuPDFParser()
+                result = parser.parse_document(tmp_path)
+                result.setdefault("metadata", {})["parser"] = "pymupdf"
         else:
             raise HTTPException(status_code=400, detail=f"Unknown parser: {parser_type}")
 

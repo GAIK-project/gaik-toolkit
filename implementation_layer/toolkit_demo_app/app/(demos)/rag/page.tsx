@@ -138,8 +138,6 @@ function transformSources(
   }));
 }
 
-const PARSER_CHOICE = "docling_rag";
-
 const STORAGE_KEYS = {
   collectionId: "rag-collection-id",
   indexedDocuments: "rag-indexed-documents",
@@ -274,6 +272,7 @@ export default function RAGPage() {
   const [searchType, setSearchType] = useState<"semantic" | "hybrid">(
     "semantic",
   );
+  const [parserChoice, setParserChoice] = useState<"vision_plus" | "docling_rag" | "pymupdf">("docling_rag");
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -389,7 +388,7 @@ export default function RAGPage() {
       if (collectionId) {
         formData.append("collection_id", collectionId);
       }
-      formData.append("parser_choice", PARSER_CHOICE);
+      formData.append("parser_choice", parserChoice);
 
       const response = await apiFetch("/api/rag/index", {
         method: "POST",
@@ -450,7 +449,7 @@ export default function RAGPage() {
     setIsIndexing(true);
     try {
       const formData = new FormData();
-      formData.append("parser_choice", PARSER_CHOICE);
+      formData.append("parser_choice", parserChoice);
 
       const response = await apiFetch("/api/rag/load-example", {
         method: "POST",
@@ -729,6 +728,31 @@ export default function RAGPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="parserChoice" className="text-xs">
+                    Parser
+                  </Label>
+                  <Select
+                    value={parserChoice}
+                    onValueChange={(v) =>
+                      setParserChoice(v as "vision_plus" | "docling_rag" | "pymupdf")
+                    }
+                  >
+                    <SelectTrigger id="parserChoice" className="h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="vision_plus">Vision+ Parser</SelectItem>
+                      <SelectItem value="docling_rag">Docling RAG Parser</SelectItem>
+                      <SelectItem value="pymupdf">PyMuPDF</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {parserChoice === "vision_plus" ? (
+                  <p className="text-xs font-medium text-red-600">
+                    Demo only parses 10 pages with Vision+ parser
+                  </p>
+                ) : null}
+                <div className="space-y-2">
                   <Label htmlFor="searchType" className="text-xs">
                     Search Type
                   </Label>
@@ -764,15 +788,25 @@ export default function RAGPage() {
           <AccordionTrigger className="py-2.5 text-xs">
             <span className="text-muted-foreground">How it works</span>
           </AccordionTrigger>
-          <AccordionContent className="pb-3 text-xs leading-5">
-            <p className="mb-2">
-              Upload PDF documents to index them into a vector store. The Docling RAG parser converts pages into semantically chunked segments with metadata. After indexing, ask questions and get AI-generated answers with source citations.
+          <AccordionContent className="space-y-2 pb-3 text-xs leading-5 text-muted-foreground">
+            <p>
+              This demo parses one or more PDF documents, breaks them into searchable chunks with metadata, stores them in an in-memory vector database, and lets you ask questions against the indexed content.
             </p>
-            <ol className="text-muted-foreground list-inside list-decimal space-y-1">
-              <li><strong>Upload PDFs</strong> — one or more files per indexing run</li>
-              <li><strong>Build vector store</strong> — chunks are embedded and stored in-memory</li>
-              <li><strong>Ask questions</strong> — retriever finds relevant chunks, LLM generates answers with references</li>
-            </ol>
+            <p>
+              <strong>1. Upload one or more PDFs:</strong> You can index several PDF documents in one run. They are all added into the same temporary in-memory collection for retrieval.
+            </p>
+            <p>
+              <strong>2. Choose the parser:</strong> The parser determines how the PDF is converted into chunked content before embedding.
+            </p>
+            <p>
+              <strong>3. Understand parser differences:</strong> <strong>Vision+ Parser:</strong> Used for high-quality parsing. It can interpret images and place their interpretation in the right location in the document flow. It is intended to extract everything from a document and produce vision-enhanced RAG chunks with metadata. In this demo, Vision+ is limited to 10 pages. Read more at <a href="https://medium.com/@umairali.khan/how-i-enhanced-doclings-image-interpretation-capabilities-641ce017bce5" target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">this article</a>. <strong>Docling RAG Parser:</strong> Uses the Docling parser running in Haaga-Helia as a service. It provides high quality parsing with metadata and returns ready-made RAG chunks. <strong>PyMuPDF:</strong> Uses direct PDF text extraction locally. It is the simplest parser and serves as the fallback path.
+            </p>
+            <p>
+              <strong>4. Build the vector store:</strong> The parsed chunks are embedded and stored in an in-memory vector store. This collection is available only for the current backend process and session.
+            </p>
+            <p>
+              <strong>5. Ask questions:</strong> The retriever finds the most relevant chunks, and the answer generator uses them to produce an answer with source citations.
+            </p>
           </AccordionContent>
         </AccordionItem>
       </Accordion>

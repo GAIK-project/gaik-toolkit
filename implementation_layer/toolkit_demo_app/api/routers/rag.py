@@ -39,7 +39,7 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 # Page limit for demo (CPU environment in CSC Rahti)
 MAX_PAGES_VISION_PLUS_DEMO = 10
-MAX_PAGES_OTHER_PARSERS_DEMO = 1000
+MAX_PAGES_OTHER_PARSERS_DEMO = 200
 
 NO_RESULTS_MESSAGE = (
     "I couldn't find any relevant information in the indexed documents "
@@ -53,13 +53,23 @@ CUSTOM_RAG_PROMPT = """You are a friendly document assistant 📚
 Your job is to help users find information from the indexed documents.
 
 Guidelines:
-- Answer questions using the provided context
+- Use ONLY facts found in Context. Do not rely on prior knowledge or assumptions.
+- If Context is empty or irrelevant, say: "I couldn't find this in the provided documents."
 - Be conversational and helpful - use emojis sparingly 😊
 - For greetings (Hello, Hi, etc.): respond briefly and warmly, then ask what
-  they'd like to know. Do NOT summarize or list document contents unprompted
+  they'd like to know. 
+- Do not summarize or list document contents unless the user asks.
 - Only share specific information when the user asks for it
 - Include citations [document_name, page X] when answering questions
 - If you can't find an answer, say so briefly and suggest they rephrase
+
+Answer style:
+- Be conversational and helpful.
+- If the answer requires steps, use short bullet points.
+- Use valid Markdown for all bullet and numbered lists.
+- Put the bullet marker and the content on the same line.
+- Do not output empty bullet lines.
+- When you cannot answer, suggest 2-3 rephrased queries that would likely retrieve better context.
 
 Context:
 {context}
@@ -89,6 +99,27 @@ def extract_page_filter(query: str) -> dict | None:
     if match:
         return {"page_number": int(match.group(1))}
     return None
+
+
+def _normalize_source_name(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip().lower())
+
+
+def _filter_sources_by_citations(answer: str, sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    citations = re.findall(r"\[([^\]]+?),\s*page\s+(\d+)\]", answer, flags=re.IGNORECASE)
+    if not citations:
+        return sources
+
+    cited_pairs = {
+        (_normalize_source_name(document_name), str(page_number))
+        for document_name, page_number in citations
+    }
+    filtered = [
+        source
+        for source in sources
+        if (_normalize_source_name(str(source.get("document_name", ""))), str(source.get("page_number", ""))) in cited_pairs
+    ]
+    return filtered or sources
 
 
 async def _get_collection_lock(collection_id: str) -> asyncio.Lock:
@@ -264,7 +295,7 @@ def _parse_document_to_chunks(
     parser_choice: str,
     config: dict,
 ) -> tuple[list[Document], str]:
-    choice = (parser_choice or "vision_plus").lower()
+    choice = (parser_choice or "docling_rag").lower()
     if choice == "pymupdf":
         return _parse_with_pymupdf(file_path, document_name), "pymupdf"
     if choice == "docling_rag":
@@ -342,7 +373,7 @@ def _get_or_create_workflow(collection_id: str | None = None):
 async def index_documents(
     files: list[UploadFile] = File(...),
     collection_id: str | None = Form(None),
-    parser_choice: Literal["vision_plus", "docling_rag", "pymupdf"] = Form("vision_plus"),
+    parser_choice: Literal["vision_plus", "docling_rag", "pymupdf"] = Form("docling_rag"),
 ):
     """
     Index PDF documents into the RAG vector store.
@@ -622,12 +653,13 @@ async def query_rag_stream(
             steps[1]["status"] = "completed"
             yield sse_event("step_update", steps[1])
 
-            # Send final result
+            # Send final result with sources limited to the pages actually cited.
+            cited_sources = _filter_sources_by_citations(full_answer, sources)
             yield sse_event(
                 "result",
                 {
                     "answer": full_answer,
-                    "sources": sources,
+                    "sources": cited_sources,
                 },
             )
 
@@ -711,7 +743,7 @@ async def clear_all_collections():
 
 @router.post("/load-example", response_model=IndexResponse)
 async def load_example_document(
-    parser_choice: Literal["vision_plus", "docling_rag", "pymupdf"] = Form("vision_plus"),
+    parser_choice: Literal["vision_plus", "docling_rag", "pymupdf"] = Form("docling_rag"),
 ):
     """
     Load the pre-indexed example document for demo purposes.

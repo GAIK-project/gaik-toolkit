@@ -62,7 +62,7 @@ function formatParserName(parser: string): string {
 export default function ParserPage() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
-  const [parserType, setParserType] = useState<"auto" | "pymupdf" | "docx" | "vision" | "vision_plus" | "docling_api">("auto");
+  const [parserType, setParserType] = useState<"auto" | "pymupdf" | "docx" | "vision" | "vision_plus" | "docling_api">("docling_api");
   const [isLoading, setIsLoading] = useState(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [result, setResult] = useState<ParseResult | null>(null);

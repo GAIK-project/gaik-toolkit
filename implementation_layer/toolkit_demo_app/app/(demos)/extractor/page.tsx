@@ -455,6 +455,11 @@ export default function ExtractorPage() {
                             ? "Define specific fields to extract from documents"
                             : "Describe extraction requirements in natural language"}
                         </p>
+                        {extractionMode === "plain-language" ? (
+                          <p className="text-muted-foreground text-xs leading-relaxed">
+                            If you modify the extraction task, click "Generate Schema" and then "Extract Data" with the new schema. Your generated schema will not be persisted.
+                          </p>
+                        ) : null}
                       </div>
 
                       {/* Fields Mode */}
