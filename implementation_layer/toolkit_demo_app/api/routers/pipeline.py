@@ -1,41 +1,42 @@
 """Pipeline router - End-to-end pipeline endpoints for demos."""
 
 import asyncio
-import importlib.util
-import io
-import json
 import logging
 import os
 import tempfile
 import uuid
 from collections.abc import AsyncGenerator
-from contextlib import redirect_stdout
 from datetime import datetime, timedelta
-from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Literal, get_args, get_origin
+from typing import Literal
 
 try:
     from utils import (
         MAX_FILE_SIZE_BYTES,
         MAX_FILE_SIZE_MB,
         get_api_config,
+        load_schema,
+        save_schema,
         sse_event,
         validate_file_size,
         validate_vision_page_limit,
+        wrap_schema_with_numeric_normalizers,
     )
 except ImportError:
     from api.utils import (
         MAX_FILE_SIZE_BYTES,
         MAX_FILE_SIZE_MB,
         get_api_config,
+        load_schema,
+        save_schema,
         sse_event,
         validate_file_size,
         validate_vision_page_limit,
+        wrap_schema_with_numeric_normalizers,
     )
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -45,8 +46,6 @@ PDF_CLEANUP_AFTER_HOURS = 1
 # Temporary storage for generated PDFs (path and creation time)
 PDF_STORAGE: dict[str, Path] = {}
 PDF_TIMESTAMPS: dict[str, datetime] = {}
-SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
-SCHEMA_DIR.mkdir(exist_ok=True)
 
 
 def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config: dict):
@@ -105,243 +104,26 @@ def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config
     return parser.parse_pdf(tmp_path)
 
 
-def _clean_schema_dump(raw_dump: str) -> str:
-    """Strip header/footer lines from print_pydantic_schema output."""
-    lines = raw_dump.splitlines()
-    start_idx = 0
-    for i, line in enumerate(lines):
-        if line.startswith("class "):
-            start_idx = i
-            break
-    body = lines[start_idx:]
-    while body and (set(body[-1].strip()) == {"="} or not body[-1].strip()):
-        body.pop()
-    return "\n".join(body).strip()
-
-
-def _sanitize_schema_code(schema_code: str) -> str:
-    """Remove fully qualified extractor-schema references from cached modules."""
-    return schema_code.replace("gaik.software_components.extractor.schema.", "")
-
-
-def _schema_paths(schema_key: str) -> tuple[Path, Path]:
-    safe_key = "".join(c if c.isalnum() or c in {"_", "-"} else "_" for c in schema_key).strip("_") or "schema"
-    return SCHEMA_DIR / f"{safe_key}_schema.py", SCHEMA_DIR / f"{safe_key}_requirements.json"
-
-
-def _save_schema(schema: type, requirements, schema_key: str, user_requirements: str) -> None:
-    from gaik.software_components.extractor.schema import print_pydantic_schema
-
-    schema_path, req_path = _schema_paths(schema_key)
-
-    buffer = io.StringIO()
-    with redirect_stdout(buffer):
-        print_pydantic_schema(schema, title="Saved Schema")
-
-    schema_code = _sanitize_schema_code(_clean_schema_dump(buffer.getvalue()))
-    template = f'''"""
-Auto-generated schema module (do not edit manually).
-"""
-
-import decimal
-from decimal import Decimal
-from typing import List, Literal, Optional
-
-from pydantic import BaseModel, Field, ConfigDict
-
-{schema_code}
-'''
-    schema_path.write_text(template, encoding="utf-8")
-
-    payload = {
-        "model_name": schema.__name__,
-        "requirements": requirements.model_dump(),
-        "user_requirements": user_requirements,
-    }
-    req_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-
-
-def _load_schema(schema_key: str, user_requirements: str):
-    from gaik.software_components.extractor import ExtractionRequirements
-
-    schema_path, req_path = _schema_paths(schema_key)
-    if not (schema_path.exists() and req_path.exists()):
-        return None
-
-    data = json.loads(req_path.read_text(encoding="utf-8"))
-    if data.get("user_requirements") != user_requirements:
-        return None
-
-    model_name = data["model_name"]
-    requirements = ExtractionRequirements(**data["requirements"])
-
-    source = schema_path.read_text(encoding="utf-8")
-    sanitized = _sanitize_schema_code(source)
-    if sanitized != source:
-        schema_path.write_text(sanitized, encoding="utf-8")
-        logger.info("Sanitized cached schema module: %s", schema_path)
-
-    spec = importlib.util.spec_from_file_location(model_name, schema_path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec and spec.loader is not None
-    spec.loader.exec_module(module)  # type: ignore[attr-defined]
-    schema = getattr(module, model_name)
-    return schema, requirements
-
-
-def _annotation_contains(annotation, target_type: type) -> bool:
-    if annotation is target_type:
-        return True
-
-    origin = get_origin(annotation)
-    if origin is None:
-        return False
-
-    return any(
-        arg is not type(None) and _annotation_contains(arg, target_type)
-        for arg in get_args(annotation)
-    )
-
-
-def _clean_numeric_string(value: str) -> str:
-    cleaned = value.strip()
-    if not cleaned:
-        return cleaned
-
-    negative = False
-    if cleaned.startswith("(") and cleaned.endswith(")"):
-        negative = True
-        cleaned = cleaned[1:-1].strip()
-
-    cleaned = cleaned.replace("$", "").replace("EUR", "").replace("eur", "")
-    cleaned = cleaned.replace(" ", "").replace(",", "")
-    cleaned = cleaned.replace("%", "")
-
-    if negative and cleaned and not cleaned.startswith("-"):
-        cleaned = f"-{cleaned}"
-    return cleaned
-
-
-def _normalize_decimal_value(value):
-    if value is None or isinstance(value, Decimal):
-        return value
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return Decimal(str(value))
-    if isinstance(value, str):
-        cleaned = _clean_numeric_string(value)
-        if cleaned in {"", "-", "N/A", "n/a", "none", "null"}:
-            return None
-        try:
-            return Decimal(cleaned)
-        except (InvalidOperation, ValueError):
-            return value
-    return value
-
-
-def _normalize_float_value(value):
-    if value is None or isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float, Decimal)):
-        return float(value)
-    if isinstance(value, str):
-        cleaned = _clean_numeric_string(value)
-        if cleaned in {"", "-", "N/A", "n/a", "none", "null"}:
-            return None
-        try:
-            return float(cleaned)
-        except ValueError:
-            return value
-    return value
-
-
-def _normalize_int_value(value):
-    if value is None or isinstance(value, bool):
-        return value
-    if isinstance(value, int):
-        return value
-    if isinstance(value, (float, Decimal)):
-        return int(value)
-    if isinstance(value, str):
-        cleaned = _clean_numeric_string(value)
-        if cleaned in {"", "-", "N/A", "n/a", "none", "null"}:
-            return None
-        try:
-            return int(float(cleaned))
-        except ValueError:
-            return value
-    return value
-
-
-def _wrap_schema_with_numeric_normalizers(schema: type[BaseModel]) -> type[BaseModel]:
-    decimal_fields = [
-        name for name, field in schema.model_fields.items()
-        if _annotation_contains(field.annotation, Decimal)
-    ]
-    float_fields = [
-        name for name, field in schema.model_fields.items()
-        if _annotation_contains(field.annotation, float)
-    ]
-    int_fields = [
-        name for name, field in schema.model_fields.items()
-        if _annotation_contains(field.annotation, int)
-    ]
-
-    if not any((decimal_fields, float_fields, int_fields)):
-        return schema
-
-    namespace: dict[str, object] = {}
-
-    if decimal_fields:
-        @field_validator(*decimal_fields, mode="before", check_fields=False)
-        @classmethod
-        def _normalize_decimal_fields(cls, value):
-            return _normalize_decimal_value(value)
-
-        namespace["_normalize_decimal_fields"] = _normalize_decimal_fields
-
-    if float_fields:
-        @field_validator(*float_fields, mode="before", check_fields=False)
-        @classmethod
-        def _normalize_float_fields(cls, value):
-            return _normalize_float_value(value)
-
-        namespace["_normalize_float_fields"] = _normalize_float_fields
-
-    if int_fields:
-        @field_validator(*int_fields, mode="before", check_fields=False)
-        @classmethod
-        def _normalize_int_fields(cls, value):
-            return _normalize_int_value(value)
-
-        namespace["_normalize_int_fields"] = _normalize_int_fields
-
-    wrapped_schema = type(f"{schema.__name__}Normalized", (schema,), namespace)
-    wrapped_schema.model_rebuild(force=True)
-    return wrapped_schema
-
-
 def _get_or_create_schema(config, user_requirements: str, schema_key: str | None, regenerate_schema: bool):
     from gaik.software_components.extractor.schema import SchemaGenerator
 
     loaded = None
     if schema_key:
-        loaded = _load_schema(schema_key, user_requirements)
+        loaded = load_schema(schema_key, user_requirements)
         if loaded is not None and not regenerate_schema:
             logger.info("Loaded existing schema for key %s", schema_key)
             schema, requirements = loaded
-            return _wrap_schema_with_numeric_normalizers(schema), requirements, False
+            return schema, requirements, False
 
     generator = SchemaGenerator(config=config)
     schema = generator.generate_schema(user_requirements)
     requirements = generator.item_requirements
 
     if schema_key and loaded is None and not regenerate_schema:
-        _save_schema(schema, requirements, schema_key, user_requirements)
+        save_schema(schema, requirements, schema_key, user_requirements)
         logger.info("Saved schema for key %s", schema_key)
 
-    return _wrap_schema_with_numeric_normalizers(schema), requirements, True
+    return wrap_schema_with_numeric_normalizers(schema), requirements, True
 
 
 async def cleanup_old_pdfs():
@@ -671,10 +453,10 @@ async def document_pipeline(
                 pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
                 pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
 
-                # Use extracted_fields if available, otherwise create from parsed content
+                # Use extracted_data if available, otherwise create from parsed content
                 pdf_data = (
-                    result.extracted_fields
-                    if result.extracted_fields
+                    extracted_data
+                    if extracted_data
                     else [{"parsed_content": parsed_content or "No content extracted"}]
                 )
                 pdf_generator.run(pdf_data, pdf_path)
@@ -895,12 +677,31 @@ async def audio_pipeline_stream(
 
             from gaik.software_components.transcriber import Transcriber
 
-            transcriber = Transcriber(
-                api_config=config,
-                enhanced_transcript=enhanced,
-                compress_audio=compress_audio,
-            )
-            transcription = transcriber.transcribe(file_path=tmp_path)
+            local_api_base = os.getenv("LOCAL_TRANSCRIBER_API_BASE")
+            local_api_key = os.getenv("LOCAL_TRANSCRIBER_API_KEY")
+
+            transcriber_kwargs = {
+                "api_config": config,
+                "enhanced_transcript": enhanced,
+                "compress_audio": compress_audio,
+                "local_api_base": local_api_base,
+                "local_api_key": local_api_key,
+            }
+
+            if local_api_base and local_api_key:
+                try:
+                    transcriber = Transcriber(
+                        **transcriber_kwargs,
+                        transcription_model="whisper_local",
+                    )
+                    transcription = transcriber.transcribe(file_path=tmp_path)
+                except Exception as exc:
+                    logger.warning("Local transcription failed: %s — falling back", exc)
+                    transcriber = Transcriber(**transcriber_kwargs)
+                    transcription = transcriber.transcribe(file_path=tmp_path)
+            else:
+                transcriber = Transcriber(**transcriber_kwargs)
+                transcription = transcriber.transcribe(file_path=tmp_path)
 
             steps[0]["status"] = "completed"
             steps[0]["message"] = "Transcription complete"

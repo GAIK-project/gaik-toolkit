@@ -5,7 +5,7 @@ Usage:
     python api/scripts/seed_dental_demo.py
 
 Requires: yt-dlp, ffmpeg, boto3, gaik[all-cpu]>=0.3.10
-Reads config from .env.local (LOCAL_WHISPER_BASE, LOCAL_WHISPER_KEY, DATABASE_URL, ALLAS_*)
+Reads config from .env.local (LOCAL_TRANSCRIBER_API_BASE, LOCAL_TRANSCRIBER_API_KEY, DATABASE_URL, ALLAS_*)
 """
 
 from __future__ import annotations
@@ -117,10 +117,10 @@ def transcribe_video(video_path: Path) -> dict:
     """Transcribe using local Whisper."""
     from gaik.software_components.transcriber.whisper_local import transcribe
 
-    api_base = os.getenv("LOCAL_WHISPER_BASE")
-    api_key = os.getenv("LOCAL_WHISPER_KEY")
+    api_base = os.getenv("LOCAL_TRANSCRIBER_API_BASE")
+    api_key = os.getenv("LOCAL_TRANSCRIBER_API_KEY")
     if not api_base or not api_key:
-        raise RuntimeError("LOCAL_WHISPER_BASE and LOCAL_WHISPER_KEY must be set")
+        raise RuntimeError("LOCAL_TRANSCRIBER_API_BASE and LOCAL_TRANSCRIBER_API_KEY must be set")
 
     return transcribe(
         audio_path=video_path,
@@ -276,7 +276,7 @@ def main():
         print(f"ERROR: yt-dlp not available - {e}")
         sys.exit(1)
 
-    required_envs = ["LOCAL_WHISPER_BASE", "LOCAL_WHISPER_KEY"]
+    required_envs = ["LOCAL_TRANSCRIBER_API_BASE", "LOCAL_TRANSCRIBER_API_KEY"]
     for env in required_envs:
         if not os.getenv(env):
             print(f"ERROR: {env} not set")

@@ -71,12 +71,12 @@ async def dental_transcription_stream(
         return sse_error_response(f"Unsupported file type: {suffix}")
 
     # Check local Whisper configuration
-    local_api_base = os.getenv("LOCAL_WHISPER_BASE")
-    local_api_key = os.getenv("LOCAL_WHISPER_KEY")
+    local_api_base = os.getenv("LOCAL_TRANSCRIBER_API_BASE")
+    local_api_key = os.getenv("LOCAL_TRANSCRIBER_API_KEY")
     if not local_api_base or not local_api_key:
         return sse_error_response(
             "Local Whisper service not configured. "
-            "Set LOCAL_WHISPER_BASE and LOCAL_WHISPER_KEY environment variables."
+            "Set LOCAL_TRANSCRIBER_API_BASE and LOCAL_TRANSCRIBER_API_KEY environment variables."
         )
 
     # Validate file size

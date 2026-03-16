@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
   // Setting compress: false allows chunked transfer encoding to work properly.
   // See: https://medium.com/@oyetoketoby80/fixing-slow-sse-server-sent-events-streaming-in-next-js-and-vercel-99f42fbdb996
   // compress: false,
+  allowedDevOrigins: ["*.local", "10.*"],
   reactCompiler: true,
   output: "standalone",
   images: {
