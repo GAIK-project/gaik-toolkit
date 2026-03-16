@@ -213,7 +213,7 @@ function UploadDialogContent({
           <Button onClick={onIndex} disabled={isIndexing} className="w-full">
             <Sparkles className="mr-2 h-4 w-4" />
             {isIndexing ? (
-              <Shimmer className="text-inherit">Indexing {pendingFiles.length} document(s)...</Shimmer>
+              <Shimmer className="text-inherit">{`Indexing ${pendingFiles.length} document(s)...`}</Shimmer>
             ) : (
               `Index ${pendingFiles.length} Document${pendingFiles.length !== 1 ? "s" : ""}`
             )}
