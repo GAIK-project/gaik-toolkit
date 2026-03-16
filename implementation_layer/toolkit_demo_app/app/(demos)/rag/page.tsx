@@ -31,6 +31,12 @@ import {
   SourcesContent,
   Source as SourceItem,
 } from "@/components/ai-elements/sources";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -262,7 +268,6 @@ export default function RAGPage() {
   const [isQuerying, setIsQuerying] = useState(false);
   const [streamingAnswer, setStreamingAnswer] = useState<string[]>([]);
   const [streamingSources, setStreamingSources] = useState<Source[]>([]);
-  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   // Settings state
   const [topK, setTopK] = useState(5);
@@ -621,10 +626,10 @@ export default function RAGPage() {
       className="flex h-[calc(100vh-10rem)] flex-col sm:h-[calc(100vh-12rem)]"
     >
       {/* Header */}
-      <header className="mb-4">
+      <header className="mb-2">
         <Button
           variant="ghost"
-          className="mb-4 -ml-3 gap-2"
+          className="mb-2 -ml-3 gap-2"
           onClick={() => router.push("/")}
         >
           <ArrowLeft className="h-4 w-4" />
@@ -754,52 +759,23 @@ export default function RAGPage() {
         </div>
       </header>
 
-      <div className="mb-4 rounded-xl border bg-white">
-        <button
-          type="button"
-          className="flex w-full items-center justify-between px-5 py-4 text-left"
-          onClick={() => setHowItWorksOpen((current) => !current)}
-        >
-          <div>
-            <h2 className="text-base font-semibold">How It Works</h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Index documents into an in-memory vector store and query them with retrieval-augmented generation.
+      <Accordion type="single" collapsible className="mb-2 rounded-lg border bg-white px-4">
+        <AccordionItem value="how-it-works" className="border-b-0">
+          <AccordionTrigger className="py-2.5 text-xs">
+            <span className="text-muted-foreground">How it works</span>
+          </AccordionTrigger>
+          <AccordionContent className="pb-3 text-xs leading-5">
+            <p className="mb-2">
+              Upload PDF documents to index them into a vector store. The Docling RAG parser converts pages into semantically chunked segments with metadata. After indexing, ask questions and get AI-generated answers with source citations.
             </p>
-          </div>
-          <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-            {howItWorksOpen ? "Hide" : "Show"}
-            <Upload className={`h-4 w-4 transition-transform ${howItWorksOpen ? "rotate-180" : "-rotate-90"}`} />
-          </div>
-        </button>
-        {howItWorksOpen && (
-          <div className="space-y-4 border-t px-5 py-4 text-sm leading-6">
-            <p>
-              This demo indexes one or more PDF documents into an in-memory vector store and then lets you ask questions over the indexed content. The parser determines how the PDF is converted into RAG chunks before embeddings are created and stored.
-            </p>
-            <div className="space-y-2">
-              <p><strong>1. Choose a parser:</strong></p>
-              <p>
-                <strong>Vision+ Parser:</strong> Used for high-quality parsing. It can interpret images and place their interpretation in the right location in the document flow. It is intended to extract everything from a document and produce vision-enhanced RAG chunks with metadata. In this demo, Vision+ is limited to 10 pages. Read more at <a href="https://medium.com/@umairali.khan/how-i-enhanced-doclings-image-interpretation-capabilities-641ce017bce5" target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">this article</a>.
-              </p>
-              <p>
-                <strong>Docling RAG Parser:</strong> Uses the Docling parser running at Haaga-Helia as a service. It provides high-quality parsing with metadata and returns ready-made RAG chunks through the remote parsing endpoint.
-              </p>
-              <p>
-                <strong>PyMuPDF:</strong> Fast local fallback parser that extracts page text directly. It is lighter than the other two options and is useful when you need robust local parsing without the richer image-aware or Docling-based processing.
-              </p>
-            </div>
-            <p>
-              <strong>2. Upload PDFs:</strong> You can upload one or more PDF files in the same indexing run. The selected parser is applied to each file, and the resulting chunks are embedded and stored in the same in-memory collection.
-            </p>
-            <p>
-              <strong>3. Build the vector store:</strong> Parsed chunks are embedded and added to the current in-memory vector store. This collection persists only for the running demo session.
-            </p>
-            <p>
-              <strong>4. Ask questions:</strong> After indexing, the retriever searches the stored chunks, and the answer generator produces a response with source references.
-            </p>
-          </div>
-        )}
-      </div>
+            <ol className="text-muted-foreground list-inside list-decimal space-y-1">
+              <li><strong>Upload PDFs</strong> — one or more files per indexing run</li>
+              <li><strong>Build vector store</strong> — chunks are embedded and stored in-memory</li>
+              <li><strong>Ask questions</strong> — retriever finds relevant chunks, LLM generates answers with references</li>
+            </ol>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {/* Chat area */}
       <Conversation className="flex-1 rounded-xl border bg-white">
@@ -818,15 +794,14 @@ export default function RAGPage() {
                   open={uploadDialogOpen}
                   onOpenChange={setUploadDialogOpen}
                 >
-                  <div className="flex h-full flex-col items-center justify-center py-16">
-                    <div className="bg-primary/10 mb-6 rounded-full p-6">
-                      <Upload className="text-primary h-12 w-12" />
+                  <div className="flex h-full flex-col items-center justify-center py-8">
+                    <div className="bg-primary/10 mb-4 rounded-full p-4">
+                      <Upload className="text-primary h-8 w-8" />
                     </div>
-                    <h2 className="mb-2 text-xl font-semibold">Get started</h2>
-                    <p className="text-muted-foreground mb-6 max-w-md text-center">
-                      Try our example document to see RAG in action, or upload
-                      your own PDFs to ask questions and get AI-powered answers
-                      with citations.
+                    <h2 className="mb-1.5 text-lg font-semibold">Get started</h2>
+                    <p className="text-muted-foreground mb-4 max-w-sm text-center text-sm">
+                      Try our example document or upload your own PDFs to ask
+                      questions and get AI-powered answers with citations.
                     </p>
                     <div className="flex gap-3">
                       <ExamplePreviewDialog
@@ -905,7 +880,7 @@ export default function RAGPage() {
       </Conversation>
 
       {/* Input area */}
-      <PromptInput onSubmit={({ text }) => handleQuery(text)} className="mt-4">
+      <PromptInput onSubmit={({ text }) => handleQuery(text)} className="mt-2">
         <PromptInputBody>
           <PromptInputTextarea
             placeholder={
