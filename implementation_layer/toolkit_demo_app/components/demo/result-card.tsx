@@ -192,14 +192,38 @@ export function LoadingCard({ message, subMessage }: LoadingCardProps) {
 }
 
 interface EmptyStateCardProps {
-  message: string;
+  message?: string;
+  title?: string;
+  description?: string;
+  icon?: React.ElementType;
+  variant?: "bordered" | "default";
+  feedbackSlot?: React.ReactNode;
+  delay?: number;
 }
 
-export function EmptyStateCard({ message }: EmptyStateCardProps) {
+export function EmptyStateCard({
+  message,
+  title,
+  description,
+  icon: Icon,
+  variant = "default",
+  feedbackSlot,
+}: EmptyStateCardProps) {
+  const displayTitle = title ?? message ?? "";
+  const displayDescription = description;
   return (
-    <Card className="border-dashed">
+    <Card className={variant === "bordered" ? "border-dashed" : "border-dashed"}>
       <CardContent className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground text-center">{message}</p>
+        <div className="text-center">
+          {Icon && <Icon className="text-muted-foreground mx-auto mb-3 h-8 w-8" />}
+          {displayTitle && (
+            <p className="text-muted-foreground font-medium">{displayTitle}</p>
+          )}
+          {displayDescription && (
+            <p className="text-muted-foreground mt-1 text-sm">{displayDescription}</p>
+          )}
+          {feedbackSlot && <div className="mt-3">{feedbackSlot}</div>}
+        </div>
       </CardContent>
     </Card>
   );
