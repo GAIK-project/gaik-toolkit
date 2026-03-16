@@ -24,8 +24,8 @@ export function Hero() {
             GAIK Toolkit Demos
           </h1>
           <p className="text-muted-foreground max-w-2xl text-lg">
-            Interactive document AI demos. Parse, extract, classify, and
-            transcribe with modern AI.
+            Interactive demos of GAIK toolkit's software components,
+            software modules, and general use cases.
           </p>
         </div>
 
