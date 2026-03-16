@@ -17,7 +17,8 @@ export type DemoType =
   | "dental-transcription"
   | "document-structured"
   | "video-search"
-  | "luvata-order";
+  | "luvata-order"
+  | "text-to-speech";
 
 /**
  * User feedback stored in the database
