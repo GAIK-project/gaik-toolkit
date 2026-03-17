@@ -1,9 +1,14 @@
 "use client";
 
-import { StarsBackground } from "@/components/stars";
+import dynamic from "next/dynamic";
 import { motion } from "motion/react";
 import Image from "next/image";
 import type { ReactNode } from "react";
+
+const StarsBackground = dynamic(
+  () => import("@/components/stars").then((mod) => mod.StarsBackground),
+  { ssr: false },
+);
 
 const fadeUp = {
   initial: { opacity: 0, y: 18 },

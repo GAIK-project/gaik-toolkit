@@ -342,7 +342,12 @@ export default function ClassifierPage() {
           )}
 
           {!result && !isLoading && (
-            <EmptyStateCard message="Upload a document and click classify to see results" />
+            <EmptyStateCard
+              icon={Tags}
+              title="No classification yet"
+              description="Upload a document and click Sort to see results."
+              feedbackSlot={<FeedbackButton demoType="classifier" />}
+            />
           )}
         </div>
       </div>

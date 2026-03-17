@@ -766,7 +766,12 @@ export default function ExtractorPage() {
           )}
 
           {!result && !isLoading && !isParsing && (
-            <EmptyStateCard message="Provide document text and click extract to see results" />
+            <EmptyStateCard
+              icon={Database}
+              title="No extraction yet"
+              description="Provide document text or upload a file and click Extract."
+              feedbackSlot={<FeedbackButton demoType="extractor" />}
+            />
           )}
         </div>
       </div>

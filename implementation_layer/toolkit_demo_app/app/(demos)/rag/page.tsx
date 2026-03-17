@@ -635,7 +635,7 @@ export default function RAGPage() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="flex h-[calc(100vh-9rem)] flex-col sm:h-[calc(100vh-11rem)]"
+      className="flex h-[calc(100vh-6rem)] flex-col sm:h-[calc(100vh-8rem)]"
     >
       {/* Header */}
       <header className="mb-2">

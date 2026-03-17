@@ -556,7 +556,12 @@ export default function DocumentStructuredPage() {
           )}
 
           {!result && !isLoading && (
-            <EmptyStateCard message="Upload a document and click process to see results" />
+            <EmptyStateCard
+              icon={FileOutput}
+              title="No structured data yet"
+              description="Upload a document and click Process to see results."
+              feedbackSlot={<FeedbackButton demoType="document-structured" />}
+            />
           )}
         </div>
       </div>

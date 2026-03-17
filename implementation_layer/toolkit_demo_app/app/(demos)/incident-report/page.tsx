@@ -575,6 +575,30 @@ export default function IncidentReportPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <HowItWorksCard>
+            <p>
+              <strong>1. Provide the incident input:</strong> Upload an audio
+              recording or type the incident description directly. For a quick
+              test, use <strong>Load Example</strong> to load the built-in
+              sample audio or sample text.
+            </p>
+            <p>
+              <strong>2. Transcribe or read the report:</strong> Audio input is
+              transcribed first. Text input skips transcription and goes
+              directly to extraction.
+            </p>
+            <p>
+              <strong>3. Extract the key incident fields:</strong> The tool
+              extracts relevant details such as incident date, location,
+              description, people involved, injuries, and actions taken.
+            </p>
+            <p>
+              <strong>4. Review and download:</strong> The result view shows the
+              transcript and structured incident details. You can also generate
+              a downloadable PDF report.
+            </p>
+          </HowItWorksCard>
         </div>
 
         {/* Results / Processing Section */}
@@ -698,47 +722,12 @@ export default function IncidentReportPage() {
           )}
 
           {!result && !isLoading && (
-            <>
-              <EmptyStateCard
-                message={
-                  inputMode === "audio"
-                    ? "Your generated report will appear here."
-                    : "Submit your details to see the magic happen."
-                }
-              />
-
-              <HowItWorksCard>
-                <p>
-                  <strong>1. Provide the incident input:</strong> Upload an
-                  audio recording or type the incident description directly. For
-                  a quick test, use <strong>Load Example</strong> to load the
-                  built-in sample audio or sample text.
-                </p>
-                <p>
-                  <strong>2. Transcribe or read the report:</strong> Audio input
-                  is transcribed first. Text input skips transcription and goes
-                  directly to extraction.
-                </p>
-                <p>
-                  <strong>3. Extract the key incident fields:</strong> The tool
-                  extracts relevant details such as incident date and time,
-                  location, description of what happened, people involved,
-                  injuries or damages, immediate actions taken, and witness
-                  information when available.
-                </p>
-                <p>
-                  <strong>4. Refine the output:</strong> If enabled, the
-                  transcript is enhanced for readability. You can also switch to
-                  custom extraction mode and define your own fields or
-                  questions.
-                </p>
-                <p>
-                  <strong>5. Generate the final report:</strong> The result view
-                  shows the transcript and structured incident details. It can
-                  also generate a downloadable PDF incident report.
-                </p>
-              </HowItWorksCard>
-            </>
+            <EmptyStateCard
+              icon={AlertTriangle}
+              title="No report generated yet"
+              description="Provide an audio recording or text description and click Generate."
+              feedbackSlot={<FeedbackButton demoType="incident-report" />}
+            />
           )}
         </div>
       </div>

@@ -1,7 +1,11 @@
 import { getUserAccessStatus } from "@/lib/queries/access";
-import { DemoCards } from "./components/demo-cards";
+import dynamic from "next/dynamic";
 import { Hero } from "./components/hero";
 import { InstallSnippet } from "./components/install-snippet";
+
+const DemoCards = dynamic(() =>
+  import("./components/demo-cards").then((mod) => mod.DemoCards),
+);
 
 export default async function HomePage() {
   const { isUnlocked } = await getUserAccessStatus();

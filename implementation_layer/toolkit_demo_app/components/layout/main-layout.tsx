@@ -19,7 +19,7 @@ export function MainLayout({
   return (
     <div className="flex min-h-screen flex-col">
       <SiteNavServer />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 pt-20 pb-24 sm:px-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 pt-8 pb-24 sm:px-8">
         {contentWrapper === "spaced" ? (
           <div className="space-y-6">{children}</div>
         ) : (

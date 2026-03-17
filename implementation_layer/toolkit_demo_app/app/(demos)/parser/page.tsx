@@ -320,7 +320,12 @@ export default function ParserPage() {
           )}
 
           {!result && !isLoading && (
-            <EmptyStateCard message="Upload a document to see parsed results here" />
+            <EmptyStateCard
+              icon={FileText}
+              title="No parsed output yet"
+              description="Upload a document and click Parse to see results."
+              feedbackSlot={<FeedbackButton demoType="parser" />}
+            />
           )}
         </div>
       </div>

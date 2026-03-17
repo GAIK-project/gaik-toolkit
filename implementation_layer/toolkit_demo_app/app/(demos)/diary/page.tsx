@@ -727,6 +727,27 @@ export default function DiaryPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <HowItWorksCard>
+            <p>
+              <strong>1. Provide input:</strong> Upload an audio recording or
+              type the daily construction diary entry. Use{" "}
+              <strong>Load Example</strong> for a quick test.
+            </p>
+            <p>
+              <strong>2. Transcribe and extract:</strong> Audio is transcribed
+              first. The tool then extracts standard diary fields like project,
+              date, weather, personnel, and work phases.
+            </p>
+            <p>
+              <strong>3. Review results:</strong> The structured diary data and
+              transcript are shown side by side.
+            </p>
+            <p>
+              <strong>4. Download PDF:</strong> Generate and download a
+              formatted construction diary report.
+            </p>
+          </HowItWorksCard>
         </div>
 
         {/* Results / Processing Section */}
@@ -848,46 +869,12 @@ export default function DiaryPage() {
           )}
 
           {!result && !isLoading && (
-            <>
-              <EmptyStateCard
-                message={
-                  inputMode === "audio"
-                    ? "Your processed diary entry will appear here."
-                    : "Submit your diary details to see the extracted data."
-                }
-              />
-
-              <HowItWorksCard>
-                <p>
-                  <strong>1. Provide the diary input:</strong> Upload an audio
-                  recording or type the daily construction diary entry directly.
-                  Use <strong>Load Example</strong> to test the built-in sample
-                  audio or example texts.
-                </p>
-                <p>
-                  <strong>2. Transcribe or read the content:</strong> Audio
-                  input is transcribed first. Text input is processed directly
-                  without transcription.
-                </p>
-                <p>
-                  <strong>3. Extract the diary fields:</strong> In automatic
-                  mode, the tool extracts the standard construction diary fields
-                  such as project, date, weather, personnel, work phases, and
-                  supervisor observations. In custom mode, it extracts the
-                  fields you define.
-                </p>
-                <p>
-                  <strong>4. Review the structured result:</strong> The result
-                  view shows the transcript, generated schema details, and the
-                  extracted construction diary data.
-                </p>
-                <p>
-                  <strong>5. Generate the final report:</strong> If enabled, the
-                  tool also creates a downloadable PDF construction diary
-                  report.
-                </p>
-              </HowItWorksCard>
-            </>
+            <EmptyStateCard
+              icon={HardHat}
+              title="No diary entry yet"
+              description="Upload audio or type a diary entry and click Generate."
+              feedbackSlot={<FeedbackButton demoType="construction-diary" />}
+            />
           )}
         </div>
       </div>

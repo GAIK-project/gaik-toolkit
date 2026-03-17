@@ -49,7 +49,15 @@ export function Footer({ githubPreview }: FooterProps) {
                 />
               </Link>
               <span className="text-muted-foreground text-sm">
-                &copy; {currentYear} GAIK Project
+                &copy; {currentYear}{" "}
+                <a
+                  href="https://gaik.ai/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-foreground transition-colors"
+                >
+                  GAIK Project
+                </a>
               </span>
             </div>
             <Image

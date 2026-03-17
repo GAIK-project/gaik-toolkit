@@ -3,8 +3,14 @@ import { signOut } from "@/app/(auth)/actions";
 import { getAccessStatus } from "@/data/auth";
 import { AuthShell } from "../components/auth-shell";
 import { Button } from "@/components/ui/button";
-import { SuccessAnimation } from "../components/success-animation";
+import dynamic from "next/dynamic";
 import { AccessPolling } from "../components/access-polling";
+
+const SuccessAnimation = dynamic(() =>
+  import("../components/success-animation").then(
+    (mod) => mod.SuccessAnimation,
+  ),
+);
 
 export default async function AccessPendingPage() {
   const { isLoggedIn, status, email } = await getAccessStatus();

@@ -473,7 +473,12 @@ export default function DentalTranscriptionPage() {
         )}
 
         {!result && !isLoading && (
-          <EmptyStateCard message="Upload your own file or load the ready-made example to see transcript and subtitle output here." />
+          <EmptyStateCard
+            icon={Subtitles}
+            title="No transcription yet"
+            description="Upload a file or load the example to see transcript and subtitle output."
+            feedbackSlot={<FeedbackButton demoType="dental-transcription" />}
+          />
         )}
 
         <Accordion

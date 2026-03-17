@@ -27,6 +27,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -69,7 +76,7 @@ interface TranscribeResult {
 
 export default function TranscriberPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [customContext, setCustomContext] = useState("");
+  const [additionalContext, setAdditionalContext] = useState("");
   const [fixTranscriptionErrors, setFixTranscriptionErrors] = useState(false);
   const [compressAudio, setCompressAudio] = useState(true);
   const [language, setLanguage] = useState("auto");
@@ -77,7 +84,6 @@ export default function TranscriberPage() {
   const [speakerCount, setSpeakerCount] = useState("");
   const [minSpeakers, setMinSpeakers] = useState("");
   const [maxSpeakers, setMaxSpeakers] = useState("");
-  const [initialPrompt, setInitialPrompt] = useState("");
   const [preferLocalFirst, setPreferLocalFirst] = useState(true);
   const [selectedTranscriptView, setSelectedTranscriptView] = useState<
     "corrected" | "diff" | "diarized" | "raw"
@@ -256,7 +262,7 @@ export default function TranscriberPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("custom_context", customContext);
+      formData.append("custom_context", additionalContext);
       formData.append(
         "fix_transcription_errors",
         String(fixTranscriptionErrors),
@@ -271,8 +277,8 @@ export default function TranscriberPage() {
         formData.append("min_speakers", minSpeakers.trim());
       if (maxSpeakers.trim() !== "")
         formData.append("max_speakers", maxSpeakers.trim());
-      if (initialPrompt.trim() !== "")
-        formData.append("initial_prompt", initialPrompt.trim());
+      if (additionalContext.trim() !== "")
+        formData.append("initial_prompt", additionalContext.trim());
 
       const response = await apiFetch("/api/transcribe", {
         method: "POST",
@@ -299,7 +305,7 @@ export default function TranscriberPage() {
         file_size: file.size,
         fix_transcription_errors: fixTranscriptionErrors,
         compress_audio: compressAudio,
-        has_custom_context: customContext.length > 0,
+        has_custom_context: additionalContext.length > 0,
         language: language,
         diarization: diarization,
         prefer_local_first: preferLocalFirst,
@@ -335,7 +341,7 @@ export default function TranscriberPage() {
       <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
         {/* Input Section */}
         <div className="space-y-6">
-          <Card>
+          <Card className="overflow-hidden">
             <CardHeader>
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -368,12 +374,7 @@ export default function TranscriberPage() {
                 disabled={isLoading}
               />
 
-              <Accordion
-                type="single"
-                collapsible
-                defaultValue="settings"
-                className="w-full"
-              >
+              <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="settings" className="border-none">
                   <AccordionTrigger className="text-muted-foreground hover:text-foreground py-2 text-sm font-medium">
                     Processing Settings
@@ -381,17 +382,20 @@ export default function TranscriberPage() {
                   <AccordionContent className="space-y-6 pt-4">
                     <div className="space-y-2">
                       <Label htmlFor="language">Language</Label>
-                      <select
-                        id="language"
+                      <Select
                         value={language}
-                        onChange={(e) => setLanguage(e.target.value)}
+                        onValueChange={setLanguage}
                         disabled={isLoading}
-                        className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <option value="auto">auto</option>
-                        <option value="fi">fi</option>
-                        <option value="en">en</option>
-                      </select>
+                        <SelectTrigger id="language">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">auto</SelectItem>
+                          <SelectItem value="fi">fi</SelectItem>
+                          <SelectItem value="en">en</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="space-y-4">
@@ -508,28 +512,14 @@ export default function TranscriberPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="initial-prompt">
-                        Initial Prompt (Finnish Transcriber)
+                      <Label htmlFor="additional-context">
+                        Additional Context
                       </Label>
                       <Textarea
-                        id="initial-prompt"
-                        value={initialPrompt}
-                        onChange={(e) => setInitialPrompt(e.target.value)}
-                        placeholder="Optional hint text for the local transcriber..."
-                        disabled={isLoading}
-                        rows={3}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="context">
-                        Custom Context (OpenAI/Azure fallback)
-                      </Label>
-                      <Textarea
-                        id="context"
-                        value={customContext}
-                        onChange={(e) => setCustomContext(e.target.value)}
-                        placeholder="Optional context for the OpenAI/Azure fallback transcriber (speaker names, technical terms, topic)..."
+                        id="additional-context"
+                        value={additionalContext}
+                        onChange={(e) => setAdditionalContext(e.target.value)}
+                        placeholder="Speaker names, technical terms, topic, or other hints to improve accuracy..."
                         disabled={isLoading}
                         rows={3}
                       />
@@ -549,6 +539,28 @@ export default function TranscriberPage() {
               </Button>
             </CardContent>
           </Card>
+
+          <HowItWorksCard>
+            <p>
+              <strong>1. Upload media:</strong> Add an audio or video file. The
+              demo accepts common speech and meeting formats.
+            </p>
+            <p>
+              <strong>2. Adjust settings:</strong> Optionally select the
+              language, enable the Finnish transcriber, turn on diarization, or
+              provide additional context to improve accuracy.
+            </p>
+            <p>
+              <strong>3. Transcribe:</strong> The demo first tries the Finnish
+              transcriber when enabled. If unavailable, it falls back to the
+              configured OpenAI/Azure model.
+            </p>
+            <p>
+              <strong>4. Review results:</strong> The result view can show raw
+              text, diarized output, corrected text, and a side-by-side diff
+              when correction is enabled.
+            </p>
+          </HowItWorksCard>
         </div>
 
         {/* Results Section */}
@@ -701,45 +713,12 @@ export default function TranscriberPage() {
           )}
 
           {!result && !isLoading && (
-            <>
-              <EmptyStateCard message="Upload an audio/video file to see transcription here" />
-
-              <HowItWorksCard>
-                <p>
-                  <strong>1. Upload media:</strong> Add an audio or video file.
-                  The demo accepts common speech and meeting formats.
-                </p>
-                <p>
-                  <strong>2. Choose transcription settings:</strong> You can
-                  select the language, enable the Finnish FastAPI transcriber,
-                  turn on diarization, and optionally provide an initial prompt
-                  or fallback context.
-                </p>
-                <p>
-                  <strong>3. Generate the transcript:</strong> The demo first
-                  tries the Finnish transcriber when enabled. If that service is
-                  unavailable, it falls back to the configured transcription
-                  model.
-                </p>
-                <p>
-                  <strong>4. Correct transcription errors:</strong> If the beta
-                  Finnish correction option is enabled, the raw transcript is
-                  passed through a two-pass correction flow focused on spelling
-                  and ASR repair.
-                </p>
-                <p>
-                  <strong>5. Review and compare outputs:</strong> The result
-                  view can show raw text, diarized output, corrected text, and a
-                  side-by-side diff with highlighted changes when correction is
-                  enabled.
-                </p>
-                <p>
-                  <strong>6. Download the transcript:</strong> The download
-                  button exports the transcript currently selected in the result
-                  tabs as a <code>.txt</code> file.
-                </p>
-              </HowItWorksCard>
-            </>
+            <EmptyStateCard
+              icon={Mic}
+              title="No transcription yet"
+              description="Upload an audio or video file and click Transcribe to see results."
+              feedbackSlot={<FeedbackButton demoType="transcriber" />}
+            />
           )}
         </div>
       </div>

@@ -486,7 +486,12 @@ export default function AudioStructuredPage() {
           )}
 
           {!result && !isLoading && (
-            <EmptyStateCard message="Upload an audio file and click process to see results" />
+            <EmptyStateCard
+              icon={AudioWaveform}
+              title="No structured data yet"
+              description="Upload an audio file and click Process to see results."
+              feedbackSlot={<FeedbackButton demoType="audio-structured" />}
+            />
           )}
         </div>
       </div>
