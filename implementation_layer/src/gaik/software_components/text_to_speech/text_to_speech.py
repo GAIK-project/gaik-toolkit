@@ -74,9 +74,8 @@ class TextToSpeech:
         self.client = create_openai_client(self.api_config)
         self.model = model or self._resolve_default_model()
         if language not in SUPPORTED_LANGUAGES:
-            raise ValueError(
-                f"Unsupported language '{language}'. Supported languages: {', '.join(SUPPORTED_LANGUAGES)}"
-            )
+            supported = ", ".join(SUPPORTED_LANGUAGES)
+            raise ValueError(f"Unsupported language '{language}'. Supported languages: {supported}")
         self.language = language
         self.voice = voice
         self.response_format = response_format
@@ -98,16 +97,18 @@ class TextToSpeech:
             raise ValueError("Text input cannot be empty.")
         resolved_language = language or self.language
         if resolved_language not in SUPPORTED_LANGUAGES:
+            supported = ", ".join(SUPPORTED_LANGUAGES)
             raise ValueError(
-                f"Unsupported language '{resolved_language}'. Supported languages: {', '.join(SUPPORTED_LANGUAGES)}"
+                f"Unsupported language '{resolved_language}'. Supported languages: {supported}"
             )
 
         resolved_voice = voice or self.voice
         resolved_speed = self.speed if speed is None else speed
         resolved_format = response_format or self.response_format
         if resolved_format not in SUPPORTED_RESPONSE_FORMATS:
+            supported = ", ".join(SUPPORTED_RESPONSE_FORMATS)
             raise ValueError(
-                f"Unsupported response format '{resolved_format}'. Supported formats: {', '.join(SUPPORTED_RESPONSE_FORMATS)}"
+                f"Unsupported response format '{resolved_format}'. Supported formats: {supported}"
             )
 
         resolved_instructions = self._build_instructions(

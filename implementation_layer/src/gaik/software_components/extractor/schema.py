@@ -189,20 +189,33 @@ def detect_structure_type(
             {
                 "role": "user",
                 "content": (
-                    "Analyze the following extraction requirements and determine the output structure.\n\n"
+                    "Analyze the following extraction requirements "
+                    "and determine the output structure.\n\n"
                     "Use NESTED_LIST when:\n"
-                    "- The DOCUMENT contains multiple items/records/rows to extract\n"
-                    "- Instructions mention 'multiple items IN THE DOCUMENT', 'list of items', 'table of records'\n"
-                    "- 'one line per item', 'one row per record', 'repeat for each entry'\n"
-                    "- Document is structured as a table, list, or collection of similar items\n"
-                    "- Example: Extract all products from an invoice (multiple products in one invoice)\n\n"
+                    "- The DOCUMENT contains multiple items/records/rows "
+                    "to extract\n"
+                    "- Instructions mention 'multiple items IN THE DOCUMENT', "
+                    "'list of items', 'table of records'\n"
+                    "- 'one line per item', 'one row per record', "
+                    "'repeat for each entry'\n"
+                    "- Document is structured as a table, list, "
+                    "or collection of similar items\n"
+                    "- Example: Extract all products from an invoice "
+                    "(multiple products in one invoice)\n\n"
                     "Use FLAT when:\n"
-                    "- ONE record per document (even if processing multiple documents)\n"
-                    "- 'for each document', 'from each document', 'per document'\n"
-                    "- Document describes a SINGLE entity (e.g., one project, one invoice, one person)\n"
-                    "- Extracting summary/aggregate information from the document\n"
-                    "- Example: Extract project details from grant document (one project per document)\n\n"
-                    "IMPORTANT: 'For each X, extract...' means FLAT if X is the document itself, NESTED if X refers to multiple items within the document.\n\n"
+                    "- ONE record per document "
+                    "(even if processing multiple documents)\n"
+                    "- 'for each document', 'from each document', "
+                    "'per document'\n"
+                    "- Document describes a SINGLE entity "
+                    "(e.g., one project, one invoice, one person)\n"
+                    "- Extracting summary/aggregate information "
+                    "from the document\n"
+                    "- Example: Extract project details from grant document "
+                    "(one project per document)\n\n"
+                    "IMPORTANT: 'For each X, extract...' means FLAT "
+                    "if X is the document itself, NESTED if X refers "
+                    "to multiple items within the document.\n\n"
                     "Requirements:\n```txt\n" + user_description + "\n```"
                 ),
             },
@@ -259,14 +272,14 @@ def parse_nested_requirements(
     print(f"  Fields: {[f.field_name for f in item_requirements.fields]}")
 
     print("\nCreating nested Pydantic model...")
-    ItemModel = create_extraction_model(item_requirements)
+    ItemModel = create_extraction_model(item_requirements)  # noqa: N806
 
     # Create parent model with items list
     suffix = "_Collection"
     base_name = sanitize_model_name(item_requirements.use_case_name, suffix=suffix)
     model_name = base_name + suffix
 
-    ParentModel = create_model(
+    ParentModel = create_model(  # noqa: N806
         model_name,
         __config__=ConfigDict(extra="forbid"),
         __doc__=f"Collection of {item_requirements.use_case_name} items",
@@ -307,7 +320,8 @@ FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
    Use for any date or timestamp field.
    Recognition patterns:
    - Contains "date" in name or description: "entry date", "start date", "date of birth"
-   - Date words in any language: "pÃ¤ivÃ¤mÃ¤Ã¤rÃ¤" (Finnish), "datum" (German), "fecha" (Spanish), etc.
+   - Date words in any language: "päivämäärä" (Finnish), "datum" (German),
+     "fecha" (Spanish), etc.
    - Temporal references: "when", "timestamp", "created on", "modified at"
    Examples:
    - "Entry Date" -> field_type='date'
@@ -415,8 +429,10 @@ def parse_user_requirements(
             {"role": "system", "content": SYSTEM_PARSER},
             {
                 "role": "user",
-                "content": "Parse the extraction requirements below into the target schema.\n"
-                "Apply the type detection rules to determine the correct field_type for each field.\n"
+                "content": "Parse the extraction requirements below "
+                "into the target schema.\n"
+                "Apply the type detection rules to determine "
+                "the correct field_type for each field.\n"
                 "If a field cannot be identified reliably, omit it.\n"
                 + TYPE_DETECTION_RULES
                 + "\n\nRequirements to parse:\n```txt\n"
@@ -594,7 +610,7 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
     base_name = sanitize_model_name(requirements.use_case_name, suffix=suffix)
     model_name = base_name + suffix
 
-    DynamicModel = create_model(
+    DynamicModel = create_model(  # noqa: N806
         model_name,
         __config__=ConfigDict(extra="forbid"),
         __doc__=f"Extraction model for {requirements.use_case_name}",

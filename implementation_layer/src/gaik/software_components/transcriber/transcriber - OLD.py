@@ -212,7 +212,9 @@ def post_process_transcript(raw_transcript: str, api_config: dict) -> str:
     model_name = api_config.get("model", "GPT model")
     print(f"Enhancing transcript quality with {model_name}...")
     prompt = f"""
-    You are an expert transcript editor. Please improve the following raw transcript. The transcript could be in any language, e.g., English, Finnish, Swedish, etc.
+    You are an expert transcript editor. Please improve the following \
+raw transcript. The transcript could be in any language, e.g., \
+English, Finnish, Swedish, etc.
 
     Your task is to:
     1. Fix any transcription errors, inconsistencies, and unclear speech
@@ -349,7 +351,8 @@ def split_and_transcribe_with_context(
                 prompt = base_prompt
             else:
                 trimmed_context = context_text[-170:] if len(context_text) > 170 else context_text
-                prompt = f"""The following is a continuation of a conversation. Here is the previous part of the transcript:
+                prompt = f"""The following is a continuation of a \
+conversation. Here is the previous part of the transcript:
 
 {trimmed_context}
 

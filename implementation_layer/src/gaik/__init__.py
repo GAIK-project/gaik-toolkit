@@ -1,16 +1,25 @@
 """General AI Kit (GAIK) - AI/ML toolkit for Python.
 
-AI toolkit with structured data extraction, document parsing, and audio/video transcription using OpenAI/Azure OpenAI.
+AI toolkit with structured data extraction, document parsing,
+and audio/video transcription using OpenAI/Azure OpenAI.
 
 Modules:
-    - gaik.software_components.extractor: Schema generation and structured data extraction
-    - gaik.software_components.parsers: Document parsing - PDFs and Word docs (vision models, PyMuPDF, python-docx, Docling)
-    - gaik.software_components.transcriber: Audio/video transcription using Whisper with GPT enhancement
-    - gaik.software_components.text_to_speech: Text-to-speech generation using OpenAI/Azure OpenAI
-    - gaik.software_components.doc_classifier: Document classification into predefined categories
+    - gaik.software_components.extractor:
+        Schema generation and structured data extraction
+    - gaik.software_components.parsers:
+        Document parsing - PDFs and Word docs
+        (vision models, PyMuPDF, python-docx, Docling)
+    - gaik.software_components.transcriber:
+        Audio/video transcription using Whisper with GPT enhancement
+    - gaik.software_components.text_to_speech:
+        Text-to-speech generation using OpenAI/Azure OpenAI
+    - gaik.software_components.doc_classifier:
+        Document classification into predefined categories
 
 Example - Schema-based Extraction:
-    >>> from gaik.software_components.extractor import SchemaGenerator, DataExtractor, get_openai_config
+    >>> from gaik.software_components.extractor import (
+    ...     SchemaGenerator, DataExtractor, get_openai_config,
+    ... )
     >>> config = get_openai_config(use_azure=True)
     >>> generator = SchemaGenerator(config=config)
     >>> schema = generator.generate_schema("Extract name and age")

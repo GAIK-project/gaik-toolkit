@@ -9,7 +9,8 @@ try:
     from langchain_core.documents import Document
 except ImportError as exc:
     raise ImportError(
-        "VectorStore requires 'langchain-core'. Install extras with 'pip install gaik[vector-store]'"
+        "VectorStore requires 'langchain-core'. "
+        "Install extras with 'pip install gaik[vector-store]'"
     ) from exc
 
 

@@ -1,4 +1,7 @@
-"""Building blocks namespace for gaik components (extractor, transcriber, parsers, doc_classifier, config)."""
+"""Building blocks namespace for gaik components.
+
+Includes extractor, transcriber, parsers, doc_classifier, and config.
+"""
 
 __all__ = [
     "config",

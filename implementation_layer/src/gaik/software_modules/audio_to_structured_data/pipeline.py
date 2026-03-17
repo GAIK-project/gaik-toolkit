@@ -71,7 +71,8 @@ class AudioToStructuredData:
         Args:
             file_path: Audio/video file to transcribe.
             user_requirements: Natural-language requirements describing desired fields.
-            transcriber_ctor: Constructor args for Transcriber (e.g., enhanced_transcript, output_dir).
+            transcriber_ctor: Constructor args for Transcriber
+                (e.g., enhanced_transcript, output_dir).
             transcribe_options: Call-time args for Transcriber.transcribe().
             extractor_ctor: Constructor args for DataExtractor (e.g., model override).
             extract_options: Call-time args for DataExtractor.extract().

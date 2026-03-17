@@ -25,7 +25,6 @@ Interactive web application for the GAIK toolkit at `implementation_layer/toolki
 - **Rate limiting:** Upstash Redis
 - **Analytics:** PostHog
 - **Animations:** Motion (Framer Motion alternative)
-- **3D:** React Three Fiber (homepage)
 
 ## Dev Commands
 

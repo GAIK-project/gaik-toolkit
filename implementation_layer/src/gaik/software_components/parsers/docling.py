@@ -262,14 +262,14 @@ class DoclingParser:
             try:
                 # Try to add DOC support (often handled by DOCX converter)
                 extensions.append(".doc")
-            except:
+            except Exception:
                 pass
 
             # Check if PPT format is supported
             try:
                 extensions.append(".ppt")
                 extensions.append(".pptx")
-            except:
+            except Exception:
                 pass
 
         return extensions
@@ -312,7 +312,8 @@ class DoclingParser:
             file_path: Path to the document file to parse
             chunk_size: Not used (kept for compatibility with other parsers)
             chunk_overlap: Not used (kept for compatibility with other parsers)
-            use_markdown: If True, returns markdown format. If False, returns structured text format.
+            use_markdown: If True, returns markdown format.
+                If False, returns structured text format.
 
         Returns:
             Dictionary containing:
@@ -332,7 +333,8 @@ class DoclingParser:
 
         if not self.docling_available:
             raise ValueError(
-                "Docling is not available. Please install required dependencies or use Fast parsing."
+                "Docling is not available. "
+                "Please install required dependencies or use Fast parsing."
             )
 
         if not self.is_supported_file(file_path):

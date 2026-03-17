@@ -38,7 +38,7 @@ def _create_classification_model(classes: list[str]):
         Pydantic BaseModel class for classification results
     """
     # Create Literal type from classes
-    ClassLiteral = Literal[tuple(classes)]  # type: ignore
+    ClassLiteral = Literal[tuple(classes)]  # type: ignore  # noqa: N806
 
     class ClassificationResult(BaseModel):
         document_class: ClassLiteral = Field(  # type: ignore
@@ -76,7 +76,9 @@ class DocumentClassifier:
             model: Optional model override. If not provided, uses config['model']
 
         Example:
-            >>> from gaik.software_components.doc_classifier import DocumentClassifier, get_openai_config
+            >>> from gaik.software_components.doc_classifier import (
+            ...     DocumentClassifier, get_openai_config,
+            ... )
             >>> config = get_openai_config(use_azure=True)
             >>> classifier = DocumentClassifier(config=config)
         """
@@ -328,13 +330,14 @@ class DocumentClassifier:
             Classification result with 'class', 'confidence', 'reasoning'
         """
         # Create classification model
-        ClassificationModel = _create_classification_model(classes)
+        ClassificationModel = _create_classification_model(classes)  # noqa: N806
 
         # Create prompt
         classes_str = ", ".join(f"'{c}'" for c in classes if c != "unknown")
 
         # Truncate to 4000 chars (~1000 tokens) to prevent token limit errors
-        user_prompt = f"""Classify the following document into one of these categories: {classes_str}
+        user_prompt = f"""Classify the following document into one of \
+these categories: {classes_str}
 
 If the document does not clearly fit any category, classify it as 'unknown'.
 

@@ -52,7 +52,8 @@ class DocxParser:
 
         Args:
             file_path: Path to the DOCX file
-            use_markdown: If True, returns simple text. If False, returns structured text with formatting
+            use_markdown: If True, returns simple text.
+                If False, returns structured text with formatting
 
         Returns:
             Extracted text content as string

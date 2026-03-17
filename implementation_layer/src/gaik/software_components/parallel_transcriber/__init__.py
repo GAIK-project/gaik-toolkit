@@ -42,7 +42,7 @@ __all__: list[str] = []
 
 # --- Models (no extra dependencies) ---
 try:
-    from .models import (  # noqa: F401
+    from .models import (
         SimpleCancellation,
         TranscriptionCancelled,
         TranscriptionModel,
@@ -62,7 +62,7 @@ except ImportError:
 
 # --- SRT utilities (no extra dependencies) ---
 try:
-    from .srt import parse_srt_content  # noqa: F401
+    from .srt import parse_srt_content
 
     __all__.append("parse_srt_content")
 except ImportError:
@@ -70,7 +70,7 @@ except ImportError:
 
 # --- Configuration ---
 try:
-    from .config import TranscriptionConfig  # noqa: F401
+    from .config import TranscriptionConfig
 
     __all__.append("TranscriptionConfig")
 except ImportError:
@@ -78,7 +78,7 @@ except ImportError:
 
 # --- Pipeline (requires openai) ---
 try:
-    from .pipeline import ParallelTranscriber  # noqa: F401
+    from .pipeline import ParallelTranscriber
 
     __all__.append("ParallelTranscriber")
 except ImportError:
@@ -86,7 +86,7 @@ except ImportError:
 
 # --- Shared OpenAI config (from gaik.software_components.config) ---
 try:
-    from gaik.software_components.config import (  # noqa: F401
+    from gaik.software_components.config import (
         create_openai_client,
         get_openai_config,
     )
