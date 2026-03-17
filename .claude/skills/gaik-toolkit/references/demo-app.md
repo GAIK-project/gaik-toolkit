@@ -60,6 +60,7 @@ From `implementation_layer/toolkit_demo_app/CLAUDE.md`:
 2. **Use bun and uv**, not npm/pip
 3. **API proxy:** `proxy.ts` handles Next.js 16 API proxying to FastAPI backend (replaced middleware.ts)
 4. **Tailwind v4:** Use `globals.css` theme variables for styling
+5. **UI components:** Prefer shadcn/ui components (Accordion, Card, Button, Select, etc.)
 
 ## Project Structure
 
@@ -79,8 +80,14 @@ toolkit_demo_app/
 │   └── sse.py               # Server-sent events helper
 ├── components/
 │   ├── ui/                  # shadcn/ui components
-│   ├── demo/                # Demo-specific components
-│   ├── layout/              # Header, footer, nav
+│   ├── ai-elements/         # AI chat components (message, streamdown)
+│   ├── demo/                # Demo-specific shared components
+│   │   ├── demo-page-header.tsx  # Shared Back + title header
+│   │   ├── how-it-works-card.tsx # Shared accordion "How It Works"
+│   │   ├── file-upload.tsx       # File upload widget
+│   │   ├── result-card.tsx       # Result/loading/empty state cards
+│   │   └── example-preview-dialog.tsx
+│   ├── layout/              # Header, footer, nav, main-layout
 │   └── feedback/            # Feedback widgets
 ├── lib/
 │   ├── api-client.ts        # Typed API client
@@ -109,6 +116,8 @@ All under `app/(demos)/`:
 | `/diary` | Voice notes -> construction diary | AudioToStructuredData |
 | `/dental-transcription` | Audio/video -> SRT/VTT subtitles | ParallelTranscriber, srt_utils |
 | `/video-search` | Semantic video search (pgvector) | Embedder, PgVectorStore, video_search_helpers |
+| `/text-to-speech` | Text to downloadable speech audio | TextToSpeech |
+| `/luvata-order` | PDF order -> structured Luvata data | DocumentsToStructuredData |
 
 ## API Routes
 
@@ -125,6 +134,7 @@ FastAPI backend at `api/main.py`, routers in `api/routers/`:
 | `/diary` | `diary.py` | Construction diary workflow |
 | `/dental-transcribe` | `dental_transcription.py` | Dental transcription with SRT/VTT subtitles |
 | `/video-search` | `video_search.py` | Semantic dental video search (pgvector) |
+| `/text-to-speech` | `text_to_speech.py` | Text-to-speech audio generation |
 | `/health` | (in main.py) | Health check |
 
 API docs available at `http://localhost:8000/docs` (Swagger UI).
@@ -153,6 +163,14 @@ OPENAI_API_KEY=your-key
 NEXT_PUBLIC_SUPABASE_URL=your-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-key
 SUPABASE_SERVICE_ROLE_KEY=your-key
+
+# Text-to-Speech
+AZURE_TTS_MODEL=gpt-4o-mini-tts
+TTS_ENDPOINT=azure  # or "openai"
+
+# Local Transcriber (optional, for local Whisper)
+LOCAL_TRANSCRIBER_API_BASE=http://your-whisper-host/v1
+LOCAL_TRANSCRIBER_API_KEY=your-key
 
 # PostgreSQL (for PgVectorStore / video search)
 DATABASE_URL=postgresql://user:pass@host:5432/db
