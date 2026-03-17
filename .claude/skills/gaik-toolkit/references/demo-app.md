@@ -129,7 +129,7 @@ FastAPI backend at `api/main.py`, routers in `api/routers/`:
 | `/extract` | `extractor.py` | Structured data extraction |
 | `/transcribe` | `transcriber.py` | Audio/video transcription |
 | `/pipeline` | `pipeline.py` | End-to-end pipelines (audio/document -> structured data) |
-| `/rag` | `rag.py` | RAG pipeline (indexing + Q&A with SSE streaming) |
+| `/rag` | `rag.py` | RAG pipeline (indexing, Q&A with SSE, debug endpoint) |
 | `/diary` | `diary.py` | Construction diary workflow |
 | `/dental-transcribe` | `dental_transcription.py` | Dental transcription with SRT/VTT subtitles |
 | `/video-search` | `video_search.py` | Semantic dental video search (pgvector) |
@@ -188,5 +188,9 @@ NEXT_PUBLIC_POSTHOG_HOST=your-host
 - **Docker:** `docker-compose.yml` builds both frontend and API
 - **OpenShift/Rahti:** Configs in `openshift/` directory
   - `deployment-api.yaml` - API deployment (uses placeholder values -- real secrets managed in Rahti)
-  - Route configs for `gaik-demo.2.rahtiapp.fi`
-- **Deploy script:** `deploy.sh` for pushing to Rahti registry
+  - Route: `gaik-demo.2.rahtiapp.fi` with annotations:
+    - `haproxy.router.openshift.io/timeout: 15m` (for long-running RAG indexing)
+    - `haproxy.router.openshift.io/proxy-body-size: 50m` (for large PDF uploads)
+    - `haproxy.router.openshift.io/response-buffering: "off"` (for SSE streaming)
+- **Deploy script:** `deploy.sh api|frontend|all` for building and pushing to Rahti registry
+- **Docling API:** External parsing service at `DOCLING_API_BASE` (env var in Rahti secret)

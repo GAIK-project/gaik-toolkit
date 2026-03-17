@@ -85,11 +85,47 @@ Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
 
 ### Backend (gaik-demo-api)
 
-| Variable            | Description           | Source                       |
-| ------------------- | --------------------- | ---------------------------- |
-| `AZURE_API_KEY`     | Azure OpenAI API key  | Secret: `gaik-demo-api-keys` |
-| `AZURE_ENDPOINT`    | Azure OpenAI endpoint | Secret: `gaik-demo-api-keys` |
-| `AZURE_API_VERSION` | Azure API version     | Secret: `gaik-demo-api-keys` |
+| Variable                    | Description              | Source                       |
+| --------------------------- | ------------------------ | ---------------------------- |
+| `AZURE_API_KEY`             | Azure OpenAI API key     | Secret: `gaik-demo-api-keys` |
+| `AZURE_ENDPOINT`            | Azure OpenAI endpoint    | Secret: `gaik-demo-api-keys` |
+| `AZURE_API_VERSION`         | Azure API version        | Secret: `gaik-demo-api-keys` |
+| `DOCLING_API_BASE`          | Docling parser API URL   | Secret: `gaik-demo-api-keys` |
+| `DOCLING_API_PASSWORD`      | Docling parser API key   | Secret: `gaik-demo-api-keys` |
+
+## Route Annotations
+
+The public route (`gaik-demo.2.rahtiapp.fi`) has these HAProxy annotations:
+
+| Annotation | Value | Purpose |
+|---|---|---|
+| `haproxy.router.openshift.io/timeout` | `15m` | Allow long-running RAG indexing |
+| `haproxy.router.openshift.io/proxy-body-size` | `50m` | Allow large PDF uploads (up to 20MB app limit) |
+| `haproxy.router.openshift.io/response-buffering` | `off` | Enable SSE streaming passthrough |
+| `haproxy.router.openshift.io/disable-cookies` | `true` | Not needed for this app |
+
+These are defined in `route.yaml` and applied via `oc apply -f route.yaml`.
+
+## Deploy Script
+
+```bash
+cd implementation_layer/toolkit_demo_app/openshift
+
+# Deploy API only
+./deploy.sh api
+
+# Deploy frontend only
+./deploy.sh frontend
+
+# Deploy both (skips DB if POSTGRESQL_PASSWORD not set)
+./deploy.sh all
+
+# Seed dental demo videos
+./deploy.sh seed
+
+# Verify deployment
+./deploy.sh verify
+```
 
 ## Files
 

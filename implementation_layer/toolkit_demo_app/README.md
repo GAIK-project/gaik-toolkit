@@ -8,7 +8,14 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 - **Parser** - Parse PDFs and Word documents with multiple backends
 - **Classifier** - Classify documents into predefined categories
 - **Transcriber** - Transcribe audio/video with Whisper and GPT enhancement
-- **RAG Builder** - Build retrieval-augmented generation pipelines with document upload and Q&A
+- **RAG Builder** - Document upload, indexing, Q&A with citations and debug tools
+- **Audio Structured** - Audio to structured data pipeline
+- **Document Structured** - Document to structured data pipeline
+- **Incident Report** - Voice to structured incident report
+- **Diary** - Voice notes to construction diary
+- **Dental Transcription** - Audio/video to SRT/VTT subtitles
+- **Video Search** - Semantic video search with pgvector
+- **Text-to-Speech** - Text to downloadable speech audio
 
 ## Quick Start
 
@@ -25,7 +32,7 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 ```bash
 cd implementation_layer/toolkit_demo_app
 bun install
-pip install -r api/requirements.txt
+uv pip install -r api/requirements.txt
 ```
 
 **Configure environment:**
@@ -67,33 +74,43 @@ docker compose up --build
 ```
 toolkit_demo_app/
 ├── app/                    # Next.js pages
-│   ├── (demos)/            # Demo pages
-│   │   ├── extractor/
-│   │   ├── parser/
-│   │   ├── classifier/
-│   │   ├── transcriber/
-│   │   └── rag/
+│   ├── (home)/             # Landing page, privacy
+│   ├── (auth)/             # sign-in, sign-up, access-pending
+│   ├── (demos)/            # All demo pages
 │   └── admin/              # Admin dashboard
 ├── api/                    # FastAPI backend
 │   ├── main.py
-│   └── routers/
-├── components/             # React components
+│   ├── routers/            # One module per feature
+│   └── scripts/            # Seed and verification scripts
+├── components/             # React components (shadcn/ui, ai-elements)
+├── lib/                    # API client, SSE, Supabase
+├── proxy.ts                # API proxy (Next.js 16)
+├── openshift/              # Rahti/OpenShift deployment configs
 └── docker-compose.yml
 ```
 
 ## API Endpoints
 
-| Endpoint      | Method | Description                     |
-| ------------- | ------ | ------------------------------- |
-| `/health`     | GET    | Health check                    |
-| `/parse`      | POST   | Parse PDF/DOCX documents        |
-| `/classify`   | POST   | Classify documents              |
-| `/extract`    | POST   | Extract structured data         |
-| `/transcribe` | POST   | Transcribe audio/video          |
-| `/rag`        | POST   | RAG pipeline with SSE streaming |
+| Prefix | Description |
+| --- | --- |
+| `/health` | Health check |
+| `/parse` | Parse PDF/DOCX documents |
+| `/classify` | Classify documents |
+| `/extract` | Extract structured data |
+| `/transcribe` | Transcribe audio/video |
+| `/rag` | RAG pipeline (indexing, Q&A with SSE, debug) |
+| `/pipeline` | End-to-end pipelines (audio/document to structured data) |
+| `/diary` | Construction diary workflow |
+| `/dental-transcribe` | Dental transcription with SRT/VTT |
+| `/video-search` | Semantic dental video search |
+| `/text-to-speech` | Text-to-speech audio generation |
+
+API docs: <http://localhost:8000/docs> (Swagger UI)
 
 ## Tech Stack
 
-- **Frontend:** Next.js 16, React 19, Tailwind CSS, shadcn/ui
-- **Backend:** FastAPI, Python 3.11, GAIK toolkit
-- **AI:** OpenAI GPT-5.1, Whisper
+- **Frontend:** Next.js 16, React 19, Tailwind CSS v4, shadcn/ui
+- **Backend:** FastAPI, Python 3.11+, GAIK toolkit (PyPI)
+- **Package managers:** bun (frontend), uv (backend)
+- **Auth:** Supabase
+- **Deployment:** CSC Rahti 2 (OpenShift) — see `openshift/README.md`
