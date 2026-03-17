@@ -38,19 +38,19 @@ class TextToSpeechResponse(BaseModel):
     audio_base64: str
 
 
-@router.post('', response_model=TextToSpeechResponse)
+@router.post("", response_model=TextToSpeechResponse)
 async def synthesize_text(
     text: str = Form(...),
-    language: str = Form('fi'),
-    voice: str = Form('alloy'),
+    language: str = Form("fi"),
+    voice: str = Form("alloy"),
 ):
     normalized_text = text.strip()
     if not normalized_text:
-        raise HTTPException(status_code=400, detail='Text cannot be empty')
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
     if len(normalized_text) > MAX_TEXT_LENGTH:
         raise HTTPException(
             status_code=400,
-            detail=f'Text exceeds maximum length of {MAX_TEXT_LENGTH} characters',
+            detail=f"Text exceeds maximum length of {MAX_TEXT_LENGTH} characters",
         )
     if language not in SUPPORTED_LANGUAGES:
         raise HTTPException(
@@ -60,7 +60,7 @@ async def synthesize_text(
     if voice not in SUPPORTED_VOICES:
         raise HTTPException(
             status_code=400,
-            detail='Unsupported voice selection',
+            detail="Unsupported voice selection",
         )
 
     try:
@@ -69,7 +69,9 @@ async def synthesize_text(
         tts = TextToSpeech(api_config=get_api_config(), language=language, voice=voice)
         result = tts.synthesize(normalized_text)
     except ImportError as exc:
-        raise HTTPException(status_code=500, detail=f'Text-to-speech component not installed: {exc}') from exc
+        raise HTTPException(
+            status_code=500, detail=f"Text-to-speech component not installed: {exc}"
+        ) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -82,5 +84,5 @@ async def synthesize_text(
         response_format=result.response_format,
         content_type=result.content_type,
         character_count=len(normalized_text),
-        audio_base64=base64.b64encode(result.audio_bytes).decode('ascii'),
+        audio_base64=base64.b64encode(result.audio_bytes).decode("ascii"),
     )

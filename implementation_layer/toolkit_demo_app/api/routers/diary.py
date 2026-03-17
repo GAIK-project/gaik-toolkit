@@ -54,20 +54,22 @@ def _save_schema(schema: type, requirements, schema_key: str, user_requirements:
     with redirect_stdout(buffer):
         print_pydantic_schema(schema, title="Saved Schema")
     schema_code = _clean_schema_dump(buffer.getvalue())
-    template = "\n".join([
-        '"""',
-        'Auto-generated schema module (do not edit manually).',
-        '"""',
-        '',
-        'import decimal',
-        'from decimal import Decimal',
-        'from typing import List, Literal, Optional',
-        '',
-        'from pydantic import BaseModel, Field, ConfigDict',
-        '',
-        schema_code,
-        '',
-    ])
+    template = "\n".join(
+        [
+            '"""',
+            "Auto-generated schema module (do not edit manually).",
+            '"""',
+            "",
+            "import decimal",
+            "from decimal import Decimal",
+            "from typing import List, Literal, Optional",
+            "",
+            "from pydantic import BaseModel, Field, ConfigDict",
+            "",
+            schema_code,
+            "",
+        ]
+    )
     schema_path.write_text(template, encoding="utf-8")
     payload = {
         "model_name": schema.__name__,
@@ -114,6 +116,7 @@ def _get_or_create_schema(config, user_requirements: str, schema_key: str, regen
         logger.info("Saved diary schema for key %s", schema_key)
 
     return extraction_model, requirements, True
+
 
 # Logo path for PDF generation (use GAIK logo)
 LOGO_PATH = Path(__file__).parent.parent.parent / "public" / "logos" / "gaik-logo-letter-only.png"
@@ -228,7 +231,9 @@ async def diary_audio_pipeline_stream(
                 schema_key="construction_diary",
                 regenerate_schema=regenerate_schema,
             )
-            reasoning_output = "Generated new schema" if generated_new_schema else "Loaded saved schema"
+            reasoning_output = (
+                "Generated new schema" if generated_new_schema else "Loaded saved schema"
+            )
 
             steps[1]["status"] = "completed"
             steps[1]["message"] = reasoning_output
@@ -278,9 +283,7 @@ async def diary_audio_pipeline_stream(
                         from api.utils.pdf_generator import StructuredDataToPDF
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
-                    pdf_generator = StructuredDataToPDF(
-                        title="Construction Diary", logo_path=logo
-                    )
+                    pdf_generator = StructuredDataToPDF(title="Construction Diary", logo_path=logo)
                     pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
 
                     if extracted_data:
@@ -401,7 +404,9 @@ async def diary_text_pipeline_stream(
             schema_str = schema_buffer.getvalue()
 
             steps[1]["status"] = "completed"
-            steps[1]["message"] = "Generated new schema" if generated_new_schema else "Loaded saved schema"
+            steps[1]["message"] = (
+                "Generated new schema" if generated_new_schema else "Loaded saved schema"
+            )
             steps[1]["details"] = {
                 "type": "schema",
                 "title": "Generated Pydantic Schema",
@@ -439,9 +444,7 @@ async def diary_text_pipeline_stream(
                         from api.utils.pdf_generator import StructuredDataToPDF
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
-                    pdf_generator = StructuredDataToPDF(
-                        title="Construction Diary", logo_path=logo
-                    )
+                    pdf_generator = StructuredDataToPDF(title="Construction Diary", logo_path=logo)
                     pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
 
                     pdf_data = extracted_data if extracted_data else [{"input_text": text}]

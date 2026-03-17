@@ -59,8 +59,8 @@ export function ProcessingDetails({ schema }: ProcessingDetailsProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="bg-white min-h-0 flex-1 overflow-hidden rounded-md border">
-            <pre className="h-full max-h-[70vh] overflow-auto whitespace-pre-wrap wrap-break-word p-4 text-xs leading-relaxed text-gray-800">
+          <div className="min-h-0 flex-1 overflow-hidden rounded-md border bg-white">
+            <pre className="h-full max-h-[70vh] overflow-auto p-4 text-xs leading-relaxed wrap-break-word whitespace-pre-wrap text-gray-800">
               {cleanedSchema}
             </pre>
           </div>

@@ -28,11 +28,21 @@ const FIELD_ALIASES = {
   date: ["date", "incident_date", "incident_datetime"],
   time: ["time", "incident_time"],
   location: ["location", "incident_location"],
-  description: ["description", "incident_description", "brief_description", "what_happened"],
+  description: [
+    "description",
+    "incident_description",
+    "brief_description",
+    "what_happened",
+  ],
   people: ["people_involved", "people", "persons_involved", "involved_people"],
   injuries: ["injuries", "injury", "injuries_reported"],
   damages: ["damages", "damage", "damages_reported", "property_damage"],
-  actions: ["actions_taken", "immediate_actions_taken", "actions", "immediate_actions"],
+  actions: [
+    "actions_taken",
+    "immediate_actions_taken",
+    "actions",
+    "immediate_actions",
+  ],
   witnesses: ["witnesses", "witness_information", "witness_info"],
 } as const;
 
@@ -47,13 +57,41 @@ export function IncidentDetails({ data, className }: IncidentDetailsProps) {
 
         const date = resolveField(report, FIELD_ALIASES.date, displayedKeys);
         const time = resolveField(report, FIELD_ALIASES.time, displayedKeys);
-        const location = resolveField(report, FIELD_ALIASES.location, displayedKeys);
-        const description = resolveField(report, FIELD_ALIASES.description, displayedKeys);
-        const people = resolveField(report, FIELD_ALIASES.people, displayedKeys);
-        const injuries = resolveField(report, FIELD_ALIASES.injuries, displayedKeys);
-        const damages = resolveField(report, FIELD_ALIASES.damages, displayedKeys);
-        const actions = resolveField(report, FIELD_ALIASES.actions, displayedKeys);
-        const witnesses = resolveField(report, FIELD_ALIASES.witnesses, displayedKeys);
+        const location = resolveField(
+          report,
+          FIELD_ALIASES.location,
+          displayedKeys,
+        );
+        const description = resolveField(
+          report,
+          FIELD_ALIASES.description,
+          displayedKeys,
+        );
+        const people = resolveField(
+          report,
+          FIELD_ALIASES.people,
+          displayedKeys,
+        );
+        const injuries = resolveField(
+          report,
+          FIELD_ALIASES.injuries,
+          displayedKeys,
+        );
+        const damages = resolveField(
+          report,
+          FIELD_ALIASES.damages,
+          displayedKeys,
+        );
+        const actions = resolveField(
+          report,
+          FIELD_ALIASES.actions,
+          displayedKeys,
+        );
+        const witnesses = resolveField(
+          report,
+          FIELD_ALIASES.witnesses,
+          displayedKeys,
+        );
 
         const formattedDate = formatIncidentDate(date.value);
         const otherKeys = Object.keys(report).filter(
@@ -68,12 +106,14 @@ export function IncidentDetails({ data, className }: IncidentDetailsProps) {
                   <Calendar className="text-primary h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                  <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                     Date & Time
                   </p>
                   <p className="font-medium">{formattedDate}</p>
                   {hasContent(time.value) && (
-                    <p className="text-muted-foreground text-sm">{String(time.value)}</p>
+                    <p className="text-muted-foreground text-sm">
+                      {String(time.value)}
+                    </p>
                   )}
                 </div>
               </div>
@@ -82,7 +122,7 @@ export function IncidentDetails({ data, className }: IncidentDetailsProps) {
                   <MapPin className="text-primary h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                  <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                     Location
                   </p>
                   <p className="font-medium">{valueOrNA(location.value)}</p>
@@ -95,7 +135,9 @@ export function IncidentDetails({ data, className }: IncidentDetailsProps) {
                 <div className="bg-primary/10 flex h-8 w-8 items-center justify-center rounded-lg">
                   <FileText className="text-primary h-4 w-4" />
                 </div>
-                <h3 className="text-lg font-semibold tracking-tight">Incident Description</h3>
+                <h3 className="text-lg font-semibold tracking-tight">
+                  Incident Description
+                </h3>
               </div>
               <div className="bg-muted/30 text-card-foreground rounded-xl border p-5 leading-relaxed shadow-sm">
                 {renderList(description.value, "No description extracted.")}
@@ -108,7 +150,9 @@ export function IncidentDetails({ data, className }: IncidentDetailsProps) {
                   <Users className="text-muted-foreground h-4 w-4" />
                   <h3 className="font-medium">People Involved</h3>
                 </div>
-                <div className="p-4">{renderList(people.value, "No extracted information.")}</div>
+                <div className="p-4">
+                  {renderList(people.value, "No extracted information.")}
+                </div>
               </div>
 
               <div className="bg-card rounded-xl border shadow-sm">
@@ -123,15 +167,19 @@ export function IncidentDetails({ data, className }: IncidentDetailsProps) {
                         Injuries
                       </span>
                     </div>
-                    <div className="text-sm">{valueOrFallback(injuries.value, "None reported.")}</div>
+                    <div className="text-sm">
+                      {valueOrFallback(injuries.value, "None reported.")}
+                    </div>
                   </div>
                   <div>
                     <div className="mb-2 flex items-center gap-2">
-                      <span className="rounded-md bg-orange-500/10 px-2 py-0.5 text-xs font-medium uppercase text-orange-600 dark:text-orange-400">
+                      <span className="rounded-md bg-orange-500/10 px-2 py-0.5 text-xs font-medium text-orange-600 uppercase dark:text-orange-400">
                         Damages
                       </span>
                     </div>
-                    <div className="text-sm">{valueOrFallback(damages.value, "None reported.")}</div>
+                    <div className="text-sm">
+                      {valueOrFallback(damages.value, "None reported.")}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -142,7 +190,9 @@ export function IncidentDetails({ data, className }: IncidentDetailsProps) {
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10">
                   <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />
                 </div>
-                <h3 className="text-lg font-semibold tracking-tight">Actions Taken</h3>
+                <h3 className="text-lg font-semibold tracking-tight">
+                  Actions Taken
+                </h3>
               </div>
               <div className="rounded-xl border border-green-200 bg-green-500/5 p-5 dark:border-green-900">
                 {renderList(actions.value, "No actions recorded.", true)}
@@ -154,28 +204,40 @@ export function IncidentDetails({ data, className }: IncidentDetailsProps) {
                 <Users className="text-muted-foreground h-4 w-4" />
                 <h3 className="font-medium">Witnesses</h3>
               </div>
-              <div className="p-4">{renderList(witnesses.value, "No witness information recorded.")}</div>
+              <div className="p-4">
+                {renderList(
+                  witnesses.value,
+                  "No witness information recorded.",
+                )}
+              </div>
             </div>
 
             {otherKeys.length > 0 && (
               <div className="space-y-4 border-t pt-6">
-                <h3 className="text-muted-foreground text-sm font-semibold uppercase tracking-wider">
+                <h3 className="text-muted-foreground text-sm font-semibold tracking-wider uppercase">
                   Additional Details
                 </h3>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {otherKeys.map((key) => (
-                    <div key={key} className="bg-muted/30 rounded-xl border p-4">
-                      <p className="text-muted-foreground mb-2 text-xs font-bold uppercase tracking-wide">
+                    <div
+                      key={key}
+                      className="bg-muted/30 rounded-xl border p-4"
+                    >
+                      <p className="text-muted-foreground mb-2 text-xs font-bold tracking-wide uppercase">
                         {formatFieldName(key)}
                       </p>
-                      <div className="text-sm font-medium">{renderList(report[key], "N/A")}</div>
+                      <div className="text-sm font-medium">
+                        {renderList(report[key], "N/A")}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {index < data.length - 1 && <hr className="border-muted my-8 border-dashed" />}
+            {index < data.length - 1 && (
+              <hr className="border-muted my-8 border-dashed" />
+            )}
           </div>
         );
       })}
@@ -183,7 +245,11 @@ export function IncidentDetails({ data, className }: IncidentDetailsProps) {
   );
 }
 
-function resolveField(report: IncidentReport, aliases: readonly string[], displayedKeys: Set<string>): FieldResolution {
+function resolveField(
+  report: IncidentReport,
+  aliases: readonly string[],
+  displayedKeys: Set<string>,
+): FieldResolution {
   for (const key of aliases) {
     const value = report[key];
     if (hasContent(value)) {
@@ -251,7 +317,10 @@ function renderList(content: unknown, fallback: string, isChecklist = false) {
     return (
       <ul className="space-y-3">
         {content.map((item, i) => (
-          <li key={i} className="flex items-start gap-3 text-sm leading-relaxed">
+          <li
+            key={i}
+            className="flex items-start gap-3 text-sm leading-relaxed"
+          >
             {isChecklist ? (
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600 dark:text-green-500" />
             ) : (
@@ -272,5 +341,9 @@ function renderList(content: unknown, fallback: string, isChecklist = false) {
     );
   }
 
-  return <p className="text-foreground/90 text-sm leading-relaxed">{String(content)}</p>;
+  return (
+    <p className="text-foreground/90 text-sm leading-relaxed">
+      {String(content)}
+    </p>
+  );
 }

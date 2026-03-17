@@ -15,13 +15,11 @@ try:
     from utils import get_api_config, sse_event
 except ImportError:
     from api.utils import get_api_config, sse_event
+import requests
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-
-import requests
-
 from langchain_core.documents import Document
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -105,7 +103,9 @@ def _normalize_source_name(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip().lower())
 
 
-def _filter_sources_by_citations(answer: str, sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _filter_sources_by_citations(
+    answer: str, sources: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     citations = re.findall(r"\[([^\]]+?),\s*page\s+(\d+)\]", answer, flags=re.IGNORECASE)
     if not citations:
         return sources
@@ -117,7 +117,11 @@ def _filter_sources_by_citations(answer: str, sources: list[dict[str, Any]]) -> 
     filtered = [
         source
         for source in sources
-        if (_normalize_source_name(str(source.get("document_name", ""))), str(source.get("page_number", ""))) in cited_pairs
+        if (
+            _normalize_source_name(str(source.get("document_name", ""))),
+            str(source.get("page_number", "")),
+        )
+        in cited_pairs
     ]
     return filtered or sources
 
@@ -256,7 +260,9 @@ def _parse_with_pymupdf(file_path: str | Path, document_name: str) -> list[Docum
     return docs
 
 
-def _parse_with_vision_plus(file_path: str | Path, document_name: str, config: dict) -> list[Document]:
+def _parse_with_vision_plus(
+    file_path: str | Path, document_name: str, config: dict
+) -> list[Document]:
     from gaik.software_components.RAG.rag_parser_vision import VisionRagParser
 
     parser = VisionRagParser(vision_config=config)

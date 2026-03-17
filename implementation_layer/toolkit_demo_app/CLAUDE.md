@@ -2,3 +2,4 @@
 - Package managers: Use bun and uv, not npm
 - API proxy: `proxy.ts` – Next.js 16 proxy for API requests (replaced middleware.ts)
 - Tailwind v4: Use `globals.css` theme variables
+- UI components: Prefer shadcn/ui components

@@ -66,6 +66,7 @@ cd implementation_layer/toolkit_demo_app/openshift
 ```
 
 Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
+
 - live `video-search` has zero indexed videos
 - Allas is missing any `dental-demo/<video_id>/video.mp4`, `thumbnail.jpg`, or `subtitles.srt`
 - sample playback or thumbnail endpoints fail

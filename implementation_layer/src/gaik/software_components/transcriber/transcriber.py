@@ -1,4 +1,4 @@
-﻿"""Reusable transcription package entry point."""
+"""Reusable transcription package entry point."""
 
 from __future__ import annotations
 
@@ -231,13 +231,9 @@ class Transcriber:
     def _transcribe_input_local(self, input_path: Path) -> tuple[str, list[dict] | None]:
         """Transcribe via local Whisper and return (text, segments)."""
         if not self.local_api_base:
-            raise ValueError(
-                "local_api_base is required when transcription_model='whisper_local'."
-            )
+            raise ValueError("local_api_base is required when transcription_model='whisper_local'.")
         if not self.local_api_key:
-            raise ValueError(
-                "local_api_key is required when transcription_model='whisper_local'."
-            )
+            raise ValueError("local_api_key is required when transcription_model='whisper_local'.")
 
         result = whisper_local_transcribe(
             audio_path=input_path,
@@ -270,7 +266,9 @@ class Transcriber:
         """
         if self._needs_chunking(input_path):
             print("Chunking input for transcription...")
-            audio = AudioSegment.from_file(input_path)  # works for audio, and many video containers via ffmpeg
+            audio = AudioSegment.from_file(
+                input_path
+            )  # works for audio, and many video containers via ffmpeg
             return split_and_transcribe_with_context(
                 str(input_path),
                 self.api_config,
@@ -537,4 +535,3 @@ def format_timestamp(seconds):
     minutes = int(seconds // 60)
     seconds = int(seconds % 60)
     return f"{minutes:02d}:{seconds:02d}"
-    

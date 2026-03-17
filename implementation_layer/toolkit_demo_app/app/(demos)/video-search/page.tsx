@@ -36,9 +36,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import {
   AlertCircle,
-  ArrowLeft,
   Clock,
   Database,
   Film,
@@ -52,7 +52,6 @@ import {
   Zap,
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -109,7 +108,6 @@ const SEARCH_TYPE_INFO: Record<
 };
 
 export default function VideoSearchPage() {
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [searchType, setSearchType] = useState("hybrid");
   const [videoFilter, setVideoFilter] = useState<string>("all");
@@ -312,25 +310,13 @@ export default function VideoSearchPage() {
         transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
         className="mx-auto max-w-4xl"
       >
-        <header className="mb-6 space-y-3 pl-1">
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-10 w-fit rounded-xl px-3"
-            onClick={() => router.push("/")}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-            <Video className="text-primary h-8 w-8" />
-            Semantic Video Search
-          </h1>
-          <p className="text-muted-foreground max-w-2xl leading-relaxed">
-            Search your indexed videos with normal language and jump straight to
-            the relevant moment.
-          </p>
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <DemoPageHeader
+          icon={Video}
+          iconClassName="text-primary h-8 w-8"
+          title="Semantic Video Search"
+          description="Search your indexed videos with normal language and jump straight to the relevant moment."
+        >
+          <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
             {[
               "Describe what you want to find",
               "Search compares meaning & wording",
@@ -344,7 +330,7 @@ export default function VideoSearchPage() {
               </span>
             ))}
           </div>
-        </header>
+        </DemoPageHeader>
 
         {statusLoading ? (
           <div className="mb-6 flex items-center gap-2 text-sm">
@@ -428,7 +414,9 @@ export default function VideoSearchPage() {
                   aria-label="Run video search"
                   onClick={handleSearch}
                   disabled={
-                    isSearching || !query.trim() || (!statusLoading && !status?.database_connected)
+                    isSearching ||
+                    !query.trim() ||
+                    (!statusLoading && !status?.database_connected)
                   }
                   className="h-12 gap-2 px-5"
                 >
@@ -447,10 +435,7 @@ export default function VideoSearchPage() {
               </div>
 
               <div className="mt-4 space-y-3">
-                <Tabs
-                  value={searchType}
-                  onValueChange={setSearchType}
-                >
+                <Tabs value={searchType} onValueChange={setSearchType}>
                   <div className="flex flex-wrap items-end gap-4">
                     <div className="space-y-1.5">
                       <Label className="text-muted-foreground text-xs font-normal">
@@ -462,7 +447,7 @@ export default function VideoSearchPage() {
                             <TabsTrigger
                               key={key}
                               value={key}
-                              className="h-auto gap-1.5 rounded-lg border border-transparent px-3 py-2 whitespace-nowrap data-[state=active]:bg-background data-[state=active]:border-border data-[state=active]:shadow-sm"
+                              className="data-[state=active]:bg-background data-[state=active]:border-border h-auto gap-1.5 rounded-lg border border-transparent px-3 py-2 whitespace-nowrap data-[state=active]:shadow-sm"
                             >
                               <Icon className="h-3.5 w-3.5 shrink-0" />
                               <span className="text-sm font-medium">
@@ -479,7 +464,10 @@ export default function VideoSearchPage() {
                         <Label className="text-muted-foreground text-xs font-normal">
                           Video scope
                         </Label>
-                        <Select value={videoFilter} onValueChange={setVideoFilter}>
+                        <Select
+                          value={videoFilter}
+                          onValueChange={setVideoFilter}
+                        >
                           <SelectTrigger
                             aria-label="Filter by Video"
                             className={cn(
@@ -595,7 +583,7 @@ export default function VideoSearchPage() {
                               </span>
                             </div>
                           ) : (
-                            <div className="bg-muted animate-pulse h-full w-full" />
+                            <div className="bg-muted h-full w-full animate-pulse" />
                           )}
 
                           <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
@@ -653,70 +641,72 @@ export default function VideoSearchPage() {
             <EmptyStateCard message="No results found. Try a different wording, another search style, or narrow the search to one video." />
           )}
 
-          {!hasSearched && !isSearching && (statusLoading || status?.database_connected) && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="space-y-4"
-            >
-              <div className="text-muted-foreground flex items-center justify-center gap-2 py-4 text-sm">
-                <Search className="h-4 w-4 opacity-40" />
-                <span>
-                  Try searches like &ldquo;tekoäly työelämässä&rdquo;,
-                  &ldquo;kielitaito&rdquo;, or &ldquo;johtaminen&rdquo;
-                </span>
-              </div>
+          {!hasSearched &&
+            !isSearching &&
+            (statusLoading || status?.database_connected) && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="space-y-4"
+              >
+                <div className="text-muted-foreground flex items-center justify-center gap-2 py-4 text-sm">
+                  <Search className="h-4 w-4 opacity-40" />
+                  <span>
+                    Try searches like &ldquo;tekoäly työelämässä&rdquo;,
+                    &ldquo;kielitaito&rdquo;, or &ldquo;johtaminen&rdquo;
+                  </span>
+                </div>
 
-              {videos.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Film className="h-4 w-4" />
-                      Indexed Videos
-                      <Badge variant="secondary" className="ml-1">
-                        {videos.length}
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription>
-                      These videos already have subtitles and can be searched by
-                      topic or wording.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-2">
-                      {videos.map((video) => (
-                        <button
-                          key={video.video_id}
-                          className="hover:bg-muted/50 flex items-center justify-between rounded-lg px-3 py-2.5 text-left transition-colors"
-                          onClick={() => {
-                            setVideoFilter(video.video_id);
-                            setQuery("");
-                            searchInputRef.current?.focus();
-                          }}
-                        >
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
-                              <Video className="text-muted-foreground h-4 w-4" />
-                            </div>
-                            <span className="truncate text-sm font-medium">
-                              {video.video_title}
-                            </span>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className="ml-2 shrink-0 text-xs"
+                {videos.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Film className="h-4 w-4" />
+                        Indexed Videos
+                        <Badge variant="secondary" className="ml-1">
+                          {videos.length}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription>
+                        These videos already have subtitles and can be searched
+                        by topic or wording.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid gap-2">
+                        {videos.map((video) => (
+                          <button
+                            key={video.video_id}
+                            className="hover:bg-muted/50 flex items-center justify-between rounded-lg px-3 py-2.5 text-left transition-colors"
+                            onClick={() => {
+                              setVideoFilter(video.video_id);
+                              setQuery("");
+                              searchInputRef.current?.focus();
+                            }}
                           >
-                            {video.segment_count} segments
-                          </Badge>
-                        </button>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </motion.div>
-          )}
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
+                                <Video className="text-muted-foreground h-4 w-4" />
+                              </div>
+                              <span className="truncate text-sm font-medium">
+                                {video.video_title}
+                              </span>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className="ml-2 shrink-0 text-xs"
+                            >
+                              {video.segment_count} segments
+                            </Badge>
+                          </button>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </motion.div>
+            )}
 
           <FeedbackButton demoType="video-search" />
         </div>

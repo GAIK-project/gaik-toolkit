@@ -10,6 +10,8 @@ import {
 import { FeedbackButton } from "@/components/feedback";
 import { StepIndicator } from "@/components/demo/step-indicator";
 import { Button } from "@/components/ui/button";
+import { DemoPageHeader } from "@/components/demo/demo-page-header";
+import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import {
   Accordion,
   AccordionContent,
@@ -27,16 +29,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
-import {
-  ArrowLeft,
-  AudioWaveform,
-  ChevronDown,
-  Download,
-  Loader2,
-  Sparkles,
-} from "lucide-react";
+import { AudioWaveform, Download, Loader2, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
-import { useRouter } from "next/navigation";
 import { formatFieldName } from "@/lib/utils";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
@@ -66,12 +60,11 @@ interface AudioStructuredResult {
 }
 
 export default function AudioStructuredPage() {
-  const router = useRouter();
   const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [userRequirements, setUserRequirements] = useState(DEFAULT_REQUIREMENTS);
+  const [userRequirements, setUserRequirements] =
+    useState(DEFAULT_REQUIREMENTS);
   const [generatePdf, setGeneratePdf] = useState(true);
   const [regenerateSchema, setRegenerateSchema] = useState(false);
-  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   const [result, setResult] = useState<AudioStructuredResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -93,13 +86,17 @@ export default function AudioStructuredPage() {
         throw new Error("Failed to load example audio");
       }
       const blob = await response.blob();
-      const exampleFile = new File([blob], "sample.mp3", { type: blob.type || "audio/mpeg" });
+      const exampleFile = new File([blob], "sample.mp3", {
+        type: blob.type || "audio/mpeg",
+      });
       setAudioFile(exampleFile);
       setResult(null);
       setPipelineSteps([]);
       toast.success("Example audio loaded");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to load example audio");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to load example audio",
+      );
     }
   }
 
@@ -113,9 +110,12 @@ export default function AudioStructuredPage() {
     setResult(null);
     setPipelineSteps([]);
 
-    const usingDefaultRequirements = userRequirements.trim() === DEFAULT_REQUIREMENTS.trim();
+    const usingDefaultRequirements =
+      userRequirements.trim() === DEFAULT_REQUIREMENTS.trim();
     if (!usingDefaultRequirements && !regenerateSchema) {
-      toast.error("If you edit the extraction requirements, enable Regenerate Schema before extraction.");
+      toast.error(
+        "If you edit the extraction requirements, enable Regenerate Schema before extraction.",
+      );
       return;
     }
 
@@ -126,8 +126,14 @@ export default function AudioStructuredPage() {
       formData.append("compress_audio", "true");
       formData.append("generate_pdf", String(generatePdf));
       formData.append("pdf_title", "Audio Structured Data");
-      formData.append("schema_key", usingDefaultRequirements ? DEFAULT_SCHEMA_KEY : "");
-      formData.append("regenerate_schema", String(!usingDefaultRequirements && regenerateSchema));
+      formData.append(
+        "schema_key",
+        usingDefaultRequirements ? DEFAULT_SCHEMA_KEY : "",
+      );
+      formData.append(
+        "regenerate_schema",
+        String(!usingDefaultRequirements && regenerateSchema),
+      );
 
       const response = await apiFetch("/api/pipeline/audio/stream", {
         method: "POST",
@@ -200,23 +206,12 @@ export default function AudioStructuredPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <header className="mb-8">
-        <Button
-          variant="ghost"
-          className="mb-4 -ml-3 gap-2"
-          onClick={() => router.push("/")}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
-        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-          <AudioWaveform className="h-8 w-8" />
-          Audio → Structured Data
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Transcribe audio and extract structured data automatically
-        </p>
-      </header>
+      <DemoPageHeader
+        icon={AudioWaveform}
+        title="Audio → Structured Data"
+        description="Transcribe audio and extract structured data automatically"
+        className="mb-8"
+      />
 
       <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
         {/* Input Section */}
@@ -269,13 +264,19 @@ export default function AudioStructuredPage() {
                 rows={10}
               />
               <p className="text-muted-foreground mt-2 text-xs">
-                If you edit the extraction requirements, enable Regenerate Schema before extraction. Custom regenerated schemas are used only for the current run and are not saved.
+                If you edit the extraction requirements, enable Regenerate
+                Schema before extraction. Custom regenerated schemas are used
+                only for the current run and are not saved.
               </p>
             </CardContent>
           </Card>
 
           {/* Advanced Settings */}
-          <Accordion type="single" collapsible className="rounded-xl border bg-card shadow-sm">
+          <Accordion
+            type="single"
+            collapsible
+            className="bg-card rounded-xl border shadow-sm"
+          >
             <AccordionItem value="advanced" className="border-0">
               <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">
                 Advanced Settings
@@ -284,9 +285,12 @@ export default function AudioStructuredPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="regenerate-schema" className="text-sm">Regenerate Schema</Label>
+                      <Label htmlFor="regenerate-schema" className="text-sm">
+                        Regenerate Schema
+                      </Label>
                       <p className="text-muted-foreground text-xs">
-                        Required when you edit the default extraction requirements. Regenerated schemas are not persisted.
+                        Required when you edit the default extraction
+                        requirements. Regenerated schemas are not persisted.
                       </p>
                     </div>
                     <Switch
@@ -299,7 +303,9 @@ export default function AudioStructuredPage() {
 
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label htmlFor="generate-pdf" className="text-sm">Generate PDF Report</Label>
+                      <Label htmlFor="generate-pdf" className="text-sm">
+                        Generate PDF Report
+                      </Label>
                       <p className="text-muted-foreground text-xs">
                         Create a downloadable PDF with extracted data
                       </p>
@@ -335,43 +341,38 @@ export default function AudioStructuredPage() {
             )}
           </Button>
 
-          <Card>
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-6 py-5 text-left"
-              onClick={() => setHowItWorksOpen((current) => !current)}
-            >
-              <div>
-                <CardTitle>How It Works</CardTitle>
-                <CardDescription className="mt-1">
-                  Transcribe the audio, load or regenerate the extraction schema, and return structured data.
-                </CardDescription>
-              </div>
-              <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-                {howItWorksOpen ? "Hide" : "Show"}
-                <ChevronDown className={`h-4 w-4 transition-transform ${howItWorksOpen ? "rotate-180" : ""}`} />
-              </div>
-            </button>
-            {howItWorksOpen ? (
-              <CardContent className="text-muted-foreground space-y-3 text-sm leading-6">
-                <p>
-                  This module extracts structured information from audios. The user can specify their extraction task in plain language. For instance, the example ("Load Example") audio contains a patient's medical examination done by a doctor. The task specified in the extraction requirements extracts symptoms, medical conditions, diagnosis, follow-up, and related details. The user can edit the extraction task for testing on their own data.
-                </p>
-                <p>
-                  <strong>1. Upload audio:</strong> Add an audio or video file. You can also load the bundled example file.
-                </p>
-                <p>
-                  <strong>2. Define extraction requirements:</strong> The default medical requirements use a persistent saved schema. If you edit the requirements, enable <em>Regenerate Schema</em> before extraction.
-                </p>
-                <p>
-                  <strong>3. Transcribe and extract:</strong> The pipeline transcribes the audio, loads the saved schema when available, or generates a temporary new schema for custom requirements, and then extracts structured fields.
-                </p>
-                <p>
-                  <strong>4. Review the results:</strong> The result panel shows the transcript, extracted structured data, and an optional PDF download when enabled.
-                </p>
-              </CardContent>
-            ) : null}
-          </Card>
+          <HowItWorksCard description="Transcribe the audio, load or regenerate the extraction schema, and return structured data.">
+            <p>
+              This module extracts structured information from audios. The user
+              can specify their extraction task in plain language. For instance,
+              the example ("Load Example") audio contains a patient's medical
+              examination done by a doctor. The task specified in the extraction
+              requirements extracts symptoms, medical conditions, diagnosis,
+              follow-up, and related details. The user can edit the extraction
+              task for testing on their own data.
+            </p>
+            <p>
+              <strong>1. Upload audio:</strong> Add an audio or video file. You
+              can also load the bundled example file.
+            </p>
+            <p>
+              <strong>2. Define extraction requirements:</strong> The default
+              medical requirements use a persistent saved schema. If you edit
+              the requirements, enable <em>Regenerate Schema</em> before
+              extraction.
+            </p>
+            <p>
+              <strong>3. Transcribe and extract:</strong> The pipeline
+              transcribes the audio, loads the saved schema when available, or
+              generates a temporary new schema for custom requirements, and then
+              extracts structured fields.
+            </p>
+            <p>
+              <strong>4. Review the results:</strong> The result panel shows the
+              transcript, extracted structured data, and an optional PDF
+              download when enabled.
+            </p>
+          </HowItWorksCard>
         </div>
 
         {/* Results Section */}
@@ -380,7 +381,9 @@ export default function AudioStructuredPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Processing</CardTitle>
-                <CardDescription>Running audio to structured data pipeline</CardDescription>
+                <CardDescription>
+                  Running audio to structured data pipeline
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <StepIndicator steps={pipelineSteps} />
@@ -393,7 +396,9 @@ export default function AudioStructuredPage() {
               <CardContent className="flex items-center justify-center py-12">
                 <div className="text-center">
                   <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
-                  <p className="text-muted-foreground mt-2">Starting audio processing...</p>
+                  <p className="text-muted-foreground mt-2">
+                    Starting audio processing...
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -402,16 +407,21 @@ export default function AudioStructuredPage() {
           {result && !isLoading && (
             <>
               {/* Transcript - only show if there's actual content */}
-              {(result.enhanced_transcript && result.enhanced_transcript.trim() !== "") ||
-               (result.raw_transcript && result.raw_transcript.trim() !== "") ? (
+              {(result.enhanced_transcript &&
+                result.enhanced_transcript.trim() !== "") ||
+              (result.raw_transcript && result.raw_transcript.trim() !== "") ? (
                 <ResultCard
                   title="Transcript"
                   description="Audio transcription"
-                  copyContent={result.raw_transcript || result.enhanced_transcript || ""}
+                  copyContent={
+                    result.raw_transcript || result.enhanced_transcript || ""
+                  }
                   delay={0}
                 >
                   <ResultText
-                    content={result.raw_transcript || result.enhanced_transcript || ""}
+                    content={
+                      result.raw_transcript || result.enhanced_transcript || ""
+                    }
                     maxHeight="200px"
                   />
                 </ResultCard>
@@ -436,11 +446,14 @@ export default function AudioStructuredPage() {
                         )}
                         <div className="divide-y rounded-md border">
                           {Object.entries(item).map(([key, value]) => (
-                            <div key={key} className="flex items-start gap-4 p-3">
+                            <div
+                              key={key}
+                              className="flex items-start gap-4 p-3"
+                            >
                               <span className="min-w-32 text-sm font-medium">
                                 {formatFieldName(key)}
                               </span>
-                              <span className="text-muted-foreground min-w-0 wrap-break-word text-sm">
+                              <span className="text-muted-foreground min-w-0 text-sm wrap-break-word">
                                 {value !== null && value !== undefined
                                   ? String(value)
                                   : "-"}

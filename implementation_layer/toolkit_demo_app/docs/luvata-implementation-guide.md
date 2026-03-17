@@ -300,18 +300,22 @@ Replace the `generate()` function inside `process_order()` (lines 289-394) with:
 In `app/(demos)/luvata-order/page.tsx`, update the PDF download button (around line 382):
 
 ```tsx
-{/* Download PDF Button */}
-{result.pdf_job_id && (
-  <Button
-    onClick={() => {
-      window.location.href = `/luvata-order/pdf/${result.pdf_job_id}`;
-    }}
-    className="w-full"
-  >
-    <Download className="mr-2 h-4 w-4" />
-    Download Order Draft PDF
-  </Button>
-)}
+{
+  /* Download PDF Button */
+}
+{
+  result.pdf_job_id && (
+    <Button
+      onClick={() => {
+        window.location.href = `/luvata-order/pdf/${result.pdf_job_id}`;
+      }}
+      className="w-full"
+    >
+      <Download className="mr-2 h-4 w-4" />
+      Download Order Draft PDF
+    </Button>
+  );
+}
 ```
 
 ## 6. Prepare Pricing CSV
@@ -327,6 +331,7 @@ If the actual CSV has different headers, adjust the `parse_pricing_csv()` functi
 ## Testing
 
 1. Start both servers:
+
    ```bash
    cd c:\Users\h02317\gaik-toolkit\implementation_layer\toolkit_demo_app
    bun run dev:all
@@ -346,11 +351,13 @@ If the actual CSV has different headers, adjust the `parse_pricing_csv()` functi
 ## Common Issues
 
 **Import errors**: Make sure `fpdf2` is installed in the Python environment:
+
 ```bash
 pip install fpdf2
 ```
 
 **Extraction fails**: Check OpenAI API key is set in `.env.local`:
+
 ```
 OPENAI_API_KEY=sk-...
 ```

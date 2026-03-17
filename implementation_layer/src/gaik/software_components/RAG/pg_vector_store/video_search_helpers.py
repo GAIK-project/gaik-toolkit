@@ -96,13 +96,15 @@ def format_search_results(
         meta = doc.metadata or {}
         start = meta.get("start_seconds", 0)
         end = meta.get("end_seconds", 0)
-        formatted.append({
-            "text": doc.page_content,
-            "video_title": meta.get("video_title", ""),
-            "video_id": meta.get("video_id", ""),
-            "start_seconds": start,
-            "end_seconds": end,
-            "timestamp": f"{format_timestamp(start)} - {format_timestamp(end)}",
-            "score": round(score, 4),
-        })
+        formatted.append(
+            {
+                "text": doc.page_content,
+                "video_title": meta.get("video_title", ""),
+                "video_id": meta.get("video_id", ""),
+                "start_seconds": start,
+                "end_seconds": end,
+                "timestamp": f"{format_timestamp(start)} - {format_timestamp(end)}",
+                "score": round(score, 4),
+            }
+        )
     return formatted

@@ -36,8 +36,7 @@ export function PipelineLogViewer({ steps }: PipelineLogViewerProps) {
             key={step.step}
             className={cn(
               "rounded-lg border transition-colors",
-              step.status === "completed" &&
-                "border-success/30 bg-success/5",
+              step.status === "completed" && "border-success/30 bg-success/5",
               step.status === "in_progress" && "border-primary/30 bg-primary/5",
               step.status === "error" &&
                 "border-destructive/30 bg-destructive/5",

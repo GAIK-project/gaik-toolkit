@@ -27,8 +27,7 @@ export default async function proxy(request: NextRequest) {
           request.headers.get("x-real-ip") ??
           "anonymous";
 
-        const { success, limit, remaining, reset } =
-          await ratelimit.limit(ip);
+        const { success, limit, remaining, reset } = await ratelimit.limit(ip);
 
         if (!success) {
           return NextResponse.json(

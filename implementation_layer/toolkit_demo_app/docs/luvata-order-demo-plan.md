@@ -9,15 +9,18 @@ Add a Luvata order processing demo to the GAIK toolkit demo app, showcasing ABB'
 ## 1. Demo Scope & Objectives
 
 ### Goal
+
 Create a simplified, demo-focused version of the Luvata ABB order processing workflow that showcases the GAIK toolkit's extraction capabilities.
 
 ### What to Include
+
 - Upload: Purchase Order PDF, multiple BOM PDFs, Pricing CSV/Excel
 - Process: Extract data from all documents, match BOMs to PO items, calculate prices
 - Display: Show extracted items with calculated prices in a clean table format
 - Export: Generate PDF order draft (same format as main app)
 
 ### What to Exclude (vs. main app)
+
 - Manual field editing
 - Multiple vendor support (ABB only)
 - IndexedDB persistence/history
@@ -40,12 +43,14 @@ GET  /luvata-order/pdf/{job_id}  # Download generated PDF
 ```
 
 **Key Dependencies (reuse GAIK components):**
+
 - `gaik.Extractor` - Extract structured data from PO and BOMs
 - `gaik.SchemaGenerator` - Generate Pydantic schemas for extraction
 - `gaik.Parser` (PyMuPDF/Vision) - Parse PDF documents
 - CSV/Excel parsing - Read pricing table
 
 **Data Flow:**
+
 ```
 1. Parse PO PDF → Extract: po_number, customer, delivery_date, items[]
 2. Parse each BOM PDF → Extract: document_id, type_designation, length_mm, weight_per_m
@@ -60,6 +65,7 @@ GET  /luvata-order/pdf/{job_id}  # Download generated PDF
 **New Demo Page:** `app/(demos)/luvata-order/page.tsx`
 
 **Component Structure:**
+
 ```tsx
 LuvataOrderDemo/
 ├── UploadSection
@@ -209,21 +215,21 @@ export default function LuvataOrderDemo() {
 
   const handleProcess = async () => {
     const formData = new FormData();
-    formData.append('po_file', poFile);
-    bomFiles.forEach(f => formData.append('bom_files', f));
-    formData.append('pricing_file', pricingFile);
+    formData.append("po_file", poFile);
+    bomFiles.forEach((f) => formData.append("bom_files", f));
+    formData.append("pricing_file", pricingFile);
 
     // Stream SSE events (similar to other demos)
-    const response = await fetch('/api/luvata-order/process', {
-      method: 'POST',
-      body: formData
+    const response = await fetch("/api/luvata-order/process", {
+      method: "POST",
+      body: formData,
     });
 
     // Handle streaming...
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="mx-auto max-w-6xl p-6">
       <Header />
       <UploadSection />
       <ProcessButton />
@@ -278,7 +284,7 @@ export default function LuvataOrderDemo() {
     </TableRow>
   </TableHeader>
   <TableBody>
-    {result.items.map(item => (
+    {result.items.map((item) => (
       <TableRow key={item.material}>
         <TableCell>{item.material}</TableCell>
         <TableCell>{item.description}</TableCell>
@@ -315,9 +321,7 @@ Source files: `C:\Users\h02317\Tools and apps\Luvata\data\abb\examples\example-1
 #### Step 3.2: Add "Load Example" button
 
 ```tsx
-<Button onClick={loadExampleData}>
-  Load ABB Example
-</Button>
+<Button onClick={loadExampleData}>Load ABB Example</Button>
 
 // Loads the 3 example files automatically
 ```
@@ -373,11 +377,13 @@ if not pricing_file:
 ### New Files to Create
 
 **Backend:**
+
 - [ ] `api/routers/luvata_order.py` (~300 lines)
 - [ ] `api/utils/luvata_pricing.py` (~150 lines - pricing calculations)
 - [ ] `data/luvata-order/` (example files directory)
 
 **Frontend:**
+
 - [ ] `app/(demos)/luvata-order/page.tsx` (~200 lines)
 - [ ] `app/(demos)/luvata-order/components/upload-section.tsx` (~100 lines)
 - [ ] `app/(demos)/luvata-order/components/results-table.tsx` (~150 lines)
@@ -388,28 +394,31 @@ if not pricing_file:
 ## 5. Testing Strategy
 
 ### Unit Tests (Python)
+
 - Test extraction schemas
 - Test pricing calculations
 - Test BOM matching logic
 
 ### Integration Test
+
 - Upload example files → verify correct extraction → verify pricing
 
 ### Manual Testing
+
 - Load example → process → verify table display → download PDF
 
 ---
 
 ## 6. Key Differences from Main App
 
-| Feature | Main App | Demo App |
-|---------|----------|----------|
-| Vendors | 3 (ABB, MC, C&B) | 1 (ABB only) |
-| Manual Edits | Full editing | View only |
-| Persistence | IndexedDB | Session only |
-| History | Save/load | None |
-| Pricing Overrides | Custom pricing | Auto only |
-| File Management | Complex caching | Simple upload |
+| Feature           | Main App         | Demo App      |
+| ----------------- | ---------------- | ------------- |
+| Vendors           | 3 (ABB, MC, C&B) | 1 (ABB only)  |
+| Manual Edits      | Full editing     | View only     |
+| Persistence       | IndexedDB        | Session only  |
+| History           | Save/load        | None          |
+| Pricing Overrides | Custom pricing   | Auto only     |
+| File Management   | Complex caching  | Simple upload |
 
 ---
 

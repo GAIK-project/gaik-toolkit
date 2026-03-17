@@ -31,7 +31,10 @@ export interface SSEEvent {
  *
  * ```
  */
-export function parseSSEEvents(text: string): { events: SSEEvent[]; remaining: string } {
+export function parseSSEEvents(text: string): {
+  events: SSEEvent[];
+  remaining: string;
+} {
   const events: SSEEvent[] = [];
 
   // Normalize \r\n and \r to \n (SSE spec allows all three)
@@ -130,7 +133,9 @@ export async function processSSEStream<TResult>(
           handlers.onResult?.(event.data as unknown as TResult);
           break;
         case "error":
-          handlers.onError?.((event.data.message as string) || "Processing failed");
+          handlers.onError?.(
+            (event.data.message as string) || "Processing failed",
+          );
           break;
         default:
           handlers.onCustomEvent?.(event);

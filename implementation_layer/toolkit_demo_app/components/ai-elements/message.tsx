@@ -309,6 +309,7 @@ export const MessageResponse = memo(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         className,
       )}
+      // @ts-expect-error shiki version mismatch between streamdown and @streamdown/code
       plugins={{ code, mermaid, math, cjk }}
       {...props}
     />

@@ -68,8 +68,7 @@ def _schema_code_from_requirements(schema: type[BaseModel], requirements) -> str
         default_value = "None" if not field.required else "..."
         desc = field.description.replace('"', '\\"')
         schema_lines.append(
-            f"    {field.field_name}: {field_type} = "
-            f'Field({default_value}, description="{desc}")'
+            f'    {field.field_name}: {field_type} = Field({default_value}, description="{desc}")'
         )
 
     return "\n".join(schema_lines)

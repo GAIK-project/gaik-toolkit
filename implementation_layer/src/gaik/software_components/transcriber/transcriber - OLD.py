@@ -145,7 +145,9 @@ class Transcriber:
         """
         if self._needs_chunking(input_path):
             print("Chunking input for transcription...")
-            audio = AudioSegment.from_file(input_path)  # works for audio, and many video containers via ffmpeg
+            audio = AudioSegment.from_file(
+                input_path
+            )  # works for audio, and many video containers via ffmpeg
             return split_and_transcribe_with_context(
                 str(input_path),
                 self.api_config,

@@ -82,7 +82,7 @@ export function StepIndicator({
             {isHorizontal && (
               <span
                 className={cn(
-                  "text-xs font-medium text-center",
+                  "text-center text-xs font-medium",
                   step.status === "completed" && "text-success",
                   step.status === "in_progress" && "text-primary",
                   step.status === "error" && "text-destructive",

@@ -267,9 +267,7 @@ class VisionRagParser:
             return markdown_text, langchain_docs
         return langchain_docs
 
-    def _convert_with_vision(
-        self, pdf_path: str
-    ) -> tuple[Any, str, dict[int, list[str]]]:
+    def _convert_with_vision(self, pdf_path: str) -> tuple[Any, str, dict[int, list[str]]]:
         if self.verbose:
             print(f"Processing PDF with vision enhancement: {pdf_path}")
 
@@ -278,8 +276,7 @@ class VisionRagParser:
 
         if self.verbose:
             print(
-                f"Document parsing complete. Pages: "
-                f"{len(getattr(doc, 'pages', [])) or 'unknown'}"
+                f"Document parsing complete. Pages: {len(getattr(doc, 'pages', [])) or 'unknown'}"
             )
 
         images_with_positions = self._collect_images(doc)
@@ -289,9 +286,7 @@ class VisionRagParser:
         image_descriptions, descriptions_by_page = self._describe_images(images_with_positions)
 
         markdown_text = result.document.export_to_markdown(image_mode="embedded")
-        markdown_text = self._replace_images_with_descriptions(
-            markdown_text, image_descriptions
-        )
+        markdown_text = self._replace_images_with_descriptions(markdown_text, image_descriptions)
 
         return result, markdown_text, descriptions_by_page
 

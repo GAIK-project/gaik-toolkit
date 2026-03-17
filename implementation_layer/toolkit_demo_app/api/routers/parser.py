@@ -2,7 +2,6 @@
 
 import os
 import tempfile
-
 from pathlib import Path
 from typing import Literal
 
@@ -13,7 +12,6 @@ except ImportError:
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 router = APIRouter()
-
 
 
 @router.post("")

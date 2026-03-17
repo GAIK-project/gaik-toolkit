@@ -12,6 +12,8 @@ import {
 import { FeedbackButton } from "@/components/feedback";
 import { PipelineLogViewer } from "@/components/demo/pipeline-log-viewer";
 import { Button } from "@/components/ui/button";
+import { DemoPageHeader } from "@/components/demo/demo-page-header";
+import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import {
   Card,
   CardContent,
@@ -134,13 +136,13 @@ export default function DiaryPage() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [textInput, setTextInput] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [extractionMode, setExtractionMode] = useState<"auto" | "custom">("auto");
+  const [extractionMode, setExtractionMode] = useState<"auto" | "custom">(
+    "auto",
+  );
   const [customSchema, setCustomSchema] = useState(DEFAULT_DIARY_SCHEMA);
   const [enhanced, setEnhanced] = useState(true);
   const [generatePdf, setGeneratePdf] = useState(true);
   const [regenerateSchema, setRegenerateSchema] = useState(false);
-  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
-
   const [result, setResult] = useState<DiaryResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pipelineSteps, setPipelineSteps] = useState<SSEStep[]>([]);
@@ -186,9 +188,7 @@ export default function DiaryPage() {
 
     try {
       const userRequirements =
-        extractionMode === "auto"
-          ? DEFAULT_DIARY_SCHEMA
-          : customSchema;
+        extractionMode === "auto" ? DEFAULT_DIARY_SCHEMA : customSchema;
 
       const formData = new FormData();
       formData.append("user_requirements", userRequirements);
@@ -260,7 +260,6 @@ export default function DiaryPage() {
               );
             }
           }
-
         }
       } else if (inputMode === "text" && textInput.trim()) {
         // Text mode with SSE streaming
@@ -320,7 +319,6 @@ export default function DiaryPage() {
               );
             }
           }
-
         }
       }
     } catch (error) {
@@ -386,16 +384,13 @@ export default function DiaryPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <header className="mb-8 pl-1">
-        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-          <HardHat className="h-8 w-8 text-amber-500" />
-          Construction Diary
-        </h1>
-        <p className="text-muted-foreground mt-2 text-lg">
-          Record daily construction site activities via voice or text. AI
-          extracts structured data.
-        </p>
-      </header>
+      <DemoPageHeader
+        icon={HardHat}
+        iconClassName="h-8 w-8 text-amber-500"
+        title="Construction Diary"
+        description="Record daily construction site activities via voice or text. AI extracts structured data."
+        className="mb-8"
+      />
 
       <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
         <div className="space-y-6">
@@ -487,7 +482,10 @@ export default function DiaryPage() {
                       : "Provide a description of the construction site activities."}
                   </CardDescription>
                 </div>
-                {(audioFile || textInput || result || pipelineSteps.length > 0) && (
+                {(audioFile ||
+                  textInput ||
+                  result ||
+                  pipelineSteps.length > 0) && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -682,9 +680,12 @@ export default function DiaryPage() {
 
                         <div className="flex items-center justify-between">
                           <div className="space-y-0.5">
-                            <Label htmlFor="regenerate-schema">Regenerate Schema</Label>
+                            <Label htmlFor="regenerate-schema">
+                              Regenerate Schema
+                            </Label>
                             <p className="text-muted-foreground text-xs">
-                              Ignore the saved diary schema and build a new one for this request
+                              Ignore the saved diary schema and build a new one
+                              for this request
                             </p>
                           </div>
                           <Switch
@@ -856,41 +857,36 @@ export default function DiaryPage() {
                 }
               />
 
-              <Card>
-                <button
-                  type="button"
-                  onClick={() => setHowItWorksOpen((open) => !open)}
-                  className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-muted/30"
-                  aria-expanded={howItWorksOpen}
-                >
-                  <h2 className="text-lg font-semibold text-foreground">How It Works</h2>
-                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <span>{howItWorksOpen ? "Hide" : "Show"}</span>
-                    <ChevronDown
-                      className={`h-5 w-5 shrink-0 transition-transform ${howItWorksOpen ? "rotate-180" : "rotate-0"}`}
-                    />
-                  </div>
-                </button>
-                {howItWorksOpen && (
-                  <CardContent className="space-y-4 border-t pt-5 text-sm text-muted-foreground">
-                    <p>
-                      <strong>1. Provide the diary input:</strong> Upload an audio recording or type the daily construction diary entry directly. Use <strong>Load Example</strong> to test the built-in sample audio or example texts.
-                    </p>
-                    <p>
-                      <strong>2. Transcribe or read the content:</strong> Audio input is transcribed first. Text input is processed directly without transcription.
-                    </p>
-                    <p>
-                      <strong>3. Extract the diary fields:</strong> In automatic mode, the tool extracts the standard construction diary fields such as project, date, weather, personnel, work phases, and supervisor observations. In custom mode, it extracts the fields you define.
-                    </p>
-                    <p>
-                      <strong>4. Review the structured result:</strong> The result view shows the transcript, generated schema details, and the extracted construction diary data.
-                    </p>
-                    <p>
-                      <strong>5. Generate the final report:</strong> If enabled, the tool also creates a downloadable PDF construction diary report.
-                    </p>
-                  </CardContent>
-                )}
-              </Card>
+              <HowItWorksCard>
+                <p>
+                  <strong>1. Provide the diary input:</strong> Upload an audio
+                  recording or type the daily construction diary entry directly.
+                  Use <strong>Load Example</strong> to test the built-in sample
+                  audio or example texts.
+                </p>
+                <p>
+                  <strong>2. Transcribe or read the content:</strong> Audio
+                  input is transcribed first. Text input is processed directly
+                  without transcription.
+                </p>
+                <p>
+                  <strong>3. Extract the diary fields:</strong> In automatic
+                  mode, the tool extracts the standard construction diary fields
+                  such as project, date, weather, personnel, work phases, and
+                  supervisor observations. In custom mode, it extracts the
+                  fields you define.
+                </p>
+                <p>
+                  <strong>4. Review the structured result:</strong> The result
+                  view shows the transcript, generated schema details, and the
+                  extracted construction diary data.
+                </p>
+                <p>
+                  <strong>5. Generate the final report:</strong> If enabled, the
+                  tool also creates a downloadable PDF construction diary
+                  report.
+                </p>
+              </HowItWorksCard>
             </>
           )}
         </div>

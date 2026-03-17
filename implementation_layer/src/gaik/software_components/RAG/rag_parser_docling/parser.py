@@ -190,9 +190,7 @@ class DoclingRagParser:
 
         return markdown_text
 
-    def convert_pdf_to_chunks_with_metadata(
-        self, pdf_path: str
-    ) -> list[Document]:
+    def convert_pdf_to_chunks_with_metadata(self, pdf_path: str) -> list[Document]:
         """
         Convert PDF to chunks with metadata including document name and page numbers.
         Returns a list of LangChain Document objects with metadata.

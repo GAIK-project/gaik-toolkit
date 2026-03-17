@@ -125,9 +125,9 @@ export function FileUpload({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="flex min-h-[176px] items-center gap-3 rounded-lg border border-success/30 bg-success/10 p-4"
+            className="border-success/30 bg-success/10 flex min-h-[176px] items-center gap-3 rounded-lg border p-4"
           >
-            <CheckCircle className="h-5 w-5 text-success" />
+            <CheckCircle className="text-success h-5 w-5" />
             <File className="text-muted-foreground h-5 w-5" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">
@@ -140,7 +140,7 @@ export function FileUpload({
             <button
               onClick={removeFile}
               disabled={disabled}
-              className="rounded-full p-1 transition-colors hover:bg-success/20"
+              className="hover:bg-success/20 rounded-full p-1 transition-colors"
               aria-label="Remove file"
             >
               <X className="h-4 w-4" />

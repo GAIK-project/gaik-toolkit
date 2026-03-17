@@ -1,4 +1,4 @@
-﻿"""HTTP client parser for Docling service endpoints.
+"""HTTP client parser for Docling service endpoints.
 
 This parser sends documents to a remote parsing service and returns parsed markdown
 and metadata without saving output locally.

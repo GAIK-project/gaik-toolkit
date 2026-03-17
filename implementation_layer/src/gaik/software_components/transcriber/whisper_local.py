@@ -1,8 +1,9 @@
-﻿import requests
 import shutil
 import subprocess
 import time
 from pathlib import Path
+
+import requests
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".avi", ".wmv", ".flv", ".webm", ".m4v"}
 
@@ -36,7 +37,9 @@ def extract_audio_from_video(video_path: Path) -> Path:
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         stderr_msg = (result.stderr or "").strip()
-        raise RuntimeError(f"Audio extraction failed for '{video_path.name}'. ffmpeg error: {stderr_msg}")
+        raise RuntimeError(
+            f"Audio extraction failed for '{video_path.name}'. ffmpeg error: {stderr_msg}"
+        )
 
     return output_audio
 
@@ -102,7 +105,9 @@ def transcribe(
     if not diarization:
         plain_text = (result.get("text") or "").strip()
         if not plain_text and segments:
-            plain_text = " ".join(seg.get("text", "").strip() for seg in segments if seg.get("text")).strip()
+            plain_text = " ".join(
+                seg.get("text", "").strip() for seg in segments if seg.get("text")
+            ).strip()
     elapsed_seconds = time.perf_counter() - start_time
     print(f"Time taken for transcription: {elapsed_seconds:.2f} seconds")
 
@@ -110,4 +115,3 @@ def transcribe(
         temp_extracted_audio.unlink(missing_ok=True)
 
     return result
-

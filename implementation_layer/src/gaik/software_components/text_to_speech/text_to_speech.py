@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import os
 import uuid
-
-import requests
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+
+import requests
 
 from gaik.software_components.config import create_openai_client, get_openai_config
 
@@ -64,7 +64,9 @@ class TextToSpeech:
         model: str | None = None,
         language: Literal["fi", "en"] = DEFAULT_LANGUAGE,
         voice: str = DEFAULT_VOICE,
-        response_format: Literal["mp3", "opus", "aac", "flac", "wav", "pcm"] = DEFAULT_RESPONSE_FORMAT,
+        response_format: Literal[
+            "mp3", "opus", "aac", "flac", "wav", "pcm"
+        ] = DEFAULT_RESPONSE_FORMAT,
         speed: float = 1.0,
         default_instructions: str | None = None,
     ) -> None:
@@ -108,7 +110,9 @@ class TextToSpeech:
                 f"Unsupported response format '{resolved_format}'. Supported formats: {', '.join(SUPPORTED_RESPONSE_FORMATS)}"
             )
 
-        resolved_instructions = self._build_instructions(language=resolved_language, instructions=instructions)
+        resolved_instructions = self._build_instructions(
+            language=resolved_language, instructions=instructions
+        )
 
         if self.api_config.get("use_azure", False):
             audio_bytes = self._synthesize_with_azure_endpoint(

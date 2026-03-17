@@ -174,12 +174,14 @@ def chunk_segments(
 
         # If adding this segment would exceed max, flush first
         if current_texts and duration > max_seconds:
-            chunks.append({
-                "start": current_start,
-                "end": current_end,
-                "text": " ".join(current_texts),
-                "srt_index": chunk_idx,
-            })
+            chunks.append(
+                {
+                    "start": current_start,
+                    "end": current_end,
+                    "text": " ".join(current_texts),
+                    "srt_index": chunk_idx,
+                }
+            )
             chunk_idx += 1
             current_texts = []
             current_start = seg_start
@@ -189,12 +191,14 @@ def chunk_segments(
 
         # If we've reached target duration, flush
         if current_start is not None and (current_end - current_start) >= target_seconds:
-            chunks.append({
-                "start": current_start,
-                "end": current_end,
-                "text": " ".join(current_texts),
-                "srt_index": chunk_idx,
-            })
+            chunks.append(
+                {
+                    "start": current_start,
+                    "end": current_end,
+                    "text": " ".join(current_texts),
+                    "srt_index": chunk_idx,
+                }
+            )
             chunk_idx += 1
             current_texts = []
             current_start = None
@@ -207,12 +211,14 @@ def chunk_segments(
             prev["end"] = current_end
             prev["text"] = prev["text"] + " " + " ".join(current_texts)
         else:
-            chunks.append({
-                "start": current_start,
-                "end": current_end,
-                "text": " ".join(current_texts),
-                "srt_index": chunk_idx,
-            })
+            chunks.append(
+                {
+                    "start": current_start,
+                    "end": current_end,
+                    "text": " ".join(current_texts),
+                    "srt_index": chunk_idx,
+                }
+            )
 
     return chunks
 

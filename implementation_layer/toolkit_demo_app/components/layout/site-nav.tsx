@@ -340,7 +340,10 @@ function MobileNav({ isActive, githubPreview, isLoggedIn }: MobileNavProps) {
       <SheetTrigger asChild>
         <MobileMenuButton />
       </SheetTrigger>
-      <SheetContent side="right" className="flex w-[85vw] max-w-72 flex-col sm:w-72">
+      <SheetContent
+        side="right"
+        className="flex w-[85vw] max-w-72 flex-col sm:w-72"
+      >
         <SheetHeader className="shrink-0">
           <SheetTitle>Navigation</SheetTitle>
         </SheetHeader>

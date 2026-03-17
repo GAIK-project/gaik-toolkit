@@ -26,15 +26,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DemoPageHeader } from "@/components/demo/demo-page-header";
+import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ArrowLeft, ChevronDown, Download, FileText } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import { motion } from "motion/react";
-import { useRouter } from "next/navigation";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -60,11 +61,11 @@ function formatParserName(parser: string): string {
 }
 
 export default function ParserPage() {
-  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
-  const [parserType, setParserType] = useState<"auto" | "pymupdf" | "docx" | "vision" | "vision_plus" | "docling_api">("docling_api");
+  const [parserType, setParserType] = useState<
+    "auto" | "pymupdf" | "docx" | "vision" | "vision_plus" | "docling_api"
+  >("docling_api");
   const [isLoading, setIsLoading] = useState(false);
-  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [result, setResult] = useState<ParseResult | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -82,7 +83,9 @@ export default function ParserPage() {
 
   function handleDownloadMarkdown(): void {
     if (!result) return;
-    const blob = new Blob([result.text_content || ""], { type: "text/markdown;charset=utf-8" });
+    const blob = new Blob([result.text_content || ""], {
+      type: "text/markdown;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -150,23 +153,12 @@ export default function ParserPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <header className="mb-8">
-        <Button
-          variant="ghost"
-          className="mb-4 -ml-3 gap-2"
-          onClick={() => router.push("/")}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
-        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-          <FileText className="h-8 w-8" />
-          Parser
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Read text and layout from PDF, Word files, and images accurately
-        </p>
-      </header>
+      <DemoPageHeader
+        icon={FileText}
+        title="Parser"
+        description="Read text and layout from PDF, Word files, and images accurately"
+        className="mb-8"
+      />
 
       <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
         {/* Input Section */}
@@ -211,7 +203,9 @@ export default function ParserPage() {
                       <Label>Parser Type</Label>
                       <Select
                         value={parserType}
-                        onValueChange={(value: typeof parserType) => setParserType(value)}
+                        onValueChange={(value: typeof parserType) =>
+                          setParserType(value)
+                        }
                         disabled={isLoading}
                       >
                         <SelectTrigger>
@@ -219,16 +213,28 @@ export default function ParserPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="auto">Auto-detect</SelectItem>
-                          <SelectItem value="pymupdf">PyMuPDF (Fast, text-based)</SelectItem>
-                          <SelectItem value="docx">DOCX (Word documents)</SelectItem>
-                          <SelectItem value="vision">Vision (AI-powered, handles images)</SelectItem>
-                          <SelectItem value="vision_plus">Vision+ (Text+Image Parsing)</SelectItem>
-                          <SelectItem value="docling_api">HH Parser (HH's fast Docling Parser)</SelectItem>
+                          <SelectItem value="pymupdf">
+                            PyMuPDF (Fast, text-based)
+                          </SelectItem>
+                          <SelectItem value="docx">
+                            DOCX (Word documents)
+                          </SelectItem>
+                          <SelectItem value="vision">
+                            Vision (AI-powered, handles images)
+                          </SelectItem>
+                          <SelectItem value="vision_plus">
+                            Vision+ (Text+Image Parsing)
+                          </SelectItem>
+                          <SelectItem value="docling_api">
+                            HH Parser (HH's fast Docling Parser)
+                          </SelectItem>
                         </SelectContent>
                       </Select>
-                      {(parserType === "vision" || parserType === "vision_plus") && (
+                      {(parserType === "vision" ||
+                        parserType === "vision_plus") && (
                         <p className="text-muted-foreground text-xs">
-                          Vision and Vision+ parsers are limited to a maximum of 10 pages per document.
+                          Vision and Vision+ parsers are limited to a maximum of
+                          10 pages per document.
                         </p>
                       )}
                     </div>
@@ -247,40 +253,39 @@ export default function ParserPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-6 py-5 text-left"
-              onClick={() => setHowItWorksOpen((current) => !current)}
-            >
-              <div>
-                <CardTitle>How It Works</CardTitle>
-                <CardDescription className="mt-1">
-                  Parse document text with a selected parser and export the result as markdown.
-                </CardDescription>
-              </div>
-              <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-                {howItWorksOpen ? "Hide" : "Show"}
-                <ChevronDown className={`h-4 w-4 transition-transform ${howItWorksOpen ? "rotate-180" : ""}`} />
-              </div>
-            </button>
-            {howItWorksOpen ? (
-              <CardContent className="text-muted-foreground space-y-3 text-sm leading-6">
-                <p>
-                  <strong>1. Upload a document:</strong> Select a PDF, DOCX, or image file. The parser demo supports both text-first and vision-based parsing strategies.
-                </p>
-                <p>
-                  <strong>2. Choose the parser type:</strong> Use auto-detect for convenience, or pick a specific parser when you want a text-based, OCR, or combined text+image parsing workflow.
-                </p>
-                <p>
-                  <strong>3. Choose the parser for the document type:</strong> Use PyMuPDF for text-based PDFs, DOCX for Word files, Vision for scanned PDFs or image-heavy documents, Vision+ when both text and images matter in the same document (<a href="https://medium.com/@umairali.khan/how-i-enhanced-doclings-image-interpretation-capabilities-641ce017bce5" target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">read more</a>), and Haaga-Helia's parser when you want a remote high-quality parsing option.
-                </p>
-                <p>
-                  <strong>4. Review the output:</strong> The result panel shows the parsed text, lets you copy it, and also lets you download the parsed content as a markdown file.
-                </p>
-              </CardContent>
-            ) : null}
-          </Card>
+          <HowItWorksCard description="Parse document text with a selected parser and export the result as markdown.">
+            <p>
+              <strong>1. Upload a document:</strong> Select a PDF, DOCX, or
+              image file. The parser demo supports both text-first and
+              vision-based parsing strategies.
+            </p>
+            <p>
+              <strong>2. Choose the parser type:</strong> Use auto-detect for
+              convenience, or pick a specific parser when you want a text-based,
+              OCR, or combined text+image parsing workflow.
+            </p>
+            <p>
+              <strong>3. Choose the parser for the document type:</strong> Use
+              PyMuPDF for text-based PDFs, DOCX for Word files, Vision for
+              scanned PDFs or image-heavy documents, Vision+ when both text and
+              images matter in the same document (
+              <a
+                href="https://medium.com/@umairali.khan/how-i-enhanced-doclings-image-interpretation-capabilities-641ce017bce5"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                read more
+              </a>
+              ), and Haaga-Helia's parser when you want a remote high-quality
+              parsing option.
+            </p>
+            <p>
+              <strong>4. Review the output:</strong> The result panel shows the
+              parsed text, lets you copy it, and also lets you download the
+              parsed content as a markdown file.
+            </p>
+          </HowItWorksCard>
         </div>
 
         {/* Results Section */}
@@ -290,7 +295,11 @@ export default function ParserPage() {
           {result && !isLoading && (
             <>
               <div className="mb-4 flex justify-end">
-                <Button variant="outline" onClick={handleDownloadMarkdown} className="gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadMarkdown}
+                  className="gap-2"
+                >
                   <Download className="h-4 w-4" />
                   Download Markdown
                 </Button>

@@ -9,6 +9,8 @@ import {
   ResultCard,
 } from "@/components/demo/result-card";
 import { FeedbackButton } from "@/components/feedback";
+import { DemoPageHeader } from "@/components/demo/demo-page-header";
+import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import {
   Accordion,
   AccordionContent,
@@ -27,7 +29,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronDown, Database, FileCode2, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import {
+  Database,
+  FileCode2,
+  Loader2,
+  Plus,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { formatFieldName } from "@/lib/utils";
 import posthog from "posthog-js";
@@ -75,7 +84,9 @@ function formatExtractorValue(key: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "-";
 
   const normalizedKey = key.toLowerCase();
-  const isCurrencyField = CURRENCY_FIELD_HINTS.some((hint) => normalizedKey.includes(hint));
+  const isCurrencyField = CURRENCY_FIELD_HINTS.some((hint) =>
+    normalizedKey.includes(hint),
+  );
   if (isCurrencyField && typeof value === "number") {
     return `EUR ${value.toLocaleString("en-US", {
       minimumFractionDigits: 2,
@@ -104,14 +115,16 @@ const DEFAULT_FIELDS: Field[] = [
 
 export default function ExtractorPage() {
   const [inputMode, setInputMode] = useState<"text" | "file">("text");
-  const [extractionMode, setExtractionMode] = useState<"fields" | "plain-language">("plain-language");
+  const [extractionMode, setExtractionMode] = useState<
+    "fields" | "plain-language"
+  >("plain-language");
   const [documentText, setDocumentText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [userRequirements, setUserRequirements] = useState(
     "Extract key information from this document",
   );
   const [plainLanguageRequirements, setPlainLanguageRequirements] = useState(
-    "Extract invoice number, sender name, receiver name, purchase order number, date of invoice, subtotal, discount, tax, and grand total from the invoice."
+    "Extract invoice number, sender name, receiver name, purchase order number, date of invoice, subtotal, discount, tax, and grand total from the invoice.",
   );
 
   // Clear generated schema when requirements change
@@ -125,8 +138,8 @@ export default function ExtractorPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [isGeneratingSchema, setIsGeneratingSchema] = useState(false);
-  const [generatedSchema, setGeneratedSchema] = useState<GeneratedSchema | null>(null);
-  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  const [generatedSchema, setGeneratedSchema] =
+    useState<GeneratedSchema | null>(null);
   const [result, setResult] = useState<ExtractResult | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -205,7 +218,9 @@ export default function ExtractorPage() {
       toast.success("Schema generated successfully!");
     } catch (error) {
       if (error instanceof RateLimitError) return;
-      toast.error(error instanceof Error ? error.message : "Failed to generate schema");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to generate schema",
+      );
     } finally {
       setIsGeneratingSchema(false);
     }
@@ -341,7 +356,10 @@ export default function ExtractorPage() {
         extraction_mode: extractionMode,
         file_type: file?.type || "text",
         file_size: file?.size || textToProcess.length,
-        fields_count: extractionMode === "fields" ? fields.length : generatedSchema?.fields.length || 0,
+        fields_count:
+          extractionMode === "fields"
+            ? fields.length
+            : generatedSchema?.fields.length || 0,
         results_count: data.results?.length || 0,
       });
 
@@ -361,15 +379,12 @@ export default function ExtractorPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <header className="mb-8">
-        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-          <Database className="h-8 w-8" />
-          Extractor
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Automatically find and list important details from any document
-        </p>
-      </header>
+      <DemoPageHeader
+        icon={Database}
+        title="Extractor"
+        description="Automatically find and list important details from any document"
+        className="mb-8"
+      />
 
       <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
         {/* Input Section */}
@@ -443,11 +458,15 @@ export default function ExtractorPage() {
                         <Label>Extraction Mode</Label>
                         <Tabs
                           value={extractionMode}
-                          onValueChange={(v) => setExtractionMode(v as "fields" | "plain-language")}
+                          onValueChange={(v) =>
+                            setExtractionMode(v as "fields" | "plain-language")
+                          }
                         >
                           <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="fields">Fields</TabsTrigger>
-                            <TabsTrigger value="plain-language">Plain Language</TabsTrigger>
+                            <TabsTrigger value="plain-language">
+                              Plain Language
+                            </TabsTrigger>
                           </TabsList>
                         </Tabs>
                         <p className="text-muted-foreground text-xs">
@@ -457,7 +476,9 @@ export default function ExtractorPage() {
                         </p>
                         {extractionMode === "plain-language" ? (
                           <p className="text-muted-foreground text-xs leading-relaxed">
-                            If you modify the extraction task, click "Generate Schema" and then "Extract Data" with the new schema. Your generated schema will not be persisted.
+                            If you modify the extraction task, click "Generate
+                            Schema" and then "Extract Data" with the new schema.
+                            Your generated schema will not be persisted.
                           </p>
                         ) : null}
                       </div>
@@ -470,7 +491,9 @@ export default function ExtractorPage() {
                             <Textarea
                               id="requirements"
                               value={userRequirements}
-                              onChange={(e) => setUserRequirements(e.target.value)}
+                              onChange={(e) =>
+                                setUserRequirements(e.target.value)
+                              }
                               placeholder="Describe what data to extract..."
                               disabled={isLoading}
                               rows={2}
@@ -479,63 +502,69 @@ export default function ExtractorPage() {
 
                           <div className="space-y-2">
                             <Label>Fields to Extract</Label>
-                        <div className="max-h-48 space-y-2 overflow-auto">
-                          {fields.map((field) => (
-                            <div
-                              key={field.name}
-                              className="flex items-center gap-2 rounded-md border p-2 text-sm"
-                            >
-                              <div className="min-w-0 flex-1">
-                                <span className="font-mono font-medium">
-                                  {field.name}
-                                </span>
-                                <span className="text-muted-foreground ml-2">
-                                  - {field.description}
-                                </span>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 shrink-0"
-                                onClick={() => handleRemoveField(field.name)}
+                            <div className="max-h-48 space-y-2 overflow-auto">
+                              {fields.map((field) => (
+                                <div
+                                  key={field.name}
+                                  className="flex items-center gap-2 rounded-md border p-2 text-sm"
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <span className="font-mono font-medium">
+                                      {field.name}
+                                    </span>
+                                    <span className="text-muted-foreground ml-2">
+                                      - {field.description}
+                                    </span>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 shrink-0"
+                                    onClick={() =>
+                                      handleRemoveField(field.name)
+                                    }
+                                    disabled={isLoading}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                              <Input
+                                value={newFieldName}
+                                onChange={(e) =>
+                                  setNewFieldName(e.target.value)
+                                }
+                                placeholder="Field name"
                                 disabled={isLoading}
+                                className="w-full sm:flex-1"
+                              />
+                              <Input
+                                value={newFieldDesc}
+                                onChange={(e) =>
+                                  setNewFieldDesc(e.target.value)
+                                }
+                                placeholder="Description"
+                                disabled={isLoading}
+                                className="w-full sm:flex-1"
+                              />
+                              <Button
+                                variant="secondary"
+                                size="icon"
+                                onClick={handleAddField}
+                                disabled={
+                                  isLoading ||
+                                  !newFieldName.trim() ||
+                                  !newFieldDesc.trim()
+                                }
+                                className="self-end sm:self-auto"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Plus className="h-4 w-4" />
                               </Button>
                             </div>
-                          ))}
-                        </div>
-
-                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                          <Input
-                            value={newFieldName}
-                            onChange={(e) => setNewFieldName(e.target.value)}
-                            placeholder="Field name"
-                            disabled={isLoading}
-                            className="w-full sm:flex-1"
-                          />
-                          <Input
-                            value={newFieldDesc}
-                            onChange={(e) => setNewFieldDesc(e.target.value)}
-                            placeholder="Description"
-                            disabled={isLoading}
-                            className="w-full sm:flex-1"
-                          />
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            onClick={handleAddField}
-                            disabled={
-                              isLoading ||
-                              !newFieldName.trim() ||
-                              !newFieldDesc.trim()
-                            }
-                            className="self-end sm:self-auto"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
+                          </div>
                         </>
                       )}
 
@@ -543,11 +572,15 @@ export default function ExtractorPage() {
                       {extractionMode === "plain-language" && (
                         <>
                           <div className="space-y-2">
-                            <Label htmlFor="plain-requirements">Extraction Requirements</Label>
+                            <Label htmlFor="plain-requirements">
+                              Extraction Requirements
+                            </Label>
                             <Textarea
                               id="plain-requirements"
                               value={plainLanguageRequirements}
-                              onChange={(e) => handleRequirementsChange(e.target.value)}
+                              onChange={(e) =>
+                                handleRequirementsChange(e.target.value)
+                              }
                               placeholder="Describe in natural language what data to extract and the structure..."
                               disabled={isLoading || isGeneratingSchema}
                               rows={8}
@@ -556,7 +589,11 @@ export default function ExtractorPage() {
 
                           <Button
                             onClick={handleGenerateSchema}
-                            disabled={isLoading || isGeneratingSchema || !plainLanguageRequirements.trim()}
+                            disabled={
+                              isLoading ||
+                              isGeneratingSchema ||
+                              !plainLanguageRequirements.trim()
+                            }
                             variant="secondary"
                             className="w-full"
                           >
@@ -582,7 +619,7 @@ export default function ExtractorPage() {
                                   This schema will be reused for extraction
                                 </span>
                               </div>
-                              <div className="rounded-md border bg-muted/50 p-4">
+                              <div className="bg-muted/50 rounded-md border p-4">
                                 <div className="mb-2 flex items-center justify-between">
                                   <span className="text-sm font-medium">
                                     {generatedSchema.schema_name}
@@ -591,20 +628,31 @@ export default function ExtractorPage() {
                                     {generatedSchema.structure_type}
                                   </span>
                                 </div>
-                                <pre className="max-h-64 overflow-auto rounded bg-background p-3 text-xs">
+                                <pre className="bg-background max-h-64 overflow-auto rounded p-3 text-xs">
                                   <code>{generatedSchema.schema_code}</code>
                                 </pre>
                                 <div className="mt-3 space-y-1">
                                   <p className="text-xs font-medium">Fields:</p>
                                   <div className="space-y-1">
-                                    {generatedSchema.fields.map((field, idx) => (
-                                      <div key={idx} className="text-xs text-muted-foreground">
-                                        <span className="font-mono">{field.name}</span>
-                                        <span className="mx-1">:</span>
-                                        <span>{field.type}</span>
-                                        {field.required && <span className="ml-1 text-orange-500">*</span>}
-                                      </div>
-                                    ))}
+                                    {generatedSchema.fields.map(
+                                      (field, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="text-muted-foreground text-xs"
+                                        >
+                                          <span className="font-mono">
+                                            {field.name}
+                                          </span>
+                                          <span className="mx-1">:</span>
+                                          <span>{field.type}</span>
+                                          {field.required && (
+                                            <span className="ml-1 text-orange-500">
+                                              *
+                                            </span>
+                                          )}
+                                        </div>
+                                      ),
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -640,43 +688,34 @@ export default function ExtractorPage() {
               : "Extract Data"}
           </Button>
 
-          <Card>
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-6 py-5 text-left"
-              onClick={() => setHowItWorksOpen((current) => !current)}
-            >
-              <div>
-                <CardTitle>How It Works</CardTitle>
-                <CardDescription className="mt-1">
-                  Parse a document, define the target fields, and return structured extracted data.
-                </CardDescription>
-              </div>
-              <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-                {howItWorksOpen ? "Hide" : "Show"}
-                <ChevronDown className={`h-4 w-4 transition-transform ${howItWorksOpen ? "rotate-180" : ""}`} />
-              </div>
-            </button>
-            {howItWorksOpen ? (
-              <CardContent className="text-muted-foreground space-y-3 text-sm leading-6">
-                <p>
-                  <strong>1. Provide the input:</strong> Paste document text directly or upload a PDF or DOCX file. Uploaded files are parsed before extraction.
-                </p>
-                <p>
-                  <strong>2. Choose the extraction mode:</strong> Use <em>Fields</em> when you already know the exact fields to extract, or <em>Plain Language</em> when you want the system to first generate a schema from natural-language requirements.
-                </p>
-                <p>
-                  <strong>3. Define the extraction target:</strong> In field mode, add field names and descriptions. In plain-language mode, describe the output structure and generate the schema before extraction.
-                </p>
-                <p>
-                  <strong>4. Run extraction:</strong> The extractor sends the parsed text and the configured requirements to the backend and returns structured results for each document.
-                </p>
-                <p>
-                  <strong>5. Review the output:</strong> The result panel shows the extracted fields in a readable layout and also lets you copy the raw JSON response.
-                </p>
-              </CardContent>
-            ) : null}
-          </Card>
+          <HowItWorksCard description="Parse a document, define the target fields, and return structured extracted data.">
+            <p>
+              <strong>1. Provide the input:</strong> Paste document text
+              directly or upload a PDF or DOCX file. Uploaded files are parsed
+              before extraction.
+            </p>
+            <p>
+              <strong>2. Choose the extraction mode:</strong> Use{" "}
+              <em>Fields</em> when you already know the exact fields to extract,
+              or <em>Plain Language</em> when you want the system to first
+              generate a schema from natural-language requirements.
+            </p>
+            <p>
+              <strong>3. Define the extraction target:</strong> In field mode,
+              add field names and descriptions. In plain-language mode, describe
+              the output structure and generate the schema before extraction.
+            </p>
+            <p>
+              <strong>4. Run extraction:</strong> The extractor sends the parsed
+              text and the configured requirements to the backend and returns
+              structured results for each document.
+            </p>
+            <p>
+              <strong>5. Review the output:</strong> The result panel shows the
+              extracted fields in a readable layout and also lets you copy the
+              raw JSON response.
+            </p>
+          </HowItWorksCard>
         </div>
 
         {/* Results Section */}

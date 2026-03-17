@@ -1,4 +1,4 @@
-﻿"""VisionPlus parser: Docling structure + vision descriptions, no chunking."""
+"""VisionPlus parser: Docling structure + vision descriptions, no chunking."""
 
 from __future__ import annotations
 

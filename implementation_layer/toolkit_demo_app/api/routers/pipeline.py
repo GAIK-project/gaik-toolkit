@@ -79,7 +79,9 @@ def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config
         password = os.getenv("DOCLING_API_PASSWORD")
         if api_base and password:
             try:
-                from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
+                from gaik.software_components.parsers.docling_api_client import (
+                    DoclingApiClientParser,
+                )
 
                 parser = DoclingApiClientParser(api_base=api_base, password=password)
                 result = parser.parse_document(tmp_path)
@@ -104,7 +106,9 @@ def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config
     return parser.parse_pdf(tmp_path)
 
 
-def _get_or_create_schema(config, user_requirements: str, schema_key: str | None, regenerate_schema: bool):
+def _get_or_create_schema(
+    config, user_requirements: str, schema_key: str | None, regenerate_schema: bool
+):
     from gaik.software_components.extractor.schema import SchemaGenerator
 
     loaded = None
@@ -343,7 +347,9 @@ async def audio_pipeline(
 async def document_pipeline(
     file: UploadFile = File(...),
     user_requirements: str = Form(...),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api"] = Form("docling_api"),
+    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api"] = Form(
+        "docling_api"
+    ),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
     schema_key: str | None = Form(None),
@@ -406,11 +412,10 @@ async def document_pipeline(
         # Step 2: Parse
         steps[1].status = "in_progress"
 
+        from gaik.software_components.extractor import DataExtractor
         from gaik.software_modules.documents_to_structured_data import (
             DocumentsToStructuredData,
         )
-
-        from gaik.software_components.extractor import DataExtractor
 
         extraction_model, requirements, _generated_new_schema = _get_or_create_schema(
             config=config,
@@ -722,7 +727,9 @@ async def audio_pipeline_stream(
             )
 
             steps[1]["status"] = "completed"
-            steps[1]["message"] = "Generated new schema" if generated_new_schema else "Loaded saved schema"
+            steps[1]["message"] = (
+                "Generated new schema" if generated_new_schema else "Loaded saved schema"
+            )
             yield sse_event("step_update", steps[1])
 
             # Step 3: Data Extraction
@@ -864,7 +871,9 @@ async def text_pipeline_stream(
             )
 
             steps[0]["status"] = "completed"
-            steps[0]["message"] = "Generated new schema" if generated_new_schema else "Loaded saved schema"
+            steps[0]["message"] = (
+                "Generated new schema" if generated_new_schema else "Loaded saved schema"
+            )
             yield sse_event("step_update", steps[0])
 
             # Step 2: Extract data
@@ -953,7 +962,9 @@ async def text_pipeline_stream(
 async def document_pipeline_stream(
     file: UploadFile = File(...),
     user_requirements: str = Form(...),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api"] = Form("docling_api"),
+    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api"] = Form(
+        "docling_api"
+    ),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
     schema_key: str | None = Form(None),
@@ -1052,7 +1063,9 @@ async def document_pipeline_stream(
             )
 
             steps[1]["status"] = "completed"
-            steps[1]["message"] = "Generated new schema" if generated_new_schema else "Loaded saved schema"
+            steps[1]["message"] = (
+                "Generated new schema" if generated_new_schema else "Loaded saved schema"
+            )
             yield sse_event("step_update", steps[1])
 
             # Step 3: Data Extraction

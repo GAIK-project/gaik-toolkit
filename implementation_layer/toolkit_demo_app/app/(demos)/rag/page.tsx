@@ -160,8 +160,8 @@ function UploadDialogContent({
   onIndex,
 }: UploadDialogContentProps) {
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>): void {
-    const selected = Array.from(event.target.files || []).filter(
-      (file) => file.name.toLowerCase().endsWith(".pdf"),
+    const selected = Array.from(event.target.files || []).filter((file) =>
+      file.name.toLowerCase().endsWith(".pdf"),
     );
     if (selected.length > 0) {
       onFilesSelect(selected);
@@ -178,11 +178,13 @@ function UploadDialogContent({
         </DialogTitle>
       </DialogHeader>
       <div className="space-y-4 pt-4">
-        <label className="flex min-h-[176px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 transition-all hover:border-primary/50 hover:bg-muted/50">
+        <label className="border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50 flex min-h-[176px] cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed p-8 transition-all">
           <Upload className="text-muted-foreground h-10 w-10" />
           <div className="text-center">
             <p className="font-medium">Click to upload PDFs</p>
-            <p className="text-muted-foreground mt-1 text-sm">Supports multiple PDF files (max 20MB each)</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Supports multiple PDF files (max 20MB each)
+            </p>
           </div>
           <input
             type="file"
@@ -198,7 +200,10 @@ function UploadDialogContent({
             <p className="text-sm font-medium">Pending files</p>
             <div className="space-y-2">
               {pendingFiles.map((file) => (
-                <div key={`${file.name}-${file.size}`} className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-2 text-sm">
+                <div
+                  key={`${file.name}-${file.size}`}
+                  className="bg-muted/50 flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm"
+                >
                   <span className="truncate">{file.name}</span>
                   <Button
                     type="button"
@@ -272,7 +277,9 @@ export default function RAGPage() {
   const [searchType, setSearchType] = useState<"semantic" | "hybrid">(
     "semantic",
   );
-  const [parserChoice, setParserChoice] = useState<"vision_plus" | "docling_rag" | "pymupdf">("docling_rag");
+  const [parserChoice, setParserChoice] = useState<
+    "vision_plus" | "docling_rag" | "pymupdf"
+  >("docling_rag");
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -355,14 +362,20 @@ export default function RAGPage() {
 
   function handleFilesSelect(files: File[]): void {
     setPendingFiles((current) => {
-      const existing = new Set(current.map((file) => `${file.name}-${file.size}`));
-      const additions = files.filter((file) => !existing.has(`${file.name}-${file.size}`));
+      const existing = new Set(
+        current.map((file) => `${file.name}-${file.size}`),
+      );
+      const additions = files.filter(
+        (file) => !existing.has(`${file.name}-${file.size}`),
+      );
       return [...current, ...additions];
     });
   }
 
   function handleFileRemove(filename: string): void {
-    setPendingFiles((current) => current.filter((file) => file.name !== filename));
+    setPendingFiles((current) =>
+      current.filter((file) => file.name !== filename),
+    );
   }
 
   async function handleIndexDocuments(): Promise<void> {
@@ -622,7 +635,7 @@ export default function RAGPage() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="flex h-[calc(100vh-10rem)] flex-col sm:h-[calc(100vh-12rem)]"
+      className="flex h-[calc(100vh-9rem)] flex-col sm:h-[calc(100vh-11rem)]"
     >
       {/* Header */}
       <header className="mb-2">
@@ -648,164 +661,206 @@ export default function RAGPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-          {/* Document status badge - only show when documents exist */}
-          {hasDocuments && (
+            {/* Document status badge - only show when documents exist */}
+            {hasDocuments && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <FileText className="h-4 w-4" />
+                    {indexedCount} doc{indexedCount !== 1 ? "s" : ""} indexed
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 sm:w-72">
+                  <div className="overflow-x-hidden p-2">
+                    <DocumentList
+                      documents={indexedDocuments}
+                      onRemove={handleRemoveDocument}
+                      className="max-h-48 overflow-y-auto"
+                    />
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleClearCollection}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Clear all documents
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Upload button - only show when documents exist */}
+            {hasDocuments && (
+              <Dialog
+                open={uploadDialogOpen}
+                onOpenChange={setUploadDialogOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Upload PDF
+                  </Button>
+                </DialogTrigger>
+                <UploadDialogContent
+                  pendingFiles={pendingFiles}
+                  isIndexing={isIndexing}
+                  onFilesSelect={handleFilesSelect}
+                  onFileRemove={handleFileRemove}
+                  onIndex={handleIndexDocuments}
+                />
+              </Dialog>
+            )}
+
+            {/* Feedback - show when documents exist */}
+            {hasDocuments && <FeedbackButton demoType="rag" />}
+
+            {/* Settings */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <FileText className="h-4 w-4" />
-                  {indexedCount} doc{indexedCount !== 1 ? "s" : ""} indexed
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  Settings
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 sm:w-72">
-                <div className="overflow-x-hidden p-2">
-                  <DocumentList
-                    documents={indexedDocuments}
-                    onRemove={handleRemoveDocument}
-                    className="max-h-48 overflow-y-auto"
-                  />
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="space-y-4 p-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="topK" className="text-xs">
+                      Results (Top K)
+                    </Label>
+                    <Select
+                      value={String(topK)}
+                      onValueChange={(v) => setTopK(Number(v))}
+                    >
+                      <SelectTrigger id="topK" className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="3">3 chunks</SelectItem>
+                        <SelectItem value="5">5 chunks</SelectItem>
+                        <SelectItem value="10">10 chunks</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="parserChoice" className="text-xs">
+                      Parser
+                    </Label>
+                    <Select
+                      value={parserChoice}
+                      onValueChange={(v) =>
+                        setParserChoice(
+                          v as "vision_plus" | "docling_rag" | "pymupdf",
+                        )
+                      }
+                    >
+                      <SelectTrigger id="parserChoice" className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="vision_plus">
+                          Vision+ Parser
+                        </SelectItem>
+                        <SelectItem value="docling_rag">
+                          Docling RAG Parser
+                        </SelectItem>
+                        <SelectItem value="pymupdf">PyMuPDF</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {parserChoice === "vision_plus" ? (
+                    <p className="text-xs font-medium text-red-600">
+                      Demo only parses 10 pages with Vision+ parser
+                    </p>
+                  ) : null}
+                  <div className="space-y-2">
+                    <Label htmlFor="searchType" className="text-xs">
+                      Search Type
+                    </Label>
+                    <Select
+                      value={searchType}
+                      onValueChange={(v) =>
+                        setSearchType(v as "semantic" | "hybrid")
+                      }
+                    >
+                      <SelectTrigger id="searchType" className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="semantic">Semantic</SelectItem>
+                        <SelectItem value="hybrid">Hybrid</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-muted-foreground text-xs">
+                    {searchType === "semantic"
+                      ? "Uses vector similarity"
+                      : "Combines vectors + keywords"}
+                  </p>
                 </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleClearCollection}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Clear all documents
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
-
-          {/* Upload button - only show when documents exist */}
-          {hasDocuments && (
-            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Upload PDF
-                </Button>
-              </DialogTrigger>
-              <UploadDialogContent
-                pendingFiles={pendingFiles}
-                isIndexing={isIndexing}
-                onFilesSelect={handleFilesSelect}
-                onFileRemove={handleFileRemove}
-                onIndex={handleIndexDocuments}
-              />
-            </Dialog>
-          )}
-
-          {/* Feedback - show when documents exist */}
-          {hasDocuments && <FeedbackButton demoType="rag" />}
-
-          {/* Settings */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
-                <Settings2 className="h-4 w-4" />
-                Settings
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <div className="space-y-4 p-3">
-                <div className="space-y-2">
-                  <Label htmlFor="topK" className="text-xs">
-                    Results (Top K)
-                  </Label>
-                  <Select
-                    value={String(topK)}
-                    onValueChange={(v) => setTopK(Number(v))}
-                  >
-                    <SelectTrigger id="topK" className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="3">3 chunks</SelectItem>
-                      <SelectItem value="5">5 chunks</SelectItem>
-                      <SelectItem value="10">10 chunks</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="parserChoice" className="text-xs">
-                    Parser
-                  </Label>
-                  <Select
-                    value={parserChoice}
-                    onValueChange={(v) =>
-                      setParserChoice(v as "vision_plus" | "docling_rag" | "pymupdf")
-                    }
-                  >
-                    <SelectTrigger id="parserChoice" className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="vision_plus">Vision+ Parser</SelectItem>
-                      <SelectItem value="docling_rag">Docling RAG Parser</SelectItem>
-                      <SelectItem value="pymupdf">PyMuPDF</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {parserChoice === "vision_plus" ? (
-                  <p className="text-xs font-medium text-red-600">
-                    Demo only parses 10 pages with Vision+ parser
-                  </p>
-                ) : null}
-                <div className="space-y-2">
-                  <Label htmlFor="searchType" className="text-xs">
-                    Search Type
-                  </Label>
-                  <Select
-                    value={searchType}
-                    onValueChange={(v) =>
-                      setSearchType(v as "semantic" | "hybrid")
-                    }
-                  >
-                    <SelectTrigger id="searchType" className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="semantic">Semantic</SelectItem>
-                      <SelectItem value="hybrid">Hybrid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  {searchType === "semantic"
-                    ? "Uses vector similarity"
-                    : "Combines vectors + keywords"}
-                </p>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
           </div>
         </div>
       </header>
 
-      <Accordion type="single" collapsible className="mb-2 rounded-lg border bg-white px-4">
+      <Accordion
+        type="single"
+        collapsible
+        className="mb-2 rounded-lg border bg-white px-4"
+      >
         <AccordionItem value="how-it-works" className="border-b-0">
           <AccordionTrigger className="py-2.5 text-xs">
             <span className="text-muted-foreground">How it works</span>
           </AccordionTrigger>
-          <AccordionContent className="space-y-2 pb-3 text-xs leading-5 text-muted-foreground">
+          <AccordionContent className="text-muted-foreground space-y-2 pb-3 text-xs leading-5">
             <p>
-              This demo parses one or more PDF documents, breaks them into searchable chunks with metadata, stores them in an in-memory vector database, and lets you ask questions against the indexed content.
+              This demo parses one or more PDF documents, breaks them into
+              searchable chunks with metadata, stores them in an in-memory
+              vector database, and lets you ask questions against the indexed
+              content.
             </p>
             <p>
-              <strong>1. Upload one or more PDFs:</strong> You can index several PDF documents in one run. They are all added into the same temporary in-memory collection for retrieval.
+              <strong>1. Upload one or more PDFs:</strong> You can index several
+              PDF documents in one run. They are all added into the same
+              temporary in-memory collection for retrieval.
             </p>
             <p>
-              <strong>2. Choose the parser:</strong> The parser determines how the PDF is converted into chunked content before embedding.
+              <strong>2. Choose the parser:</strong> The parser determines how
+              the PDF is converted into chunked content before embedding.
             </p>
             <p>
-              <strong>3. Understand parser differences:</strong> <strong>Vision+ Parser:</strong> Used for high-quality parsing. It can interpret images and place their interpretation in the right location in the document flow. It is intended to extract everything from a document and produce vision-enhanced RAG chunks with metadata. In this demo, Vision+ is limited to 10 pages. Read more at <a href="https://medium.com/@umairali.khan/how-i-enhanced-doclings-image-interpretation-capabilities-641ce017bce5" target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">this article</a>. <strong>Docling RAG Parser:</strong> Uses the Docling parser running in Haaga-Helia as a service. It provides high quality parsing with metadata and returns ready-made RAG chunks. <strong>PyMuPDF:</strong> Uses direct PDF text extraction locally. It is the simplest parser and serves as the fallback path.
+              <strong>3. Understand parser differences:</strong>{" "}
+              <strong>Vision+ Parser:</strong> Used for high-quality parsing. It
+              can interpret images and place their interpretation in the right
+              location in the document flow. It is intended to extract
+              everything from a document and produce vision-enhanced RAG chunks
+              with metadata. In this demo, Vision+ is limited to 10 pages. Read
+              more at{" "}
+              <a
+                href="https://medium.com/@umairali.khan/how-i-enhanced-doclings-image-interpretation-capabilities-641ce017bce5"
+                target="_blank"
+                rel="noreferrer"
+                className="text-primary underline underline-offset-2"
+              >
+                this article
+              </a>
+              . <strong>Docling RAG Parser:</strong> Uses the Docling parser
+              running in Haaga-Helia as a service. It provides high quality
+              parsing with metadata and returns ready-made RAG chunks.{" "}
+              <strong>PyMuPDF:</strong> Uses direct PDF text extraction locally.
+              It is the simplest parser and serves as the fallback path.
             </p>
             <p>
-              <strong>4. Build the vector store:</strong> The parsed chunks are embedded and stored in an in-memory vector store. This collection is available only for the current backend process and session.
+              <strong>4. Build the vector store:</strong> The parsed chunks are
+              embedded and stored in an in-memory vector store. This collection
+              is available only for the current backend process and session.
             </p>
             <p>
-              <strong>5. Ask questions:</strong> The retriever finds the most relevant chunks, and the answer generator uses them to produce an answer with source citations.
+              <strong>5. Ask questions:</strong> The retriever finds the most
+              relevant chunks, and the answer generator uses them to produce an
+              answer with source citations.
             </p>
           </AccordionContent>
         </AccordionItem>
@@ -832,7 +887,9 @@ export default function RAGPage() {
                     <div className="bg-primary/10 mb-4 rounded-full p-4">
                       <Upload className="text-primary h-8 w-8" />
                     </div>
-                    <h2 className="mb-1.5 text-lg font-semibold">Get started</h2>
+                    <h2 className="mb-1.5 text-lg font-semibold">
+                      Get started
+                    </h2>
                     <p className="text-muted-foreground mb-4 max-w-sm text-center text-sm">
                       Try our example document or upload your own PDFs to ask
                       questions and get AI-powered answers with citations.

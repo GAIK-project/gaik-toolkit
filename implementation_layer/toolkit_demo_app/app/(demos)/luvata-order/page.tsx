@@ -1,8 +1,16 @@
 "use client";
 
+import { DemoPageHeader } from "@/components/demo/demo-page-header";
+import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import { FileUpload } from "@/components/demo/file-upload";
 import { FeedbackButton } from "@/components/feedback";
 import { Button } from "@/components/ui/button";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
   Card,
   CardContent,
@@ -30,8 +38,6 @@ import {
   File as FileIcon,
   FileText,
   Loader2,
-  ArrowLeft,
-  ChevronDown,
   Package,
   RotateCcw,
   Upload,
@@ -40,7 +46,6 @@ import {
 import { motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 interface EnrichedItem {
@@ -81,7 +86,6 @@ interface ProcessOrderResponse {
 }
 
 export default function LuvataOrderPage() {
-  const router = useRouter();
   const abortControllerRef = useRef<AbortController | null>(null);
   const [poFile, setPoFile] = useState<File | null>(null);
   const [bomFiles, setBomFiles] = useState<File[]>([]);
@@ -90,8 +94,6 @@ export default function LuvataOrderPage() {
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
   const [result, setResult] = useState<ProcessOrderResponse | null>(null);
-  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
-  const [sourceDocumentsOpen, setSourceDocumentsOpen] = useState(false);
   const [activeDocumentTab, setActiveDocumentTab] = useState("po");
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [pricingPreviewText, setPricingPreviewText] = useState("");
@@ -107,7 +109,9 @@ export default function LuvataOrderPage() {
       const fetchExampleFile = async (url: string) => {
         const response = await fetch(url);
         if (!response.ok) {
-          throw new Error(`Failed to fetch example asset: ${url} (${response.status})`);
+          throw new Error(
+            `Failed to fetch example asset: ${url} (${response.status})`,
+          );
         }
         return response.blob();
       };
@@ -280,18 +284,30 @@ export default function LuvataOrderPage() {
       });
   }, [pricingFile]);
 
-  const documentTabs = useMemo(() => [
-    ...(poFile ? [{ key: "po", label: "PO", type: "pdf" as const, file: poFile }] : []),
-    ...bomFiles.map((file, index) => ({
-      key: `bom-${index}`,
-      label: `BOM ${index + 1}`,
-      type: "pdf" as const,
-      file,
-    })),
-    ...(pricingFile
-      ? [{ key: "pricing", label: "Pricing table", type: "sheet" as const, file: pricingFile }]
-      : []),
-  ], [poFile, bomFiles, pricingFile]);
+  const documentTabs = useMemo(
+    () => [
+      ...(poFile
+        ? [{ key: "po", label: "PO", type: "pdf" as const, file: poFile }]
+        : []),
+      ...bomFiles.map((file, index) => ({
+        key: `bom-${index}`,
+        label: `BOM ${index + 1}`,
+        type: "pdf" as const,
+        file,
+      })),
+      ...(pricingFile
+        ? [
+            {
+              key: "pricing",
+              label: "Pricing table",
+              type: "sheet" as const,
+              file: pricingFile,
+            },
+          ]
+        : []),
+    ],
+    [poFile, bomFiles, pricingFile],
+  );
 
   useEffect(() => {
     if (documentTabs.length === 0) {
@@ -304,7 +320,8 @@ export default function LuvataOrderPage() {
     }
   }, [documentTabs, activeDocumentTab]);
 
-  const activeDocument = documentTabs.find((tab) => tab.key === activeDocumentTab) ?? null;
+  const activeDocument =
+    documentTabs.find((tab) => tab.key === activeDocumentTab) ?? null;
 
   const resetDemo = () => {
     setPoFile(null);
@@ -318,35 +335,15 @@ export default function LuvataOrderPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       {/* Header */}
-      <div className="space-y-4">
-        <div>
-          <Button
-            type="button"
-            variant="ghost"
-            className="-ml-3 h-9 rounded-full px-3 text-sm"
-            onClick={() => {
-              router.push("/");
-            }}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </div>
-
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="flex items-center gap-2 font-serif text-3xl font-semibold tracking-tight">
-              <Package className="h-8 w-8" />
-              Purchase Order Processing
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              Process purchase orders with BOM matching and automated pricing
-              calculations
-            </p>
-          </div>
+      <DemoPageHeader
+        icon={Package}
+        title="Purchase Order Processing"
+        description="Process purchase orders with BOM matching and automated pricing calculations"
+      >
+        <div className="mt-2 flex justify-end">
           <FeedbackButton demoType="luvata-order" />
         </div>
-      </div>
+      </DemoPageHeader>
 
       {/* Upload Section */}
       <Card>
@@ -360,14 +357,16 @@ export default function LuvataOrderPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3 md:items-start">
             <div className="flex flex-col gap-2">
-              <label className="block text-sm font-medium">Purchase Order PDF</label>
+              <label className="block text-sm font-medium">
+                Purchase Order PDF
+              </label>
               <FileUpload
                 accept=".pdf"
                 file={poFile}
                 onFileSelect={setPoFile}
               />
             </div>
-            <div className="flex flex-col gap-2 w-full">
+            <div className="flex w-full flex-col gap-2">
               <label className="block text-sm font-medium">
                 BOM PDFs (multiple)
               </label>
@@ -377,22 +376,28 @@ export default function LuvataOrderPage() {
                   {bomFiles.map((file, index) => (
                     <div
                       key={`${file.name}-${index}`}
-                      className="flex items-center gap-3 rounded-lg border border-success/30 bg-success/10 p-4"
+                      className="border-success/30 bg-success/10 flex items-center gap-3 rounded-lg border p-4"
                     >
-                      <CheckCircle className="h-5 w-5 text-success" />
-                      <FileIcon className="h-5 w-5 text-muted-foreground" />
+                      <CheckCircle className="text-success h-5 w-5" />
+                      <FileIcon className="text-muted-foreground h-5 w-5" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{file.name}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="truncate text-sm font-medium">
+                          {file.name}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
                           {formatFileSize(file.size)}
                         </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => {
-                          setBomFiles(bomFiles.filter((_, fileIndex) => fileIndex !== index));
+                          setBomFiles(
+                            bomFiles.filter(
+                              (_, fileIndex) => fileIndex !== index,
+                            ),
+                          );
                         }}
-                        className="rounded-full p-1 transition-colors hover:bg-success/20"
+                        className="hover:bg-success/20 rounded-full p-1 transition-colors"
                         aria-label={`Remove ${file.name}`}
                       >
                         <X className="h-4 w-4" />
@@ -400,7 +405,7 @@ export default function LuvataOrderPage() {
                     </div>
                   ))}
 
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-muted-foreground/25 px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/50">
+                  <label className="border-muted-foreground/25 text-muted-foreground hover:border-primary/50 hover:bg-muted/50 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-3 text-sm font-medium transition-colors">
                     <Upload className="h-4 w-4" />
                     Add more BOM PDFs
                     <input
@@ -418,11 +423,13 @@ export default function LuvataOrderPage() {
                   </label>
                 </div>
               ) : (
-                <label className="flex min-h-[176px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-8 transition-all hover:border-primary/50 hover:bg-muted/50">
-                  <Upload className="h-10 w-10 text-muted-foreground" />
+                <label className="border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50 flex min-h-[176px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 transition-all">
+                  <Upload className="text-muted-foreground h-10 w-10" />
                   <div className="text-center">
-                    <p className="font-medium">Drag & drop or click to upload</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p className="font-medium">
+                      Drag & drop or click to upload
+                    </p>
+                    <p className="text-muted-foreground mt-1 text-sm">
                       Supports: .pdf (multiple files, max 10MB each)
                     </p>
                   </div>
@@ -449,7 +456,7 @@ export default function LuvataOrderPage() {
             </div>
           </div>
 
-          <div className="border-t border-border/60 pt-4">
+          <div className="border-border/60 border-t pt-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <Button
                 onClick={processOrder}
@@ -501,90 +508,99 @@ export default function LuvataOrderPage() {
 
       {documentTabs.length > 0 && (
         <Card>
-          <button
-            type="button"
-            onClick={() => setSourceDocumentsOpen((open) => !open)}
-            className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-muted/30"
-            aria-expanded={sourceDocumentsOpen}
-          >
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Source Documents</h2>
-              <p className="mt-1 text-sm text-muted-foreground">View the uploaded input documents.</p>
-            </div>
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <span>{sourceDocumentsOpen ? "Hide" : "Show"}</span>
-              <ChevronDown
-                className={`h-5 w-5 shrink-0 transition-transform ${sourceDocumentsOpen ? "rotate-180" : "rotate-0"}`}
-              />
-            </div>
-          </button>
-          {sourceDocumentsOpen && (
-            <CardContent className="space-y-4 border-t pt-5">
-              <div className="flex flex-wrap gap-2">
-                {documentTabs.map((tab) => (
-                  <Button
-                    key={tab.key}
-                    type="button"
-                    variant={activeDocumentTab === tab.key ? "default" : "outline"}
-                    className="rounded-full"
-                    onClick={() => setActiveDocumentTab(tab.key)}
-                  >
-                    {tab.label}
-                  </Button>
-                ))}
-              </div>
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="source-documents" className="border-none">
+              <AccordionTrigger className="px-6 py-4 text-left hover:no-underline">
+                <div>
+                  <span className="text-base font-semibold">
+                    Source Documents
+                  </span>
+                  <p className="text-muted-foreground mt-1 text-sm font-normal">
+                    View the uploaded input documents.
+                  </p>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-6 pb-6">
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    {documentTabs.map((tab) => (
+                      <Button
+                        key={tab.key}
+                        type="button"
+                        variant={
+                          activeDocumentTab === tab.key ? "default" : "outline"
+                        }
+                        className="rounded-full"
+                        onClick={() => setActiveDocumentTab(tab.key)}
+                      >
+                        {tab.label}
+                      </Button>
+                    ))}
+                  </div>
 
-              <div className="overflow-hidden rounded-xl border bg-muted/15">
-                {activeDocument?.type === "pdf" && previewUrls[activeDocument.key] ? (
-                  <iframe
-                    title={activeDocument.label}
-                    src={`${previewUrls[activeDocument.key]}#toolbar=0`}
-                    className="h-[720px] w-full bg-white"
-                  />
-                ) : activeDocument?.type === "sheet" ? (
-                  <div className="space-y-4 p-5">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{activeDocument.file.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatFileSize(activeDocument.file.size)}
-                        </p>
-                      </div>
-                      {previewUrls[activeDocument.key] && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            window.open(previewUrls[activeDocument.key], "_blank");
-                          }}
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Open file
-                        </Button>
-                      )}
-                    </div>
+                  <div className="bg-muted/15 overflow-hidden rounded-xl border">
+                    {activeDocument?.type === "pdf" &&
+                    previewUrls[activeDocument.key] ? (
+                      <iframe
+                        title={activeDocument.label}
+                        src={`${previewUrls[activeDocument.key]}#toolbar=0`}
+                        className="h-[720px] w-full bg-white"
+                      />
+                    ) : activeDocument?.type === "sheet" ? (
+                      <div className="space-y-4 p-5">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-foreground text-sm font-medium">
+                              {activeDocument.file.name}
+                            </p>
+                            <p className="text-muted-foreground text-sm">
+                              {formatFileSize(activeDocument.file.size)}
+                            </p>
+                          </div>
+                          {previewUrls[activeDocument.key] && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                window.open(
+                                  previewUrls[activeDocument.key],
+                                  "_blank",
+                                );
+                              }}
+                            >
+                              <Download className="mr-2 h-4 w-4" />
+                              Open file
+                            </Button>
+                          )}
+                        </div>
 
-                    {pricingPreviewText ? (
-                      <div className="rounded-lg border bg-background p-4">
-                        <p className="mb-3 text-sm font-medium text-foreground">CSV preview</p>
-                        <pre className="overflow-x-auto whitespace-pre-wrap text-xs text-muted-foreground">
-                          {pricingPreviewText}
-                        </pre>
+                        {pricingPreviewText ? (
+                          <div className="bg-background rounded-lg border p-4">
+                            <p className="text-foreground mb-3 text-sm font-medium">
+                              CSV preview
+                            </p>
+                            <pre className="text-muted-foreground overflow-x-auto text-xs whitespace-pre-wrap">
+                              {pricingPreviewText}
+                            </pre>
+                          </div>
+                        ) : (
+                          <div className="bg-background/70 text-muted-foreground rounded-lg border border-dashed p-6 text-sm">
+                            Spreadsheet preview is not rendered inline for this
+                            file type. Use <strong>Open file</strong> to inspect
+                            the uploaded pricing table.
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <div className="rounded-lg border border-dashed bg-background/70 p-6 text-sm text-muted-foreground">
-                        Spreadsheet preview is not rendered inline for this file type. Use <strong>Open file</strong> to inspect the uploaded pricing table.
+                      <div className="text-muted-foreground p-6 text-sm">
+                        No preview available for this document.
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="p-6 text-sm text-muted-foreground">
-                    No preview available for this document.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </Card>
       )}
 
@@ -619,34 +635,38 @@ export default function LuvataOrderPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-success" />
+                <CheckCircle2 className="text-success h-5 w-5" />
                 Order Summary
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-5">
                 <div>
-                  <p className="text-sm text-muted-foreground">PO Number</p>
+                  <p className="text-muted-foreground text-sm">PO Number</p>
                   <p className="text-lg font-semibold">{result.po_number}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Customer</p>
+                  <p className="text-muted-foreground text-sm">Customer</p>
                   <p className="text-lg font-semibold">{result.customer}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Material Subtotal</p>
+                  <p className="text-muted-foreground text-sm">
+                    Material Subtotal
+                  </p>
                   <p className="text-lg font-semibold">
                     ${(result.summary?.material_subtotal ?? 0).toFixed(2)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Processing Fees</p>
+                  <p className="text-muted-foreground text-sm">
+                    Processing Fees
+                  </p>
                   <p className="text-lg font-semibold">
                     ${(result.summary?.total_fees ?? 0).toFixed(2)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Grand Total</p>
+                  <p className="text-muted-foreground text-sm">Grand Total</p>
                   <p className="text-lg font-semibold">
                     ${(result.summary?.grand_total ?? 0).toFixed(2)}
                   </p>
@@ -659,7 +679,7 @@ export default function LuvataOrderPage() {
           {result.errors.length > 0 && (
             <Card className="border-destructive/30 bg-destructive/10">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-destructive">
+                <CardTitle className="text-destructive flex items-center gap-2">
                   <AlertCircle className="h-5 w-5" />
                   Errors
                 </CardTitle>
@@ -667,7 +687,7 @@ export default function LuvataOrderPage() {
               <CardContent>
                 <ul className="list-disc space-y-1 pl-4">
                   {result.errors.map((error, i) => (
-                    <li key={i} className="text-sm text-destructive">
+                    <li key={i} className="text-destructive text-sm">
                       {error}
                     </li>
                   ))}
@@ -723,8 +743,10 @@ export default function LuvataOrderPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div>${item.total_fees.toFixed(2)}</div>
-                          <div className="text-xs text-muted-foreground">
-                            C ${item.cutting_fee.toFixed(2)} | T ${item.testing_fee.toFixed(2)} | Cert ${item.cert_fee.toFixed(2)}
+                          <div className="text-muted-foreground text-xs">
+                            C ${item.cutting_fee.toFixed(2)} | T $
+                            {item.testing_fee.toFixed(2)} | Cert $
+                            {item.cert_fee.toFixed(2)}
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
@@ -749,7 +771,7 @@ export default function LuvataOrderPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-hidden rounded-xl border bg-muted/15">
+                <div className="bg-muted/15 overflow-hidden rounded-xl border">
                   <iframe
                     title="Order Draft Preview"
                     src={`/api/luvata-order/pdf/${result.pdf_job_id}#toolbar=0`}
@@ -766,7 +788,10 @@ export default function LuvataOrderPage() {
               variant="outline"
               className="w-full"
               onClick={() => {
-                window.open(`/api/luvata-order/pdf/${result.pdf_job_id}?download=1`, "_blank");
+                window.open(
+                  `/api/luvata-order/pdf/${result.pdf_job_id}?download=1`,
+                  "_blank",
+                );
               }}
             >
               <Download className="mr-2 h-4 w-4" />
@@ -778,58 +803,39 @@ export default function LuvataOrderPage() {
 
       {/* Info Card */}
       {!result && !processing && (
-        <Card>
-          <button
-            type="button"
-            onClick={() => setHowItWorksOpen((open) => !open)}
-            className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-muted/30"
-            aria-expanded={howItWorksOpen}
-          >
-            <h2 className="text-lg font-semibold text-foreground">How It Works</h2>
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <span>{howItWorksOpen ? "Hide" : "Show"}</span>
-              <ChevronDown
-                className={`h-5 w-5 shrink-0 transition-transform ${howItWorksOpen ? "rotate-180" : "rotate-0"}`}
-              />
-            </div>
-          </button>
-          {howItWorksOpen && (
-            <CardContent className="space-y-4 border-t pt-5 text-sm text-muted-foreground">
-              <p>
-                <strong>1. Upload the source files:</strong> Provide one purchase
-                order PDF, one or more BOM PDFs, and a pricing file in CSV or
-                Excel format. If you want to test quickly, use
-                <strong> Load Example</strong> to load the built-in sample set.
-              </p>
-              <p>
-                <strong>2. Parse and extract key fields:</strong> The tool parses
-                each document into markdown and extracts the main PO fields such
-                as PO number, customer, material numbers, descriptions,
-                quantities, and delivery dates. From each BOM it extracts the
-                material ID, type/part designation, dimensions, material grade,
-                and fee-related requirement flags such as cutting, testing, and
-                certificates.
-              </p>
-              <p>
-                <strong>3. Match PO items to BOMs and pricing rows:</strong> Each
-                PO line is matched to a BOM using the material code. The matched
-                BOM is then linked to the pricing table, primarily by item or
-                material ID and secondarily by type designation when needed.
-              </p>
-              <p>
-                <strong>4. Calculate the order value:</strong> The tool computes a
-                material subtotal from quantity and unit price, then adds the
-                applicable processing fees from the pricing table, such as
-                Cutting, testing, and certificate fees, as mentioned in the BoM.
-              </p>
-              <p>
-                <strong>5. Generate the order draft:</strong> The result view shows
-                the order lines, fee breakdowns, totals, and any errors. It also
-                generates a downloadable order-draft PDF.
-              </p>
-            </CardContent>
-          )}
-        </Card>
+        <HowItWorksCard>
+          <p>
+            <strong>1. Upload the source files:</strong> Provide one purchase
+            order PDF, one or more BOM PDFs, and a pricing file in CSV or Excel
+            format. If you want to test quickly, use
+            <strong> Load Example</strong> to load the built-in sample set.
+          </p>
+          <p>
+            <strong>2. Parse and extract key fields:</strong> The tool parses
+            each document into markdown and extracts the main PO fields such as
+            PO number, customer, material numbers, descriptions, quantities, and
+            delivery dates. From each BOM it extracts the material ID, type/part
+            designation, dimensions, material grade, and fee-related requirement
+            flags such as cutting, testing, and certificates.
+          </p>
+          <p>
+            <strong>3. Match PO items to BOMs and pricing rows:</strong> Each PO
+            line is matched to a BOM using the material code. The matched BOM is
+            then linked to the pricing table, primarily by item or material ID
+            and secondarily by type designation when needed.
+          </p>
+          <p>
+            <strong>4. Calculate the order value:</strong> The tool computes a
+            material subtotal from quantity and unit price, then adds the
+            applicable processing fees from the pricing table, such as Cutting,
+            testing, and certificate fees, as mentioned in the BoM.
+          </p>
+          <p>
+            <strong>5. Generate the order draft:</strong> The result view shows
+            the order lines, fee breakdowns, totals, and any errors. It also
+            generates a downloadable order-draft PDF.
+          </p>
+        </HowItWorksCard>
       )}
     </div>
   );

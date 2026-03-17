@@ -179,7 +179,8 @@ const buildingBlocks: Demo[] = [
   },
   {
     title: "Parser",
-    description: "Read text and layout from PDF, Word files, and images accurately",
+    description:
+      "Read text and layout from PDF, Word files, and images accurately",
     href: "/parser",
     icon: FileText,
   },
@@ -197,7 +198,8 @@ const buildingBlocks: Demo[] = [
   },
   {
     title: "Text-to-Speech",
-    description: "Generate downloadable spoken audio from text in Finnish or English",
+    description:
+      "Generate downloadable spoken audio from text in Finnish or English",
     href: "/text-to-speech",
     icon: Volume2,
   },

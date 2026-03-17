@@ -2,6 +2,7 @@
 
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { FileUpload } from "@/components/demo/file-upload";
+import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import {
   EmptyStateCard,
   ResultCard,
@@ -34,7 +35,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import {
-  ArrowLeft,
   ArrowRight,
   Download,
   ExternalLink,
@@ -46,7 +46,6 @@ import {
   Video,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
@@ -90,7 +89,6 @@ const workflowItems = [
 ];
 
 export default function DentalTranscriptionPage() {
-  const router = useRouter();
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [language, setLanguage] = useState("auto");
   const [result, setResult] = useState<TranscriptionResult | null>(null);
@@ -288,25 +286,13 @@ export default function DentalTranscriptionPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <header className="mb-6 space-y-3 pl-1">
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-10 w-fit rounded-xl px-3"
-          onClick={() => router.push("/")}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-          <Mic className="text-primary h-8 w-8" />
-          Video Transcription & Subtitles
-        </h1>
-        <p className="text-muted-foreground max-w-2xl leading-relaxed">
-          Upload a recording or open the ready-made example. Whisper turns
-          speech into a transcript and subtitle files (SRT &amp; VTT).
-        </p>
-        <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+      <DemoPageHeader
+        icon={Mic}
+        iconClassName="text-primary h-8 w-8"
+        title="Video Transcription & Subtitles"
+        description="Upload a recording or open the ready-made example. Whisper turns speech into a transcript and subtitle files (SRT & VTT)."
+      >
+        <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           {workflowItems.map((item, i) => (
             <span key={item.title} className="flex items-center gap-1.5">
               <span className="bg-primary/10 text-primary inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold">
@@ -316,7 +302,7 @@ export default function DentalTranscriptionPage() {
             </span>
           ))}
         </div>
-      </header>
+      </DemoPageHeader>
 
       <div className="space-y-6">
         <Card className="shadow-md">
@@ -425,7 +411,7 @@ export default function DentalTranscriptionPage() {
                   title={`SRT Subtitles (${result.segments_count} segments)`}
                   copyContent={result.srt_content}
                 >
-                  <pre className="bg-muted max-h-96 overflow-auto rounded-lg p-4 font-mono text-sm whitespace-pre-wrap wrap-break-word">
+                  <pre className="bg-muted max-h-96 overflow-auto rounded-lg p-4 font-mono text-sm wrap-break-word whitespace-pre-wrap">
                     {result.srt_content || "No subtitle data available."}
                   </pre>
                 </ResultCard>

@@ -71,7 +71,7 @@ export function ResultCard({
                 className="h-8 w-8"
               >
                 {copied ? (
-                  <Check className="h-4 w-4 text-success" />
+                  <Check className="text-success h-4 w-4" />
                 ) : (
                   <Copy className="h-4 w-4" />
                 )}
@@ -212,15 +212,21 @@ export function EmptyStateCard({
   const displayTitle = title ?? message ?? "";
   const displayDescription = description;
   return (
-    <Card className={variant === "bordered" ? "border-dashed" : "border-dashed"}>
+    <Card
+      className={variant === "bordered" ? "border-dashed" : "border-dashed"}
+    >
       <CardContent className="flex items-center justify-center py-12">
         <div className="text-center">
-          {Icon && <Icon className="text-muted-foreground mx-auto mb-3 h-8 w-8" />}
+          {Icon && (
+            <Icon className="text-muted-foreground mx-auto mb-3 h-8 w-8" />
+          )}
           {displayTitle && (
             <p className="text-muted-foreground font-medium">{displayTitle}</p>
           )}
           {displayDescription && (
-            <p className="text-muted-foreground mt-1 text-sm">{displayDescription}</p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {displayDescription}
+            </p>
           )}
           {feedbackSlot && <div className="mt-3">{feedbackSlot}</div>}
         </div>

@@ -24,8 +24,8 @@ export function Hero() {
             GAIK Toolkit Demos
           </h1>
           <p className="text-muted-foreground max-w-2xl text-lg">
-            Interactive demos of GAIK toolkit's software components,
-            software modules, and general use cases.
+            Interactive demos of GAIK toolkit's software components, software
+            modules, and general use cases.
           </p>
         </div>
 

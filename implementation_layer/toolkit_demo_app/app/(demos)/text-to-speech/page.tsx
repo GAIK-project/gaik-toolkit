@@ -7,6 +7,8 @@ import {
   LoadingCard,
   ResultCard,
 } from "@/components/demo/result-card";
+import { DemoPageHeader } from "@/components/demo/demo-page-header";
+import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import {
   Accordion,
   AccordionContent,
@@ -30,9 +32,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, ChevronDown, Download, RotateCcw, Volume2 } from "lucide-react";
+import { Download, RotateCcw, Volume2 } from "lucide-react";
 import { motion } from "motion/react";
-import { useRouter } from "next/navigation";
 import posthog from "posthog-js";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
@@ -65,12 +66,10 @@ interface TextToSpeechResult {
 }
 
 export default function TextToSpeechPage() {
-  const router = useRouter();
   const [text, setText] = useState("");
   const [voice, setVoice] = useState<Voice>("alloy");
   const [language, setLanguage] = useState<Language>("fi");
   const [isLoading, setIsLoading] = useState(false);
-  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [result, setResult] = useState<TextToSpeechResult | null>(null);
 
   function loadExample(): void {
@@ -166,23 +165,11 @@ export default function TextToSpeechPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <header className="mb-8">
-        <Button
-          variant="ghost"
-          className="mb-4 -ml-3 gap-2"
-          onClick={() => router.push("/")}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back
-        </Button>
-        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-          <Volume2 className="h-8 w-8" />
-          Text-to-Speech
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Convert text into downloadable speech audio using OpenAI or Azure OpenAI.
-        </p>
-      </header>
+      <DemoPageHeader
+        icon={Volume2}
+        title="Text-to-Speech"
+        description="Convert text into downloadable speech audio using OpenAI or Azure OpenAI."
+      />
 
       <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
         <div className="space-y-6">
@@ -192,11 +179,18 @@ export default function TextToSpeechPage() {
                 <div>
                   <CardTitle>Input Text</CardTitle>
                   <CardDescription>
-                    Enter up to {MAX_CHARACTERS} characters and generate spoken audio.
+                    Enter up to {MAX_CHARACTERS} characters and generate spoken
+                    audio.
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={loadExample} disabled={isLoading}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={loadExample}
+                    disabled={isLoading}
+                  >
                     Load Example
                   </Button>
                   <Button
@@ -204,7 +198,13 @@ export default function TextToSpeechPage() {
                     variant="outline"
                     size="sm"
                     onClick={resetDemo}
-                    disabled={isLoading || (!text && !result && voice === "alloy" && language === "fi")}
+                    disabled={
+                      isLoading ||
+                      (!text &&
+                        !result &&
+                        voice === "alloy" &&
+                        language === "fi")
+                    }
                     className="gap-2"
                   >
                     <RotateCcw className="h-4 w-4" />
@@ -219,7 +219,9 @@ export default function TextToSpeechPage() {
                 <Textarea
                   id="tts-text"
                   value={text}
-                  onChange={(event) => setText(event.target.value.slice(0, MAX_CHARACTERS))}
+                  onChange={(event) =>
+                    setText(event.target.value.slice(0, MAX_CHARACTERS))
+                  }
                   placeholder="Write the text you want to convert into speech..."
                   rows={10}
                   disabled={isLoading}
@@ -229,44 +231,60 @@ export default function TextToSpeechPage() {
                 </div>
               </div>
 
-              <Accordion type="single" collapsible defaultValue="settings" className="w-full">
+              <Accordion
+                type="single"
+                collapsible
+                defaultValue="settings"
+                className="w-full"
+              >
                 <AccordionItem value="settings" className="border-none">
                   <AccordionTrigger className="text-muted-foreground hover:text-foreground py-2 text-sm font-medium">
                     Speech Settings
                   </AccordionTrigger>
-                  <AccordionContent className="space-y-4 pt-4">
-                    <div className="space-y-2">
-                      <div className="space-y-1">
+                  <AccordionContent className="pt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
                         <Label htmlFor="tts-language">Language</Label>
-                        <p className="text-muted-foreground text-xs">The model can also infer the text language automatically.</p>
+                        <Select
+                          value={language}
+                          onValueChange={(value: Language) =>
+                            setLanguage(value)
+                          }
+                          disabled={isLoading}
+                        >
+                          <SelectTrigger id="tts-language">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="fi">fi</SelectItem>
+                            <SelectItem value="en">en</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Select value={language} onValueChange={(value: Language) => setLanguage(value)} disabled={isLoading}>
-                        <SelectTrigger id="tts-language">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="fi">fi</SelectItem>
-                          <SelectItem value="en">en</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="tts-voice">Voice</Label>
-                      <Select value={voice} onValueChange={(value: Voice) => setVoice(value)} disabled={isLoading}>
-                        <SelectTrigger id="tts-voice">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {VOICES.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-2">
+                        <Label htmlFor="tts-voice">Voice</Label>
+                        <Select
+                          value={voice}
+                          onValueChange={(value: Voice) => setVoice(value)}
+                          disabled={isLoading}
+                        >
+                          <SelectTrigger id="tts-voice">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {VOICES.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-
+                    <p className="text-muted-foreground mt-3 text-xs">
+                      The model can also infer the text language automatically.
+                    </p>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
@@ -282,40 +300,26 @@ export default function TextToSpeechPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-6 py-5 text-left"
-              onClick={() => setHowItWorksOpen((current) => !current)}
-            >
-              <div>
-                <CardTitle>How It Works</CardTitle>
-                <CardDescription className="mt-1">
-                  Convert text into speech and download the generated audio.
-                </CardDescription>
-              </div>
-              <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-                {howItWorksOpen ? "Hide" : "Show"}
-                <ChevronDown className={`h-4 w-4 transition-transform ${howItWorksOpen ? "rotate-180" : ""}`} />
-              </div>
-            </button>
-            {howItWorksOpen ? (
-              <CardContent className="text-muted-foreground space-y-3 text-sm leading-6">
-                <p>
-                  <strong>1. Enter text:</strong> Add the text you want the model to speak. The demo accepts up to 1000 characters.
-                </p>
-                <p>
-                  <strong>2. Choose voice and language:</strong> Select one of the supported voices and choose whether the speech should be generated in Finnish or English.
-                </p>
-                <p>
-                  <strong>3. Generate audio:</strong> The backend uses the `gpt-4o-mini-tts` text-to-speech model through the standalone GAIK `TextToSpeech` software component.
-                </p>
-                <p>
-                  <strong>4. Review and download:</strong> After generation, you can play the audio in the browser and download the generated file.
-                </p>
-              </CardContent>
-            ) : null}
-          </Card>
+          <HowItWorksCard description="Convert text into speech and download the generated audio.">
+            <p>
+              <strong>1. Enter text:</strong> Add the text you want the model to
+              speak. The demo accepts up to 1000 characters.
+            </p>
+            <p>
+              <strong>2. Choose voice and language:</strong> Select one of the
+              supported voices and choose whether the speech should be generated
+              in Finnish or English.
+            </p>
+            <p>
+              <strong>3. Generate audio:</strong> The backend uses the
+              `gpt-4o-mini-tts` text-to-speech model through the standalone GAIK
+              `TextToSpeech` software component.
+            </p>
+            <p>
+              <strong>4. Review and download:</strong> After generation, you can
+              play the audio in the browser and download the generated file.
+            </p>
+          </HowItWorksCard>
         </div>
 
         <div>
@@ -335,13 +339,23 @@ export default function TextToSpeechPage() {
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Card className="bg-muted/40">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Generation Details</CardTitle>
+                      <CardTitle className="text-base">
+                        Generation Details
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-1 text-sm">
-                      <p><strong>Model:</strong> {result.model}</p>
-                      <p><strong>Voice:</strong> {result.voice}</p>
-                      <p><strong>Language:</strong> {result.language}</p>
-                      <p><strong>Characters:</strong> {result.character_count}</p>
+                      <p>
+                        <strong>Model:</strong> {result.model}
+                      </p>
+                      <p>
+                        <strong>Voice:</strong> {result.voice}
+                      </p>
+                      <p>
+                        <strong>Language:</strong> {result.language}
+                      </p>
+                      <p>
+                        <strong>Characters:</strong> {result.character_count}
+                      </p>
                     </CardContent>
                   </Card>
                   <Card className="bg-muted/40">
@@ -349,8 +363,12 @@ export default function TextToSpeechPage() {
                       <CardTitle className="text-base">Audio File</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
-                      <p><strong>Filename:</strong> {result.filename}</p>
-                      <p><strong>Format:</strong> {result.response_format}</p>
+                      <p className="break-all">
+                        <strong>Filename:</strong> {result.filename}
+                      </p>
+                      <p>
+                        <strong>Format:</strong> {result.response_format}
+                      </p>
                       <Button onClick={handleDownload} className="w-full gap-2">
                         <Download className="h-4 w-4" />
                         Download Audio

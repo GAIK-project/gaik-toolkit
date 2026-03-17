@@ -1,7 +1,9 @@
 "use client";
 
 import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { FileUpload } from "@/components/demo/file-upload";
+import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import { IncidentDetails } from "@/components/demo/incident-details";
 import {
   EmptyStateCard,
@@ -27,7 +29,6 @@ import { cn } from "@/lib/utils";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import {
   AlertTriangle,
-  ArrowLeft,
   ChevronDown,
   ChevronUp,
   ClipboardPaste,
@@ -45,7 +46,6 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 const DEFAULT_INCIDENT_SCHEMA = `Extract the following from the incident report:
@@ -57,7 +57,8 @@ const DEFAULT_INCIDENT_SCHEMA = `Extract the following from the incident report:
 - Immediate actions taken
 - Witness information (if any)`;
 
-const DEFAULT_AUTO_REQUIREMENTS = "Extract all relevant incident details automatically including date, time, location, description, people involved, injuries, damages, and actions taken.";
+const DEFAULT_AUTO_REQUIREMENTS =
+  "Extract all relevant incident details automatically including date, time, location, description, people involved, injuries, damages, and actions taken.";
 
 const EXAMPLE_INCIDENT_TEXT = `Incident Report
 
@@ -87,7 +88,6 @@ interface IncidentReportResult {
 }
 
 export default function IncidentReportPage() {
-  const router = useRouter();
   const [inputMode, setInputMode] = useState<"audio" | "text">("audio");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [textInput, setTextInput] = useState("");
@@ -104,7 +104,6 @@ export default function IncidentReportPage() {
   const [result, setResult] = useState<IncidentReportResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pipelineSteps, setPipelineSteps] = useState<SSEStep[]>([]);
-  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -122,15 +121,15 @@ export default function IncidentReportPage() {
     abortControllerRef.current = new AbortController();
 
     const userRequirements =
-      extractionMode === "auto"
-        ? DEFAULT_AUTO_REQUIREMENTS
-        : customSchema;
+      extractionMode === "auto" ? DEFAULT_AUTO_REQUIREMENTS : customSchema;
     const usingPersistedSchema =
       extractionMode === "auto" ||
       customSchema.trim() === DEFAULT_INCIDENT_SCHEMA.trim();
 
     if (!usingPersistedSchema && !regenerateSchema) {
-      toast.error("If you modify the extraction task, enable Regenerate Schema before extraction.");
+      toast.error(
+        "If you modify the extraction task, enable Regenerate Schema before extraction.",
+      );
       return;
     }
 
@@ -141,7 +140,6 @@ export default function IncidentReportPage() {
     // Steps are sent by backend via SSE
 
     try {
-
       const formData = new FormData();
       formData.append("user_requirements", userRequirements);
       formData.append("generate_pdf", String(generatePdf));
@@ -266,24 +264,13 @@ export default function IncidentReportPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <header className="mb-8 pl-1">
-        <Button
-          type="button"
-          variant="ghost"
-          className="mb-4 h-10 rounded-xl px-3"
-          onClick={() => router.push("/")}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-        <h1 className="flex items-center gap-3 font-serif text-3xl font-semibold tracking-tight">
-          <AlertTriangle className="h-8 w-8 text-amber-500" />
-          Incident Reporting
-        </h1>
-        <p className="text-muted-foreground mt-2 text-lg">
-          Easily report incidents via voice or text. AI handles the rest.
-        </p>
-      </header>
+      <DemoPageHeader
+        icon={AlertTriangle}
+        iconClassName="h-8 w-8 text-amber-500"
+        title="Incident Reporting"
+        description="Easily report incidents via voice or text. AI handles the rest."
+        className="mb-8"
+      />
 
       <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
         <div className="space-y-6">
@@ -379,13 +366,18 @@ export default function IncidentReportPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={inputMode === "audio" ? loadExampleAudio : loadExampleText}
+                    onClick={
+                      inputMode === "audio" ? loadExampleAudio : loadExampleText
+                    }
                     disabled={isLoading}
                   >
                     <ClipboardPaste className="mr-2 h-4 w-4" />
                     Load Example
                   </Button>
-                  {(audioFile || textInput || result || pipelineSteps.length > 0) && (
+                  {(audioFile ||
+                    textInput ||
+                    result ||
+                    pipelineSteps.length > 0) && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -506,7 +498,9 @@ export default function IncidentReportPage() {
                               className="font-mono text-sm"
                             />
                             <p className="text-muted-foreground text-xs leading-relaxed">
-                              If you modify the extraction task, click "Regenerate Schema" and then run extraction. The generated schema will not be persisted.
+                              If you modify the extraction task, click
+                              "Regenerate Schema" and then run extraction. The
+                              generated schema will not be persisted.
                             </p>
                           </div>
                         )}
@@ -533,9 +527,12 @@ export default function IncidentReportPage() {
 
                           <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
-                              <Label htmlFor="regenerate-schema">Regenerate Schema</Label>
+                              <Label htmlFor="regenerate-schema">
+                                Regenerate Schema
+                              </Label>
                               <p className="text-muted-foreground text-xs">
-                                Use a temporary schema for this modified task without overwriting the saved incident schema
+                                Use a temporary schema for this modified task
+                                without overwriting the saved incident schema
                               </p>
                             </div>
                             <Switch
@@ -710,41 +707,37 @@ export default function IncidentReportPage() {
                 }
               />
 
-              <Card>
-                <button
-                  type="button"
-                  onClick={() => setHowItWorksOpen((open) => !open)}
-                  className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-muted/30"
-                  aria-expanded={howItWorksOpen}
-                >
-                  <h2 className="text-lg font-semibold text-foreground">How It Works</h2>
-                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <span>{howItWorksOpen ? "Hide" : "Show"}</span>
-                    <ChevronDown
-                      className={`h-5 w-5 shrink-0 transition-transform ${howItWorksOpen ? "rotate-180" : "rotate-0"}`}
-                    />
-                  </div>
-                </button>
-                {howItWorksOpen && (
-                  <CardContent className="space-y-4 border-t pt-5 text-sm text-muted-foreground">
-                    <p>
-                      <strong>1. Provide the incident input:</strong> Upload an audio recording or type the incident description directly. For a quick test, use <strong>Load Example</strong> to load the built-in sample audio or sample text.
-                    </p>
-                    <p>
-                      <strong>2. Transcribe or read the report:</strong> Audio input is transcribed first. Text input skips transcription and goes directly to extraction.
-                    </p>
-                    <p>
-                      <strong>3. Extract the key incident fields:</strong> The tool extracts relevant details such as incident date and time, location, description of what happened, people involved, injuries or damages, immediate actions taken, and witness information when available.
-                    </p>
-                    <p>
-                      <strong>4. Refine the output:</strong> If enabled, the transcript is enhanced for readability. You can also switch to custom extraction mode and define your own fields or questions.
-                    </p>
-                    <p>
-                      <strong>5. Generate the final report:</strong> The result view shows the transcript and structured incident details. It can also generate a downloadable PDF incident report.
-                    </p>
-                  </CardContent>
-                )}
-              </Card>
+              <HowItWorksCard>
+                <p>
+                  <strong>1. Provide the incident input:</strong> Upload an
+                  audio recording or type the incident description directly. For
+                  a quick test, use <strong>Load Example</strong> to load the
+                  built-in sample audio or sample text.
+                </p>
+                <p>
+                  <strong>2. Transcribe or read the report:</strong> Audio input
+                  is transcribed first. Text input skips transcription and goes
+                  directly to extraction.
+                </p>
+                <p>
+                  <strong>3. Extract the key incident fields:</strong> The tool
+                  extracts relevant details such as incident date and time,
+                  location, description of what happened, people involved,
+                  injuries or damages, immediate actions taken, and witness
+                  information when available.
+                </p>
+                <p>
+                  <strong>4. Refine the output:</strong> If enabled, the
+                  transcript is enhanced for readability. You can also switch to
+                  custom extraction mode and define your own fields or
+                  questions.
+                </p>
+                <p>
+                  <strong>5. Generate the final report:</strong> The result view
+                  shows the transcript and structured incident details. It can
+                  also generate a downloadable PDF incident report.
+                </p>
+              </HowItWorksCard>
             </>
           )}
         </div>

@@ -118,15 +118,18 @@ def wrap_schema_with_numeric_normalizers(schema: type[BaseModel]) -> type[BaseMo
     """Return a subclass of *schema* with Pydantic ``field_validator``s that
     clean and coerce numeric strings before validation."""
     decimal_fields = [
-        name for name, field in schema.model_fields.items()
+        name
+        for name, field in schema.model_fields.items()
         if _annotation_contains(field.annotation, Decimal)
     ]
     float_fields = [
-        name for name, field in schema.model_fields.items()
+        name
+        for name, field in schema.model_fields.items()
         if _annotation_contains(field.annotation, float)
     ]
     int_fields = [
-        name for name, field in schema.model_fields.items()
+        name
+        for name, field in schema.model_fields.items()
         if _annotation_contains(field.annotation, int)
     ]
 
@@ -136,6 +139,7 @@ def wrap_schema_with_numeric_normalizers(schema: type[BaseModel]) -> type[BaseMo
     namespace: dict[str, object] = {}
 
     if decimal_fields:
+
         @field_validator(*decimal_fields, mode="before", check_fields=False)
         @classmethod
         def _normalize_decimal_fields(cls, value):
@@ -144,6 +148,7 @@ def wrap_schema_with_numeric_normalizers(schema: type[BaseModel]) -> type[BaseMo
         namespace["_normalize_decimal_fields"] = _normalize_decimal_fields
 
     if float_fields:
+
         @field_validator(*float_fields, mode="before", check_fields=False)
         @classmethod
         def _normalize_float_fields(cls, value):
@@ -152,6 +157,7 @@ def wrap_schema_with_numeric_normalizers(schema: type[BaseModel]) -> type[BaseMo
         namespace["_normalize_float_fields"] = _normalize_float_fields
 
     if int_fields:
+
         @field_validator(*int_fields, mode="before", check_fields=False)
         @classmethod
         def _normalize_int_fields(cls, value):
@@ -167,6 +173,7 @@ def wrap_schema_with_numeric_normalizers(schema: type[BaseModel]) -> type[BaseMo
 # ---------------------------------------------------------------------------
 # Schema persistence (save / load generated Pydantic schemas to disk)
 # ---------------------------------------------------------------------------
+
 
 def _clean_schema_dump(raw_dump: str) -> str:
     """Strip header/footer lines from ``print_pydantic_schema`` output."""
@@ -204,9 +211,10 @@ from pydantic import BaseModel, Field, ConfigDict
 
 def schema_paths(schema_key: str) -> tuple[Path, Path]:
     """Return (schema_module_path, requirements_json_path) for *schema_key*."""
-    safe_key = "".join(
-        c if c.isalnum() or c in {"_", "-"} else "_" for c in schema_key
-    ).strip("_") or "schema"
+    safe_key = (
+        "".join(c if c.isalnum() or c in {"_", "-"} else "_" for c in schema_key).strip("_")
+        or "schema"
+    )
     return (
         SCHEMA_DIR / f"{safe_key}_schema.py",
         SCHEMA_DIR / f"{safe_key}_requirements.json",
@@ -280,6 +288,7 @@ def load_schema(
 # ---------------------------------------------------------------------------
 # Schema ID helper (hash-based, used by the extractor router)
 # ---------------------------------------------------------------------------
+
 
 def schema_id_from_requirements(user_requirements: str) -> str:
     """Return a short deterministic ID for the given requirements text."""
