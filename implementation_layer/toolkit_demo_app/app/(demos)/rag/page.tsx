@@ -426,6 +426,7 @@ export default function RAGPage() {
           filename: doc.filename,
           chunkCount: doc.chunk_count,
           status: doc.status,
+          error: doc.error ?? undefined,
         });
       }
       setIndexedDocuments(updatedDocs);
@@ -437,14 +438,23 @@ export default function RAGPage() {
           `Indexed ${data.document_count} document(s) with ${data.chunk_count} chunks`,
         );
       } else {
-        toast.error("Some documents failed to index");
+        const firstError = data.documents?.find(
+          (d: { status: string; error?: string }) => d.status === "error" && d.error,
+        )?.error;
+        toast.error(firstError ?? "Some documents failed to index");
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       if (error instanceof RateLimitError) return; // Toast already shown
-      toast.error(
-        error instanceof Error ? error.message : "Failed to index documents",
-      );
+
+      let errorMessage = "Failed to index documents";
+      if (error instanceof TypeError && error.message === "Failed to fetch") {
+        errorMessage =
+          "Connection lost during indexing. The document may be too large or the server timed out. Try a smaller document or try again later.";
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast.error(errorMessage);
 
       setIndexedDocuments(
         indexedDocuments.map((d) =>

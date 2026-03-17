@@ -85,6 +85,8 @@ else:
 EXAMPLE_PDF_PATH = _public_path / "GAIK_Test_Document_Demo.pdf"
 EXAMPLE_INDEX_PATH = _public_path / "example-index.json"
 EXAMPLE_COLLECTION_PREFIX = "example-demo"
+EXAMPLE_FILENAME = "GAIK_Test_Document_Demo.pdf"
+EXAMPLE_DOCUMENT_NAME = "GAIK_Test_Document_Demo"
 
 
 def extract_page_filter(query: str) -> dict | None:
@@ -172,8 +174,7 @@ class DoclingRagApiClient:
                 headers={"key": self.password},
                 timeout=self.timeout_seconds,
             )
-            if r.status_code >= 400:
-                r.raise_for_status()
+            r.raise_for_status()
 
         payload = r.json()
         return {
@@ -305,17 +306,9 @@ def _parse_document_to_chunks(
     if choice == "pymupdf":
         return _parse_with_pymupdf(file_path, document_name), "pymupdf"
     if choice == "docling_rag":
-        try:
-            return _parse_with_docling_rag_api(file_path, document_name), "docling_rag"
-        except Exception as exc:
-            print(f"Docling RAG parser failed, falling back to PyMuPDF: {exc}")
-            return _parse_with_pymupdf(file_path, document_name), "pymupdf"
+        return _parse_with_docling_rag_api(file_path, document_name), "docling_rag"
     if choice == "vision_plus":
-        try:
-            return _parse_with_vision_plus(file_path, document_name, config), "vision_plus"
-        except Exception as exc:
-            print(f"Vision+ parser failed, falling back to PyMuPDF: {exc}")
-            return _parse_with_pymupdf(file_path, document_name), "pymupdf"
+        return _parse_with_vision_plus(file_path, document_name, config), "vision_plus"
     raise ValueError(f"Unsupported parser_choice: {parser_choice}")
 
 
@@ -333,6 +326,7 @@ class IndexedDocument(BaseModel):
     filename: str
     chunk_count: int
     status: Literal["indexed", "processing", "error"] = "indexed"
+    error: str | None = None
 
 
 class IndexResponse(BaseModel):
@@ -418,6 +412,7 @@ async def index_documents(
 
     try:
         async with lock:
+            request_start = time.perf_counter()
             workflow, coll_id = _get_or_create_workflow(
                 collection_id if collection_id else target_coll_id
             )
@@ -434,6 +429,7 @@ async def index_documents(
 
                 try:
                     # Check page count for PDF files (demo limit)
+                    page_count = 0
                     if suffix == ".pdf":
                         import fitz  # PyMuPDF - already available via docling
 
@@ -457,7 +453,13 @@ async def index_documents(
                                 ),
                             )
 
-                    # Parse and index the document with the selected parser
+                    print(
+                        f"[RAG] Starting {file.filename}"
+                        f" ({page_count} pages, parser={parser_choice})"
+                    )
+
+                    # Parse the document with the selected parser
+                    parse_start = time.perf_counter()
                     original_name = Path(file.filename).stem
                     chunks, parser_used = _parse_document_to_chunks(
                         tmp_path,
@@ -465,7 +467,21 @@ async def index_documents(
                         parser_choice=parser_choice,
                         config=workflow.api_config,
                     )
+                    parse_duration = time.perf_counter() - parse_start
+                    print(
+                        f"[RAG] Parsed {file.filename}: {len(chunks)} chunks"
+                        f" in {parse_duration:.1f}s (parser={parser_used})"
+                    )
+
+                    # Embed and index chunks
+                    embed_start = time.perf_counter()
                     num_chunks = workflow.index_chunk_documents(chunks)
+                    embed_duration = time.perf_counter() - embed_start
+                    print(
+                        f"[RAG] Embedded {file.filename}:"
+                        f" {num_chunks} chunks in {embed_duration:.1f}s"
+                    )
+
                     total_chunks += num_chunks
 
                     indexed_docs.append(
@@ -475,18 +491,27 @@ async def index_documents(
                             status="indexed",
                         )
                     )
-                    print(f"Indexed {file.filename} using parser: {parser_used}")
+                except HTTPException:
+                    raise
                 except Exception as e:
+                    error_msg = str(e)
                     indexed_docs.append(
                         IndexedDocument(
                             filename=file.filename,
                             chunk_count=0,
                             status="error",
+                            error=error_msg,
                         )
                     )
-                    print(f"Error indexing {file.filename}: {e}")
+                    print(f"[RAG] Error indexing {file.filename}: {e}")
                 finally:
                     Path(tmp_path).unlink(missing_ok=True)
+
+            total_duration = time.perf_counter() - request_start
+            print(
+                f"[RAG] Index request completed: {len(files)} file(s),"
+                f" {total_chunks} total chunks in {total_duration:.1f}s"
+            )
 
             return IndexResponse(
                 collection_id=coll_id,
@@ -496,6 +521,8 @@ async def index_documents(
                 status="success" if total_chunks > 0 else "error",
             )
 
+    except HTTPException:
+        raise
     except ImportError as e:
         raise HTTPException(
             status_code=500, detail=f"Required components not installed: {e}"
@@ -747,6 +774,23 @@ async def clear_all_collections():
     return {"status": "success", "message": f"Cleared {count} collections"}
 
 
+def _example_index_response(collection_id: str, chunk_count: int) -> IndexResponse:
+    """Build a standard IndexResponse for the example document."""
+    return IndexResponse(
+        collection_id=collection_id,
+        document_count=1,
+        chunk_count=chunk_count,
+        documents=[
+            IndexedDocument(
+                filename=EXAMPLE_FILENAME,
+                chunk_count=chunk_count,
+                status="indexed",
+            )
+        ],
+        status="success",
+    )
+
+
 @router.post("/load-example", response_model=IndexResponse)
 async def load_example_document(
     parser_choice: Literal["vision_plus", "docling_rag", "pymupdf"] = Form("docling_rag"),
@@ -762,20 +806,7 @@ async def load_example_document(
     # If already loaded, return existing collection
     if example_collection_id in RAG_INSTANCES:
         workflow = RAG_INSTANCES[example_collection_id]
-        chunk_count = workflow.vector_store.count()
-        return IndexResponse(
-            collection_id=example_collection_id,
-            document_count=1,
-            chunk_count=chunk_count,
-            documents=[
-                IndexedDocument(
-                    filename="GAIK_Test_Document_Demo.pdf",
-                    chunk_count=chunk_count,
-                    status="indexed",
-                )
-            ],
-            status="success",
-        )
+        return _example_index_response(example_collection_id, workflow.vector_store.count())
 
     # Acquire lock
     lock = await _get_collection_lock(example_collection_id)
@@ -784,20 +815,7 @@ async def load_example_document(
         # Double-check after acquiring lock
         if example_collection_id in RAG_INSTANCES:
             workflow = RAG_INSTANCES[example_collection_id]
-            chunk_count = workflow.vector_store.count()
-            return IndexResponse(
-                collection_id=example_collection_id,
-                document_count=1,
-                chunk_count=chunk_count,
-                documents=[
-                    IndexedDocument(
-                        filename="GAIK_Test_Document_Demo.pdf",
-                        chunk_count=chunk_count,
-                        status="indexed",
-                    )
-                ],
-                status="success",
-            )
+            return _example_index_response(example_collection_id, workflow.vector_store.count())
 
         try:
             config = get_api_config()
@@ -816,20 +834,7 @@ async def load_example_document(
                 workflow.vector_store.add(documents, embeddings)
                 RAG_INSTANCES[example_collection_id] = workflow
 
-                chunk_count = len(documents)
-                return IndexResponse(
-                    collection_id=example_collection_id,
-                    document_count=1,
-                    chunk_count=chunk_count,
-                    documents=[
-                        IndexedDocument(
-                            filename="GAIK_Test_Document_Demo.pdf",
-                            chunk_count=chunk_count,
-                            status="indexed",
-                        )
-                    ],
-                    status="success",
-                )
+                return _example_index_response(example_collection_id, len(documents))
 
             if not EXAMPLE_PDF_PATH.exists():
                 raise HTTPException(
@@ -839,7 +844,7 @@ async def load_example_document(
 
             chunks, parser_used = _parse_document_to_chunks(
                 EXAMPLE_PDF_PATH,
-                document_name="GAIK_Test_Document_Demo",
+                document_name=EXAMPLE_DOCUMENT_NAME,
                 parser_choice=parser_choice,
                 config=config,
             )
@@ -848,19 +853,7 @@ async def load_example_document(
 
             RAG_INSTANCES[example_collection_id] = workflow
 
-            return IndexResponse(
-                collection_id=example_collection_id,
-                document_count=1,
-                chunk_count=chunk_count,
-                documents=[
-                    IndexedDocument(
-                        filename="GAIK_Test_Document_Demo.pdf",
-                        chunk_count=chunk_count,
-                        status="indexed",
-                    )
-                ],
-                status="success",
-            )
+            return _example_index_response(example_collection_id, chunk_count)
 
         except ImportError as e:
             raise HTTPException(

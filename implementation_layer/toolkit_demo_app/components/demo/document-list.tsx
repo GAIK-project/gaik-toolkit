@@ -15,6 +15,7 @@ export interface IndexedDocument {
   filename: string;
   chunkCount: number;
   status: "indexed" | "processing" | "error";
+  error?: string;
 }
 
 interface DocumentListProps {
@@ -85,7 +86,7 @@ export function DocumentList({
                 <p className="text-muted-foreground text-xs">
                   {doc.status === "indexed" && `${doc.chunkCount} chunks`}
                   {doc.status === "processing" && "Processing..."}
-                  {doc.status === "error" && "Failed to index"}
+                  {doc.status === "error" && (doc.error || "Failed to index")}
                 </p>
               </div>
 
