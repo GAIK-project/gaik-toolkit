@@ -8,6 +8,7 @@ metadata:
     haproxy.router.openshift.io/timeout: 15m
     haproxy.router.openshift.io/response-buffering: "off"
     haproxy.router.openshift.io/disable-cookies: "true"
+    haproxy.router.openshift.io/proxy-body-size: 50m
 spec:
   host: gaik-demo.2.rahtiapp.fi
   to:

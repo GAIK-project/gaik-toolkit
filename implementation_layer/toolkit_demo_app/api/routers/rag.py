@@ -744,6 +744,56 @@ async def get_status(collection_id: str):
     )
 
 
+@router.get("/debug/{collection_id}")
+async def debug_collection(collection_id: str, page: int = 1, per_page: int = 20):
+    """Return paginated chunk details for debugging."""
+    if collection_id not in RAG_INSTANCES:
+        raise HTTPException(status_code=404, detail="Collection not found")
+
+    workflow = RAG_INSTANCES[collection_id]
+    all_docs = workflow.vector_store.get_all() if hasattr(workflow.vector_store, "get_all") else []
+
+    # Fallback: access internal chromadb collection
+    if not all_docs and hasattr(workflow.vector_store, "_collection"):
+        col = workflow.vector_store._collection
+        result = col.get(include=["documents", "metadatas"])
+        all_docs = [
+            {"content": doc, "metadata": meta}
+            for doc, meta in zip(
+                result.get("documents", []),
+                result.get("metadatas", []),
+            )
+        ]
+
+    total = len(all_docs)
+    start = (page - 1) * per_page
+    end = start + per_page
+    chunks = all_docs[start:end]
+
+    return {
+        "collection_id": collection_id,
+        "total_chunks": total,
+        "page": page,
+        "per_page": per_page,
+        "chunks": [
+            {
+                "index": start + i,
+                "content": (
+                    c.get("content", c.page_content)
+                    if hasattr(c, "page_content")
+                    else c.get("content", "")
+                )[:500],
+                "metadata": (
+                    c.get("metadata", c.metadata)
+                    if hasattr(c, "metadata")
+                    else c.get("metadata", {})
+                ),
+            }
+            for i, c in enumerate(chunks)
+        ],
+    }
+
+
 @router.delete("/clear/{collection_id}")
 async def clear_collection(collection_id: str):
     """

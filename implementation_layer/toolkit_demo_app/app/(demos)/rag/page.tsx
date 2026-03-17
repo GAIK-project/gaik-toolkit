@@ -71,6 +71,7 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  Wrench,
   X,
 } from "lucide-react";
 import { FeedbackButton } from "@/components/feedback";
@@ -252,6 +253,118 @@ function SourcesList({ sources }: { sources: Source[] }) {
   );
 }
 
+interface DebugChunk {
+  index: number;
+  content: string;
+  metadata: Record<string, unknown>;
+}
+
+function DebugDialog({ collectionId }: { collectionId: string }) {
+  const [open, setOpen] = useState(false);
+  const [chunks, setChunks] = useState<DebugChunk[]>([]);
+  const [totalChunks, setTotalChunks] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const perPage = 20;
+
+  async function loadChunks(p: number) {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/rag/debug/${collectionId}?page=${p}&per_page=${perPage}`,
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setChunks(data.chunks);
+      setTotalChunks(data.total_chunks);
+      setPage(p);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleOpen(isOpen: boolean) {
+    setOpen(isOpen);
+    if (isOpen) loadChunks(1);
+  }
+
+  const totalPages = Math.ceil(totalChunks / perPage);
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8">
+          <Wrench className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[80vh] max-w-3xl overflow-hidden">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Wrench className="h-5 w-5" />
+            Debug: {totalChunks} chunks in {collectionId}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: "60vh" }}>
+          {loading ? (
+            <p className="text-muted-foreground text-sm">Loading...</p>
+          ) : (
+            chunks.map((chunk) => (
+              <div
+                key={chunk.index}
+                className="space-y-1 rounded-lg border p-3 text-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono font-semibold">
+                    Chunk #{chunk.index}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {chunk.metadata.parser_used as string ?? "unknown"} | page{" "}
+                    {(chunk.metadata.page_number as string) ?? "?"}
+                  </span>
+                </div>
+                <p className="text-muted-foreground whitespace-pre-wrap break-words leading-relaxed">
+                  {chunk.content}
+                </p>
+                <details className="text-muted-foreground/70">
+                  <summary className="cursor-pointer text-[10px]">
+                    metadata
+                  </summary>
+                  <pre className="mt-1 overflow-x-auto text-[10px]">
+                    {JSON.stringify(chunk.metadata, null, 2)}
+                  </pre>
+                </details>
+              </div>
+            ))
+          )}
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t pt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1 || loading}
+              onClick={() => loadChunks(page - 1)}
+            >
+              Previous
+            </Button>
+            <span className="text-muted-foreground text-xs">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages || loading}
+              onClick={() => loadChunks(page + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function RAGPage() {
   const router = useRouter();
   // Collection state
@@ -411,7 +524,14 @@ export default function RAGPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.detail || "Failed to index documents");
+        const detail = errorData?.detail;
+        let message = "Failed to index documents";
+        if (typeof detail === "string") {
+          message = detail;
+        } else if (Array.isArray(detail)) {
+          message = detail.map((d: { msg?: string }) => d.msg).join("; ") || message;
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();
@@ -441,7 +561,7 @@ export default function RAGPage() {
         const firstError = data.documents?.find(
           (d: { status: string; error?: string }) => d.status === "error" && d.error,
         )?.error;
-        toast.error(firstError ?? "Some documents failed to index");
+        toast.error(firstError ?? "Some documents failed to index", { duration: Infinity });
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
@@ -454,7 +574,7 @@ export default function RAGPage() {
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-      toast.error(errorMessage);
+      toast.error(errorMessage, { duration: Infinity });
 
       setIndexedDocuments(
         indexedDocuments.map((d) =>
@@ -722,7 +842,10 @@ export default function RAGPage() {
               </Dialog>
             )}
 
-            {/* Feedback - show when documents exist */}
+            {/* Debug & Feedback - show when documents exist */}
+            {hasDocuments && collectionId && (
+              <DebugDialog collectionId={collectionId} />
+            )}
             {hasDocuments && <FeedbackButton demoType="rag" />}
 
             {/* Settings */}
