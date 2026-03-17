@@ -7,9 +7,7 @@ import dynamic from "next/dynamic";
 import { AccessPolling } from "../components/access-polling";
 
 const SuccessAnimation = dynamic(() =>
-  import("../components/success-animation").then(
-    (mod) => mod.SuccessAnimation,
-  ),
+  import("../components/success-animation").then((mod) => mod.SuccessAnimation),
 );
 
 export default async function AccessPendingPage() {
