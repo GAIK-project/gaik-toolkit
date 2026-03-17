@@ -58,12 +58,17 @@ export default async function proxy(request: NextRequest) {
     if (contentType) headers.set("content-type", contentType);
 
     try {
+      // Use arrayBuffer for requests with body to avoid Bun/standalone streaming issues
+      // that truncate large multipart uploads (e.g. 10MB+ PDFs)
+      let body: ArrayBuffer | undefined;
+      if (hasBody(request.method)) {
+        body = await request.arrayBuffer();
+      }
+
       const response = await fetch(targetUrl, {
         method: request.method,
         headers,
-        body: hasBody(request.method) ? request.body : undefined,
-        // @ts-expect-error duplex required for streaming request body
-        duplex: "half",
+        body,
       });
 
       // For SSE streaming responses, pass through directly

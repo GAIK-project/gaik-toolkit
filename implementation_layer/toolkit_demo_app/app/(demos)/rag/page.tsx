@@ -561,7 +561,7 @@ export default function RAGPage() {
         const firstError = data.documents?.find(
           (d: { status: string; error?: string }) => d.status === "error" && d.error,
         )?.error;
-        toast.error(firstError ?? "Some documents failed to index", { duration: Infinity });
+        toast.error(firstError ?? "Some documents failed to index", { duration: 15000 });
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
@@ -574,7 +574,7 @@ export default function RAGPage() {
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
-      toast.error(errorMessage, { duration: Infinity });
+      toast.error(errorMessage, { duration: 15000 });
 
       setIndexedDocuments(
         indexedDocuments.map((d) =>
