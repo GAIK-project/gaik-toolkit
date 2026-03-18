@@ -1,6 +1,6 @@
 # Transcription Evaluation
 
-This folder contains methods and scripts for evaluating automatic transcription quality and transcript post-processing quality for Finnish domain-specific audio/video material.
+This folder contains methods and scripts for evaluating transcription (speech-to-text) quality.
 
 ## 1. Evaluation metrics
 
@@ -274,8 +274,8 @@ Enhancement method compared:
 #### Post-processing-fixable errors
 | Error Type | Description | Examples | Fix Strategy |
 |-----------|-------------|----------|--------------|
-| **Brands/Proper Nouns Garbled** | Brand/company names become phonetically similar nonsense | Straumann → Strauman<br>Dentsply Sirona → Splacirona<br>Nobel Biocare → Nobel Pajaker<br>Implantona → Implanttoona | Dictionary + fuzzy matching |
-| **Name Alterations** | Person names/surnames wrong (near-miss) | Martola/Martoon<br>Pallonen/Pallosen<br>Suojärvi/Suojärven | Dictionary-mapped variants |
+| **Brands/Proper Nouns Garbled** | Brand/company names become phonetically similar nonsense | Straumann → Strauman<br>Dentsply Sirona → Splacirona<br>Nobel Biocare → Nobel Pajaker<br>Implantona → Implanttoona | LLM-based correction |
+| **Name Alterations** | Person names/surnames wrong (near-miss) | Martola/Martoon<br>Pallonen/Pallosen<br>Suojärvi/Suojärven | LLM-based correction |
 | **Compound/Hyphenation** | Compounds split/merged inconsistently | peri-implantiitti ↔ periimplantiitti | Consistency normalization |
 | **Loanword Distortion** | English technical terms misheard as Finnish | lowdose → loudausohjelmia | Bilingual domain lexicon |
 | **Number Format** | Digits vs. Finnish number words | kahdenkymmenen → 20<br>viisikymmentäkuusi → 56 | Number normalizer |
@@ -427,7 +427,7 @@ python eval_enhanced.py \
 See the complete 2 prompts in `enhance_transcript.py`.
 
 **Pass 1 (Spelling Consistency):**
-- Normalizes spelling using dental-focused Finnish dictionary
+- Normalizes spelling 
 - Fixes capitalization 
 - Ensures consistent hyphenation 
 - **No word additions/deletions** (preserves word count)
@@ -596,7 +596,7 @@ Update `config.py` line 37 to set `use_azure=False` if using standard OpenAI.
 **Solutions:**
 - Improve audio quality (noise reduction, better microphone)
 - Fine-tune transcription model on domain-specific data
-- Add domain terms to enhancement dictionary
+- Adjust LLM-based enhancement prompt(s)
 - Verify reference transcript accuracy
 
 ---
