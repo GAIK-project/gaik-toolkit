@@ -276,11 +276,11 @@ Enhancement method compared:
 |-----------|-------------|----------|--------------|
 | **Brands/Proper Nouns Garbled** | Brand/company names become phonetically similar nonsense | Straumann → Strauman<br>Dentsply Sirona → Splacirona<br>Nobel Biocare → Nobel Pajaker<br>Implantona → Implanttoona | LLM-based correction |
 | **Name Alterations** | Person names/surnames wrong (near-miss) | Martola/Martoon<br>Pallonen/Pallosen<br>Suojärvi/Suojärven | LLM-based correction |
-| **Compound/Hyphenation** | Compounds split/merged inconsistently | peri-implantiitti ↔ periimplantiitti | Consistency normalization |
-| **Loanword Distortion** | English technical terms misheard as Finnish | lowdose → loudausohjelmia | Bilingual domain lexicon |
-| **Number Format** | Digits vs. Finnish number words | kahdenkymmenen → 20<br>viisikymmentäkuusi → 56 | Number normalizer |
-| **Decimal Tokenization** | Spoken math becomes wrong tokens | "X ja puoli" → 375 (intended 37.5) | Finnish number normalizer |
-| **Finnish Morphology** | Wrong case/number endings (same lemma) | Plural/singular drift, case variations | Finnish-aware inflection |
+| **Compound/Hyphenation** | Compounds split/merged inconsistently | peri-implantiitti ↔ periimplantiitti | Consistency normalization with LLM |
+| **Loanword Distortion** | English technical terms misheard as Finnish | lowdose → loudausohjelmia | LLM-based correction |
+| **Number Format** | Digits vs. Finnish number words | kahdenkymmenen → 20<br>viisikymmentäkuusi → 56 | Number normalization with LLM|
+| **Decimal Tokenization** | Spoken math becomes wrong tokens | "X ja puoli" → 375 (intended 37.5) | Finnish number normalization with LLM |
+| **Finnish Morphology** | Wrong case/number endings (same lemma) | Plural/singular drift, case variations | Finnish-aware inflection with LLM |
 
 #### Evaluation-level artifacts
 | Error Type | Description | Examples | Fix Strategy |
@@ -350,11 +350,11 @@ Concretely:
 |---------------------------|----------------------|
 | Catastrophic omissions | Better ASR model, fine-tuning, improved acoustic modeling, better VAD |
 | Brand / proper noun distortion | Prompt-guided normalization, post-processing consistency rules |
-| Name alteration | Name normalization constraints, stronger proper-noun handling |
+| Name alteration | Prompt-guided name normalization constraints, stronger proper-noun handling |
 | Compound / hyphenation inconsistency | Compound normalization rules, prompt consistency constraints |
-| Loanword distortion | Better bilingual/domain handling, domain-aware post-processing |
-| Number and decimal errors | Dedicated number normalization and Finnish inflection handling |
-| Finnish morphology errors | Finnish-aware post-processing and prompt constraints |
+| Loanword distortion | Prompt-guided bilingual/domain handling, domain-aware post-processing |
+| Number and decimal errors | Prompt-guided number normalization and Finnish inflection handling |
+| Finnish morphology errors | Prompt-guided Finnish-aware post-processing|
 | Evaluation formatting artifacts | Pre-evaluation normalization of reference and hypothesis |
 | Excess filler insertions | Stronger insertion constraints in enhancement prompts |
 | Function-word deletions | Better ASR recall, selective context-based repair |
