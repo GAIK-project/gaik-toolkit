@@ -1,9 +1,9 @@
 """
-Enhance transcripts using GPT-5.1 with dental-focused Finnish dictionary.
+Enhance transcripts using GPT-5.4.
 
 Strategy:
 - Read transcripts from a directory
-- Use GPT-5.1 to correct spelling, capitalization, and inflection
+- Use GPT-5.4 to correct spelling, capitalization, and inflection
 - CONSTRAINT: Do NOT add or remove words
 - Save enhanced versions to an output directory
 """
@@ -34,7 +34,7 @@ What to do (high priority):
 
 3) Technical terms and names:
    - Correct capitalization of proper nouns/brands when clearly identifiable.
-   - Do NOT change a person’s name to a different person. Only correct spelling/casing for the same name (or dictionary-mapped variant).
+   - Do NOT change a person’s name to a different person. Only correct spelling/casing for the same name.
 
 4) Hyphenation / compounds (consistency):
    - Normalize consistent hyphenation and compound forms when it is clearly the same intended term.
@@ -112,14 +112,6 @@ def get_client(use_azure: bool = True):
         key_name = "AZURE_API_KEY" if use_azure else "OPENAI_API_KEY"
         raise SystemExit(f"{key_name} not found in environment")
     return create_openai_client(config), config
-
-def format_dictionary_for_prompt(dictionary: dict) -> str:
-    """Format dictionary as readable list for prompt"""
-    entries = []
-    for wrong, correct in sorted(dictionary.items()):
-        if wrong.lower() != correct.lower():
-            entries.append(f'  "{wrong}" → "{correct}"')
-    return "\n".join(entries)  
 
 def enhance_transcript_pass1(client, transcript_text: str, model: str = DEFAULT_MODEL_AZURE) -> str:
     """
