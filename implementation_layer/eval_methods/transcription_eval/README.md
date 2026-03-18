@@ -441,9 +441,9 @@ See the complete 2 prompts in `enhance_transcript.py`.
 - **Preserves colloquial Finnish** (spoken language: "tän", "tää", "niinku", "mä", "sä")
 - Limited insertion budget: max 4 words per 100 words
 
-![Transcription evaluation example](../../../images/transcript.eval.png)
+![Transcription evaluation example](../../../images/transcript_eval.png)
 
-**Output:**
+**Sample Output:**
 ```
 Processing: Ajokortti.txt
   Original: 402 words
@@ -453,10 +453,7 @@ Processing: Ajokortti.txt
     -> 405 words (delta: +3)
   Total change: 402 -> 405 words (+3)
   Saved to: enhanced_transcripts/Ajokortti.txt
-```
 
-**Sample Output:**
-```
 ================================================================================
 EVALUATING ORIGINAL VS ENHANCED TRANSCRIPTS
 ================================================================================
