@@ -441,7 +441,7 @@ See the complete 2 prompts in `enhance_transcript.py`.
 - **Preserves colloquial Finnish** (spoken language: "tän", "tää", "niinku", "mä", "sä")
 - Limited insertion budget: max 4 words per 100 words
 
-![Transcription evaluation example](../../../images/transcript_eval.png)
+![Transcription evaluation example](../../../images/transcript_eval_1.png)
 
 **Sample Output:**
 ```
