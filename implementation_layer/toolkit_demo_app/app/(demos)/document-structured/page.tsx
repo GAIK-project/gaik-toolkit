@@ -246,7 +246,7 @@ export default function DocumentStructuredPage() {
             <CardContent>
               <FileUpload
                 accept=".pdf,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.tif,.webp"
-                maxSize={10}
+                maxSize={20}
                 file={documentFile}
                 onFileSelect={setDocumentFile}
                 onFileRemove={() => setDocumentFile(null)}

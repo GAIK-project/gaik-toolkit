@@ -183,7 +183,7 @@ export default function ParserPage() {
             <CardContent className="space-y-6">
               <FileUpload
                 accept=".pdf,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.tif,.webp"
-                maxSize={10}
+                maxSize={20}
                 file={file}
                 onFileSelect={setFile}
                 onFileRemove={() => {

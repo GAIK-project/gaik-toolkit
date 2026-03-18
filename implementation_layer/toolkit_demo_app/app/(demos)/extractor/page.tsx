@@ -427,7 +427,7 @@ export default function ExtractorPage() {
                 <TabsContent value="file">
                   <FileUpload
                     accept=".pdf,.docx"
-                    maxSize={10}
+                    maxSize={20}
                     file={file}
                     onFileSelect={setFile}
                     onFileRemove={() => setFile(null)}

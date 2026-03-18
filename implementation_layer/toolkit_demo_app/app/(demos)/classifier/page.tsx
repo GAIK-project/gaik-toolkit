@@ -187,7 +187,7 @@ export default function ClassifierPage() {
             <CardContent className="space-y-6">
               <FileUpload
                 accept=".pdf,.docx,.png,.jpg,.jpeg"
-                maxSize={10}
+                maxSize={20}
                 file={file}
                 onFileSelect={setFile}
                 onFileRemove={() => {
