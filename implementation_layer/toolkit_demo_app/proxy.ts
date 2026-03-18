@@ -58,19 +58,18 @@ export default async function proxy(request: NextRequest) {
     if (contentType) headers.set("content-type", contentType);
 
     try {
-      // Buffer body as Uint8Array for large multipart uploads.
-      // Streaming with duplex:"half" truncates data in Bun/standalone.
-      let body: Uint8Array | null = null;
+      // Buffer the full body to preserve binary integrity for large
+      // multipart uploads. Streaming truncates data in Bun/standalone.
+      let body: ArrayBuffer | null = null;
       if (hasBody(request.method)) {
-        const buf = await request.arrayBuffer();
-        body = new Uint8Array(buf);
+        body = await request.arrayBuffer();
         headers.set("content-length", body.byteLength.toString());
       }
 
       const response = await fetch(targetUrl, {
         method: request.method,
         headers,
-        body,
+        body: body as BodyInit | null,
       });
 
       // For SSE streaming responses, pass through directly
