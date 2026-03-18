@@ -58,11 +58,13 @@ export default async function proxy(request: NextRequest) {
     if (contentType) headers.set("content-type", contentType);
 
     try {
-      // Use arrayBuffer for requests with body to avoid Bun/standalone streaming issues
-      // that truncate large multipart uploads (e.g. 10MB+ PDFs)
-      let body: ArrayBuffer | undefined;
+      // Buffer body as Uint8Array for large multipart uploads.
+      // Streaming with duplex:"half" truncates data in Bun/standalone.
+      let body: Uint8Array | null = null;
       if (hasBody(request.method)) {
-        body = await request.arrayBuffer();
+        const buf = await request.arrayBuffer();
+        body = new Uint8Array(buf);
+        headers.set("content-length", body.byteLength.toString());
       }
 
       const response = await fetch(targetUrl, {

@@ -15,6 +15,9 @@ const nextConfig: NextConfig = {
     unoptimized: true,
   },
   serverExternalPackages: ["shiki"],
+  experimental: {
+    proxyClientMaxBodySize: "50mb",
+  },
   async rewrites() {
     return [
       {
