@@ -46,3 +46,6 @@ next-env.d.ts
 rahti.md
 
 .mcp.json
+
+# Auto-generated extractor schemas
+api/schemas/extractor_*

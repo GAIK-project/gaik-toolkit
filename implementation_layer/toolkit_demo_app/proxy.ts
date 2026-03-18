@@ -69,7 +69,7 @@ export default async function proxy(request: NextRequest) {
       const response = await fetch(targetUrl, {
         method: request.method,
         headers,
-        body: body as BodyInit | null,
+        body,
       });
 
       // For SSE streaming responses, pass through directly
