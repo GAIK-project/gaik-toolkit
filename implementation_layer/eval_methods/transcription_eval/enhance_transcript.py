@@ -13,93 +13,32 @@ from pathlib import Path
 
 from config import create_openai_client, get_openai_config
 
-# Dental-focused Finnish dictionary
-DENTAL_DICTIONARY = {
-    # Brands
-    "straumann": "Straumann",
-    "strauman": "Straumann",
-    "nobel biocare": "Nobel Biocare",
-    "nobel": "Nobel Biocare",
-    "dentsply sirona": "Dentsply Sirona",
-    "dentsply": "Dentsply Sirona",
-    "splacirona": "Dentsply Sirona",
-    "densply sirona": "Dentsply Sirona",
-    "neodent": "Neodent",
-    "niden": "Neodent",
-    "camlog": "Camlog",
-    "camlog-conelog": "Camlog-Conelog",
-    "implantona": "Implantona",
-    "implanttoona": "Implantona",
-
-    # Finnish dental terms
-    "implantti": "implantti",
-    "implantit": "implantit",
-    "implanttiprotetiikka": "implanttiprotetiikka",
-    "implanttihoito": "implanttihoito",
-    "peri-implantiitti": "peri-implantiitti",
-    "periimplantiitti": "peri-implantiitti",
-    "esteettinen": "esteettinen",
-    "esteettisyys": "esteettisyys",
-    "estettinen": "esteettinen",
-    "hammaslääkäri": "hammaslääkäri",
-    "parodontologi": "parodontologi",
-    "hammashoito": "hammashoito",
-    "protetiikka": "protetiikka",
-    "krooni": "krooni",
-    "kruunu": "kruunu",
-    "silta": "silta",
-    "pohjustus": "pohjustus",
-    "täyte": "täyte",
-    "juurenhoito": "juurenhoito",
-    "kirurgia": "kirurgia",
-    "kirurginen": "kirurginen",
-    "osteotomia": "osteotomia",
-    "sinuslift": "sinuslift",
-    "augmentaatio": "augmentaatio",
-    "luunsiirto": "luunsiirto",
-
-    # Names
-    "timo suojärvi": "Timo Suojärvi",
-    "virpi myller": "Virpi Myller",
-    "ilkka pallonen": "Ilkka Pallonen",
-    "martta martola": "Martta Martola",
-    "martta martoon": "Martta Martola",
-    "peeter": "Peeter",
-    "peetteri": "Peeter",
-
-    # Company suffixes
-    "oy": "Oy",
-    "ab": "Ab",
-
-    # Locations
-    "clarion": "Clarion",
-    "helsinki": "Helsinki",
-}
+DEFAULT_MODEL_AZURE = "gpt-5.4"
+DEFAULT_MODEL_OPENAI = "gpt-5.4-2026-03-05"
 
 ##Focuses on spelling corrections
 
-PASS1_SYSTEM_PROMPT = """You are a Finnish transcript editor specialized in dental webinar transcripts (implantology, prosthetics, periodontology).
+PASS1_SYSTEM_PROMPT = """You are a Finnish transcript editor.
 
 PRIMARY GOAL: Maximize spelling correctness and spelling consistency while preserving the original meaning and style.
 
 What to do (high priority):
 1) Spelling consistency is TOP PRIORITY.
    - If the same content term appears with multiple spellings in this transcript, choose the best Finnish spelling/canonical form and normalize ALL occurrences to that form everywhere.
-   - This includes dental terms, anatomy, procedures, materials, abbreviations, and loanwords used in dental context.
+   - This includes technical terms, proper nouns, abbreviations, and loanwords.
 
 2) Finnish vocabulary:
    - Prefer valid Finnish words and standard Finnish orthography.
    - If a token looks malformed or non-Finnish but the intended Finnish word is obvious from immediate context, correct it into a valid Finnish word.
-   - Preserve common dental loanwords/brand names when they are clearly intended.
+   - Preserve common loanwords/brand names when they are clearly intended.
 
 3) Technical terms and names:
-   - Use the DICTIONARY as strong guidance for correct spellings and capitalization.
    - Correct capitalization of proper nouns/brands when clearly identifiable.
    - Do NOT change a person’s name to a different person. Only correct spelling/casing for the same name (or dictionary-mapped variant).
 
 4) Hyphenation / compounds (consistency):
-   - Normalize consistent hyphenation and compound forms (e.g., periimplantiitti → peri-implantiitti) when it is clearly the same intended term.
-   - Normalize common compound dental terms consistently across the transcript.
+   - Normalize consistent hyphenation and compound forms when it is clearly the same intended term.
+   - Normalize common compound terms consistently across the transcript.
 
 Forbidden:
 - Do NOT summarize, rewrite, paraphrase, or reorder sentences.
@@ -108,15 +47,12 @@ Forbidden:
 - Avoid inserting or deleting words unless it is required to fix a clear tokenization artifact (e.g., accidental split/merge that keeps the same meaning).
 - Avoid merging two separate words into one or removing tokens. Prefer minimal spelling fixes that keep word boundaries stable.
 
-DICTIONARY (use as reference for correct spellings and capitalization):
-{dictionary}
-
 Output:
 Return ONLY the corrected transcript text with no commentary.
 """
 
 ## Focuses on context based repair
-PASS2_SYSTEM_PROMPT = """You are a Finnish transcript repair editor specialized in dental webinar transcripts.
+PASS2_SYSTEM_PROMPT = """You are a Finnish transcript repair editor.
 
 GOAL: Reduce transcription errors using context, while staying faithful to SPOKEN Finnish. This is a transcript of speech, so preserve colloquial forms.
 
@@ -144,6 +80,7 @@ Allowed repairs (ONLY when confident):
    - Decimals: "37,5" → "kolmekymmentäseitsemän ja puoli"
    - Years/decades: "70-luvulta" → "seitsemänkymmentäluvulta"
    - Keep numbers in proper nouns/codes unchanged (e.g., "COVID-19", "ISO 9001")
+   - Keep date and time exactly in the same format (DO NOT change)
 
 5) PRESERVE COLLOQUIAL FINNISH (spoken language):
    - Keep colloquial forms if present: "tän", "tää", "et", "sitte", "sit", "oo", "mä", "sä", "niinku", "elikkä"
@@ -153,7 +90,7 @@ Allowed repairs (ONLY when confident):
 Hard constraints (must follow):
 - Do NOT delete any words in Pass 2 (number conversion may change word count).
 - Do NOT introduce any new names, brands, roles, or titles.
-- Do NOT replace one person's name with another (unless explicitly dictionary-mapped).
+- Do NOT replace one person's name with another.
 - Do NOT rewrite or paraphrase sentences.
 - Do NOT add new sentences or remove entire phrases.
 - Do NOT convert colloquial Finnish to formal Finnish.
@@ -161,9 +98,6 @@ Hard constraints (must follow):
 Insertion budget:
 - At most 4 inserted words per 100 words of transcript (excluding number conversions).
 - If you are near the budget, prioritize the most grammar-critical insertions only.
-
-DICTIONARY (strong guidance for spellings/capitalization):
-{dictionary}
 
 If uncertain about a change, leave the original text unchanged.
 
@@ -173,6 +107,7 @@ Return ONLY the repaired transcript text with no commentary.
 
 def get_client(use_azure: bool = True):
     config = get_openai_config(use_azure=use_azure)
+    config["model"] = DEFAULT_MODEL_AZURE if use_azure else DEFAULT_MODEL_OPENAI
     if not config.get("api_key"):
         key_name = "AZURE_API_KEY" if use_azure else "OPENAI_API_KEY"
         raise SystemExit(f"{key_name} not found in environment")
@@ -186,13 +121,12 @@ def format_dictionary_for_prompt(dictionary: dict) -> str:
             entries.append(f'  "{wrong}" → "{correct}"')
     return "\n".join(entries)  
 
-def enhance_transcript_pass1(client, transcript_text: str, model: str = "gpt-5.1") -> str:
+def enhance_transcript_pass1(client, transcript_text: str, model: str = DEFAULT_MODEL_AZURE) -> str:
     """
     Pass 1: Fix spelling consistency, capitalization, and Finnish vocabulary.
     Focus on making terms consistent and correctly spelled.
     """
-    dictionary_text = format_dictionary_for_prompt(DENTAL_DICTIONARY)
-    system_prompt = PASS1_SYSTEM_PROMPT.format(dictionary=dictionary_text)
+    system_prompt = PASS1_SYSTEM_PROMPT
 
     response = client.chat.completions.create(
         model=model,
@@ -205,14 +139,13 @@ def enhance_transcript_pass1(client, transcript_text: str, model: str = "gpt-5.1
 
     return response.choices[0].message.content.strip()
 
-def enhance_transcript_pass2(client, transcript_text: str, model: str = "gpt-5.1") -> str:
+def enhance_transcript_pass2(client, transcript_text: str, model: str = DEFAULT_MODEL_AZURE) -> str:
     """
     Pass 2: Context-based repair with limited insertions/deletions allowed.
     Fix ASR-specific errors like dropped filler words and compound splitting.
     Also converts numeric digits to Finnish word numbers.
     """
-    dictionary_text = format_dictionary_for_prompt(DENTAL_DICTIONARY)
-    system_prompt = PASS2_SYSTEM_PROMPT.format(dictionary=dictionary_text)
+    system_prompt = PASS2_SYSTEM_PROMPT
 
     response = client.chat.completions.create(
         model=model,
@@ -225,7 +158,7 @@ def enhance_transcript_pass2(client, transcript_text: str, model: str = "gpt-5.1
 
     return response.choices[0].message.content.strip()
 
-def process_transcripts(transcripts_dir: str, output_dir: str, model: str = "gpt-5.1", use_azure: bool = True):
+def process_transcripts(transcripts_dir: str, output_dir: str, model: str | None = None, use_azure: bool = True):
     """Process all transcripts in directory
 
     Args:
@@ -289,7 +222,7 @@ def main():
     import argparse
 
     ap = argparse.ArgumentParser(
-        description="Enhance transcripts using GPT-5.1 with dental dictionary"
+        description="Enhance transcripts using GPT-5.1"
     )
     ap.add_argument(
         "--transcripts-dir",
@@ -306,8 +239,8 @@ def main():
     ap.add_argument(
         "--model",
         type=str,
-        default="gpt-5.1",
-        help="Model to use (default: gpt-5.1)",
+        default=None,
+        help="Model to use (defaults: gpt-5.4 for Azure, gpt-5.4-2026-03-05 for OpenAI)",
     )
 
     args = ap.parse_args()
