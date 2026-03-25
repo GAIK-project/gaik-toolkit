@@ -127,6 +127,9 @@ transcriber = [
     "requests>=2.31.0",
 ]
 
+# Transcript enhancement using a two-pass prompt workflow
+enhance-transcript = []
+
 # Text-to-speech generation (core openai dependency already included)
 text-to-speech = []
 
@@ -146,6 +149,7 @@ all = [
     "gaik[extract]",
     "gaik[parser]",
     "gaik[transcriber]",
+    "gaik[enhance-transcript]",
     "gaik[text-to-speech]",
     "gaik[parallel-transcriber]",
     "gaik[classifier]",
@@ -187,6 +191,7 @@ all-cpu = [
     "gaik[extract]",
     "gaik[parser-cpu]",
     "gaik[transcriber]",
+    "gaik[enhance-transcript]",
     "gaik[text-to-speech]",
     "gaik[parallel-transcriber]",
     "gaik[classifier]",

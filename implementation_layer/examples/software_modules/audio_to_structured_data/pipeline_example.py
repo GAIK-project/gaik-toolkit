@@ -31,8 +31,8 @@ USER_REQUIREMENTS = """
     Extract the following fields exactly as they appear below:
 
     1. Patient Name
-    2. Date of Birth (Format: dd.mm.yyyy)
-    3. Consultation Date (Format: dd.mm.yyyy)
+    2. Date of Birth in this format: dd-mm-yyyy
+    3. Consultation Date in this format: dd.mm.yyyy
     4. Symptoms
     5. Symptom Duration
     6. Medical History
@@ -57,7 +57,7 @@ def main() -> None:
     transcriber_ctor = {
         "output_dir": "./",
         "compress_audio": True,  # (Optional) for compressing large audios (uses FFMPEG)
-        "enhanced_transcript": False,
+        "enhanced_transcript": True,
     }
     transcribe_options = {
         "custom_context": "",  # Optional extra prompt for transcription

@@ -16,6 +16,8 @@ import openai
 from openai import AzureOpenAI
 from pydub import AudioSegment
 
+from gaik.software_components.enhance_transcript import TranscriptEnhancer
+
 from .whisper_local import transcribe as whisper_local_transcribe
 
 DEFAULT_PROMPT = (
@@ -27,7 +29,7 @@ ALLOWED_TRANSCRIPTION_MODELS = {"whisper", "gpt-4o-transcribe", "whisper_local"}
 
 @dataclass
 class TranscriptionResult:
-    """Container for raw and enhanced transcripts."""
+    """Container for raw and corrected transcripts."""
 
     raw_transcript: str
     enhanced_transcript: str | None
@@ -69,7 +71,7 @@ class TranscriptionResult:
 
 
 class Transcriber:
-    """High-level transcription workflow with optional enhancement."""
+    """High-level transcription workflow with optional transcript error fixing."""
 
     def __init__(
         self,
@@ -78,6 +80,7 @@ class Transcriber:
         *,
         compress_audio: bool = True,  # kept for backward compatibility; no longer used
         enhanced_transcript: bool = False,
+        fix_transcription_errors: bool | None = None,
         max_size_mb: int = 25,
         max_duration_seconds: int = 1500,
         default_prompt: str = DEFAULT_PROMPT,
@@ -94,7 +97,9 @@ class Transcriber:
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
         self.compress_audio = compress_audio  # backward compat; not used in simplified flow
-        self.enhanced_transcript = enhanced_transcript
+        self.enhanced_transcript_enabled = (
+            fix_transcription_errors if fix_transcription_errors is not None else enhanced_transcript
+        )
         self.max_size_mb = max_size_mb
         self.max_duration_seconds = max_duration_seconds
         self.default_prompt = default_prompt
@@ -159,11 +164,13 @@ class Transcriber:
             )
 
         enhanced_text: str | None = None
-        if self.enhanced_transcript:
-            print("Enhancing transcript for improved readability...")
-            enhanced_text = post_process_transcript(raw_transcript, self.api_config)
+        if self.enhanced_transcript_enabled:
+            print("Fixing transcription errors with TranscriptEnhancer...")
+            enhancer = TranscriptEnhancer(api_config=self.api_config)
+            enhanced_result = enhancer.enhance_text(raw_transcript)
+            enhanced_text = enhanced_result.enhanced_text
         else:
-            print("Transcript enhancement disabled; returning raw text only.")
+            print("Transcript error fixing disabled; returning raw text only.")
 
         print("Transcription complete. Use TranscriptionResult.save(...) to persist output.")
 
@@ -264,7 +271,8 @@ class Transcriber:
         (audio OR video container supported by the API).
         Else: chunk with PyDub and transcribe sequentially.
         """
-        if self._needs_chunking(input_path):
+        chunkable_models = {"whisper", "whisper-1"}
+        if transcription_model in chunkable_models and self._needs_chunking(input_path):
             print("Chunking input for transcription...")
             audio = AudioSegment.from_file(
                 input_path
@@ -328,85 +336,6 @@ class Transcriber:
             api_version=api_version,
         )
 
-
-def post_process_transcript(raw_transcript: str, api_config: dict) -> str:
-    """Enhance transcript quality with GPT models."""
-
-    model_name = api_config.get("model", "GPT model")
-    print(f"Enhancing transcript quality with {model_name}...")
-    prompt = f"""
-    You are an expert transcript editor. Please improve the following \
-raw transcript. The transcript could be in any language, e.g., \
-English, Finnish, Swedish, etc.
-
-    Your task is to:
-    1. Fix any transcription errors, inconsistencies, and unclear speech
-    2. Create proper dialogue structure
-    3. Format the text with appropriate paragraphs and line breaks for readability
-    4. Ensure the conversation flows naturally between segments and timestamp blocks
-    5. Retain all factual information without altering meaning or context
-    6. Do not add any content that wasn't in the original transcript
-
-    **QUALITY ENHANCEMENT:**
-    - Remove filler words (um, uh, you know) for clarity while preserving natural speech patterns
-    - Fix grammatical errors, spelling mistakes, and incomplete sentences
-    - Use consistent terms/words for a concept.
-    - Ensure proper capitalization and punctuation
-    - Group related statements by the same speaker into coherent paragraphs
-    - Add line breaks between different speakers for visual clarity
-
-    Return ONLY the enhanced transcript. Do not include any explanatory text or commentary.
-
-    RAW TRANSCRIPT:
-    {raw_transcript}
-    """
-
-    try:
-        use_azure = bool(api_config.get("use_azure", False))
-        if use_azure:
-            client = AzureOpenAI(
-                api_key=api_config.get("api_key"),
-                azure_endpoint=api_config.get("azure_endpoint", ""),
-                api_version=api_config.get("api_version", "2024-12-01-preview"),
-            )
-            chat_model = api_config.get("model", "gpt-4.1")
-            response = client.chat.completions.create(
-                model=chat_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an expert transcript editor who improves the quality, "
-                            "readability, and structure of transcribed conversations."
-                        ),
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.0,
-            )
-        else:
-            openai.api_key = api_config.get("api_key")
-            chat_model = api_config.get("model", "gpt-4.1-2025-04-14")
-            response = openai.chat.completions.create(
-                model=chat_model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are an expert transcript editor who improves the quality, "
-                            "readability, and structure of transcribed conversations."
-                        ),
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.0,
-            )
-
-        return response.choices[0].message.content
-    except Exception as e:
-        print(f"Error enhancing transcript: {e}")
-        print("Falling back to raw transcript...")
-        return raw_transcript
 
 
 def split_and_transcribe_with_context(

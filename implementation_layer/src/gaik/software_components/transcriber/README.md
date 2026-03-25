@@ -1,6 +1,6 @@
-﻿# Transcriber
+# Transcriber
 
-Transcribe audio and video files with configurable transcription backends and optional GPT enhancement.
+Transcribe audio and video files with configurable transcription backends and optional transcript error fixing.
 
 ## Installation
 
@@ -11,7 +11,7 @@ pip install gaik[transcriber]
 ## System Requirements
 
 - For basic API transcription of supported formats, no extra system dependency is required.
-- For chunking/video decoding through PyDub, install ffmpeg.
+- For chunking and video decoding through PyDub, install `ffmpeg`.
 
 ```bash
 ffmpeg -version
@@ -32,6 +32,7 @@ transcriber = Transcriber(
 
 result = transcriber.transcribe(file_path="meeting.mp3")
 print(result.raw_transcript)
+print(result.enhanced_transcript)
 ```
 
 ## Transcription Models
@@ -43,16 +44,35 @@ print(result.raw_transcript)
 
 Resolution policy:
 - If `transcription_model` is not provided:
-  - `use_azure=True` -> `whisper-1`
-  - `use_azure=False` -> `whisper`
+  - Azure config value is used, typically `whisper-1` or `gpt-4o-transcribe`
+  - OpenAI config value is used, typically `whisper` or `gpt-4o-transcribe`
 - If `transcription_model="whisper"`:
-  - `use_azure=True` -> `whisper-1`
-  - `use_azure=False` -> `whisper`
+  - Azure resolves to the configured Azure transcription deployment, typically `whisper-1`
+  - OpenAI resolves to `whisper`
 - If `transcription_model="gpt-4o-transcribe"`:
-  - both Azure/OpenAI -> `gpt-4o-transcribe`
+  - Azure/OpenAI both use `gpt-4o-transcribe`
 - If `transcription_model="whisper_local"`:
   - ignores `use_azure`
-  - uses local transcription endpoint through `whisper_local.py`
+  - uses the local transcription endpoint through `whisper_local.py`
+
+## Chunking Behavior
+
+- Chunking is used only for Whisper models:
+  - `whisper`
+  - `whisper-1`
+- `gpt-4o-transcribe` is sent without chunking.
+- `whisper_local` uses the local transcription server path and does not use PyDub chunking.
+
+## Transcript Error Fixing
+
+If `enhanced_transcript=True`, the transcriber runs the raw transcript through the standalone `enhance_transcript` software component.
+
+- Input: raw transcript text
+- Output: corrected transcript text
+- Returned in:
+  - `result.enhanced_transcript`
+
+Note: the result field name remains `enhanced_transcript` for compatibility, even though it now contains the corrected transcript returned by `TranscriptEnhancer`.
 
 ## Local Whisper Mode
 
@@ -68,7 +88,23 @@ Optional local parameters:
 - `max_speakers=None`
 - `initial_prompt=None`
 
-If these local-only options are given while model is not `whisper_local`, they are ignored with a message and no runtime error.
+If these local-only options are given while the model is not `whisper_local`, they are ignored with a message.
+
+### How `language` works with `whisper_local`
+
+When `transcription_model="whisper_local"`, the `language` value is sent to the remote Whisper server and used there to select the ASR model.
+
+Typical behavior with the current HH server implementation:
+- `language="fi"`:
+  - uses `Finnish-NLP/whisper-large-finnish-v3-ct2`
+- `language="en"`:
+  - uses `large-v3` with English
+- `language="auto"`:
+  - uses `large-v3` with automatic language detection
+
+So the combination works in two layers:
+- `transcription_model="whisper_local"` selects the local/remote Whisper server path
+- `language` selects the ASR model or language mode inside that server
 
 ## Basic API
 
@@ -110,6 +146,8 @@ result = transcriber.transcribe(
 | `AZURE_ENDPOINT` | Azure mode | Azure OpenAI endpoint URL |
 | `OPENAI_API_KEY` | OpenAI mode | OpenAI API key |
 | `AZURE_API_VERSION` | Optional | API version |
+| `AZURE_TRANSCRIPTION_MODEL` | Optional | Azure transcription deployment/model |
+| `OPENAI_TRANSCRIPTION_MODEL` | Optional | OpenAI transcription model |
 
 ## Examples
 

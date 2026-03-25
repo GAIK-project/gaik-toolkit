@@ -1,4 +1,4 @@
-"""Minimal example for running the Transcriber class on a single file."""
+"""Minimal example for running the Transcriber class on a single file with transcript error fixing."""
 
 from __future__ import annotations
 
@@ -53,13 +53,13 @@ def main() -> None:
 
     print("\nTranscription finished!")
     raw_path = saved_paths.get("raw")
-    enhanced_path = saved_paths.get("enhanced")
+    corrected_path = saved_paths.get("enhanced")
     if raw_path:
         print(f"Raw transcript saved to: {raw_path}")
-    if enhanced_path:
-        print(f"Enhanced transcript saved to: {enhanced_path}")
-    elif enhanced_path is None:
-        print("Enhanced transcript not available (enhancement disabled).")
+    if corrected_path:
+        print(f"Corrected transcript saved to: {corrected_path}")
+    elif corrected_path is None:
+        print("Corrected transcript not available (error fixing disabled).")
 
 
 if __name__ == "__main__":

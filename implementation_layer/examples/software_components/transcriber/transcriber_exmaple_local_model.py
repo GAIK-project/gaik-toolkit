@@ -1,6 +1,7 @@
 ﻿"""Example for local transcription model usage with Transcriber.
 
 Edit the configuration values below and run the script directly.
+This example keeps transcript error fixing disabled.
 """
 
 from __future__ import annotations
@@ -19,17 +20,17 @@ from gaik.software_components.transcriber import Transcriber, get_openai_config
 AUDIO_FILE = Path("Sample.m4a")
 
 def main() -> None:
-    # API config is still required for optional enhancement step.
+    # API config is still required for optional transcript error fixing.
     config = get_openai_config(use_azure=True)
 
     transcriber = Transcriber(
         api_config=config,  # OpenAI/Azure config
         output_dir=".",  
-        enhanced_transcript=False,  # GPT enhancement
+        enhanced_transcript=True,  # Two-pass transcript correction
         transcription_model="whisper_local",  # Force local transcription backend
-        local_api_base=""http://YOUR_ADDRESS:8080"",  # Local whisper base URL
+        local_api_base="http://YOUR_ADDRESS:8080",  # Local whisper base URL
         local_api_key="YOUR_KEY",  # API key sent to local whisper service
-        language="auto",  # Language code. "auto" for detection. "fi" for Finnish.
+        language="fi",  # Language code. "auto" for detection. "fi" for Finnish.
         diarization=False,  # Enable/disable speaker diarization
         speaker_count=None,  # Exact speaker count if known
         min_speakers=None,  # Minimum speakers for diarization range
@@ -44,10 +45,10 @@ def main() -> None:
     print(result.raw_transcript)
 
     if result.enhanced_transcript is not None:
-        print("\n--- Enhanced Transcript ---\n")
+        print("\n--- Corrected Transcript ---\n")
         print(result.enhanced_transcript)
     else:
-        print("\nEnhanced transcript not available (enhancement disabled).")
+        print("\nCorrected transcript not available (error fixing disabled).")
 
 
 if __name__ == "__main__":

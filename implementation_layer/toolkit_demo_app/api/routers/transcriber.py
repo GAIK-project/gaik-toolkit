@@ -67,8 +67,17 @@ router = APIRouter()
 # 3) Finish remaining spelling/casing consistency:
 #    - Ensure the same term is spelled the same way throughout the transcript.
 #    - Ensure malformed/non-Finnish tokens are corrected when the intended word is obvious from immediate context.
-
-# 4) PRESERVE COLLOQUIAL FINNISH (spoken language):
+# 4) Convert numeric digits to Finnish word numbers WITH CORRECT INFLECTION:
+#    CRITICAL: Use correct Finnish grammatical case for numbers!
+#    - Genitive case (possessive): "20 prosentin" → "kahdenkymmenen prosentin" (NOT "kaksikymmenen")
+#    - Nominative: "20 prosenttia" → "kaksikymmentä prosenttia"
+#    - Common genitive forms: yhden, kahden, kolmen, neljän, viiden, kuuden, seitsemän, kahdeksan, yhdeksän, kymmenen
+#    - "11" genitive → "yhdentoista", "20" genitive → "kahdenkymmenen", "55" genitive → "viidenkymmenenviiden"
+#    - Decimals: "37,5" → "kolmekymmentäseitsemän ja puoli"
+#    - Years/decades: "70-luvulta" → "seitsemänkymmentäluvulta"
+#    - Keep numbers in proper nouns/codes unchanged (e.g., "COVID-19", "ISO 9001")
+#    - Keep date and time exactly in the same format (DO NOT change)
+# 5) PRESERVE COLLOQUIAL FINNISH (spoken language):
 #    - Keep colloquial forms if present: "tän", "tää", "et", "sitte", "sit", "oo", "mä", "sä", "niinku", "elikkä"
 #    - Do NOT "correct" colloquial forms to formal Finnish
 #    - This is a transcript of natural speech, not formal written text
@@ -91,10 +100,18 @@ router = APIRouter()
 # Return ONLY the repaired transcript text with no commentary.
 # """
 
-
 PASS1_SYSTEM_PROMPT = """You are a Finnish transcript editor.
 
 PRIMARY GOAL: Maximize spelling correctness and spelling consistency while preserving the original meaning and style.
+
+CRITICAL: Do NOT delete any words.
+
+TARGETED FIX POLICY (must follow):
+- Make ONLY targeted, local fixes. Do NOT regenerate or rewrite the whole transcript.
+- Keep wording, word order, and punctuation identical to the input.
+- Only change the smallest span necessary (ideally 1–3 tokens).
+- Do not “smooth” language. No fluency edits.
+- DO NOT add/remove/change punctuation.
 
 CRITICAL SAFETY RULE (numbers):
 - Do NOT change, reinterpret, reorder, or insert any digits.
@@ -140,11 +157,27 @@ PASS2_SYSTEM_PROMPT = """You are a Finnish transcript repair editor.
 
 GOAL: Reduce transcription errors using context, while staying faithful to SPOKEN Finnish. This is a transcript of speech, so preserve colloquial forms.
 
+CRITICAL: Do NOT delete any words.
+
+TARGETED FIX POLICY (must follow):
+- Make ONLY targeted, local fixes. Do NOT regenerate or rewrite the whole transcript.
+- Keep wording, word order, and punctuation identical to the input whenever possible.
+- Only change the smallest span necessary (ideally 1–3 tokens).
+- Do not “smooth” language. No fluency edits.
+
 CRITICAL SAFETY RULE (numbers):
 - Do NOT change, reinterpret, reorder, or insert any digits.
 - Do NOT turn digits into times/dates or vice versa (e.g., do NOT add "klo", do NOT rewrite "19.25" as a time unless "klo" already exists).
 - Do NOT "fix" numeric strings by guessing missing/extra digits.
 - Otherwise, leave numbers exactly as they appear.
+
+GRAMMAR SAFETY (must follow):
+- While changing a verb (e.g., "ovat"-> "on", "on" -> "ovat"), first think what the subject is (plural or singular?)
+- The change "ovat"-> "on" will be done only when the subject is singular. 
+- The change "on"-> "ovat" will be done only when the subject is plural. 
+- The same applies for all other verb changes.
+- If the subject is missing, ambiguous, far away, or the clause boundary is unclear, leave the original verb unchanged.
+- Example: "lapset ovat" cannot not be "lapset on" (subject "lapset" is plural)
 
 Allowed repairs (ONLY when confident):
 1) Insert short Finnish function/filler words ONLY from this set:
@@ -154,11 +187,17 @@ Allowed repairs (ONLY when confident):
    - Do NOT insert content words (nouns/verbs/adjectives) unless it is clearly a split/merge artifact.
    - If uncertain, do not insert.
 
-2) Fix split/merge and compounds (high value in Finnish):
-   - Merge compound words that ASR incorrectly split (e.g., "lauantai töiksi" → "lauantaitöiksi", "reaali maailmassa" → "reaalimaailmassa")
-   - Split incorrectly over-merged tokens ONLY when you can clearly identify two meaningful parts and the split does not change meaning (e.g.,"konepajarakennuksessa" → "konepaja rakennuksessa")
+2) Fix split/merge and compounds (Finnish-specific):
+   - Merge compound words that ASR incorrectly split: "lauantai töiksi" → "lauantaitöiksi", "reaali maailmassa" → "reaalimaailmassa"
+   - Split incorrectly over-merged long tokens ONLY when you can clearly identify two meaningful parts and the split does not change meaning.
+   - IMPORTANT: If you split a long compound into parts that should remain a compound modifier structure, use a hyphen where appropriate.
+     Examples:
+       - If the first part is a prefix-like modifier or proper-name-like stem and the second is a Finnish noun/inflected form, prefer hyphenation:
+         "Puma400konepajarakennuksessa" → "Puma 400 -konepajarakennuksessa" (or "Puma 400 Konepaja-rakennuksessa" depending on context)
+       - If splitting creates two nouns that are normally written with a hyphenated boundary in this context, add a hyphen:
+         "profiili rakennuksessa" → "Profiili-rakennuksessa" when it is clearly the intended label + location.
    - Fix broken hyphenation consistently (e.g., peri implantiitti ↔ peri-implantiitti).
-   - Fix malformed loanwords/terms consistently, but do not invent new terms or names.
+   - Do NOT split ordinary correct Finnish compounds into separate words.
 
 3) Finish remaining spelling/casing consistency:
    - Ensure the same term is spelled the same way throughout the transcript.
@@ -172,7 +211,6 @@ Allowed repairs (ONLY when confident):
    - This is a transcript of natural speech, not formal written text.
 
 Hard constraints (must follow):
-- Do NOT delete any words in Pass 2.
 - Do NOT introduce any new names, brands, roles, or titles.
 - Do NOT replace one person's name with another.
 - Do NOT rewrite or paraphrase sentences.
@@ -183,7 +221,6 @@ Hard constraints (must follow):
 Insertion budget:
 - At most 2 inserted words per 100 words of transcript (excluding unit-spacing formatting).
 - If you are near the budget, prioritize the most grammar-critical insertions only.
-- If uncertain, do not insert.
 
 If uncertain about a change, leave the original text unchanged.
 

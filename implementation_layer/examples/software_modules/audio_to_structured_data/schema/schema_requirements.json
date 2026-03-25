@@ -1,0 +1,125 @@
+{
+  "model_name": "standard_medical_consultation_summary_Extraction",
+  "requirements": {
+    "use_case_name": "standard_medical_consultation_summary",
+    "fields": [
+      {
+        "field_name": "patient_name",
+        "field_type": "str",
+        "description": "Patient Name",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "date_of_birth",
+        "field_type": "date",
+        "description": "Date of Birth in this format: dd-mm-yyyy",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": "%d-%m-%Y"
+      },
+      {
+        "field_name": "consultation_date",
+        "field_type": "date",
+        "description": "Consultation Date in this format: dd.mm.yyyy",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": "%d.%m.%Y"
+      },
+      {
+        "field_name": "symptoms",
+        "field_type": "list[str]",
+        "description": "Symptoms",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "symptom_duration",
+        "field_type": "str",
+        "description": "Symptom Duration",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "medical_history",
+        "field_type": "str",
+        "description": "Medical History",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "examinations_performed",
+        "field_type": "list[str]",
+        "description": "Examinations Performed",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "clinical_findings",
+        "field_type": "str",
+        "description": "Clinical Findings",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "diagnosis",
+        "field_type": "str",
+        "description": "Diagnosis",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "treatment_prescribed",
+        "field_type": "str",
+        "description": "Treatment Prescribed",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "follow_up_instructions",
+        "field_type": "str",
+        "description": "Follow-up Instructions",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "referrals",
+        "field_type": "list[str]",
+        "description": "Referrals",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "attachments",
+        "field_type": "list[str]",
+        "description": "Attachments",
+        "required": true,
+        "enum": null,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  }
+}

@@ -1,10 +1,10 @@
 """Audio and Video Transcription
 
-This module provides audio/video transcription using OpenAI Whisper with optional GPT enhancement.
+This module provides audio/video transcription with optional transcript error fixing.
 
 Main Classes:
-    - Transcriber: High-level transcription API with chunking and enhancement
-    - TranscriptionResult: Container for raw and enhanced transcripts
+    - Transcriber: High-level transcription API with chunking and optional transcript error fixing
+    - TranscriptionResult: Container for raw and corrected transcripts
 
 Configuration:
     - get_openai_config: Get OpenAI/Azure configuration for transcription
@@ -13,14 +13,13 @@ Configuration:
 Utilities:
     - split_and_transcribe: Chunk and transcribe long audio files
     - split_and_transcribe_with_context: Transcribe with context awareness
-    - post_process_transcript: Enhance transcript using GPT
     - DEFAULT_PROMPT: Default transcription prompt for Whisper
 
 Example:
     >>> from gaik.software_components.transcriber import Transcriber, get_openai_config
     >>> config = get_openai_config(use_azure=True)
     >>> transcriber = Transcriber(config)
-    >>> result = transcriber.transcribe("audio.mp3", enhance=True)
+    >>> result = transcriber.transcribe("audio.mp3")
     >>> result.save("output/")
 """
 
@@ -43,7 +42,6 @@ try:
         DEFAULT_PROMPT,
         Transcriber,
         TranscriptionResult,
-        post_process_transcript,
         split_and_transcribe,
         split_and_transcribe_with_context,
     )
@@ -54,7 +52,6 @@ try:
             "TranscriptionResult",
             "split_and_transcribe",
             "split_and_transcribe_with_context",
-            "post_process_transcript",
             "DEFAULT_PROMPT",
         ]
     )

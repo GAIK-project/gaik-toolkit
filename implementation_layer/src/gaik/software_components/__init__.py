@@ -7,6 +7,7 @@ __all__ = [
     "config",
     "extractor",
     "transcriber",
+    "enhance_transcript",
     "text_to_speech",
     "parallel_transcriber",
     "parsers",
