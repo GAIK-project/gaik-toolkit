@@ -250,6 +250,8 @@ ignore = []
 [tool.ruff.lint.per-file-ignores]
 # Re-exports in __init__.py are intentional
 "**/__init__.py" = ["F401"]
+# LLM prompt strings are intentionally long single lines
+"implementation_layer/src/gaik/software_components/enhance_transcript/enhance_transcript.py" = ["E501"]
 # Legacy module names that cannot be renamed in a published package
 "implementation_layer/src/gaik/software_components/parsers/visionPlus.py" = ["N999"]
 "implementation_layer/src/gaik/software_components/transcriber/transcriber - OLD.py" = ["N999"]

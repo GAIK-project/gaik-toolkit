@@ -99,7 +99,9 @@ class Transcriber:
         self.workspace_dir = Path(output_dir)
         self.compress_audio = compress_audio  # backward compat; not used in simplified flow
         self.enhanced_transcript_enabled = (
-            fix_transcription_errors if fix_transcription_errors is not None else enhanced_transcript
+            fix_transcription_errors
+            if fix_transcription_errors is not None
+            else enhanced_transcript
         )
         self.max_size_mb = max_size_mb
         self.max_duration_seconds = max_duration_seconds
