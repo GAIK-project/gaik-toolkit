@@ -1,6 +1,6 @@
 ---
 name: gaik-toolkit
-description: GAIK (Generative AI Knowledge Management Toolkit) development guidance. Use when working with structured data extraction from documents/PDFs/audio, schema generation, document parsing (VisionParser, PyMuPDFParser, DoclingParser), audio transcription with Whisper, parallel transcription (ParallelTranscriber), SRT/VTT subtitle generation (srt_utils), document classification, RAG pipelines (Embedder, VectorStore, PgVectorStore, Retriever, AnswerGenerator), semantic video search (video_search_helpers), end-to-end pipelines (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow), the GAIK demo app (Next.js + FastAPI), or the GAIK documentation website (Fumadocs).
+description: GAIK (Generative AI Knowledge Management Toolkit) development guidance. Use when working with structured data extraction from documents/PDFs/audio, schema generation, document parsing (VisionParser, PyMuPDFParser, DoclingParser), audio transcription with Whisper (Transcriber, ParallelTranscriber), local Whisper backends (whisper_local with Finnish fine-tuned model), transcript enhancement/error correction (TranscriptEnhancer, enhance_transcript), text-to-speech (TextToSpeech), SRT/VTT subtitle generation (srt_utils), document classification, RAG pipelines (Embedder, VectorStore, PgVectorStore, Retriever, AnswerGenerator), semantic video search (video_search_helpers), end-to-end pipelines (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow), the GAIK demo app (Next.js + FastAPI), or the GAIK documentation website (Fumadocs).
 ---
 
 # GAIK Toolkit
@@ -10,8 +10,10 @@ Python toolkit for knowledge extraction, capture, and generation. Use when worki
 - Structured data extraction from documents, PDFs, images, or audio
 - Schema generation from natural language requirements
 - Document parsing (PDF, DOCX, images)
-- Audio/video transcription with Whisper + GPT enhancement
+- Audio/video transcription with Whisper + local Whisper backends (Finnish fine-tuned model)
+- **Transcript enhancement** — two-pass LLM error correction (TranscriptEnhancer, enhance_transcript)
 - **Parallel transcription** with FFmpeg chunking (ParallelTranscriber)
+- **Text-to-speech** generation (TextToSpeech)
 - Document classification
 - **RAG pipelines**: embedder, vector store (Chroma / PostgreSQL), retriever, answer generator
 - End-to-end pipelines: AudioToStructuredData, DocumentsToStructuredData, **RAGWorkflow**
@@ -69,7 +71,7 @@ See [Installation Reference](references/installation.md) for all available extra
 ```bash
 AZURE_API_KEY=your-key
 AZURE_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_DEPLOYMENT=gpt-5.1
+AZURE_DEPLOYMENT=gpt-5.4
 AZURE_API_VERSION=2025-03-01-preview
 ```
 
@@ -77,7 +79,7 @@ AZURE_API_VERSION=2025-03-01-preview
 
 ```bash
 OPENAI_API_KEY=your-key
-OPENAI_MODEL=gpt-5.1
+OPENAI_MODEL=gpt-5.4
 ```
 
 ## Configuration Pattern
@@ -143,10 +145,56 @@ text = DoclingParser().parse("complex_document.pdf")
 from gaik.software_components.transcriber import Transcriber, get_openai_config
 
 config = get_openai_config(use_azure=True)
+
+# Basic usage with transcript error correction
 transcriber = Transcriber(api_config=config, enhanced_transcript=True)
 result = transcriber.transcribe("meeting.mp3")
 print(result.enhanced_transcript or result.raw_transcript)
-result.save("output/")
+
+# Local Whisper backend (e.g. Finnish fine-tuned model on AI Hub)
+transcriber = Transcriber(
+    api_config=config,
+    enhanced_transcript=True,
+    enhanced_transcript_instructions="",  # Optional domain-specific instructions
+    transcription_model="whisper_local",  # Force local transcription backend
+    local_api_base="http://your-server:8080",
+    local_api_key="your-api-key",
+    language="fi",  # "fi" = Finnish fine-tuned model, "auto" or "en" = whisper-large-v3
+)
+result = transcriber.transcribe("meeting.mp3")
+print(result.srt_content)  # SRT subtitles (whisper_local only)
+```
+
+Transcription models: `"whisper"`, `"gpt-4o-transcribe"`, `"whisper_local"`.
+When `enhanced_transcript=True`, the Transcriber runs the raw transcript through the standalone `TranscriptEnhancer` component.
+
+### TranscriptEnhancer (enhance_transcript)
+
+Standalone two-pass LLM transcript error correction, currently tuned for Finnish.
+
+```python
+from gaik.software_components.enhance_transcript import TranscriptEnhancer, get_openai_config
+
+config = get_openai_config(use_azure=True)
+enhancer = TranscriptEnhancer(api_config=config)
+result = enhancer.enhance_text(
+    "tama on suomenkielinen litterointi jossa on virheita",
+    generate_summary=True,
+    diff_chunks=True,
+    additional_instructions="Keep company names exactly as written.",
+)
+print(result.enhanced_text)
+```
+
+### TextToSpeech
+
+```python
+from gaik.software_components.text_to_speech import TextToSpeech, get_openai_config
+
+config = get_openai_config(use_azure=True)
+tts = TextToSpeech(api_config=config, language="fi", voice="alloy")
+result = tts.synthesize("Tama on tekstista puheeksi.")
+result.save("tts_outputs")
 ```
 
 ### ParallelTranscriber
@@ -305,7 +353,7 @@ print(result.answer)
 | Level | Concept | Examples |
 |-------|---------|----------|
 | **Service** | Logical capability | `speech_to_text`, `document_parsing`, `information_extraction`, `rag` |
-| **Building block** | Atomic toolkit class/function | `Transcriber`, `ParallelTranscriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `Embedder`, `VectorStore`, `PgVectorStore`, `Retriever`, `AnswerGenerator`, `VisionRagParser`, `DoclingRagParser`, `srt_utils`, `video_search_helpers` |
+| **Building block** | Atomic toolkit class/function | `Transcriber`, `ParallelTranscriber`, `TranscriptEnhancer`, `TextToSpeech`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `Embedder`, `VectorStore`, `PgVectorStore`, `Retriever`, `AnswerGenerator`, `VisionRagParser`, `DoclingRagParser`, `srt_utils`, `video_search_helpers` |
 | **Software component** | Composed, workflow-ready unit | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow` |
 
 ## Use Cases

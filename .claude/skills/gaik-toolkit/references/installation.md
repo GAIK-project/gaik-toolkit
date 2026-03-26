@@ -20,6 +20,12 @@ pip install "gaik[transcriber]"
 # Parallel transcription (FFmpeg-based, requires ffmpeg on $PATH)
 pip install "gaik[parallel-transcriber]"
 
+# Transcript enhancement (two-pass LLM error correction)
+pip install "gaik[enhance-transcript]"
+
+# Text-to-speech
+pip install "gaik[text-to-speech]"
+
 # Document classification
 pip install "gaik[classifier]"
 
@@ -60,6 +66,8 @@ pip install "gaik[all-cpu]"
 | Parse PDFs (fast, local) | `parser-cpu` |
 | Parse PDFs (with OCR/GPU) | `parser` |
 | Transcribe audio/video | `transcriber` or `parallel-transcriber` |
+| Fix transcript errors (LLM) | `enhance-transcript` |
+| Text-to-speech | `text-to-speech` |
 | Classify documents | `classifier` |
 | Build RAG pipeline | `rag-workflow` |
 | Just embeddings | `embedder` |

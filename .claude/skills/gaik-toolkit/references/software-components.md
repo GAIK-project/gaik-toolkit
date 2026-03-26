@@ -327,16 +327,18 @@ See [RAG Building Blocks](rag.md) for full PgVectorStore API.
 
 ## Import Patterns
 
+Each pipeline module exports its own `PipelineResult` class. Import from the module you are using:
+
 ```python
 # Audio pipeline
 from gaik.software_modules.audio_to_structured_data import (
     AudioToStructuredData,
-    PipelineResult,
+    PipelineResult as AudioPipelineResult,
 )
 
 # Document pipeline
 from gaik.software_modules.documents_to_structured_data import (
     DocumentsToStructuredData,
-    PipelineResult,
+    PipelineResult as DocPipelineResult,
 )
 ```

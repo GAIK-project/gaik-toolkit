@@ -10,7 +10,9 @@ Detailed API documentation for GAIK building blocks.
 - [Extractor Module](#extractor-module) (SchemaGenerator, DataExtractor, FieldSpec)
 - [Parsers Module](#parsers-module) (VisionParser, PyMuPDFParser, DocxParser, DoclingParser)
 - [Transcriber Module](#transcriber-module) (Transcriber, TranscriptionResult)
+- [Enhance Transcript Module](#enhance-transcript-module) (TranscriptEnhancer)
 - [Parallel Transcriber Module](#parallel-transcriber-module) (ParallelTranscriber, TranscriptionConfig)
+- [Text-to-Speech Module](#text-to-speech-module) (TextToSpeech)
 - [Document Classifier Module](#document-classifier-module)
 - [Import Patterns](#import-patterns)
 
@@ -34,8 +36,8 @@ client = create_openai_client(config)
     "api_key": str,
     "azure_endpoint": str,
     "api_version": str,
-    "model": str,  # Default: "gpt-4o"
-    "transcription_model": str,  # Default: "whisper"
+    "model": str,  # Default: "gpt-5.4"
+    "transcription_model": str,  # Default: "gpt-4o-transcribe"
 }
 ```
 
@@ -43,8 +45,8 @@ client = create_openai_client(config)
 ```python
 {
     "api_key": str,
-    "model": str,  # Default: "gpt-4o"
-    "transcription_model": str,  # Default: "whisper-1"
+    "model": str,  # Default: "gpt-5.4-2026-03-05"
+    "transcription_model": str,  # Default: "gpt-4o-transcribe"
 }
 ```
 
@@ -62,7 +64,7 @@ Generates Pydantic models from natural language requirements.
 from gaik.software_components.extractor import SchemaGenerator
 
 generator = SchemaGenerator(config=config)
-schema = generator.generate_schema(user_requirements: str)
+schema = generator.generate_schema(user_requirements="Extract invoice number, total, vendor name.")
 ```
 
 **Attributes after generation:**
@@ -208,43 +210,127 @@ text = parse_document("complex_document.pdf")
 
 ### Transcriber
 
-Audio/video transcription with optional GPT enhancement.
+Audio/video transcription with configurable backends and optional transcript error correction.
 
 ```python
 from gaik.software_components.transcriber import Transcriber
 
 transcriber = Transcriber(
     api_config=config,
-    output_dir="workspace/",       # Working directory
-    enhanced_transcript=True,      # GPT post-processing
-    max_size_mb=25,                # Chunk threshold
-    max_duration_seconds=1500,     # Max chunk duration
-    default_prompt="",             # Whisper language hint
-    compress_audio=True,           # Compress before API call
+    output_dir="workspace/",                    # Working directory
+    enhanced_transcript=True,                   # Run TranscriptEnhancer on raw output
+    enhanced_transcript_instructions=None,      # Optional domain instructions for enhancement
+    max_size_mb=25,                             # Chunk threshold
+    max_duration_seconds=1500,                  # Max chunk duration
+    default_prompt="",                          # Whisper language hint
+    transcription_model=None,                   # "whisper", "gpt-4o-transcribe", or "whisper_local"
+    language="auto",                            # Language code ("fi", "en", "auto")
+    local_api_base=None,                        # Required for whisper_local
+    local_api_key=None,                         # Required for whisper_local
+    diarization=False,                          # whisper_local only
+    speaker_count=None,                         # whisper_local only
+    min_speakers=None,                          # whisper_local only
+    max_speakers=None,                          # whisper_local only
+    initial_prompt=None,                        # whisper_local only
 )
 
 result = transcriber.transcribe(
     file_path: str,
     custom_context="",             # Optional domain context
+    use_case_name=None,            # Optional label for logging
 )
 
 result.save("output/")
 ```
 
-### TranscriptionResult
+### Transcription Models
 
-Result container with save helpers.
+`transcription_model` accepts: `"whisper"`, `"gpt-4o-transcribe"`, `"whisper_local"`.
+
+- Not provided: uses the model from `api_config` (default `gpt-4o-transcribe` for both Azure and OpenAI)
+- `"whisper"`: Azure resolves to configured deployment (typically `whisper-1`), OpenAI uses `whisper`
+- `"gpt-4o-transcribe"`: both Azure/OpenAI use `gpt-4o-transcribe`
+- `"whisper_local"`: routes to local Whisper server via `local_api_base`/`local_api_key`
+
+### Local Whisper (`whisper_local`)
+
+The `language` parameter selects the ASR model on the remote server:
+- `language="fi"` — Finnish fine-tuned model (`Finnish-NLP/whisper-large-finnish-v3-ct2`)
+- `language="en"` or `language="auto"` — `whisper-large-v3`
+
+Local-only parameters (`diarization`, `speaker_count`, etc.) are silently ignored when not using `whisper_local`.
+
+### Transcript Error Correction
+
+When `enhanced_transcript=True`, the Transcriber runs the raw transcript through the standalone `TranscriptEnhancer` component (see Enhance Transcript Module below). The `enhanced_transcript_instructions` parameter is forwarded as `additional_instructions` to the second pass.
+
+### TranscriptionResult
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
 | `raw_transcript` | str | Direct Whisper output |
-| `enhanced_transcript` | str | GPT-refined version (if enabled) |
+| `enhanced_transcript` | str \| None | Corrected version from TranscriptEnhancer (if enabled) |
 | `job_id` | str | Unique job identifier |
+| `segments` | list[dict] \| None | Whisper segments with start/end/text (whisper_local only) |
+| `srt_content` | str \| None | SRT subtitle content (whisper_local only) |
+| `vtt_content` | str \| None | VTT subtitle content (whisper_local only) |
 
 **Methods:**
-- `result.save(output_dir)` - Persist to disk with timestamp
+- `result.save(directory, *, save_raw=True, save_enhanced=True, encoding="utf-8")` - Persist to disk. Returns `dict[str, Path | None]` mapping `"raw"` and `"enhanced"` to saved file paths.
 
 **Supported formats:** .mp3, .wav, .m4a, .mp4, .webm, .ogg, .flac
+
+---
+
+## Enhance Transcript Module
+
+**Source:** `gaik.software_components.enhance_transcript`
+
+**Install:** `pip install "gaik[enhance-transcript]"`
+
+Two-pass LLM transcript error correction, currently tuned for Finnish. Pass 1: spelling cleanup and consistency. Pass 2: context-based ASR repair with optional custom instructions.
+
+### TranscriptEnhancer
+
+```python
+from gaik.software_components.enhance_transcript import TranscriptEnhancer, get_openai_config
+
+config = get_openai_config(use_azure=True)
+enhancer = TranscriptEnhancer(
+    api_config=config,         # Optional; uses get_openai_config() if omitted
+    use_azure=True,            # Used only when api_config is omitted
+    model=None,                # Optional model override
+)
+
+# From string
+result = enhancer.enhance_text(
+    transcript_text="...",
+    generate_summary=False,           # Include change count summary
+    diff_chunks=False,                # Include list of changed spans
+    additional_instructions=None,     # Extra instructions for Pass 2
+)
+
+# From file
+result = enhancer.enhance_file(
+    file_path="transcript.txt",
+    generate_summary=True,
+    diff_chunks=True,
+    additional_instructions="Keep company names exactly as written.",
+)
+```
+
+### TranscriptEnhancerResult
+
+```python
+result.enhanced_text           # Corrected transcript
+result.original_text           # Input transcript
+result.source_file             # File path (if enhance_file was used)
+result.correction_summary      # CorrectionSummary (if generate_summary=True)
+result.diff_chunks             # List[DiffChunk] (if diff_chunks=True)
+result.model_dump()            # Serialize to dict
+```
+
+**Default models:** Azure: `gpt-5.4`, OpenAI: `gpt-5.4-2026-03-05`
 
 ---
 
@@ -346,6 +432,58 @@ cancel.cancel()
 
 ---
 
+## Text-to-Speech Module
+
+**Source:** `gaik.software_components.text_to_speech`
+
+**Install:** `pip install "gaik[text-to-speech]"`
+
+Generate spoken audio from text using OpenAI or Azure OpenAI TTS.
+
+### TextToSpeech
+
+```python
+from gaik.software_components.text_to_speech import TextToSpeech, get_openai_config
+
+config = get_openai_config(use_azure=True)
+tts = TextToSpeech(
+    api_config=config,
+    model="tts-hd",
+    language="fi",                   # "fi" or "en"
+    voice="alloy",
+    response_format="mp3",
+    speed=1.0,
+    default_instructions=None,
+)
+
+result = tts.synthesize(
+    text="Tama on tekstista puheeksi.",
+    language="fi",    # optional override
+    voice="alloy",    # optional override
+)
+saved_path = result.save("tts_outputs")
+```
+
+### SpeechSynthesisResult
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `audio_bytes` | bytes | Raw audio data |
+| `job_id` | str | Unique job identifier |
+| `model` | str | Model used |
+| `voice` | str | Voice used |
+| `language` | str | Language code |
+| `response_format` | str | Audio format |
+| `content_type` | str | MIME type |
+
+**Methods:**
+- `result.save(output_dir)` - Save audio file, returns path
+
+**Azure env vars:** `AZURE_API_KEY`, `TTS_ENDPOINT`, `AZURE_TTS_MODEL`
+**OpenAI env var:** `OPENAI_TTS_MODEL` (optional override)
+
+---
+
 ## Document Classifier Module
 
 **Source:** `gaik.software_components.doc_classifier`
@@ -409,6 +547,21 @@ from gaik.software_components.parsers import (
 from gaik.software_components.transcriber import (
     Transcriber,
     TranscriptionResult,
+    get_openai_config,
+)
+
+# Enhance Transcript
+from gaik.software_components.enhance_transcript import (
+    TranscriptEnhancer,
+    TranscriptEnhancerResult,
+    CorrectionSummary,
+    DiffChunk,
+    get_openai_config,
+)
+
+# Text-to-Speech
+from gaik.software_components.text_to_speech import (
+    TextToSpeech,
     get_openai_config,
 )
 
