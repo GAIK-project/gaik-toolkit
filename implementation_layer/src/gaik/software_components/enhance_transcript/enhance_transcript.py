@@ -178,13 +178,17 @@ class TranscriptEnhancer:
         *,
         generate_summary: bool = False,
         diff_chunks: bool = False,
+        additional_instructions: str | None = None,
     ) -> TranscriptEnhancerResult:
         transcript_text = transcript_text.strip()
         if not transcript_text:
             raise ValueError("transcript_text must not be empty")
 
         pass1_text = self._enhance_pass1(transcript_text)
-        enhanced_text = self._enhance_pass2(pass1_text)
+        enhanced_text = self._enhance_pass2(
+            pass1_text,
+            additional_instructions=additional_instructions,
+        )
 
         return TranscriptEnhancerResult(
             original_text=transcript_text,
@@ -201,6 +205,7 @@ class TranscriptEnhancer:
         *,
         generate_summary: bool = False,
         diff_chunks: bool = False,
+        additional_instructions: str | None = None,
         encoding: str = "utf-8",
     ) -> TranscriptEnhancerResult:
         transcript_path = Path(file_path)
@@ -214,6 +219,7 @@ class TranscriptEnhancer:
             transcript_text,
             generate_summary=generate_summary,
             diff_chunks=diff_chunks,
+            additional_instructions=additional_instructions,
         )
         result.source_file = transcript_path.name
         return result
@@ -236,14 +242,29 @@ class TranscriptEnhancer:
         )
         return self._extract_response_text(response, transcript_text)
 
-    def _enhance_pass2(self, transcript_text: str) -> str:
+    def _enhance_pass2(
+        self,
+        transcript_text: str,
+        *,
+        additional_instructions: str | None = None,
+    ) -> str:
+        user_prompt = (
+            f"Repair remaining ASR errors in this Finnish transcript:\n\n"
+            f"{transcript_text}"
+        )
+        if additional_instructions and additional_instructions.strip():
+            user_prompt += (
+                "\n\nADDITIONAL INSTRUCTIONS:\n"
+                f"{additional_instructions.strip()}"
+            )
+
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": PASS2_SYSTEM_PROMPT},
                 {
                     "role": "user",
-                    "content": f"Repair remaining ASR errors in this Finnish transcript:\n\n{transcript_text}",
+                    "content": user_prompt,
                 },
             ],
             temperature=0.0,

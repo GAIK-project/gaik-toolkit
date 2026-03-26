@@ -85,6 +85,7 @@ class Transcriber:
         max_duration_seconds: int = 1500,
         default_prompt: str = DEFAULT_PROMPT,
         transcription_model: str | None = None,
+        enhanced_transcript_instructions: str | None = None,
         language: str = "auto",
         diarization: bool = False,
         speaker_count: int | None = None,
@@ -104,6 +105,7 @@ class Transcriber:
         self.max_duration_seconds = max_duration_seconds
         self.default_prompt = default_prompt
         self.transcription_model = transcription_model
+        self.enhanced_transcript_instructions = enhanced_transcript_instructions
         self.language = language
         self.diarization = diarization
         self.speaker_count = speaker_count
@@ -167,7 +169,10 @@ class Transcriber:
         if self.enhanced_transcript_enabled:
             print("Fixing transcription errors with TranscriptEnhancer...")
             enhancer = TranscriptEnhancer(api_config=self.api_config)
-            enhanced_result = enhancer.enhance_text(raw_transcript)
+            enhanced_result = enhancer.enhance_text(
+                raw_transcript,
+                additional_instructions=self.enhanced_transcript_instructions,
+            )
             enhanced_text = enhanced_result.enhanced_text
         else:
             print("Transcript error fixing disabled; returning raw text only.")

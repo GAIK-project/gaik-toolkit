@@ -36,6 +36,7 @@ def main() -> None:
         min_speakers=None,  # Minimum speakers for diarization range
         max_speakers=None,  # Maximum speakers for diarization range
         initial_prompt=None,  # Optional prompt hint for the local transcriber
+        enhanced_transcript_instructions=""
     )
 
     result = transcriber.transcribe(file_path=AUDIO_FILE)

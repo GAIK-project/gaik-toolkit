@@ -67,18 +67,20 @@ result = enhancer.enhance_text(
     transcript_text="...",
     generate_summary=False,
     diff_chunks=False,
+    additional_instructions=None,
 )
 
 result = enhancer.enhance_file(
     file_path="transcript.txt",
     generate_summary=True,
     diff_chunks=True,
+    additional_instructions="Keep company names exactly as they appear.",
 )
 ```
 
 ## Optional Parameters
 
-Both `enhance_text(...)` and `enhance_file(...)` support these optional flags:
+Both `enhance_text(...)` and `enhance_file(...)` support these optional parameters:
 
 ### `generate_summary`
 
@@ -131,6 +133,23 @@ DiffChunk(kind="substitute", original="hammas laakari", corrected="hammaslääk�
 ```
 
 Use this when you want to inspect exactly what changed, build a UI diff, or analyze correction behavior in more detail.
+
+### `additional_instructions`
+
+When `additional_instructions` is provided, it is appended to the Pass 2 user prompt under an `ADDITIONAL INSTRUCTIONS` section.
+
+This is useful when you want to guide the second pass with task-specific constraints without changing the default Finnish repair policy.
+
+Example:
+
+```python
+result = enhancer.enhance_text(
+    transcript_text="tama on acme oy projekti",
+    additional_instructions="Keep company names and product names exactly as written.",
+)
+```
+
+This affects only Pass 2. Pass 1 remains unchanged.
 
 ### Using Both Together
 

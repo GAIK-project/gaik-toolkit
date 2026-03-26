@@ -72,6 +72,21 @@ If `enhanced_transcript=True`, the transcriber runs the raw transcript through t
 - Returned in:
   - `result.enhanced_transcript`
 
+Optional pass-through instructions:
+- `enhanced_transcript_instructions`
+
+If `enhanced_transcript_instructions` is provided, it is forwarded to the second pass of `TranscriptEnhancer` as `additional_instructions`.
+
+Example:
+
+```python
+transcriber = Transcriber(
+    api_config=config,
+    enhanced_transcript=True,
+    enhanced_transcript_instructions="Keep company names and product names exactly as written.",
+)
+```
+
 Note: the result field name remains `enhanced_transcript` for compatibility, even though it now contains the corrected transcript returned by `TranscriptEnhancer`.
 
 ## Local Whisper Mode
@@ -120,6 +135,7 @@ transcriber = Transcriber(
     max_duration_seconds=1500,
     default_prompt="...",
     transcription_model=None,
+    enhanced_transcript_instructions=None,
     language="auto",
     diarization=False,
     speaker_count=None,
