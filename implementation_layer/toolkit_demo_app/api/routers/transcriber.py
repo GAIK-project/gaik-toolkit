@@ -44,6 +44,9 @@ class TranscribeResponse(BaseModel):
     diff_chunks: list[DiffChunk] | None = None
     job_id: str
     segments: list[TranscriptSegment] | None = None
+    used_fallback: bool = False
+    fallback_reason: str | None = None
+    transcription_model: str | None = None
 
 
 @router.post("", response_model=TranscribeResponse)
@@ -113,6 +116,10 @@ async def transcribe_audio(
             "local_api_key": local_api_key,
         }
 
+        used_fallback = False
+        fallback_reason = None
+        cloud_model = config.get("transcription_model", "whisper")
+
         if prefer_local_first and local_api_base and local_api_key:
             try:
                 transcriber = Transcriber(
@@ -120,11 +127,15 @@ async def transcribe_audio(
                     transcription_model="whisper_local",
                 )
                 result = transcriber.transcribe(file_path=tmp_path, custom_context=custom_context)
+                transcription_model_used = "whisper_local"
             except Exception as exc:
                 print(f"Local transcription failed: {exc}")
                 print("Falling back to configured transcription model.")
+                used_fallback = True
+                fallback_reason = _categorize_fallback_reason(exc)
                 transcriber = Transcriber(**transcriber_kwargs)
                 result = transcriber.transcribe(file_path=tmp_path, custom_context=custom_context)
+                transcription_model_used = cloud_model
         else:
             if prefer_local_first and not (local_api_base and local_api_key):
                 print(
@@ -133,6 +144,7 @@ async def transcribe_audio(
                 )
             transcriber = Transcriber(**transcriber_kwargs)
             result = transcriber.transcribe(file_path=tmp_path, custom_context=custom_context)
+            transcription_model_used = cloud_model
 
         corrected_transcript = None
         correction_summary = None
@@ -160,6 +172,9 @@ async def transcribe_audio(
             diff_chunks=diff_chunks,
             job_id=result.job_id,
             segments=result.segments if diarization else None,
+            used_fallback=used_fallback,
+            fallback_reason=fallback_reason,
+            transcription_model=transcription_model_used,
         )
     except ImportError as e:
         raise HTTPException(status_code=500, detail=f"Transcriber not installed: {e}") from e
@@ -167,6 +182,28 @@ async def transcribe_audio(
         raise HTTPException(status_code=500, detail=str(e)) from e
     finally:
         Path(tmp_path).unlink(missing_ok=True)
+
+
+def _categorize_fallback_reason(exc: Exception) -> str:
+    causes: list[BaseException] = []
+    current: BaseException | None = exc
+    while current is not None:
+        causes.append(current)
+        current = getattr(current, "__cause__", None) or getattr(
+            current, "__context__", None
+        )
+
+    for cause in causes:
+        cause_type = type(cause).__name__.lower()
+        cause_str = str(cause).lower()
+        if "connectionrefused" in cause_type or "connection refused" in cause_str:
+            return "Local transcriber server is not reachable (connection refused)"
+        if "timeout" in cause_type or "timed out" in cause_str:
+            return "Local transcriber server timed out"
+        if "name or service not known" in cause_str or "nodename nor servname" in cause_str:
+            return "Local transcriber hostname could not be resolved (DNS)"
+
+    return f"Local transcription failed ({type(exc).__name__})"
 
 
 def _summarize_corrections(original_text: str, corrected_text: str) -> CorrectionSummary:

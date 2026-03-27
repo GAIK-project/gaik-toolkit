@@ -37,7 +37,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Download, Mic, Sparkles } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertTriangle, Download, Mic, Sparkles } from "lucide-react";
 import { motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
@@ -72,6 +73,9 @@ interface TranscribeResult {
   diff_chunks: DiffChunk[] | null;
   job_id: string;
   segments: TranscriptSegment[] | null;
+  used_fallback: boolean;
+  fallback_reason: string | null;
+  transcription_model: string | null;
 }
 
 export default function TranscriberPage() {
@@ -309,9 +313,19 @@ export default function TranscriberPage() {
         language: language,
         diarization: diarization,
         prefer_local_first: preferLocalFirst,
+        used_fallback: data.used_fallback,
+        fallback_reason: data.fallback_reason,
+        transcription_model: data.transcription_model,
       });
 
-      toast.success("Transcription complete!");
+      if (data.used_fallback) {
+        toast(
+          data.fallback_reason || "Fell back to cloud transcription",
+          { icon: "\u26A0\uFE0F", duration: 8000 },
+        );
+      } else {
+        toast.success("Transcription complete!");
+      }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         return; // Request was aborted, don't show error
@@ -575,10 +589,20 @@ export default function TranscriberPage() {
           {result && !isLoading && (
             <ResultCard
               title="Result"
-              description={`File: ${result.filename}`}
+              description={`File: ${result.filename} \u00b7 Model: ${result.transcription_model || "unknown"}`}
               feedbackSlot={<FeedbackButton demoType="transcriber" />}
               delay={0}
             >
+              {result.used_fallback && (
+                <Alert className="mb-4 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertTitle>Fallback transcription used</AlertTitle>
+                  <AlertDescription>
+                    {result.fallback_reason ||
+                      "The local transcriber was unavailable. Cloud model was used instead."}
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="mb-4 flex justify-end">
                 <Button
                   variant="outline"
