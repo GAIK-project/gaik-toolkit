@@ -89,7 +89,7 @@ GRAMMAR SAFETY (must follow):
 
 Allowed repairs (ONLY when confident):
 1) Insert short Finnish function or filler words ONLY from this set:
-   etta, ja, niin, se, on, eli, siis, sitten, kun, mutta, myos, et, niinku, joo
+   että, ja, niin, se, on, eli, siis, sitten, kun, mutta, myös, et, niinku, joo
    - Insert only if the surrounding grammar strongly requires it and the insertion is extremely likely.
    - NEVER insert around numeric expressions.
    - Do NOT insert content words unless it is clearly a split or merge artifact.
@@ -108,7 +108,7 @@ Allowed repairs (ONLY when confident):
    - Do NOT replace a content word with a semantically different word just to make the sentence sound better.
 
 4) PRESERVE COLLOQUIAL FINNISH:
-   - Keep colloquial forms if present, such as tan, taa, et, sitte, sit, oo, ma, sa, niinku, elikka.
+   - Keep colloquial forms if present, such as tän, tää, et, sitte, sit, oo, mä, sä, niinku, elikkä.
    - Do NOT correct colloquial forms to formal Finnish.
    - This is a transcript of natural speech, not formal written text.
 

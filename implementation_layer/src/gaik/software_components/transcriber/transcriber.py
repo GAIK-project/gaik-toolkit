@@ -24,7 +24,7 @@ DEFAULT_PROMPT = (
     "Detect the language and extract transcript in the same language. "
     "The audio could be in any language, such as English, Finnish, Swedish, etc."
 )
-ALLOWED_TRANSCRIPTION_MODELS = {"whisper", "gpt-4o-transcribe", "whisper_local"}
+ALLOWED_TRANSCRIPTION_MODELS = {"whisper", "whisper-1", "gpt-4o-transcribe", "whisper_local"}
 
 
 @dataclass
@@ -80,7 +80,6 @@ class Transcriber:
         *,
         compress_audio: bool = True,  # kept for backward compatibility; no longer used
         enhanced_transcript: bool = False,
-        fix_transcription_errors: bool | None = None,
         max_size_mb: int = 25,
         max_duration_seconds: int = 1500,
         default_prompt: str = DEFAULT_PROMPT,
@@ -98,11 +97,7 @@ class Transcriber:
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
         self.compress_audio = compress_audio  # backward compat; not used in simplified flow
-        self.enhanced_transcript_enabled = (
-            fix_transcription_errors
-            if fix_transcription_errors is not None
-            else enhanced_transcript
-        )
+        self.enhanced_transcript_enabled = enhanced_transcript
         self.max_size_mb = max_size_mb
         self.max_duration_seconds = max_duration_seconds
         self.default_prompt = default_prompt

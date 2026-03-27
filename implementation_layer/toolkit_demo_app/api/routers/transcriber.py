@@ -1,8 +1,8 @@
 """Transcriber router - Audio/video transcription endpoints"""
 
 import os
-import tempfile
 from difflib import SequenceMatcher
+import tempfile
 from pathlib import Path
 
 try:
@@ -68,11 +68,7 @@ async def transcribe_audio(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
 
-    if enhanced and fix_transcription_errors:
-        raise HTTPException(
-            status_code=400,
-            detail="Polished text and fix transcription errors cannot be enabled at the same time",
-        )
+    enhanced = fix_transcription_errors
 
     use_azure = bool(os.getenv("AZURE_API_KEY"))
     if not use_azure and not os.getenv("OPENAI_API_KEY"):
@@ -105,6 +101,7 @@ async def transcribe_audio(
             "api_config": config,
             "output_dir": tempfile.gettempdir(),
             "enhanced_transcript": enhanced,
+            "enhanced_transcript_instructions": enhanced_transcript_instructions,
             "compress_audio": compress_audio,
             "language": language,
             "diarization": diarization,
@@ -149,19 +146,16 @@ async def transcribe_audio(
         corrected_transcript = None
         correction_summary = None
         diff_chunks = None
-        if fix_transcription_errors:
-            from gaik.software_components.enhance_transcript import TranscriptEnhancer
-
-            enhancer = TranscriptEnhancer(api_config=config)
-            enhance_result = enhancer.enhance_text(
-                result.raw_transcript,
-                additional_instructions=enhanced_transcript_instructions,
-            )
-            corrected_transcript = enhance_result.enhanced_text
+        if fix_transcription_errors and result.enhanced_transcript:
+            corrected_transcript = result.enhanced_transcript
             correction_summary = _summarize_corrections(
-                result.raw_transcript, corrected_transcript
+                result.raw_transcript,
+                corrected_transcript,
             )
-            diff_chunks = _build_diff_chunks(result.raw_transcript, corrected_transcript)
+            diff_chunks = _build_diff_chunks(
+                result.raw_transcript,
+                corrected_transcript,
+            )
 
         return TranscribeResponse(
             filename=file.filename,

@@ -81,6 +81,8 @@ interface TranscribeResult {
 export default function TranscriberPage() {
   const [file, setFile] = useState<File | null>(null);
   const [additionalContext, setAdditionalContext] = useState("");
+  const [enhancedTranscriptInstructions, setEnhancedTranscriptInstructions] =
+    useState("");
   const [fixTranscriptionErrors, setFixTranscriptionErrors] = useState(false);
   const [compressAudio, setCompressAudio] = useState(true);
   const [language, setLanguage] = useState("auto");
@@ -271,6 +273,11 @@ export default function TranscriberPage() {
         "fix_transcription_errors",
         String(fixTranscriptionErrors),
       );
+      if (enhancedTranscriptInstructions.trim() !== "")
+        formData.append(
+          "enhanced_transcript_instructions",
+          enhancedTranscriptInstructions.trim(),
+        );
       formData.append("compress_audio", String(compressAudio));
       formData.append("language", language);
       formData.append("diarization", String(diarization));
@@ -308,6 +315,8 @@ export default function TranscriberPage() {
         file_type: file.type,
         file_size: file.size,
         fix_transcription_errors: fixTranscriptionErrors,
+        has_enhanced_transcript_instructions:
+          enhancedTranscriptInstructions.trim().length > 0,
         compress_audio: compressAudio,
         has_custom_context: additionalContext.length > 0,
         language: language,
@@ -537,6 +546,25 @@ export default function TranscriberPage() {
                         disabled={isLoading}
                         rows={3}
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="enhanced-transcript-instructions">
+                        Enhancement Instructions
+                      </Label>
+                      <Textarea
+                        id="enhanced-transcript-instructions"
+                        value={enhancedTranscriptInstructions}
+                        onChange={(e) =>
+                          setEnhancedTranscriptInstructions(e.target.value)
+                        }
+                        placeholder="Optional Finnish correction instructions, e.g. keep company names exactly as written..."
+                        disabled={isLoading || !fixTranscriptionErrors}
+                        rows={3}
+                      />
+                      <p className="text-muted-foreground text-xs">
+                        Used only when Fix Transcription Errors is enabled.
+                      </p>
                     </div>
                   </AccordionContent>
                 </AccordionItem>
