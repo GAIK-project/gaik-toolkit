@@ -116,7 +116,7 @@ Core classes in `gaik.software_components.*`. For detailed API and constructor p
 
 ### Transcriber notes
 
-- Models: `"whisper"`, `"gpt-4o-transcribe"`, `"whisper_local"`
+- Models: `"whisper"`, `"whisper-1"`, `"gpt-4o-transcribe"`, `"whisper_local"`
 - `enhanced_transcript=True` runs output through TranscriptEnhancer (two-pass LLM correction)
 - `whisper_local` requires `local_api_base` + `local_api_key`; `language="fi"` selects Finnish fine-tuned model
 - ParallelTranscriber uses FFmpeg chunking; requires `ffmpeg` + `ffprobe` on `$PATH`
