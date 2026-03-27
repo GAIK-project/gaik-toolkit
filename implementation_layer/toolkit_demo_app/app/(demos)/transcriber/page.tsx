@@ -328,10 +328,7 @@ export default function TranscriberPage() {
       });
 
       if (data.used_fallback) {
-        toast(
-          data.fallback_reason || "Fell back to cloud transcription",
-          { icon: "\u26A0\uFE0F", duration: 8000 },
-        );
+        toast.success("Transcription complete (cloud fallback)");
       } else {
         toast.success("Transcription complete!");
       }
