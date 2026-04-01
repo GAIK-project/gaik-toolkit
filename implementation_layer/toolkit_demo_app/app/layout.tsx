@@ -2,6 +2,7 @@ import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { Toaster } from "@/components/ui/toaster";
 import type { Metadata } from "next";
 import { Fraunces, JetBrains_Mono, Sora } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const sora = Sora({
@@ -70,6 +71,12 @@ export default function RootLayout({
           {children}
           <Toaster />
         </PostHogProvider>
+        {process.env.NEXT_PUBLIC_CHAT_URL && (
+          <Script
+            src={`${process.env.NEXT_PUBLIC_CHAT_URL}/widget.js`}
+            strategy="lazyOnload"
+          />
+        )}
       </body>
     </html>
   );
