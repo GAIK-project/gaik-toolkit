@@ -2,6 +2,7 @@ import '@/app/global.css';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
 import { Inter } from 'next/font/google';
+import Script from 'next/script';
 import type { Metadata } from 'next';
 import { baseOptions } from '@/lib/layout.shared';
 import { source } from '@/lib/source';
@@ -80,6 +81,12 @@ export default function Layout({ children }: LayoutProps<'/'>) {
             {children}
           </DocsLayout>
         </RootProvider>
+        {process.env.NEXT_PUBLIC_CHAT_URL && (
+          <Script
+            src={`${process.env.NEXT_PUBLIC_CHAT_URL}/widget.js`}
+            strategy="lazyOnload"
+          />
+        )}
       </body>
     </html>
   );

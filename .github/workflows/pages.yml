@@ -43,6 +43,8 @@ jobs:
 
       - name: Build static site
         run: pnpm build
+        env:
+          NEXT_PUBLIC_CHAT_URL: https://gaik-chatbot.2.rahtiapp.fi
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
