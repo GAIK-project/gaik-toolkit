@@ -27,4 +27,6 @@ yarn-error.log*
 .vercel
 next-env.d.ts
 
+bun.lock
+
 .claude
