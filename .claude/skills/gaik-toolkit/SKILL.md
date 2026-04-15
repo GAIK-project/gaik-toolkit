@@ -1,10 +1,13 @@
 ---
 name: gaik-toolkit
 description: >-
-  GAIK toolkit development: structured data extraction, document parsing,
-  audio transcription (Whisper/local), transcript enhancement, text-to-speech,
-  RAG pipelines (pgvector/Chroma), document classification, end-to-end pipelines,
-  demo app (Next.js + FastAPI), and docs website (Fumadocs).
+  GAIK toolkit development. Use when implementing or modifying GAIK components
+  (extractors, parsers, transcribers, RAG, TTS, classifiers, pipelines), adding
+  examples to implementation_layer/examples/, updating guidance_layer/docs/ or
+  guidance_layer/website/content/docs/, or working on the demo app (Next.js +
+  FastAPI) or docs website (Fumadocs). Covers: structured data extraction, document
+  parsing, audio transcription (Whisper/local), transcript enhancement, text-to-speech,
+  RAG pipelines (pgvector/Chroma), document classification, end-to-end pipelines.
 argument-hint: "[component-name]"
 ---
 
@@ -170,6 +173,21 @@ All pipelines follow: `pipeline = Pipeline(use_azure=True)` → `result = pipeli
 ## Use Cases
 
 Documented in `guidance_layer/website/content/docs/use-cases/`: incident reporting, dental transcription & captioning, semantic dental video search, construction diary, dental learning assistant, purchase order processing, report writing, sales proposal generation, customer onboarding.
+
+## When to Update Documentation
+
+When adding or modifying a component, update **both** documentation locations:
+
+| What changed | Update |
+|---|---|
+| New/modified building block or pipeline | `guidance_layer/docs/software_components/` or `guidance_layer/docs/software_modules/` |
+| New/modified building block or pipeline | `guidance_layer/website/content/docs/toolkit/software-components.mdx` or `software-modules.mdx` |
+| New use case or example | `guidance_layer/website/content/docs/use-cases/` (new `.mdx` file) |
+| New examples added | `implementation_layer/examples/` + README updated |
+
+- **`guidance_layer/docs/`**: Technical Markdown docs (API-level details, constructor params)
+- **`guidance_layer/website/content/docs/`**: User-facing MDX for the Fumadocs website
+- Run `pnpm dev` from `guidance_layer/website/` to preview website changes
 
 ## Detailed References
 
