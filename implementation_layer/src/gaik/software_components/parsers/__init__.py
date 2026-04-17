@@ -31,7 +31,7 @@ try:
     from .vision import OpenAIConfig, VisionParser, get_openai_config
 
     __all__.extend(["VisionParser", "OpenAIConfig", "get_openai_config"])
-except ImportError:
+except Exception:
     pass
 
 # Local PDF parsing (requires PyMuPDF)
@@ -39,7 +39,7 @@ try:
     from .pymypdf import PyMuPDFParser, parse_pdf
 
     __all__.extend(["PyMuPDFParser", "parse_pdf"])
-except ImportError:
+except Exception:
     pass
 
 # Local DOCX parsing (requires python-docx)
@@ -47,7 +47,7 @@ try:
     from .docx_parser import DocxParser, parse_docx
 
     __all__.extend(["DocxParser", "parse_docx"])
-except ImportError:
+except Exception:
     pass
 
 # Advanced parsing (requires docling)
@@ -55,7 +55,7 @@ try:
     from .docling import DoclingParser, parse_document
 
     __all__.extend(["DoclingParser", "parse_document"])
-except ImportError:
+except Exception:
     pass
 
 # Vision+ advanced parsing (requires docling + openai)
@@ -63,7 +63,7 @@ try:
     from .visionPlus import VisionPlusParser, parse_document_with_vision_plus
 
     __all__.extend(["VisionPlusParser", "parse_document_with_vision_plus"])
-except ImportError:
+except Exception:
     pass
 
 # Remote client parsing (requires requests)
@@ -71,5 +71,5 @@ try:
     from .docling_api_client import DoclingApiClientParser, parse_document_via_api
 
     __all__.extend(["DoclingApiClientParser", "parse_document_via_api"])
-except ImportError:
+except Exception:
     pass
