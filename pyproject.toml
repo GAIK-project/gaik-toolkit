@@ -144,6 +144,14 @@ classifier = [
     "python-docx>=1.2.0",
 ]
 
+# Multi-provider PDF-to-markdown parser (OpenAI, Claude, Google Gemini)
+multimodal-parser = [
+    "anthropic>=0.43.0",
+    "google-auth>=2.0.0",
+    "requests>=2.31.0",
+    "markdown-it-py>=3.0.0",
+]
+
 # All features
 all = [
     "gaik[extract]",

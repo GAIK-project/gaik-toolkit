@@ -31,9 +31,7 @@ def get_openai_config(use_azure: bool = True) -> dict:
         >>> # Returns OpenAI config with model name
     """
     if use_azure:
-        azure_endpoint = os.getenv(
-            "AZURE_ENDPOINT", "https://haagahelia-poc-gaik.openai.azure.com/"
-        )
+        azure_endpoint = os.getenv("AZURE_ENDPOINT")
         return {
             "use_azure": True,
             "api_key": os.getenv("AZURE_API_KEY"),

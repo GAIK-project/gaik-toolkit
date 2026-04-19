@@ -19,6 +19,10 @@ Advanced Parsing:
     - VisionPlusParser: Docling + vision parsing that returns markdown + metadata (no chunking)
     - parse_document_with_vision_plus: Convenience wrapper for VisionPlusParser
 
+Multi-provider Parsing:
+    - MultimodalParser: PDF-to-markdown using OpenAI, Claude, or Google Gemini
+    - ParseResult: Dataclass with raw_markdown, clean_markdown, and optional html
+
 Remote Client Parsing:
     - DoclingApiClientParser: Client parser for remote Docling parsing service
     - parse_document_via_api: Convenience wrapper for remote parsing calls
@@ -72,4 +76,12 @@ try:
 
     __all__.extend(["DoclingApiClientParser", "parse_document_via_api"])
 except Exception:
+    pass
+
+# Multi-provider PDF parsing (requires anthropic, google-auth, markdown-it-py)
+try:
+    from .multimodal_parser import MultimodalParser, ParseResult
+
+    __all__.extend(["MultimodalParser", "ParseResult"])
+except ImportError:
     pass

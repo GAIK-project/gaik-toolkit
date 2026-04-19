@@ -14,10 +14,11 @@ pip install gaik[parser]
 
 ## Available Parsers
 
-GAIK provides six parser options, each optimized for different use cases:
+GAIK provides seven parser options, each optimized for different use cases:
 
 | Parser | Use Case | Speed | Requirements |
 |--------|----------|-------|--------------|
+| `MultimodalParser` | Premium PDF parsing with layout-aware table extraction across multiple LLM providers | Slow | OpenAI/Azure, Anthropic, or Google API |
 | `VisionParser` | High-quality PDF/image parsing with table extraction | Medium | OpenAI/Azure API |
 | `PyMuPDFParser` | Fast PDF text extraction | Fast | None (local) |
 | `DocxParser` | Word document parsing | Fast | None (local) |
@@ -26,6 +27,13 @@ GAIK provides six parser options, each optimized for different use cases:
 | `DoclingApiClientParser` | Remote Docling parsing via Haaga-Helia Docling service | Fast | API_BASE + PASSWORD |
 
 ### Quick Comparison
+
+**Use MultimodalParser when:**
+- Documents contain messy, irregular, or complex tables that span multiple pages
+- You need the highest accuracy for layout preservation and table extraction
+- Quality matters more than speed or cost
+- Allows you to choose between providers (OpenAI, Claude, Google Gemini)
+- Install separately: `pip install "gaik[multimodal-parser]"`
 
 **Use VisionParser when:**
 - You need accurate table extraction
@@ -64,6 +72,18 @@ GAIK provides six parser options, each optimized for different use cases:
 ---
 
 ## Environment Variables
+
+For MultimodalParser (see [multimodal_parser/README.md](multimodal_parser/README.md) for full details):
+
+| Variable | When | Description |
+|----------|------|-------------|
+| `AZURE_API_KEY` | OpenAI or Claude with `use_azure=True` | Azure / Foundry API key |
+| `AZURE_ENDPOINT` | OpenAI with `use_azure=True` | Azure OpenAI endpoint URL |
+| `ANTHROPIC_FOUNDRY_RESOURCE` | Claude with `use_azure=True` | Foundry resource name |
+| `ANTHROPIC_API_KEY` | Claude with `use_azure=False` | Direct Anthropic API key |
+| `GOOGLE_PROJECT_ID` | Google with `vertex_ai=True` | GCP project ID |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Google with `vertex_ai=True` | Service account JSON (inline) |
+| `GOOGLE_API_KEY` | Google with `vertex_ai=False` | Direct Gemini API key |
 
 For VisionParser/VisionPlusParser only:
 
