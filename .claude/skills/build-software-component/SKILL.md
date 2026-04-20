@@ -5,7 +5,9 @@ description: >-
   Accepts context from URLs, external codebases, or plain descriptions.
   Produces an implementation plan for user review, then executes the plan:
   creates component files, updates pyproject.toml, installs the package,
-  and verifies with import smoke tests.
+  and verifies with import smoke tests. Optionally continues with website
+  docs, toolkit_demo_app integration, and PyPI release tagging when the user
+  wants the full release-ready flow.
 argument-hint: "[context: URLs, paths, PyPI package names, or description]"
 ---
 
@@ -145,10 +147,98 @@ Read `references/verification.md` for exact commands. Steps:
    - Smoke test result.
    - Example run result (or "skipped — requires credentials").
 
+### Phase 6 — Full release workflow (optional)
+
+After Phase 5, ask the user: **"Continue with the full release flow (docs →
+demo app → PyPI tag), or stop here?"** Default: **stop** for quick prototypes;
+**continue** when the component is a user-facing capability worth shipping.
+
+If the user stops, end the skill. If they continue, work through 6a–6d below.
+Each step is itself gated by its own question — skip any the user declines.
+
+#### 6a. Additional examples (ask)
+
+Phase 4 step 7 already created one initial example. Only delegate to the
+`gaik-add-examples` skill when the user confirms they want **more**:
+
+- Add a `software_modules/` pipeline example (default yes if the component is
+  a building block in an end-to-end pipeline).
+- Add a second numbered example (`<name>_example_2.py`) for a distinct mode.
+- Enrich the component's README with a usage walkthrough.
+
+#### 6b. Website & docs (ask)
+
+Ask: **"Update Fumadocs website (`guidance_layer/website/content/docs/`)
+and/or API docs (`guidance_layer/docs/`)?"**
+
+Default: **yes** for parsers, extractors, transcribers, RAG modules, pipelines
+(user-discoverable); **no** for internal utilities.
+
+If yes:
+- Add or update an MDX page under `guidance_layer/website/content/docs/`
+  describing the component, its config, and a minimal usage snippet.
+- Link the new page from the relevant category index (`meta.json` or the
+  category MDX).
+- Mirror the API surface in `guidance_layer/docs/` if the component has a
+  non-trivial public API.
+
+#### 6c. toolkit_demo_app integration (ask)
+
+Ask: **"Expose this in `implementation_layer/toolkit_demo_app/`?"**
+
+Default: **yes** for interactive components (parsers, transcribers, RAG, TTS,
+classifiers); **no** for internal utilities.
+
+If yes:
+- Add a FastAPI endpoint in the demo app's backend.
+- Add a UI card / route in the Next.js frontend.
+- Handle missing optional dependencies gracefully (the extra may not be
+  installed by default).
+
+#### 6d. PyPI release (ask)
+
+Ask: **"Tag a PyPI release now?"**
+
+If yes:
+1. Commit and push all changes from Phases 4–6c.
+2. Run the test suite locally (`uv run pytest` or the project's runner).
+3. Decide the semver bump:
+   - patch (`v0.X.Y+1`) — bug fix or small additive component.
+   - minor (`v0.X+1.0`) — meaningful new component or capability.
+   - major — breaking changes (rare).
+4. Tag and push: `git tag v0.X.Y && git push origin v0.X.Y`.
+5. `.github/workflows/publish.yml` triggers automatically on `v*.*.*` tag
+   push: runs tests, builds wheel + sdist, validates the version, uploads to
+   PyPI, creates a GitHub Release.
+6. setuptools-scm derives the package version from the tag — **do not** edit
+   version strings manually anywhere (it breaks the publish workflow's
+   version validation).
+
+If no: note "release deferred" in the commit message so the next contributor
+knows it's pending.
+
+#### Release-readiness checklist
+
+Before tagging, confirm:
+
+- [ ] Source files + `__init__.py` exports under the component's directory.
+- [ ] Component `README.md` written.
+- [ ] `pyproject.toml` optional extra added (and named consistently).
+- [ ] Parent `__init__.py` (top-level or category) updated to list the
+      component.
+- [ ] Example under `implementation_layer/examples/` runs cleanly with the
+      optional extra installed.
+- [ ] Local tests pass (`uv run pytest`).
+- [ ] Website docs updated (if user-facing).
+- [ ] `toolkit_demo_app` updated (if interactive).
+- [ ] All changes committed and pushed.
+- [ ] `v*.*.*` tag pushed (if releasing now).
+
 ## Hard rules
 
 - **Never skip Phase 3.** Always present the plan and wait for approval.
-- **Scope of edits:** only create/edit files inside
+- **Scope of edits during Phases 1–5** (source creation): only create/edit
+  files inside
   - the component's own directory (top-level or nested),
   - the matching `implementation_layer/examples/software_components/...` directory,
   - `pyproject.toml`, and
@@ -156,13 +246,16 @@ Read `references/verification.md` for exact commands. Steps:
     (top-level) or `software_components/<category>/__init__.py` (nested) — never
     both.
 
-  Never edit anything else (no demo app, no docs website, no other components).
+  Never touch the demo app, docs website, or other components during source
+  creation. Phase 6 is the only phase where those edits are allowed, and only
+  after the user has explicitly opted in.
 - **Shared config:** for any component that calls an LLM, import from
   `gaik.software_components.config` and use `get_openai_config()` +
   `create_openai_client()`. Never call `load_dotenv()` inside the component
   and never read `OPENAI_API_KEY` / `AZURE_API_KEY` directly.
-- **Never commit.** Leave all changes uncommitted so the user can review with
-  `git diff` and commit themselves.
+- **Never commit during Phases 1–5.** Leave source changes uncommitted so the
+  user can review with `git diff`. Phase 6d is the only place that commits or
+  pushes, and only after the user approves the PyPI release step.
 - **No unit tests** unless the user's context explicitly demands them. The
   example file is the proof-of-life artifact.
 
