@@ -31,10 +31,15 @@ from .config import (
     get_openai_config,
 )
 from .multimodal_parser import MultimodalParser, ParseResult
+from .pricing import compute_cost_usd, lookup_price
+from .usage import UsageRecord
 
 __all__ = [
     "MultimodalParser",
     "ParseResult",
+    "UsageRecord",
+    "compute_cost_usd",
+    "lookup_price",
     "get_openai_config",
     "create_openai_client",
     "get_claude_config",
@@ -43,4 +48,4 @@ __all__ = [
     "get_google_access_token",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

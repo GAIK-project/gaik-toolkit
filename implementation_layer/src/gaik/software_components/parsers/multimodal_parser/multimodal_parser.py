@@ -6,6 +6,7 @@ import base64
 import html
 import logging
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -22,6 +23,7 @@ from .config import (
     get_openai_config,
 )
 from .prompts import SYSTEM_PROMPTS, USER_PROMPTS
+from .usage import UsageRecord, build_usage_record
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +145,7 @@ class ParseResult:
     raw_markdown: str
     clean_markdown: str
     html: str | None
+    usage: UsageRecord | None = None
 
 
 ModelProvider = Literal["openai", "claude", "google"]
@@ -218,11 +221,31 @@ class MultimodalParser:
             "claude": self._call_claude,
             "google": self._call_google,
         }
-        raw_output = callers[self.model_provider](pdf_path, system_prompt, user_prompt)
+        start = time.perf_counter()
+        raw_output, usage_dict = callers[self.model_provider](
+            pdf_path, system_prompt, user_prompt
+        )
+        duration_s = time.perf_counter() - start
         raw_markdown = _unwrap_fenced_output(raw_output)
 
         if not raw_markdown.strip():
             raise ValueError("The model response did not contain any text output.")
+
+        usage = build_usage_record(
+            provider=self.model_provider,
+            model=self.config.get("model", ""),
+            usage_dict=usage_dict,
+            duration_s=duration_s,
+        )
+        logger.info(
+            "%s/%s parsed in %.2fs — in=%d out=%d cost=$%.4f",
+            self.model_provider,
+            usage.model,
+            usage.duration_s,
+            usage.input_tokens,
+            usage.output_tokens,
+            usage.cost_usd,
+        )
 
         clean_md = _clean_markdown(raw_markdown)
         html_output = (
@@ -233,6 +256,7 @@ class MultimodalParser:
             raw_markdown=raw_markdown,
             clean_markdown=clean_md,
             html=html_output,
+            usage=usage,
         )
 
     # -- prompt helpers -------------------------------------------------------
@@ -254,7 +278,9 @@ class MultimodalParser:
 
     # -- provider calls -------------------------------------------------------
 
-    def _call_openai(self, pdf_path: Path, system_prompt: str, user_prompt: str) -> str:
+    def _call_openai(
+        self, pdf_path: Path, system_prompt: str, user_prompt: str
+    ) -> tuple[str, dict[str, int]]:
         client = create_openai_client(self.config)
         response = client.responses.create(
             model=self.config["model"],
@@ -271,11 +297,12 @@ class MultimodalParser:
         text = response.output_text.strip()
         if not text:
             raise ValueError("The OpenAI response did not contain any text output.")
-        return text + "\n"
+        return text + "\n", _extract_openai_usage(response)
 
-    def _call_claude(self, pdf_path: Path, system_prompt: str, user_prompt: str) -> str:
+    def _call_claude(
+        self, pdf_path: Path, system_prompt: str, user_prompt: str
+    ) -> tuple[str, dict[str, int]]:
         client = create_claude_client(self.config)
-        text_blocks: list[str] = []
         with client.messages.stream(
             model=self.config["model"],
             max_tokens=32768,
@@ -297,9 +324,11 @@ class MultimodalParser:
         ]
         if not text_blocks:
             raise ValueError("The Claude response did not contain any text blocks.")
-        return "".join(text_blocks).strip() + "\n"
+        return "".join(text_blocks).strip() + "\n", _extract_claude_usage(response)
 
-    def _call_google(self, pdf_path: Path, system_prompt: str, user_prompt: str) -> str:
+    def _call_google(
+        self, pdf_path: Path, system_prompt: str, user_prompt: str
+    ) -> tuple[str, dict[str, int]]:
         body = _build_google_body(pdf_path, system_prompt, user_prompt, self.reasoning_effort)
 
         if self.config.get("vertex_ai", True):
@@ -331,7 +360,69 @@ class MultimodalParser:
         if not text_parts:
             raise ValueError(f"The Gemini response contained no text parts: {payload}")
 
-        return "".join(text_parts).strip() + "\n"
+        return "".join(text_parts).strip() + "\n", _extract_google_usage(payload)
+
+
+# -- usage extraction (module-level helpers) ----------------------------------
+
+
+def _extract_openai_usage(response) -> dict[str, int]:
+    """Extract token counts from an OpenAI Responses API result."""
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0, "total_tokens": 0}
+    input_tok = (
+        getattr(usage, "input_tokens", None)
+        or getattr(usage, "prompt_tokens", 0)
+        or 0
+    )
+    output_tok = (
+        getattr(usage, "output_tokens", None)
+        or getattr(usage, "completion_tokens", 0)
+        or 0
+    )
+    total_tok = getattr(usage, "total_tokens", 0) or (input_tok + output_tok)
+    # Reasoning tokens (o-series / gpt-5.x)
+    details = getattr(usage, "output_tokens_details", None) or getattr(
+        usage, "completion_tokens_details", None
+    )
+    thinking_tok = getattr(details, "reasoning_tokens", 0) or 0 if details else 0
+    return {
+        "input_tokens": int(input_tok),
+        "output_tokens": int(output_tok),
+        "thinking_tokens": int(thinking_tok),
+        "total_tokens": int(total_tok),
+    }
+
+
+def _extract_claude_usage(response) -> dict[str, int]:
+    """Extract token counts from an Anthropic messages response."""
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0, "total_tokens": 0}
+    input_tok = getattr(usage, "input_tokens", 0) or 0
+    output_tok = getattr(usage, "output_tokens", 0) or 0
+    return {
+        "input_tokens": int(input_tok),
+        "output_tokens": int(output_tok),
+        "thinking_tokens": 0,  # Not separately reported by Claude API
+        "total_tokens": int(input_tok + output_tok),
+    }
+
+
+def _extract_google_usage(payload: dict) -> dict[str, int]:
+    """Extract token counts from a Gemini REST ``generateContent`` payload."""
+    meta = payload.get("usageMetadata") or {}
+    input_tok = int(meta.get("promptTokenCount", 0) or 0)
+    output_tok = int(meta.get("candidatesTokenCount", 0) or 0)
+    thinking_tok = int(meta.get("thoughtsTokenCount", 0) or 0)
+    total_tok = int(meta.get("totalTokenCount", 0) or (input_tok + output_tok))
+    return {
+        "input_tokens": input_tok,
+        "output_tokens": output_tok,
+        "thinking_tokens": thinking_tok,
+        "total_tokens": total_tok,
+    }
 
 
 # -- content builders (module-level helpers) ----------------------------------

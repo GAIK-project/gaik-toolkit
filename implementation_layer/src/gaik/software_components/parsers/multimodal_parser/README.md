@@ -57,6 +57,33 @@ result = parser.parse("document.pdf")
 result.raw_markdown     # Model output with <div data-bbox/data-label> wrappers
 result.clean_markdown   # Wrappers stripped, inner markdown/HTML preserved
 result.html             # Styled HTML document, or None if create_html=False
+result.usage            # UsageRecord with token counts, duration, and USD cost
+```
+
+### UsageRecord
+
+Token accounting and cost are computed from `pricing.py` using longest-prefix
+matching on the model name. Reasoning/thinking tokens are billed at the output
+rate, matching provider behaviour.
+
+```python
+result.usage.provider        # "openai" | "claude" | "google"
+result.usage.model           # Actual model identifier used
+result.usage.input_tokens    # Prompt tokens sent
+result.usage.output_tokens   # Completion tokens (incl. reasoning)
+result.usage.thinking_tokens # Subset of output_tokens spent on reasoning
+result.usage.total_tokens
+result.usage.duration_s      # Wall-clock seconds for the single parse() call
+result.usage.cost_usd        # 0.0 if the model has no pricing entry
+```
+
+To price a hypothetical call without running the parser:
+
+```python
+from gaik.software_components.parsers.multimodal_parser import compute_cost_usd
+
+compute_cost_usd("openai", "gpt-5.4-mini", input_tokens=1000, output_tokens=2000)
+# -> 0.00975
 ```
 
 ### Configuration
