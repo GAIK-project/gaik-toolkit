@@ -137,9 +137,46 @@ components — they should stay opt-in.
 
 ## Parent namespace `__init__.py`
 
+### Top-level components
+
 Append the new component's snake_case name to the `__all__` list in
 `implementation_layer/src/gaik/software_components/__init__.py`. Preserve the
 existing ordering; add the new entry at the end.
+
+### Nested sub-components (e.g. a new parser under `parsers/`)
+
+When the component is a variant of an existing category, it lives at
+`software_components/<category>/<component_name>/` and is registered in
+`<category>/__init__.py` — **not** the top-level `software_components/__init__.py`.
+
+Use the existing `try/except ImportError: pass` guard pattern in that category's
+`__init__.py` to keep heavy optional deps opt-in. Canonical example:
+`parsers/__init__.py:81-87`:
+
+```python
+# Multi-provider PDF parsing (requires anthropic, google-auth, markdown-it-py)
+try:
+    from .multimodal_parser import MultimodalParser, ParseResult
+
+    __all__.extend(["MultimodalParser", "ParseResult"])
+except ImportError:
+    pass
+```
+
+Append a similar block to the category's `__init__.py`. Do not touch
+`software_components/__init__.py`.
+
+## When to pick nested vs top-level
+
+| Component kind | Layout |
+|---|---|
+| Another PDF/DOCX/document parser | nested under `parsers/` |
+| Another vector store, retriever, embedder, or RAG parser | nested under `RAG/` |
+| Another transcriber variant | nested under `transcriber/` |
+| A new independent capability (e.g. text-to-speech, classifier, extractor) | top-level |
+
+If unsure, prefer top-level. Only nest when there is a clear sibling in an
+existing category directory.
 
 ## Examples directory
 

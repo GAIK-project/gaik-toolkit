@@ -8,7 +8,7 @@ Detailed API documentation for GAIK building blocks.
 
 - [Configuration](#configuration)
 - [Extractor Module](#extractor-module) (SchemaGenerator, DataExtractor, FieldSpec)
-- [Parsers Module](#parsers-module) (VisionParser, PyMuPDFParser, DocxParser, DoclingParser)
+- [Parsers Module](#parsers-module) (VisionParser, PyMuPDFParser, DocxParser, DoclingParser, VisionPlusParser, DoclingApiClientParser, MultimodalParser)
 - [Transcriber Module](#transcriber-module) (Transcriber, TranscriptionResult)
 - [Enhance Transcript Module](#enhance-transcript-module) (TranscriptEnhancer)
 - [Parallel Transcriber Module](#parallel-transcriber-module) (ParallelTranscriber, TranscriptionConfig)
@@ -201,6 +201,47 @@ text = parse_document("complex_document.pdf")
 **Returns:** `str` - Extracted text content
 
 **Supported formats:** PDF, images (.png, .jpg, .jpeg), Word docs
+
+### VisionPlusParser
+
+Docling + vision hybrid — returns markdown plus per-element metadata (no chunking).
+Requires `gaik[parser]` + OpenAI-compatible credentials.
+
+```python
+from gaik.software_components.parsers import VisionPlusParser, parse_document_with_vision_plus
+
+result = parse_document_with_vision_plus("document.pdf")
+```
+
+**Returns:** markdown string + metadata for downstream RAG pipelines.
+
+### DoclingApiClientParser
+
+Client that calls a remote Docling parsing service instead of running Docling locally.
+Use when you want Docling-quality parsing without the local install overhead.
+
+```python
+from gaik.software_components.parsers import DoclingApiClientParser, parse_document_via_api
+
+result = parse_document_via_api("document.pdf", api_url=...)
+```
+
+### MultimodalParser
+
+Multi-provider PDF-to-markdown parser (OpenAI, Claude, Google Gemini). Produces
+raw markdown with layout metadata, cleaned markdown, and optional styled HTML.
+Requires `gaik[multimodal-parser]`.
+
+```python
+from gaik.software_components.parsers import MultimodalParser, ParseResult
+
+parser = MultimodalParser(config=config, model_provider="openai", create_html=True)
+result: ParseResult = parser.parse("document.pdf")
+result.save("output/")
+```
+
+**Returns:** `ParseResult` with `raw_markdown`, `clean_markdown`, and optional `html`.
+Tracks token usage and cost per run.
 
 ---
 

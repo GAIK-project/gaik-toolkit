@@ -50,6 +50,9 @@ venv/
 # Claude Code (except shared skills)
 .claude/*
 !.claude/skills/
+
+# Skill scratch files
+**/.claude/skills/**/last_plan.md
 .mcp.json
 .ruff_cache/src/gaik/_version.py
 src/gaik/_version.py

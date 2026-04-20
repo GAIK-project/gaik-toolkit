@@ -296,3 +296,31 @@ __all__ = [
 
 Use the `Edit` tool with a targeted `old_string` of the last two entries and the
 closing `]` to insert the new line without risking duplicates.
+
+---
+
+## Template 8 — category `__init__.py` edit (nested components only)
+
+Use this instead of Template 7 when the component is nested under an existing
+category (e.g. `parsers/`, `RAG/`, `transcriber/`). Do NOT also edit the
+top-level `software_components/__init__.py`.
+
+Append a new try/except block at the end of the category's `__init__.py`:
+
+```python
+# {{ComponentTitle}} ({{one_line_description}})
+try:
+    from .{{component_name}} import {{MainClassName}}  # add more classes as needed
+
+    __all__.extend(["{{MainClassName}}"])
+except ImportError:
+    pass
+```
+
+If the component exports more than one public name (e.g. main class plus a
+result dataclass), include them all in the import and the `__all__.extend(...)`.
+
+Canonical example in the repo: `implementation_layer/src/gaik/software_components/parsers/__init__.py:81-87`.
+
+Use the `Edit` tool with an `old_string` that ends at the file's final line
+(typically a `pass` in the last try/except block) to append cleanly.

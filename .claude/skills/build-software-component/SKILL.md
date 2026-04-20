@@ -49,12 +49,24 @@ Before moving on, make sure you understand:
 3. What Python dependencies it needs, with versions when available.
 4. Whether it is LLM-based (will use `get_openai_config()` / `create_openai_client()`)
    or provider-agnostic (pure Python / local library).
+5. **Layout decision — top-level or nested?**
+   - **Top-level** — sibling of `extractor/`, `transcriber/`, `doc_classifier/`. Use
+     for new independent capabilities.
+   - **Nested sub-component** — lives inside an existing category like
+     `parsers/<name>/`, `RAG/<name>/`, or `transcriber/<name>/`. Use when the new
+     component is a *variant* of an existing category (e.g. another PDF parser
+     belongs in `parsers/`, another vector store in `RAG/`). The shipped
+     `parsers/multimodal_parser/` is the canonical nested example.
+
+   The two layouts follow the same conventions for `pyproject.toml` extras and
+   shared config, but differ in which `__init__.py` gets edited — see the rules
+   in Phase 4 and in `references/conventions.md`.
 
 ### Phase 2 — Plan Creation
 
 Read `references/conventions.md` first to ground the plan in GAIK patterns.
 
-Write a component plan to `.claude/skills/build_software_component/last_plan.md`
+Write a component plan to `.claude/skills/build-software-component/last_plan.md`
 with these sections:
 
 1. **Component identity** — `component_name` (snake_case directory name),
@@ -63,13 +75,16 @@ with these sections:
 3. **Dependencies** — Python packages with version pins, marked required vs optional.
 4. **Config integration** — uses `get_openai_config()` / `create_openai_client()`,
    or provider-agnostic.
-5. **Files to create** — full relative paths.
-6. **Files to modify** — additions to `pyproject.toml` and
-   `implementation_layer/src/gaik/software_components/__init__.py`.
-7. **Install extra name** — the name used in `pip install "gaik[<extra>]"`.
+5. **Layout** — top-level (`software_components/<name>/`) or nested
+   (`software_components/<category>/<name>/`).
+6. **Files to create** — full relative paths.
+7. **Files to modify** — additions to `pyproject.toml` and *either*
+   `software_components/__init__.py` (top-level) *or*
+   `software_components/<category>/__init__.py` (nested).
+8. **Install extra name** — the name used in `pip install "gaik[<extra>]"`.
    Must be hyphenated, lowercase.
-8. **Example usage** — one working snippet the example file will demonstrate.
-9. **Verification steps** — the exact import test and smoke-test commands.
+9. **Example usage** — one working snippet the example file will demonstrate.
+10. **Verification steps** — the exact import test and smoke-test commands.
 
 ### Phase 3 — Plan Review (MANDATORY — never skip)
 
@@ -86,8 +101,11 @@ Only after explicit approval. Read `references/file-templates.md` for the litera
 file bodies to use. Execute in this order — if any step fails, stop and report
 the error to the user before continuing:
 
-1. Create `implementation_layer/src/gaik/software_components/<component_name>/`
-   directory.
+Let `<dir>` be:
+- `implementation_layer/src/gaik/software_components/<component_name>/` for top-level
+- `implementation_layer/src/gaik/software_components/<category>/<component_name>/` for nested
+
+1. Create `<dir>` directory.
 2. Write `<component_name>.py` — the main class file. Use the template from
    `file-templates.md`.
 3. Write `__init__.py` — module docstring, re-exports, `__all__`,
@@ -96,18 +114,29 @@ the error to the user before continuing:
 5. Edit `pyproject.toml` — add a new entry under `[project.optional-dependencies]`
    named `<extra-name>`. If the component belongs in `all` / `all-cpu` composite
    groups, add it there too.
-6. Edit `implementation_layer/src/gaik/software_components/__init__.py` — append
-   the new `component_name` string to the `__all__` list.
-7. Create `implementation_layer/examples/software_components/<component_name>/<component_name>_example.py`
-   using the example template.
+6. Register the component in the **parent** `__init__.py`:
+   - **Top-level:** edit `software_components/__init__.py` — append the
+     `component_name` string to `__all__`.
+   - **Nested:** edit `software_components/<category>/__init__.py` — add a
+     `try/except ImportError: pass` guard that imports and `__all__.extend(...)`
+     the public classes (see `parsers/__init__.py:81-87` for the canonical
+     pattern). Do **not** touch the top-level `software_components/__init__.py`.
+7. Create the example at
+   `implementation_layer/examples/software_components/<component_name>/<component_name>_example.py`
+   (top-level) or
+   `implementation_layer/examples/software_components/<category>/demo_<component_name>.py`
+   (nested — mirrors how existing parser demos are organized) using the example
+   template.
 
 ### Phase 5 — Verification
 
 Read `references/verification.md` for exact commands. Steps:
 
 1. Run `pip install -e ".[<extra-name>]"` from the repo root.
-2. Run the import smoke test:
-   `python -c "from gaik.software_components.<component_name> import <MainClassName>; print('OK')"`.
+2. Run the import smoke test against the public import path:
+   - Top-level: `python -c "from gaik.software_components.<component_name> import <MainClassName>; print('OK')"`
+   - Nested: `python -c "from gaik.software_components.<category> import <MainClassName>; print('OK')"`
+     (nested components are re-exported from the category's `__init__.py`).
 3. If the example file can be run without live credentials, run it. Otherwise,
    skip this step and note that running the example requires credentials.
 4. Report final status to the user:
@@ -120,10 +149,13 @@ Read `references/verification.md` for exact commands. Steps:
 
 - **Never skip Phase 3.** Always present the plan and wait for approval.
 - **Scope of edits:** only create/edit files inside
-  `implementation_layer/src/gaik/software_components/<component_name>/`,
-  `implementation_layer/examples/software_components/<component_name>/`,
-  `pyproject.toml`, and
-  `implementation_layer/src/gaik/software_components/__init__.py`.
+  - the component's own directory (top-level or nested),
+  - the matching `implementation_layer/examples/software_components/...` directory,
+  - `pyproject.toml`, and
+  - exactly one parent `__init__.py`: either `software_components/__init__.py`
+    (top-level) or `software_components/<category>/__init__.py` (nested) — never
+    both.
+
   Never edit anything else (no demo app, no docs website, no other components).
 - **Shared config:** for any component that calls an LLM, import from
   `gaik.software_components.config` and use `get_openai_config()` +

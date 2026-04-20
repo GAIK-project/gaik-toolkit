@@ -111,6 +111,9 @@ Core classes in `gaik.software_components.*`. For detailed API and constructor p
 | PyMuPDFParser | `from gaik.software_components.parsers import PyMuPDFParser` | `parse_pdf(path)` → str |
 | DocxParser | `from gaik.software_components.parsers import DocxParser` | `parse_docx(path)` → str |
 | DoclingParser | `from gaik.software_components.parsers import DoclingParser` | `parse(path)` → str |
+| VisionPlusParser | `from gaik.software_components.parsers import VisionPlusParser` | `parse_document_with_vision_plus(path)` → markdown + metadata |
+| DoclingApiClientParser | `from gaik.software_components.parsers import DoclingApiClientParser` | `parse_document_via_api(path)` → remote Docling result |
+| MultimodalParser | `from gaik.software_components.parsers import MultimodalParser` | `parse(pdf_path)` → `ParseResult` (OpenAI / Claude / Gemini) |
 | Transcriber | `from gaik.software_components.transcriber import Transcriber` | `transcribe(path)` → TranscriptionResult |
 | TranscriptEnhancer | `from gaik.software_components.enhance_transcript import TranscriptEnhancer` | `enhance_text(text)` / `enhance_file(path)` |
 | ParallelTranscriber | `from gaik.software_components.parallel_transcriber import ParallelTranscriber` | `transcribe(path)` → TranscriptionResult |
