@@ -176,7 +176,7 @@ result = parser.parse("document.pdf")
 | `GOOGLE_PROJECT_ID` | `vertex_ai=True` | — | GCP project ID |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | `vertex_ai=True` | — | Service account JSON (inline) |
 | `GOOGLE_SCOPES` | `vertex_ai=True` | — | OAuth scopes (comma-separated) |
-| `GOOGLE_GENERATE_CONTENT_URL` | `vertex_ai=True` | — | Vertex generateContent endpoint |
+| `GOOGLE_GENERATE_CONTENT_URL` | `vertex_ai=True` | — | Vertex generateContent endpoint. Include literal `{model}` to have the active model substituted at call time (e.g. `.../models/{model}:generateContent`), so one deployment can swap Gemini models at runtime. |
 | `GOOGLE_API_KEY` | `vertex_ai=False` | — | Direct Gemini API key |
 | `GOOGLE_MODEL` | Always | `gemini-3-flash-preview` | Model name (fallback when `model=None`) |
 

@@ -334,6 +334,11 @@ class MultimodalParser:
         if self.config.get("vertex_ai", True):
             token = get_google_access_token(self.config)
             url = self.config["generate_content_url"]
+            # Substitute ``{model}`` placeholder with the active model so one
+            # env-configured URL can drive runtime model swaps. URLs without
+            # the placeholder are used as-is (backwards compatible).
+            if "{model}" in url:
+                url = url.replace("{model}", self.config["model"])
             headers = {
                 "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json; charset=utf-8",
