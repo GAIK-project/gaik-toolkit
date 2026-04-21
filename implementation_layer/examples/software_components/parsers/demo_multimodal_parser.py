@@ -49,9 +49,7 @@ def print_usage(result, label: str) -> None:
         return
 
     cost_str = (
-        f"${usage.cost_usd:.4f}"
-        if usage.cost_usd > 0
-        else f"pricing unknown for {usage.model}"
+        f"${usage.cost_usd:.4f}" if usage.cost_usd > 0 else f"pricing unknown for {usage.model}"
     )
     thinking = f"  (thinking: {usage.thinking_tokens:,})" if usage.thinking_tokens else ""
 
