@@ -166,3 +166,37 @@ if __name__ == "__main__":
     ]
 
     print_total(results)
+
+
+# Example output (single-provider run, OpenAI / Azure):
+#
+#     ============================================================
+#     OpenAI / Azure OpenAI Parser
+#     ============================================================
+#     parsing....
+#
+#     Parsing time: 39.8s
+#     Saved: .../output/output_openai_raw.md
+#     Saved: .../output/output_openai_clean.md
+#     Saved: .../output/output_openai_clean.html
+#
+#     Usage (openai):
+#       provider        : openai
+#       model           : gpt-5.4
+#       input tokens    : 2,779
+#       output tokens   : 2,261  (thinking: 57)
+#       total tokens    : 5,040
+#       llm duration    : 39.801s
+#       cost            : $0.0409
+#
+# When multiple providers are uncommented above, a TOTAL block is printed
+# after all provider blocks, summing calls, tokens, duration and cost:
+#
+#     ============================================================
+#     TOTAL across providers
+#     ============================================================
+#       calls           : 3
+#       input tokens    : <sum>
+#       output tokens   : <sum>
+#       llm duration    : <sum>s
+#       cost            : $<sum>
