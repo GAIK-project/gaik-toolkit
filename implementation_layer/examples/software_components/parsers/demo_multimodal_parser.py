@@ -142,6 +142,7 @@ def print_total(results: list) -> None:
         return
     total_in = sum(u.input_tokens for u in usages)
     total_out = sum(u.output_tokens for u in usages)
+    total_dur = sum(u.duration_s for u in usages)
     total_cost = sum(u.cost_usd for u in usages)
     print("\n" + "=" * 60)
     print("TOTAL across providers")
@@ -149,6 +150,7 @@ def print_total(results: list) -> None:
     print(f"  calls           : {len(usages)}")
     print(f"  input tokens    : {total_in:,}")
     print(f"  output tokens   : {total_out:,}")
+    print(f"  llm duration    : {total_dur:.3f}s")
     print(f"  cost            : ${total_cost:.4f}")
 
 
