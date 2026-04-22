@@ -118,7 +118,7 @@ This makes the result:
 
 ## Implementation Layer Using Code-Based Method. 
 
-Two software components — **Transcriber** (with an AI enhancement step that cleans up the raw transcript) and **Extractor** — are combined into the **Audio to Structured Data** module to handle this use case end-to-end.
+Two software components — **Transcriber** (with an optional AI enhancement step that cleans up the raw transcript) and **Extractor** — are combined into the **Audio to Structured Data** module to handle this use case end-to-end.
 
 ```mermaid
 flowchart LR
@@ -127,7 +127,7 @@ flowchart LR
     subgraph B["Audio to Structured Data"]
         direction TB
         T["Transcriber<br/>Speech-to-Text"]
-        E["AI Enhancement<br/>Clean & Format Transcript"]
+        E["AI Enhancement (optional)<br/>Clean & Format Transcript"]
         X["Extractor<br/>Structured Field Extraction"]
         T --> E --> X
     end
@@ -139,6 +139,7 @@ flowchart LR
     style C fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style D fill:#dcfce7,stroke:#16a34a,color:#14532d
     style B fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+    style E stroke-dasharray: 5 5
 ```
 
 ---
