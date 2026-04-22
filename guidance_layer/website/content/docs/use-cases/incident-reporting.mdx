@@ -118,11 +118,20 @@ This makes the result:
 
 ## Implementation Layer Using Code-Based Method. 
 
-Two software components — **Transcriber** and **Extractor** — are combined into the **Audio to Structured Data** module to handle this use case end-to-end.
+Two software components — **Transcriber** (with an AI enhancement step that cleans up the raw transcript) and **Extractor** — are combined into the **Audio to Structured Data** module to handle this use case end-to-end.
 
 ```mermaid
 flowchart LR
-    A("🎙️ Audio Recording") --> B["Audio to Structured Data"]
+    A("🎙️ Audio Recording") --> B
+
+    subgraph B["Audio to Structured Data"]
+        direction TB
+        T["Transcriber<br/>Speech-to-Text"]
+        E["AI Enhancement<br/>Clean & Format Transcript"]
+        X["Extractor<br/>Structured Field Extraction"]
+        T --> E --> X
+    end
+
     C("📋 Field Requirements<br/>Plain language description") --> B
     B --> D("✅ Structured Incident Report")
 
