@@ -10,7 +10,7 @@ dependencies = [
     "python-multipart>=0.0.21",
     "python-dotenv>=1.2.1",
     "fpdf2>=2.8.5",
-    "gaik[all-cpu]>=0.3.13",
+    "gaik[all-cpu,multimodal-parser]>=0.3.17",
 ]
 
 [tool.uv.sources]

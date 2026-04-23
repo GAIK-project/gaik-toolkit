@@ -56,6 +56,7 @@ function formatParserName(parser: string): string {
     vision: "Vision",
     vision_plus: "Vision+",
     docling_api: "HH Parser",
+    multimodal: "Multimodal",
   };
   return parserNames[parser] || parser;
 }
@@ -63,7 +64,13 @@ function formatParserName(parser: string): string {
 export default function ParserPage() {
   const [file, setFile] = useState<File | null>(null);
   const [parserType, setParserType] = useState<
-    "auto" | "pymupdf" | "docx" | "vision" | "vision_plus" | "docling_api"
+    | "auto"
+    | "pymupdf"
+    | "docx"
+    | "vision"
+    | "vision_plus"
+    | "docling_api"
+    | "multimodal"
   >("docling_api");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ParseResult | null>(null);
@@ -228,6 +235,9 @@ export default function ParserPage() {
                           <SelectItem value="docling_api">
                             HH Parser (HH's fast Docling Parser)
                           </SelectItem>
+                          <SelectItem value="multimodal">
+                            Multimodal (Layout-aware, PDF only)
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       {(parserType === "vision" ||
@@ -235,6 +245,13 @@ export default function ParserPage() {
                         <p className="text-muted-foreground text-xs">
                           Vision and Vision+ parsers are limited to a maximum of
                           10 pages per document.
+                        </p>
+                      )}
+                      {parserType === "multimodal" && (
+                        <p className="text-muted-foreground text-xs">
+                          Multimodal parser sends the PDF directly to the LLM
+                          (via Azure OpenAI) for layout-aware markdown
+                          extraction. PDF files only.
                         </p>
                       )}
                     </div>
@@ -277,8 +294,10 @@ export default function ParserPage() {
               >
                 read more
               </a>
-              ), and Haaga-Helia's parser when you want a remote high-quality
-              parsing option.
+              ), Haaga-Helia's parser when you want a remote high-quality
+              parsing option, and Multimodal when you want a single LLM call to
+              produce layout-aware markdown (with token usage and cost
+              reporting).
             </p>
             <p>
               <strong>4. Review the output:</strong> The result panel shows the

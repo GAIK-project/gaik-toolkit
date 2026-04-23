@@ -17,15 +17,16 @@ router = APIRouter()
 @router.post("")
 async def parse_document(
     file: UploadFile = File(...),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api"] = Form(
-        "docling_api"
-    ),
+    parser_type: Literal[
+        "auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api", "multimodal"
+    ] = Form("docling_api"),
 ):
     """
     Parse a document (PDF, DOCX, or image) and extract text content.
 
     - **file**: The document or image file to parse
-    - **parser_type**: Parser to use (auto, pymupdf, docx, vision, vision_plus)
+    - **parser_type**: Parser to use (auto, pymupdf, docx, vision, vision_plus,
+      docling_api, multimodal)
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
@@ -98,6 +99,42 @@ async def parse_document(
                 tmp_path, return_markdown=True
             )
             result = {"text_content": markdown, "metadata": {"parser": "vision_plus"}}
+        elif parser_type == "multimodal":
+            if suffix != ".pdf":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Multimodal parser currently supports PDF files only",
+                )
+
+            from gaik.software_components.parsers import MultimodalParser
+
+            parser = MultimodalParser(
+                model_provider="openai",
+                use_azure=bool(os.getenv("AZURE_API_KEY")),
+                reasoning_effort="low",
+                merge_table=True,
+                create_html=False,
+            )
+            parse_result = parser.parse(tmp_path)
+            usage = parse_result.usage
+            metadata: dict = {"parser": "multimodal"}
+            if usage is not None:
+                metadata.update(
+                    {
+                        "provider": usage.provider,
+                        "model": usage.model,
+                        "input_tokens": usage.input_tokens,
+                        "output_tokens": usage.output_tokens,
+                        "thinking_tokens": usage.thinking_tokens,
+                        "total_tokens": usage.total_tokens,
+                        "duration_s": usage.duration_s,
+                        "cost_usd": usage.cost_usd,
+                    }
+                )
+            result = {
+                "text_content": parse_result.clean_markdown,
+                "metadata": metadata,
+            }
         elif parser_type == "docling_api":
             from gaik.software_components.parsers import PyMuPDFParser
             from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
