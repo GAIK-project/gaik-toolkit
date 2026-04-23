@@ -407,8 +407,17 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
             annotated = Literal[tuple(f.enum)]  # type: ignore[misc,call-arg]
 
         # Optionality
+        #
+        # `required_default = ...` keeps `required=True` fields present in the
+        # LLM response (no default → strict structured-output still requires
+        # the key). But the annotation always allows `None` because the
+        # SYSTEM_PARSER explicitly instructs the LLM to "return null" when a
+        # value is uncertain or missing. Without the `| None`, pydantic rejects
+        # those intentional nulls for non-string fields like `decimal`, `int`,
+        # and `float`, failing the whole extraction instead of returning the
+        # fields that did succeed.
         required_default = ... if f.required else None
-        typ = annotated if f.required else (annotated | None)
+        typ = annotated | None
 
         field_defs[f.field_name] = (
             typ,
