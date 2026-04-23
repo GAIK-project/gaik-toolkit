@@ -12,7 +12,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from implementation_layer.api.config import settings
-from implementation_layer.api.routers import parse, pipeline, transcribe
+from implementation_layer.api.routers import (
+    extract_form,
+    form_understand,
+    parse,
+    pipeline,
+    transcribe,
+)
 
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
@@ -55,6 +61,8 @@ if settings.CORS_ORIGINS:
 app.include_router(transcribe.router, prefix="/transcribe", tags=["Transcription"])
 app.include_router(parse.router, prefix="/parse", tags=["Parsing"])
 app.include_router(pipeline.router, prefix="/pipeline", tags=["Pipelines"])
+app.include_router(extract_form.router, prefix="/extract/form", tags=["Form Extraction"])
+app.include_router(form_understand.router, prefix="/form/understand", tags=["Form Understanding"])
 
 
 @app.get("/health", tags=["Health"])
@@ -88,6 +96,13 @@ async def root():
             "POST /pipeline/diary": "Generate construction diary from audio",
             "POST /pipeline/incident-report": "Generate incident report from audio/text/document",
             "GET /pipeline/pdf/{job_id}": "Download generated PDF",
+            "POST /extract/form": (
+                "Extract structured form values from free-form text "
+                "(used by the GAIK Form Filler Chrome extension)"
+            ),
+            "POST /form/understand": (
+                "Clean up cryptic form-field identifiers into readable labels"
+            ),
             "GET /health": "Health check for Kubernetes",
         },
         "authentication": "X-API-Key header required",

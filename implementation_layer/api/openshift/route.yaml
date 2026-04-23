@@ -1,0 +1,23 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: gaik-toolkit-api
+  labels:
+    app: gaik-toolkit-api
+  annotations:
+    # LLM calls from /extract/form can take up to ~60 s on bigger forms, so
+    # give the HAProxy router plenty of headroom.
+    haproxy.router.openshift.io/timeout: 2m
+    haproxy.router.openshift.io/response-buffering: "off"
+    haproxy.router.openshift.io/disable-cookies: "true"
+spec:
+  host: gaik-toolkit-api.2.rahtiapp.fi
+  to:
+    kind: Service
+    name: gaik-toolkit-api
+    weight: 100
+  port:
+    targetPort: 8000
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

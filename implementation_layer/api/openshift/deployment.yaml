@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gaik-toolkit-api
+  labels:
+    app: gaik-toolkit-api
+    app.kubernetes.io/part-of: gaik-toolkit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gaik-toolkit-api
+  template:
+    metadata:
+      labels:
+        app: gaik-toolkit-api
+    spec:
+      containers:
+        - name: gaik-toolkit-api
+          image: image-registry.apps.2.rahti.csc.fi/gaik/gaik-toolkit-api:latest
+          ports:
+            - containerPort: 8000
+          env:
+            # Auth token clients send via X-API-Key.
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-toolkit-api-keys
+                  key: API_KEY
+            # Azure OpenAI credentials (used by extractor + form_understander).
+            - name: AZURE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-toolkit-api-keys
+                  key: AZURE_API_KEY
+            - name: AZURE_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-toolkit-api-keys
+                  key: AZURE_ENDPOINT
+            - name: AZURE_API_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-toolkit-api-keys
+                  key: AZURE_API_VERSION
+                  optional: true
+            - name: AZURE_DEPLOYMENT
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-toolkit-api-keys
+                  key: AZURE_DEPLOYMENT
+                  optional: true
+            - name: USE_AZURE
+              value: "true"
+            # Allow the Chrome extension (chrome-extension://<id>) to call.
+            # We authenticate via X-API-Key, not cookies, so '*' is safe.
+            # pydantic-settings expects JSON for list[str] fields.
+            - name: CORS_ORIGINS
+              value: '["*"]'
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          # Probes sized for the occasional slow LLM call; tolerate ~100 s
+          # before a kill so long `/extract/form` runs don't SIGKILL.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
