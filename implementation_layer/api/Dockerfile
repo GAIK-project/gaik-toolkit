@@ -31,10 +31,10 @@ COPY implementation_layer/src/ ./implementation_layer/src/
 COPY pyproject.toml ./
 
 # Install gaik with only required extras (NO docling/torch)
-# - transcriber: Whisper transcription via Azure/OpenAI
-# - PyMuPDF: PDF parsing
-# - python-docx: DOCX parsing
-RUN pip install --no-cache-dir ".[transcriber]" PyMuPDF python-docx reportlab fpdf2
+# - transcriber: Whisper / gpt-4o-transcribe via Azure/OpenAI
+# - multimodal-parser: layout-aware PDF-to-markdown (OpenAI/Azure, Claude, Gemini)
+# - PyMuPDF + python-docx: local PDF/DOCX parsing
+RUN pip install --no-cache-dir ".[transcriber,multimodal-parser]" PyMuPDF python-docx reportlab fpdf2
 
 # Copy API source code
 COPY implementation_layer/api/ ./implementation_layer/api/

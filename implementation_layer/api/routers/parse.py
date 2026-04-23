@@ -12,6 +12,8 @@ from gaik.software_components.parsers import DocxParser, PyMuPDFParser, VisionPa
 
 router = APIRouter()
 
+ParserType = Literal["auto", "pymupdf", "docx", "vision", "multimodal"]
+
 
 def select_parser(parser_type: str, suffix: str) -> str:
     """Select the actual parser based on type and file extension."""
@@ -51,10 +53,35 @@ def parse_with_vision(file_path: str) -> tuple[str, dict]:
     return "\n\n".join(pages), {"pages": len(pages), "parser": "vision"}
 
 
+def parse_with_multimodal(file_path: str) -> tuple[str, dict]:
+    """Parse PDF using MultimodalParser (layout-aware OpenAI/Azure markdown)."""
+    from gaik.software_components.parsers import MultimodalParser
+
+    parser = MultimodalParser(
+        model_provider="openai",
+        use_azure=settings.USE_AZURE,
+        reasoning_effort="low",
+        create_html=False,
+    )
+    result = parser.parse(file_path)
+    metadata: dict = {"parser": "multimodal", "model_provider": "openai"}
+    if result.usage:
+        metadata["model"] = result.usage.model
+        metadata["duration_seconds"] = result.usage.duration_s
+        metadata["tokens"] = {
+            "input": result.usage.input_tokens,
+            "output": result.usage.output_tokens,
+            "total": result.usage.total_tokens,
+        }
+        metadata["cost_usd"] = result.usage.cost_usd
+    return result.clean_markdown, metadata
+
+
 PARSERS = {
     "docx": parse_with_docx,
     "pymupdf": parse_with_pymupdf,
     "vision": parse_with_vision,
+    "multimodal": parse_with_multimodal,
 }
 
 
@@ -67,8 +94,9 @@ PARSERS = {
 )
 async def parse_document(
     file: UploadFile = File(..., description="Document file (PDF or DOCX)"),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision"] = Form(
-        default="auto", description="Parser type to use"
+    parser_type: ParserType = Form(
+        default="auto",
+        description="Parser type: auto | pymupdf | docx | vision | multimodal",
     ),
 ):
     """
@@ -76,10 +104,11 @@ async def parse_document(
 
     - **file**: PDF or DOCX file
     - **parser_type**:
-        - auto: Automatically select based on file type
-        - pymupdf: Fast local PDF parsing
+        - auto: Automatically select based on file type (pymupdf for PDF, docx for DOCX)
+        - pymupdf: Fast local PDF parsing (text only)
         - docx: Word document parsing
-        - vision: LLM-based PDF to Markdown (requires OpenAI)
+        - vision: LLM-based PDF to Markdown page by page (requires OpenAI)
+        - multimodal: Layout-aware LLM parsing with clean Markdown output (requires OpenAI)
 
     Returns extracted text content and metadata.
     """
@@ -95,6 +124,12 @@ async def parse_document(
             parse_func = PARSERS.get(actual_parser)
             if not parse_func:
                 raise HTTPException(status_code=400, detail=f"Unknown parser type: {parser_type}")
+
+            if actual_parser in {"vision", "multimodal"} and suffix != ".pdf":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Parser '{actual_parser}' supports PDF only.",
+                )
 
             text_content, metadata = parse_func(tmp_path)
             metadata["word_count"] = len(text_content.split())
