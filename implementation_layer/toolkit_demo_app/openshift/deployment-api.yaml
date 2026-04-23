@@ -58,15 +58,23 @@ spec:
             limits:
               cpu: 4000m
               memory: 8Gi
+          # Probes sized for slow multimodal-parser calls that may block the
+          # event loop briefly; failureThreshold 5 + timeout 10s tolerates
+          # ~150s before kill instead of the ~3s default that triggered a
+          # SIGKILL mid-request. See docs/README for tuning rationale.
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
           readinessProbe:
             httpGet:
               path: /health
               port: 8000
             initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
