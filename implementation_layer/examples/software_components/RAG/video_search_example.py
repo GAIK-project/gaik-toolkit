@@ -32,13 +32,13 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
+from gaik.software_components.config import get_openai_config
 from gaik.software_components.RAG.embedder import Embedder
 from gaik.software_components.RAG.pg_vector_store import PgVectorStore
 from gaik.software_components.RAG.pg_vector_store.video_search_helpers import (
     format_search_results,
     ingest_video_segments,
 )
-from gaik.software_components.config import get_openai_config
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

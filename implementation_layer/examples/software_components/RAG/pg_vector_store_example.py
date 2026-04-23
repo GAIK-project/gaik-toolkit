@@ -36,11 +36,10 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 # Add src directory to path to import modules (works without pip install)
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from langchain_core.documents import Document
-
+from gaik.software_components.config import get_openai_config
 from gaik.software_components.RAG.embedder import Embedder
 from gaik.software_components.RAG.pg_vector_store import PgVectorStore
-from gaik.software_components.config import get_openai_config
+from langchain_core.documents import Document
 
 # Connection string (override with DATABASE_URL environment variable)
 DATABASE_URL = os.getenv(

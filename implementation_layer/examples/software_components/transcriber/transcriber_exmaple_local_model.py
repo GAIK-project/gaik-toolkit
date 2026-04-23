@@ -25,7 +25,7 @@ def main() -> None:
 
     transcriber = Transcriber(
         api_config=config,  # OpenAI/Azure config
-        output_dir=".",  
+        output_dir=".",
         enhanced_transcript=True,  # Two-pass transcript correction
         transcription_model="whisper_local",  # Force local transcription backend
         local_api_base="http://YOUR_ADDRESS:8080",  # Local whisper base URL

@@ -2,11 +2,9 @@
 Auto-generated schema module (do not edit manually).
 """
 
-import decimal
-from decimal import Decimal
-from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class Ty_maap_iv_kirja_kenttien_poiminta_nitallenteesta_Extraction(BaseModel):
     """Extraction model for Työmaapäiväkirja kenttien poiminta äänitallenteesta"""

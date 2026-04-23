@@ -5,23 +5,24 @@ Generates PDF reports from extracted diary fields using ReportLab,
 matching the Finnish construction diary template layout.
 """
 
-from reportlab.lib.pagesizes import A4
+import base64
+from io import BytesIO
+from pathlib import Path
+from typing import Any
+
 from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_LEFT, TA_RIGHT
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import (
+    Image,
+    Paragraph,
     SimpleDocTemplate,
+    Spacer,
     Table,
     TableStyle,
-    Paragraph,
-    Spacer,
-    Image,
 )
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
-from io import BytesIO
-from typing import Dict, Any, Optional, List
-from pathlib import Path
-import base64
 
 # Page size: A4 Portrait (210 × 297 mm = 595.28 × 841.89 points)
 PAGE_WIDTH, PAGE_HEIGHT = A4  # A4 is already portrait orientation
@@ -40,7 +41,7 @@ LABEL_COL_WIDTH = 120
 VALUE_COL_WIDTH = CONTENT_WIDTH - LABEL_COL_WIDTH
 
 
-def _get_value(data: Dict[str, Any], *keys: str, default: str = "") -> str:
+def _get_value(data: dict[str, Any], *keys: str, default: str = "") -> str:
     """Get value from dict, trying multiple key variations."""
     for key in keys:
         if key in data:
@@ -58,7 +59,7 @@ def _get_value(data: Dict[str, Any], *keys: str, default: str = "") -> str:
     return default
 
 
-def _create_styles() -> Dict[str, ParagraphStyle]:
+def _create_styles() -> dict[str, ParagraphStyle]:
     """Create paragraph styles for the PDF.
 
     Font specifications:
@@ -100,17 +101,17 @@ def _create_styles() -> Dict[str, ParagraphStyle]:
     }
 
 
-def _make_label_cell(text: str, styles: Dict) -> Paragraph:
+def _make_label_cell(text: str, styles: dict) -> Paragraph:
     """Create a label cell paragraph."""
     return Paragraph(f"<b>{text}</b>", styles["label"])
 
 
-def _make_value_cell(text: str, styles: Dict) -> Paragraph:
+def _make_value_cell(text: str, styles: dict) -> Paragraph:
     """Create a value cell paragraph."""
     return Paragraph(text or "", styles["value"])
 
 
-def _format_resurssit_henkilosto(value: str, styles: Dict) -> Table:
+def _format_resurssit_henkilosto(value: str, styles: dict) -> Table:
     """Format resurssit_henkilosto field with Henkilöstö header and 2-column table layout.
 
     Expected format: "Työnjohtajat: X hlö, Työntekijät: X hlö, Alihankkijat: X hlö, Yhteensä: X hlö"
@@ -182,7 +183,7 @@ def _format_resurssit_henkilosto(value: str, styles: Dict) -> Table:
     return content_table
 
 
-def _format_multiline_list(value: str, styles: Dict) -> Paragraph:
+def _format_multiline_list(value: str, styles: dict) -> Paragraph:
     """Format a comma-separated value as multiple lines.
 
     Each comma-separated item appears on a new line.
@@ -205,7 +206,7 @@ def _decode_base64_image(base64_str: str) -> BytesIO:
     return BytesIO(image_data)
 
 
-def _build_image_grid(images: List[str], max_cols: int = 5) -> Table:
+def _build_image_grid(images: list[str], max_cols: int = 5) -> Table:
     """Build a grid of thumbnail images."""
     THUMB_SIZE = 60  # Size for each thumbnail
 
@@ -250,9 +251,9 @@ def _build_image_grid(images: List[str], max_cols: int = 5) -> Table:
 
 
 def _build_header_table(
-    data: Dict[str, Any],
-    styles: Dict,
-    logo_path: Optional[str] = None
+    data: dict[str, Any],
+    styles: dict,
+    logo_path: str | None = None
 ) -> Table:
     """Build the header section with logo and title."""
     # Logo placeholder or actual logo
@@ -278,7 +279,7 @@ def _build_header_table(
     return header_table
 
 
-def _build_info_table(data: Dict[str, Any], styles: Dict) -> Table:
+def _build_info_table(data: dict[str, Any], styles: dict) -> Table:
     """Build the info section (Kohde/Laatija, Sää/Päivämäärä)."""
     kohde = _get_value(data, "kohde", "Kohde")
     laatija = _get_value(data, "laatija", "Laatija")
@@ -327,10 +328,10 @@ def _build_info_table(data: Dict[str, Any], styles: Dict) -> Table:
 
 
 def _build_main_table(
-    data: Dict[str, Any],
-    styles: Dict,
-    images: Optional[List[str]] = None,
-    field_specs: Optional[List] = None
+    data: dict[str, Any],
+    styles: dict,
+    images: list[str] | None = None,
+    field_specs: list | None = None
 ) -> Table:
     """Build the main content table with all diary fields dynamically.
 
@@ -477,7 +478,7 @@ def _build_main_table(
     return main_table
 
 
-def _build_signature_table(data: Dict[str, Any], styles: Dict) -> Table:
+def _build_signature_table(data: dict[str, Any], styles: dict) -> Table:
     """Build the signature section."""
     valvojan_allekirjoitus = _get_value(
         data, "valvojan_allekirjoitus", "Valvojan allekirjoitus"
@@ -513,11 +514,11 @@ def _build_signature_table(data: Dict[str, Any], styles: Dict) -> Table:
 
 
 def generate_diary_pdf(
-    extraction_data: Dict[str, Any],
-    logo_path: Optional[str] = None,
+    extraction_data: dict[str, Any],
+    logo_path: str | None = None,
     title: str = "TYÖMAAPÄIVÄKIRJA",
-    images: Optional[List[str]] = None,
-    field_specs: Optional[List] = None,
+    images: list[str] | None = None,
+    field_specs: list | None = None,
 ) -> BytesIO:
     """
     Generate a PDF report from extracted diary fields.
@@ -544,7 +545,7 @@ def generate_diary_pdf(
     )
 
     styles = _create_styles()
-    elements: List = []
+    elements: list = []
 
     # Header with logo and title
     header_table = _build_header_table(extraction_data, styles, logo_path)

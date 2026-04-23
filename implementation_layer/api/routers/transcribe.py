@@ -1,12 +1,12 @@
 """Transcribe endpoint for audio/video transcription."""
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from gaik.software_components.transcriber.transcriber import Transcriber
 
 from implementation_layer.api.config import get_openai_config, settings
 from implementation_layer.api.dependencies import verify_api_key
 from implementation_layer.api.schemas.transcribe import TranscribeResponse
 from implementation_layer.api.utils import temp_file, validate_file_size, validate_upload
-from gaik.software_components.transcriber.transcriber import Transcriber
 
 router = APIRouter()
 

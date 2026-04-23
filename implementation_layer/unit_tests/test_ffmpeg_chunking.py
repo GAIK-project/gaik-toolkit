@@ -6,12 +6,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from gaik.software_components.parallel_transcriber.ffmpeg import (
-    check_ffmpeg_available,
     split_into_chunks,
 )
-from gaik.software_components.parallel_transcriber.config import TranscriptionConfig
 from gaik.software_components.parallel_transcriber.models import ChunkSpec
 
 

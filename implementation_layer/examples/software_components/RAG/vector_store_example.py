@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from langchain_core.documents import Document
-
 from gaik.software_components.RAG.vector_store import VectorStore
+from langchain_core.documents import Document
 
 
 def main() -> None:

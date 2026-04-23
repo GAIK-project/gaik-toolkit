@@ -1,7 +1,8 @@
 import json
-import numpy as np
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
+
+import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -23,9 +24,9 @@ ALL_FIELDS = EXACT_FIELDS + SEMANTIC_FIELDS
 EXACT_THRESHOLD = 0.95
 SEMANTIC_THRESHOLD = 0.80
 
-# we use ground truth here 
+# we use ground truth here
 def evaluate_field_matching(ground_truth_dir: Path, prediction_dir: Path, output_file: Path, model_name: str = "all-MiniLM-L6-v2"):
-    
+
     model = SentenceTransformer(model_name)
 
     tp_list, fp_list, fn_list, tn_list = [], [], [], []

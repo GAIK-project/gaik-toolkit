@@ -1,5 +1,6 @@
-from pathlib import Path
 import json
+from pathlib import Path
+
 from openai import OpenAI
 
 # We want these info from LLM
@@ -22,7 +23,7 @@ FIELDS = [
 def extract_fields_from_text(file_path: Path,client: OpenAI,model_name: str):
 
     #LLM should return JSON format
-    text = file_path.read_text(encoding="utf-8") 
+    text = file_path.read_text(encoding="utf-8")
     prompt = f"""
     You are a strict JSON generator.
     Return ONLY a valid JSON object with these exact keys:
@@ -78,7 +79,7 @@ def extract_fields_from_text(file_path: Path,client: OpenAI,model_name: str):
 
 
 def run_field_extraction(input_dir:Path, output_dir: Path, model_name: str, api_key: str):
-    
+
     output_dir.mkdir(parents=True, exist_ok=True)
     client = OpenAI(api_key=api_key)
 

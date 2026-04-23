@@ -5,16 +5,17 @@ Workflow: input audio->transcribe->parse user requirement and build schema->extr
 """
 
 from __future__ import annotations
-import json
-import sys
+
 import base64
+import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 from pdf_generator import generate_diary_pdf
+
 load_dotenv(Path(__file__).parent.parent.parent.parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
-from gaik.software_modules.audio_to_structured_data import AudioToStructuredData  
-
+from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
 
 
 def create_pdf_report(extracted_fields: list[dict]) -> Path | None:
@@ -82,8 +83,8 @@ USER_REQUIREMENTS = """
 
 def main() -> None:
     extract_options = {"generate_schema": False}
-    generate_schema = extract_options.pop("generate_schema", True) 
-    schema_name = extract_options.pop("schema_name", "schema") 
+    generate_schema = extract_options.pop("generate_schema", True)
+    schema_name = extract_options.pop("schema_name", "schema")
 
     pipeline = AudioToStructuredData(use_azure=True)
 

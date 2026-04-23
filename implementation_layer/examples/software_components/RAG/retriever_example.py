@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from langchain_core.documents import Document
-
+from gaik.software_components.config import get_openai_config
 from gaik.software_components.RAG.embedder import Embedder
 from gaik.software_components.RAG.retriever import Retriever
 from gaik.software_components.RAG.vector_store import VectorStore
-from gaik.software_components.config import get_openai_config
+from langchain_core.documents import Document
 
 
 def main() -> None:

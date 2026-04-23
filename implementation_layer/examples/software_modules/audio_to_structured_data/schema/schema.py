@@ -2,11 +2,9 @@
 Auto-generated schema module (do not edit manually).
 """
 
-import decimal
-from decimal import Decimal
-from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class standard_medical_consultation_summary_Extraction(BaseModel):
     """Extraction model for standard_medical_consultation_summary"""

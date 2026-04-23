@@ -1,10 +1,10 @@
 """MCP Server for GAIK Transcriber"""
-import os
 import sys
 from pathlib import Path
-from mcp.server.fastmcp import FastMCP
-from gaik.software_components.transcriber import Transcriber, get_openai_config
+
 from dotenv import load_dotenv
+from gaik.software_components.transcriber import Transcriber, get_openai_config
+from mcp.server.fastmcp import FastMCP
 
 load_dotenv(Path(__file__).with_name(".env"))
 

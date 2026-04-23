@@ -1,8 +1,8 @@
 """Transcriber router - Audio/video transcription endpoints"""
 
 import os
-from difflib import SequenceMatcher
 import tempfile
+from difflib import SequenceMatcher
 from pathlib import Path
 
 try:

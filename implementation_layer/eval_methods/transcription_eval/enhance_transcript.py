@@ -8,7 +8,6 @@ Strategy:
 - Save enhanced versions to an output directory
 """
 
-import sys
 from pathlib import Path
 
 from config import create_openai_client, get_openai_config
@@ -226,13 +225,13 @@ def process_transcripts(transcripts_dir: str, output_dir: str, model: str | None
         print(f"  Original: {original_word_count} words")
 
         # Pass 1: Spelling consistency + Finnish vocabulary
-        print(f"  Pass 1: Spelling consistency...")
+        print("  Pass 1: Spelling consistency...")
         pass1_text = enhance_transcript_pass1(client, original_text, model=model)
         pass1_word_count = len(pass1_text.split())
         print(f"    -> {pass1_word_count} words (delta: {pass1_word_count - original_word_count:+d})")
 
         # Pass 2: Context-based repair + number conversion
-        print(f"  Pass 2: Context repair + number conversion...")
+        print("  Pass 2: Context repair + number conversion...")
         pass2_text = enhance_transcript_pass2(client, pass1_text, model=model)
         pass2_word_count = len(pass2_text.split())
         print(f"    -> {pass2_word_count} words (delta: {pass2_word_count - pass1_word_count:+d})")
