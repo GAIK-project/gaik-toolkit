@@ -108,8 +108,12 @@ async def parse_document(
 
             from gaik.software_components.parsers import MultimodalParser
 
+            # Default to gpt-5.4-mini on Azure (lighter + cheaper than gpt-5.4).
+            # Override with AZURE_MULTIMODAL_DEPLOYMENT without redeploy.
+            multimodal_model = os.getenv("AZURE_MULTIMODAL_DEPLOYMENT", "gpt-5.4-mini")
             parser = MultimodalParser(
                 model_provider="openai",
+                model=multimodal_model,
                 use_azure=bool(os.getenv("AZURE_API_KEY")),
                 reasoning_effort="low",
                 merge_table=True,
