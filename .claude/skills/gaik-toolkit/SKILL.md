@@ -1,13 +1,16 @@
 ---
 name: gaik-toolkit
 description: >-
-  GAIK toolkit development. Use when implementing or modifying GAIK components
-  (extractors, parsers, transcribers, RAG, TTS, classifiers, pipelines), adding
-  examples to implementation_layer/examples/, updating guidance_layer/docs/ or
-  guidance_layer/website/content/docs/, or working on the demo app (Next.js +
-  FastAPI) or docs website (Fumadocs). Covers: structured data extraction, document
-  parsing, audio transcription (Whisper/local), transcript enhancement, text-to-speech,
-  RAG pipelines (pgvector/Chroma), document classification, end-to-end pipelines.
+  GAIK toolkit overview and reference. Use when needing context on GAIK
+  components (extractors, parsers, transcribers, RAG, TTS, classifiers,
+  pipelines), the repository structure, configuration pattern, environment
+  variables, building-block API tables, the documentation update map, or the
+  demo app and docs website setup. For CREATING a new component package use
+  build-software-component; for ADDING EXAMPLES and running the canonical
+  publish flow (docs → demo app → PyPI tag) use gaik-add-examples. Covers:
+  structured data extraction, document parsing, audio transcription
+  (Whisper/local), transcript enhancement, text-to-speech, RAG pipelines
+  (pgvector/Chroma), document classification, end-to-end pipelines.
 argument-hint: "[component-name]"
 ---
 
@@ -27,6 +30,16 @@ Python toolkit for knowledge extraction, capture, and generation. Use when worki
 - Document classification
 - RAG pipelines: embedder, vector store (Chroma / PostgreSQL), retriever, answer generator
 - End-to-end pipelines: AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow
+
+## Related Skills
+
+This skill is the **overview / reference**. Two sibling skills handle workflows:
+
+| Task | Skill |
+|------|-------|
+| Create a new installable component package (source + `pyproject.toml` + extras) | **`build-software-component`** |
+| Add an example, then optionally publish (docs → demo app → PyPI tag) | **`gaik-add-examples`** |
+| Understand the toolkit: components, config, repo layout, docs update map | **this skill** |
 
 ## Quick Links
 
@@ -192,6 +205,18 @@ When adding or modifying a component, update **both** documentation locations:
 - **`guidance_layer/website/content/docs/`**: User-facing MDX for the Fumadocs website
 - Run `pnpm dev` from `guidance_layer/website/` to preview website changes
 - For the gated, step-by-step publish flow (docs → demo app → PyPI tag), use the **`gaik-add-examples`** skill Step 6 — the canonical follow-up workflow
+
+## Gotchas
+
+Non-obvious things that cause real mistakes in this repo. Check here before assuming.
+
+- **Docs website uses `pnpm`, not `bun`.** Everything else in `toolkit_demo_app/` uses `bun`. Running `bun dev` inside `guidance_layer/website/` silently installs a second lockfile and breaks Fumadocs build.
+- **Fumadocs needs `meta.json` updates.** When adding a new `.mdx` page under `content/docs/`, also add it to the parent directory's `meta.json`, or it will not appear in the navigation.
+- **`ParallelTranscriber` requires `ffmpeg` + `ffprobe` on `$PATH`.** On Windows that means installing ffmpeg and adding its `bin/` to PATH — there is no Python wheel fallback.
+- **`whisper_local` model needs `local_api_base` + `local_api_key`.** `language="fi"` switches to the Finnish fine-tuned model. Leaving `local_api_base` unset fails with an unhelpful OpenAI-style error.
+- **Never edit `__version__` strings by hand.** The package version is derived from the git tag by `setuptools-scm`. Manual edits desync the wheel and break the PyPI publish workflow's version validation.
+- **CORS_ORIGINS must be valid JSON, not `"*"`.** In the OpenShift API deployment, `CORS_ORIGINS='["*"]'` works; plain `*` crashloops (pydantic-settings parses the env var as a list[str]).
+- **OpenAI structured outputs can't use `additionalProperties`.** Prefer an explicit list-of-entries model (see `FormUnderstander.LabelEntry`) over a free-form dict.
 
 ## Detailed References
 
