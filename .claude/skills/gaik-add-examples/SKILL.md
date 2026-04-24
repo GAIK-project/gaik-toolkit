@@ -4,15 +4,29 @@ description: >-
   Adds or updates working code examples for GAIK toolkit components and pipelines
   in implementation_layer/examples/. Use when adding a new example, demonstrating
   a feature, creating a usage sample, or showing how a building block or pipeline
-  works. Covers software_components (extractor, parsers, transcriber, RAG, etc.)
-  and software_modules (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow).
+  works. After the example is in place, offers optional follow-ups: update API docs
+  (guidance_layer/docs/), update the Fumadocs website (guidance_layer/website/content/docs/),
+  expose the feature in the demo app (toolkit_demo_app/api/routers + UI), and push
+  a PyPI release tag. Covers software_components (extractor, parsers, transcriber,
+  RAG, classifier, TTS, enhance_transcript) and software_modules (AudioToStructuredData,
+  DocumentsToStructuredData, RAGWorkflow). Not for creating a brand-new component
+  package — use build-software-component for that.
 ---
 
 # Add GAIK Examples
 
+Adds or updates working examples under `implementation_layer/examples/`. After the
+example is added, asks the user whether to propagate the new capability to docs,
+the demo app, and a PyPI release.
+
+**Not this skill's job** — use **`build-software-component`** instead when the user
+wants to create a brand-new component package (new source files under
+`implementation_layer/src/gaik/software_components/...`, new `pyproject.toml` extra,
+installable `pip install "gaik[...]"` flow).
+
 Examples live in `implementation_layer/examples/` split into two categories:
 
-- `software_components/` — individual building blocks (extractor, parsers, transcriber, RAG, etc.)
+- `software_components/` — individual building blocks (extractor, parsers, transcriber, RAG, classifier, TTS, etc.)
 - `software_modules/` — end-to-end pipelines (audio_to_structured_data, documents_to_structured_data, RAG_workflow)
 
 ## Steps
@@ -20,7 +34,8 @@ Examples live in `implementation_layer/examples/` split into two categories:
 1. **Choose the right location**
    - New building block example → `software_components/<component_name>/`
    - New pipeline example → `software_modules/<pipeline_name>/`
-   - Adding to existing component → add numbered file: `component_example_2.py`, `component_example_3.py`
+   - Adding to existing component → add a numbered/named file alongside the existing ones:
+     `demo_<variant>.py`, `<component>_example_2.py`, etc.
 
 2. **Follow the standard file structure**
 
@@ -66,7 +81,7 @@ if __name__ == "__main__":
 
 4. **Update the parent README.md** (`software_components/README.md` or `software_modules/README.md`) to list the new example.
 
-5. **Add sample input files if needed** (PDFs, audio files, images) to an `input/` subdirectory.
+5. **Add sample input files if needed** (PDFs, audio files, images) to an `input/` subdirectory. Keep samples small and redistributable.
 
 ## Configuration pattern
 
@@ -86,9 +101,72 @@ Pipeline constructors accept `use_azure=True/False` directly:
 pipeline = DocumentsToStructuredData(use_azure=True)
 ```
 
+## Step 6 — Optional follow-ups (ask the user)
+
+After Steps 1–5 are done, the example is working. Ask the user whether to
+propagate the new capability further. Each sub-step is **gated** by its own
+yes/no question — run only the ones the user approves.
+
+Default suggestion: **ask all four** unless the example is a trivial tweak to
+an existing file. Skip straight to a single question in that case.
+
+### 6a. Update API docs (`guidance_layer/docs/`)
+
+Ask: **"Update API-level Markdown docs under `guidance_layer/docs/`?"**
+
+Update when: the example introduces a new public API surface, new constructor
+params, or a new public method.
+
+- `guidance_layer/docs/software_components/<component>.md` — per-component API reference
+- `guidance_layer/docs/software_modules/<pipeline>/` — pipeline API reference
+
+### 6b. Update Fumadocs website (`guidance_layer/website/content/docs/`)
+
+Ask: **"Update the user-facing Fumadocs website?"**
+
+Update when: the example demonstrates a new capability users would discover via
+the website.
+
+- `toolkit/software-components.mdx` or `toolkit/software-modules.mdx` — component catalog
+- `use-cases/<case>.mdx` — new or updated use case walkthrough
+- Update the relevant `meta.json` if a new page is added
+- Preview locally: `cd guidance_layer/website && pnpm dev` (uses pnpm, not bun)
+
+### 6c. Expose in `toolkit_demo_app/`
+
+Ask: **"Expose this in the demo app (`implementation_layer/toolkit_demo_app/`)?"**
+
+Default: **yes** for interactive, user-facing features (parsers, transcribers,
+extractors, RAG, TTS, classifiers); **no** for internal utilities.
+
+If yes:
+- Add/extend a FastAPI router under `toolkit_demo_app/api/routers/` (e.g. `parser.py`, `extractor.py`, `rag.py`)
+- Add schema(s) under `toolkit_demo_app/api/schemas/`
+- Add or update a Next.js page/route under `toolkit_demo_app/app/`
+- Handle missing optional dependencies gracefully (the extra may not be installed by default)
+- Dev preview: `bun run dev:all` from `toolkit_demo_app/`
+
+### 6d. Tag a PyPI release
+
+Ask: **"Tag a PyPI release now?"**
+
+Only relevant if the example accompanies a code change in
+`implementation_layer/src/gaik/` (pure docs/example-only changes don't need a
+release).
+
+If yes:
+1. Commit and push all changes.
+2. Run the test suite locally (`uv run pytest`).
+3. Choose the semver bump (patch / minor / major).
+4. Tag and push: `git tag v0.X.Y && git push origin v0.X.Y`.
+5. `.github/workflows/publish.yml` triggers on `v*.*.*` tag push — runs tests,
+   builds wheel + sdist, uploads to PyPI, creates a GitHub Release.
+6. setuptools-scm derives the version from the tag — **never** edit version
+   strings manually.
+
 ## Notes
 
 - Examples serve as both usage documentation and integration tests
-- Keep each file focused on one concept — add a new numbered file for a new concept
+- Keep each file focused on one concept — add a new numbered/named file for a new concept
 - Real-world complexity examples go in a subdirectory (e.g., `diary_workflow/`)
-- After adding examples, also update `guidance_layer/docs/` and `guidance_layer/website/content/docs/` if documenting a new capability — see the `gaik-toolkit` skill for the documentation update table
+- For the full mapping of "what changed → what to update", see the `gaik-toolkit` skill
