@@ -5,9 +5,9 @@ description: >-
   Accepts context from URLs, external codebases, or plain descriptions.
   Produces an implementation plan for user review, then executes the plan:
   creates component files, updates pyproject.toml, installs the package,
-  and verifies with import smoke tests. Optionally continues with website
-  docs, toolkit_demo_app integration, and PyPI release tagging when the user
-  wants the full release-ready flow.
+  and verifies with import smoke tests. For the full release-ready flow
+  (more examples, docs, demo app integration, PyPI release tag) delegates
+  to the gaik-add-examples skill instead of duplicating that workflow.
 argument-hint: "[context: URLs, paths, PyPI package names, or description]"
 ---
 
@@ -149,90 +149,37 @@ Read `references/verification.md` for exact commands. Steps:
 
 ### Phase 6 — Full release workflow (optional)
 
-After Phase 5, ask the user: **"Continue with the full release flow (docs →
-demo app → PyPI tag), or stop here?"** Default: **stop** for quick prototypes;
-**continue** when the component is a user-facing capability worth shipping.
+After Phase 5, ask the user: **"Continue with the full release flow (more
+examples → docs → demo app → PyPI tag), or stop here?"** Default: **stop**
+for quick prototypes; **continue** when the component is a user-facing
+capability worth shipping.
 
-If the user stops, end the skill. If they continue, work through 6a–6d below.
-Each step is itself gated by its own question — skip any the user declines.
+If the user continues, **delegate to the `gaik-add-examples` skill Step 6**
+— it is the canonical publish flow and owns the gated 6a–6d prompts for:
 
-#### 6a. Additional examples (ask)
+- 6a. Additional API docs (`guidance_layer/docs/`)
+- 6b. Fumadocs website (`guidance_layer/website/content/docs/`)
+- 6c. Demo app integration (`toolkit_demo_app/api/routers/` + UI)
+- 6d. PyPI release tag
 
-Phase 4 step 7 already created one initial example. Only delegate to the
-`gaik-add-examples` skill when the user confirms they want **more**:
+Phase 4 step 7 of this skill already created one initial example, so
+`gaik-add-examples` is typically invoked for **additional** examples (a
+pipeline-level example, a second variant, or an enriched README walkthrough).
 
-- Add a `software_modules/` pipeline example (default yes if the component is
-  a building block in an end-to-end pipeline).
-- Add a second numbered example (`<name>_example_2.py`) for a distinct mode.
-- Enrich the component's README with a usage walkthrough.
+Do not duplicate 6a–6d logic here — read from `gaik-add-examples/SKILL.md`
+so the publish flow stays in one place.
 
-#### 6b. Website & docs (ask)
+#### Component-specific release-readiness checklist
 
-Ask: **"Update Fumadocs website (`guidance_layer/website/content/docs/`)
-and/or API docs (`guidance_layer/docs/`)?"**
-
-Default: **yes** for parsers, extractors, transcribers, RAG modules, pipelines
-(user-discoverable); **no** for internal utilities.
-
-If yes:
-- Add or update an MDX page under `guidance_layer/website/content/docs/`
-  describing the component, its config, and a minimal usage snippet.
-- Link the new page from the relevant category index (`meta.json` or the
-  category MDX).
-- Mirror the API surface in `guidance_layer/docs/` if the component has a
-  non-trivial public API.
-
-#### 6c. toolkit_demo_app integration (ask)
-
-Ask: **"Expose this in `implementation_layer/toolkit_demo_app/`?"**
-
-Default: **yes** for interactive components (parsers, transcribers, RAG, TTS,
-classifiers); **no** for internal utilities.
-
-If yes:
-- Add a FastAPI endpoint in the demo app's backend.
-- Add a UI card / route in the Next.js frontend.
-- Handle missing optional dependencies gracefully (the extra may not be
-  installed by default).
-
-#### 6d. PyPI release (ask)
-
-Ask: **"Tag a PyPI release now?"**
-
-If yes:
-1. Commit and push all changes from Phases 4–6c.
-2. Run the test suite locally (`uv run pytest` or the project's runner).
-3. Decide the semver bump:
-   - patch (`v0.X.Y+1`) — bug fix or small additive component.
-   - minor (`v0.X+1.0`) — meaningful new component or capability.
-   - major — breaking changes (rare).
-4. Tag and push: `git tag v0.X.Y && git push origin v0.X.Y`.
-5. `.github/workflows/publish.yml` triggers automatically on `v*.*.*` tag
-   push: runs tests, builds wheel + sdist, validates the version, uploads to
-   PyPI, creates a GitHub Release.
-6. setuptools-scm derives the package version from the tag — **do not** edit
-   version strings manually anywhere (it breaks the publish workflow's
-   version validation).
-
-If no: note "release deferred" in the commit message so the next contributor
-knows it's pending.
-
-#### Release-readiness checklist
-
-Before tagging, confirm:
+Before tagging (this is the build-side addition to the checklist in
+`gaik-add-examples` — verify the component shape first):
 
 - [ ] Source files + `__init__.py` exports under the component's directory.
 - [ ] Component `README.md` written.
 - [ ] `pyproject.toml` optional extra added (and named consistently).
 - [ ] Parent `__init__.py` (top-level or category) updated to list the
       component.
-- [ ] Example under `implementation_layer/examples/` runs cleanly with the
-      optional extra installed.
 - [ ] Local tests pass (`uv run pytest`).
-- [ ] Website docs updated (if user-facing).
-- [ ] `toolkit_demo_app` updated (if interactive).
-- [ ] All changes committed and pushed.
-- [ ] `v*.*.*` tag pushed (if releasing now).
 
 ## Hard rules
 

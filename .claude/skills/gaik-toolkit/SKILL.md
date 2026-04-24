@@ -191,6 +191,7 @@ When adding or modifying a component, update **both** documentation locations:
 - **`guidance_layer/docs/`**: Technical Markdown docs (API-level details, constructor params)
 - **`guidance_layer/website/content/docs/`**: User-facing MDX for the Fumadocs website
 - Run `pnpm dev` from `guidance_layer/website/` to preview website changes
+- For the gated, step-by-step publish flow (docs → demo app → PyPI tag), use the **`gaik-add-examples`** skill Step 6 — the canonical follow-up workflow
 
 ## Detailed References
 
