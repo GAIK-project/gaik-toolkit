@@ -27,6 +27,7 @@ from openai import APIError, APITimeoutError, RateLimitError
 
 # Import shared configuration
 from gaik.software_components.config import create_openai_client, get_openai_config
+from gaik.software_components.llm.base import ProviderClient
 
 try:
     # Pydantic v2 style config (preferred)
@@ -71,16 +72,51 @@ def _with_retries(call, tries: int = 4):
             time.sleep(2**i)  # backoff
 
 
+class _ParsedMessage:
+    def __init__(self, parsed: BaseModel):
+        self.parsed = parsed
+
+
+class _ParsedChoice:
+    def __init__(self, parsed: BaseModel):
+        self.message = _ParsedMessage(parsed)
+
+
+class _ParsedShim:
+    """OpenAI-completion-shaped wrapper around a parsed Pydantic instance.
+
+    Lets non-OpenAI providers (Anthropic, Google) reuse the same caller code
+    that does ``resp.choices[0].message.parsed``.
+    """
+
+    def __init__(self, parsed: BaseModel):
+        self.choices = [_ParsedChoice(parsed)]
+        self.usage = None
+
+
 def _parse_with(*, client, model: str, messages: list[dict], response_format: type[BaseModel]):
     """
     Wraps client.beta.chat.completions.parse in a retry + deterministic settings.
 
+    Accepts either a raw OpenAI/Azure client or a ``ProviderClient`` adapter
+    (from ``gaik.software_components.llm``). Returns an object with a
+    ``.choices[0].message.parsed`` shape in both cases.
+
     Args:
-        client: OpenAI or AzureOpenAI client instance
+        client: OpenAI or AzureOpenAI client instance, or a ProviderClient
         model: Model name to use
         messages: Messages to send
         response_format: Pydantic model for structured output
     """
+    if isinstance(client, ProviderClient):
+        parsed = _with_retries(
+            lambda: client.chat_parsed(
+                messages=messages,
+                response_format=response_format,
+                model=model,
+            )
+        )
+        return _ParsedShim(parsed)
     return _with_retries(
         lambda: client.beta.chat.completions.parse(
             model=model,

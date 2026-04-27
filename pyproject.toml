@@ -152,6 +152,20 @@ multimodal-parser = [
     "markdown-it-py>=3.0.0",
 ]
 
+# Multi-provider LLM client adapters used across software_components/llm/.
+# Opt-in: install only the providers you need at runtime.
+llm-anthropic = [
+    "anthropic>=0.43.0",
+]
+llm-google = [
+    "google-genai>=0.3.0",
+    "google-auth>=2.0.0",
+]
+llm-all = [
+    "gaik[llm-anthropic]",
+    "gaik[llm-google]",
+]
+
 # All features
 all = [
     "gaik[extract]",
