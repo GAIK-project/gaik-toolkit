@@ -7,6 +7,7 @@ Detailed API documentation for GAIK building blocks.
 ## Contents
 
 - [Configuration](#configuration)
+- [Multi-Provider Configuration (`llm/`)](#multi-provider-configuration-llm)
 - [Extractor Module](#extractor-module) (SchemaGenerator, DataExtractor, FieldSpec)
 - [Parsers Module](#parsers-module) (VisionParser, PyMuPDFParser, DocxParser, DoclingParser, VisionPlusParser, DoclingApiClientParser, MultimodalParser)
 - [Transcriber Module](#transcriber-module) (Transcriber, TranscriptionResult)
@@ -49,6 +50,84 @@ client = create_openai_client(config)
     "transcription_model": str,  # Default: "gpt-4o-transcribe"
 }
 ```
+
+---
+
+## Multi-Provider Configuration (`llm/`)
+
+Available since `gaik>=0.3.21`. The `gaik.software_components.llm` package provides a `ProviderClient` adapter that lets the same component code call OpenAI, Azure, Anthropic, or Google through a uniform interface — without breaking the legacy `get_openai_config()` path. Components detect the config shape and route automatically.
+
+### get_llm_config()
+
+```python
+from gaik.software_components.llm import get_llm_config, create_llm_client
+
+config = get_llm_config("google")        # or "openai", "azure", "anthropic",
+                                         #    "anthropic_foundry", "vertex"
+client = create_llm_client(config)       # ProviderClient
+```
+
+**Returns (always includes `provider` and `model`):**
+```python
+# google: {"provider": "google", "api_key": str, "model": "gemini-2.5-flash",
+#          "embedding_model": "gemini-embedding-001"}
+# anthropic: {"provider": "anthropic", "api_key": str, "model": "claude-sonnet-4-6",
+#             "max_tokens": 4096}
+# azure: {"provider": "azure", "use_azure": True, "api_key": str,
+#         "azure_endpoint": str, "api_version": str, "model": str, ...}
+```
+
+### ProviderClient interface
+
+| Method | Purpose |
+|--------|---------|
+| `chat(messages, **kwargs)` | Single chat completion. Returns `ChatResponse(text, model, provider, raw, usage)`. |
+| `chat_parsed(messages, response_format, **kwargs)` | Pydantic structured output. OpenAI uses `beta.chat.completions.parse()`, Anthropic uses forced tool_use, Google uses `response_json_schema`. |
+| `chat_stream(messages, **kwargs)` | `Iterator[str]` of text deltas, normalized across providers. |
+| `embed(texts, **kwargs)` | Batch embeddings. Anthropic raises `NotImplementedError` (Voyage AI is recommended). |
+
+### Provider resolution priority
+
+1. Explicit `provider` argument to `get_llm_config()`
+2. `config["provider"]` field
+3. Env `LLM_PROVIDER`
+4. Legacy `config["use_azure"]` → `azure` or `openai`
+5. Default `azure`
+
+### Helpers
+
+- `build_compat_client(config)` — used by every component constructor: returns the raw `OpenAI`/`AzureOpenAI` for legacy configs (preserves bit-for-bit deterministic behavior), `ProviderClient` for `anthropic`/`google` configs.
+- `assert_openai_or_azure(config, component=...)` — guard used by audio components (transcriber, parallel_transcriber, text_to_speech) to reject Anthropic/Google with a clear error message.
+
+### Provider support matrix
+
+| Component | OpenAI/Azure | Anthropic native | Google native | Gemini-via-OpenAI-compat |
+|---|---|---|---|---|
+| Extractor, Doc Classifier, Enhance Transcript, Answer Generator | ✅ | ✅ | ✅ | ✅ |
+| Embedder | ✅ | ❌ → Voyage | ✅ (`gemini-embedding-001`) | ✅ |
+| Vision Parser | ✅ | → `MultimodalParser` | → `MultimodalParser` | ✅ |
+| Transcriber, Parallel Transcriber, TextToSpeech | ✅ | ❌ NotImplementedError | ❌ NotImplementedError | ✅ (separate audio client) |
+
+### Extras
+
+```toml
+gaik[llm-anthropic]   # adds anthropic SDK
+gaik[llm-google]      # adds google-genai + google-auth
+gaik[llm-all]         # both
+```
+
+### Example: same code, three providers
+
+```python
+from gaik.software_components.extractor import DataExtractor
+from gaik.software_components.llm import get_llm_config
+
+for provider in ["azure", "anthropic", "google"]:
+    extractor = DataExtractor(config=get_llm_config(provider))
+    results = extractor.extract(extraction_model=MyModel, ...)
+```
+
+See `examples/software_components/llm/example_multi_provider_extractor.py`.
 
 ---
 

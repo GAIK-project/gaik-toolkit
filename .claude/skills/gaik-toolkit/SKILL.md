@@ -102,7 +102,9 @@ OPENAI_MODEL=gpt-5.1
 
 ## Configuration Pattern
 
-All components use `get_openai_config()`:
+Two parallel surfaces ship since `gaik>=0.3.21`. Pick the simpler one for OpenAI/Azure-only use cases; pick the multi-provider one when the same code needs to switch between OpenAI, Azure, Anthropic, or Google.
+
+**Legacy surface (OpenAI/Azure only — bit-for-bit unchanged):**
 
 ```python
 from gaik.software_components.config import get_openai_config, create_openai_client
@@ -111,6 +113,17 @@ config = get_openai_config(use_azure=True)   # Azure OpenAI
 config = get_openai_config(use_azure=False)  # Standard OpenAI
 client = create_openai_client(config)        # OpenAI/AzureOpenAI client
 ```
+
+**Multi-provider surface (Anthropic, Google, OpenAI, Azure):**
+
+```python
+from gaik.software_components.llm import get_llm_config, create_llm_client
+
+config = get_llm_config("google")            # or "anthropic", "openai", "azure"
+client = create_llm_client(config)           # ProviderClient with chat/chat_parsed/chat_stream/embed
+```
+
+`gaik[llm-anthropic]` and `gaik[llm-google]` extras pull in the provider SDKs on demand. Audio components (transcriber, TTS) and vision parsing only support OpenAI/Azure — they raise `NotImplementedError` for native Anthropic/Google. For multi-provider vision, use `MultimodalParser`. For Gemini-via-OpenAI-compat-endpoint, set `OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/` on a standard OpenAI config — every component then routes through the legacy path.
 
 ## Building Blocks
 
