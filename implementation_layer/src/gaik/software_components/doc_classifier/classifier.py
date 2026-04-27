@@ -11,7 +11,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from gaik.software_components.config import create_openai_client
+from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.factory import build_compat_client
 
 from ..parsers.docx_parser import DocxParser
 from ..parsers.pymypdf import PyMuPDFParser
@@ -84,7 +85,7 @@ class DocumentClassifier:
         """
         self.config = config
         self.model = model or config["model"]
-        self.client = create_openai_client(config)
+        self.client = build_compat_client(config)
 
     def classify(self, file_or_dir: str, classes: list[str], parser: str | None = None) -> dict:
         """
@@ -358,16 +359,21 @@ Provide your classification with:
         ]
 
         try:
-            # Call LLM with structured output
-            response = self.client.beta.chat.completions.parse(
-                model=self.model,
-                messages=messages,
-                response_format=ClassificationModel,
-                temperature=0,
-                timeout=30,
-            )
-
-            parsed = response.choices[0].message.parsed
+            if isinstance(self.client, ProviderClient):
+                parsed = self.client.chat_parsed(
+                    messages=messages,
+                    response_format=ClassificationModel,
+                    model=self.model,
+                )
+            else:
+                response = self.client.beta.chat.completions.parse(
+                    model=self.model,
+                    messages=messages,
+                    response_format=ClassificationModel,
+                    temperature=0,
+                    timeout=30,
+                )
+                parsed = response.choices[0].message.parsed
 
             return {
                 "class": parsed.document_class,

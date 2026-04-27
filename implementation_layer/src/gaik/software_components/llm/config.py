@@ -29,7 +29,7 @@ def _embedding_model_default(provider: str) -> str:
     if provider in (Provider.OPENAI.value, Provider.AZURE.value):
         return os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
     if provider in (Provider.GOOGLE.value, Provider.VERTEX.value):
-        return os.getenv("EMBEDDING_MODEL", "text-embedding-004")
+        return os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
     return os.getenv("EMBEDDING_MODEL", "")
 
 

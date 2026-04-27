@@ -11,9 +11,7 @@ import json
 
 from pydantic import BaseModel
 
-from gaik.software_components.config import create_openai_client
-from gaik.software_components.llm.factory import create_llm_client
-from gaik.software_components.llm.providers import Provider, resolve_provider
+from gaik.software_components.llm.factory import build_compat_client
 
 from .schema import (
     SYSTEM_PARSER,
@@ -21,23 +19,6 @@ from .schema import (
     _parse_with,
     normalize_extracted_data,
 )
-
-
-def _build_client(config: dict):
-    """Pick the correct client type based on provider in config.
-
-    Legacy OpenAI/Azure dicts (no ``provider`` key, or provider in
-    ``{openai, azure}``) keep using the original ``create_openai_client``
-    so deterministic settings (temperature/seed) and call shape are
-    preserved bit-for-bit. Other providers route through the multi-provider
-    factory.
-    """
-    if "provider" not in config and "use_azure" in config:
-        return create_openai_client(config)
-    name = resolve_provider(config=config)
-    if name in (Provider.OPENAI.value, Provider.AZURE.value):
-        return create_openai_client(config)
-    return create_llm_client(config)
 
 
 def save_to_json(results: list[dict], json_path: str) -> None:
@@ -102,7 +83,7 @@ class DataExtractor:
         """
         self.config = config
         self.model = model if model else self.config["model"]
-        self.client = _build_client(self.config)
+        self.client = build_compat_client(self.config)
 
     def extract(
         self,

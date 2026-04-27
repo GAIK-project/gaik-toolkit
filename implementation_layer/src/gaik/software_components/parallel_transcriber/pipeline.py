@@ -23,6 +23,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
+from gaik.software_components.llm.factory import assert_openai_or_azure
+
 from .config import TranscriptionConfig
 from .ffmpeg import (
     check_ffmpeg_available,
@@ -69,6 +71,7 @@ class ParallelTranscriber:
         api_config: dict,
         config: TranscriptionConfig | None = None,
     ) -> None:
+        assert_openai_or_azure(api_config, component="ParallelTranscriber")
         self._api_config = dict(api_config)
         self._config = config or TranscriptionConfig()
 

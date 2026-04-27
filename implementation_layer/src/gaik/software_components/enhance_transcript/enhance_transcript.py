@@ -7,7 +7,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from gaik.software_components.config import create_openai_client, get_openai_config
+from gaik.software_components.config import get_openai_config
+from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.factory import build_compat_client
 
 DEFAULT_MODEL_AZURE = "gpt-5.4"
 DEFAULT_MODEL_OPENAI = "gpt-5.4-2026-03-05"
@@ -170,7 +172,7 @@ class TranscriptEnhancer:
 
         self.api_config = config
         self.model = config["model"]
-        self.client = create_openai_client(config)
+        self.client = build_compat_client(config)
 
     def enhance_text(
         self,
@@ -229,18 +231,14 @@ class TranscriptEnhancer:
         return DEFAULT_MODEL_AZURE if config.get("use_azure", False) else DEFAULT_MODEL_OPENAI
 
     def _enhance_pass1(self, transcript_text: str) -> str:
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": PASS1_SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": f"Edit this Finnish transcript for spelling consistency:\n\n{transcript_text}",
-                },
-            ],
-            temperature=0.0,
-        )
-        return self._extract_response_text(response, transcript_text)
+        messages = [
+            {"role": "system", "content": PASS1_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": f"Edit this Finnish transcript for spelling consistency:\n\n{transcript_text}",
+            },
+        ]
+        return self._chat_text(messages, fallback=transcript_text)
 
     def _enhance_pass2(
         self,
@@ -258,18 +256,25 @@ class TranscriptEnhancer:
                 f"{additional_instructions.strip()}"
             )
 
+        messages = [
+            {"role": "system", "content": PASS2_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ]
+        return self._chat_text(messages, fallback=transcript_text)
+
+    def _chat_text(self, messages: list[dict], *, fallback: str) -> str:
+        if isinstance(self.client, ProviderClient):
+            result = self.client.chat(
+                messages=messages, model=self.model, temperature=0.0
+            )
+            text = (result.text or "").strip()
+            return text or fallback
         response = self.client.chat.completions.create(
             model=self.model,
-            messages=[
-                {"role": "system", "content": PASS2_SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": user_prompt,
-                },
-            ],
+            messages=messages,
             temperature=0.0,
         )
-        return self._extract_response_text(response, transcript_text)
+        return self._extract_response_text(response, fallback)
 
     @staticmethod
     def _extract_response_text(response, fallback_text: str) -> str:

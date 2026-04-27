@@ -17,6 +17,7 @@ from openai import AzureOpenAI
 from pydub import AudioSegment
 
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
+from gaik.software_components.llm.factory import assert_openai_or_azure
 
 from .whisper_local import transcribe as whisper_local_transcribe
 
@@ -94,6 +95,7 @@ class Transcriber:
         local_api_base: str | None = None,
         local_api_key: str | None = None,
     ) -> None:
+        assert_openai_or_azure(api_config, component="Transcriber")
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
         self.compress_audio = compress_audio  # backward compat; not used in simplified flow

@@ -6,6 +6,7 @@ Lazy-imports the provider-specific adapter so that an installation without the
 
 from __future__ import annotations
 
+from gaik.software_components.config import create_openai_client
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.providers import Provider, resolve_provider
 
@@ -41,3 +42,43 @@ def create_llm_client(config: dict) -> ProviderClient:
             ) from exc
         return GoogleProvider(config)
     raise ValueError(f"Unsupported provider: {name}")
+
+
+def assert_openai_or_azure(config: dict, *, component: str) -> None:
+    """Raise NotImplementedError if config picks a non-OpenAI/Azure provider.
+
+    Audio components (transcriber, parallel_transcriber, text_to_speech) only
+    support OpenAI and Azure: Anthropic has no audio API and Google's audio is
+    served through a different (Live) API. Gemini transcription/TTS through
+    Gemini's OpenAI-compatible endpoint still works because that produces a
+    config with ``provider`` unset (or ``openai``) plus an ``OPENAI_BASE_URL``.
+    """
+    provider = config.get("provider")
+    if provider and provider not in {Provider.OPENAI.value, Provider.AZURE.value}:
+        raise NotImplementedError(
+            f"{component} only supports OpenAI/Azure (got provider='{provider}'). "
+            f"Anthropic has no audio API; Google's audio is on the Live API "
+            f"(not yet wired). To use Gemini for transcription/TTS, set "
+            f"OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ "
+            f"on a standard OpenAI config instead."
+        )
+
+
+def build_compat_client(config: dict):
+    """Pick a client matching the config's provider, with legacy bit-for-bit fallback.
+
+    Components call this from their constructors so OpenAI/Azure users keep
+    using the original ``OpenAI``/``AzureOpenAI`` instance (preserving the exact
+    deterministic call paths and kwargs in older code), while non-OpenAI
+    providers go through the multi-provider ``ProviderClient`` adapter.
+
+    Returns the raw ``OpenAI``/``AzureOpenAI`` client for legacy configs
+    (no ``provider`` key, or provider in ``{openai, azure}``); returns a
+    ``ProviderClient`` for ``anthropic``/``google`` configs.
+    """
+    if "provider" not in config and "use_azure" in config:
+        return create_openai_client(config)
+    name = resolve_provider(config=config)
+    if name in (Provider.OPENAI.value, Provider.AZURE.value):
+        return create_openai_client(config)
+    return create_llm_client(config)

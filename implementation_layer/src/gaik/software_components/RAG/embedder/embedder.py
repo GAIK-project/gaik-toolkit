@@ -14,7 +14,9 @@ except ImportError as exc:
         "Embedder requires 'langchain-core'. Install extras with 'pip install gaik[embedder]'"
     ) from exc
 
-from gaik.software_components.config import create_openai_client, get_openai_config
+from gaik.software_components.config import get_openai_config
+from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.factory import build_compat_client
 
 
 def _chunked(items: list[str], batch_size: int) -> Iterable[list[str]]:
@@ -43,9 +45,9 @@ class Embedder:
         batch_size: int = 100,
     ) -> None:
         self.config = config
-        self.model = model or "text-embedding-3-large"
+        self.model = model or config.get("embedding_model") or "text-embedding-3-large"
         self.batch_size = batch_size
-        self.client = create_openai_client(config)
+        self.client = build_compat_client(config)
 
     def embed(
         self,
@@ -66,11 +68,17 @@ class Embedder:
         embeddings: list[list[float]] = []
 
         for batch in _chunked([doc.page_content for doc in docs], size):
-            resp = _with_retries(
-                lambda: self.client.embeddings.create(model=self.model, input=batch)
-            )
-            data = sorted(resp.data, key=lambda item: item.index)
-            embeddings.extend([item.embedding for item in data])
+            if isinstance(self.client, ProviderClient):
+                vectors = _with_retries(
+                    lambda batch=batch: self.client.embed(batch, model=self.model)
+                )
+                embeddings.extend(vectors)
+            else:
+                resp = _with_retries(
+                    lambda: self.client.embeddings.create(model=self.model, input=batch)
+                )
+                data = sorted(resp.data, key=lambda item: item.index)
+                embeddings.extend([item.embedding for item in data])
 
         return embeddings, docs
 

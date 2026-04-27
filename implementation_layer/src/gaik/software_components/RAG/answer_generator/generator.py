@@ -12,7 +12,9 @@ try:
 except ImportError:
     Document = None  # type: ignore[assignment]
 
-from gaik.software_components.config import create_openai_client, get_openai_config
+from gaik.software_components.config import get_openai_config
+from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.factory import build_compat_client
 
 DEFAULT_PROMPT = (
     "You are a helpful assistant that answers questions using only the provided context.\n"
@@ -64,7 +66,7 @@ class AnswerGenerator:
         self.stream = stream
         self.conversation_history = conversation_history
         self.last_n = last_n
-        self.client = create_openai_client(self.config)
+        self.client = build_compat_client(self.config)
         self._history: list[tuple[str, str]] = []
 
     def generate(
@@ -83,17 +85,25 @@ class AnswerGenerator:
         if use_stream:
             return self._stream_answer(messages, query)
 
-        response = _with_retries(
-            lambda: self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.0,
+        if isinstance(self.client, ProviderClient):
+            result = _with_retries(
+                lambda: self.client.chat(
+                    messages=messages, model=self.model, temperature=0.0
+                )
             )
-        )
-        if not response or not response.choices:
-            answer = ""
+            answer = result.text or ""
         else:
-            answer = response.choices[0].message.content or ""
+            response = _with_retries(
+                lambda: self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.0,
+                )
+            )
+            if not response or not response.choices:
+                answer = ""
+            else:
+                answer = response.choices[0].message.content or ""
         self._remember(query, answer)
         return answer
 
@@ -119,21 +129,30 @@ class AnswerGenerator:
     def _stream_answer(self, messages: list[dict], query: str) -> Iterable[str]:
         def iterator():
             collected = []
-            response = _with_retries(
-                lambda: self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=0.0,
-                    stream=True,
+            if isinstance(self.client, ProviderClient):
+                stream = self.client.chat_stream(
+                    messages=messages, model=self.model, temperature=0.0
                 )
-            )
-            for chunk in response:
-                if not chunk.choices:
-                    continue
-                delta = chunk.choices[0].delta.content
-                if delta:
-                    collected.append(delta)
-                    yield delta
+                for delta in stream:
+                    if delta:
+                        collected.append(delta)
+                        yield delta
+            else:
+                response = _with_retries(
+                    lambda: self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=0.0,
+                        stream=True,
+                    )
+                )
+                for chunk in response:
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta.content
+                    if delta:
+                        collected.append(delta)
+                        yield delta
             answer = "".join(collected)
             self._remember(query, answer)
 

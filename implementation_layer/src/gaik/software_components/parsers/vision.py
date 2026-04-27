@@ -235,6 +235,17 @@ class VisionParser:
         if not isinstance(config, Mapping):
             raise TypeError("openai_config must be an OpenAIConfig or a mapping.")
 
+        provider = config.get("provider")
+        if provider and provider not in {"openai", "azure"}:
+            raise NotImplementedError(
+                f"VisionParser only supports OpenAI/Azure providers (got '{provider}'). "
+                f"For native Anthropic/Google vision, use "
+                f"gaik.software_components.parsers.multimodal_parser.MultimodalParser, "
+                f"which handles per-provider image payload formats. To use Gemini "
+                f"through this parser, set OPENAI_BASE_URL to Gemini's OpenAI-compat "
+                f"endpoint and pass an OpenAIConfig with use_azure=False."
+            )
+
         return OpenAIConfig(
             model=config.get("model") or "gpt-4.1",
             use_azure=config.get("use_azure", True),
