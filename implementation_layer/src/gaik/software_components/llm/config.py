@@ -115,7 +115,7 @@ def _google_config() -> dict:
     return {
         "provider": Provider.GOOGLE.value,
         "api_key": api_key.strip(),
-        "model": os.getenv("GOOGLE_MODEL", "gemini-3-flash-preview"),
+        "model": os.getenv("GOOGLE_MODEL", "gemini-2.5-flash"),
         "embedding_model": _embedding_model_default(Provider.GOOGLE.value),
     }
 
@@ -131,6 +131,6 @@ def _vertex_config() -> dict:
             if scope.strip()
         ],
         "generate_content_url": _require("GOOGLE_GENERATE_CONTENT_URL"),
-        "model": os.getenv("GOOGLE_MODEL", "gemini-3-flash-preview"),
+        "model": os.getenv("GOOGLE_MODEL", "gemini-2.5-flash"),
         "embedding_model": _embedding_model_default(Provider.VERTEX.value),
     }
