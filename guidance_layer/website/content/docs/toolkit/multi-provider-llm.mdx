@@ -109,11 +109,17 @@ You usually do not call these directly — components call them through their ow
 | Document Classifier | ✅ | ✅ | ✅ | ✅ |
 | Transcript Enhancer | ✅ | ✅ | ✅ | ✅ |
 | Answer Generator (incl. streaming) | ✅ | ✅ | ✅ | ✅ |
-| Embedder | ✅ | ❌ → Voyage AI | ✅ (`gemini-embedding-001`) | ✅ |
-| Vision Parser | ✅ | → `MultimodalParser` | → `MultimodalParser` | ✅ |
-| Transcriber, Parallel Transcriber, TextToSpeech | ✅ | ❌ NotImplementedError | ❌ NotImplementedError | ✅ (separate audio client) |
+| Embedder | ✅ | ❌ | ✅ | ✅ |
+| Vision Parser | ✅ | ❌ | ❌ | ✅ |
+| Transcriber, Parallel Transcriber, TextToSpeech | ✅ | ❌ | ❌ | ✅ |
 
 **Gemini-via-OpenAI-compat** means setting `OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/` on a standard OpenAI config. Every component routes through the legacy path and the OpenAI SDK transparently calls Gemini. This is how the Cloud Run deployment at [gaik-demo.8wave.ai](https://gaik-demo.8wave.ai) currently runs Gemini for non-audio components.
+
+**Notes on the ❌ cells:**
+- *Embedder + Anthropic*: Anthropic does not expose a native embeddings API. The `embed()` call raises `NotImplementedError`; Anthropic recommends [Voyage AI](https://docs.voyageai.com/) for embeddings.
+- *Embedder + Google*: uses `gemini-embedding-001` (3072 dimensions).
+- *Vision Parser + Anthropic / Google*: `VisionParser` stays OpenAI-shaped. For native multi-provider vision use [`MultimodalParser`](/toolkit/software-components) — it handles OpenAI, Claude, and Gemini natively with per-provider image payloads.
+- *Audio components + Anthropic / Google*: raise `NotImplementedError`. Anthropic has no audio API; Google's audio is on the separate Live API. Route through Gemini-via-OpenAI-compat instead (a separate audio client targets `api.openai.com` so `/audio/speech` and Whisper still work).
 
 ---
 
