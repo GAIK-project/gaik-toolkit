@@ -166,6 +166,12 @@ llm-all = [
     "gaik[llm-google]",
 ]
 
+# LLM-as-judge validator (multi-provider second-opinion on extraction outputs)
+llm-judge = [
+    "gaik[llm-anthropic]",
+    "gaik[llm-google]",
+]
+
 # All features
 all = [
     "gaik[extract]",
@@ -185,6 +191,7 @@ all = [
     "gaik[rag-workflow]",
     "gaik[audio-to-structured-data]",
     "gaik[documents-to-structured-data]",
+    "gaik[llm-judge]",
 ]
 
 # Software components
