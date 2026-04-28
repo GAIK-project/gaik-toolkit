@@ -35,15 +35,9 @@ def openai_usage_to_dict(response: Any) -> dict[str, int]:
             "thinking_tokens": 0,
             "total_tokens": 0,
         }
-    input_tok = (
-        getattr(usage, "input_tokens", None)
-        or getattr(usage, "prompt_tokens", 0)
-        or 0
-    )
+    input_tok = getattr(usage, "input_tokens", None) or getattr(usage, "prompt_tokens", 0) or 0
     output_tok = (
-        getattr(usage, "output_tokens", None)
-        or getattr(usage, "completion_tokens", 0)
-        or 0
+        getattr(usage, "output_tokens", None) or getattr(usage, "completion_tokens", 0) or 0
     )
     total_tok = getattr(usage, "total_tokens", 0) or (input_tok + output_tok)
     details = getattr(usage, "output_tokens_details", None) or getattr(

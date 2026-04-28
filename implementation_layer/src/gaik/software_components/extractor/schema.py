@@ -25,6 +25,14 @@ from decimal import Decimal
 from typing import Annotated, Literal, get_args, get_origin
 
 from openai import APIError, APITimeoutError, RateLimitError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    constr,
+    create_model,
+    field_validator,
+)
 
 from gaik.observability import (
     UsageRecord,
@@ -36,24 +44,6 @@ from gaik.observability import (
 # Import shared configuration
 from gaik.software_components.config import create_openai_client, get_openai_config
 from gaik.software_components.llm.base import ProviderClient
-
-try:
-    # Pydantic v2 style config (preferred)
-    from pydantic import ConfigDict
-
-    _HAS_V2 = True
-except Exception:
-    _HAS_V2 = False
-
-
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    constr,
-    create_model,
-    field_validator,
-)
 
 # -----------------------------------------------------------------------------
 # Setup
@@ -1075,9 +1065,7 @@ class SchemaGenerator:
 
         return self.extraction_model
 
-    def generate_schema_with_usage(
-        self, user_requirements: str
-    ) -> SchemaGenerationResult:
+    def generate_schema_with_usage(self, user_requirements: str) -> SchemaGenerationResult:
         """
         Generate schema and report token usage + latency + cost.
 

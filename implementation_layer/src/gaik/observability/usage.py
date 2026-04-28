@@ -69,9 +69,7 @@ def build_usage_record(
     input_tokens = int(usage_dict.get("input_tokens", 0) or 0)
     output_tokens = int(usage_dict.get("output_tokens", 0) or 0)
     thinking_tokens = int(usage_dict.get("thinking_tokens", 0) or 0)
-    total_tokens = int(
-        usage_dict.get("total_tokens") or (input_tokens + output_tokens)
-    )
+    total_tokens = int(usage_dict.get("total_tokens") or (input_tokens + output_tokens))
     cost_usd = compute_cost_usd(provider, model, input_tokens, output_tokens)
     return UsageRecord(
         provider=provider,

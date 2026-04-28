@@ -45,9 +45,9 @@ class TranscriptionResult:
     segments: list[dict] | None = None
     srt_content: str | None = None
     vtt_content: str | None = None
-    duration_s: float | None = None        # transcriber wall-clock seconds
+    duration_s: float | None = None  # transcriber wall-clock seconds
     audio_duration_s: float | None = None  # input audio length in seconds
-    model_used: str | None = None          # resolved transcription model
+    model_used: str | None = None  # resolved transcription model
 
     def save(
         self,
@@ -159,9 +159,7 @@ class Transcriber:
         # we fall back to None rather than blocking transcription.
         audio_duration_s: float | None = None
         try:
-            audio_duration_s = round(
-                len(AudioSegment.from_file(str(input_path))) / 1000.0, 3
-            )
+            audio_duration_s = round(len(AudioSegment.from_file(str(input_path))) / 1000.0, 3)
         except Exception as exc:
             print(f"Could not read audio duration: {exc}")
 
@@ -365,7 +363,6 @@ class Transcriber:
             azure_endpoint=audio_endpoint.split("/openai/")[0],
             api_version=api_version,
         )
-
 
 
 def split_and_transcribe_with_context(
