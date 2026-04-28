@@ -16,6 +16,7 @@ import openai
 from openai import AzureOpenAI
 from pydub import AudioSegment
 
+from gaik.observability import measure_duration
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
 from gaik.software_components.llm.factory import assert_openai_or_azure
 
@@ -30,7 +31,13 @@ ALLOWED_TRANSCRIPTION_MODELS = {"whisper", "whisper-1", "gpt-4o-transcribe", "wh
 
 @dataclass
 class TranscriptionResult:
-    """Container for raw and corrected transcripts."""
+    """Container for raw and corrected transcripts.
+
+    The trailing ``duration_s`` / ``audio_duration_s`` / ``model_used``
+    fields are optional so existing call sites that build a
+    ``TranscriptionResult`` by hand do not have to change. The transcriber
+    populates them on every successful run.
+    """
 
     raw_transcript: str
     enhanced_transcript: str | None
@@ -38,6 +45,9 @@ class TranscriptionResult:
     segments: list[dict] | None = None
     srt_content: str | None = None
     vtt_content: str | None = None
+    duration_s: float | None = None        # transcriber wall-clock seconds
+    audio_duration_s: float | None = None  # input audio length in seconds
+    model_used: str | None = None          # resolved transcription model
 
     def save(
         self,
@@ -144,37 +154,50 @@ class Transcriber:
         effective_model = self._resolve_transcription_model()
         self._warn_ignored_local_options(effective_model)
 
+        # Best-effort input audio duration. PyDub can decode both audio and
+        # video containers; if it fails (corrupt file, unsupported codec)
+        # we fall back to None rather than blocking transcription.
+        audio_duration_s: float | None = None
+        try:
+            audio_duration_s = round(
+                len(AudioSegment.from_file(str(input_path))) / 1000.0, 3
+            )
+        except Exception as exc:
+            print(f"Could not read audio duration: {exc}")
+
         segments: list[dict] | None = None
         srt_content: str | None = None
         vtt_content: str | None = None
 
-        if effective_model == "whisper_local":
-            raw_transcript, segments = self._transcribe_input_local(input_path)
-            if segments:
-                from .srt_utils import segments_to_srt, segments_to_vtt
+        with measure_duration() as elapsed:
+            if effective_model == "whisper_local":
+                raw_transcript, segments = self._transcribe_input_local(input_path)
+                if segments:
+                    from .srt_utils import segments_to_srt, segments_to_vtt
 
-                srt_content = segments_to_srt(segments)
-                vtt_content = segments_to_vtt(segments)
-        else:
-            # Simplified: do not extract/compress audio. Use original file if <= 25MB,
-            # otherwise chunk via PyDub (which can decode both audio and video containers).
-            raw_transcript = self._transcribe_input_remote(
-                input_path=input_path,
-                prompt=prompt,
-                transcription_model=effective_model,
-            )
+                    srt_content = segments_to_srt(segments)
+                    vtt_content = segments_to_vtt(segments)
+            else:
+                # Simplified: do not extract/compress audio. Use original file if <= 25MB,
+                # otherwise chunk via PyDub (which can decode both audio and video containers).
+                raw_transcript = self._transcribe_input_remote(
+                    input_path=input_path,
+                    prompt=prompt,
+                    transcription_model=effective_model,
+                )
 
-        enhanced_text: str | None = None
-        if self.enhanced_transcript_enabled:
-            print("Fixing transcription errors with TranscriptEnhancer...")
-            enhancer = TranscriptEnhancer(api_config=self.api_config)
-            enhanced_result = enhancer.enhance_text(
-                raw_transcript,
-                additional_instructions=self.enhanced_transcript_instructions,
-            )
-            enhanced_text = enhanced_result.enhanced_text
-        else:
-            print("Transcript error fixing disabled; returning raw text only.")
+            enhanced_text: str | None = None
+            if self.enhanced_transcript_enabled:
+                print("Fixing transcription errors with TranscriptEnhancer...")
+                enhancer = TranscriptEnhancer(api_config=self.api_config)
+                enhanced_result = enhancer.enhance_text(
+                    raw_transcript,
+                    additional_instructions=self.enhanced_transcript_instructions,
+                )
+                enhanced_text = enhanced_result.enhanced_text
+            else:
+                print("Transcript error fixing disabled; returning raw text only.")
+        duration_s = round(elapsed(), 3)
 
         print("Transcription complete. Use TranscriptionResult.save(...) to persist output.")
 
@@ -185,6 +208,9 @@ class Transcriber:
             segments=segments,
             srt_content=srt_content,
             vtt_content=vtt_content,
+            duration_s=duration_s,
+            audio_duration_s=audio_duration_s,
+            model_used=effective_model,
         )
 
     # ------------------------------------------------------------------
