@@ -189,6 +189,51 @@ flowchart LR
 
 ---
 
+### Validator (LLM-as-Judge)
+
+The Validator runs a second-pass LLM over the output of an upstream extractor — feeding the source page images plus the extractor's JSON to a vision-capable model and asking it to flag fields whose value doesn't match the document. It returns per-field `ok` / `suspect` / `wrong` flags with reasons and suggested values, plus a token / cost / duration record per call. Useful when missing or hallucinated fields are expensive downstream and you want a cross-provider sanity check before acting on extraction output.
+
+<Mermaid chart={`
+flowchart LR
+    A("📄 Source Pages") --> B
+    C("📋 Extractor JSON") --> B
+    R("📜 Vendor Rubric (optional)") --> B
+
+    subgraph B["LLM-as-Judge Validator"]
+        direction TB
+        M["Vision LLM<br/>(OpenAI / Azure / Anthropic / Google)"]
+    end
+
+    B --> D("🚩 Per-Field Flags<br/>severity + reason + suggested_value")
+    B --> E("💰 Token / Cost / Duration")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style R fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style D fill:#fef3c7,stroke:#d97706,color:#78350f
+    style E fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- Same code talks to OpenAI / Azure OpenAI / Anthropic Foundry / Google Vertex via the toolkit's existing config helpers
+- Returns per-field flags (`ok`, `suspect`, `wrong`) plus a document-level slot for structural observations like "items missing from the extractor output"
+- Domain-agnostic by default; pass an optional `ValidationRubric` with vendor-specific check sentences when you want targeted guidance
+- Cost tracking with longest-prefix model lookup so rotated model ids still resolve to a known rate
+
+**Potential applications:**
+- Purchase-order extraction QA before sending the order downstream
+- Invoice / receipt extraction sanity check
+- Form-extraction review where missing or hallucinated fields are expensive
+- Two-tier setups: cheap pre-screen + premium judge on flagged rows
+
+**Recommended judge model:** `gemini-3-flash-preview` via Vertex AI — F1 = 1.000 at $0.004/PO in our [Luvata judge benchmark](https://github.com/GAIK-project/parse-bench-test/blob/main/results-luvata/judge-bench/BENCHMARK-REPORT.md) across 8 candidates including GPT-5.4 / 5.5, Claude Haiku 4.5 / Sonnet 4.6 / Opus 4.7, and Gemini 3.1 Flash Lite.
+
+- **Implementation code**: [software_components/validators/llm_judge](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/validators/llm_judge)
+- **Usage examples**: [examples/validators](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/validators)
+
+---
+
 ### RAG Components
 
 The RAG (Retrieval-Augmented Generation) components provide a modular pipeline for building document-grounded question answering systems. Rather than a single monolithic tool, the RAG pipeline is split into five composable blocks — each with a clear responsibility. You can use individual blocks where needed or assemble the full pipeline for a complete Q&A system grounded in your own documents.
