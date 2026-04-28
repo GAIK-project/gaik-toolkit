@@ -21,10 +21,11 @@ Advanced (for custom schemas):
 
 from gaik.software_components.config import create_openai_client, get_openai_config
 
-from .extractor import DataExtractor, save_to_json
+from .extractor import DataExtractor, ExtractionResult, save_to_json
 from .schema import (
     ExtractionRequirements,
     FieldSpec,
+    SchemaGenerationResult,
     SchemaGenerator,
     StructureAnalysis,
     create_extraction_model,
@@ -36,6 +37,8 @@ __all__ = [
     # Main API
     "SchemaGenerator",
     "DataExtractor",
+    "ExtractionResult",
+    "SchemaGenerationResult",
     # Configuration
     "get_openai_config",
     "create_openai_client",

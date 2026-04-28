@@ -19,11 +19,19 @@ from __future__ import annotations
 
 import re
 import time
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal, get_args, get_origin
 
 from openai import APIError, APITimeoutError, RateLimitError
+
+from gaik.observability import (
+    UsageRecord,
+    build_usage_record,
+    measure_duration,
+    openai_usage_to_dict,
+)
 
 # Import shared configuration
 from gaik.software_components.config import create_openai_client, get_openai_config
@@ -205,10 +213,19 @@ class StructureAnalysis(BaseModel):
 
 
 def detect_structure_type(
-    user_description: str, *, client=None, model: str = None
+    user_description: str,
+    *,
+    client=None,
+    model: str = None,
+    _usage_sink: list | None = None,
 ) -> StructureAnalysis:
     """
     Analyze if the extraction requires a nested list structure or flat structure.
+
+    When ``_usage_sink`` is a list, the OpenAI usage dict from the underlying
+    LLM call is appended to it. This is an internal hook used by
+    :class:`SchemaGenerator` to aggregate token counts across the schema
+    generation calls; external callers can ignore it.
     """
     if client is None:
         config = get_openai_config(use_azure=True)
@@ -259,13 +276,19 @@ def detect_structure_type(
         response_format=StructureAnalysis,
     )
     analysis = resp.choices[0].message.parsed
+    if _usage_sink is not None:
+        _usage_sink.append(openai_usage_to_dict(resp))
     if getattr(resp, "usage", None):
         print(f"[detect_structure_type] tokens={resp.usage.total_tokens}")
     return analysis
 
 
 def parse_nested_requirements(
-    user_description: str, *, client=None, model: str = None
+    user_description: str,
+    *,
+    client=None,
+    model: str = None,
+    _usage_sink: list | None = None,
 ) -> tuple[type[BaseModel], ExtractionRequirements, StructureAnalysis]:
     """
     Stage 2: Parse nested requirements by:
@@ -274,6 +297,10 @@ def parse_nested_requirements(
     3. Creating nested parent model
 
     Returns: (ParentModel, item_requirements, structure_analysis)
+
+    When ``_usage_sink`` is a list, OpenAI usage dicts from each underlying
+    LLM call are appended to it. Internal hook for :class:`SchemaGenerator`;
+    external callers can ignore it.
     """
     if client is None:
         config = get_openai_config(use_azure=True)
@@ -283,7 +310,9 @@ def parse_nested_requirements(
         raise ValueError("model must be provided when client is specified")
 
     print("Analyzing structure type...")
-    analysis = detect_structure_type(user_description, client=client, model=model)
+    analysis = detect_structure_type(
+        user_description, client=client, model=model, _usage_sink=_usage_sink
+    )
 
     print(f"Structure type: {analysis.structure_type}")
     print(f"  Reasoning: {analysis.reasoning}")
@@ -291,7 +320,9 @@ def parse_nested_requirements(
     if analysis.structure_type == "flat":
         # Just parse as flat requirements
         print("Using flat structure")
-        requirements = parse_user_requirements(user_description, client=client, model=model)
+        requirements = parse_user_requirements(
+            user_description, client=client, model=model, _usage_sink=_usage_sink
+        )
         extraction_model = create_extraction_model(requirements)
         return extraction_model, requirements, analysis
 
@@ -301,7 +332,10 @@ def parse_nested_requirements(
 
     print("\nParsing item-level fields...")
     item_requirements = parse_user_requirements(
-        analysis.item_description, client=client, model=model
+        analysis.item_description,
+        client=client,
+        model=model,
+        _usage_sink=_usage_sink,
     )
 
     print(f"Identified {len(item_requirements.fields)} fields per item")
@@ -443,11 +477,19 @@ PRIORITY ORDER: When uncertain, apply rules in this order:
 
 
 def parse_user_requirements(
-    user_description: str, *, client=None, model: str = None
+    user_description: str,
+    *,
+    client=None,
+    model: str = None,
+    _usage_sink: list | None = None,
 ) -> ExtractionRequirements:
     """
     Parse extraction requirements from natural language using LLM with type detection rules.
     Works with any input format - numbered lists, bullets, prose, tables, etc.
+
+    When ``_usage_sink`` is a list, the OpenAI usage dict from the underlying
+    LLM call is appended to it. Internal hook for :class:`SchemaGenerator`;
+    external callers can ignore it.
     """
     if client is None:
         config = get_openai_config(use_azure=True)
@@ -480,6 +522,8 @@ def parse_user_requirements(
     )
     req = resp.choices[0].message.parsed
     _apply_type_overrides(req)
+    if _usage_sink is not None:
+        _usage_sink.append(openai_usage_to_dict(resp))
     if getattr(resp, "usage", None):
         print(f"[parse_user_requirements] tokens={resp.usage.total_tokens}")
     return req
@@ -869,6 +913,31 @@ def _print_single_model(model: type[BaseModel]) -> None:
 # -----------------------------------------------------------------------------
 
 
+@dataclass
+class SchemaGenerationResult:
+    """Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`.
+
+    Attributes:
+        schema: The generated Pydantic model class (same object that
+            :meth:`SchemaGenerator.generate_schema` returns).
+        requirements: Parsed item-level field specifications.
+        structure_analysis: Whether the schema is flat or nested, plus
+            the structure-detection reasoning.
+        usage: Aggregated token usage across the underlying LLM calls
+            (typically 2 — structure detection + requirement parsing).
+            ``None`` when none of the responses carried a usage payload.
+        duration_s: Wall-clock seconds the schema generation took.
+        model: Resolved model identifier the calls used.
+    """
+
+    schema: type[BaseModel]
+    requirements: ExtractionRequirements
+    structure_analysis: StructureAnalysis
+    usage: UsageRecord | None
+    duration_s: float
+    model: str
+
+
 class SchemaGenerator:
     """
     Generates Pydantic schemas from natural language requirements.
@@ -898,6 +967,9 @@ class SchemaGenerator:
         print(generator.extraction_model)
         print(generator.item_requirements)
         print(generator.get_schema_info())
+
+        # Or call generate_schema_with_usage() to also receive token /
+        # latency / cost in the return value.
     """
 
     def __init__(self, config: dict, model: str | None = None):
@@ -914,6 +986,11 @@ class SchemaGenerator:
         self.extraction_model = None
         self.item_requirements = None
         self.structure_analysis = None
+        # Side-channel attributes populated by both generate_schema()
+        # and generate_schema_with_usage(). Useful for callers who do
+        # not want to switch methods just to read usage.
+        self.last_usage: UsageRecord | None = None
+        self.last_duration_s: float = 0.0
 
     def analyze_structure(self, user_requirements: str) -> StructureAnalysis:
         """
@@ -930,6 +1007,48 @@ class SchemaGenerator:
         )
         return self.structure_analysis
 
+    def _generate_schema_inner(
+        self, user_requirements: str
+    ) -> tuple[type[BaseModel], UsageRecord | None, float]:
+        """Run schema generation and capture aggregated usage + latency.
+
+        Returns ``(model, usage, duration_s)``. Internal helper shared by
+        :meth:`generate_schema` and :meth:`generate_schema_with_usage`.
+        """
+        usage_sink: list[dict[str, int]] = []
+        with measure_duration() as elapsed:
+            (
+                self.extraction_model,
+                self.item_requirements,
+                self.structure_analysis,
+            ) = parse_nested_requirements(
+                user_requirements,
+                client=self.client,
+                model=self.model,
+                _usage_sink=usage_sink,
+            )
+        duration_s = round(elapsed(), 3)
+
+        # Aggregate usage dicts across the (typically 2) LLM calls.
+        if usage_sink:
+            totals = {
+                "input_tokens": sum(u.get("input_tokens", 0) for u in usage_sink),
+                "output_tokens": sum(u.get("output_tokens", 0) for u in usage_sink),
+                "thinking_tokens": sum(u.get("thinking_tokens", 0) for u in usage_sink),
+                "total_tokens": sum(u.get("total_tokens", 0) for u in usage_sink),
+            }
+            usage = (
+                build_usage_record("openai", self.model, totals, duration_s)
+                if totals["total_tokens"] > 0
+                else None
+            )
+        else:
+            usage = None
+
+        self.last_usage = usage
+        self.last_duration_s = duration_s
+        return self.extraction_model, usage, duration_s
+
     def generate_schema(self, user_requirements: str) -> type[BaseModel]:
         """
         Generate Pydantic schema from natural language requirements.
@@ -938,12 +1057,15 @@ class SchemaGenerator:
             user_requirements: Natural language description of fields to extract
 
         Returns:
-            Generated Pydantic model class (nested or flat)
+            Generated Pydantic model class (nested or flat).
+
+        After the call, ``generator.last_usage`` and
+        ``generator.last_duration_s`` expose token usage and wall-clock
+        latency without having to switch to
+        :meth:`generate_schema_with_usage`.
         """
         print("Generating schema from requirements...")
-        self.extraction_model, self.item_requirements, self.structure_analysis = (
-            parse_nested_requirements(user_requirements, client=self.client, model=self.model)
-        )
+        self._generate_schema_inner(user_requirements)
 
         # Print the generated Pydantic model
         print("\n" + "=" * 80)
@@ -952,6 +1074,33 @@ class SchemaGenerator:
         print_pydantic_schema(self.extraction_model, title="Extraction Schema")
 
         return self.extraction_model
+
+    def generate_schema_with_usage(
+        self, user_requirements: str
+    ) -> SchemaGenerationResult:
+        """
+        Generate schema and report token usage + latency + cost.
+
+        Same input as :meth:`generate_schema`; returns a
+        :class:`SchemaGenerationResult` aggregating usage across the
+        underlying LLM calls (structure detection + requirement parsing).
+        """
+        print("Generating schema from requirements...")
+        schema, usage, duration_s = self._generate_schema_inner(user_requirements)
+
+        print("\n" + "=" * 80)
+        print("GENERATED PYDANTIC MODEL")
+        print("=" * 80)
+        print_pydantic_schema(schema, title="Extraction Schema")
+
+        return SchemaGenerationResult(
+            schema=schema,
+            requirements=self.item_requirements,
+            structure_analysis=self.structure_analysis,
+            usage=usage,
+            duration_s=duration_s,
+            model=self.model,
+        )
 
     def get_schema_info(self) -> dict:
         """
