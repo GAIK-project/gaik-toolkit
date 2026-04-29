@@ -138,7 +138,6 @@ class FormUnderstander:
                 response_format=LabelMapping,
                 temperature=0,
                 top_p=1.0,
-                seed=12345,
                 timeout=30,
             )
 

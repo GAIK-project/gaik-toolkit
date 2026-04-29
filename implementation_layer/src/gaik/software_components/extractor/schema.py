@@ -122,7 +122,6 @@ def _parse_with(*, client, model: str, messages: list[dict], response_format: ty
             response_format=response_format,
             temperature=0,
             top_p=1.0,
-            seed=12345,
             timeout=30,
         )
     )
