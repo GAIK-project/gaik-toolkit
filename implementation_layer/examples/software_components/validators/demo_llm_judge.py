@@ -68,6 +68,7 @@ def basic_example() -> None:
     ]
     rubric = ValidationRubric(
         vendor_id="copper-brass",
+        scoring_mode="likert_1_5",
         field_checks=[
             "Quantity is integer pounds before the decimal — '4,279.940 LB' = 4279, not 940.",
             "Watch for the literal '1 LB' under PER column; it is not the ordered quantity.",
@@ -83,8 +84,9 @@ def basic_example() -> None:
     print(f"Flags ({len(result.flags)}):")
     for flag in result.flags:
         suggestion = f" -> {flag.suggested_value!r}" if flag.suggested_value else ""
+        score = f" ({flag.score}/5)" if flag.score else ""
         print(
-            f"  [{flag.severity:7s}] item {flag.item_index} field={flag.field}"
+            f"  [{flag.severity:7s}{score}] item {flag.item_index} field={flag.field}"
             f"{suggestion}: {flag.reason}"
         )
 

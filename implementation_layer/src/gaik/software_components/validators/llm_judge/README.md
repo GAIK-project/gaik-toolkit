@@ -1,12 +1,31 @@
-# LLM-as-Judge Validator
+# LLM-as-Judge Validator (v2)
 
 Multi-provider LLM-as-judge validator for structured-extraction outputs. Feeds
-page images plus the extractor's JSON to a vision-capable LLM and gets back
-per-field `wrong` / `suspect` / `ok` flags with reasons and suggested values.
+page images plus the extractor's JSON to a vision-capable LLM and returns
+per-field flags with severity, reason, suggested values — and (optionally) an
+integer Likert 1-5 score.
 
 Useful when an upstream extractor (e.g. `MultimodalParser` + a structured-output
 LLM) produced JSON and you want a *second* model to read the source and tell
 you which fields look broken before you act on them downstream.
+
+## What's new in v2 (2026 research-backed)
+
+- **Integer Likert 1-5 scoring** alongside severity. HuggingFace cookbook
+  reports ~30 % better human-correlation than continuous scales.
+- **Few-shot calibration** via `ValidationRubric.few_shot_examples` (1-2 is
+  the sweet spot — more give diminishing returns).
+- **Per-aspect evaluation focus** via `ValidationRubric.evaluation_aspects`
+  (each is one atomic criterion the judge should consider separately).
+- **Bias-mitigation guidance** in the system prompt: anti-verbosity,
+  anti-formatting-bias, evaluation-before-judgement order.
+- **Panel/jury aggregation** via `LLMJudgePanel` (3+ judges, majority vote,
+  agreement metric — mitigates single-model self-preference bias).
+- **Calibration utility** `calibrate_against_human_labels` returning Pearson
+  r vs. human raters and severity-agreement rate.
+- **Pairwise A/B** via `compare_pairwise(swap_and_average=True)` — runs the
+  comparison twice with A/B swapped and only reports a winner when both
+  passes agree (mitigates ~40 % position-bias decision flips).
 
 ## Installation
 
@@ -36,6 +55,10 @@ result = judge.validate(
     ],
     rubric=ValidationRubric(
         vendor_id="copper-brass",
+        scoring_mode="likert_1_5",                              # NEW
+        evaluation_aspects=[                                    # NEW
+            "Quantity is the ordered amount, not unit price",
+        ],
         field_checks=[
             "Quantity is integer pounds before decimal — '4,279.940 LB' = 4279.",
         ],
@@ -43,13 +66,19 @@ result = judge.validate(
 )
 
 for flag in result.flags:
-    print(flag.field, flag.severity, flag.reason, flag.suggested_value)
+    print(flag.field, flag.severity, f"{flag.score}/5", flag.reason, flag.suggested_value)
 
 print(f"Cost: ${result.usage.cost_usd:.4f}, duration: {result.usage.duration_s:.1f}s")
 ```
 
-See the [example](../../../../examples/software_components/validators/demo_llm_judge.py)
-for a complete working script that renders a PDF to PNG bytes via PyMuPDF.
+See the [examples folder](../../../../examples/software_components/validators/)
+for working scripts:
+
+- `demo_llm_judge.py` — single-judge basic usage with Likert scoring.
+- `demo_likert_scoring.py` — few-shot calibration on top of Likert mode.
+- `demo_panel_jury.py` — three-judge majority vote with `LLMJudgePanel`.
+- `demo_pairwise.py` — A/B comparison with `compare_pairwise(swap_and_average=True)`.
+- `demo_calibration.py` — Pearson-r calibration vs. a human-labeled dataset.
 
 ## Picking a model
 
@@ -64,6 +93,20 @@ We benchmarked seven judge models on five hand-curated Luvata test cases
 
 Recommendation: **Gemini 3 Flash via Vertex** as the default. For two-tier
 setups, Gemini 3.1 Flash Lite is the cheapest screener.
+
+## Scoring modes
+
+| `scoring_mode` | Output | When to use |
+|---|---|---|
+| `"severity"` (default) | severity only — `flag.score = 0` | Simple yes/no/maybe gates; existing v1 callers. |
+| `"likert_1_5"` | severity + integer 1-5 score | Calibration, regression-tracking, anywhere you want a stable numeric metric. |
+| `"additive"` | severity + 1 point per `evaluation_aspect` | When the rubric is a checklist of independent criteria. |
+
+The severity-to-score mapping the prompt enforces:
+
+- score 1 → "wrong"
+- score 2-3 → "suspect"
+- score 4-5 → "ok"
 
 ## API
 
@@ -85,6 +128,27 @@ class LLMJudge:
         extracted: list[dict] | dict,
         rubric: ValidationRubric | None = None,
     ) -> ValidationResult: ...
+
+
+class LLMJudgePanel:
+    def __init__(self, judges: list[LLMJudge]): ...  # 2+ judges required
+    def validate(self, source_pages, extracted, rubric=None) -> JudgePanelResult: ...
+
+
+def compare_pairwise(
+    judge: LLMJudge,
+    source_pages: list[bytes],
+    extracted_a, extracted_b,
+    swap_and_average: bool = True,
+) -> PairwiseResult: ...
+
+
+def calibrate_against_human_labels(
+    judge: LLMJudge,
+    dataset: list[CalibrationItem],
+    rubric: ValidationRubric | None = None,
+    field_filter: str | None = None,
+) -> CalibrationReport: ...
 ```
 
 The judge reuses provider configuration helpers from
@@ -99,6 +163,14 @@ env-vars work for both:
 | `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE` | Anthropic on Azure AI Foundry (auto-detected) |
 | `GOOGLE_VERTEXAI_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS` | Vertex AI (preferred) |
 | `GOOGLE_GEMINI_API_KEY` | Generative Language API (alternative) |
+
+## Research references
+
+- [HuggingFace LLM Judge Cookbook](https://huggingface.co/learn/cookbook/llm_judge) — Likert vs. float, few-shot, evaluation order.
+- [A Survey on LLM-as-a-Judge (arXiv 2411.15594)](https://arxiv.org/abs/2411.15594) — bias taxonomy, panel/jury patterns.
+- [Justice or Prejudice? Quantifying Biases in LLM-as-a-Judge (OpenReview)](https://openreview.net/forum?id=3GTtZFiajM) — position-bias measurement.
+- [Self-Preference Bias in LLM Judges (arXiv 2604.22891)](https://arxiv.org/html/2604.22891) — why cross-model judging matters.
+- [Evaluating and Mitigating LLM-as-a-judge Bias in Communication Systems (arXiv 2510.12462)](https://arxiv.org/abs/2510.12462) — 11 bias types, mitigation strategies.
 
 ## License
 

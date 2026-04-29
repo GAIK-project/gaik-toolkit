@@ -145,7 +145,10 @@ Core classes in `gaik.software_components.*`. For detailed API and constructor p
 | ParallelTranscriber | `from gaik.software_components.parallel_transcriber import ParallelTranscriber` | `transcribe(path)` → TranscriptionResult |
 | TextToSpeech | `from gaik.software_components.text_to_speech import TextToSpeech` | `synthesize(text)` → SpeechSynthesisResult |
 | DocumentClassifier | `from gaik.software_components.doc_classifier import DocumentClassifier` | `classify(file_or_dir, classes)` |
-| LLMJudge | `from gaik.software_components.validators import LLMJudge` | `validate(source_pages, extracted, rubric)` → ValidationResult (multi-provider extraction-output validator) |
+| LLMJudge | `from gaik.software_components.validators import LLMJudge` | `validate(source_pages, extracted, rubric)` → ValidationResult (multi-provider; Likert 1-5 via `rubric.scoring_mode="likert_1_5"`) |
+| LLMJudgePanel | `from gaik.software_components.validators import LLMJudgePanel` | `validate(source_pages, extracted, rubric)` → JudgePanelResult (3+ judges, majority vote, agreement metric) |
+| compare_pairwise | `from gaik.software_components.validators import compare_pairwise` | `compare_pairwise(judge, pages, a, b, swap_and_average=True)` → PairwiseResult (A/B with position-bias mitigation) |
+| calibrate_against_human_labels | `from gaik.software_components.validators import calibrate_against_human_labels` | `calibrate_against_human_labels(judge, dataset)` → CalibrationReport (Pearson r vs. human raters) |
 
 ### Transcriber notes
 

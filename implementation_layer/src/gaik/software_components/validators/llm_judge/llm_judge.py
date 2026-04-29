@@ -10,7 +10,7 @@ import time
 from typing import Any, Literal
 
 from .pricing import compute_judge_cost_usd
-from .prompts import JUDGE_SYSTEM_PROMPT, build_user_prompt
+from .prompts import build_system_prompt, build_user_prompt
 from .schema import (
     JudgeUsage,
     Severity,
@@ -42,6 +42,14 @@ class LLMJudge:
     The judge is provider-agnostic but reuses the configuration helpers from
     :mod:`gaik.software_components.parsers.multimodal_parser.config` so consumers
     only need to set up provider env-vars once.
+
+    Scoring modes are controlled per-call via ``rubric.scoring_mode``:
+
+    - ``"severity"`` (default): three-class flagging only (ok/suspect/wrong),
+      no integer Likert score. Backward-compatible with v1.
+    - ``"likert_1_5"``: integer Likert 1-5 + severity. ~30 % better
+      human-correlation than continuous scales (HuggingFace cookbook).
+    - ``"additive"``: 1 point per ``rubric.evaluation_aspect`` satisfied.
 
     Args:
         model_provider: ``"openai"`` | ``"azure"`` | ``"anthropic"`` | ``"google"``.
@@ -95,7 +103,8 @@ class LLMJudge:
             extracted: The extractor's structured output. Free-form JSON;
                 the toolkit does not enforce a schema. Lists of items work
                 naturally with ``item_index`` flags.
-            rubric: Optional vendor-specific check sentences.
+            rubric: Optional rubric. ``rubric.scoring_mode`` selects between
+                severity-only, integer Likert, and additive scoring.
 
         Returns:
             :class:`ValidationResult` with flags, raw text, and usage.
@@ -103,7 +112,10 @@ class LLMJudge:
         if not source_pages:
             raise ValueError("source_pages must contain at least one page image")
 
+        rubric = rubric or ValidationRubric()
+        system_prompt = build_system_prompt(rubric.scoring_mode)
         user_prompt = build_user_prompt(extracted, rubric)
+
         provider_call = {
             "openai": self._call_openai,
             "azure": self._call_openai,
@@ -112,7 +124,9 @@ class LLMJudge:
         }[self.model_provider]
 
         t0 = time.perf_counter()
-        raw_text, input_tokens, output_tokens = provider_call(source_pages, user_prompt)
+        raw_text, input_tokens, output_tokens = provider_call(
+            source_pages, user_prompt, system_prompt
+        )
         duration_s = time.perf_counter() - t0
 
         flags = parse_judge_flags(raw_text)
@@ -130,7 +144,10 @@ class LLMJudge:
     # ── Provider callers ──────────────────────────────────────────
 
     def _call_openai(
-        self, source_pages: list[bytes], user_prompt: str
+        self,
+        source_pages: list[bytes],
+        user_prompt: str,
+        system_prompt: str,
     ) -> tuple[str, int, int]:
         # Use the multimodal_parser config helpers — single source of truth
         # for env-var parsing across the toolkit.
@@ -152,7 +169,7 @@ class LLMJudge:
             for p in source_pages
         ]
         messages = [
-            {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {
                 "role": "user",
                 "content": [{"type": "text", "text": user_prompt}, *image_parts],
@@ -177,7 +194,10 @@ class LLMJudge:
         )
 
     def _call_anthropic(
-        self, source_pages: list[bytes], user_prompt: str
+        self,
+        source_pages: list[bytes],
+        user_prompt: str,
+        system_prompt: str,
     ) -> tuple[str, int, int]:
         # Reuse the toolkit's existing claude client (Foundry on Azure or direct API).
         from gaik.software_components.parsers.multimodal_parser.config import (
@@ -201,7 +221,7 @@ class LLMJudge:
         resp = client.messages.create(
             model=self.model,
             max_tokens=self.max_tokens,
-            system=JUDGE_SYSTEM_PROMPT,
+            system=system_prompt,
             messages=[
                 {
                     "role": "user",
@@ -218,7 +238,10 @@ class LLMJudge:
         return text, resp.usage.input_tokens, resp.usage.output_tokens
 
     def _call_google(
-        self, source_pages: list[bytes], user_prompt: str
+        self,
+        source_pages: list[bytes],
+        user_prompt: str,
+        system_prompt: str,
     ) -> tuple[str, int, int]:
         from google import genai
         from google.genai import types
@@ -249,7 +272,7 @@ class LLMJudge:
             model=self.model,
             contents=parts,
             config=types.GenerateContentConfig(
-                system_instruction=JUDGE_SYSTEM_PROMPT,
+                system_instruction=system_prompt,
                 response_mime_type="application/json",
                 max_output_tokens=self.max_tokens,
             ),
@@ -268,6 +291,9 @@ def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
 
     Tolerant of stray markdown fences. Returns an empty list when the response
     is unparseable so the caller can decide whether to retry.
+
+    Reads both the ``score`` (Likert 1-5) and ``severity`` fields. ``score``
+    defaults to 0 when the judge omits it (severity-mode behaviour).
     """
     text = raw_text.strip()
     if text.startswith("```"):
@@ -300,7 +326,7 @@ def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
                     item_index=int(entry.get("item_index", -1)),
                     field=str(entry.get("field", "")),
                     severity=severity,
-                    confidence=float(entry.get("confidence", 0.0)),
+                    score=_clamp_score(entry.get("score", 0)),
                     reason=str(entry.get("reason", "")),
                     suggested_value=(
                         str(entry["suggested_value"])
@@ -312,3 +338,16 @@ def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
         except (TypeError, ValueError):
             continue
     return parsed
+
+
+def _clamp_score(raw: Any) -> int:
+    """Coerce a raw score to a 0..5 integer (0 = unspecified)."""
+    try:
+        score = int(round(float(raw)))
+    except (TypeError, ValueError):
+        return 0
+    if score < 0:
+        return 0
+    if score > 5:
+        return 5
+    return score

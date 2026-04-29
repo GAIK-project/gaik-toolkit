@@ -4,6 +4,7 @@
     "index",
     "transcription-eval",
     "extraction-eval",
+    "llm-judge",
     "rag-eval",
     "report-writing-eval",
     "translation-eval"
