@@ -42,7 +42,7 @@ import {
 import { motion } from "motion/react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -638,7 +638,7 @@ function NoCodeAssetsSection() {
   );
 }
 
-export function DemoCards({ isUnlocked }: DemoCardsProps) {
+function DemoCardsContent({ isUnlocked }: DemoCardsProps) {
   return (
     <motion.section
       id="demos"
@@ -743,4 +743,85 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
       <NoCodeAssetsSection />
     </motion.section>
   );
+}
+
+export function DemoCards({ isUnlocked }: DemoCardsProps) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    // Server render and first client render: show content immediately visible.
+    // DemoCardsContent uses motion with initial="hidden" (opacity:0), which causes
+    // a blank page on hard reload with React 19 + Framer Motion v12 (SSR mismatch).
+    return (
+      <section id="demos" className="space-y-8">
+        {!isUnlocked && (
+          <div className="bg-muted/50 border-primary/20 flex items-center gap-3 rounded-lg border p-4">
+            <Lock className="text-primary h-5 w-5 shrink-0" />
+            <p className="text-muted-foreground text-sm">
+              <Link href="/sign-in" className="text-primary hover:underline">
+                Sign in
+              </Link>{" "}
+              to access the interactive demos. Don&apos;t have an account?{" "}
+              <Link href="/sign-up" className="text-primary hover:underline">
+                Sign up
+              </Link>
+              .
+            </p>
+          </div>
+        )}
+        <div className="space-y-4">
+          <h2 className="font-serif text-2xl font-semibold md:text-3xl">Use Cases</h2>
+          <div className="grid gap-6 md:grid-cols-2">
+            {useCaseDemos.map((demo) => (
+              <div key={demo.href} className={demo.size === "wide" ? "md:col-span-2" : ""}>
+                <FeaturedCard demo={demo} isUnlocked={isUnlocked} />
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {newUseCases.map((demo) => (
+              <div key={demo.href}>
+                <BuildingBlockCard demo={demo} isUnlocked={isUnlocked} />
+              </div>
+            ))}
+          </div>
+          <ComingSoonSection title="More Use Cases Coming" items={comingSoonUseCases} />
+        </div>
+        <div className="space-y-4">
+          <h2 className="font-serif text-2xl font-semibold md:text-3xl">Software Modules</h2>
+          <div className="grid gap-6 md:grid-cols-2">
+            {moduleDemos.map((demo) => (
+              <div
+                key={demo.href}
+                className={
+                  moduleDemos.length === 1 ? "md:col-span-2" : demo.size === "wide" ? "md:col-span-2" : ""
+                }
+              >
+                <FeaturedCard demo={demo} isUnlocked={isUnlocked} />
+              </div>
+            ))}
+          </div>
+          {comingSoonModules.length > 0 && (
+            <ComingSoonSection title="More Modules Coming" items={comingSoonModules} />
+          )}
+        </div>
+        <div className="space-y-4">
+          <h2 className="font-serif text-2xl font-semibold md:text-3xl">Software Components</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {buildingBlocks.map((demo) => (
+              <div key={demo.title}>
+                <BuildingBlockCard demo={demo} isUnlocked={isUnlocked} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <NoCodeAssetsSection />
+      </section>
+    );
+  }
+
+  return <DemoCardsContent isUnlocked={isUnlocked} />;
 }

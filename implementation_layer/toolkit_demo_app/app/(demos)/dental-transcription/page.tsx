@@ -45,11 +45,11 @@ import {
   Subtitles,
   Video,
 } from "lucide-react";
-import { motion } from "motion/react";
 import Link from "next/link";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { PageTransition } from "@/components/demo/page-transition";
 
 interface TranscriptionResult {
   job_id: string;
@@ -281,11 +281,7 @@ export default function DentalTranscriptionPage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
+    <PageTransition>
       <DemoPageHeader
         icon={Mic}
         iconClassName="text-primary h-8 w-8"
@@ -613,6 +609,6 @@ export default function DentalTranscriptionPage() {
 
         <FeedbackButton demoType="dental-transcription" />
       </div>
-    </motion.div>
-  );
+  </PageTransition>
+);
 }

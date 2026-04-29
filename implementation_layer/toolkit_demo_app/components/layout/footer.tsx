@@ -1,3 +1,5 @@
+"use client";
+
 import { BookOpen, Shield, UserPlus } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -11,8 +13,9 @@ import {
 } from "@/components/kibo-ui/glimpse";
 import { GitHubIcon } from "@/components/github-icon";
 import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
+import { useEffect, useState } from "react";
 
-const DOCS_URL = "https://gaik-toolkit.2.rahtiapp.fi/";
+const DOCS_URL = "https://gaik-toolkit.2.rahtiapp.fi/" as const;
 
 export interface FooterProps {
   githubPreview?: LinkPreview | null;
@@ -20,6 +23,13 @@ export interface FooterProps {
 
 export function Footer({ githubPreview }: FooterProps) {
   const currentYear = new Date().getFullYear();
+
+  // Suppress hydration mismatch: GlimpseTrigger (Radix HoverCard asChild) renders
+  // differently on the server vs. client. Only activate the hover card after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const githubLink = (
     <a
@@ -70,7 +80,7 @@ export function Footer({ githubPreview }: FooterProps) {
           </div>
 
           <nav className="text-muted-foreground flex items-center gap-4 text-sm">
-            {githubPreview ? (
+            {mounted && githubPreview ? (
               <Glimpse>
                 <GlimpseTrigger asChild>{githubLink}</GlimpseTrigger>
                 <GlimpseContent className="w-80">

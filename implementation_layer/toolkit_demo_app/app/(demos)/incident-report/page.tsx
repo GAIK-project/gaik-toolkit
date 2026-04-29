@@ -47,6 +47,7 @@ import { AnimatePresence, motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { PageTransition } from "@/components/demo/page-transition";
 
 const DEFAULT_INCIDENT_SCHEMA = `Extract the following from the incident report:
 - Incident date and time
@@ -259,11 +260,7 @@ export default function IncidentReportPage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
+    <PageTransition>
       <DemoPageHeader
         icon={AlertTriangle}
         iconClassName="h-8 w-8 text-amber-500"
@@ -731,6 +728,6 @@ export default function IncidentReportPage() {
           )}
         </div>
       </div>
-    </motion.div>
-  );
+  </PageTransition>
+);
 }

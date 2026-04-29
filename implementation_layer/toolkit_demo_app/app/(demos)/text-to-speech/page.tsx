@@ -33,10 +33,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Download, RotateCcw, Volume2 } from "lucide-react";
-import { motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { PageTransition } from "@/components/demo/page-transition";
 
 const MAX_CHARACTERS = 1000;
 const VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"] as const;
@@ -160,11 +160,7 @@ export default function TextToSpeechPage() {
   const characterCount = text.length;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
+    <PageTransition>
       <DemoPageHeader
         icon={Volume2}
         title="Text-to-Speech"
@@ -392,6 +388,6 @@ export default function TextToSpeechPage() {
           )}
         </div>
       </div>
-    </motion.div>
-  );
+  </PageTransition>
+);
 }

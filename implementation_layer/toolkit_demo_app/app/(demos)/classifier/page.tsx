@@ -37,10 +37,10 @@ import {
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import { Sparkles, Tags } from "lucide-react";
-import { motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { PageTransition } from "@/components/demo/page-transition";
 
 interface ClassifyResult {
   filename: string;
@@ -153,11 +153,7 @@ export default function ClassifierPage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
+    <PageTransition>
       <DemoPageHeader
         icon={Tags}
         title="Classifier"
@@ -351,6 +347,6 @@ export default function ClassifierPage() {
           )}
         </div>
       </div>
-    </motion.div>
-  );
+  </PageTransition>
+);
 }

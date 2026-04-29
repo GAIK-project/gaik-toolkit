@@ -39,10 +39,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Download, Mic, Sparkles } from "lucide-react";
-import { motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { PageTransition } from "@/components/demo/page-transition";
 
 interface TranscriptSegment {
   start: number | null;
@@ -346,11 +346,7 @@ export default function TranscriberPage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
+    <PageTransition>
       <DemoPageHeader
         icon={Mic}
         title="Transcriber"
@@ -771,6 +767,6 @@ export default function TranscriberPage() {
           )}
         </div>
       </div>
-    </motion.div>
-  );
+  </PageTransition>
+);
 }

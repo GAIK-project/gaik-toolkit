@@ -2,6 +2,7 @@
 
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
+import { PageTransition } from "@/components/demo/page-transition";
 import {
   DocumentList,
   type IndexedDocument,
@@ -761,12 +762,7 @@ export default function RAGPage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="flex h-[calc(100vh-6rem)] flex-col sm:h-[calc(100vh-8rem)]"
-    >
+    <PageTransition className="flex h-[calc(100vh-6rem)] flex-col sm:h-[calc(100vh-8rem)]">
       {/* Header */}
       <header className="mb-2">
         <Button
@@ -1123,6 +1119,6 @@ export default function RAGPage() {
           />
         </PromptInputFooter>
       </PromptInput>
-    </motion.div>
+    </PageTransition>
   );
 }

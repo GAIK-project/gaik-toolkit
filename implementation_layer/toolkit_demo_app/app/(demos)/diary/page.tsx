@@ -48,6 +48,7 @@ import { AnimatePresence, motion } from "motion/react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { PageTransition } from "@/components/demo/page-transition";
 
 const EXAMPLE_ENGLISH = `Construction Site Diary
 
@@ -379,11 +380,7 @@ export default function DiaryPage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
+    <PageTransition>
       <DemoPageHeader
         icon={HardHat}
         iconClassName="h-8 w-8 text-amber-500"
@@ -878,6 +875,6 @@ export default function DiaryPage() {
           )}
         </div>
       </div>
-    </motion.div>
-  );
+  </PageTransition>
+);
 }

@@ -439,6 +439,14 @@ export function SiteNav({
   const clientPathname = usePathname();
   const pathname = clientPathname ?? initialPathname;
 
+  // Suppress hydration mismatch: GlimpseTrigger (Radix HoverCard asChild) renders
+  // a different element on SSR vs client. Only pass the preview after mount so that
+  // the server and client both render the plain <a> fallback on first render.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   function isActive(href: string): boolean {
     return href === "/" ? pathname === "/" : pathname.startsWith(href);
   }
@@ -581,7 +589,7 @@ export function SiteNav({
 
         {/* Right: Actions */}
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
-          <GitHubLink preview={githubPreview} variant="desktop" />
+          <GitHubLink preview={mounted ? githubPreview : null} variant="desktop" />
           {isLoggedIn && (
             <Button
               variant="ghost"

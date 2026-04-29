@@ -38,11 +38,11 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import { Download, FileOutput, Loader2, Sparkles } from "lucide-react";
-import { motion } from "motion/react";
 import { formatFieldName } from "@/lib/utils";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { PageTransition } from "@/components/demo/page-transition";
 
 const DEFAULT_REQUIREMENTS = `Extract the following from the document:
 - Document name 
@@ -211,11 +211,7 @@ export default function DocumentStructuredPage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
+    <PageTransition>
       <DemoPageHeader
         icon={FileOutput}
         title="Document → Structured Data"
@@ -565,6 +561,6 @@ export default function DocumentStructuredPage() {
           )}
         </div>
       </div>
-    </motion.div>
-  );
+  </PageTransition>
+);
 }
