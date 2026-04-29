@@ -9,6 +9,7 @@ Detailed API documentation for GAIK RAG building blocks.
 - [Embedder](#embedder) (text embeddings, batch embedding)
 - [VectorStore](#vectorstore-in-memory--chroma) (in-memory, Chroma persistence)
 - [PgVectorStore](#pgvectorstore-postgresql--pgvector) (PostgreSQL, hybrid search, RRF)
+- [FinnishTextProcessor](#finnishtextprocessor) (Finnish lemmatization + compound splitting for hybrid search)
 - [Retriever](#retriever) (semantic + hybrid search, reranking)
 - [AnswerGenerator](#answergenerator) (LLM response, citations, streaming)
 - [RAG Parsers](#rag-parsers) (VisionRagParser, DoclingRagParser)
@@ -178,6 +179,45 @@ results = store.search_hybrid_weighted(
 ```python
 results = store.search(query_embedding, top_k=5, filters=None)
 ```
+
+---
+
+## FinnishTextProcessor
+
+**Source:** `gaik.software_components.RAG.finnish_text_processor`
+**Install:** `pip install "gaik[finnish-rag]"` (spaCy + UralicNLP) or
+`pip install "gaik[finnish-rag-voikko]"` (best morphology, requires `libvoikko` system library).
+
+Lemmatization + compound splitting for Finnish hybrid search. Plugs into
+`PgVectorStore` via the `text_processor` argument so inflected forms ("kissan",
+"kissoilla" → "kissa") and compound parts ("kerrostalo" → "kerros" + "talo")
+match between query and indexed content.
+
+```python
+from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor
+from gaik.software_components.RAG.pg_vector_store import PgVectorStore
+
+processor = FinnishTextProcessor(backend="auto")  # voikko → spacy → uralic → simple
+print(processor.lemmatize("kerrostalon kissoilla"))
+# → ["kerros", "talo", "kissa"]   (Voikko)
+
+with PgVectorStore(conn_str, text_processor=processor) as store:
+    store.setup()
+    store.add(documents, embeddings)
+    results = store.search_hybrid(q_vec, "kerrostalon kissoilla", top_k=5)
+```
+
+| Backend | Compound splitting | Install |
+|---|---|---|
+| `voikko`  | ✅ | `gaik[finnish-rag-voikko]` + `apt install libvoikko1` |
+| `spacy`   | ❌ | `gaik[finnish-rag]` + `python -m spacy download fi_core_news_md` |
+| `uralic`  | ❌ | `gaik[finnish-rag]` |
+| `simple`  | ❌ | always available — regex tokenizer + lowercase fallback |
+
+Standalone API: `lemmatize(text) -> list[str]`, `to_tsvector_text(text) -> str`,
+`expand_query(text) -> str`. The `text_processor` parameter on `PgVectorStore`
+adds a `content_lemmatized` column and routes both ingest and queries through
+the processor.
 
 ---
 

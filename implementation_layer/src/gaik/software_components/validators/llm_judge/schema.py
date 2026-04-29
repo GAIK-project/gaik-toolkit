@@ -125,7 +125,8 @@ class JudgePanelResult:
 class CalibrationItem:
     """One human-labeled example for judge calibration.
 
-    Used by :func:`gaik.software_components.validators.llm_judge.calibration.calibrate_against_human_labels`.
+    Used by ``calibrate_against_human_labels`` in
+    :mod:`gaik.software_components.validators.llm_judge.calibration`.
 
     Attributes:
         source_pages: Page-image PNGs (same shape the judge will see).
@@ -166,7 +167,11 @@ class CalibrationReport:
             verdict = ""
         else:
             pr = f"{self.pearson_r:.3f}"
-            verdict = " ✓ at HF reference" if self.pearson_r >= ref else f" (HF reference {ref:.2f})"
+            verdict = (
+                " ✓ at HF reference"
+                if self.pearson_r >= ref
+                else f" (HF reference {ref:.2f})"
+            )
         return (
             f"CalibrationReport(n={self.n_items}, "
             f"pearson_r={pr}{verdict}, "

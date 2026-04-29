@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 try:
     import psycopg
@@ -23,6 +23,9 @@ except ImportError as exc:
         "PgVectorStore requires 'langchain-core'. "
         "Install extras with 'pip install gaik[pg-vector-store]'"
     ) from exc
+
+if TYPE_CHECKING:
+    from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -54,14 +57,32 @@ class PgVectorStore:
         table_name: Name of the documents table to create/use.
         embedding_dim: Dimension of the embedding vectors (must match your model).
         fts_language: PostgreSQL text search configuration
-            (``'simple'``, ``'english'``, ``'finnish'``, etc.).
+            (``'simple'``, ``'english'``, ``'finnish'``, etc.). When using a
+            ``text_processor`` for lemmatization, ``'simple'`` is recommended
+            so Postgres treats the lemmas as already-normalized tokens.
+        text_processor: Optional ``FinnishTextProcessor``
+            (from ``gaik.software_components.RAG.finnish_text_processor``)
+            or any object with ``to_tsvector_text(str) -> str`` and
+            ``expand_query(str) -> str`` methods). When supplied, ingestion
+            lemmatizes content into a separate ``content_lemmatized`` column
+            and the ``text_search`` tsvector is generated from those lemmas.
+            Queries are lemmatized through the same processor before being
+            handed to ``websearch_to_tsquery``. This dramatically improves
+            recall on inflected / compound Finnish terms.
 
     Example::
 
-        with PgVectorStore("postgresql://postgres:postgres@localhost/mydb") as store:
+        from gaik.software_components.RAG.pg_vector_store import PgVectorStore
+        from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor
+
+        processor = FinnishTextProcessor(backend="auto")  # voikko/spacy/uralic/simple
+        with PgVectorStore(
+            "postgresql://postgres:postgres@localhost/mydb",
+            text_processor=processor,
+        ) as store:
             store.setup()
             ids = store.add(documents, embeddings)
-            results = store.search_hybrid(query_vec, "search terms", top_k=5)
+            results = store.search_hybrid(query_vec, "kerrostalon kissoilla", top_k=5)
     """
 
     def __init__(
@@ -71,6 +92,7 @@ class PgVectorStore:
         table_name: str = "documents",
         embedding_dim: int = 1536,
         fts_language: str = "simple",
+        text_processor: FinnishTextProcessor | None = None,
     ) -> None:
         if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", table_name):
             raise ValueError(
@@ -81,6 +103,7 @@ class PgVectorStore:
         self.table_name = table_name
         self.embedding_dim = embedding_dim
         self.fts_language = fts_language
+        self.text_processor = text_processor
         self._conn: psycopg.Connection | None = None
 
     # ------------------------------------------------------------------
@@ -132,20 +155,42 @@ class PgVectorStore:
             conn.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
             conn.execute("CREATE EXTENSION IF NOT EXISTS unaccent")
 
-        # 2. Documents table with generated tsvector column
-        conn.execute(f"""
-            CREATE TABLE IF NOT EXISTS {table} (
-                id SERIAL PRIMARY KEY,
-                title TEXT,
-                content TEXT NOT NULL,
-                metadata JSONB DEFAULT '{{}}'::JSONB,
-                embedding vector({dim}),
-                text_search tsvector GENERATED ALWAYS AS (
-                    to_tsvector('{lang}', COALESCE(content, ''))
-                ) STORED,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            )
-        """)
+        # 2. Documents table with generated tsvector column.
+        # When a text_processor is wired in, an extra `content_lemmatized` column
+        # holds the lemmatized text and the tsvector is generated from it; the
+        # original content stays in `content` for display / re-embedding.
+        if self.text_processor is not None:
+            conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT,
+                    content TEXT NOT NULL,
+                    content_lemmatized TEXT,
+                    metadata JSONB DEFAULT '{{}}'::JSONB,
+                    embedding vector({dim}),
+                    text_search tsvector GENERATED ALWAYS AS (
+                        to_tsvector(
+                            '{lang}',
+                            COALESCE(content_lemmatized, content, '')
+                        )
+                    ) STORED,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+        else:
+            conn.execute(f"""
+                CREATE TABLE IF NOT EXISTS {table} (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT,
+                    content TEXT NOT NULL,
+                    metadata JSONB DEFAULT '{{}}'::JSONB,
+                    embedding vector({dim}),
+                    text_search tsvector GENERATED ALWAYS AS (
+                        to_tsvector('{lang}', COALESCE(content, ''))
+                    ) STORED,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
 
         # 3. Indexes
         conn.execute(f"""
@@ -410,14 +455,34 @@ class PgVectorStore:
                 metadata = doc.metadata or {}
                 vec_str = _format_vector(emb)
 
-                cur.execute(
-                    f"""
-                    INSERT INTO {self.table_name} (title, content, metadata, embedding)
-                    VALUES (%s, %s, %s::jsonb, %s::vector({self.embedding_dim}))
-                    RETURNING id
-                    """,
-                    (title, doc.page_content, json.dumps(metadata), vec_str),
-                )
+                if self.text_processor is not None:
+                    lemmatized = self.text_processor.to_tsvector_text(doc.page_content)
+                    cur.execute(
+                        f"""
+                        INSERT INTO {self.table_name}
+                            (title, content, content_lemmatized, metadata, embedding)
+                        VALUES (
+                            %s, %s, %s, %s::jsonb, %s::vector({self.embedding_dim})
+                        )
+                        RETURNING id
+                        """,
+                        (
+                            title,
+                            doc.page_content,
+                            lemmatized,
+                            json.dumps(metadata),
+                            vec_str,
+                        ),
+                    )
+                else:
+                    cur.execute(
+                        f"""
+                        INSERT INTO {self.table_name} (title, content, metadata, embedding)
+                        VALUES (%s, %s, %s::jsonb, %s::vector({self.embedding_dim}))
+                        RETURNING id
+                        """,
+                        (title, doc.page_content, json.dumps(metadata), vec_str),
+                    )
                 row = cur.fetchone()
                 ids.append(row["id"])
 
@@ -520,6 +585,7 @@ class PgVectorStore:
         """
         conn = self._get_conn()
         filter_clause, filter_params = _build_filter_clause(filters)
+        effective_query = self._lemmatize_query(query_text)
 
         rows = conn.execute(
             f"""
@@ -535,7 +601,7 @@ class PgVectorStore:
             ORDER BY score DESC
             LIMIT %s
             """,
-            (query_text, query_text, *filter_params, top_k),
+            (effective_query, effective_query, *filter_params, top_k),
         ).fetchall()
 
         return self._rows_to_results(rows, score_key="score")
@@ -571,6 +637,7 @@ class PgVectorStore:
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
         filter_json = json.dumps(filters) if filters else None
+        effective_query = self._lemmatize_query(query_text)
 
         rows = conn.execute(
             f"""
@@ -581,7 +648,15 @@ class PgVectorStore:
                 %s::jsonb
             )
             """,
-            (vec_str, query_text, top_k, rrf_k, semantic_weight, keyword_weight, filter_json),
+            (
+                vec_str,
+                effective_query,
+                top_k,
+                rrf_k,
+                semantic_weight,
+                keyword_weight,
+                filter_json,
+            ),
         ).fetchall()
 
         return self._rows_to_results(rows, score_key="rrf_score")
@@ -615,6 +690,7 @@ class PgVectorStore:
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
         filter_json = json.dumps(filters) if filters else None
+        effective_query = self._lemmatize_query(query_text)
 
         rows = conn.execute(
             f"""
@@ -625,7 +701,14 @@ class PgVectorStore:
                 %s::jsonb
             )
             """,
-            (vec_str, query_text, top_k, semantic_weight, keyword_weight, filter_json),
+            (
+                vec_str,
+                effective_query,
+                top_k,
+                semantic_weight,
+                keyword_weight,
+                filter_json,
+            ),
         ).fetchall()
 
         return self._rows_to_results(rows, score_key="combined_score")
@@ -633,6 +716,13 @@ class PgVectorStore:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _lemmatize_query(self, query_text: str) -> str:
+        """Run the query through the configured ``text_processor`` (no-op when not set)."""
+        if not query_text or self.text_processor is None:
+            return query_text
+        expanded = self.text_processor.expand_query(query_text)
+        return expanded if expanded else query_text
 
     @staticmethod
     def _rows_to_results(

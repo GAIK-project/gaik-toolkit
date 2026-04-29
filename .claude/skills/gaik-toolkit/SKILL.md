@@ -149,6 +149,10 @@ Core classes in `gaik.software_components.*`. For detailed API and constructor p
 | LLMJudgePanel | `from gaik.software_components.validators import LLMJudgePanel` | `validate(source_pages, extracted, rubric)` → JudgePanelResult (3+ judges, majority vote, agreement metric) |
 | compare_pairwise | `from gaik.software_components.validators import compare_pairwise` | `compare_pairwise(judge, pages, a, b, swap_and_average=True)` → PairwiseResult (A/B with position-bias mitigation) |
 | calibrate_against_human_labels | `from gaik.software_components.validators import calibrate_against_human_labels` | `calibrate_against_human_labels(judge, dataset)` → CalibrationReport (Pearson r vs. human raters) |
+| FinnishTextProcessor | `from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor` | `lemmatize(text)` / `to_tsvector_text(text)` / `expand_query(text)` (Finnish lemmatization + compound splitting; backends: voikko / spacy / uralic / simple) |
+| ExtractionEvaluator | `from gaik.software_components.evaluators import ExtractionEvaluator` | `evaluate_dataset(dataset, extracted_outputs)` → ExtractionEvaluationResult (field-level P/R/F1 + hallucination rate; optional semantic mode via LLMJudge) |
+| RAGEvaluator | `from gaik.software_components.evaluators import RAGEvaluator` | `evaluate_dataset(items)` → RAGEvaluationResult (RAGAS-style faithfulness / answer_relevance / context_precision / context_recall via LLMJudge) |
+| BatchEvaluationRunner | `from gaik.software_components.evaluators import BatchEvaluationRunner` | `run(dataset)` → RunnerResult (applies a pipeline callable over a dataset; on_error="skip" tolerates failures) |
 
 ### Transcriber notes
 

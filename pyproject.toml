@@ -172,6 +172,26 @@ llm-judge = [
     "gaik[llm-google]",
 ]
 
+# Finnish RAG — Python-side morphological lemmatization + compound splitting.
+# Plugs into PgVectorStore via FinnishTextProcessor. The 'finnish-rag' extra
+# pulls pure-pip backends (spaCy + UralicNLP); the 'finnish-rag-voikko' extra
+# adds the optional libvoikko-backed wheel for best morphological accuracy
+# (also requires libvoikko system library — apt install libvoikko1 / brew
+# install libvoikko).
+finnish-rag = [
+    "spacy>=3.7",
+    "uralicNLP>=1.4",
+]
+finnish-rag-voikko = [
+    "voikko>=0.5",
+]
+
+# Evaluators — RAG-style and extraction-style metrics built on LLMJudge v2.
+# No new hard deps; semantic match mode and RAG metrics need llm-judge.
+evaluators = [
+    "gaik[llm-judge]",
+]
+
 # All features
 all = [
     "gaik[extract]",
@@ -192,6 +212,8 @@ all = [
     "gaik[audio-to-structured-data]",
     "gaik[documents-to-structured-data]",
     "gaik[llm-judge]",
+    "gaik[finnish-rag]",
+    "gaik[evaluators]",
 ]
 
 # Software components
@@ -228,6 +250,8 @@ all-cpu = [
     "gaik[documents-to-structured-data-cpu]",
     "gaik[pg-vector-store]",
     "gaik[rag-workflow]",
+    "gaik[finnish-rag]",
+    "gaik[evaluators]",
 ]
 
 # Development tooling for maintainers only (pip install -e ".[dev]")

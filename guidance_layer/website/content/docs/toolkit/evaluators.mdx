@@ -1,0 +1,161 @@
+---
+title: Evaluation Suite
+description: Reusable extraction and RAG evaluators built on LLMJudge v2
+---
+
+## What it is
+
+`gaik.software_components.evaluators` is a tiny evaluation suite for GAIK
+pipelines. It ships two evaluator classes — `ExtractionEvaluator` and
+`RAGEvaluator` — plus a `BatchEvaluationRunner` that ties any callable
+pipeline to a dataset.
+
+LLM-graded metrics reuse [LLMJudge v2](/toolkit/evals/llm-judge), so they
+share the same Likert / few-shot / panel / calibration machinery as the
+validator. No separate prompt or scoring infrastructure to maintain.
+
+## ExtractionEvaluator
+
+Computes field-level **Precision / Recall / F1** + **hallucination rate**
+between an expected dict and an extracted dict.
+
+```python
+from gaik.software_components.evaluators import (
+    EvaluationDataset, ExtractionEvaluator,
+)
+
+dataset = EvaluationDataset.from_jsonl("eval/extractions.jsonl")
+evaluator = ExtractionEvaluator()  # exact-match mode by default
+
+extracted_outputs = [your_pipeline(item) for item in dataset]
+result = evaluator.evaluate_dataset(dataset, extracted_outputs)
+print(result.aggregate)
+# ExtractionMetrics(P=0.92, R=0.88, F1=0.90, hallucination=0.05, correct=88/100, extracted=96)
+```
+
+Two matching modes:
+
+- **`match_mode="exact"`** (default) — light normalization (strip + casefold)
+  then equality. No LLM cost.
+- **`match_mode="semantic"`** — for ambiguous free-text fields, calls
+  `LLMJudge` with a 1-5 Likert rubric; `score >= 4` counts as a match.
+  Requires passing a `judge=LLMJudge(...)` argument.
+
+A `FieldVerdict` records the per-field outcome:
+
+```python
+for r in result.per_item:
+    for v in r.verdicts:
+        tag = "OK" if v.matched else (
+            "MISS" if v.is_missing else (
+                "HALLU" if v.is_hallucination else "WRONG"
+            )
+        )
+        print(f"[{tag}] {v.field}: expected={v.expected!r}  extracted={v.extracted!r}")
+```
+
+## RAGEvaluator
+
+RAGAS-style metrics. Each grades the (query, answer, context) tuple via
+`LLMJudge` on a 1-5 Likert scale; the aggregate normalizes to 0-1.
+
+```python
+from gaik.software_components.evaluators import RAGEvaluator
+from gaik.software_components.validators import LLMJudge
+
+evaluator = RAGEvaluator(judge=LLMJudge(model_provider="google"))
+
+result = evaluator.evaluate_dataset([
+    {
+        "query": "What time does customer support close on Fridays?",
+        "answer": "It closes at 4 pm on Fridays.",
+        "context": ["Customer support is open 8am–6pm Mon–Thu and 8am–4pm Fri."],
+        "ground_truth": "4 pm on Fridays.",
+    },
+    # …
+])
+print(result.aggregate)
+# RAGMetrics(faithfulness=0.93, answer_relevance=0.95,
+#            context_precision=0.88, context_recall=0.90)
+```
+
+The four metrics:
+
+| Metric | Question it answers |
+| --- | --- |
+| `faithfulness` | Does the answer stay grounded in the retrieved context? |
+| `answer_relevance` | Does the answer actually address the user's question? |
+| `context_precision` | Were the retrieved passages relevant to the question? |
+| `context_recall` | Does the retrieved context contain what's needed to answer (vs. ground truth)? |
+
+`context_recall` is skipped when `ground_truth` is missing (set
+`skip_context_recall=False` to error instead).
+
+## BatchEvaluationRunner
+
+Generic runner that applies a pipeline callable to a dataset and collects
+outputs:
+
+```python
+from gaik.software_components.evaluators import BatchEvaluationRunner
+
+def pipeline(item):
+    # Replace with DataExtractor, RAGWorkflow, etc.
+    return DataExtractor(...).extract(item.input, schema=...).fields
+
+runner = BatchEvaluationRunner(pipeline, on_error="skip")
+runner_result = runner.run(dataset)
+
+# Hand outputs to whichever evaluator fits
+eval_result = ExtractionEvaluator().evaluate_dataset(dataset, runner_result.outputs)
+```
+
+`on_error="skip"` records exceptions in `RunnerResult.failures` instead of
+re-raising — useful when one bad item shouldn't blow up the whole run.
+
+## Dataset format
+
+```python
+from gaik.software_components.evaluators import EvaluationDataset, EvaluationItem
+
+# Load
+dataset = EvaluationDataset.from_jsonl("eval/data.jsonl")
+dataset = EvaluationDataset.from_csv("eval/data.csv")
+dataset = EvaluationDataset.from_list([...])
+
+# Construct in memory
+item = EvaluationItem(
+    input="invoice-001.pdf",
+    expected={"vendor": "Acme", "amount": "1200.00"},
+    context=["..."],
+    metadata={"source": "luvata-vendor-corpus"},
+)
+```
+
+Only `input` is required. `expected`, `context`, and `metadata` are optional.
+
+## Examples
+
+- [`extraction_evaluator_example.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/evaluators/extraction_evaluator_example.py)
+  — synthetic extractor outputs scored against ground truth.
+- [`rag_evaluator_example.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/evaluators/rag_evaluator_example.py)
+  — Finnish customer-support QA scored on all four RAG metrics.
+
+## Related
+
+- [LLM-as-Judge](/toolkit/evals/llm-judge) — the underlying grader. Use
+  `LLMJudgePanel` for cross-model averaging if you need defensible
+  benchmarks.
+- [Calibration](/toolkit/evals/llm-judge#calibration-against-human-labels)
+  — verify your judge correlates with human raters before trusting any of
+  these metrics.
+
+## Why GAIK evaluators (vs. RAGAS / DeepEval)
+
+- **Provider-agnostic** — `LLMJudge` already supports OpenAI / Azure /
+  Anthropic / Google. The evaluators inherit that out of the box.
+- **One scoring abstraction** — Likert 1-5, panel, calibration, pairwise
+  comparison are all the same machinery. No second mental model.
+- **Cost-controlled** — every metric is one or four judge calls. Use
+  cheap-screener models (`gemini-3.1-flash-lite`) to keep regression-test
+  sweeps affordable.

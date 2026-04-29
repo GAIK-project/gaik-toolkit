@@ -113,11 +113,12 @@ Respond with ONLY a JSON object, no prose, no markdown fences:
 
 def build_system_prompt(scoring_mode: ScoringMode = "severity") -> str:
     """Return the system prompt tailored to *scoring_mode*."""
+    head = f"{_BASE_SYSTEM}{_BIAS_GUIDANCE}{_SEVERITY_SCALE}"
     if scoring_mode == "likert_1_5":
-        return f"{_BASE_SYSTEM}{_BIAS_GUIDANCE}{_SEVERITY_SCALE}{_LIKERT_SCALE}{_OUTPUT_FORMAT_LIKERT}"
+        return f"{head}{_LIKERT_SCALE}{_OUTPUT_FORMAT_LIKERT}"
     if scoring_mode == "additive":
-        return f"{_BASE_SYSTEM}{_BIAS_GUIDANCE}{_SEVERITY_SCALE}{_ADDITIVE_SCALE}{_OUTPUT_FORMAT_LIKERT}"
-    return f"{_BASE_SYSTEM}{_BIAS_GUIDANCE}{_SEVERITY_SCALE}{_OUTPUT_FORMAT_SEVERITY}"
+        return f"{head}{_ADDITIVE_SCALE}{_OUTPUT_FORMAT_LIKERT}"
+    return f"{head}{_OUTPUT_FORMAT_SEVERITY}"
 
 
 JUDGE_SYSTEM_PROMPT = build_system_prompt("severity")

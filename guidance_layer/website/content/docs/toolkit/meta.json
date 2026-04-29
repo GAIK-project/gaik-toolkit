@@ -1,4 +1,12 @@
 {
   "title": "Implementation Layer",
-  "pages": ["software-components", "multi-provider-llm", "software-modules", "evals", "no-code-assets"]
+  "pages": [
+    "software-components",
+    "multi-provider-llm",
+    "software-modules",
+    "finnish-rag",
+    "evaluators",
+    "evals",
+    "no-code-assets"
+  ]
 }
