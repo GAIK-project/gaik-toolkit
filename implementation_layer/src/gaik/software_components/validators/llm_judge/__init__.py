@@ -100,8 +100,10 @@ __all__ = [
     "build_user_prompt",
 ]
 
-__version__ = "0.2.1"
-"""Patch bump: research-utility benchmark code moved out of public API to
+__version__ = "0.3.1"
+"""Sub-package marker (not the published toolkit version — that comes
+from setuptools-scm git tags). 0.3.1 = patch over 0.3.0: research-utility
+benchmark code moved out of the public API to
 ``examples/software_components/validators/demo_judgebench_comparison.py``.
-The production-facing surface (LLMJudge, panel, calibration, pairwise) is
-unchanged."""
+The production-facing surface (LLMJudge, panel, calibration, pairwise)
+is unchanged."""

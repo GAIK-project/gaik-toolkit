@@ -13,7 +13,7 @@ import logging
 import time
 from typing import Literal
 
-from .llm_judge import LLMJudge
+from .llm_judge import LLMJudge, _strip_json_fences
 from .pricing import compute_judge_cost_usd
 from .schema import JudgeUsage, PairwiseResult
 
@@ -133,25 +133,14 @@ def _one_pass(
         f"```json\n{payload}\n```\n\n"
         "Now decide which is more faithful and emit your JSON judgement."
     )
-    provider_call = {
-        "openai": judge._call_openai,
-        "azure": judge._call_openai,
-        "anthropic": judge._call_anthropic,
-        "google": judge._call_google,
-    }[judge.model_provider]
     t0 = time.perf_counter()
-    raw_text, in_tok, out_tok = provider_call(source_pages, user_prompt, _PAIRWISE_SYSTEM)
+    raw_text, in_tok, out_tok = judge._dispatch(source_pages, user_prompt, _PAIRWISE_SYSTEM)
     duration = time.perf_counter() - t0
     return raw_text, in_tok, out_tok, duration
 
 
 def _parse_pairwise(raw: str) -> tuple[Literal["a", "b", "tie"], int, int, str]:
-    text = raw.strip()
-    if text.startswith("```"):
-        text = text.lstrip("`")
-        if text.lower().startswith("json"):
-            text = text[4:]
-        text = text.rstrip("`").strip()
+    text = _strip_json_fences(raw)
     try:
         data = json.loads(text)
     except json.JSONDecodeError:

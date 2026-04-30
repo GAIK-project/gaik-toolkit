@@ -116,15 +116,8 @@ class LLMJudge:
         system_prompt = build_system_prompt(rubric.scoring_mode)
         user_prompt = build_user_prompt(extracted, rubric)
 
-        provider_call = {
-            "openai": self._call_openai,
-            "azure": self._call_openai,
-            "anthropic": self._call_anthropic,
-            "google": self._call_google,
-        }[self.model_provider]
-
         t0 = time.perf_counter()
-        raw_text, input_tokens, output_tokens = provider_call(
+        raw_text, input_tokens, output_tokens = self._dispatch(
             source_pages, user_prompt, system_prompt
         )
         duration_s = time.perf_counter() - t0
@@ -142,6 +135,21 @@ class LLMJudge:
         return ValidationResult(flags=flags, raw_judge_text=raw_text, usage=usage)
 
     # ── Provider callers ──────────────────────────────────────────
+
+    def _dispatch(
+        self,
+        source_pages: list[bytes],
+        user_prompt: str,
+        system_prompt: str,
+    ) -> tuple[str, int, int]:
+        """Route to the right ``_call_*`` for ``self.model_provider``."""
+        provider_call = {
+            "openai": self._call_openai,
+            "azure": self._call_openai,
+            "anthropic": self._call_anthropic,
+            "google": self._call_google,
+        }[self.model_provider]
+        return provider_call(source_pages, user_prompt, system_prompt)
 
     def _call_openai(
         self,
@@ -286,6 +294,17 @@ class LLMJudge:
         )
 
 
+def _strip_json_fences(raw_text: str) -> str:
+    """Strip stray ```json``` markdown fences from a model response."""
+    text = raw_text.strip()
+    if text.startswith("```"):
+        text = text.lstrip("`")
+        if text.lower().startswith("json"):
+            text = text[4:]
+        text = text.rstrip("`").strip()
+    return text
+
+
 def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
     """Parse ``{"flags": [...]}`` JSON into typed :class:`ValidationFlag`\\ s.
 
@@ -295,13 +314,7 @@ def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
     Reads both the ``score`` (Likert 1-5) and ``severity`` fields. ``score``
     defaults to 0 when the judge omits it (severity-mode behaviour).
     """
-    text = raw_text.strip()
-    if text.startswith("```"):
-        text = text.lstrip("`")
-        if text.lower().startswith("json"):
-            text = text[4:]
-        text = text.rstrip("`").strip()
-
+    text = _strip_json_fences(raw_text)
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
