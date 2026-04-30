@@ -21,75 +21,70 @@ ships with v2 (2026 research-backed) features:
 ## What happens when you turn it on
 
 The validator is a **second LLM pass** over the first extractor's output.
-Concretely, when validation is enabled the system:
+Three inputs go to the judge, one structured response comes back:
 
-1. Renders each PDF page to a PNG image in memory.
-2. Builds a compact JSON payload from what the first extractor produced
-   (the structured fields the user is about to confirm).
-3. Loads a domain-specific rubric — a checklist of known failure modes
-   (e.g. "quantity must be the integer pounds before the decimal",
-   "delivery date must be in ISO format").
-4. Sends the page images + the extracted JSON + the rubric to a second
-   LLM with the system prompt: *"You are a quality validator. For every
-   field, compare the JSON value against what the PDF actually says. If
-   they disagree, flag it."*
-5. The judge LLM returns one entry per field with a severity
-   (`ok` / `suspect` / `wrong`), an integer 1-5 Likert score, a short
-   reason, and (when readable from the PDF) a suggested correct value.
-6. The application maps those flags onto the extractor's row data and
-   the UI surfaces them as red / amber chips next to the affected rows
-   so the user reviews them before confirming the order.
+1. **Source pages** — the original document as one or more images.
+2. **Extracted JSON** — what the first extractor produced (the structured
+   fields the user is about to confirm).
+3. **Rubric** — a short checklist of what to verify, including any
+   domain-specific failure modes you have seen in the wild.
+
+The judge LLM returns one entry per field with a severity
+(`ok` / `suspect` / `wrong`), an integer 1-5 Likert score, a short reason,
+and — when readable from the source — a suggested correct value. The
+application then surfaces those flags in the UI so a human can review
+them before confirming.
 
 In other words: the parsed result is handed to an LLM with the source
 document, and the LLM is asked *"is this right?"* — exactly as a human
-reviewer would do, but consistently across every order.
+reviewer would do, but consistently across every record.
 
 ```mermaid
 flowchart LR
-    PDF["PO PDF"] --> EXTRACT["Extractor LLM (first pass)"]
-    EXTRACT --> JSON["Extracted JSON fields"]
-    PDF --> JUDGE["Judge LLM (second pass)"]
+    DOC["📄 Source document"] --> EXTRACT["🤖 Extractor LLM"]
+    EXTRACT --> JSON["📋 Extracted JSON"]
+    DOC --> JUDGE["⚖️ Judge LLM"]
     JSON --> JUDGE
-    RUBRIC["Vendor rubric: known bug patterns"] --> JUDGE
-    JUDGE --> FLAGS["Per-field flags: severity + Likert 1-5 + reason"]
-    FLAGS --> UI["UI: judge wrong / suspect chips"]
-    UI --> USER["User reviews and confirms"]
+    RUBRIC["📜 Rubric checklist"] --> JUDGE
+    JUDGE --> FLAGS["🏷️ Flags: severity + 1-5 + reason"]
+    FLAGS --> UI["🎨 UI / consumer"]
+    UI --> USER["👤 Human reviews"]
 ```
 
-A more detailed view of the runtime pipeline:
+### The simplest possible usage
 
-```mermaid
-flowchart TD
-    A["User uploads PDF + enables validation"] --> B["Multimodal parser extracts fields"]
-    B --> C["Pricing pipeline enriches each row"]
-    C --> D["Render PDF pages to PNG (PyMuPDF)"]
-    D --> E["Build compact JSON payload from extracted rows"]
-    E --> F["Load vendor rubric checklist"]
-    F --> G["LLMJudge.validate(pages, payload, rubric)"]
-    G --> H["Judge returns flags: severity, score, reason, suggested_value"]
-    H --> I["Map flags onto each row's validation field"]
-    I --> J["Aggregate token cost, duration into ValidationUsage"]
-    J --> K["UI renders top-level Validated / N flags badge"]
-    K --> L["Per-row 'judge wrong N' or 'judge suspect N' chip"]
-    L --> M["User reviews flagged rows before confirming"]
-```
+You do not need a calibration dataset, a panel of judges, or a pairwise
+comparison to start. The minimum viable setup is **one judge, one call,
+one rubric** — give it the document, the extractor's output, and a
+short checklist. That is exactly how the
+[Luvata OC Builder](https://github.com/GAIK-project/Luvata) consumes the
+component in production: a single `LLMJudge.validate()` call per
+purchase order, opt-in via a UI toggle.
+
+The advanced features below (panels, pairwise, calibration) are tools
+you reach for **after** the basic pass is in place — when you want to
+quantify judge reliability, track regressions, or A/B-test prompt
+variants. Skip them on day one.
 
 ## Why this design
 
-- **Likert over float**: HuggingFace cookbook reports a ~30 % improvement in
-  human-correlation when moving from float scales (0-10) to integer Likert
-  (1-4 or 1-5).
+- **Likert over float**: the
+  [HuggingFace LLM Judge cookbook](https://huggingface.co/learn/cookbook/llm_judge)
+  reports a ~30 % improvement in human-correlation when moving from
+  float scales (0-10) to integer Likert (1-4 or 1-5).
 - **Severity + Likert together**: severity stays as the action gate
   ("ok / suspect / wrong" maps cleanly to UI badges), score gives a stable
   numeric signal for tracking regressions.
 - **Cross-model panels**: judges have self-preference bias — they score
   outputs that look familiar to their own policy more leniently
-  (arXiv 2604.22891). Pairing providers from different families
-  (Gemini + Claude + GPT) averages this out.
-- **Position-bias mitigation in pairwise**: GPT-4-class judges flip their
-  decision ~40 % of the time when A and B are swapped (Justice or Prejudice,
-  OpenReview 2024). The `swap_and_average` flag runs the comparison twice
-  and only declares a winner when both passes agree.
+  ([arXiv 2604.22891](https://arxiv.org/html/2604.22891)). Pairing
+  providers from different families (Gemini + Claude + GPT) averages
+  this out.
+- **Position-bias mitigation in pairwise**: GPT-4-class judges flip
+  their decision ~40 % of the time when A and B are swapped
+  ([Justice or Prejudice, OpenReview 2024](https://openreview.net/forum?id=3GTtZFiajM)).
+  The `swap_and_average` flag runs the comparison twice and only
+  declares a winner when both passes agree.
 
 ## Quick start
 
