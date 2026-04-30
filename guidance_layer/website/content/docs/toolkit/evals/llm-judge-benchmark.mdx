@@ -37,28 +37,55 @@ response_a, response_b, label)` source into `JudgeBenchmark.run()`.
 
 <Callout type="info">
 Numbers below come from `results/judgebench-comparison/leaderboard.md`
-in the gaik-toolkit repository. Re-run the demo against the same seed
-to reproduce.
+in the gaik-toolkit repository, run with seed `42` on the `gpt` split.
+Re-run the demo against the same seed to reproduce.
 </Callout>
 
 | Prompt | Accuracy | Position-bias flips | Ties | Mean cost (USD) | Mean latency (s) |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `naive` | _placeholder_ | _placeholder_ | _placeholder_ | _placeholder_ | _placeholder_ |
-| `research` | _placeholder_ | _placeholder_ | _placeholder_ | _placeholder_ | _placeholder_ |
+| `naive` | 64.0% | 26.0% | 13 | $0.0017 | 13.85 |
+| `research` | **66.0%** | **22.0%** | 14 | $0.0023 | 16.45 |
 
-### Score distribution
+The research-backed prompt wins on the two metrics that actually matter
+for production use:
 
-The score histograms are the most readable artefact: they show
-*qualitatively* why naive 1-10 prompts are hard to use as a metric.
+- **+2 percentage points of accuracy** against the held-out ground-truth
+  labels — small on N=50 but in the expected direction.
+- **-4 percentage points of position-bias flips**: 22 % of pairs change
+  their predicted winner under the swap-and-average check, vs. 26 % for
+  the naive prompt. Position-bias is the failure mode that causes silent
+  inconsistency in production, so this is the more important number.
 
-- `naive`: _placeholder_
-- `research`: _placeholder_
+The trade-off is **+35 % cost and +19 % latency** because the
+research-backed prompt asks for a `reason` field before the score (the
+"evaluate first, judge second" CoT ordering). On Gemini Flash this still
+costs about a fifth of a cent per pair.
 
-LLMs systematically oversaturate at the upper end of wide continuous
-scales — many "obviously correct" answers get a 9 or 10, while
-"obviously wrong" ones cluster at 6-7 instead of 1-2. Integer Likert
-1-5 forces discrimination because there are fewer points to spread
-across.
+### Score distribution — the qualitative story
+
+The score histograms are the clearest artefact for a reader: they show
+*qualitatively* why a naive 1-10 prompt is hard to use as a metric.
+
+- `naive` (1-10 scale, 100 ratings = 50 pairs × 2 sides):
+  `2` × 9, `3` × 4, `4` × 14, `5` × 6, `6` × 15, `7` × 3, `8` × 9, `9` × 14, **`10` × 26**
+- `research` (Likert 1-5):
+  `1` × 3, **`2` × 36**, `3` × 7, `4` × 21, **`5` × 33**
+
+The naive prompt **piles 26 % of all ratings on the maximum value 10**
+and another 14 on 9 — almost half the responses get a 9 or 10. The
+middle of the scale (3-7) is sparsely populated. This is the classic
+"LLMs oversaturate at the high end of continuous scales" pattern from
+the [HuggingFace cookbook](https://huggingface.co/learn/cookbook/llm_judge).
+
+The research-backed prompt with integer Likert 1-5 spreads ratings
+across the entire scale and concentrates them on **2 (significant
+error)** and **5 (perfect match)** — the two semantically meaningful
+endpoints. There are fewer values to spread across, so the model is
+forced to discriminate instead of giving compromise scores.
+
+If you ever plan to track `mean_score` as a regression KPI across
+deploys, this is the difference between "the metric moves with quality"
+(Likert) and "the metric is stuck near 9" (1-10).
 
 ## Reproducing
 

@@ -1,0 +1,11 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING:huggingface_hub.utils._http:Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Loaded 50 rows
+
+=== FINAL ===
+  naive     : acc= 64.0%, pos-bias= 26.0%, ties=13, cost=$0.0017, lat=13.85s
+    histogram: {2: 9, 3: 4, 4: 14, 5: 6, 6: 15, 7: 3, 8: 9, 9: 14, 10: 26}
+  research  : acc= 66.0%, pos-bias= 22.0%, ties=14, cost=$0.0023, lat=16.45s
+    histogram: {1: 3, 2: 36, 3: 7, 4: 21, 5: 33}
+
+Wrote results\judgebench-comparison\leaderboard.md and results\judgebench-comparison\summary.json

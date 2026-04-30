@@ -315,7 +315,8 @@ when the use case justifies the extra complexity.
 
 ## Picking a model
 
-Benchmarked on five hand-curated Luvata test cases:
+Benchmarked across seven candidates on a hand-curated extraction-
+validation test set (per-field severity F1 against ground truth):
 
 | Pipeline | F1 | Cost / call | Latency |
 | --- | ---: | ---: | ---: |
@@ -324,6 +325,8 @@ Benchmarked on five hand-curated Luvata test cases:
 | `gemini-3.1-flash-lite-preview` | 0.750 | $0.0013 | 3.6 s |
 
 **Default**: Gemini 3 Flash via Vertex. **Cheap screener**: Gemini 3.1 Flash Lite.
+For a public, reproducible comparison see the
+[Prompt Benchmark page](/toolkit/evals/llm-judge-benchmark).
 
 ## Examples
 
