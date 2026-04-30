@@ -171,7 +171,3 @@ env-vars work for both:
 - [Justice or Prejudice? Quantifying Biases in LLM-as-a-Judge (OpenReview)](https://openreview.net/forum?id=3GTtZFiajM) — position-bias measurement.
 - [Self-Preference Bias in LLM Judges (arXiv 2604.22891)](https://arxiv.org/html/2604.22891) — why cross-model judging matters.
 - [Evaluating and Mitigating LLM-as-a-judge Bias in Communication Systems (arXiv 2510.12462)](https://arxiv.org/abs/2510.12462) — 11 bias types, mitigation strategies.
-
-## License
-
-MIT — see [LICENSE](../../../../../LICENSE).

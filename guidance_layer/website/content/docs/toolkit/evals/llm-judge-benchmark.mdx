@@ -12,11 +12,12 @@ Chain-of-Thought ordering and anti-bias guidance produces more reliable
 judgements than a naive "score this 1-10" prompt. This benchmark turns
 that claim into a number.
 
-`JudgeBenchmark` runs the same model under two prompt variants on a
-public dataset, compares the predicted winner against ground truth, and
-reports which design wins. The harness is dataset-agnostic — JudgeBench
-is the default because it is open, peer-reviewed, and small enough to
-run cheaply.
+A self-contained research script
+([`demo_judgebench_comparison.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py))
+runs the same model under two prompt variants on a public dataset,
+compares the predicted winner against ground truth, and reports which
+design wins. The harness is dataset-agnostic — JudgeBench is the default
+because it is open, peer-reviewed, and small enough to run cheaply.
 
 ## Methodology
 
@@ -31,7 +32,8 @@ run cheaply.
 | **Metrics** | Accuracy vs ground truth, position-bias flip rate, ties, mean cost (USD), mean latency (s), score distribution |
 
 The harness is dataset-agnostic; you can pass any `(question,
-response_a, response_b, label)` source into `JudgeBenchmark.run()`.
+response_a, response_b, label)` source into the in-script
+`JudgeBenchmarkHarness.run()` method.
 
 ## Results
 
@@ -89,11 +91,20 @@ deploys, this is the difference between "the metric moves with quality"
 
 ## Reproducing
 
+The benchmark lives as a **single self-contained script** under
+[`implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py).
+It is intentionally not part of the toolkit's public API — the
+production-facing validator surface (`LLMJudge`, `LLMJudgePanel`,
+`compare_pairwise`, calibration) stays focused on validation, while
+this comparison harness lives next to its docs and stays out of the
+core install.
+
 ```bash
 cd gaik-toolkit
 pip install -e ".[evaluators,llm-judge]"
+pip install "datasets>=2.14"   # script-level dep; not a toolkit extra
 
-# Set provider env vars (Vertex shown; Azure / Anthropic also supported)
+# Set provider env vars (Vertex shown; Azure / Anthropic / OpenAI also supported)
 export GOOGLE_VERTEXAI_PROJECT=<your-project>
 export GOOGLE_VERTEXAI_LOCATION=global
 export GOOGLE_APPLICATION_CREDENTIALS=<service-account.json>
@@ -110,12 +121,12 @@ python implementation_layer/examples/software_components/validators/demo_judgebe
 
 ## Plugging in your own data
 
-The HF loader is a convenience for the public dataset. The harness itself
-just wants a list of plain dicts:
+The HF loader is a convenience for the public dataset. To run on your own
+pairwise data, copy the script and replace the `load_judgebench` call
+with a list of plain dicts:
 
 ```python
-from gaik.software_components.validators.llm_judge import JudgeBenchmark
-
+# In a copy of demo_judgebench_comparison.py
 rows = [
     {
         "pair_id": "case-1",
@@ -127,7 +138,7 @@ rows = [
     # ... more rows
 ]
 
-bench = JudgeBenchmark(model_provider="google", model="gemini-3-flash-preview")
+bench = JudgeBenchmarkHarness(provider="google", model="gemini-3-flash-preview")
 report = bench.run(rows, prompts=("naive", "research"), swap_and_average=True)
 
 for s in report.prompts:

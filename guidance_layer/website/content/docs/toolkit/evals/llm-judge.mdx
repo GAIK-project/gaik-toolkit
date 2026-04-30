@@ -306,7 +306,7 @@ evidence you need them.
 | High-stakes scoring where one judge's variance is the risk | `LLMJudgePanel` with 3 cross-provider judges | Latency / cost matter more than variance — sequential calls add up |
 | A/B-testing two prompt or model versions | `compare_pairwise(swap_and_average=True)` | You only have one version |
 | Quoting a tracked numeric KPI (e.g. dashboards) | `scoring_mode="likert_1_5"` so scores are comparable across runs | Severity-only is enough for the UI |
-| Empirical evidence that the research-backed prompt beats naive 1-10 | [`JudgeBenchmark`](/toolkit/evals/llm-judge-benchmark) on JudgeBench HF dataset | You trust the cited research and don't need to demo it |
+| Empirical evidence that the research-backed prompt beats naive 1-10 | [Run the JudgeBench prompt-comparison script](/toolkit/evals/llm-judge-benchmark) on the public HF dataset | You trust the cited research and don't need to demo it |
 
 The [Luvata OC Builder](https://github.com/GAIK-project/Luvata) currently
 runs only the first row — single judge call, opt-in toggle, no
