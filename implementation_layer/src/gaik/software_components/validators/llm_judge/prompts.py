@@ -159,6 +159,75 @@ def _render_few_shot_block(examples: list[FewShotExample]) -> str:
     return "\n".join(blocks)
 
 
+_TEXT_PAIR_SYSTEM = """\
+You compare two short text values for semantic equivalence.
+
+Decide whether the EXTRACTED value carries the same factual information
+as the EXPECTED value, ignoring:
+  - whitespace, casing, punctuation
+  - morphological forms (Finnish noun cases, conjugation, etc.)
+  - paraphrasing of the same fact
+  - reasonable synonyms in the relevant domain
+
+Mark them as NOT equivalent if:
+  - the extracted text adds claims not in expected (or vice versa)
+  - they refer to different entities, dates, quantities, or actions
+  - one is empty and the other is not
+
+Severity:
+  - "ok"      — same fact, possibly different wording (score 4-5)
+  - "suspect" — partial overlap, ambiguous, or one detail off (score 2-3)
+  - "wrong"   — clear factual divergence or one side empty (score 1)
+
+Likert score (integer 1-5):
+  1 — Clear divergence (different fact, different entity, or empty vs non-empty).
+  2 — Significant difference (overlapping topic but key detail wrong).
+  3 — Partial / ambiguous.
+  4 — Same fact, minor formatting or wording difference.
+  5 — Identical meaning.
+
+FIRST write the reason describing what you compared and saw, THEN assign
+the score and severity. This evaluation-before-judgement order produces
+calibrated ratings.
+
+Respond with ONLY a JSON object (no prose, no markdown fences):
+{
+  "equivalent": true|false,
+  "severity": "ok|suspect|wrong",
+  "score": 1-5,
+  "reason": "one short sentence (<=20 words)"
+}
+"""
+
+TEXT_PAIR_SYSTEM_PROMPT = _TEXT_PAIR_SYSTEM
+"""System prompt for :meth:`LLMJudge.judge_text_pair`."""
+
+
+def build_text_pair_prompt(
+    extracted_text: str,
+    expected_text: str,
+    field_name: str | None = None,
+    context: str | None = None,
+) -> str:
+    """Assemble the user-side prompt for a text-vs-text equivalence call.
+
+    Both values are shown verbatim. ``field_name`` and ``context`` are
+    optional hints — when present the judge is more accurate because it
+    knows the domain (e.g. "Päivämäärä" → date comparison rules,
+    "Tarkkailijan nimi" → person name).
+    """
+    lines: list[str] = []
+    if field_name:
+        lines.append(f"Field: {field_name}")
+    if context:
+        lines.append(f"Context: {context}")
+    lines.append(f"Expected: {expected_text!r}")
+    lines.append(f"Extracted: {extracted_text!r}")
+    lines.append("")
+    lines.append("Now decide whether they are semantically equivalent.")
+    return "\n".join(lines)
+
+
 def build_user_prompt(extracted: list[dict] | dict, rubric: ValidationRubric | None) -> str:
     """Assemble the per-call user-side prompt block.
 

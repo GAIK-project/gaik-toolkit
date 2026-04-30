@@ -220,6 +220,7 @@ flowchart LR
 - Returns per-field flags (`ok`, `suspect`, `wrong`) plus a document-level slot for structural observations like "items missing from the extractor output"
 - Domain-agnostic by default; pass an optional `ValidationRubric` with vendor-specific check sentences when you want targeted guidance
 - Cost tracking with longest-prefix model lookup so rotated model ids still resolve to a known rate
+- **Text-vs-text mode** (`judge.judge_text_pair(extracted, expected, field_name=...)`) compares two short strings for semantic equivalence without any source document — useful for scoring audio-transcription extractors against hand-annotated ground truth where exact-string match misses paraphrasing
 
 **Potential applications:**
 - Purchase-order extraction QA before sending the order downstream

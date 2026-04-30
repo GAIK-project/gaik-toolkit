@@ -50,11 +50,22 @@ Example:
 """
 
 from .calibration import calibrate_against_human_labels
-from .llm_judge import DEFAULT_MODELS, LLMJudge, parse_judge_flags
+from .llm_judge import (
+    DEFAULT_MODELS,
+    LLMJudge,
+    parse_judge_flags,
+    parse_text_judgement,
+)
 from .pairwise import compare_pairwise
 from .panel import LLMJudgePanel
 from .pricing import JUDGE_PRICING_PER_M, compute_judge_cost_usd, lookup_judge_price
-from .prompts import JUDGE_SYSTEM_PROMPT, build_system_prompt, build_user_prompt
+from .prompts import (
+    JUDGE_SYSTEM_PROMPT,
+    TEXT_PAIR_SYSTEM_PROMPT,
+    build_system_prompt,
+    build_text_pair_prompt,
+    build_user_prompt,
+)
 from .schema import (
     CalibrationItem,
     CalibrationReport,
@@ -64,6 +75,7 @@ from .schema import (
     PairwiseResult,
     ScoringMode,
     Severity,
+    TextJudgement,
     ValidationFlag,
     ValidationResult,
     ValidationRubric,
@@ -83,12 +95,14 @@ __all__ = [
     "CalibrationItem",
     "CalibrationReport",
     "PairwiseResult",
+    "TextJudgement",
     "Severity",
     "ScoringMode",
     # Utilities
     "calibrate_against_human_labels",
     "compare_pairwise",
     "parse_judge_flags",
+    "parse_text_judgement",
     # Pricing
     "DEFAULT_MODELS",
     "JUDGE_PRICING_PER_M",
@@ -96,7 +110,9 @@ __all__ = [
     "lookup_judge_price",
     # Prompt building blocks (advanced users)
     "JUDGE_SYSTEM_PROMPT",
+    "TEXT_PAIR_SYSTEM_PROMPT",
     "build_system_prompt",
+    "build_text_pair_prompt",
     "build_user_prompt",
 ]
 

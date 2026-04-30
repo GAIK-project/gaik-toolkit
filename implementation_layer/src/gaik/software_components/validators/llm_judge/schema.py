@@ -182,6 +182,34 @@ class CalibrationReport:
 
 
 @dataclass
+class TextJudgement:
+    """Result of a text-vs-text semantic-equivalence judgement.
+
+    Use this for "is the extracted free-text value the same fact as
+    the expected one?" decisions where there is no source document to
+    consult — only two strings to compare. See
+    :meth:`gaik.software_components.validators.llm_judge.LLMJudge.judge_text_pair`.
+
+    Attributes:
+        equivalent: ``True`` when the two values carry the same factual
+            information (ignoring case, whitespace, morphology,
+            paraphrasing). ``False`` for any meaningful divergence.
+        severity: ``"ok"`` when equivalent, ``"suspect"`` for partial /
+            ambiguous matches, ``"wrong"`` for clear divergence.
+        score: Likert 1-5 (1 = clear divergence, 5 = identical meaning).
+            ``score >= 4`` is the conventional cut-off for "equivalent".
+        reason: Short (≤20 words) explanation of the verdict.
+        usage: Token + cost record for the call.
+    """
+
+    equivalent: bool
+    severity: Severity
+    score: int
+    reason: str
+    usage: JudgeUsage
+
+
+@dataclass
 class PairwiseResult:
     """Result of a pairwise A-vs-B comparison with optional position-bias mitigation.
 

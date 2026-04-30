@@ -188,6 +188,52 @@ env-vars work for both.
 
 ---
 
+## Text-vs-Text Equivalence (`judge_text_pair`)
+
+Sometimes there is no source PDF — only two strings to compare. For example,
+when scoring an audio-transcription extractor against hand-annotated free-text
+ground truth, exact-string match misses paraphrases and morphological variation
+("kärsätrukin kärsästä puuttuu pultti" vs "Kärsätrukista puuttui pultti" — same
+fact, different wording).
+
+`LLMJudge.judge_text_pair()` solves this by comparing the two values directly,
+no images required. Returns a small `TextJudgement` with severity, Likert
+score, and reason.
+
+```python
+from gaik.software_components.validators import LLMJudge
+
+judge = LLMJudge(model_provider="azure")
+
+verdict = judge.judge_text_pair(
+    extracted_text="Tietokonetta ei oltu lukittu.",
+    expected_text="Tietokonetta ei ollut lukittu.",
+    field_name="Mitä tapahtui",
+)
+print(verdict.equivalent, verdict.severity, verdict.score, verdict.reason)
+# True ok 5 'Identical meaning, only minor verb form variation.'
+```
+
+`ExtractionEvaluator(match_mode="semantic", judge=judge)` uses this method
+internally to grade ambiguous free-text fields on a 1–5 scale (`score >= 4`
+counts as a match).
+
+```python
+@dataclass
+class TextJudgement:
+    equivalent: bool                          # True if the two texts are the same fact
+    severity: Literal["ok", "suspect", "wrong"]
+    score: int                                 # Likert 1-5
+    reason: str
+    usage: JudgeUsage
+```
+
+See the [demo example](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_llm_judge_text_pair.py)
+for a runnable script that scores Finnish field pairs against an Azure-hosted
+gpt-5.4 deployment.
+
+---
+
 ## Use Cases
 
 - Purchase-order extraction QA (the original driver — see

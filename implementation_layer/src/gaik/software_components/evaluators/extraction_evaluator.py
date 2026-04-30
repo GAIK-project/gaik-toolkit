@@ -245,43 +245,29 @@ class ExtractionEvaluator:
     def _semantic_match(
         self, field_name: str, expected: Any, extracted: Any
     ) -> tuple[int, str]:
-        """Use the LLMJudge to grade ambiguous matches on a 1-5 Likert scale."""
-        from gaik.software_components.validators.llm_judge import (
-            ValidationRubric,
-        )
+        """Use ``LLMJudge.judge_text_pair`` to grade ambiguous matches on a 1-5 Likert scale.
 
-        # Re-use the judge: feed a tiny synthetic prompt by piggy-backing the
-        # rubric.field_checks as the comparison instructions. The judge will
-        # emit one Likert score per field; we only look at the first flag.
-        rubric = ValidationRubric(
-            scoring_mode="likert_1_5",
-            field_checks=[
-                f"Is the extracted value semantically equivalent to the expected "
-                f"value for field {field_name!r}? "
-                f"Expected: {expected!r}. Extracted: {extracted!r}."
-            ],
-        )
+        Replaces an older empty-bytes ``validate(source_pages=[b""])`` workaround
+        with a clean text-only call. Returns ``(score, reason)`` where
+        ``score >= 4`` is the conventional "equivalent" cut-off.
+        """
+        assert self.judge is not None
         try:
-            # We pass an empty source_pages because semantic-equivalence
-            # judgement here is text-only — but LLMJudge requires at least
-            # one image. Fall back to skipping judge if no images available.
-            assert self.judge is not None
-            result = self.judge.validate(
-                source_pages=[b""],  # empty placeholder
-                extracted={field_name: extracted, "__expected__": expected},
-                rubric=rubric,
+            judgement = self.judge.judge_text_pair(
+                extracted_text=str(extracted) if extracted is not None else "",
+                expected_text=str(expected) if expected is not None else "",
+                field_name=field_name,
             )
+        except ValueError:
+            # Both sides empty — caller should have short-circuited already.
+            return 5, "both empty"
         except Exception:  # pragma: no cover - judge / network failure
             logger.exception(
                 "Semantic match judge call failed for field %r; falling back to non-match",
                 field_name,
             )
             return 0, "judge call failed"
-
-        if not result.flags:
-            return 0, "judge returned no flags"
-        flag = result.flags[0]
-        return flag.score, flag.reason or "judge graded"
+        return judgement.score, judgement.reason or "judge graded"
 
 
 _MISSING = object()

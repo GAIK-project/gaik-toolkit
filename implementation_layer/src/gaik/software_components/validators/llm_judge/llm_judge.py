@@ -10,10 +10,16 @@ import time
 from typing import Any, Literal
 
 from .pricing import compute_judge_cost_usd
-from .prompts import build_system_prompt, build_user_prompt
+from .prompts import (
+    TEXT_PAIR_SYSTEM_PROMPT,
+    build_system_prompt,
+    build_text_pair_prompt,
+    build_user_prompt,
+)
 from .schema import (
     JudgeUsage,
     Severity,
+    TextJudgement,
     ValidationFlag,
     ValidationResult,
     ValidationRubric,
@@ -134,6 +140,73 @@ class LLMJudge:
         )
         return ValidationResult(flags=flags, raw_judge_text=raw_text, usage=usage)
 
+    def judge_text_pair(
+        self,
+        extracted_text: str,
+        expected_text: str,
+        field_name: str | None = None,
+        context: str | None = None,
+    ) -> TextJudgement:
+        """Judge two short texts for semantic equivalence (no source document).
+
+        Use case: scoring an extractor where free-text fields paraphrase the
+        same fact as the hand-annotated ground truth (e.g. Finnish audio
+        transcripts where ``"Kärsätrukista puuttui pultti"`` and
+        ``"kärsätrukin kärsästä puuttuu pultti"`` mean the same thing). No
+        page images are required — pure text-to-text.
+
+        Args:
+            extracted_text: The extractor's free-text value (any length).
+            expected_text: The reference / ground-truth value.
+            field_name: Optional field name to give the judge domain hints
+                (e.g. ``"Päivämäärä"``, ``"Tarkkailijan nimi"``).
+            context: Optional extra context (e.g. the surrounding transcript).
+
+        Returns:
+            :class:`TextJudgement` with ``equivalent`` (bool), ``severity``,
+            Likert ``score``, ``reason``, and per-call ``usage``.
+
+        Raises:
+            ValueError: when both inputs are empty (caller should not need
+                a judge for the trivial both-empty case).
+        """
+        if not extracted_text and not expected_text:
+            raise ValueError(
+                "Both extracted_text and expected_text are empty; "
+                "callers should short-circuit this case before invoking the judge."
+            )
+
+        user_prompt = build_text_pair_prompt(
+            extracted_text=extracted_text,
+            expected_text=expected_text,
+            field_name=field_name,
+            context=context,
+        )
+
+        t0 = time.perf_counter()
+        raw_text, input_tokens, output_tokens = self._dispatch_text(
+            user_prompt, TEXT_PAIR_SYSTEM_PROMPT
+        )
+        duration_s = time.perf_counter() - t0
+
+        equivalent, severity, score, reason = parse_text_judgement(raw_text)
+        usage = JudgeUsage(
+            provider=self.model_provider,
+            model=self.model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=input_tokens + output_tokens,
+            duration_s=duration_s,
+            cost_usd=compute_judge_cost_usd(self.model, input_tokens, output_tokens),
+        )
+        return TextJudgement(
+            equivalent=equivalent,
+            severity=severity,
+            score=score,
+            reason=reason,
+            usage=usage,
+        )
+
     # ── Provider callers ──────────────────────────────────────────
 
     def _dispatch(
@@ -150,6 +223,20 @@ class LLMJudge:
             "google": self._call_google,
         }[self.model_provider]
         return provider_call(source_pages, user_prompt, system_prompt)
+
+    def _dispatch_text(
+        self,
+        user_prompt: str,
+        system_prompt: str,
+    ) -> tuple[str, int, int]:
+        """Route a text-only call (no source images) to the right provider."""
+        provider_call = {
+            "openai": self._call_openai_text,
+            "azure": self._call_openai_text,
+            "anthropic": self._call_anthropic_text,
+            "google": self._call_google_text,
+        }[self.model_provider]
+        return provider_call(user_prompt, system_prompt)
 
     def _call_openai(
         self,
@@ -294,6 +381,110 @@ class LLMJudge:
         )
 
 
+    # ── Text-only provider callers (no images) ────────────────────
+
+    def _call_openai_text(
+        self,
+        user_prompt: str,
+        system_prompt: str,
+    ) -> tuple[str, int, int]:
+        from gaik.software_components.parsers.multimodal_parser.config import (
+            create_openai_client,
+            get_openai_config,
+        )
+
+        config = get_openai_config(use_azure=self.use_azure)
+        client = create_openai_client(config)
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "max_completion_tokens": self.max_tokens,
+            "response_format": {"type": "json_object"},
+        }
+        if self.reasoning_effort:
+            kwargs["reasoning_effort"] = self.reasoning_effort
+
+        resp = client.chat.completions.create(**kwargs)
+        text = resp.choices[0].message.content or ""
+        usage = resp.usage
+        return (
+            text,
+            getattr(usage, "prompt_tokens", 0) or 0,
+            getattr(usage, "completion_tokens", 0) or 0,
+        )
+
+    def _call_anthropic_text(
+        self,
+        user_prompt: str,
+        system_prompt: str,
+    ) -> tuple[str, int, int]:
+        from gaik.software_components.parsers.multimodal_parser.config import (
+            create_claude_client,
+            get_claude_config,
+        )
+
+        config = get_claude_config(use_azure=self.use_azure)
+        client = create_claude_client(config)
+        resp = client.messages.create(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        text = "".join(
+            block.text for block in resp.content if getattr(block, "type", "") == "text"
+        )
+        return text, resp.usage.input_tokens, resp.usage.output_tokens
+
+    def _call_google_text(
+        self,
+        user_prompt: str,
+        system_prompt: str,
+    ) -> tuple[str, int, int]:
+        from google import genai
+        from google.genai import types
+
+        if self.use_vertexai:
+            client = genai.Client(
+                vertexai=True,
+                project=os.environ["GOOGLE_VERTEXAI_PROJECT"],
+                location=os.environ.get("GOOGLE_VERTEXAI_LOCATION", "global"),
+            )
+        else:
+            api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get(
+                "GOOGLE_API_KEY"
+            )
+            if not api_key:
+                raise RuntimeError(
+                    "No Google credentials. Set GOOGLE_VERTEXAI_PROJECT (+ "
+                    "GOOGLE_APPLICATION_CREDENTIALS) and use_vertexai=True, "
+                    "or set GOOGLE_GEMINI_API_KEY."
+                )
+            client = genai.Client(api_key=api_key)
+
+        resp = client.models.generate_content(
+            model=self.model,
+            contents=[user_prompt],
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                response_mime_type="application/json",
+                max_output_tokens=self.max_tokens,
+            ),
+        )
+        text = resp.text or ""
+        meta = getattr(resp, "usage_metadata", None)
+        return (
+            text,
+            getattr(meta, "prompt_token_count", 0) or 0,
+            getattr(meta, "candidates_token_count", 0) or 0,
+        )
+
+
 def _strip_json_fences(raw_text: str) -> str:
     """Strip stray ```json``` markdown fences from a model response."""
     text = raw_text.strip()
@@ -351,6 +542,38 @@ def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
         except (TypeError, ValueError):
             continue
     return parsed
+
+
+def parse_text_judgement(raw_text: str) -> tuple[bool, Severity, int, str]:
+    """Parse the judge's text-pair JSON response.
+
+    Returns ``(equivalent, severity, score, reason)``. Tolerant of stray
+    markdown fences and minor JSON-shape variation. Falls back to
+    ``(False, "wrong", 0, "<unparseable: ...>")`` when the response cannot
+    be parsed — callers that want strictness can check ``score == 0``.
+    """
+    text = _strip_json_fences(raw_text)
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        snippet = text[:200].replace("\n", " ")
+        logger.warning(
+            "Could not decode text-pair judge response as JSON; first 200 chars: %s",
+            snippet,
+        )
+        return False, "wrong", 0, f"<unparseable: {snippet}>"
+
+    if not isinstance(data, dict):
+        return False, "wrong", 0, "<judge response was not a JSON object>"
+
+    severity_raw = str(data.get("severity", "")).lower()
+    severity: Severity = (
+        severity_raw if severity_raw in ("ok", "suspect", "wrong") else "wrong"  # type: ignore[assignment]
+    )
+    score = _clamp_score(data.get("score", 0))
+    equivalent = bool(data.get("equivalent", severity == "ok"))
+    reason = str(data.get("reason", "")).strip()
+    return equivalent, severity, score, reason
 
 
 def _clamp_score(raw: Any) -> int:
