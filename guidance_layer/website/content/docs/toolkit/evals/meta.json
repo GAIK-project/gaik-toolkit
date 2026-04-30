@@ -5,6 +5,7 @@
     "transcription-eval",
     "extraction-eval",
     "llm-judge",
+    "llm-judge-benchmark",
     "rag-eval",
     "report-writing-eval",
     "translation-eval"

@@ -188,8 +188,11 @@ finnish-rag-voikko = [
 
 # Evaluators — RAG-style and extraction-style metrics built on LLMJudge v2.
 # No new hard deps; semantic match mode and RAG metrics need llm-judge.
+# `datasets` lets the JudgeBenchmark harness load public HF datasets like
+# ScalerLab/JudgeBench for naive-vs-research prompt comparison.
 evaluators = [
     "gaik[llm-judge]",
+    "datasets>=2.14",
 ]
 
 # All features

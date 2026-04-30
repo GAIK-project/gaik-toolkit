@@ -53,7 +53,7 @@ class LLMJudge:
 
     Args:
         model_provider: ``"openai"`` | ``"azure"`` | ``"anthropic"`` | ``"google"``.
-            Default ``"google"`` (best F1 in the Luvata judge benchmark).
+            Default ``"google"`` (best F1 in our internal judge benchmark).
         model: Model id (or Azure deployment name). Defaults to a
             sensible per-provider value.
         use_azure: Only meaningful when ``model_provider == "openai"`` — switches

@@ -38,11 +38,11 @@ Example:
     >>> judge = LLMJudge(model_provider="google", model="gemini-3-flash-preview")
     >>> result = judge.validate(
     ...     source_pages=[png_bytes_page1],
-    ...     extracted=[{"item_index": 0, "quantity": "940"}],
+    ...     extracted=[{"item_index": 0, "quantity": "10"}],
     ...     rubric=ValidationRubric(
-    ...         vendor_id="copper-brass",
+    ...         vendor_id="acme-supply",
     ...         scoring_mode="likert_1_5",
-    ...         field_checks=["Quantity is integer pounds before decimal"],
+    ...         field_checks=["Quantity is the line-amount column, not the unit-price column"],
     ...     ),
     ... )
     >>> for flag in result.flags:
@@ -50,11 +50,23 @@ Example:
 """
 
 from .calibration import calibrate_against_human_labels
+from .judge_benchmark import (
+    BenchmarkReport,
+    JudgeBenchmark,
+    PairResult,
+    PromptScore,
+    PromptVariant,
+    report_to_dict,
+)
 from .llm_judge import DEFAULT_MODELS, LLMJudge, parse_judge_flags
 from .pairwise import compare_pairwise
 from .panel import LLMJudgePanel
 from .pricing import JUDGE_PRICING_PER_M, compute_judge_cost_usd, lookup_judge_price
 from .prompts import JUDGE_SYSTEM_PROMPT, build_system_prompt, build_user_prompt
+from .prompts_naive import (
+    NAIVE_PAIRWISE_SYSTEM,
+    RESEARCH_PAIRWISE_SYSTEM,
+)
 from .schema import (
     CalibrationItem,
     CalibrationReport,
@@ -73,6 +85,7 @@ __all__ = [
     # Judge classes
     "LLMJudge",
     "LLMJudgePanel",
+    "JudgeBenchmark",
     # Schema / data shapes
     "ValidationFlag",
     "ValidationRubric",
@@ -83,12 +96,17 @@ __all__ = [
     "CalibrationItem",
     "CalibrationReport",
     "PairwiseResult",
+    "BenchmarkReport",
+    "PromptScore",
+    "PairResult",
+    "PromptVariant",
     "Severity",
     "ScoringMode",
     # Utilities
     "calibrate_against_human_labels",
     "compare_pairwise",
     "parse_judge_flags",
+    "report_to_dict",
     # Pricing
     "DEFAULT_MODELS",
     "JUDGE_PRICING_PER_M",
@@ -98,6 +116,8 @@ __all__ = [
     "JUDGE_SYSTEM_PROMPT",
     "build_system_prompt",
     "build_user_prompt",
+    "NAIVE_PAIRWISE_SYSTEM",
+    "RESEARCH_PAIRWISE_SYSTEM",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

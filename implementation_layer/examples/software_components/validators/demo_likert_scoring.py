@@ -72,21 +72,21 @@ def main() -> None:
                 field="quantity",
                 severity="wrong",
                 score=1,
-                reason="PER column shows 1 LB but ordered qty is 4,279 LB",
-                suggested_value="4279",
+                reason="Document shows ordered qty 1500 in line-total column, not unit-price '15'",
+                suggested_value="1500",
             ),
         ],
     )
 
     rubric = ValidationRubric(
-        vendor_id="copper-brass",
+        vendor_id="acme-supply",
         scoring_mode="likert_1_5",
         evaluation_aspects=[
             "Quantity is the ordered amount, not the unit price",
-            "Quantity is integer pounds before the decimal",
+            "Quantity is integer units, not a decimal portion of another value",
         ],
         field_checks=[
-            "'4,279.940 LB' means 4279 pounds, not 940.",
+            "Watch for confusion between unit price and line quantity columns.",
         ],
         few_shot_examples=[few_shot],
     )

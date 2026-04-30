@@ -62,14 +62,14 @@ def main() -> None:
 
     pages = render_pages_to_png(SAMPLE_PDF)
     extracted = [
-        {"item_index": 0, "item_number": "0010", "quantity": "940"},
-        {"item_index": 1, "item_number": "0020", "quantity": "947"},
+        {"item_index": 0, "item_number": "0010", "quantity": "10"},
+        {"item_index": 1, "item_number": "0020", "quantity": "20"},
     ]
     rubric = ValidationRubric(
-        vendor_id="copper-brass",
+        vendor_id="acme-supply",
         scoring_mode="likert_1_5",
         field_checks=[
-            "Quantity is integer pounds before the decimal — '4,279.940 LB' = 4279.",
+            "Quantity is the ordered line amount, not a unit-price column or decimal fragment.",
         ],
     )
 

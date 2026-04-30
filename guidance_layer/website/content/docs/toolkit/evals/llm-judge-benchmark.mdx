@@ -1,0 +1,145 @@
+---
+title: LLM-Judge Prompt Benchmark
+description: Empirical comparison of naive 1-10 scoring vs the research-backed Likert + CoT + bias-mitigation prompt on a public dataset
+---
+
+## What this measures
+
+The [LLM-as-Judge Validation](/toolkit/evals/llm-judge) page argues, citing
+the [HuggingFace LLM Judge cookbook](https://huggingface.co/learn/cookbook/llm_judge)
+and several research papers, that an integer Likert prompt with explicit
+Chain-of-Thought ordering and anti-bias guidance produces more reliable
+judgements than a naive "score this 1-10" prompt. This benchmark turns
+that claim into a number.
+
+`JudgeBenchmark` runs the same model under two prompt variants on a
+public dataset, compares the predicted winner against ground truth, and
+reports which design wins. The harness is dataset-agnostic — JudgeBench
+is the default because it is open, peer-reviewed, and small enough to
+run cheaply.
+
+## Methodology
+
+| | |
+| --- | --- |
+| **Dataset** | [`ScalerLab/JudgeBench`](https://hf.co/datasets/ScalerLab/JudgeBench) — 350 challenging response pairs with ground-truth A>B / B>A labels, MIT licence ([arXiv 2410.12784](https://arxiv.org/abs/2410.12784)) |
+| **Sample size** | 50 rows (seed=42) from the `gpt` split |
+| **Judge model** | `gemini-3-flash-preview` via Vertex AI, thinking budget 0 |
+| **Prompt A — naive** | "Score response from 1-10. Pick the winner." No CoT, no bias guidance |
+| **Prompt B — research** | Likert 1-5, evaluate-before-scoring CoT, anti-verbosity / anti-formatting / anti-authority guidance |
+| **Position-bias mitigation** | swap-and-average for both prompts (each pair judged twice with A/B reversed; tie when passes disagree) |
+| **Metrics** | Accuracy vs ground truth, position-bias flip rate, ties, mean cost (USD), mean latency (s), score distribution |
+
+The harness is dataset-agnostic; you can pass any `(question,
+response_a, response_b, label)` source into `JudgeBenchmark.run()`.
+
+## Results
+
+<Callout type="info">
+Numbers below come from `results/judgebench-comparison/leaderboard.md`
+in the gaik-toolkit repository. Re-run the demo against the same seed
+to reproduce.
+</Callout>
+
+| Prompt | Accuracy | Position-bias flips | Ties | Mean cost (USD) | Mean latency (s) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `naive` | _placeholder_ | _placeholder_ | _placeholder_ | _placeholder_ | _placeholder_ |
+| `research` | _placeholder_ | _placeholder_ | _placeholder_ | _placeholder_ | _placeholder_ |
+
+### Score distribution
+
+The score histograms are the most readable artefact: they show
+*qualitatively* why naive 1-10 prompts are hard to use as a metric.
+
+- `naive`: _placeholder_
+- `research`: _placeholder_
+
+LLMs systematically oversaturate at the upper end of wide continuous
+scales — many "obviously correct" answers get a 9 or 10, while
+"obviously wrong" ones cluster at 6-7 instead of 1-2. Integer Likert
+1-5 forces discrimination because there are fewer points to spread
+across.
+
+## Reproducing
+
+```bash
+cd gaik-toolkit
+pip install -e ".[evaluators,llm-judge]"
+
+# Set provider env vars (Vertex shown; Azure / Anthropic also supported)
+export GOOGLE_VERTEXAI_PROJECT=<your-project>
+export GOOGLE_VERTEXAI_LOCATION=global
+export GOOGLE_APPLICATION_CREDENTIALS=<service-account.json>
+
+# Quick smoke (10 rows, ~$0.05)
+python implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py --n 10
+
+# Full run (50 rows, seed 42, writes leaderboard.md + summary.json)
+python implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py \
+    --n 50 \
+    --provider google \
+    --out results/judgebench-comparison/
+```
+
+## Plugging in your own data
+
+The HF loader is a convenience for the public dataset. The harness itself
+just wants a list of plain dicts:
+
+```python
+from gaik.software_components.validators.llm_judge import JudgeBenchmark
+
+rows = [
+    {
+        "pair_id": "case-1",
+        "question": "What is the boiling point of water at sea level?",
+        "response_a": "100 °C (212 °F).",
+        "response_b": "Around 95 °C in most conditions.",
+        "label": "A>B",
+    },
+    # ... more rows
+]
+
+bench = JudgeBenchmark(model_provider="google", model="gemini-3-flash-preview")
+report = bench.run(rows, prompts=("naive", "research"), swap_and_average=True)
+
+for s in report.prompts:
+    print(s.prompt, s.accuracy, s.position_bias_rate, s.mean_cost_usd)
+```
+
+Use this to run the same A/B comparison on your own pairwise data
+without touching the toolkit's source. If the same prompt-design
+advantage shows up on your data too, you have empirical evidence that
+the research-backed defaults are worth keeping.
+
+## Caveats
+
+- **N=50 is small** statistically — confidence intervals on accuracy
+  are wide. The benchmark is designed to demonstrate methodology and
+  give a directional signal, not to claim significance. Scale up the
+  `--n` flag if you need narrower bounds.
+- **JudgeBench is general** (knowledge / reasoning / math / coding
+  tasks). If you are evaluating a domain-specific judge — e.g. for
+  document extraction — pair this benchmark with a calibration run on
+  your own labelled data ([calibration utility](/toolkit/evals/llm-judge#calibration-against-human-labels)).
+- **Prompt-design effect can be model-dependent.** This run uses Gemini
+  3 Flash; the same prompt pair may give different deltas on Claude or
+  GPT. Add `--provider anthropic` / `--provider openai` to extend the
+  comparison.
+
+## Related docs
+
+- [LLM-as-Judge Validation](/toolkit/evals/llm-judge) — what the
+  research-backed prompt looks like, why every component is there
+- [Calibration against human labels](/toolkit/evals/llm-judge#calibration-against-human-labels)
+  — measure judge vs human agreement on your own data
+- [Pairwise comparison utility](/toolkit/evals/llm-judge#pairwise-ab-comparison)
+  — vision-based pairwise judging for extraction outputs
+
+## References
+
+- [HuggingFace LLM Judge cookbook](https://huggingface.co/learn/cookbook/llm_judge) — Likert vs continuous scales (~30 % human-correlation gain)
+- [JudgeBench paper (arXiv 2410.12784)](https://arxiv.org/abs/2410.12784) — the dataset and methodology
+- [Justice or Prejudice (OpenReview 2024)](https://openreview.net/forum?id=3GTtZFiajM) — position-bias swap mitigation
+- [Quantitative LLM Judges (arXiv 2506.02945)](https://arxiv.org/abs/2506.02945) — calibration adjustments at scale
+- [Mitigating Bias of LLM Evaluation (arXiv 2409.16788)](https://arxiv.org/abs/2409.16788) — anti-bias prompt construction

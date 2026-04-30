@@ -51,6 +51,14 @@ flowchart LR
     UI --> USER["👤 Human reviews"]
 ```
 
+<Callout type="info">
+**Wondering whether the research-backed prompt is actually worth it?**
+The [LLM-Judge Prompt Benchmark](/toolkit/evals/llm-judge-benchmark)
+runs the naive 1-10 baseline against the prompt design described below
+on the public [JudgeBench](https://hf.co/datasets/ScalerLab/JudgeBench)
+dataset and reports the empirical delta.
+</Callout>
+
 ### The simplest possible usage
 
 You do not need a calibration dataset, a panel of judges, or a pairwise
@@ -126,37 +134,37 @@ from gaik.software_components.validators import (
 
 # 1. The extractor's output (what the first LLM produced from the PDF)
 #    For the demo we hand-write it. In production this comes from the
-#    multimodal parser. Notice item_index=0 has quantity "940" — wrong
-#    by one decimal shift; the PDF actually shows "4279.940 LB".
+#    multimodal parser. Notice item_index=0 has quantity "10" — wrong;
+#    the PDF actually shows the line ordered for 1500 units (the "10"
+#    came from the unit-price column).
 extracted = [
     {
         "item_index": 0,
         "item_number": "10",
-        "material_number": "BUS-CU-110-220",
-        "quantity": "940",
+        "material_number": "PART-A-001",
+        "quantity": "10",
         "delivery_date": "2026-06-15",
     },
     {
         "item_index": 1,
         "item_number": "20",
-        "material_number": "BUS-CU-110-440",
-        "quantity": "1500",
+        "material_number": "PART-A-002",
+        "quantity": "500",
         "delivery_date": "2026-06-15",
     },
 ]
 
 # 2. Page images of the source PDF — render once, reuse for the judge
-pages = [Path("po_5400811766_page1.png").read_bytes()]
+pages = [Path("sample_po_page1.png").read_bytes()]
 
-# 3. Vendor rubric: a checklist of known failure modes for this supplier
-#    These are short instructions that nudge the judge toward the bugs
-#    we have actually seen in production data.
+# 3. Rubric: a checklist of failure modes you have seen on this kind
+#    of document. Short instructions nudge the judge toward the bugs
+#    that matter for your domain.
 rubric = ValidationRubric(
-    vendor_id="copper-brass",
+    vendor_id="acme-supply",
     scoring_mode="likert_1_5",
     field_checks=[
-        "quantity must equal the integer pounds shown before the decimal "
-        "point in the LB column (e.g. '4279.940 LB' -> 4279, not 940).",
+        "quantity must equal the line-amount column, not the unit-price column.",
         "delivery_date must be ISO format YYYY-MM-DD.",
         "material_number must match the part code printed on the PDF row.",
     ],
@@ -182,7 +190,7 @@ for f in result.flags:
     )
 
 # Expected output (judge correctly catches the planted bug):
-# item=0 field=quantity            severity=wrong    score=1/5 -> PDF shows 4279.940 LB; "940" is the decimal portion only.
+# item=0 field=quantity            severity=wrong    score=1/5 -> PDF shows line ordered for 1500; "10" is the unit-price column.
 # item=0 field=delivery_date       severity=ok       score=5/5 -> Matches PDF row 10.
 # item=0 field=material_number     severity=ok       score=5/5 -> Matches PDF row 10.
 # item=1 field=quantity            severity=ok       score=5/5 -> Matches PDF row 20.
@@ -285,6 +293,26 @@ The HuggingFace cookbook reference Pearson is ~0.84. If your judge is below
 that, iterate on the rubric (better field checks, more relevant evaluation
 aspects, 1-2 few-shot examples) and re-run.
 
+## Best practices — when to use which feature
+
+The full v2 surface is a **menu**, not a contract. Pick the smallest set
+that matches your use case; reach for the rest only when you have
+evidence you need them.
+
+| Need | Reach for | Skip if |
+| --- | --- | --- |
+| Spot-check extractor output, opt-in toggle in a UI | Single `LLMJudge.validate()` per record | Toggle is opt-in and low-risk — no calibration needed on day one |
+| Always-on validation gating customer-facing values | Calibration first ([Pearson r ≥ 0.7 vs ~30 human labels](#calibration-against-human-labels)), then deploy | You haven't shipped opt-in yet — add the toggle first, calibrate later |
+| High-stakes scoring where one judge's variance is the risk | `LLMJudgePanel` with 3 cross-provider judges | Latency / cost matter more than variance — sequential calls add up |
+| A/B-testing two prompt or model versions | `compare_pairwise(swap_and_average=True)` | You only have one version |
+| Quoting a tracked numeric KPI (e.g. dashboards) | `scoring_mode="likert_1_5"` so scores are comparable across runs | Severity-only is enough for the UI |
+| Empirical evidence that the research-backed prompt beats naive 1-10 | [`JudgeBenchmark`](/toolkit/evals/llm-judge-benchmark) on JudgeBench HF dataset | You trust the cited research and don't need to demo it |
+
+The [Luvata OC Builder](https://github.com/GAIK-project/Luvata) currently
+runs only the first row — single judge call, opt-in toggle, no
+calibration yet — and is in production. The advanced features are there
+when the use case justifies the extra complexity.
+
 ## Picking a model
 
 Benchmarked on five hand-curated Luvata test cases:
@@ -299,11 +327,11 @@ Benchmarked on five hand-curated Luvata test cases:
 
 ## Examples
 
-- [`demo_llm_judge.py`](https://github.com/aakselileskinen/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_llm_judge.py) — single-judge basic usage with Likert scoring.
-- [`demo_likert_scoring.py`](https://github.com/aakselileskinen/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_likert_scoring.py) — few-shot calibration on top of Likert mode.
-- [`demo_panel_jury.py`](https://github.com/aakselileskinen/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_panel_jury.py) — three-judge majority vote.
-- [`demo_pairwise.py`](https://github.com/aakselileskinen/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_pairwise.py) — A/B comparison with swap-and-average.
-- [`demo_calibration.py`](https://github.com/aakselileskinen/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_calibration.py) — Pearson-r calibration vs. a human-labeled dataset.
+- [`demo_llm_judge.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_llm_judge.py) — single-judge basic usage with Likert scoring.
+- [`demo_likert_scoring.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_likert_scoring.py) — few-shot calibration on top of Likert mode.
+- [`demo_panel_jury.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_panel_jury.py) — three-judge majority vote.
+- [`demo_pairwise.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_pairwise.py) — A/B comparison with swap-and-average.
+- [`demo_calibration.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_calibration.py) — Pearson-r calibration vs. a human-labeled dataset.
 
 ## Research references
 

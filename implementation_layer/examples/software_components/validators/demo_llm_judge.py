@@ -3,16 +3,16 @@
 Renders a sample purchase-order PDF to PNG bytes via PyMuPDF, then asks the
 ``LLMJudge`` to validate a deliberately-buggy extractor output against the
 document. Exercises the multi-provider switch by defaulting to Google Gemini
-(winner of the Luvata judge benchmark).
+(winner of an internal benchmark across providers).
 
 Requires either:
     - ``GOOGLE_VERTEXAI_PROJECT`` + ``GOOGLE_APPLICATION_CREDENTIALS`` (preferred), or
     - ``GOOGLE_GEMINI_API_KEY`` (fallback)
 
 Plus a small PDF at ``examples/software_components/validators/sample_po.pdf``.
-The Luvata test corpus has compatible files at
-``ParseBench/data-luvata/extraction-validation/cb-decimal-pounds-5400811766/source.pdf``
-— copy it in to demo locally.
+Provide any short purchase-order or invoice PDF with at least one numeric
+field — the demo plants a deliberate quantity bug to show the judge
+catching it.
 """
 
 from __future__ import annotations
@@ -63,15 +63,15 @@ def basic_example() -> None:
     pages = render_pages_to_png(SAMPLE_PDF)
     extracted = [
         # Deliberately-broken values — judge should flag them as wrong.
-        {"item_index": 0, "item_number": "0010", "quantity": "940"},
-        {"item_index": 1, "item_number": "0020", "quantity": "947"},
+        {"item_index": 0, "item_number": "0010", "quantity": "10"},
+        {"item_index": 1, "item_number": "0020", "quantity": "20"},
     ]
     rubric = ValidationRubric(
-        vendor_id="copper-brass",
+        vendor_id="acme-supply",
         scoring_mode="likert_1_5",
         field_checks=[
-            "Quantity is integer pounds before the decimal — '4,279.940 LB' = 4279, not 940.",
-            "Watch for the literal '1 LB' under PER column; it is not the ordered quantity.",
+            "Quantity is the ordered line amount, not the unit-price column.",
+            "Watch for confusion between line number and quantity columns.",
         ],
     )
 

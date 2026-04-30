@@ -42,7 +42,7 @@ already in the toolkit's core deps.
 from gaik.software_components.validators import LLMJudge, ValidationRubric
 
 judge = LLMJudge(
-    model_provider="google",                    # winner of Luvata judge benchmark
+    model_provider="google",                    # winner of internal judge benchmark
     model="gemini-3-flash-preview",
     use_vertexai=True,
 )
@@ -50,17 +50,17 @@ judge = LLMJudge(
 result = judge.validate(
     source_pages=[png_bytes_page1, png_bytes_page2],
     extracted=[
-        {"item_index": 0, "item_number": "0010", "quantity": "940"},
-        {"item_index": 1, "item_number": "0020", "quantity": "947"},
+        {"item_index": 0, "item_number": "0010", "quantity": "10"},
+        {"item_index": 1, "item_number": "0020", "quantity": "20"},
     ],
     rubric=ValidationRubric(
-        vendor_id="copper-brass",
+        vendor_id="acme-supply",
         scoring_mode="likert_1_5",                              # NEW
         evaluation_aspects=[                                    # NEW
             "Quantity is the ordered amount, not unit price",
         ],
         field_checks=[
-            "Quantity is integer pounds before decimal — '4,279.940 LB' = 4279.",
+            "Quantity is the line-amount column, not the unit-price column.",
         ],
     ),
 )
@@ -82,8 +82,8 @@ for working scripts:
 
 ## Picking a model
 
-We benchmarked seven judge models on five hand-curated Luvata test cases
-(see `ParseBench/results-luvata/judge-bench/BENCHMARK-REPORT.md`):
+We benchmarked seven judge models on a small hand-curated set of
+purchase-order extraction-validation test cases:
 
 | Pipeline | F1 | Precision | Recall | Cost / call | Latency |
 |---|---:|---:|---:|---:|---:|
