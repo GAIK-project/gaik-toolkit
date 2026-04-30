@@ -5,20 +5,18 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from gaik.software_components.evaluators import ExtractionEvaluator
 from gaik.software_components.evaluators.dataset import (
     EvaluationDataset,
     EvaluationItem,
 )
 from gaik.software_components.validators.llm_judge import (
-    LLMJudge,
     TEXT_PAIR_SYSTEM_PROMPT,
+    LLMJudge,
     TextJudgement,
     build_text_pair_prompt,
     parse_text_judgement,
 )
-
 
 # ── parse_text_judgement ────────────────────────────────────────────
 
@@ -33,7 +31,11 @@ def test_parse_text_judgement_clean_json():
 
 
 def test_parse_text_judgement_with_markdown_fence():
-    raw = '```json\n{"equivalent": false, "severity": "wrong", "score": 1, "reason": "diverges"}\n```'
+    raw = (
+        "```json\n"
+        '{"equivalent": false, "severity": "wrong", "score": 1, "reason": "diverges"}\n'
+        "```"
+    )
     eq, sev, sc, reason = parse_text_judgement(raw)
     assert eq is False
     assert sev == "wrong"

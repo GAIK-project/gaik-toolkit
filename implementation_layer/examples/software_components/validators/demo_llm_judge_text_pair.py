@@ -25,7 +25,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.validators import LLMJudge  # noqa: E402
 
-
 PAIRS = [
     # (field, expected, extracted, expected verdict)
     (
