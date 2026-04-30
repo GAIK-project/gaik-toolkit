@@ -203,6 +203,87 @@ TEXT_PAIR_SYSTEM_PROMPT = _TEXT_PAIR_SYSTEM
 """System prompt for :meth:`LLMJudge.judge_text_pair`."""
 
 
+_HALLUCINATION_SYSTEM = """\
+You are a hallucination detector for a structured-extraction output.
+
+Given:
+  1. A SOURCE document (e.g. an audio transcript or parsed text).
+  2. A JSON object with fields the upstream extractor produced.
+
+Identify any field whose VALUE is NOT directly supported by the source.
+
+A field is a hallucination when its value contains a fact, name, date,
+quantity, label, or claim that the source does not state. Inferences
+from domain context, default guesses, or "most likely" enum picks are
+hallucinations.
+
+A field is NOT a hallucination when:
+  - the source explicitly states the same fact (even paraphrased)
+  - the value is an empty string ""  (empty is never a hallucination)
+  - the field is a soft default that matches the field's documented
+    fallback rule (when the caller supplies one in the field hints)
+
+For each flagged field, output:
+  - "field":    the exact JSON key
+  - "value":    the extracted value (string-rendered)
+  - "severity": "wrong" (clearly hallucinated) or "suspect" (probably
+                hallucinated but the source is partially ambiguous)
+  - "reason":   why the value is unsupported, ≤25 words
+
+FIRST list the reason describing what you compared and saw, THEN assign
+the severity. This evaluation-before-judgement order avoids snap calls.
+
+Respond with ONLY a JSON object, no prose, no markdown fences:
+{
+  "flags": [
+    {"field": "tarkkailijan_organisaatio", "value": "Luvata Pori Oy",
+     "severity": "wrong",
+     "reason": "Speaker never names an employer; Luvata is a context-only signal."}
+  ]
+}
+
+If nothing is hallucinated, return {"flags": []}.
+"""
+
+HALLUCINATION_SYSTEM_PROMPT = _HALLUCINATION_SYSTEM
+"""System prompt for :meth:`LLMJudge.detect_hallucinations`."""
+
+
+def build_hallucination_prompt(
+    source_text: str,
+    extracted: dict,
+    field_descriptions: dict[str, str] | None = None,
+) -> str:
+    """Assemble the user-side prompt for a hallucination-detector call.
+
+    The source text is shown verbatim (truncated by the caller if needed).
+    ``field_descriptions`` is an optional ``{field_name: description}`` map
+    that gives the judge per-field rules — e.g. "this field defaults to
+    'turvallisuus' when the report type is unclear" — so the judge can
+    distinguish a documented soft default from a true hallucination.
+    """
+    lines: list[str] = []
+    if field_descriptions:
+        lines.append("Field rules (use these to decide what counts as 'unsupported'):")
+        for name, desc in field_descriptions.items():
+            short = desc.replace("\n", " ").strip()
+            if len(short) > 240:
+                short = short[:237] + "..."
+            lines.append(f"  - {name}: {short}")
+        lines.append("")
+    lines.append("Source document:")
+    lines.append("```text")
+    lines.append(source_text)
+    lines.append("```")
+    lines.append("")
+    lines.append("Extracted JSON:")
+    extracted_json = json.dumps(extracted, indent=2, ensure_ascii=False)
+    lines.append(f"```json\n{extracted_json}\n```")
+    lines.append("")
+    lines.append("Now flag any unsupported field values.")
+    return "\n".join(lines)
+
+
 def build_text_pair_prompt(
     extracted_text: str,
     expected_text: str,

@@ -221,6 +221,7 @@ flowchart LR
 - Domain-agnostic by default; pass an optional `ValidationRubric` with vendor-specific check sentences when you want targeted guidance
 - Cost tracking with longest-prefix model lookup so rotated model ids still resolve to a known rate
 - **Text-vs-text mode** (`judge.judge_text_pair(extracted, expected, field_name=...)`) compares two short strings for semantic equivalence without any source document — useful for scoring audio-transcription extractors against hand-annotated ground truth where exact-string match misses paraphrasing
+- **Schema-agnostic hallucination detector** (`judge.detect_hallucinations(source_text, extracted)`) inspects an extractor's JSON as a whole against a source document and returns one `HallucinationFlag` per problem field — drop-in replacement for hand-written keyword post-validators that only cover a single schema
 
 **Potential applications:**
 - Purchase-order extraction QA before sending the order downstream

@@ -234,6 +234,67 @@ gpt-5.4 deployment.
 
 ---
 
+## Hallucination Detection (`detect_hallucinations`)
+
+The third public method on `LLMJudge` flags fields whose values are not
+supported by a source document — a **schema-agnostic** alternative to
+hand-written keyword post-validators.
+
+Given a transcript (or any text source) and an extractor's structured
+output, the judge inspects the JSON as a whole and returns one
+`HallucinationFlag` per problem field. Empty fields are never flagged.
+
+```python
+from gaik.software_components.validators import LLMJudge
+
+judge = LLMJudge(model_provider="azure")
+
+report = judge.detect_hallucinations(
+    source_text="Moi, täällä Matti Möttönen. 26.8.25 huomasin pihalla...",
+    extracted={
+        "tarkkailijan_nimi": "Matti Möttönen",
+        "tarkkailijan_organisaatio": "Luvata Pori Oy",   # not stated
+        "ehdotus": "Jatkossa kannattaisi...",            # not stated
+        "rakennus": "Ulkoalueet",
+    },
+    field_descriptions={                                  # optional rules
+        "tarkkailijan_organisaatio":
+            "Return non-empty only if speaker explicitly names employer.",
+    },
+)
+
+for flag in report.flags:
+    print(flag.field, flag.severity, flag.reason)
+# tarkkailijan_organisaatio  wrong   Speaker did not name an employer; ...
+# ehdotus                    wrong   No suggestion was made in the source.
+```
+
+Use this to clear flagged values before persisting / showing them to the
+user. Cost is one LLM call per scrub (typically ≤ 200 output tokens), and
+the judge handles all fields in a single call rather than once per field.
+
+```python
+@dataclass
+class HallucinationFlag:
+    field: str                              # exact JSON key
+    value: str                              # extracted value (rendered)
+    severity: Literal["wrong", "suspect"]   # "ok" entries are dropped
+    reason: str                             # ≤25-word explanation
+
+
+@dataclass
+class HallucinationReport:
+    flags: list[HallucinationFlag]
+    raw_judge_text: str
+    usage: JudgeUsage
+```
+
+See the [demo example](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_detect_hallucinations.py)
+for a runnable script that scrubs a Finnish audio-incident-report
+extraction in two LLM calls.
+
+---
+
 ## Use Cases
 
 - Purchase-order extraction QA (the original driver — see

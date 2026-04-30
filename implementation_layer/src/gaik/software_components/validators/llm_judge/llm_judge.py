@@ -11,12 +11,16 @@ from typing import Any, Literal
 
 from .pricing import compute_judge_cost_usd
 from .prompts import (
+    HALLUCINATION_SYSTEM_PROMPT,
     TEXT_PAIR_SYSTEM_PROMPT,
+    build_hallucination_prompt,
     build_system_prompt,
     build_text_pair_prompt,
     build_user_prompt,
 )
 from .schema import (
+    HallucinationFlag,
+    HallucinationReport,
     JudgeUsage,
     Severity,
     TextJudgement,
@@ -139,6 +143,79 @@ class LLMJudge:
             cost_usd=compute_judge_cost_usd(self.model, input_tokens, output_tokens),
         )
         return ValidationResult(flags=flags, raw_judge_text=raw_text, usage=usage)
+
+    def detect_hallucinations(
+        self,
+        source_text: str,
+        extracted: dict,
+        *,
+        field_descriptions: dict[str, str] | None = None,
+    ) -> HallucinationReport:
+        """Identify fields in ``extracted`` whose values are not supported by ``source_text``.
+
+        A schema-agnostic post-extraction scrub for text-input pipelines
+        (audio transcripts, parsed documents). The judge inspects the JSON
+        as a whole and returns one :class:`HallucinationFlag` per problem
+        field — empty fields are never flagged. Designed to replace
+        bespoke keyword post-validators (which are tied to a specific
+        schema) with one provider call that scales to any field set.
+
+        Args:
+            source_text: The grounding text (typically a transcript or
+                parsed document body). The model decides hallucination by
+                checking whether each extracted value is implied by this
+                text.
+            extracted: The extractor's output, JSON-serialisable. Empty
+                fields are silently skipped — they cannot hallucinate.
+            field_descriptions: Optional ``{field_name: description}`` map
+                used to teach the judge per-field rules (e.g. "this
+                enum defaults to 'turvallisuus' when type is unclear" so
+                a documented soft default is not misflagged).
+
+        Returns:
+            :class:`HallucinationReport` with the list of flagged fields,
+            the raw model response, and per-call usage.
+
+        Raises:
+            ValueError: when ``source_text`` is empty (callers should not
+                run hallucination detection without a grounding source).
+        """
+        if not source_text:
+            raise ValueError(
+                "source_text is empty; cannot detect hallucinations without a "
+                "grounding source — short-circuit this case in the caller."
+            )
+
+        # Drop empty fields before showing to the judge — they are noise
+        # and can only ever be "ok".
+        non_empty = {k: v for k, v in extracted.items() if v not in ("", None)}
+        if not non_empty:
+            usage = JudgeUsage(provider=self.model_provider, model=self.model)
+            return HallucinationReport(flags=[], raw_judge_text="", usage=usage)
+
+        user_prompt = build_hallucination_prompt(
+            source_text=source_text,
+            extracted=non_empty,
+            field_descriptions=field_descriptions,
+        )
+
+        t0 = time.perf_counter()
+        raw_text, input_tokens, output_tokens = self._dispatch_text(
+            user_prompt, HALLUCINATION_SYSTEM_PROMPT
+        )
+        duration_s = time.perf_counter() - t0
+
+        flags = parse_hallucination_flags(raw_text)
+        usage = JudgeUsage(
+            provider=self.model_provider,
+            model=self.model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=input_tokens + output_tokens,
+            duration_s=duration_s,
+            cost_usd=compute_judge_cost_usd(self.model, input_tokens, output_tokens),
+        )
+        return HallucinationReport(flags=flags, raw_judge_text=raw_text, usage=usage)
 
     def judge_text_pair(
         self,
@@ -541,6 +618,54 @@ def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
             )
         except (TypeError, ValueError):
             continue
+    return parsed
+
+
+def parse_hallucination_flags(raw_text: str) -> list[HallucinationFlag]:
+    """Parse ``{"flags": [...]}`` JSON into typed :class:`HallucinationFlag`\\ s.
+
+    Tolerant of stray markdown fences. Returns an empty list when the
+    response is unparseable so callers can decide whether to retry.
+    Severity-only entries (no ``score``) are accepted.
+    """
+    text = _strip_json_fences(raw_text)
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        snippet = text[:200].replace("\n", " ")
+        logger.warning(
+            "Could not decode hallucination judge response as JSON; first 200 chars: %s",
+            snippet,
+        )
+        return []
+
+    flags = data.get("flags") if isinstance(data, dict) else data
+    if not isinstance(flags, list):
+        return []
+
+    parsed: list[HallucinationFlag] = []
+    for entry in flags:
+        if not isinstance(entry, dict):
+            continue
+        severity_raw = str(entry.get("severity", "")).lower()
+        if severity_raw not in ("ok", "suspect", "wrong"):
+            continue
+        # Drop entries the judge marked "ok" — by definition the report
+        # only carries fields the caller may want to clear.
+        if severity_raw == "ok":
+            continue
+        severity: Severity = severity_raw  # type: ignore[assignment]
+        field = str(entry.get("field", "")).strip()
+        if not field:
+            continue
+        parsed.append(
+            HallucinationFlag(
+                field=field,
+                value=str(entry.get("value", "")),
+                severity=severity,
+                reason=str(entry.get("reason", "")).strip(),
+            )
+        )
     return parsed
 
 

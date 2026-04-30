@@ -182,6 +182,51 @@ class CalibrationReport:
 
 
 @dataclass
+class HallucinationFlag:
+    """One field whose extracted value is not supported by the source.
+
+    Attributes:
+        field: The exact JSON key of the offending field.
+        value: The (string-rendered) value the extractor returned.
+        severity: ``"wrong"`` for clear hallucinations, ``"suspect"`` when
+            the model is unsure but the value seems unsupported. ``"ok"``
+            never appears here — the report only carries flagged fields.
+        reason: Short (≤25 word) explanation citing what the source does
+            or doesn't say.
+    """
+
+    field: str
+    value: str
+    severity: Severity
+    reason: str = ""
+
+
+@dataclass
+class HallucinationReport:
+    """Aggregate result from one ``LLMJudge.detect_hallucinations(...)`` call.
+
+    Use case: schema-agnostic post-extraction scrub. Given a source document
+    (transcript / parsed text) and an extractor's structured output, the
+    judge identifies fields whose values were not stated in the source and
+    likely came from training-data context or eager-completion bias.
+
+    Empty fields are never flagged. The report only contains entries the
+    caller may want to clear / re-prompt.
+
+    Attributes:
+        flags: One :class:`HallucinationFlag` per problem field. Empty when
+            the extractor's output is grounded.
+        raw_judge_text: The judge's untouched response (useful for
+            debugging or re-parsing with relaxed rules).
+        usage: Token + cost record for the call.
+    """
+
+    flags: list[HallucinationFlag]
+    raw_judge_text: str
+    usage: JudgeUsage
+
+
+@dataclass
 class TextJudgement:
     """Result of a text-vs-text semantic-equivalence judgement.
 
