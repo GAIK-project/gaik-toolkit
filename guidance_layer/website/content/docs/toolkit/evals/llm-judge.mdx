@@ -97,7 +97,16 @@ variants. Skip them on day one.
 ## Quick start
 
 ```python
+import fitz  # pymupdf — render the source PDF to PNG bytes
 from gaik.software_components.validators import LLMJudge, ValidationRubric
+
+# Render every page of the source PDF to PNG bytes. The judge sees
+# images, not the PDF itself — see the note below the snippet.
+doc = fitz.open("invoice.pdf")
+matrix = fitz.Matrix(150 / 72, 150 / 72)
+source_pages = [page.get_pixmap(matrix=matrix, alpha=False).tobytes("png")
+                for page in doc]
+doc.close()
 
 judge = LLMJudge(
     model_provider="google",
@@ -106,17 +115,26 @@ judge = LLMJudge(
 )
 
 result = judge.validate(
-    source_pages=[png_bytes_page1],
-    extracted=[{"item_index": 0, "quantity": "940"}],
+    source_pages=source_pages,
+    extracted=[{"item_index": 0, "quantity": "10"}],
     rubric=ValidationRubric(
         scoring_mode="likert_1_5",
-        field_checks=["Quantity is integer pounds before decimal"],
+        field_checks=["Quantity is the line-amount column, not unit-price"],
     ),
 )
 
 for flag in result.flags:
     print(flag.field, flag.severity, f"{flag.score}/5", flag.reason)
 ```
+
+<Callout type="info">
+**`source_pages` is a list of PNG bytes, not the PDF.** The judge LLM is
+vision-based: the caller renders the document once (PyMuPDF shown above)
+and hands the pixel bytes in. The judge does not re-parse the PDF — it
+compares what the first extractor produced (the `extracted` JSON)
+against what it sees in the page images, exactly as a human reviewer
+would.
+</Callout>
 
 ## End-to-end synthetic example
 

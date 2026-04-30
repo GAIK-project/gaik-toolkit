@@ -39,24 +39,34 @@ already in the toolkit's core deps.
 ## Quick Start
 
 ```python
+import fitz  # pymupdf — render the source PDF to page images
 from gaik.software_components.validators import LLMJudge, ValidationRubric
 
+# 1. Render the source document to PNG bytes — the judge is vision-based
+#    and needs to SEE the page, not parse the PDF itself.
+doc = fitz.open("invoice.pdf")
+matrix = fitz.Matrix(150 / 72, 150 / 72)  # 150 DPI is plenty
+source_pages = [page.get_pixmap(matrix=matrix, alpha=False).tobytes("png")
+                for page in doc]
+doc.close()
+
+# 2. Run the judge against (page images + extractor's JSON + rubric).
 judge = LLMJudge(
-    model_provider="google",                    # winner of internal judge benchmark
-    model="gemini-3-flash-preview",
+    model_provider="google",
+    model="gemini-3-flash-preview",  # winner of our internal judge benchmark
     use_vertexai=True,
 )
 
 result = judge.validate(
-    source_pages=[png_bytes_page1, png_bytes_page2],
+    source_pages=source_pages,
     extracted=[
         {"item_index": 0, "item_number": "0010", "quantity": "10"},
         {"item_index": 1, "item_number": "0020", "quantity": "20"},
     ],
     rubric=ValidationRubric(
         vendor_id="acme-supply",
-        scoring_mode="likert_1_5",                              # NEW
-        evaluation_aspects=[                                    # NEW
+        scoring_mode="likert_1_5",
+        evaluation_aspects=[
             "Quantity is the ordered amount, not unit price",
         ],
         field_checks=[
@@ -70,6 +80,20 @@ for flag in result.flags:
 
 print(f"Cost: ${result.usage.cost_usd:.4f}, duration: {result.usage.duration_s:.1f}s")
 ```
+
+### What `source_pages` is (and is not)
+
+`source_pages` is a `list[bytes]` of PNG-encoded page images — one entry
+per page of the source document. The judge LLM is vision-capable and
+reads pixels: it does **not** receive the PDF directly and does not
+re-parse it. The caller renders the PDF to PNGs once (PyMuPDF / `fitz`
+shown above) and hands the bytes in.
+
+This is intentional: the judge is comparing what the first extractor
+produced against what the document actually shows visually, exactly as
+a human reviewer would. The same code path works for any source
+document — PDF, scanned image, screenshot — as long as you can render
+it to PNG bytes.
 
 See the [examples folder](../../../../examples/software_components/validators/)
 for working scripts:
