@@ -250,23 +250,28 @@ from gaik.software_components.validators import LLMJudge
 judge = LLMJudge(model_provider="azure")
 
 report = judge.detect_hallucinations(
-    source_text="Moi, täällä Matti Möttönen. 26.8.25 huomasin pihalla...",
+    source_text=(
+        "Maintenance round on 2025-09-12. Coolant leak under unit B; "
+        "absorbent mat applied. Source not yet identified."
+    ),
     extracted={
-        "tarkkailijan_nimi": "Matti Möttönen",
-        "tarkkailijan_organisaatio": "Luvata Pori Oy",   # not stated
-        "ehdotus": "Jatkossa kannattaisi...",            # not stated
-        "rakennus": "Ulkoalueet",
+        "report_date": "2025-09-12",
+        "location": "unit B",
+        "issue_type": "coolant leak",
+        "actions_taken": "absorbent mat applied",
+        "priority": "high",                     # not stated
+        "follow_up_date": "2025-09-15",         # not stated
     },
-    field_descriptions={                                  # optional rules
-        "tarkkailijan_organisaatio":
-            "Return non-empty only if speaker explicitly names employer.",
+    field_descriptions={                         # optional per-field rules
+        "priority":
+            "Return only if explicitly classified in the source.",
     },
 )
 
 for flag in report.flags:
     print(flag.field, flag.severity, flag.reason)
-# tarkkailijan_organisaatio  wrong   Speaker did not name an employer; ...
-# ehdotus                    wrong   No suggestion was made in the source.
+# priority         wrong   Source describes the issue but never assigns a priority.
+# follow_up_date   wrong   No follow-up date is stated in the source.
 ```
 
 Use this to clear flagged values before persisting / showing them to the

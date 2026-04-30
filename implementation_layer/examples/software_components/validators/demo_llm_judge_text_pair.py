@@ -1,14 +1,15 @@
 """LLMJudge text-vs-text equivalence demo.
 
-Compares two short Finnish strings for semantic equivalence using
+Compares two short strings for semantic equivalence using
 ``LLMJudge.judge_text_pair`` — no source document required.
 
-Use case: scoring an audio-transcription extractor where the extracted
-free-text field paraphrases the same fact as the hand-annotated ground
-truth. Exact-string matching scores those wrong; the text-pair judge
-recognises them as equivalent.
+Use case: scoring an extractor where the extracted free-text field
+paraphrases the same fact as the hand-annotated ground truth. Exact-
+string matching scores those wrong; the text-pair judge recognises them
+as equivalent. Works across languages (the judge prompt is in English
+but the values inside can be any language the underlying LLM handles).
 
-Requires Azure OpenAI credentials (the default `model_provider="azure"`):
+Requires Azure OpenAI credentials (the default ``model_provider="azure"``):
     AZURE_API_KEY, AZURE_ENDPOINT, AZURE_DEPLOYMENT, AZURE_API_VERSION
 """
 
@@ -25,38 +26,39 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.validators import LLMJudge  # noqa: E402
 
+# Each tuple: (field name, expected text, extracted text, expected verdict).
+# Mixes English and Finnish to show the judge handles either; nothing here
+# references a specific organisation, person, or location.
 PAIRS = [
-    # (field, expected, extracted, expected verdict)
     (
-        "Mitä tapahtui",
-        "Tietokonetta ei ollut lukittu.",
-        "Tietokonetta ei oltu lukittu.",
-        "ok",
+        "incident_summary",
+        "The computer was not locked.",
+        "Computer left unlocked at the workstation.",
+        "ok",          # same fact, different phrasing
     ),
     (
-        "Tapahtumapaikan tarkenne",
+        "location_detail",
         "kieppipeittaus",
         "kieppipeittauksessa",
-        "ok",
+        "ok",          # Finnish morphological case variation
     ),
     (
-        "Mitä tapahtui",
-        "Solmukiepit aiheuttavat tuotannon hidastumista.",
-        "Solmukiepit lisäävät tuottavuutta.",
-        "wrong",
+        "incident_summary",
+        "Coolant leaked under unit B.",
+        "Production output increased by 12 %.",
+        "wrong",       # entirely different facts
     ),
     (
-        "Päivämäärä",
+        "report_date",
         "26.8.2025",
         "2025-08-26",
-        "ok",
+        "ok",           # same date, different format
     ),
 ]
 
 
 def main() -> None:
     judge = LLMJudge(model_provider="azure")
-
     for field_name, expected, extracted, predicted in PAIRS:
         print(f"\nField: {field_name}")
         print(f"  Expected:  {expected!r}")

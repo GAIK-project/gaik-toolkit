@@ -20,14 +20,14 @@ from gaik.software_components.validators.llm_judge import (
 def test_parse_hallucination_flags_clean_json():
     raw = (
         '{"flags": ['
-        '{"field": "org", "value": "Luvata Pori Oy", "severity": "wrong",'
+        '{"field": "org", "value": "Acme Corp", "severity": "wrong",'
         ' "reason": "Speaker did not name an employer."}'
         "]}"
     )
     flags = parse_hallucination_flags(raw)
     assert len(flags) == 1
     assert flags[0].field == "org"
-    assert flags[0].value == "Luvata Pori Oy"
+    assert flags[0].value == "Acme Corp"
     assert flags[0].severity == "wrong"
 
 
@@ -36,7 +36,7 @@ def test_parse_hallucination_flags_drops_ok_entries():
     raw = (
         '{"flags": ['
         '{"field": "name", "value": "Matti", "severity": "ok", "reason": "stated"},'
-        '{"field": "org", "value": "Luvata", "severity": "wrong", "reason": "no"}'
+        '{"field": "org", "value": "Acme", "severity": "wrong", "reason": "no"}'
         "]}"
     )
     flags = parse_hallucination_flags(raw)
@@ -130,18 +130,18 @@ def test_detect_hallucinations_short_circuits_when_extracted_all_empty():
 def test_detect_hallucinations_returns_flags():
     judge = LLMJudge(model_provider="azure")
     fake = (
-        '{"flags": [{"field": "org", "value": "Luvata Pori Oy",'
-        ' "severity": "wrong", "reason": "Speaker did not name an employer"}]}'
+        '{"flags": [{"field": "priority", "value": "high",'
+        ' "severity": "wrong", "reason": "Source never assigns a priority"}]}'
     )
     with patch.object(judge, "_dispatch_text", return_value=(fake, 100, 30)) as dispatch:
         report = judge.detect_hallucinations(
-            source_text="Moi, täällä Matti Möttönen. 26.8.25 huomasin pihalla...",
-            extracted={"name": "Matti Möttönen", "org": "Luvata Pori Oy"},
+            source_text="Routine maintenance round on 2025-09-12. Coolant leak under unit B.",
+            extracted={"location": "unit B", "priority": "high"},
         )
     dispatch.assert_called_once()
     assert len(report.flags) == 1
     assert isinstance(report.flags[0], HallucinationFlag)
-    assert report.flags[0].field == "org"
+    assert report.flags[0].field == "priority"
     assert report.flags[0].severity == "wrong"
     assert report.usage.input_tokens == 100
     assert report.usage.output_tokens == 30

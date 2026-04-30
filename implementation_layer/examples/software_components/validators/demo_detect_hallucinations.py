@@ -1,13 +1,13 @@
 """LLMJudge.detect_hallucinations() demo — schema-agnostic post-extraction scrub.
 
-Given a source transcript and an extractor's structured output, the judge
-flags any field whose value is not directly supported by the source.
+Given a source text and an extractor's structured output, the judge flags
+any field whose value is not directly supported by the source. Drop the
+flagged values to ``""`` to clean up hallucinated extraction outputs.
 
 Use case: a generic alternative to handwritten keyword post-validators
-(which need a separate config per schema). Drop the flagged values to
-``""`` to clean up hallucinated extraction outputs.
+(which need a separate config per schema).
 
-Requires Azure OpenAI credentials (default ``model_provider="azure"``):
+Requires Azure OpenAI credentials (the default ``model_provider="azure"``):
     AZURE_API_KEY, AZURE_ENDPOINT, AZURE_DEPLOYMENT, AZURE_API_VERSION
 """
 
@@ -24,23 +24,33 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.validators import LLMJudge  # noqa: E402
 
+# A short maintenance log entry — the kind of source text a structured
+# extractor might be asked to summarise into JSON fields.
 TRANSCRIPT = (
-    "Moi, täällä Matti Möttönen. 26.8.25 kulkiessani pihalla huomasin, "
-    "että alihankkijan vesikärry oli parkkeerattu esimerkillisesti "
-    "väljään kohtaan pihaa."
+    "Maintenance round on 2025-09-12. The technician reported a coolant "
+    "leak under unit B and applied an absorbent mat. The leak source was "
+    "not identified during this visit."
 )
 
 # A typical extractor output: most fields grounded, two hallucinated
-# (organisation guessed from domain context, suggestion invented).
+# (priority guessed from domain context, follow-up date invented).
 EXTRACTED = {
-    "tarkkailijan_nimi": "Matti Möttönen",
-    "tarkkailijan_organisaatio": "Luvata Pori Oy",  # ← hallucination
-    "paivamaara": "26.8.25",
-    "rakennus": "Ulkoalueet",
-    "tapahtumapaikan_tarkenne": "pihalla",
-    "mita_tapahtui": "Vesikärry parkkeerattu hyvin.",
-    "lahella_piti_tilanne": "Ei",
-    "ehdotus": "Jatkossa kannattaisi merkitä myös pyöräkiilat.",  # ← invented
+    "report_date": "2025-09-12",
+    "location": "unit B",
+    "issue_type": "coolant leak",
+    "actions_taken": "absorbent mat applied",
+    "priority": "high",                # ← hallucinated: source never says priority
+    "follow_up_date": "2025-09-15",    # ← hallucinated: source never says when
+}
+
+# Optional per-field rules teach the judge which "soft defaults" are
+# documented (and therefore not hallucinations). Pass an empty dict when
+# no such rules exist.
+FIELD_RULES = {
+    "priority": (
+        "Return only if explicitly classified in the source "
+        "(e.g. 'priority high', 'low priority'). Domain context is not enough."
+    ),
 }
 
 
@@ -49,13 +59,14 @@ def main() -> None:
     report = judge.detect_hallucinations(
         source_text=TRANSCRIPT,
         extracted=EXTRACTED,
+        field_descriptions=FIELD_RULES,
     )
-    print(f"Source transcript:\n  {TRANSCRIPT}\n")
-    print("Extracted (input):")
+    print(f"Source:\n  {TRANSCRIPT}\n")
+    print("Extractor output:")
     for k, v in EXTRACTED.items():
         print(f"  {k}: {v!r}")
     print()
-    print(f"Judge flagged {len(report.flags)} hallucinations:")
+    print(f"Judge flagged {len(report.flags)} hallucination(s):")
     for flag in report.flags:
         print(f"  - {flag.field} = {flag.value!r}  ({flag.severity})")
         print(f"    reason: {flag.reason}")

@@ -159,7 +159,7 @@ def _render_few_shot_block(examples: list[FewShotExample]) -> str:
     return "\n".join(blocks)
 
 
-_TEXT_PAIR_SYSTEM = """\
+TEXT_PAIR_SYSTEM_PROMPT = """\
 You compare two short text values for semantic equivalence.
 
 Decide whether the EXTRACTED value carries the same factual information
@@ -199,11 +199,8 @@ Respond with ONLY a JSON object (no prose, no markdown fences):
 }
 """
 
-TEXT_PAIR_SYSTEM_PROMPT = _TEXT_PAIR_SYSTEM
-"""System prompt for :meth:`LLMJudge.judge_text_pair`."""
 
-
-_HALLUCINATION_SYSTEM = """\
+HALLUCINATION_SYSTEM_PROMPT = """\
 You are a hallucination detector for a structured-extraction output.
 
 Given:
@@ -236,17 +233,14 @@ the severity. This evaluation-before-judgement order avoids snap calls.
 Respond with ONLY a JSON object, no prose, no markdown fences:
 {
   "flags": [
-    {"field": "tarkkailijan_organisaatio", "value": "Luvata Pori Oy",
+    {"field": "priority", "value": "high",
      "severity": "wrong",
-     "reason": "Speaker never names an employer; Luvata is a context-only signal."}
+     "reason": "Source describes the issue but never assigns a priority level."}
   ]
 }
 
 If nothing is hallucinated, return {"flags": []}.
 """
-
-HALLUCINATION_SYSTEM_PROMPT = _HALLUCINATION_SYSTEM
-"""System prompt for :meth:`LLMJudge.detect_hallucinations`."""
 
 
 def build_hallucination_prompt(
