@@ -32,6 +32,7 @@ from pydantic import (
     constr,
     create_model,
     field_validator,
+    model_validator,
 )
 
 from gaik.observability import (
@@ -51,7 +52,8 @@ from gaik.software_components.llm.base import ProviderClient
 
 SYSTEM_PARSER = (
     "You convert text into strictly structured data according to the provided schema. "
-    "Never invent values. If uncertain or missing, return null. "
+    "Never invent values. If a value is uncertain or missing, use the field's default "
+    "value (empty string for text fields, null for numeric fields). "
     "Do not include explanations or extra keys or extra fields."
 )
 
@@ -137,15 +139,35 @@ AllowedTypes = Literal["str", "int", "float", "bool", "list[str]", "date", "deci
 class FieldSpec(BaseModel):
     """Specification for a single field to extract."""
 
-    field_name: str = Field(description="snake_case field name, must start with a letter")
+    field_name: str = Field(description="Field identifier in lowercase_with_underscores format")
     field_type: AllowedTypes = Field(description="Type of the field")
     description: str
-    required: bool = True
+    required_in_output: bool = Field(
+        default=True, description="Must this key appear in every output object?"
+    )
+    nullable: bool = Field(default=False, description="Is None an allowed value?")
     enum: list[str] | None = Field(default=None, description="Allowed values (if enumerated)")
+    default: str | None = Field(default=None, description="Fallback value from the task")
+    has_explicit_default: bool = Field(
+        default=False, description="True when the task explicitly stated a default"
+    )
+    required: bool = True
     pattern: str | None = Field(default=None, description="Regex to validate strings (optional)")
     format: str | None = Field(
         default=None, description="Output format (e.g., date strftime format)"
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _compat_required_to_nullable(cls, data):
+        if isinstance(data, dict) and "required" in data and "nullable" not in data:
+            data["nullable"] = not data["required"]
+        return data
+
+    @model_validator(mode="after")
+    def _sync_required_from_policy(self):
+        self.required = self.required_in_output and not self.nullable
+        return self
 
     @field_validator("field_name")
     @classmethod
@@ -451,6 +473,19 @@ FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
    - "Company name" -> field_type='str'
    - "General remarks" -> field_type='str'
 
+10. DEFAULT VALUES (default, has_explicit_default):
+   Set has_explicit_default=True when the task says "default is X",
+   "if unclear return X", "otherwise return X", or states a primary value
+   for an enum/binary choice. Set 'default' to that value.
+
+11. NULLABILITY (nullable):
+   Default to nullable=False. Set True only when task explicitly allows
+   null/None. If task says "do not use null" or "missing → ''", nullable=False.
+
+12. REQUIRED IN OUTPUT (required_in_output):
+   Default to True. Set False only when the task says "omit if not found"
+   or "include only if present".
+
 PRIORITY ORDER: When uncertain, apply rules in this order:
 1. Check for explicit enum values first (brackets, slashes)
 2. Check for date-related keywords
@@ -500,7 +535,14 @@ def parse_user_requirements(
                 "into the target schema.\n"
                 "Apply the type detection rules to determine "
                 "the correct field_type for each field.\n"
-                "If a field cannot be identified reliably, omit it.\n"
+                "If a field cannot be identified reliably, omit it.\n\n"
+                "For each field, also determine:\n"
+                "- required_in_output: must the key appear in every output object?\n"
+                "- nullable: does the task explicitly allow null/None?\n"
+                "- default + has_explicit_default: does the task state a fallback value?\n"
+                "- enum: include '' in enum only when empty string is an allowed value.\n\n"
+                "Do not confuse a missing value with an optional field.\n"
+                "A field may be required in output and still have '' as its value.\n"
                 + TYPE_DETECTION_RULES
                 + "\n\nRequirements to parse:\n```txt\n"
                 + cleaned_description
@@ -510,7 +552,7 @@ def parse_user_requirements(
         response_format=ExtractionRequirements,
     )
     req = resp.choices[0].message.parsed
-    _apply_type_overrides(req)
+    _apply_type_overrides(req, original_text=cleaned_description)
     if _usage_sink is not None:
         _usage_sink.append(openai_usage_to_dict(resp))
     if getattr(resp, "usage", None):
@@ -527,6 +569,7 @@ def _clean_requirements_text(text: str) -> str:
 
 # Date format patterns to detect from user requirements
 DATE_FORMAT_PATTERNS: dict[str, str] = {
+    # English: DD, MM, YYYY
     "dd/mm/yyyy": "%d/%m/%Y",
     "dd/mm/yyy": "%d/%m/%Y",
     "dd-mm-yyyy": "%d-%m-%Y",
@@ -536,6 +579,18 @@ DATE_FORMAT_PATTERNS: dict[str, str] = {
     "yyyy-mm-dd": "%Y-%m-%d",
     "yyyy/mm/dd": "%Y/%m/%d",
     "yyyy.mm.dd": "%Y.%m.%d",
+    # Finnish: pp (päivä), kk (kuukausi), vvvv (vuosi)
+    "pp/kk/vvvv": "%d/%m/%Y",
+    "pp-kk-vvvv": "%d-%m-%Y",
+    "pp.kk.vvvv": "%d.%m.%Y",
+    "vvvv-kk-pp": "%Y-%m-%d",
+    "vvvv.kk.pp": "%Y.%m.%d",
+    # German: TT (Tag), MM (Monat), JJJJ (Jahr)
+    "tt/mm/jjjj": "%d/%m/%Y",
+    "tt-mm-jjjj": "%d-%m-%Y",
+    "tt.mm.jjjj": "%d.%m.%Y",
+    "jjjj-mm-tt": "%Y-%m-%d",
+    "jjjj.mm.tt": "%Y.%m.%d",
 }
 
 # Date-related keywords in multiple languages for field detection
@@ -576,7 +631,9 @@ def _is_date_field(name: str, description: str) -> bool:
     return False
 
 
-def _apply_type_overrides(requirements: ExtractionRequirements) -> None:
+def _apply_type_overrides(
+    requirements: ExtractionRequirements, original_text: str = ""
+) -> None:
     """
     Apply deterministic heuristics to FieldSpec entries to enforce critical types
     even when the LLM guesses incorrectly (e.g., date fields must be typed as date).
@@ -586,8 +643,9 @@ def _apply_type_overrides(requirements: ExtractionRequirements) -> None:
     for field in requirements.fields:
         if _is_date_field(field.field_name, field.description):
             field.field_type = "date"
-            # Detect date format from description (e.g., "DD/MM/YYYY")
             detected_format = _detect_date_format(field.description)
+            if not detected_format and original_text:
+                detected_format = _detect_date_format(original_text)
             if detected_format:
                 field.format = detected_format
 
@@ -653,36 +711,46 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
 
     for f in requirements.fields:
         py_type = base_types[f.field_type]
-
-        # Constrain strings when possible
         annotated: object = py_type
+
         if f.field_type == "str" and f.pattern:
             annotated = Annotated[str, constr(pattern=f.pattern)]
         elif f.field_type == "decimal":
-            annotated = Decimal  # leave numeric constraints to normalization/validation
+            annotated = Decimal
 
-        # Enums -> Literal[...] for strict checking
         if f.enum:
-            # Build a Literal[...] dynamically; acceptable for runtime checks
-            annotated = Literal[tuple(f.enum)]  # type: ignore[misc,call-arg]
+            if f.has_explicit_default:
+                if f.default not in f.enum:
+                    f.enum.append(f.default)
+                annotated = Literal[tuple(f.enum)]  # type: ignore[misc,call-arg]
+            else:
+                values = [""] + f.enum if "" not in f.enum else f.enum
+                annotated = Literal[tuple(values)]  # type: ignore[misc,call-arg]
 
-        # Optionality
-        #
-        # `required_default = ...` keeps `required=True` fields present in the
-        # LLM response (no default → strict structured-output still requires
-        # the key). But the annotation always allows `None` because the
-        # SYSTEM_PARSER explicitly instructs the LLM to "return null" when a
-        # value is uncertain or missing. Without the `| None`, pydantic rejects
-        # those intentional nulls for non-string fields like `decimal`, `int`,
-        # and `float`, failing the whole extraction instead of returning the
-        # fields that did succeed.
-        required_default = ... if f.required else None
-        typ = annotated | None
+        if f.nullable:
+            annotated = annotated | None
 
-        field_defs[f.field_name] = (
-            typ,
-            Field(default=required_default, description=f.description),
-        )
+        if f.has_explicit_default:
+            default_val = f.default
+        elif f.nullable:
+            default_val = None
+        elif f.field_type in ("list[str]", "list[dict]"):
+            default_val = []
+        elif f.enum and not f.has_explicit_default:
+            default_val = ""
+        else:
+            default_val = ...
+
+        if f.field_type in ("list[str]", "list[dict]") and default_val == []:
+            field_defs[f.field_name] = (
+                annotated,
+                Field(default_factory=list, description=f.description),
+            )
+        else:
+            field_defs[f.field_name] = (
+                annotated,
+                Field(default=default_val, description=f.description),
+            )
 
     suffix = "_Extraction"
     base_name = sanitize_model_name(requirements.use_case_name, suffix=suffix)
@@ -792,9 +860,11 @@ def normalize_extracted_data(
             continue
 
         if spec.field_type == "date":
-            # Use format from field spec if available, otherwise use default
-            date_format = spec.format if spec.format else default_date_format
-            result[key] = parse_date(value, date_format)
+            if isinstance(value, str) and not value.strip():
+                result[key] = value
+            else:
+                date_format = spec.format if spec.format else default_date_format
+                result[key] = parse_date(value, date_format)
         elif spec.field_type == "list[str]":
             if isinstance(value, str):
                 result[key] = [s.strip() for s in re.split(r"[;,]", value) if s.strip()]
@@ -885,16 +955,71 @@ def _print_single_model(model: type[BaseModel]) -> None:
         description = field_info.description
 
         # Build field definition
+        default = field_info.default
         if is_required:
             if description:
                 print(f'    {field_name}: {type_str} = Field(description="{description}")')
             else:
                 print(f"    {field_name}: {type_str}")
         else:
-            if description:
-                print(f'    {field_name}: {type_str} = Field(None, description="{description}")')
+            from pydantic_core import PydanticUndefined
+
+            if default is PydanticUndefined and field_info.default_factory is not None:
+                default_repr = repr(field_info.default_factory())
             else:
-                print(f"    {field_name}: {type_str} = None")
+                default_repr = repr(default)
+            if description:
+                print(
+                    f"    {field_name}: {type_str} = "
+                    f'Field(default={default_repr}, description="{description}")'
+                )
+            else:
+                print(f"    {field_name}: {type_str} = {default_repr}")
+
+
+# -----------------------------------------------------------------------------
+# Post-processing: deterministic field policy enforcement
+# -----------------------------------------------------------------------------
+
+
+def _resolve_fallback(field: FieldSpec):
+    if field.has_explicit_default:
+        return field.default
+    if field.field_type in ("str", "date"):
+        return ""
+    if field.field_type in ("list[str]", "list[dict]"):
+        return []
+    return None
+
+
+def apply_field_policies(data: dict, requirements: ExtractionRequirements) -> dict:
+    spec_by_name = {f.field_name: f for f in requirements.fields}
+    output = {}
+
+    for name, field in spec_by_name.items():
+        if name not in data:
+            if field.required_in_output:
+                output[name] = _resolve_fallback(field)
+            continue
+
+        value = data[name]
+
+        if value is None:
+            if field.nullable:
+                output[name] = None
+                continue
+            value = _resolve_fallback(field)
+
+        if field.enum and value not in field.enum:
+            value = _resolve_fallback(field)
+
+        output[name] = value
+
+    for name, value in data.items():
+        if name not in output:
+            output[name] = value
+
+    return output
 
 
 # -----------------------------------------------------------------------------

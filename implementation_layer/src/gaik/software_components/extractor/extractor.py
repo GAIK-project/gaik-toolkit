@@ -24,6 +24,7 @@ from .schema import (
     SYSTEM_PARSER,
     ExtractionRequirements,
     _parse_with,
+    apply_field_policies,
     normalize_extracted_data,
 )
 
@@ -155,6 +156,18 @@ class DataExtractor:
 
         parsed = resp.choices[0].message.parsed
         result_dict = parsed.model_dump()
+
+        # Apply field policies (fix nulls, missing keys, out-of-enum values)
+        if isinstance(result_dict, dict):
+            has_nested = False
+            for key, value in list(result_dict.items()):
+                if isinstance(value, list) and value and isinstance(value[0], dict):
+                    has_nested = True
+                    result_dict[key] = [
+                        apply_field_policies(item, requirements) for item in value
+                    ]
+            if not has_nested:
+                result_dict = apply_field_policies(result_dict, requirements)
 
         # Normalize extracted data (dates, lists, etc.)
         if isinstance(result_dict, dict):
