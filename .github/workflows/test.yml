@@ -56,4 +56,9 @@ jobs:
       run: python -c "from gaik import __version__; print(f'gaik {__version__} OK')"
 
     - name: Run tests
+      env:
+        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+        AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+        AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
+        AZURE_DEPLOYMENT: ${{ secrets.AZURE_DEPLOYMENT }}
       run: pytest -v --strict-markers

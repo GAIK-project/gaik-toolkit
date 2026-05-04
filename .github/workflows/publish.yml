@@ -16,6 +16,7 @@ jobs:
     uses: ./.github/workflows/test.yml
     with:
       ref: ${{ github.ref }}  # Pass the tag ref to test workflow
+    secrets: inherit  # Pass Azure-test secrets through to the called workflow
 
   build-and-publish:
     needs: test  # Only publish if tests pass
