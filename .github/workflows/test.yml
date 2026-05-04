@@ -7,6 +7,7 @@ on:
       - dev
     paths:
       - 'src/**'
+      - 'implementation_layer/**'
       - 'pyproject.toml'
       - '.github/workflows/test.yml'
       - '.github/workflows/publish.yml'
@@ -16,9 +17,11 @@ on:
       - dev
     paths:
       - 'src/**'
+      - 'implementation_layer/**'
       - 'pyproject.toml'
       - '.github/workflows/test.yml'
       - '.github/workflows/publish.yml'
+  workflow_dispatch:  # Allow manual trigger from GitHub UI / gh CLI
   workflow_call:  # Allow this workflow to be called by other workflows
     inputs:
       ref:
