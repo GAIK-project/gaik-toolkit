@@ -319,7 +319,10 @@ class TranscriptEnhancer:
             )
             text = (result.text or "").strip()
             return text or fallback
-        response = self.client.chat.completions.create(
+        # OpenAI's typed overloads can't match a ``**dict[str, Any]`` splat, so
+        # ignore the spurious overload-mismatch warning. The runtime kwargs are
+        # always valid (model name, messages, optional ``reasoning_effort``).
+        response = self.client.chat.completions.create(  # type: ignore[call-overload]
             model=self.model,
             messages=messages,
             temperature=0.0,
