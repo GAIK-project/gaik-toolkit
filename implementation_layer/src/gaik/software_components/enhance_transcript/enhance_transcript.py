@@ -2,14 +2,29 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from difflib import SequenceMatcher
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel
 
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
+
+ProgressCallback = Callable[[str, dict[str, Any]], None]
+"""Optional callback for live pass-by-pass progress updates.
+
+Invoked four times per ``enhance_text`` call:
+``("pass1_started", {"chars": int})``,
+``("pass1_completed", {"chars": int})``,
+``("pass2_started", {"chars": int})``,
+``("pass2_completed", {"chars": int})``.
+
+Errors raised by the callback are swallowed so a misbehaving observer
+can never break the enhancement run.
+"""
 
 DEFAULT_MODEL_AZURE = "gpt-5.4"
 DEFAULT_MODEL_OPENAI = "gpt-5.4-2026-03-05"
@@ -163,6 +178,7 @@ class TranscriptEnhancer:
         *,
         use_azure: bool = True,
         model: str | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         config = dict(api_config) if api_config is not None else get_openai_config(use_azure=use_azure)
         config["model"] = model or self._default_model_for_config(config)
@@ -172,6 +188,7 @@ class TranscriptEnhancer:
 
         self.api_config = config
         self.model = config["model"]
+        self.reasoning_effort = reasoning_effort
         self.client = build_compat_client(config)
 
     def enhance_text(
@@ -181,16 +198,22 @@ class TranscriptEnhancer:
         generate_summary: bool = False,
         diff_chunks: bool = False,
         additional_instructions: str | None = None,
+        progress_callback: ProgressCallback | None = None,
     ) -> TranscriptEnhancerResult:
         transcript_text = transcript_text.strip()
         if not transcript_text:
             raise ValueError("transcript_text must not be empty")
 
+        self._notify(progress_callback, "pass1_started", {"chars": len(transcript_text)})
         pass1_text = self._enhance_pass1(transcript_text)
+        self._notify(progress_callback, "pass1_completed", {"chars": len(pass1_text)})
+
+        self._notify(progress_callback, "pass2_started", {"chars": len(pass1_text)})
         enhanced_text = self._enhance_pass2(
             pass1_text,
             additional_instructions=additional_instructions,
         )
+        self._notify(progress_callback, "pass2_completed", {"chars": len(enhanced_text)})
 
         return TranscriptEnhancerResult(
             original_text=transcript_text,
@@ -200,6 +223,25 @@ class TranscriptEnhancer:
             ),
             diff_chunks=self._build_diff_chunks(transcript_text, enhanced_text) if diff_chunks else None,
         )
+
+    @staticmethod
+    def _notify(
+        callback: ProgressCallback | None,
+        event: str,
+        payload: dict[str, Any],
+    ) -> None:
+        if callback is None:
+            return
+        try:
+            callback(event, payload)
+        except Exception:  # noqa: BLE001 — observer must never break enhancement
+            import logging
+
+            logging.getLogger(__name__).debug(
+                "TranscriptEnhancer progress_callback raised on %s; ignored",
+                event,
+                exc_info=True,
+            )
 
     def enhance_file(
         self,
@@ -263,9 +305,17 @@ class TranscriptEnhancer:
         return self._chat_text(messages, fallback=transcript_text)
 
     def _chat_text(self, messages: list[dict], *, fallback: str) -> str:
+        # ``reasoning_effort`` is omitted unless explicitly configured so we
+        # don't accidentally force the parameter onto providers/models that
+        # don't support it. Routing both the ProviderClient and raw-OpenAI
+        # paths keeps user-facing behaviour identical.
+        extra_kwargs: dict[str, Any] = {}
+        if self.reasoning_effort:
+            extra_kwargs["reasoning_effort"] = self.reasoning_effort
+
         if isinstance(self.client, ProviderClient):
             result = self.client.chat(
-                messages=messages, model=self.model, temperature=0.0
+                messages=messages, model=self.model, temperature=0.0, **extra_kwargs
             )
             text = (result.text or "").strip()
             return text or fallback
@@ -273,6 +323,7 @@ class TranscriptEnhancer:
             model=self.model,
             messages=messages,
             temperature=0.0,
+            **extra_kwargs,
         )
         return self._extract_response_text(response, fallback)
 
