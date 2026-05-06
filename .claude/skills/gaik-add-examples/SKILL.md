@@ -8,8 +8,10 @@ description: >-
   (guidance_layer/docs/), update the Fumadocs website (guidance_layer/website/content/docs/),
   expose the feature in the demo app (toolkit_demo_app/api/routers + UI), and push
   a PyPI release tag. Covers software_components (extractor, parsers, transcriber,
-  RAG, classifier, TTS, enhance_transcript) and software_modules (AudioToStructuredData,
-  DocumentsToStructuredData, RAGWorkflow). Not for creating a brand-new component
+  RAG, classifier, TTS, enhance_transcript, validators (LLMJudge / panel /
+  pairwise / calibration), evaluators (ExtractionEvaluator, RAGEvaluator,
+  BatchEvaluationRunner), form_understander, observability) and software_modules
+  (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow). Not for creating a brand-new component
   package — use build-software-component for that.
 ---
 
@@ -85,7 +87,7 @@ if __name__ == "__main__":
 
 ## Configuration pattern
 
-All examples use the same config — always import from `gaik.software_components.config`:
+**OpenAI/Azure-only examples** use the legacy config — always import from `gaik.software_components.config`:
 
 ```python
 from gaik.software_components.config import get_openai_config, create_openai_client
@@ -100,6 +102,18 @@ Pipeline constructors accept `use_azure=True/False` directly:
 ```python
 pipeline = DocumentsToStructuredData(use_azure=True)
 ```
+
+**Multi-provider examples** (validators, evaluators, anything that must run on
+Anthropic or Google in addition to OpenAI/Azure) use the multi-provider surface:
+
+```python
+from gaik.software_components.llm import get_llm_config, create_llm_client
+
+config = get_llm_config("anthropic")  # or "openai", "azure", "google"
+client = create_llm_client(config)    # ProviderClient (chat / chat_parsed / chat_stream / embed)
+```
+
+`gaik[llm-anthropic]` and `gaik[llm-google]` extras pull in the provider SDKs on demand.
 
 ## Step 6 — Optional follow-ups (ask the user)
 

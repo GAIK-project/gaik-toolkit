@@ -145,7 +145,8 @@ Core classes in `gaik.software_components.*`. For detailed API and constructor p
 | ParallelTranscriber | `from gaik.software_components.parallel_transcriber import ParallelTranscriber` | `transcribe(path)` → TranscriptionResult |
 | TextToSpeech | `from gaik.software_components.text_to_speech import TextToSpeech` | `synthesize(text)` → SpeechSynthesisResult |
 | DocumentClassifier | `from gaik.software_components.doc_classifier import DocumentClassifier` | `classify(file_or_dir, classes)` |
-| LLMJudge | `from gaik.software_components.validators import LLMJudge` | `validate(source_pages, extracted, rubric)` → ValidationResult (multi-provider; Likert 1-5 via `rubric.scoring_mode="likert_1_5"`) |
+| FormUnderstander | `from gaik.software_components.form_understander import FormUnderstander` | `clean_labels(fields, language_hint="fi")` → `dict[str, str]` (cryptic ASP.NET / generated form ids → readable labels) |
+| LLMJudge | `from gaik.software_components.validators import LLMJudge` | `validate(source_pages, extracted, rubric)` → ValidationResult (rubric scoring; Likert 1-5 via `rubric.scoring_mode="likert_1_5"`) / `detect_hallucinations(source, extracted)` → schema-agnostic post-validator / `judge_text_pair(a, b)` → text-vs-text equivalence (multi-provider) |
 | LLMJudgePanel | `from gaik.software_components.validators import LLMJudgePanel` | `validate(source_pages, extracted, rubric)` → JudgePanelResult (3+ judges, majority vote, agreement metric) |
 | compare_pairwise | `from gaik.software_components.validators import compare_pairwise` | `compare_pairwise(judge, pages, a, b, swap_and_average=True)` → PairwiseResult (A/B with position-bias mitigation) |
 | calibrate_against_human_labels | `from gaik.software_components.validators import calibrate_against_human_labels` | `calibrate_against_human_labels(judge, dataset)` → CalibrationReport (Pearson r vs. human raters) |
@@ -207,6 +208,22 @@ All pipelines follow: `pipeline = Pipeline(use_azure=True)` → `result = pipeli
 | **Building block** | Atomic toolkit class/function | `Transcriber`, `ParallelTranscriber`, `TranscriptEnhancer`, `TextToSpeech`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `Embedder`, `VectorStore`, `PgVectorStore`, `Retriever`, `AnswerGenerator` |
 | **Software component** | Composed, workflow-ready unit | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow` |
 
+## Observability
+
+Token-usage, ajoaika ja providerikohtainen hinnoittelu kaikille LLM-kutsuille. Yhteinen `UsageRecord`-tyyppi varmistaa, että kaikki komponentit raportoivat saman muotoisen datan riippumatta providerista (OpenAI / Azure / Anthropic / Google).
+
+```python
+from gaik.observability import (
+    UsageRecord, build_usage_record,         # uniform usage shape
+    compute_cost_usd, lookup_price,          # cost from prompt/completion tokens
+    measure_duration,                        # context-manager timing helper
+    openai_usage_to_dict,                    # OpenAI-shape → dict normalizer
+    OPENAI_PRICING_PER_M, ANTHROPIC_PRICING_PER_M, GEMINI_PRICING_PER_M,
+)
+```
+
+Käytä kun rakennat dashboardia, lokitusta tai compliance-pipelineä joka tarvitsee yhdenmukaisen kulu/aika-raportin yli providerien.
+
 ## Use Cases
 
 Documented in `guidance_layer/website/content/docs/use-cases/`: incident reporting, dental transcription & captioning, semantic dental video search, construction diary, dental learning assistant, purchase order processing, report writing, sales proposal generation, customer onboarding.
@@ -244,6 +261,7 @@ Non-obvious things that cause real mistakes in this repo. Check here before assu
 - [Building Blocks API](references/building-blocks.md) - Constructor params, return types, all options
 - [RAG Building Blocks](references/rag.md) - RAG components: Embedder, stores, Retriever, AnswerGenerator
 - [Software Components](references/software-components.md) - Pipeline patterns, schema persistence, batch processing
+- [Evaluators](references/evaluators.md) - ExtractionEvaluator, RAGEvaluator, BatchEvaluationRunner (LLMJudge v2 -based)
 - [Examples](references/examples.md) - Complete working examples (invoice extraction, RAG, parallel transcription, etc.)
 - [Demo App](references/demo-app.md) - Demo app architecture, routes, env vars, deployment
 - [Docs Website](references/docs-website.md) - Documentation site structure and editing guide

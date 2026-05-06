@@ -30,7 +30,7 @@ Invoke this skill when the user asks to:
 Do not use this skill for non-component work (demo app changes, docs website edits,
 bug fixes in existing components, etc.).
 
-## Workflow — 5 phases
+## Workflow — 6 phases (Phase 6 optional)
 
 Follow these phases in order. Do not skip Phase 3.
 
@@ -49,8 +49,13 @@ Before moving on, make sure you understand:
 1. What the component does (one sentence).
 2. What external library/APIs it wraps (if any).
 3. What Python dependencies it needs, with versions when available.
-4. Whether it is LLM-based (will use `get_openai_config()` / `create_openai_client()`)
-   or provider-agnostic (pure Python / local library).
+4. Whether it is LLM-based and which config surface to use:
+   - **OpenAI/Azure-only** → `get_openai_config()` + `create_openai_client()`
+     from `gaik.software_components.config`
+   - **Multi-provider** (OpenAI/Azure/Anthropic/Google) → `get_llm_config()` +
+     `create_llm_client()` from `gaik.software_components.llm`. Use this when
+     the component needs to swap providers (e.g. validators, evaluators).
+   - **Provider-agnostic** (pure Python / local library, no LLM call).
 5. **Layout decision — top-level or nested?**
    - **Top-level** — sibling of `extractor/`, `transcriber/`, `doc_classifier/`. Use
      for new independent capabilities.
@@ -197,9 +202,12 @@ Before tagging (this is the build-side addition to the checklist in
   creation. Phase 6 is the only phase where those edits are allowed, and only
   after the user has explicitly opted in.
 - **Shared config:** for any component that calls an LLM, import from
-  `gaik.software_components.config` and use `get_openai_config()` +
-  `create_openai_client()`. Never call `load_dotenv()` inside the component
-  and never read `OPENAI_API_KEY` / `AZURE_API_KEY` directly.
+  `gaik.software_components.config` (`get_openai_config` /
+  `create_openai_client`) for OpenAI/Azure-only components, or from
+  `gaik.software_components.llm` (`get_llm_config` / `create_llm_client`) for
+  multi-provider components (OpenAI/Azure/Anthropic/Google). Never call
+  `load_dotenv()` inside the component and never read `OPENAI_API_KEY` /
+  `AZURE_API_KEY` directly.
 - **Never commit during Phases 1–5.** Leave source changes uncommitted so the
   user can review with `git diff`. Phase 6d is the only place that commits or
   pushes, and only after the user approves the PyPI release step.
