@@ -45,9 +45,9 @@ def _build_enhancer(
 
 def test_enhance_text_returns_pydantic_result():
     enhancer, _ = _build_enhancer()
-    result = enhancer.enhance_text("Joku teksti tähän.")
+    result = enhancer.enhance_text("Some sample transcript text.")
     assert isinstance(result, TranscriptEnhancerResult)
-    assert result.original_text == "Joku teksti tähän."
+    assert result.original_text == "Some sample transcript text."
     assert result.enhanced_text == "enhanced output"
 
 
@@ -56,7 +56,7 @@ def test_progress_callback_fires_in_order():
     events: list[tuple[str, dict[str, Any]]] = []
 
     enhancer.enhance_text(
-        "Joku teksti tähän.",
+        "Some sample transcript text.",
         progress_callback=lambda evt, payload: events.append((evt, payload)),
     )
 
@@ -80,7 +80,7 @@ def test_progress_callback_failure_is_swallowed():
         raise RuntimeError("observer exploded")
 
     # Must not raise — observer errors are isolated from the pipeline
-    result = enhancer.enhance_text("Joku teksti tähän.", progress_callback=boom)
+    result = enhancer.enhance_text("Some sample transcript text.", progress_callback=boom)
     assert isinstance(result, TranscriptEnhancerResult)
     assert calls == ["pass1_started", "pass1_completed", "pass2_started", "pass2_completed"]
 
