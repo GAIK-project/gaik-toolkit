@@ -1,0 +1,43 @@
+# Ollama (local LLM) + Open WebUI (chat UI with built-in Knowledge/RAG).
+#
+# Bring up the stack:    docker compose up -d
+# Pull a small model:    docker exec -it ollama ollama pull gemma3:4b
+# Open the UI:           http://localhost:8080
+#
+# The ./markdown_out folder is mounted read-only at /data/docs inside the
+# Open WebUI container, so you can import it as a Knowledge collection
+# without leaving the browser.
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama_data:/root/.ollama
+    restart: unless-stopped
+    # GPU passthrough — uncomment if you have NVIDIA + nvidia-container-toolkit:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    depends_on:
+      - ollama
+    ports:
+      - "${OPEN_WEBUI_PORT:-8080}:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_AUTH=true
+      - DEFAULT_MODELS=${DEFAULT_MODEL:-gemma3:4b}
+    volumes:
+      - ./openwebui_data:/app/backend/data
+      - ./markdown_out:/data/docs:ro
+    restart: unless-stopped
