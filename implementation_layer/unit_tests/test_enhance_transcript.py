@@ -86,6 +86,22 @@ def test_progress_callback_failure_is_swallowed():
 
 
 # --- _chat_text-level tests: confirm reasoning_effort actually reaches the API ---
+#
+# NB: ProviderClient is a ``@runtime_checkable`` Protocol, and a bare
+# ``MagicMock()`` satisfies its hasattr-based instance check (every
+# attribute is auto-mocked). That made _chat_text take the ProviderClient
+# branch on Python 3.11 (CI) even though the test wanted the raw-OpenAI
+# branch. We use a concrete dummy class so isinstance(client, ProviderClient)
+# is unambiguously False — chat is a regular attribute, the protocol's other
+# required members (chat_parsed, chat_stream, embed, provider, model, raw)
+# are deliberately absent.
+
+
+class _FakeRawOpenAIClient:
+    """Stand-in for the openai.OpenAI client (NOT a ProviderClient)."""
+
+    def __init__(self):
+        self.chat = MagicMock()
 
 
 def test_reasoning_effort_omitted_by_default_in_chat_call():
@@ -100,7 +116,7 @@ def test_reasoning_effort_omitted_by_default_in_chat_call():
     choice = MagicMock()
     choice.message.content = "enhanced output"
     fake_response.choices = [choice]
-    enhancer.client = MagicMock()
+    enhancer.client = _FakeRawOpenAIClient()
     enhancer.client.chat.completions.create.return_value = fake_response
 
     enhancer._chat_text([{"role": "user", "content": "hi"}], fallback="x")
@@ -119,7 +135,7 @@ def test_reasoning_effort_forwarded_to_chat_call_when_set():
     choice = MagicMock()
     choice.message.content = "enhanced output"
     fake_response.choices = [choice]
-    enhancer.client = MagicMock()
+    enhancer.client = _FakeRawOpenAIClient()
     enhancer.client.chat.completions.create.return_value = fake_response
 
     enhancer._chat_text([{"role": "user", "content": "hi"}], fallback="x")
