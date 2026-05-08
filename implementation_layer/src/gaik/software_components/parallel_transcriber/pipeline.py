@@ -71,9 +71,19 @@ class ParallelTranscriber:
         api_config: dict,
         config: TranscriptionConfig | None = None,
     ) -> None:
-        assert_openai_or_azure(api_config, component="ParallelTranscriber")
+        cfg = config or TranscriptionConfig()
+        # Whisper Local has its own on-prem auth (api_base + key) — skip the
+        # OpenAI/Azure provider check that the cloud-only models require.
+        if cfg.model == TranscriptionModel.WHISPER_LOCAL:
+            if not api_config.get("api_base"):
+                raise ValueError(
+                    "WHISPER_LOCAL requires api_config['api_base'] "
+                    "(e.g. 'http://whisper.example.com:8080')"
+                )
+        else:
+            assert_openai_or_azure(api_config, component="ParallelTranscriber")
         self._api_config = dict(api_config)
-        self._config = config or TranscriptionConfig()
+        self._config = cfg
 
     # ------------------------------------------------------------------
     # Public helpers
@@ -150,6 +160,23 @@ class ParallelTranscriber:
                 if total_duration > _MAX_GPT4O_DURATION_SECONDS:
                     needs_chunking = True
 
+            # For Whisper Local, an on-prem GPU-VM POST gets a single audio
+            # blob and must finish within whisper_local_request_timeout_seconds
+            # (default 30 min). Anything longer than the configured chunk
+            # length must be chunked, and anything past max_audio_minutes is
+            # rejected so callers fall back to the cloud path immediately.
+            if model == TranscriptionModel.WHISPER_LOCAL:
+                total_duration = get_audio_duration(str(audio_path))
+                duration_minutes = total_duration / 60
+                if duration_minutes > cfg.whisper_local_max_audio_minutes:
+                    raise ValueError(
+                        f"Audio too long for whisper_local "
+                        f"({duration_minutes:.1f} min > "
+                        f"{cfg.whisper_local_max_audio_minutes:.0f} min)"
+                    )
+                if duration_minutes > cfg.whisper_local_chunk_duration_minutes:
+                    needs_chunking = True
+
             if not needs_chunking:
                 # Single-pass transcription
                 logger.info("File %.1f MB within limits, single-pass transcription", file_size_mb)
@@ -170,6 +197,10 @@ class ParallelTranscriber:
             if model == TranscriptionModel.GPT4O_DIARIZE:
                 chunk_minutes = cfg.gpt4o_chunk_duration_minutes
                 parallelism = cfg.gpt4o_chunk_parallelism
+                force_duration = True
+            elif model == TranscriptionModel.WHISPER_LOCAL:
+                chunk_minutes = cfg.whisper_local_chunk_duration_minutes
+                parallelism = cfg.whisper_local_chunk_parallelism
                 force_duration = True
             else:
                 chunk_minutes = cfg.chunk_duration_minutes
@@ -200,6 +231,14 @@ class ParallelTranscriber:
             try:
                 if model == TranscriptionModel.GPT4O_DIARIZE:
                     combined = self._transcribe_chunks_gpt4o(
+                        chunk_files,
+                        chunk_metadata,
+                        parallelism,
+                        check_cancelled,
+                        progress_callback,
+                    )
+                elif model == TranscriptionModel.WHISPER_LOCAL:
+                    combined = self._transcribe_chunks_whisper_local(
                         chunk_files,
                         chunk_metadata,
                         parallelism,
@@ -258,6 +297,8 @@ class ParallelTranscriber:
 
         if model == TranscriptionModel.GPT4O_DIARIZE:
             content = self._call_gpt4o_single(audio_path)
+        elif model == TranscriptionModel.WHISPER_LOCAL:
+            content = self._call_whisper_local_single(audio_path)
         else:
             content = self._call_whisper_single(audio_path)
 
@@ -574,6 +615,141 @@ class ParallelTranscriber:
         max_workers = min(parallelism, total)
 
         logger.info("Transcribing %d chunks (parallel=%d, model=gpt-4o)", total, max_workers)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {executor.submit(_transcribe_one, item): item[0] for item in indexed}
+            for future in concurrent.futures.as_completed(future_map):
+                out_idx, srt_content = future.result()
+                results[out_idx] = srt_content
+
+        ordered = [r for r in results if r is not None]
+
+        if progress_callback:
+            progress_callback("merging", 0, 1, "Merging transcriptions …")
+
+        combined = combine_srt_chunks(ordered, chunk_metadata)
+
+        if progress_callback:
+            progress_callback("merging", 1, 1, "Merge complete")
+
+        return combined
+
+    # ------------------------------------------------------------------
+    # Whisper Local (on-prem) API
+    # ------------------------------------------------------------------
+
+    def _call_whisper_local_api(self, audio_file_path: str) -> dict:
+        """Send a single audio chunk to the on-prem Whisper server.
+
+        Uses ``requests.post`` against ``api_base/transcribe`` with the same
+        payload shape as the standalone ``transcriber.whisper_local.transcribe``
+        helper, but with a configurable timeout so chunked callers can override
+        the 30-minute default per request.
+        """
+        import requests
+
+        api_cfg = self._api_config
+        cfg = self._config
+
+        api_base = api_cfg.get("api_base", "")
+        key = api_cfg.get("key", "") or api_cfg.get("api_key", "")
+        if not api_base:
+            raise ValueError("Whisper Local api_base not configured")
+
+        file_name = Path(audio_file_path).name
+        with open(audio_file_path, "rb") as f:
+            payload = {
+                "language": cfg.language or "auto",
+                "diarization": False,
+                "include_words": True,
+            }
+            if cfg.prompt:
+                payload["initial_prompt"] = cfg.prompt
+            files = {"file": (file_name, f)}
+            response = requests.post(
+                f"{api_base.rstrip('/')}/transcribe",
+                data=payload,
+                files=files,
+                headers={"key": key} if key else {},
+                timeout=cfg.whisper_local_request_timeout_seconds,
+            )
+            response.raise_for_status()
+        return response.json()
+
+    @staticmethod
+    def _whisper_local_segments_to_srt(segments: list[dict]) -> str:
+        """Convert Whisper Local response segments to SRT content."""
+        lines: list[str] = []
+        for i, seg in enumerate(segments, 1):
+            start = seconds_to_time(float(seg.get("start", 0.0)))
+            end = seconds_to_time(float(seg.get("end", 0.0)))
+            text = (seg.get("text") or "").strip()
+            if not text:
+                continue
+            lines.append(f"{i}\n{start} --> {end}\n{text}\n")
+        return "\n".join(lines)
+
+    def _call_whisper_local_single(self, audio_path: Path) -> str:
+        """Transcribe a single (small) file with Whisper Local, return SRT."""
+        result = self._call_whisper_local_api(str(audio_path))
+        segments = result.get("segments", []) or []
+        if segments:
+            return self._whisper_local_segments_to_srt(segments)
+        # No segments — fall back to single-block SRT spanning the whole audio
+        text = (result.get("text") or "").strip()
+        if not text:
+            return ""
+        try:
+            duration = get_audio_duration(str(audio_path))
+        except Exception:
+            duration = 0.0
+        return f"1\n{seconds_to_time(0.0)} --> {seconds_to_time(duration)}\n{text}\n"
+
+    def _transcribe_chunks_whisper_local(
+        self,
+        chunk_files: list[str],
+        chunk_metadata: list[dict] | None,
+        parallelism: int,
+        check_cancelled: Callable[[], None] | None,
+        progress_callback: Callable[[str, int, int, str], None] | None,
+    ) -> str:
+        """Transcribe multiple chunks in parallel against the on-prem server."""
+        total = len(chunk_files)
+        completed = 0
+        lock = threading.Lock()
+
+        def _transcribe_one(idx_and_path: tuple[int, str]) -> tuple[int, str]:
+            nonlocal completed
+            idx, path = idx_and_path
+
+            if check_cancelled:
+                check_cancelled()
+
+            result = self._call_whisper_local_api(path)
+            segments = result.get("segments", []) or []
+            srt = self._whisper_local_segments_to_srt(segments)
+
+            if check_cancelled:
+                check_cancelled()
+
+            with lock:
+                completed += 1
+                current = completed
+
+            if progress_callback:
+                msg = f"Transcribed chunk {current}/{total} (whisper_local)"
+                progress_callback("transcribing", current, total, msg)
+
+            logger.info("Chunk %d/%d transcribed (whisper_local)", idx + 1, total)
+            return idx, srt
+
+        indexed = list(enumerate(chunk_files))
+        results: list[str | None] = [None] * total
+        max_workers = min(parallelism, total)
+
+        logger.info(
+            "Transcribing %d chunks (parallel=%d, model=whisper_local)", total, max_workers
+        )
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_map = {executor.submit(_transcribe_one, item): item[0] for item in indexed}

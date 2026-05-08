@@ -21,6 +21,7 @@ class TranscriptionModel(StrEnum):
 
     WHISPER = "whisper"
     GPT4O_DIARIZE = "gpt-4o-transcribe-diarize"
+    WHISPER_LOCAL = "whisper_local"
 
 
 @dataclass
