@@ -13,16 +13,18 @@ Configuration:
     - create_openai_client: Create OpenAI client from config
 
 Advanced (for custom schemas):
-    - FieldSpec: Field specification model
-    - ExtractionRequirements: Parsed extraction requirements
-    - StructureAnalysis: Nested vs flat structure analysis
-    - create_extraction_model: Create Pydantic model from requirements
+- FieldSpec: Field specification model
+- ExtractionRequirements: Parsed extraction requirements
+- CompositeExtractionRequirements: Parent + child extraction requirements
+- StructureAnalysis: Nested vs flat structure analysis
+- create_extraction_model: Create Pydantic model from requirements
 """
 
 from gaik.software_components.config import create_openai_client, get_openai_config
 
 from .extractor import DataExtractor, ExtractionResult, save_to_json
 from .schema import (
+    CompositeExtractionRequirements,
     ExtractionRequirements,
     FieldSpec,
     SchemaGenerationResult,
@@ -45,6 +47,7 @@ __all__ = [
     # Advanced - for custom schemas
     "FieldSpec",
     "ExtractionRequirements",
+    "CompositeExtractionRequirements",
     "StructureAnalysis",
     "create_extraction_model",
     # Utilities

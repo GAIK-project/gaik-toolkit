@@ -1,0 +1,11 @@
+Extract the following from the audio:
+- Date (DD/MM/YYYY) 
+- Patient's date of birth ((DD-MM-YYYY))
+- Symptoms (in a few keywords separated by semicolons)
+- Medical history (in a few keywords separated by semicolons)
+- Examination description (in a few keywords separated by semicolons)
+- Body temperature / Heart Rate / Oxygen saturation
+- Procedure performed (in a few keywords)
+- Diagnosis (in a few keywords)
+- Prescription (in a few keywords)
+- Follow-up (in a few keywords)

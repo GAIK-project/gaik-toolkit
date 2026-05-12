@@ -1,0 +1,16 @@
+Extract purchase order data.
+
+The output will include the following top-level fields:
+- date (DD-MM-YYYY)
+- purchase order number
+- supplier number
+- contact
+
+Also, the output will include the data for each line item. 
+
+For each line item, extract these scalar fields:
+- item number
+- complete description
+- quantity
+- price
+- material number

@@ -1,0 +1,135 @@
+{
+  "model_name": "purchase_order_top_level_fields_extraction_Extraction",
+  "requirements_type": "parent_with_nested_list",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "purchase_order_top_level_fields_extraction",
+      "fields": [
+        {
+          "field_name": "date",
+          "field_type": "date",
+          "description": "Purchase order date (DD-MM-YYYY)",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "DD-MM-YYYY",
+          "format": "%d-%m-%Y"
+        },
+        {
+          "field_name": "purchase_order_number",
+          "field_type": "str",
+          "description": "Purchase order number",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "supplier_number",
+          "field_type": "str",
+          "description": "Supplier number",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "contact",
+          "field_type": "str",
+          "description": "Contact",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        }
+      ]
+    },
+    "child_container_name": "line_items",
+    "child_requirements": {
+      "use_case_name": "line_item",
+      "fields": [
+        {
+          "field_name": "item_number",
+          "field_type": "str",
+          "description": "item number",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "complete_description",
+          "field_type": "str",
+          "description": "complete description",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "quantity",
+          "field_type": "int",
+          "description": "quantity",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "price",
+          "field_type": "decimal",
+          "description": "price",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "material_number",
+          "field_type": "str",
+          "description": "material number",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        }
+      ]
+    }
+  }
+}

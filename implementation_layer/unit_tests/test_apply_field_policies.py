@@ -256,6 +256,17 @@ class TestPolicyFixesNull:
         result = apply_field_policies(data, reqs)
         assert result["extra_key"] == 42
 
+    def test_blank_numeric_string_to_none(self):
+        reqs = _make_requirements(
+            [FieldSpec(field_name="price", field_type="decimal", description="price")]
+        )
+        data = {"price": ""}
+        result = apply_field_policies(data, reqs)
+        model = create_extraction_model(reqs)
+
+        assert result["price"] is None
+        assert model.model_validate(result).price is None
+
 
 # ---------------------------------------------------------------------------
 # Test 9: Finnish incident report — 13-field integration

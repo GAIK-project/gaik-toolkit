@@ -134,6 +134,8 @@ def _parse_with(*, client, model: str, messages: list[dict], response_format: ty
 # -----------------------------------------------------------------------------
 
 AllowedTypes = Literal["str", "int", "float", "bool", "list[str]", "date", "decimal", "list[dict]"]
+NUMERIC_FIELD_TYPES = {"int", "float", "decimal"}
+RequirementsParseMode = Literal["normal", "repeated_item"]
 
 
 class FieldSpec(BaseModel):
@@ -202,6 +204,15 @@ class ExtractionRequirements(BaseModel):
         return fields
 
 
+class CompositeExtractionRequirements(BaseModel):
+    """Requirements for one parent record with one repeated child collection."""
+
+    structure_type: Literal["parent_with_nested_list"] = "parent_with_nested_list"
+    parent_requirements: ExtractionRequirements
+    child_container_name: str
+    child_requirements: ExtractionRequirements
+
+
 # -----------------------------------------------------------------------------
 # Structure Detection for Nested vs Flat Schemas
 # -----------------------------------------------------------------------------
@@ -210,8 +221,12 @@ class ExtractionRequirements(BaseModel):
 class StructureAnalysis(BaseModel):
     """Analysis of whether the extraction requires nested or flat structure."""
 
-    structure_type: Literal["flat", "nested_list"] = Field(
-        description="Type of structure: 'flat' for single object, 'nested_list' for array of items"
+    structure_type: Literal["flat", "nested_list", "parent_with_nested_list"] = Field(
+        description=(
+            "Type of structure: 'flat' for one object, 'nested_list' for only "
+            "repeated records, or 'parent_with_nested_list' for one parent "
+            "object plus one repeated child collection"
+        )
     )
     parent_container_name: str = Field(
         description="Name for the parent container (e.g., 'items', 'records', 'entries')"
@@ -219,6 +234,31 @@ class StructureAnalysis(BaseModel):
     parent_description: str = Field(description="Description of what the parent container holds")
     item_description: str = Field(
         description="Description of extraction requirements for each individual item (if nested)"
+    )
+    parent_fields_description: str = Field(
+        default="",
+        description=(
+            "For parent_with_nested_list: extraction requirements for fields that "
+            "occur once per document/entity"
+        ),
+    )
+    child_container_name: str = Field(
+        default="",
+        description=(
+            "For parent_with_nested_list: snake_case name of the repeated child "
+            "collection field"
+        ),
+    )
+    child_container_description: str = Field(
+        default="",
+        description="For parent_with_nested_list: description of the child collection",
+    )
+    child_fields_description: str = Field(
+        default="",
+        description=(
+            "For parent_with_nested_list: extraction requirements for one repeated "
+            "child row/item/record"
+        ),
     )
     reasoning: str = Field(description="Brief explanation of why this structure was chosen")
 
@@ -255,9 +295,25 @@ def detect_structure_type(
                 "content": (
                     "Analyze the following extraction requirements "
                     "and determine the output structure.\n\n"
+                    "Use PARENT_WITH_NESTED_LIST when:\n"
+                    "- The output needs fields that occur once per document, "
+                    "entity, case, form, report, order, invoice, or record\n"
+                    "- AND the same output also needs one repeated collection "
+                    "of child rows/items/entries/events/findings/records\n"
+                    "- The final answer should be one parent object containing "
+                    "both the parent scalar fields and the repeated child list\n"
+                    "- Generic example:\n"
+                    "  Common fields: document_id, date, owner\n"
+                    "  Repeated records: record_id, description, amount\n"
+                    "  => parent_with_nested_list\n"
+                    "- Return parent_fields_description as only the once-per-"
+                    "document fields, child_container_name as the repeated "
+                    "collection field name, and child_fields_description as "
+                    "only the fields for one child row/item/record.\n\n"
                     "Use NESTED_LIST when:\n"
                     "- The DOCUMENT contains multiple items/records/rows "
-                    "to extract\n"
+                    "to extract, and there are no separate common/header/"
+                    "document-level fields to keep in the same output\n"
                     "- Instructions mention 'multiple items IN THE DOCUMENT', "
                     "'list of items', 'table of records'\n"
                     "- 'one line per item', 'one row per record', "
@@ -280,6 +336,12 @@ def detect_structure_type(
                     "IMPORTANT: 'For each X, extract...' means FLAT "
                     "if X is the document itself, NESTED if X refers "
                     "to multiple items within the document.\n\n"
+                    "If the requirements contain both a heading like common/"
+                    "header/document-level fields and another heading like "
+                    "line items/rows/records/events/actions/findings, choose "
+                    "PARENT_WITH_NESTED_LIST. If more than one repeated child "
+                    "collection is requested, choose the most central one and "
+                    "explain the limitation in reasoning.\n\n"
                     "Requirements:\n```txt\n" + user_description + "\n```"
                 ),
             },
@@ -294,13 +356,70 @@ def detect_structure_type(
     return analysis
 
 
+def _sanitize_field_name(name: str, fallback: str = "records") -> str:
+    field_name = re.sub(r"[^a-zA-Z0-9]+", "_", name or "").strip("_").lower()
+    if not field_name:
+        field_name = fallback
+    if not re.match(r"^[a-z]", field_name):
+        field_name = f"{fallback}_{field_name}".strip("_")
+    return field_name
+
+
+def _ensure_no_list_dict_fields(requirements: ExtractionRequirements, *, context: str) -> None:
+    bad_fields = [f.field_name for f in requirements.fields if f.field_type == "list[dict]"]
+    if bad_fields:
+        raise ValueError(
+            f"{context} cannot contain list[dict] fields because the surrounding "
+            "schema already represents the repeated object. Parse the row/item "
+            f"fields as scalar fields instead. Problem fields: {bad_fields}"
+        )
+
+
+def _create_parent_with_nested_list_model(
+    *,
+    parent_requirements: ExtractionRequirements,
+    child_requirements: ExtractionRequirements,
+    child_container_name: str,
+    child_container_description: str,
+) -> type[BaseModel]:
+    ParentFieldsModel = create_extraction_model(parent_requirements)  # noqa: N806
+    ChildModel = create_extraction_model(child_requirements)  # noqa: N806
+
+    combined_fields = {
+        name: (finfo.annotation, finfo)
+        for name, finfo in ParentFieldsModel.model_fields.items()
+    }
+    combined_fields[child_container_name] = (
+        list[ChildModel],
+        Field(description=child_container_description),
+    )
+
+    suffix = "_Extraction"
+    base_name = sanitize_model_name(parent_requirements.use_case_name, suffix=suffix)
+    model_name = base_name + suffix
+
+    return create_model(  # noqa: N806
+        model_name,
+        __config__=ConfigDict(extra="forbid"),
+        __doc__=(
+            f"Extraction model for {parent_requirements.use_case_name} "
+            f"with repeated {child_container_name}"
+        ),
+        **combined_fields,
+    )
+
+
 def parse_nested_requirements(
     user_description: str,
     *,
     client=None,
     model: str = None,
     _usage_sink: list | None = None,
-) -> tuple[type[BaseModel], ExtractionRequirements, StructureAnalysis]:
+) -> tuple[
+    type[BaseModel],
+    ExtractionRequirements | CompositeExtractionRequirements,
+    StructureAnalysis,
+]:
     """
     Stage 2: Parse nested requirements by:
     1. Detecting structure type
@@ -337,6 +456,79 @@ def parse_nested_requirements(
         extraction_model = create_extraction_model(requirements)
         return extraction_model, requirements, analysis
 
+    if analysis.structure_type == "parent_with_nested_list":
+        print("Using parent-with-nested-list structure")
+        print(f"  Parent fields: {analysis.parent_fields_description}")
+        print(f"  Child collection: {analysis.child_container_name}")
+        print(f"  Child fields: {analysis.child_fields_description}")
+
+        if not analysis.parent_fields_description.strip():
+            raise ValueError(
+                "Structure detector selected parent_with_nested_list but did not "
+                "return parent_fields_description."
+            )
+        if not analysis.child_fields_description.strip():
+            raise ValueError(
+                "Structure detector selected parent_with_nested_list but did not "
+                "return child_fields_description."
+            )
+
+        print("\nParsing parent-level fields...")
+        parent_requirements = parse_user_requirements(
+            analysis.parent_fields_description,
+            client=client,
+            model=model,
+            _usage_sink=_usage_sink,
+        )
+
+        print("\nParsing child row fields...")
+        child_requirements = parse_user_requirements(
+            analysis.child_fields_description,
+            client=client,
+            model=model,
+            _usage_sink=_usage_sink,
+            parse_mode="repeated_item",
+        )
+        _ensure_no_list_dict_fields(
+            parent_requirements,
+            context="Parent requirements for parent_with_nested_list",
+        )
+        _ensure_no_list_dict_fields(
+            child_requirements,
+            context="Child requirements for parent_with_nested_list",
+        )
+
+        child_container_name = _sanitize_field_name(
+            analysis.child_container_name or analysis.parent_container_name,
+            fallback="records",
+        )
+        child_container_description = (
+            analysis.child_container_description
+            or analysis.parent_description
+            or f"Repeated {child_container_name} records"
+        )
+
+        print(f"Identified parent fields: {[f.field_name for f in parent_requirements.fields]}")
+        print(f"Identified child fields: {[f.field_name for f in child_requirements.fields]}")
+
+        print("\nCreating parent-with-nested-list Pydantic model...")
+        extraction_model = _create_parent_with_nested_list_model(
+            parent_requirements=parent_requirements,
+            child_requirements=child_requirements,
+            child_container_name=child_container_name,
+            child_container_description=child_container_description,
+        )
+        composite_requirements = CompositeExtractionRequirements(
+            parent_requirements=parent_requirements,
+            child_container_name=child_container_name,
+            child_requirements=child_requirements,
+        )
+
+        print(f"Created combined model: {extraction_model.__name__}")
+        print(f"Child container field: '{child_container_name}'")
+
+        return extraction_model, composite_requirements, analysis
+
     # Nested structure
     print(f"Using nested structure with '{analysis.parent_container_name}' field")
     print(f"  Parent: {analysis.parent_description}")
@@ -351,6 +543,7 @@ def parse_nested_requirements(
 
     print(f"Identified {len(item_requirements.fields)} fields per item")
     print(f"  Fields: {[f.field_name for f in item_requirements.fields]}")
+    _ensure_no_list_dict_fields(item_requirements, context="Nested list item requirements")
 
     print("\nCreating nested Pydantic model...")
     ItemModel = create_extraction_model(item_requirements)  # noqa: N806
@@ -506,6 +699,7 @@ def parse_user_requirements(
     client=None,
     model: str = None,
     _usage_sink: list | None = None,
+    parse_mode: RequirementsParseMode = "normal",
 ) -> ExtractionRequirements:
     """
     Parse extraction requirements from natural language using LLM with type detection rules.
@@ -523,31 +717,14 @@ def parse_user_requirements(
         raise ValueError("model must be provided when client is specified")
 
     cleaned_description = _clean_requirements_text(user_description)
+    prompt = _build_parse_requirements_prompt(cleaned_description, parse_mode=parse_mode)
 
     resp = _parse_with(
         client=client,
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_PARSER},
-            {
-                "role": "user",
-                "content": "Parse the extraction requirements below "
-                "into the target schema.\n"
-                "Apply the type detection rules to determine "
-                "the correct field_type for each field.\n"
-                "If a field cannot be identified reliably, omit it.\n\n"
-                "For each field, also determine:\n"
-                "- required_in_output: must the key appear in every output object?\n"
-                "- nullable: does the task explicitly allow null/None?\n"
-                "- default + has_explicit_default: does the task state a fallback value?\n"
-                "- enum: include '' in enum only when empty string is an allowed value.\n\n"
-                "Do not confuse a missing value with an optional field.\n"
-                "A field may be required in output and still have '' as its value.\n"
-                + TYPE_DETECTION_RULES
-                + "\n\nRequirements to parse:\n```txt\n"
-                + cleaned_description
-                + "\n```",
-            },
+            {"role": "user", "content": prompt},
         ],
         response_format=ExtractionRequirements,
     )
@@ -558,6 +735,57 @@ def parse_user_requirements(
     if getattr(resp, "usage", None):
         print(f"[parse_user_requirements] tokens={resp.usage.total_tokens}")
     return req
+
+
+def _build_parse_requirements_prompt(
+    cleaned_description: str,
+    *,
+    parse_mode: RequirementsParseMode = "normal",
+) -> str:
+    repeated_item_instruction = ""
+    if parse_mode == "repeated_item":
+        repeated_item_instruction = (
+            "SPECIAL CONTEXT: You are parsing the schema for ONE repeated child "
+            "row/item/record. The surrounding parent schema already contains the "
+            "list field. Therefore, do NOT create any field with field_type "
+            "'list[dict]'. Phrases such as 'for each line item', 'for each row', "
+            "'records containing', or 'items with fields' refer to the current "
+            "single child object. Convert the named subfields into scalar fields "
+            "on that child object.\n\n"
+        )
+
+    repeated_item_footer = ""
+    if parse_mode == "repeated_item":
+        repeated_item_footer = (
+            "\n\nRepeated child row reminder:\n"
+            "- The output model you are parsing is ONE row/item/record, not the "
+            "list container.\n"
+            "- Do not output a collection field such as line_items/items/records.\n"
+            "- Do not use field_type='list[dict]'.\n"
+            "- If the text says 'For each line item, extract item number, "
+            "description, quantity, price', return scalar fields like "
+            "item_number, description, quantity, and price."
+        )
+
+    return (
+        "Parse the extraction requirements below into the target schema.\n"
+        + repeated_item_instruction
+        + "Apply the type detection rules to determine "
+        "the correct field_type for each field.\n"
+        "If a field cannot be identified reliably, omit it.\n\n"
+        "For each field, also determine:\n"
+        "- required_in_output: must the key appear in every output object?\n"
+        "- nullable: does the task explicitly allow null/None?\n"
+        "- default + has_explicit_default: does the task state a fallback value?\n"
+        "- enum: include '' in enum only when empty string is an allowed value.\n\n"
+        "Do not confuse a missing value with an optional field.\n"
+        "A field may be required in output and still have '' as its value.\n"
+        + TYPE_DETECTION_RULES
+        + repeated_item_footer
+        + "\n\nRequirements to parse:\n```txt\n"
+        + cleaned_description
+        + "\n```"
+    )
 
 
 def _clean_requirements_text(text: str) -> str:
@@ -727,12 +955,20 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
                 values = [""] + f.enum if "" not in f.enum else f.enum
                 annotated = Literal[tuple(values)]  # type: ignore[misc,call-arg]
 
-        if f.nullable:
+        uses_numeric_fallback = (
+            f.field_type in NUMERIC_FIELD_TYPES
+            and not f.has_explicit_default
+            and not f.nullable
+        )
+
+        if f.nullable or uses_numeric_fallback:
             annotated = annotated | None
 
         if f.has_explicit_default:
             default_val = f.default
         elif f.nullable:
+            default_val = None
+        elif uses_numeric_fallback:
             default_val = None
         elif f.field_type in ("list[str]", "list[dict]"):
             default_val = []
@@ -1010,6 +1246,13 @@ def apply_field_policies(data: dict, requirements: ExtractionRequirements) -> di
                 continue
             value = _resolve_fallback(field)
 
+        if (
+            field.field_type in NUMERIC_FIELD_TYPES
+            and isinstance(value, str)
+            and not value.strip()
+        ):
+            value = _resolve_fallback(field)
+
         if field.enum and value not in field.enum:
             value = _resolve_fallback(field)
 
@@ -1034,7 +1277,9 @@ class SchemaGenerationResult:
     Attributes:
         schema: The generated Pydantic model class (same object that
             :meth:`SchemaGenerator.generate_schema` returns).
-        requirements: Parsed item-level field specifications.
+        requirements: Parsed field specifications. For parent_with_nested_list
+            schemas this is a CompositeExtractionRequirements object containing
+            separate parent and child requirements.
         structure_analysis: Whether the schema is flat or nested, plus
             the structure-detection reasoning.
         usage: Aggregated token usage across the underlying LLM calls
@@ -1045,7 +1290,7 @@ class SchemaGenerationResult:
     """
 
     schema: type[BaseModel]
-    requirements: ExtractionRequirements
+    requirements: ExtractionRequirements | CompositeExtractionRequirements
     structure_analysis: StructureAnalysis
     usage: UsageRecord | None
     duration_s: float
@@ -1224,13 +1469,27 @@ class SchemaGenerator:
         if not self.extraction_model:
             return {"error": "No schema generated yet. Call generate_schema() first."}
 
+        requirements = self.item_requirements
+        if isinstance(requirements, CompositeExtractionRequirements):
+            fields = {
+                "parent": [f.field_name for f in requirements.parent_requirements.fields],
+                requirements.child_container_name: [
+                    f.field_name for f in requirements.child_requirements.fields
+                ],
+            }
+            field_count = (
+                len(requirements.parent_requirements.fields)
+                + len(requirements.child_requirements.fields)
+            )
+        else:
+            fields = [f.field_name for f in requirements.fields] if requirements else []
+            field_count = len(requirements.fields) if requirements else 0
+
         return {
             "model_name": self.extraction_model.__name__,
             "structure_type": self.structure_analysis.structure_type
             if self.structure_analysis
             else "unknown",
-            "fields": [f.field_name for f in self.item_requirements.fields]
-            if self.item_requirements
-            else [],
-            "field_count": len(self.item_requirements.fields) if self.item_requirements else 0,
+            "fields": fields,
+            "field_count": field_count,
         }

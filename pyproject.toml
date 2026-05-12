@@ -152,6 +152,13 @@ multimodal-parser = [
     "markdown-it-py>=3.0.0",
 ]
 
+# Single-pass vision extraction: PDF/image → structured data (OpenAI, Claude, Google)
+vision-extract = [
+    "anthropic>=0.43.0",
+    "google-auth>=2.0.0",
+    "requests>=2.31.0",
+]
+
 # Multi-provider LLM client adapters used across software_components/llm/.
 # Opt-in: install only the providers you need at runtime.
 llm-anthropic = [

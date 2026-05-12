@@ -1,0 +1,106 @@
+{
+  "date": "20-02-2026",
+  "purchase_order_number": "5400810558-R05",
+  "supplier_number": "3008700",
+  "contact": "Bryant Pham",
+  "line_items": [
+    {
+      "item_number": "0010",
+      "complete_description": "OFE Copper C10100 H04 (hard) Round 0.2500 (+-.0015) X 144 \" Mill Length ASTM B 187/B 187M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 4000,
+      "price": "7.53",
+      "material_number": "CURD01925"
+    },
+    {
+      "item_number": "0020",
+      "complete_description": "OFE Copper C10100 H04 (hard) Round 0.3750 (+-.0015) X 144 \" Mill Length ASTM B 187/B 187M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 2000,
+      "price": "7.5",
+      "material_number": "CURD00241"
+    },
+    {
+      "item_number": "0030",
+      "complete_description": "OFE Copper C10100 H04 (hard) Round 1.0000 (+-.002) X 144 \" Mill Length ASTM B 187/B 187M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 2000,
+      "price": "7.47",
+      "material_number": "CURD01208"
+    },
+    {
+      "item_number": "0040",
+      "complete_description": "OFE Copper C10100 H04 (hard) Round 1.7500 (+-.0025) X 144 \" Mill Length ASTM B 187/B 187M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 2000,
+      "price": "7.43",
+      "material_number": "CURD00251"
+    },
+    {
+      "item_number": "0050",
+      "complete_description": "OFE Copper C10100 H04 (hard) Round 2.5000 (+-.004) X 144 \" Mill Length ASTM B 187/B 187M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 6000,
+      "price": "7.43",
+      "material_number": "CURD01162"
+    },
+    {
+      "item_number": "0060",
+      "complete_description": "OFE Copper C10100 H58 (drawn-general purpose) Tube OD 4.1250 (+-.006) X 0.31250 (+-.025) X 144 \" Mill Length ASTM B 75/B 75M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 2000,
+      "price": "9.79",
+      "material_number": "CUTUB01183"
+    },
+    {
+      "item_number": "0070",
+      "complete_description": "OFE Copper C10100 H80 (hard-drawn) Tube OD 0.7500 (+-.0025) X 0.06250 (+-.004) X 144 \" Mill Length ASTM B 75/B 75M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 1000,
+      "price": "10.7",
+      "material_number": "CUTUB01142"
+    },
+    {
+      "item_number": "0080",
+      "complete_description": "OFE Copper C10100 H80 (hard-drawn) Tube OD 1.5000 (+-.003) X 0.25000 (+-.012) X 144 \" Mill Length ASTM B 75/B 75M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 2000,
+      "price": "9.73",
+      "material_number": "CUTUB01150"
+    },
+    {
+      "item_number": "0090",
+      "complete_description": "OFE Copper C10100 H80 (hard-drawn) Tube OD 2.0000 (+-.003) X 0.06300 (+-.004) X 144 \" Mill Length ASTM B 75/B 75M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 1000,
+      "price": "10.7",
+      "material_number": "CUTUB01156"
+    },
+    {
+      "item_number": "0100",
+      "complete_description": "OFE Copper C10100 H80 (hard-drawn) Tube OD 2.5000 (+-.004) X 0.37500 (+-.023) X 144 \" Mill Length ASTM B 75/B 75M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 1000,
+      "price": "10.7",
+      "material_number": "CUTUB01165"
+    },
+    {
+      "item_number": "0110",
+      "complete_description": "OFE Copper C10100 H80 (hard-drawn) Tube OD 2.7500 (+-.004) X 0.25000 (+-.014) X 144 \" Mill Length ASTM B 75/B 75M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 3000,
+      "price": "9.39",
+      "material_number": "CUTUB01167"
+    },
+    {
+      "item_number": "0120",
+      "complete_description": "OFE Copper C10100 H80 (hard-drawn) Tube OD 2.7500 (+-.004) X 0.37500 (+-.023) X 144 \" Mill Length ASTM B 75/B 75M ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 1000,
+      "price": "10.0",
+      "material_number": "CUTUB01168"
+    },
+    {
+      "item_number": "0130",
+      "complete_description": "OFE Copper C10100 Forged & Rough Machined Round 6.0000 (+-.120) X 55 \" Mill Length ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 2000,
+      "price": "7.61",
+      "material_number": "CURD01479"
+    },
+    {
+      "item_number": "0140",
+      "complete_description": "OFE Copper C10100 Forged & Rough Machined Round 7.0000 (+.125-0) X 53 \" Mill Length ASTM F 68 Actual Chemistry/Act. Physical",
+      "quantity": 3000,
+      "price": "7.61",
+      "material_number": "CURD01481"
+    }
+  ]
+}

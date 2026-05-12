@@ -14,4 +14,5 @@ __all__ = [
     "doc_classifier",
     "RAG",
     "agents",
+    "vision_extractor",
 ]

@@ -419,8 +419,9 @@ def _extract_google_usage(payload: dict) -> dict[str, int]:
     """Extract token counts from a Gemini REST ``generateContent`` payload."""
     meta = payload.get("usageMetadata") or {}
     input_tok = int(meta.get("promptTokenCount", 0) or 0)
-    output_tok = int(meta.get("candidatesTokenCount", 0) or 0)
+    candidate_tok = int(meta.get("candidatesTokenCount", 0) or 0)
     thinking_tok = int(meta.get("thoughtsTokenCount", 0) or 0)
+    output_tok = candidate_tok + thinking_tok
     total_tok = int(meta.get("totalTokenCount", 0) or (input_tok + output_tok))
     return {
         "input_tokens": input_tok,
