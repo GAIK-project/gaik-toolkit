@@ -9,6 +9,7 @@ Detailed API documentation for GAIK building blocks.
 - [Configuration](#configuration)
 - [Multi-Provider Configuration (`llm/`)](#multi-provider-configuration-llm)
 - [Extractor Module](#extractor-module) (SchemaGenerator, DataExtractor, FieldSpec)
+- [Vision Extractor Module](#vision-extractor-module) (VisionExtractor, VisionExtractionResult, VerifiableField)
 - [Parsers Module](#parsers-module) (VisionParser, PyMuPDFParser, DocxParser, DoclingParser, VisionPlusParser, DoclingApiClientParser, MultimodalParser)
 - [Transcriber Module](#transcriber-module) (Transcriber, TranscriptionResult)
 - [Enhance Transcript Module](#enhance-transcript-module) (TranscriptEnhancer)
@@ -211,6 +212,82 @@ Individual field specification.
 | `enum` | list | Optional allowed values |
 | `pattern` | str | Optional regex pattern |
 | `format` | str | Optional output format |
+
+---
+
+## Vision Extractor Module
+
+**Source:** `gaik.software_components.vision_extractor`
+
+**Install:** `pip install "gaik[vision-extract]"`
+
+Single-pass PDF/image → structured data via a vision LLM. Skips the
+intermediate markdown step that `DocumentsToStructuredData` produces; the
+model sees the full visual context across one or more documents in a single
+API call (e.g. a Purchase Order + several BOMs).
+
+Use when accuracy on visually-laid-out documents (tables, stamps, signatures,
+forms) matters more than throughput, or when several related files must be
+extracted together as one logical record.
+
+### VisionExtractor
+
+```python
+from gaik.software_components.vision_extractor import VisionExtractor
+
+extractor = VisionExtractor(
+    api_config=None,                  # Optional explicit provider config
+    model_provider="openai",          # "openai" | "claude" | "google"
+    model=None,                       # Optional model override
+    reasoning_effort="medium",        # "minimal" | "low" | "medium" | "high"
+    merge_table=False,                # Merge multi-page tables into one record
+    use_azure=True,                   # OpenAI provider: use Azure deployment
+    vertex_ai=True,                   # Google provider: use Vertex AI
+    additional_instructions=None,     # Extra task-specific guidance
+    include_verification=False,       # Wrap each field in VerifiableField
+)
+
+result = extractor.extract(
+    file_paths=["PO.pdf", "BOM1.pdf", "BOM2.pdf"],
+    user_requirements="Extract purchase order header and line items ...",
+    extraction_model=None,            # Optional pre-built Pydantic model
+    requirements=None,                # Optional pre-built ExtractionRequirements
+    schema_dir=None,                  # Persist/load schema.py + requirements.json
+)
+```
+
+**Supported input formats:** `.pdf`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`,
+`.tiff`, `.bmp`. All file paths are sent in one call.
+
+**Schema resolution order:**
+
+1. Both `extraction_model` and `requirements` passed → use directly.
+2. `schema_dir` set and `schema.py` + `requirements.json` exist → load from disk.
+3. Otherwise → generate via `SchemaGenerator` (one text LLM call).
+
+### VisionExtractionResult
+
+```python
+result.data            # dict[str, Any] — extracted fields (or VerifiableField-wrapped dict)
+result.verification    # Optional verification metadata (include_verification=True)
+result.usage           # UsageRecord — token counts, duration, cost (observability)
+result.model_dump()    # Serialize to dict
+```
+
+### VerifiableField (opt-in per-field metadata)
+
+When `include_verification=True`, each leaf field is wrapped:
+
+```python
+{
+    "value": <extracted value>,
+    "confidence_score": 0.0..1.0,
+    "reasoning": "short why-this-value note",
+}
+```
+
+Use for human-in-the-loop QA pipelines where the operator needs to know which
+fields the model was unsure about.
 
 ---
 
@@ -420,6 +497,10 @@ enhancer = TranscriptEnhancer(
     api_config=config,         # Optional; uses get_openai_config() if omitted
     use_azure=True,            # Used only when api_config is omitted
     model=None,                # Optional model override
+    reasoning_effort=None,     # Optional: "minimal" | "low" | "medium" | "high"
+                               #   Forwarded to gpt-5.x reasoning models;
+                               #   provider-agnostic — silently ignored by
+                               #   models that don't accept it.
 )
 
 # From string
@@ -428,6 +509,13 @@ result = enhancer.enhance_text(
     generate_summary=False,           # Include change count summary
     diff_chunks=False,                # Include list of changed spans
     additional_instructions=None,     # Extra instructions for Pass 2
+    progress_callback=None,           # Optional: Callable[[str, dict], None]
+                                      #   Emits events: pass1_started,
+                                      #   pass1_completed, pass2_started,
+                                      #   pass2_completed. Exceptions from the
+                                      #   callback are swallowed with a
+                                      #   warning so enhancement still
+                                      #   completes.
 )
 
 # From file
@@ -649,6 +737,13 @@ from gaik.software_components.extractor import (
     ExtractionRequirements,
     FieldSpec,
     get_openai_config,
+)
+
+# Vision Extractor
+from gaik.software_components.vision_extractor import (
+    VisionExtractor,
+    VisionExtractionResult,
+    VerifiableField,
 )
 
 # Parsers

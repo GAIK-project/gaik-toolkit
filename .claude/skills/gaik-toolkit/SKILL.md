@@ -133,6 +133,7 @@ Core classes in `gaik.software_components.*`. For detailed API and constructor p
 |-----------|--------|------------|
 | SchemaGenerator | `from gaik.software_components.extractor import SchemaGenerator` | `generate_schema(user_requirements)` |
 | DataExtractor | `from gaik.software_components.extractor import DataExtractor` | `extract(extraction_model, requirements, ...)` |
+| VisionExtractor | `from gaik.software_components.vision_extractor import VisionExtractor` | `extract(file_paths, user_requirements, extraction_model=None, requirements=None, schema_dir=None)` → VisionExtractionResult (single-pass PDF/image → structured data; OpenAI / Claude / Google) |
 | VisionParser | `from gaik.software_components.parsers import VisionParser` | `convert_pdf(path)` → list[str] per page |
 | PyMuPDFParser | `from gaik.software_components.parsers import PyMuPDFParser` | `parse_pdf(path)` → str |
 | DocxParser | `from gaik.software_components.parsers import DocxParser` | `parse_docx(path)` → str |

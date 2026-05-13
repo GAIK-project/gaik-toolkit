@@ -13,6 +13,8 @@ Working examples for common GAIK toolkit use cases.
 - [Example 7: FastAPI Integration](#example-7-fastapi-integration)
 - [Example 8: Parallel Transcription of Long Video](#example-8-parallel-transcription-of-long-video)
 - [Example 9: RAG with PostgreSQL Vector Store](#example-9-rag-with-postgresql-vector-store)
+- [Example 10: Vision Extraction across multiple PDFs](#example-10-vision-extraction-across-multiple-pdfs)
+- [Example 11: Standalone Schema Generation](#example-11-standalone-schema-generation)
 - [Tips](#tips)
 
 ## Example 1: Invoice Extraction from PDF
@@ -503,6 +505,88 @@ with PgVectorStore("postgresql://postgres:pass@localhost/ragdb", embedding_dim=3
     answer = generator.generate("What are the key findings?", relevant)
     print(answer)
 ```
+
+---
+
+## Example 10: Vision Extraction across multiple PDFs
+
+Send a Purchase Order plus its Bills of Material in a single LLM call so the
+model can align PO line items with their matching BOM via Material Number.
+
+**Sample location:** `implementation_layer/examples/software_components/vision_extractor/`
+
+```python
+"""Multi-document extraction with VisionExtractor."""
+from pathlib import Path
+from gaik.software_components.vision_extractor import VisionExtractor
+
+extractor = VisionExtractor(
+    model_provider="openai",         # or "claude" / "google"
+    use_azure=True,
+    reasoning_effort="medium",
+    include_verification=False,
+)
+
+PO_FOLDER = Path("PO")
+result = extractor.extract(
+    file_paths=[
+        PO_FOLDER / "PO.pdf",
+        PO_FOLDER / "BOM1.pdf",
+        PO_FOLDER / "BOM2.pdf",
+        PO_FOLDER / "BOM3.pdf",
+    ],
+    user_requirements=(
+        "Extract PO header fields and each line item. For each line item, "
+        "include the matching BOM components keyed by Material Number."
+    ),
+    schema_dir=Path("./schema_multi"),    # Auto-persists generated schema for reuse
+)
+
+print(result.data)        # nested dict aligned across the 4 PDFs
+print(result.usage)       # tokens + duration + cost via observability
+```
+
+**Why single-pass:** the model sees PO and BOMs together in one context, so
+cross-document linking (PO line ↔ BOM material) is handled by the LLM rather
+than by brittle post-extraction joins. Use `include_verification=True` to get
+per-field `confidence_score` + `reasoning` for human-in-the-loop QA.
+
+---
+
+## Example 11: Standalone Schema Generation
+
+Generate a reusable Pydantic schema + requirements metadata from a natural
+language task description, without running any extraction. The output is then
+loaded by `DataExtractor` or `VisionExtractor` on later runs via `schema_dir`.
+
+**Sample location:** `implementation_layer/examples/software_components/schema-generator/`
+
+```python
+"""Generate a reusable schema once; reuse it across many extraction runs."""
+from pathlib import Path
+from gaik.software_components.extractor import SchemaGenerator, get_openai_config
+
+TASK = """
+Extract purchase order data.
+
+Top-level: date (DD-MM-YYYY), purchase order number, supplier number, contact.
+For each line item: item number, complete description, quantity, price,
+material number.
+"""
+
+generator = SchemaGenerator(config=get_openai_config(use_azure=True))
+extraction_model, requirements = generator.generate_schema(TASK)
+
+SCHEMA_DIR = Path("./schema_generated")
+SCHEMA_DIR.mkdir(exist_ok=True)
+# Persist for later reuse — DataExtractor / VisionExtractor pick these up
+# automatically when called with schema_dir=SCHEMA_DIR.
+(SCHEMA_DIR / "requirements.json").write_text(requirements.model_dump_json(indent=2))
+```
+
+**When to do this separately:** batch pipelines where schema generation cost
+should be paid once at deploy time, not on every record. Pair with
+`schema_dir=` in the extractor to skip the generation step at runtime.
 
 ---
 

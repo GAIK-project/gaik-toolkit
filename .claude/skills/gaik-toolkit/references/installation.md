@@ -8,6 +8,10 @@ Install via pip with optional extras based on your needs.
 # Structured extraction (schema generation + extraction)
 pip install "gaik[extract]"
 
+# Single-pass vision extraction (PDF/image → structured data)
+# Pulls anthropic + google-auth + requests for multi-provider (OpenAI/Claude/Google).
+pip install "gaik[vision-extract]"
+
 # Document parsing (includes docling with GPU support)
 pip install "gaik[parser]"
 
@@ -63,6 +67,7 @@ pip install "gaik[all-cpu]"
 | Task | Extra |
 |------|-------|
 | Extract structured data from text | `extract` |
+| Extract structured data from PDFs/images (single-pass, vision) | `vision-extract` |
 | Parse PDFs (fast, local) | `parser-cpu` |
 | Parse PDFs (with OCR/GPU) | `parser` |
 | Transcribe audio/video | `transcriber` or `parallel-transcriber` |
