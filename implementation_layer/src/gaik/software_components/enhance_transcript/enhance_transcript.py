@@ -77,6 +77,8 @@ Forbidden:
 
 If uncertain about a change, leave the original text unchanged.
 
+{DOMAIN_RULES}
+
 Output:
 Return ONLY the corrected transcript text with no commentary.
 """
@@ -143,9 +145,30 @@ Insertion budget:
 
 If uncertain about a change, leave the original text unchanged.
 
+{DOMAIN_RULES}
+
 Output:
 Return ONLY the repaired transcript text with no commentary.
 """
+
+
+_DOMAIN_RULES_HEADER = (
+    "DOMAIN-SPECIFIC RULES (these override the general rules above where stated):"
+)
+
+
+def _apply_domain_rules(prompt: str, domain_rules: str | None) -> str:
+    """Inject domain-specific rules at the ``{DOMAIN_RULES}`` placeholder.
+
+    When ``domain_rules`` is None or empty, the placeholder and the
+    surrounding blank lines are removed cleanly so the prompt stays
+    identical to the pre-domain-rules behavior (backward compatible).
+    """
+    if domain_rules and domain_rules.strip():
+        block = f"{_DOMAIN_RULES_HEADER}\n{domain_rules.strip()}"
+        return prompt.replace("{DOMAIN_RULES}", block)
+    # Tidy: collapse the empty placeholder + its surrounding blank lines
+    return prompt.replace("\n\n{DOMAIN_RULES}\n\n", "\n\n")
 
 
 class CorrectionSummary(BaseModel):
@@ -198,6 +221,7 @@ class TranscriptEnhancer:
         generate_summary: bool = False,
         diff_chunks: bool = False,
         additional_instructions: str | None = None,
+        domain_rules: str | None = None,
         progress_callback: ProgressCallback | None = None,
     ) -> TranscriptEnhancerResult:
         transcript_text = transcript_text.strip()
@@ -205,13 +229,14 @@ class TranscriptEnhancer:
             raise ValueError("transcript_text must not be empty")
 
         self._notify(progress_callback, "pass1_started", {"chars": len(transcript_text)})
-        pass1_text = self._enhance_pass1(transcript_text)
+        pass1_text = self._enhance_pass1(transcript_text, domain_rules=domain_rules)
         self._notify(progress_callback, "pass1_completed", {"chars": len(pass1_text)})
 
         self._notify(progress_callback, "pass2_started", {"chars": len(pass1_text)})
         enhanced_text = self._enhance_pass2(
             pass1_text,
             additional_instructions=additional_instructions,
+            domain_rules=domain_rules,
         )
         self._notify(progress_callback, "pass2_completed", {"chars": len(enhanced_text)})
 
@@ -250,6 +275,7 @@ class TranscriptEnhancer:
         generate_summary: bool = False,
         diff_chunks: bool = False,
         additional_instructions: str | None = None,
+        domain_rules: str | None = None,
         encoding: str = "utf-8",
     ) -> TranscriptEnhancerResult:
         transcript_path = Path(file_path)
@@ -264,6 +290,7 @@ class TranscriptEnhancer:
             generate_summary=generate_summary,
             diff_chunks=diff_chunks,
             additional_instructions=additional_instructions,
+            domain_rules=domain_rules,
         )
         result.source_file = transcript_path.name
         return result
@@ -272,9 +299,17 @@ class TranscriptEnhancer:
     def _default_model_for_config(config: dict) -> str:
         return DEFAULT_MODEL_AZURE if config.get("use_azure", False) else DEFAULT_MODEL_OPENAI
 
-    def _enhance_pass1(self, transcript_text: str) -> str:
+    def _enhance_pass1(
+        self,
+        transcript_text: str,
+        *,
+        domain_rules: str | None = None,
+    ) -> str:
         messages = [
-            {"role": "system", "content": PASS1_SYSTEM_PROMPT},
+            {
+                "role": "system",
+                "content": _apply_domain_rules(PASS1_SYSTEM_PROMPT, domain_rules),
+            },
             {
                 "role": "user",
                 "content": f"Edit this Finnish transcript for spelling consistency:\n\n{transcript_text}",
@@ -287,6 +322,7 @@ class TranscriptEnhancer:
         transcript_text: str,
         *,
         additional_instructions: str | None = None,
+        domain_rules: str | None = None,
     ) -> str:
         user_prompt = (
             f"Repair remaining ASR errors in this Finnish transcript:\n\n"
@@ -299,7 +335,10 @@ class TranscriptEnhancer:
             )
 
         messages = [
-            {"role": "system", "content": PASS2_SYSTEM_PROMPT},
+            {
+                "role": "system",
+                "content": _apply_domain_rules(PASS2_SYSTEM_PROMPT, domain_rules),
+            },
             {"role": "user", "content": user_prompt},
         ]
         return self._chat_text(messages, fallback=transcript_text)

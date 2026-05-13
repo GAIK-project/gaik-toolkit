@@ -16,8 +16,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from gaik.software_components.enhance_transcript.enhance_transcript import (
+    PASS1_SYSTEM_PROMPT,
+    PASS2_SYSTEM_PROMPT,
     TranscriptEnhancer,
     TranscriptEnhancerResult,
+    _apply_domain_rules,
 )
 
 
@@ -142,6 +145,95 @@ def test_reasoning_effort_forwarded_to_chat_call_when_set():
 
     call_kwargs = enhancer.client.chat.completions.create.call_args.kwargs
     assert call_kwargs.get("reasoning_effort") == "minimal"
+
+
+# --- domain_rules parameter tests ---
+
+
+def test_apply_domain_rules_none_removes_placeholder_cleanly():
+    """When domain_rules is None, the {DOMAIN_RULES} placeholder must be
+    removed without leaving stray blank lines — keeps the prompt
+    byte-identical to the pre-feature shape for backward compat."""
+    result = _apply_domain_rules(PASS1_SYSTEM_PROMPT, None)
+    assert "{DOMAIN_RULES}" not in result
+    # No double-blank-line artifact where the placeholder used to live
+    assert "\n\n\n" not in result
+    assert "DOMAIN-SPECIFIC RULES" not in result
+
+
+def test_apply_domain_rules_empty_string_removes_placeholder():
+    """An empty or whitespace-only string is treated like None."""
+    for empty in ["", "   ", "\n\n", "\t"]:
+        result = _apply_domain_rules(PASS1_SYSTEM_PROMPT, empty)
+        assert "{DOMAIN_RULES}" not in result
+        assert "DOMAIN-SPECIFIC RULES" not in result
+
+
+def test_apply_domain_rules_with_text_injects_at_placeholder():
+    rule = "DOMAIN OVERRIDE: normalize tooth refs like 'ykskakkonen' to '#12'."
+    result = _apply_domain_rules(PASS1_SYSTEM_PROMPT, rule)
+    assert "{DOMAIN_RULES}" not in result
+    assert "DOMAIN-SPECIFIC RULES" in result
+    assert rule in result
+    # The block lands BEFORE the Output: section, so the LLM reads
+    # domain exceptions after the general safety rules — last instruction
+    # in the conflict wins.
+    assert result.index("DOMAIN-SPECIFIC RULES") < result.index("Output:")
+
+
+def test_apply_domain_rules_works_on_pass2_prompt_too():
+    rule = "test rule"
+    result = _apply_domain_rules(PASS2_SYSTEM_PROMPT, rule)
+    assert "{DOMAIN_RULES}" not in result
+    assert "DOMAIN-SPECIFIC RULES" in result
+    assert rule in result
+
+
+def test_enhance_text_threads_domain_rules_through_both_passes():
+    """When domain_rules is passed, it must reach _enhance_pass1 AND
+    _enhance_pass2 — otherwise pass1's number safety rule wins."""
+    enhancer, _chat_stub = _build_enhancer()
+    pass1_calls: list[str | None] = []
+    pass2_calls: list[str | None] = []
+
+    # Capture which domain_rules each pass receives
+    orig_pass1 = TranscriptEnhancer._enhance_pass1
+    orig_pass2 = TranscriptEnhancer._enhance_pass2
+
+    def spy_pass1(self, text, *, domain_rules=None):
+        pass1_calls.append(domain_rules)
+        return orig_pass1(self, text, domain_rules=domain_rules)
+
+    def spy_pass2(self, text, *, additional_instructions=None, domain_rules=None):
+        pass2_calls.append(domain_rules)
+        return orig_pass2(
+            self,
+            text,
+            additional_instructions=additional_instructions,
+            domain_rules=domain_rules,
+        )
+
+    enhancer._enhance_pass1 = spy_pass1.__get__(enhancer)
+    enhancer._enhance_pass2 = spy_pass2.__get__(enhancer)
+
+    enhancer.enhance_text("Some sample text.", domain_rules="MY_DOMAIN_RULE")
+
+    assert pass1_calls == ["MY_DOMAIN_RULE"]
+    assert pass2_calls == ["MY_DOMAIN_RULE"]
+
+
+def test_enhance_text_domain_rules_default_none_remains_backward_compatible():
+    """Existing callers (no domain_rules) must still get the bare PASS prompts."""
+    enhancer, chat_stub = _build_enhancer()
+    enhancer.enhance_text("Some sample text.")
+
+    # Both pass1 and pass2 stub-calls should have system prompts without DOMAIN-SPECIFIC RULES
+    for call in chat_stub.call_args_list:
+        messages = call.args[0] if call.args else call.kwargs.get("messages", [])
+        sys_msg = next((m for m in messages if m["role"] == "system"), None)
+        assert sys_msg is not None
+        assert "DOMAIN-SPECIFIC RULES" not in sys_msg["content"]
+        assert "{DOMAIN_RULES}" not in sys_msg["content"]
 
 
 def test_reasoning_effort_forwarded_through_provider_client_path():
