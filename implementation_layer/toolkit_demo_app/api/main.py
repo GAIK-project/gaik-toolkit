@@ -42,6 +42,7 @@ try:
         text_to_speech,
         transcriber,
         video_search,
+        vision_extractor,
     )
 except ImportError:
     # Local dev: running from project root with api.main:app
@@ -57,6 +58,7 @@ except ImportError:
         text_to_speech,
         transcriber,
         video_search,
+        vision_extractor,
     )
 
 
@@ -103,6 +105,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(parser.router, prefix="/parse", tags=["Parser"])
 app.include_router(classifier.router, prefix="/classify", tags=["Classifier"])
 app.include_router(extractor.router, prefix="/extract", tags=["Extractor"])
+app.include_router(
+    vision_extractor.router,
+    prefix="/extract-vision",
+    tags=["Vision Extractor"],
+)
 app.include_router(transcriber.router, prefix="/transcribe", tags=["Transcriber"])
 app.include_router(text_to_speech.router, prefix="/text-to-speech", tags=["Text-to-Speech"])
 app.include_router(pipeline.router, prefix="/pipeline", tags=["Pipeline"])
@@ -134,6 +141,9 @@ async def root():
             "parse": "/parse - Document parsing (PDF, DOCX)",
             "classify": "/classify - Document classification",
             "extract": "/extract - Data extraction",
+            "extract-vision": (
+                "/extract-vision - Single-pass vision extraction (PDF/image → structured data)"
+            ),
             "transcribe": "/transcribe - Audio/video transcription",
             "text-to-speech": "/text-to-speech - Text-to-speech audio generation",
             "pipeline": "/pipeline - End-to-end pipelines (audio/document to structured data)",

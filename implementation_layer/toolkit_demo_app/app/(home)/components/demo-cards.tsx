@@ -32,6 +32,7 @@ import {
   type LucideIcon,
   MessageSquareQuote,
   Mic,
+  ScanEye,
   Search,
   Volume2,
   SearchCode,
@@ -176,6 +177,13 @@ const buildingBlocks: Demo[] = [
       "Automatically find and list important details from any document",
     href: "/extractor",
     icon: FileSearch,
+  },
+  {
+    title: "Vision Extractor",
+    description:
+      "Extract structured data from PDFs and images in a single LLM call — multi-doc, no intermediate parse step",
+    href: "/vision-extractor",
+    icon: ScanEye,
   },
   {
     title: "Parser",

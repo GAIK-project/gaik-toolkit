@@ -149,6 +149,51 @@ flowchart TD
 
 ---
 
+### Vision Extractor
+
+The Vision Extractor turns PDFs and images directly into structured, schema-validated data — without an intermediate Markdown parse step. One LLM call sees all uploaded files together, so the model can use visual layout cues (tables, column alignment, headers, multi-page structure) and reason across documents in a single pass. It is best suited for forms, purchase orders, bills of materials, scanned reports, and any document where parsing quality strongly affects extraction accuracy or where row-level alignment must be preserved across pages or related files.
+
+<Mermaid chart={`
+flowchart TD
+    A("📄 PDFs / Images<br/>one or many files") --> VE
+    B("📋 User Requirements<br/>Plain language extraction task") --> VE
+
+    subgraph VE["Vision Extractor"]
+        direction TB
+        SG["Schema Generator<br/>Build typed schema (reused)"]
+        VL["Vision LLM<br/>OpenAI · Claude · Google"]
+        SG -.->|"typed schema"| VL
+    end
+
+    VE --> C("✅ Structured Data")
+    VE --> D("🔍 Optional per-field<br/>confidence scores")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style VE fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- Single-pass PDF/image → structured data — no parse-then-extract round-trip
+- Multi-document calls: align line items in a PO with quantities in a BOM in one request
+- Multi-provider: OpenAI / Azure, Anthropic Claude (Foundry), Google Gemini (Vertex AI or direct)
+- Reuses generated Pydantic schemas across runs via `schema_dir` persistence
+- Optional per-field verification: confidence score + reasoning for every scalar field
+
+**Potential applications:**
+- Purchase order processing with bill-of-materials cross-referencing
+- Invoice and receipt extraction from scanned documents
+- Form digitisation (insurance claims, medical intake, government applications)
+- Layout-sensitive tables (lab reports, financial statements, technical drawings)
+- Human-in-the-loop QA pipelines where each value must be justified
+
+- **Implementation code**: [software_components/vision_extractor](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/vision_extractor)
+- **Usage examples**: [examples/vision_extractor](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/vision_extractor)
+
+---
+
 ### Document Classifier
 
 The Document Classifier assigns a predefined label to a document based on its content. It uses an LLM to evaluate the document against a user-defined set of classes and returns both the predicted class and a confidence score. It is most useful as a preprocessing step in multi-document pipelines — routing each document to the appropriate extraction schema, storage location, or downstream process before any further processing begins.

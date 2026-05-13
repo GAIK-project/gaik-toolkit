@@ -9,6 +9,7 @@ export type DemoType =
   | "classifier"
   | "construction-diary"
   | "extractor"
+  | "vision-extractor"
   | "parser"
   | "transcriber"
   | "incident-report"
