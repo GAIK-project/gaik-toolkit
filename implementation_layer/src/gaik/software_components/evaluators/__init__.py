@@ -65,3 +65,37 @@ __all__ = [
 ]
 
 __version__ = "0.1.0"
+
+try:
+    from .rag_response_evaluator import (
+        CorrectnessScore,
+        DEFAULT_PAIRWISE_SPEC,
+        DEFAULT_SCORING_SPEC,
+        PairwiseComparison,
+        PairwiseRanking,
+        PairwiseSpec,
+        PairwiseVerdict,
+        ProgressEvent,
+        RAGPairwiseEvalResult,
+        RAGResponseAggregate,
+        RAGResponseEvalResult,
+        RAGResponseEvaluator,
+        ScoringSpec,
+    )
+    __all__ += [
+        "RAGResponseEvaluator",
+        "RAGResponseEvalResult",
+        "RAGResponseAggregate",
+        "ScoringSpec",
+        "CorrectnessScore",
+        "DEFAULT_SCORING_SPEC",
+        "RAGPairwiseEvalResult",
+        "PairwiseRanking",
+        "PairwiseComparison",
+        "PairwiseSpec",
+        "PairwiseVerdict",
+        "DEFAULT_PAIRWISE_SPEC",
+        "ProgressEvent",
+    ]
+except ImportError:
+    pass

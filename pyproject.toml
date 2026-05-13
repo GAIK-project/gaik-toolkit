@@ -203,6 +203,15 @@ evaluators = [
     "gaik[llm-judge]",
 ]
 
+# RAG response evaluator — multi-system judging (referenced + pairwise) with
+# pandas-DataFrame I/O and matplotlib plots. Pulls llm-judge for multi-provider
+# access; pandas is required for the tabular interface and matplotlib for plots.
+rag-response-evaluator = [
+    "gaik[evaluators]",
+    "pandas>=2.0",
+    "matplotlib>=3.8",
+]
+
 # All features
 all = [
     "gaik[extract]",
@@ -225,6 +234,7 @@ all = [
     "gaik[llm-judge]",
     "gaik[finnish-rag]",
     "gaik[evaluators]",
+    "gaik[rag-response-evaluator]",
 ]
 
 # Software components
@@ -263,6 +273,7 @@ all-cpu = [
     "gaik[rag-workflow]",
     "gaik[finnish-rag]",
     "gaik[evaluators]",
+    "gaik[rag-response-evaluator]",
 ]
 
 # Development tooling for maintainers only (pip install -e ".[dev]")
