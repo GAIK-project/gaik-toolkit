@@ -157,7 +157,7 @@ _DOMAIN_RULES_HEADER = (
 )
 
 
-def _apply_domain_rules(prompt: str, domain_rules: str | None) -> str:
+def apply_domain_rules(prompt: str, domain_rules: str | None) -> str:
     """Inject domain-specific rules at the ``{DOMAIN_RULES}`` placeholder.
 
     When ``domain_rules`` is None or empty, the placeholder and the
@@ -308,7 +308,7 @@ class TranscriptEnhancer:
         messages = [
             {
                 "role": "system",
-                "content": _apply_domain_rules(PASS1_SYSTEM_PROMPT, domain_rules),
+                "content": apply_domain_rules(PASS1_SYSTEM_PROMPT, domain_rules),
             },
             {
                 "role": "user",
@@ -337,7 +337,7 @@ class TranscriptEnhancer:
         messages = [
             {
                 "role": "system",
-                "content": _apply_domain_rules(PASS2_SYSTEM_PROMPT, domain_rules),
+                "content": apply_domain_rules(PASS2_SYSTEM_PROMPT, domain_rules),
             },
             {"role": "user", "content": user_prompt},
         ]

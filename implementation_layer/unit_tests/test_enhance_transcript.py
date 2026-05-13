@@ -20,7 +20,7 @@ from gaik.software_components.enhance_transcript.enhance_transcript import (
     PASS2_SYSTEM_PROMPT,
     TranscriptEnhancer,
     TranscriptEnhancerResult,
-    _apply_domain_rules,
+    apply_domain_rules,
 )
 
 
@@ -150,28 +150,28 @@ def test_reasoning_effort_forwarded_to_chat_call_when_set():
 # --- domain_rules parameter tests ---
 
 
-def test_apply_domain_rules_none_removes_placeholder_cleanly():
+def testapply_domain_rules_none_removes_placeholder_cleanly():
     """When domain_rules is None, the {DOMAIN_RULES} placeholder must be
     removed without leaving stray blank lines — keeps the prompt
     byte-identical to the pre-feature shape for backward compat."""
-    result = _apply_domain_rules(PASS1_SYSTEM_PROMPT, None)
+    result = apply_domain_rules(PASS1_SYSTEM_PROMPT, None)
     assert "{DOMAIN_RULES}" not in result
     # No double-blank-line artifact where the placeholder used to live
     assert "\n\n\n" not in result
     assert "DOMAIN-SPECIFIC RULES" not in result
 
 
-def test_apply_domain_rules_empty_string_removes_placeholder():
+def testapply_domain_rules_empty_string_removes_placeholder():
     """An empty or whitespace-only string is treated like None."""
     for empty in ["", "   ", "\n\n", "\t"]:
-        result = _apply_domain_rules(PASS1_SYSTEM_PROMPT, empty)
+        result = apply_domain_rules(PASS1_SYSTEM_PROMPT, empty)
         assert "{DOMAIN_RULES}" not in result
         assert "DOMAIN-SPECIFIC RULES" not in result
 
 
-def test_apply_domain_rules_with_text_injects_at_placeholder():
+def testapply_domain_rules_with_text_injects_at_placeholder():
     rule = "DOMAIN OVERRIDE: normalize tooth refs like 'ykskakkonen' to '#12'."
-    result = _apply_domain_rules(PASS1_SYSTEM_PROMPT, rule)
+    result = apply_domain_rules(PASS1_SYSTEM_PROMPT, rule)
     assert "{DOMAIN_RULES}" not in result
     assert "DOMAIN-SPECIFIC RULES" in result
     assert rule in result
@@ -181,9 +181,9 @@ def test_apply_domain_rules_with_text_injects_at_placeholder():
     assert result.index("DOMAIN-SPECIFIC RULES") < result.index("Output:")
 
 
-def test_apply_domain_rules_works_on_pass2_prompt_too():
+def testapply_domain_rules_works_on_pass2_prompt_too():
     rule = "test rule"
-    result = _apply_domain_rules(PASS2_SYSTEM_PROMPT, rule)
+    result = apply_domain_rules(PASS2_SYSTEM_PROMPT, rule)
     assert "{DOMAIN_RULES}" not in result
     assert "DOMAIN-SPECIFIC RULES" in result
     assert rule in result
