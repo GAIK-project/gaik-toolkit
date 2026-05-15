@@ -51,6 +51,21 @@ def _schema_key_for(user_requirements: str) -> str:
     return f"vision_extractor_{schema_id_from_requirements(user_requirements)}"
 
 
+def _validate_suffix(filename: str | None) -> None:
+    """Raise 400 if the filename is missing or has an unsupported suffix."""
+    if not filename:
+        raise HTTPException(status_code=400, detail="One of the files has no filename")
+    suffix = Path(filename).suffix.lower()
+    if suffix not in SUPPORTED_SUFFIXES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported file type: {suffix}. "
+                f"Supported: {', '.join(sorted(SUPPORTED_SUFFIXES))}"
+            ),
+        )
+
+
 def _field_descriptors(requirements) -> list[dict]:
     return [
         {
@@ -111,6 +126,23 @@ class UsageMetadata(BaseModel):
     thinking_tokens: int | None = None
     total_tokens: int | None = None
     cost_usd: float | None = None
+
+
+_USAGE_FIELDS = (
+    "provider",
+    "model",
+    "input_tokens",
+    "output_tokens",
+    "thinking_tokens",
+    "total_tokens",
+    "cost_usd",
+)
+
+
+def _usage_from(usage: Any) -> "UsageMetadata | None":
+    if usage is None:
+        return None
+    return UsageMetadata(**{name: getattr(usage, name, None) for name in _USAGE_FIELDS})
 
 
 class VisionExtractResponse(BaseModel):
@@ -187,17 +219,7 @@ async def extract_vision(
         raise HTTPException(status_code=400, detail="No requirements provided")
 
     for f in files:
-        if not f.filename:
-            raise HTTPException(status_code=400, detail="One of the files has no filename")
-        suffix = Path(f.filename).suffix.lower()
-        if suffix not in SUPPORTED_SUFFIXES:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Unsupported file type: {suffix}. "
-                    f"Supported: {', '.join(sorted(SUPPORTED_SUFFIXES))}"
-                ),
-            )
+        _validate_suffix(f.filename)
 
     temp_paths: list[Path] = []
     try:
@@ -243,25 +265,13 @@ async def extract_vision(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Vision extraction failed: {e}") from e
 
-        usage_meta: UsageMetadata | None = None
-        if result.usage is not None:
-            usage_meta = UsageMetadata(
-                provider=getattr(result.usage, "provider", None),
-                model=getattr(result.usage, "model", None),
-                input_tokens=getattr(result.usage, "input_tokens", None),
-                output_tokens=getattr(result.usage, "output_tokens", None),
-                thinking_tokens=getattr(result.usage, "thinking_tokens", None),
-                total_tokens=getattr(result.usage, "total_tokens", None),
-                cost_usd=getattr(result.usage, "cost_usd", None),
-            )
-
         return VisionExtractResponse(
             data=result.data,
             verification=result.verification,
             model=result.model,
             documents_processed=result.documents_processed,
             duration_s=result.duration_s,
-            usage=usage_meta,
+            usage=_usage_from(result.usage),
         )
 
     finally:

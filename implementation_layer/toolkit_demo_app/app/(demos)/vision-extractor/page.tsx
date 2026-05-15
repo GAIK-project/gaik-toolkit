@@ -150,10 +150,160 @@ function validateFile(file: File): string | null {
 
 function formatNumeric(value: unknown): string {
   if (value === null || value === undefined || value === "") return "-";
-  if (typeof value === "object") {
-    return JSON.stringify(value, null, 2);
-  }
+  if (typeof value === "object") return JSON.stringify(value, null, 2);
   return String(value);
+}
+
+function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+interface FileListRowProps {
+  file: File;
+  disabled: boolean;
+  onRemove: () => void;
+}
+
+function FileListRow({ file, disabled, onRemove }: FileListRowProps) {
+  return (
+    <div className="border-success/30 bg-success/10 flex items-center gap-2 rounded-md border p-2">
+      <CheckCircle className="text-success h-4 w-4 shrink-0" />
+      <FileIcon className="text-muted-foreground h-4 w-4 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{file.name}</p>
+        <p className="text-muted-foreground text-xs">{formatFileSize(file.size)}</p>
+      </div>
+      <button
+        onClick={onRemove}
+        disabled={disabled}
+        className="hover:bg-success/20 rounded-full p-1 transition-colors"
+        aria-label={`Remove ${file.name}`}
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+interface UsageStatsProps {
+  usage: NonNullable<VisionExtractResult["usage"]>;
+}
+
+function UsageStats({ usage }: UsageStatsProps) {
+  const stats: Array<{ label: string; value: string; mono?: boolean; bold?: boolean }> = [];
+  if (usage.total_tokens != null) {
+    stats.push({
+      label: "Tokens",
+      value: usage.total_tokens.toLocaleString(),
+      bold: true,
+    });
+  }
+  if (usage.input_tokens != null) {
+    stats.push({ label: "Input", value: usage.input_tokens.toLocaleString() });
+  }
+  if (usage.output_tokens != null) {
+    stats.push({ label: "Output", value: usage.output_tokens.toLocaleString() });
+  }
+  if (usage.cost_usd != null) {
+    stats.push({ label: "Cost", value: `$${usage.cost_usd.toFixed(4)}`, bold: true });
+  }
+
+  if (stats.length === 0) return null;
+
+  return (
+    <div className="bg-muted/40 mb-4 grid grid-cols-2 gap-2 rounded-md border p-3 text-xs sm:grid-cols-4">
+      {stats.map((stat) => (
+        <div key={stat.label}>
+          <p className="text-muted-foreground">{stat.label}</p>
+          <p className={`font-mono ${stat.bold ? "font-medium" : ""}`}>{stat.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+interface ExtractedFieldRowProps {
+  fieldKey: string;
+  value: unknown;
+  verification?: VerificationEntry | VerificationEntry[];
+}
+
+function ExtractedFieldRow({ fieldKey, value, verification }: ExtractedFieldRowProps) {
+  const isList = Array.isArray(value);
+  const scalarVerification =
+    verification && !Array.isArray(verification) ? verification : null;
+
+  return (
+    <div className="space-y-2 p-3">
+      <div className="flex items-start gap-4">
+        <span className="min-w-32 text-sm font-medium">{formatFieldName(fieldKey)}</span>
+        <span className="text-muted-foreground flex-1 text-sm whitespace-pre-wrap">
+          {isList
+            ? `${(value as unknown[]).length} item(s)`
+            : formatNumeric(value)}
+        </span>
+      </div>
+      {scalarVerification && (
+        <div className="ml-32 flex items-center gap-2 text-xs">
+          <span className="bg-primary/10 text-primary rounded px-1.5 py-0.5 font-mono">
+            {Math.round((scalarVerification.confidence_score ?? 0) * 100)}%
+          </span>
+          <span className="text-muted-foreground">
+            {scalarVerification.confidence_reason ?? ""}
+          </span>
+        </div>
+      )}
+      {isList && (
+        <pre className="bg-muted/30 ml-32 max-h-64 overflow-auto rounded p-2 text-xs">
+          <code>{JSON.stringify(value, null, 2)}</code>
+        </pre>
+      )}
+    </div>
+  );
+}
+
+interface SchemaPreviewProps {
+  schema: GeneratedSchema;
+}
+
+function SchemaPreview({ schema }: SchemaPreviewProps) {
+  return (
+    <Accordion type="single" collapsible defaultValue="schema" className="w-full">
+      <AccordionItem value="schema" className="border-none">
+        <AccordionTrigger className="text-sm">
+          Generated schema · {schema.schema_name} ·{" "}
+          {pluralize(schema.fields.length, "field")}
+        </AccordionTrigger>
+        <AccordionContent>
+          <div className="bg-muted/50 space-y-3 rounded-md border p-3">
+            <pre className="bg-background max-h-72 overflow-auto rounded p-3 text-xs">
+              <code>{schema.schema_code}</code>
+            </pre>
+            <div>
+              <p className="mb-1 text-xs font-medium">Fields</p>
+              <div className="space-y-0.5">
+                {schema.fields.map((field) => (
+                  <div key={field.name} className="text-muted-foreground text-xs">
+                    <span className="font-mono">{field.name}</span>
+                    <span className="mx-1">:</span>
+                    <span>{field.type}</span>
+                    {field.required && (
+                      <span className="ml-1 text-orange-500">*</span>
+                    )}
+                    {field.description && (
+                      <span className="text-muted-foreground/80 ml-2">
+                        — {field.description}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  );
 }
 
 export default function VisionExtractorPage() {
@@ -318,12 +468,8 @@ export default function VisionExtractorPage() {
     }
   }
 
-  function getVerification(
-    key: string,
-  ): VerificationEntry | VerificationEntry[] | undefined {
-    if (!includeVerification || !result?.verification) return undefined;
-    return result.verification[key];
-  }
+  const verificationMap =
+    includeVerification && result?.verification ? result.verification : null;
 
   return (
     <PageTransition>
@@ -418,33 +564,16 @@ export default function VisionExtractorPage() {
               {files.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-xs">
-                    {files.length} file{files.length === 1 ? "" : "s"} selected
+                    {pluralize(files.length, "file")} selected
                   </Label>
                   <div className="max-h-48 space-y-1.5 overflow-auto">
                     {files.map((file, index) => (
-                      <div
+                      <FileListRow
                         key={`${file.name}-${index}`}
-                        className="border-success/30 bg-success/10 flex items-center gap-2 rounded-md border p-2"
-                      >
-                        <CheckCircle className="text-success h-4 w-4 shrink-0" />
-                        <FileIcon className="text-muted-foreground h-4 w-4 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
-                            {file.name}
-                          </p>
-                          <p className="text-muted-foreground text-xs">
-                            {formatFileSize(file.size)}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => removeFile(index)}
-                          disabled={isLoading}
-                          className="hover:bg-success/20 rounded-full p-1 transition-colors"
-                          aria-label={`Remove ${file.name}`}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                        file={file}
+                        disabled={isLoading}
+                        onRemove={() => removeFile(index)}
+                      />
                     ))}
                   </div>
                 </div>
@@ -563,52 +692,7 @@ export default function VisionExtractorPage() {
                 )}
               </Button>
 
-              {generatedSchema && (
-                <Accordion
-                  type="single"
-                  collapsible
-                  defaultValue="schema"
-                  className="w-full"
-                >
-                  <AccordionItem value="schema" className="border-none">
-                    <AccordionTrigger className="text-sm">
-                      Generated schema · {generatedSchema.schema_name} ·{" "}
-                      {generatedSchema.fields.length} field
-                      {generatedSchema.fields.length === 1 ? "" : "s"}
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="bg-muted/50 space-y-3 rounded-md border p-3">
-                        <pre className="bg-background max-h-72 overflow-auto rounded p-3 text-xs">
-                          <code>{generatedSchema.schema_code}</code>
-                        </pre>
-                        <div>
-                          <p className="mb-1 text-xs font-medium">Fields</p>
-                          <div className="space-y-0.5">
-                            {generatedSchema.fields.map((field) => (
-                              <div
-                                key={field.name}
-                                className="text-muted-foreground text-xs"
-                              >
-                                <span className="font-mono">{field.name}</span>
-                                <span className="mx-1">:</span>
-                                <span>{field.type}</span>
-                                {field.required && (
-                                  <span className="ml-1 text-orange-500">*</span>
-                                )}
-                                {field.description && (
-                                  <span className="text-muted-foreground/80 ml-2">
-                                    — {field.description}
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              )}
+              {generatedSchema && <SchemaPreview schema={generatedSchema} />}
             </CardContent>
           </Card>
 
@@ -679,80 +763,18 @@ export default function VisionExtractorPage() {
               feedbackSlot={<FeedbackButton demoType="vision-extractor" />}
               delay={0}
             >
-              {result.usage && (
-                <div className="bg-muted/40 mb-4 grid grid-cols-2 gap-2 rounded-md border p-3 text-xs sm:grid-cols-4">
-                  {result.usage.total_tokens != null && (
-                    <div>
-                      <p className="text-muted-foreground">Tokens</p>
-                      <p className="font-mono font-medium">
-                        {result.usage.total_tokens.toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-                  {result.usage.input_tokens != null && (
-                    <div>
-                      <p className="text-muted-foreground">Input</p>
-                      <p className="font-mono">
-                        {result.usage.input_tokens.toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-                  {result.usage.output_tokens != null && (
-                    <div>
-                      <p className="text-muted-foreground">Output</p>
-                      <p className="font-mono">
-                        {result.usage.output_tokens.toLocaleString()}
-                      </p>
-                    </div>
-                  )}
-                  {result.usage.cost_usd != null && (
-                    <div>
-                      <p className="text-muted-foreground">Cost</p>
-                      <p className="font-mono font-medium">
-                        ${result.usage.cost_usd.toFixed(4)}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
+              {result.usage && <UsageStats usage={result.usage} />}
 
               {Object.keys(result.data).length > 0 ? (
                 <div className="divide-y rounded-md border">
-                  {Object.entries(result.data).map(([key, value]) => {
-                    const verification = getVerification(key);
-                    const isList = Array.isArray(value);
-                    return (
-                      <div key={key} className="space-y-2 p-3">
-                        <div className="flex items-start gap-4">
-                          <span className="min-w-32 text-sm font-medium">
-                            {formatFieldName(key)}
-                          </span>
-                          <span className="text-muted-foreground flex-1 text-sm whitespace-pre-wrap">
-                            {isList
-                              ? `${(value as unknown[]).length} item(s)`
-                              : formatNumeric(value)}
-                          </span>
-                        </div>
-                        {verification && !Array.isArray(verification) && (
-                          <div className="ml-32 flex items-center gap-2 text-xs">
-                            <span className="bg-primary/10 text-primary rounded px-1.5 py-0.5 font-mono">
-                              {Math.round(
-                                (verification.confidence_score ?? 0) * 100,
-                              )}%
-                            </span>
-                            <span className="text-muted-foreground">
-                              {verification.confidence_reason ?? ""}
-                            </span>
-                          </div>
-                        )}
-                        {isList && (
-                          <pre className="bg-muted/30 ml-32 max-h-64 overflow-auto rounded p-2 text-xs">
-                            <code>{JSON.stringify(value, null, 2)}</code>
-                          </pre>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {Object.entries(result.data).map(([key, value]) => (
+                    <ExtractedFieldRow
+                      key={key}
+                      fieldKey={key}
+                      value={value}
+                      verification={verificationMap?.[key]}
+                    />
+                  ))}
                 </div>
               ) : (
                 <p className="text-muted-foreground">No data extracted</p>
