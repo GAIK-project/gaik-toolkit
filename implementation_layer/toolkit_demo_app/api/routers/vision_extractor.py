@@ -66,44 +66,101 @@ def _validate_suffix(filename: str | None) -> None:
         )
 
 
+def _has_use_case_name(requirements) -> bool:
+    """Distinguish ExtractionRequirements (has fields) from CompositeExtractionRequirements."""
+    return hasattr(requirements, "fields") and hasattr(requirements, "use_case_name")
+
+
 def _field_descriptors(requirements) -> list[dict]:
-    return [
+    """Flatten requirements (flat OR composite parent+child) into a display list."""
+    if _has_use_case_name(requirements):
+        return [
+            {
+                "name": field.field_name,
+                "type": field.field_type,
+                "description": field.description,
+                "required": field.required,
+            }
+            for field in requirements.fields
+        ]
+
+    # CompositeExtractionRequirements: parent scalar fields + one repeated child collection.
+    parent = requirements.parent_requirements
+    child = requirements.child_requirements
+    container = requirements.child_container_name
+    descriptors = [
         {
             "name": field.field_name,
             "type": field.field_type,
             "description": field.description,
             "required": field.required,
         }
-        for field in requirements.fields
+        for field in parent.fields
     ]
+    descriptors.append(
+        {
+            "name": container,
+            "type": f"list[{child.use_case_name}]",
+            "description": f"Repeated {container} (one entry per row in the source)",
+            "required": True,
+        }
+    )
+    return descriptors
+
+
+def _format_field_line(field) -> str:
+    field_type = field.field_type
+    if field_type not in _KNOWN_TYPES and not field_type.startswith("Literal["):
+        field_type = "str"
+    if not field.required:
+        field_type = f"{field_type} | None"
+    default_value = "None" if not field.required else "..."
+    desc = field.description.replace('"', '\\"')
+    return f'    {field.field_name}: {field_type} = Field({default_value}, description="{desc}")'
+
+
+def _flat_schema_lines(schema_name: str, use_case_name: str, requirements) -> list[str]:
+    lines = [
+        f"class {schema_name}(BaseModel):",
+        f'    """Extraction model for {use_case_name}"""',
+        "",
+    ]
+    lines.extend(_format_field_line(field) for field in requirements.fields)
+    return lines
 
 
 def _schema_code_from_requirements(schema: type[BaseModel], requirements) -> str:
-    schema_lines = [
+    """Render Pydantic schema source — supports both flat and composite layouts."""
+    header = [
         "from pydantic import BaseModel, Field",
         "from typing import Literal",
         "import decimal",
         "",
-        f"class {schema.__name__}(BaseModel):",
-        f'    """Extraction model for {requirements.use_case_name}"""',
-        "",
     ]
 
-    for field in requirements.fields:
-        field_type = field.field_type
-        if field_type not in _KNOWN_TYPES and not field_type.startswith("Literal["):
-            field_type = "str"
-
-        if not field.required:
-            field_type = f"{field_type} | None"
-
-        default_value = "None" if not field.required else "..."
-        desc = field.description.replace('"', '\\"')
-        schema_lines.append(
-            f'    {field.field_name}: {field_type} = Field({default_value}, description="{desc}")'
+    if _has_use_case_name(requirements):
+        return "\n".join(
+            header + _flat_schema_lines(schema.__name__, requirements.use_case_name, requirements)
         )
 
-    return "\n".join(schema_lines)
+    # Composite: emit child model first, then parent model with the list[Child] container.
+    parent = requirements.parent_requirements
+    child = requirements.child_requirements
+    container = requirements.child_container_name
+    child_class = child.use_case_name
+
+    body: list[str] = []
+    body.extend(_flat_schema_lines(child_class, child.use_case_name, child))
+    body.append("")
+    body.append(f"class {schema.__name__}(BaseModel):")
+    body.append(f'    """Extraction model for {parent.use_case_name}"""')
+    body.append("")
+    body.extend(_format_field_line(field) for field in parent.fields)
+    body.append(
+        f"    {container}: list[{child_class}] = Field("
+        f'..., description="Repeated {container} (one entry per row in the source)")'
+    )
+    return "\n".join(header + body)
 
 
 class GenerateSchemaRequest(BaseModel):
@@ -187,10 +244,15 @@ async def generate_schema(request: GenerateSchemaRequest):
             _schema_cache[sid] = (schema, requirements)
             logger.info("Generated temporary vision-extractor schema for hash %s", sid)
 
+        structure_type = (
+            "object"
+            if _has_use_case_name(requirements)
+            else getattr(requirements, "structure_type", "parent_with_nested_list")
+        )
         return GenerateSchemaResponse(
             schema_code=_schema_code_from_requirements(schema, requirements),
             schema_name=schema.__name__,
-            structure_type="object",
+            structure_type=structure_type,
             fields=_field_descriptors(requirements),
             schema_id=sid,
         )
