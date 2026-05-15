@@ -49,6 +49,7 @@ import {
   MessageSquare,
   Mic,
   Puzzle,
+  ScanEye,
   Search,
   SearchCode,
   ShieldAlert,
@@ -129,6 +130,7 @@ const navGroups: NavGroup[] = [
     icon: Boxes,
     items: [
       { label: "Extractor", href: "/extractor", icon: FileSearch },
+      { label: "Vision Extractor", href: "/vision-extractor", icon: ScanEye },
       { label: "Parser", href: "/parser", icon: FileText },
       { label: "Classifier", href: "/classifier", icon: Tags },
       { label: "Transcriber", href: "/transcriber", icon: Mic },
