@@ -9,6 +9,12 @@ import {
   ResultCard,
 } from "@/components/demo/result-card";
 import { FeedbackButton } from "@/components/feedback";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,6 +38,7 @@ import { formatFieldName, formatFileSize } from "@/lib/utils";
 import {
   CheckCircle,
   File as FileIcon,
+  FileCode2,
   FileStack,
   Loader2,
   ScanEye,
@@ -68,6 +75,42 @@ const EXAMPLE_REQUIREMENTS = `Extract key fields from a Purchase Order (PO) and 
 For every PO item, extract: Material Number, Quantity, Description, Delivery Date (DD/MM/YYYY). Then look up the matching BOM (where ID = Material Number) and add: Type Part Designation, Dimensions.
 
 Also extract from the PO header: Order Date, Buyer, Sales Person, Shipping Address, Payment Terms.`;
+
+const REQUIREMENT_PRESETS: { label: string; description: string; text: string }[] = [
+  {
+    label: "Invoice / receipt",
+    description: "Sender, totals, line items",
+    text: "Extract invoice number, issue date, due date, sender name and address, recipient name and address, subtotal, tax, total amount, currency, and a list of line items (description, quantity, unit price, line total).",
+  },
+  {
+    label: "Document metadata",
+    description: "Title, author, dates — works for reports & papers",
+    text: "Extract document title, authors (list), organization or publisher, publication date, document type (e.g. report, paper, brief), executive summary or abstract (1–2 sentences), key topics covered (list of short phrases), and any URLs or references mentioned.",
+  },
+  {
+    label: "Contract",
+    description: "Parties, dates, key clauses",
+    text: "Extract the parties involved (list with name and role), contract type, effective date, expiration or termination date, payment terms, key obligations (list), governing law / jurisdiction, and any notable exceptions or termination clauses.",
+  },
+  {
+    label: "Form / application",
+    description: "Generic structured form fields",
+    text: "Extract every labelled field you see in this form together with its value. Group related fields and preserve checkbox / radio selections as their selected option text.",
+  },
+];
+
+interface GeneratedSchema {
+  schema_code: string;
+  schema_name: string;
+  structure_type: string;
+  schema_id: string;
+  fields: Array<{
+    name: string;
+    type: string;
+    description: string;
+    required: boolean;
+  }>;
+}
 
 type Provider = "openai" | "claude" | "google";
 
@@ -115,16 +158,52 @@ function formatNumeric(value: unknown): string {
 
 export default function VisionExtractorPage() {
   const [files, setFiles] = useState<File[]>([]);
-  const [userRequirements, setUserRequirements] = useState(
-    "Extract key fields from the document(s) — sender, recipient, dates, totals, and any line items.",
-  );
+  const [userRequirements, setUserRequirements] = useState("");
   const [provider, setProvider] = useState<Provider>("openai");
   const [includeVerification, setIncludeVerification] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingExample, setIsLoadingExample] = useState(false);
+  const [isGeneratingSchema, setIsGeneratingSchema] = useState(false);
+  const [generatedSchema, setGeneratedSchema] = useState<GeneratedSchema | null>(
+    null,
+  );
   const [result, setResult] = useState<VisionExtractResult | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Clear preview when requirements change so the user knows it's stale
+  function handleRequirementsChange(value: string): void {
+    setUserRequirements(value);
+    setGeneratedSchema(null);
+  }
+
+  async function handlePreviewSchema(): Promise<void> {
+    if (isGeneratingSchema || isLoading) return;
+    if (!userRequirements.trim()) {
+      toast.error("Please describe what to extract first");
+      return;
+    }
+    setIsGeneratingSchema(true);
+    try {
+      const response = await apiFetch("/api/extract-vision/generate-schema", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_requirements: userRequirements }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.detail ?? "Failed to generate schema");
+      }
+      const data = (await response.json()) as GeneratedSchema;
+      setGeneratedSchema(data);
+      toast.success("Schema generated — review before extracting");
+    } catch (err) {
+      if (err instanceof RateLimitError) return;
+      toast.error(err instanceof Error ? err.message : "Failed to generate schema");
+    } finally {
+      setIsGeneratingSchema(false);
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -377,21 +456,50 @@ export default function VisionExtractorPage() {
             <CardHeader>
               <CardTitle>Extraction</CardTitle>
               <CardDescription>
-                Describe what to pull out — the schema is generated and reused
-                automatically.
+                Describe in plain language what fields you want — the toolkit
+                turns your description into a typed Pydantic schema and the
+                model fills it in. Preview the schema below before extracting
+                if you want to see exactly what will be returned.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs">Quick-start prompts</Label>
+                <div className="flex flex-wrap gap-2">
+                  {REQUIREMENT_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRequirementsChange(preset.text)}
+                      disabled={isLoading || isGeneratingSchema}
+                      title={preset.description}
+                      className="h-auto whitespace-normal text-left"
+                    >
+                      <span className="font-medium">{preset.label}</span>
+                      <span className="text-muted-foreground ml-2 hidden text-xs sm:inline">
+                        {preset.description}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="requirements">Requirements</Label>
                 <Textarea
                   id="requirements"
                   value={userRequirements}
-                  onChange={(e) => setUserRequirements(e.target.value)}
-                  placeholder="Describe what to extract..."
-                  disabled={isLoading}
-                  rows={5}
+                  onChange={(e) => handleRequirementsChange(e.target.value)}
+                  placeholder="e.g. Extract company name, total amount, date, and a list of line items (description, quantity, unit price) from this invoice."
+                  disabled={isLoading || isGeneratingSchema}
+                  rows={6}
                 />
+                <p className="text-muted-foreground text-xs">
+                  Be specific about field names and types. The clearer your
+                  description, the better the generated schema.
+                </p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -432,6 +540,75 @@ export default function VisionExtractorPage() {
                   </div>
                 </div>
               </div>
+
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handlePreviewSchema}
+                disabled={
+                  isLoading || isGeneratingSchema || !userRequirements.trim()
+                }
+                className="w-full"
+              >
+                {isGeneratingSchema ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating schema…
+                  </>
+                ) : (
+                  <>
+                    <FileCode2 className="mr-2 h-4 w-4" />
+                    Preview schema
+                  </>
+                )}
+              </Button>
+
+              {generatedSchema && (
+                <Accordion
+                  type="single"
+                  collapsible
+                  defaultValue="schema"
+                  className="w-full"
+                >
+                  <AccordionItem value="schema" className="border-none">
+                    <AccordionTrigger className="text-sm">
+                      Generated schema · {generatedSchema.schema_name} ·{" "}
+                      {generatedSchema.fields.length} field
+                      {generatedSchema.fields.length === 1 ? "" : "s"}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="bg-muted/50 space-y-3 rounded-md border p-3">
+                        <pre className="bg-background max-h-72 overflow-auto rounded p-3 text-xs">
+                          <code>{generatedSchema.schema_code}</code>
+                        </pre>
+                        <div>
+                          <p className="mb-1 text-xs font-medium">Fields</p>
+                          <div className="space-y-0.5">
+                            {generatedSchema.fields.map((field) => (
+                              <div
+                                key={field.name}
+                                className="text-muted-foreground text-xs"
+                              >
+                                <span className="font-mono">{field.name}</span>
+                                <span className="mx-1">:</span>
+                                <span>{field.type}</span>
+                                {field.required && (
+                                  <span className="ml-1 text-orange-500">*</span>
+                                )}
+                                {field.description && (
+                                  <span className="text-muted-foreground/80 ml-2">
+                                    — {field.description}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              )}
             </CardContent>
           </Card>
 
@@ -461,17 +638,24 @@ export default function VisionExtractorPage() {
               them (e.g. line items in a PO against quantities in a BOM).
             </p>
             <p>
-              <strong>2. Describe the extraction.</strong> The system generates
-              a Pydantic schema from your natural-language requirements and
-              reuses it for subsequent runs.
+              <strong>2. Describe what you want.</strong> Use a quick-start
+              preset or write your own prompt — list the field names, types,
+              and any constraints. A short, specific description gives a
+              cleaner schema than a vague one.
             </p>
             <p>
-              <strong>3. Pick a provider.</strong> OpenAI/Azure works out of
+              <strong>3. (Optional) Preview the schema.</strong> Click{" "}
+              <em>Preview schema</em> to see the exact Pydantic class that will
+              be returned. If the fields look wrong for your document, edit the
+              prompt and regenerate — no LLM document call is made yet.
+            </p>
+            <p>
+              <strong>4. Pick a provider.</strong> OpenAI/Azure works out of
               the box. Claude (Anthropic Foundry) and Google (Vertex AI) need
               their respective credentials configured.
             </p>
             <p>
-              <strong>4. Optional verification.</strong> When enabled, every
+              <strong>5. Optional verification.</strong> When enabled, every
               scalar field carries a confidence score and a short reason — useful
               for QA and human-in-the-loop workflows.
             </p>
