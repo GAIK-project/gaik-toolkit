@@ -32,6 +32,7 @@ import { formatFieldName, formatFileSize } from "@/lib/utils";
 import {
   CheckCircle,
   File as FileIcon,
+  FileStack,
   Loader2,
   ScanEye,
   Sparkles,
@@ -54,6 +55,19 @@ const ACCEPTED_EXTENSIONS = [
 ];
 const ACCEPT_ATTR = ACCEPTED_EXTENSIONS.join(",");
 const MAX_FILE_MB = 20;
+
+const EXAMPLE_FILES = [
+  "/vision-extractor-example/PO.pdf",
+  "/vision-extractor-example/BOM1.pdf",
+  "/vision-extractor-example/BOM2.pdf",
+  "/vision-extractor-example/BOM3.pdf",
+];
+
+const EXAMPLE_REQUIREMENTS = `Extract key fields from a Purchase Order (PO) and align each PO item with the matching Bill of Materials (BOM) via Material Number.
+
+For every PO item, extract: Material Number, Quantity, Description, Delivery Date (DD/MM/YYYY). Then look up the matching BOM (where ID = Material Number) and add: Type Part Designation, Dimensions.
+
+Also extract from the PO header: Order Date, Buyer, Sales Person, Shipping Address, Payment Terms.`;
 
 type Provider = "openai" | "claude" | "google";
 
@@ -107,6 +121,7 @@ export default function VisionExtractorPage() {
   const [provider, setProvider] = useState<Provider>("openai");
   const [includeVerification, setIncludeVerification] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingExample, setIsLoadingExample] = useState(false);
   const [result, setResult] = useState<VisionExtractResult | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -141,6 +156,30 @@ export default function VisionExtractorPage() {
 
   function removeFile(index: number): void {
     setFiles(files.filter((_, i) => i !== index));
+  }
+
+  async function handleLoadExample(): Promise<void> {
+    if (isLoadingExample || isLoading) return;
+    setIsLoadingExample(true);
+    try {
+      const fetched = await Promise.all(
+        EXAMPLE_FILES.map(async (url) => {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`Failed to load ${url}`);
+          const blob = await res.blob();
+          const name = url.split("/").pop() ?? "example.pdf";
+          return new File([blob], name, { type: blob.type || "application/pdf" });
+        }),
+      );
+      setFiles(fetched);
+      setUserRequirements(EXAMPLE_REQUIREMENTS);
+      setResult(null);
+      toast.success("Example loaded — PO + 3 BOMs ready to extract");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load example");
+    } finally {
+      setIsLoadingExample(false);
+    }
   }
 
   async function handleSubmit(): Promise<void> {
@@ -221,12 +260,30 @@ export default function VisionExtractorPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Documents</CardTitle>
-              <CardDescription>
-                Upload one or more PDF or image files. The model sees them all
-                together — useful for cross-document tasks like matching a
-                purchase order with its bills of materials.
-              </CardDescription>
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1.5">
+                  <CardTitle>Documents</CardTitle>
+                  <CardDescription>
+                    Upload one or more PDF or image files. The model sees them
+                    all together — useful for cross-document tasks like
+                    matching a purchase order with its bills of materials.
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLoadExample}
+                  disabled={isLoading || isLoadingExample}
+                  className="shrink-0"
+                >
+                  {isLoadingExample ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileStack className="mr-2 h-4 w-4" />
+                  )}
+                  Try example
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <label
