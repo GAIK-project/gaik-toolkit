@@ -42,7 +42,7 @@ TASK_MULTI = Path("task_multi_doc.txt").read_text(
 # ---------------------------------------------------------------------------
 
 # filename of the single document
-SINGLE_PDF = Path("./single_PO.pdf")
+SINGLE_PDF = Path("./PO2.pdf")
 
 # path of the folder containing multipele documents
 PO_FOLDER = Path("PO")
@@ -87,7 +87,7 @@ def run_case(label: str, file_paths: list[Path], task: str, schema_dir: Path) ->
         additional_instructions=None,  # str appended to the user prompt, or None
 
         # --- Verification ---
-        include_verification=True,    # True = add confidence_score + reasoning per field
+        include_verification=False,    # True = add confidence_score + reasoning per field
     )
     result = extractor.extract(
         # --- Input files ---
@@ -123,7 +123,7 @@ def run_case(label: str, file_paths: list[Path], task: str, schema_dir: Path) ->
 
 if __name__ == "__main__":
     # Case 1: single PDF
-    # run_case("Single document", [SINGLE_PDF], TASK_SINGLE, SCHEMA_DIR_SINGLE)
+    run_case("Single document", [SINGLE_PDF], TASK_SINGLE, SCHEMA_DIR_SINGLE)
 
     # Case 2: multi-document (PO + 3 BOMs in one call)
-    run_case("Multi document", MULTI_FILES, TASK_MULTI, SCHEMA_DIR_MULTI)
+    # run_case("Multi document", MULTI_FILES, TASK_MULTI, SCHEMA_DIR_MULTI)

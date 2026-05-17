@@ -1,16 +1,17 @@
 Extract purchase order data.
 
 The output will include the following top-level fields:
-- date (DD-MM-YYYY)
-- purchase order number
-- supplier number
-- contact
+- Purchase order date (Output format: DD-MM-YYYY, only if the source format is unambiguous; otherwise, output the source format)
+- Delivery date (Use format: DD-MM-YYYY, only if the source format is unambiguous; otherwise, output the source format)
+- Purchase order number (separated by a dash after every 4 digits)
+- Supplier number
+- Shipping address (Format: company name, street number, postal code, city, country)
 
 Also, the output will include the data for each line item. 
 
 For each line item, extract these scalar fields:
-- item number
-- complete description
-- quantity
-- price
-- material number
+- Item number (e.g., 010, 020)
+- Complete description 
+- Quantity (text string including the unit, e.g., "8.600 LB") 
+- Price per currency
+- Material number
