@@ -213,7 +213,7 @@ def test_repeated_item_prompt_forbids_list_dict_for_line_item_text():
 
     assert "ONE repeated child row/item/record" in prompt
     assert "Do not use field_type='list[dict]'" in prompt
-    assert "return scalar fields like item_number" in prompt
+    assert "return scalar fields like name, date, and status" in prompt
 
 
 def test_vision_extractor_stores_use_azure_flag():
