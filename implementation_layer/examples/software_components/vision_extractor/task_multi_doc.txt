@@ -4,13 +4,12 @@ details. Begin with the customer's purchase order, which may include multiple it
 is linked to its BOM via a Material Number.
 
 For every item in the PO, extract the Material Number along with the basic item details:
-Quantity, Description, and Delivery Date (Format: DD/MM/YYYY). Use the item's Material Number from the PO to find
-the BOM having the same Material Number (represented as 'ID'). From the matching BOM, extract
-the part's 'Type Part Designation' and Dimensions.
+Quantity, Description, and Delivery Date (Format: DD/MM/YYYY). Use the item's Material Number from the PO to find the BOM having the same Material Number (represented as 'ID'). From the matching BOM, extract
+the part's 'Part Designation' and part dimension (length followed by unit, e.g., 1487mm).
 
 The final output should contain as many lines as the number of items in the PO. Each line
-should have: Material Number, Quantity, Description, Delivery Date (from PO), Type Part
-Designation, Dimensions (from BOM).
+should have: Material Number, Quantity, Description, Delivery Date (from PO), Part
+Designation, part dimension (from BOM).
 
-Also extract the following header information from the PO: Order Date, Buyer, Sales Person,
+Also, extract the following header information from the PO: Order Date, Buyer, Sales Person,
 Shipping Address, Payment Terms.

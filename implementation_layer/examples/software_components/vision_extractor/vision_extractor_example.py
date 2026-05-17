@@ -46,6 +46,7 @@ SINGLE_PDF = Path("./single_PO.pdf")
 
 # path of the folder containing multipele documents
 PO_FOLDER = Path("PO")
+
 MULTI_FILES = [
     PO_FOLDER / "PO.pdf",
     PO_FOLDER / "BOM1.pdf",
@@ -73,7 +74,7 @@ def run_case(label: str, file_paths: list[Path], task: str, schema_dir: Path) ->
         vertex_ai=True,                # True = Google Vertex AI, False = Gemini direct (google only)
 
         # --- Model ---
-        model="gpt-5.4",    # None = use model from config/.env; e.g., gemini-3.1-flash-lite
+        model="gpt-5.4-mini",    # None = use model from config/.env; e.g., gemini-3.1-flash-lite
         api_config=None,               # None = auto-build from .env; or pass a config dict directly
 
         # --- Reasoning ---
@@ -106,7 +107,6 @@ def run_case(label: str, file_paths: list[Path], task: str, schema_dir: Path) ->
     print(f"\nModel     : {result.model}")
     print(f"Files     : {result.documents_processed}")
     print(f"LLM time  : {result.duration_s}s")
-    print(f"Total time: {total_s}s")
     if result.usage:
         print(f"Tokens    : {result.usage.total_tokens} total")
         print(f"Cost      : ${result.usage.cost_usd:.6f}")
@@ -123,7 +123,7 @@ def run_case(label: str, file_paths: list[Path], task: str, schema_dir: Path) ->
 
 if __name__ == "__main__":
     # Case 1: single PDF
-    run_case("Single document", [SINGLE_PDF], TASK_SINGLE, SCHEMA_DIR_SINGLE)
+    # run_case("Single document", [SINGLE_PDF], TASK_SINGLE, SCHEMA_DIR_SINGLE)
 
     # Case 2: multi-document (PO + 3 BOMs in one call)
-    # run_case("Multi document", MULTI_FILES, TASK_MULTI, SCHEMA_DIR_MULTI)
+    run_case("Multi document", MULTI_FILES, TASK_MULTI, SCHEMA_DIR_MULTI)
