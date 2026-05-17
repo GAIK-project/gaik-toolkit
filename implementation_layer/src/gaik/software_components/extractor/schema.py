@@ -462,28 +462,28 @@ def parse_nested_requirements(
         print(f"  Child collection: {analysis.child_container_name}")
         print(f"  Child fields: {analysis.child_fields_description}")
 
-        if not analysis.parent_fields_description.strip():
-            raise ValueError(
-                "Structure detector selected parent_with_nested_list but did not "
-                "return parent_fields_description."
-            )
-        if not analysis.child_fields_description.strip():
-            raise ValueError(
-                "Structure detector selected parent_with_nested_list but did not "
-                "return child_fields_description."
-            )
-
         print("\nParsing parent-level fields...")
+        _parent_task = (
+            "From the requirements below, parse only the once-per-document "
+            "(header / summary) fields. Ignore any repeated row or item-level fields.\n\n"
+            + user_description
+        )
         parent_requirements = parse_user_requirements(
-            analysis.parent_fields_description,
+            _parent_task,
             client=client,
             model=model,
             _usage_sink=_usage_sink,
         )
 
         print("\nParsing child row fields...")
+        _child_task = (
+            "From the requirements below, parse only the fields for each repeated "
+            "row or item. Treat every field as a scalar value. "
+            "Ignore any once-per-document, header, or summary fields.\n\n"
+            + user_description
+        )
         child_requirements = parse_user_requirements(
-            analysis.child_fields_description,
+            _child_task,
             client=client,
             model=model,
             _usage_sink=_usage_sink,
@@ -534,11 +534,18 @@ def parse_nested_requirements(
     print(f"  Parent: {analysis.parent_description}")
 
     print("\nParsing item-level fields...")
+    _item_task = (
+        "From the requirements below, parse only the fields for each repeated "
+        "item. Treat every field as a scalar value. "
+        "Ignore any once-per-document, header, or summary fields.\n\n"
+        + user_description
+    )
     item_requirements = parse_user_requirements(
-        analysis.item_description,
+        _item_task,
         client=client,
         model=model,
         _usage_sink=_usage_sink,
+        parse_mode="repeated_item",
     )
 
     print(f"Identified {len(item_requirements.fields)} fields per item")
@@ -577,6 +584,23 @@ def parse_nested_requirements(
 
 TYPE_DETECTION_RULES = """
 FIELD TYPE DETECTION RULES - Apply these rules to determine field_type and enum:
+
+OVERRIDE RULE — Explicit representation instructions in the task text take priority
+over all field-name heuristics below. Apply these mappings strictly, regardless of
+what the field name suggests:
+- "text string", "as text", "preserve exactly as written",
+  "text string including the unit", "with the unit", "with the currency symbol"
+  → field_type='str'  (even if the field name is "quantity", "price", "amount",
+  "measurement", "reading", or another name that normally implies a numeric type)
+- "choose from A, B, C", "one of: A, B, C", "select from: A, B, C",
+  "Choose from: A, B, or C"
+  → field_type='str' with enum=['A', 'B', 'C']
+- "numeric, if stated, else null", "if stated, else null" on a numeric context
+  → appropriate numeric type (float or int) with nullable=True
+- "if stated, else null", "else null" on a text context
+  → field_type='str' with nullable=True
+- "return empty string if missing", "else empty string", "else ''"
+  → field_type='str' with nullable=False and default=''
 
 1. ENUM (field_type='str' + populate 'enum' list):
    Use when a SMALL, FIXED set of allowed values (2-8 options) is explicitly specified.
@@ -748,10 +772,10 @@ def _build_parse_requirements_prompt(
             "SPECIAL CONTEXT: You are parsing the schema for ONE repeated child "
             "row/item/record. The surrounding parent schema already contains the "
             "list field. Therefore, do NOT create any field with field_type "
-            "'list[dict]'. Phrases such as 'for each line item', 'for each row', "
-            "'records containing', or 'items with fields' refer to the current "
-            "single child object. Convert the named subfields into scalar fields "
-            "on that child object.\n\n"
+            "'list[dict]'. Phrases such as 'for each item', 'for each row', "
+            "'for each record', 'records containing', or 'items with fields' "
+            "refer to the current single child object. Convert the named subfields "
+            "into scalar fields on that child object.\n\n"
         )
 
     repeated_item_footer = ""
@@ -760,11 +784,10 @@ def _build_parse_requirements_prompt(
             "\n\nRepeated child row reminder:\n"
             "- The output model you are parsing is ONE row/item/record, not the "
             "list container.\n"
-            "- Do not output a collection field such as line_items/items/records.\n"
+            "- Do not output a collection field such as items/rows/records.\n"
             "- Do not use field_type='list[dict]'.\n"
-            "- If the text says 'For each line item, extract item number, "
-            "description, quantity, price', return scalar fields like "
-            "item_number, description, quantity, and price."
+            "- If the text says 'For each record, extract name, date, status', "
+            "return scalar fields like name, date, and status."
         )
 
     return (

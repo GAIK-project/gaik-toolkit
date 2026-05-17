@@ -86,7 +86,7 @@ def run_case(label: str, file_paths: list[Path], task: str, schema_dir: Path) ->
         additional_instructions=None,  # str appended to the user prompt, or None
 
         # --- Verification ---
-        include_verification=False,    # True = add confidence_score + reasoning per field
+        include_verification=True,    # True = add confidence_score + reasoning per field
     )
     result = extractor.extract(
         # --- Input files ---

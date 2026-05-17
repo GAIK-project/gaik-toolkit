@@ -1,8 +1,8 @@
 """Standalone schema generation example.
 
-This example uses SchemaGenerator by itself. It does not run DataExtractor or
-VisionExtractor. The output is a reusable Pydantic schema plus requirements
-metadata that another component can use later for extraction.
+This example uses SchemaGenerator to output a reusable Pydantic schema plus requirements
+metadata that another component can use later for extraction. 
+It contains the examples of several task requirements.
 """
 
 from __future__ import annotations
@@ -27,25 +27,129 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 # Natural-language task description. SchemaGenerator turns this into:
 # - a Pydantic model class
 # - requirements metadata used for post-processing/normalization
+# Several extraction task descriptions to test
+
+
+
+# TASK = """
+# Extract purchase order data.
+
+# The output will include the following top-level fields:
+# - date (DD-MM-YYYY)
+# - purchase order number
+# - supplier number
+# - contact
+
+# Also, the output will include the data for each line item.
+
+# For each line item, extract these scalar fields:
+# - item number
+# - complete description
+# - quantity
+# - price 
+# - material number
+# """
+
+
+# TASK = """
+# Extract purchase order data from the document.
+
+# Top-level fields:
+# - Purchase order number
+# - Delivery date (format: DD-MM-YYYY)
+# - Delivery_address (Format: company name + street + postal code + city + country)
+# - Vendor number
+
+# For each line item, extract:
+# - Item number (e.g. 0100, 0200)
+# - Article code (internal supplier code)
+# - Dimensions (cross-section as stated, e.g. "25x8mm")
+# - Product form (Choose from: Flat, round, or rectangular bar)
+# - Material grade (e.g. "6061 Aluminum", "316 Stainless", "C260 Brass")
+# - Standard designation (alloy/standard code, e.g. "CW024A", "ASTM B221")
+# - Cut length (text string including the unit, e.g. "2000mm")
+# - Temper or condition (e.g. "Cold drawn, bright finish", "T6")
+# - Hardness HV (numeric, if stated, else null)
+# - Min bend radius (numeric, if stated, else null)
+# - Delivery length note (e.g. "in lengths of 3000mm", if stated, else null)
+# - Applicable standard (e.g. "ASTM B221", "EN 755-2", if stated, else null)
+# - Special flags (any remaining codes, e.g. "XK", "chamfered edges", else null)
+# - Quantity (text string including the unit, e.g. "4.200 kg")
+# """
+
+
+
+# TASK = """
+# The task is to extract key fields from customer documents (Purchase Order (PO) and Bill of
+# Material (BOM)), and align them so that each PO item is enriched with the correct technical
+# details. Begin with the customer's purchase order, which may include multiple items. Each item
+# is linked to its BOM via a Material Number.
+
+# For every item in the PO, extract the Material Number along with the basic item details:
+# Quantity, Description, and Delivery Date (Format: DD/MM/YYYY). Use the item's Material Number from the PO to find
+# the BOM having the same Material Number (represented as 'ID'). From the matching BOM, extract
+# the part's 'Type Part Designation' and Dimensions.
+
+# The final output should contain as many lines as the number of items in the PO. Each line
+# should have: Material Number, Quantity, Description, Delivery Date (from PO), Type Part
+# Designation, Dimensions (from BOM).
+
+# Also extract the following header information from the PO: Order Date, Buyer, Sales Person,
+# Shipping Address, Payment Terms.
+# """
+
+
+
+# TASK = """
+# Extract the following from the audio:
+# - Date (DD/MM/YYYY) 
+# - Patient's date of birth ((DD-MM-YYYY))
+# - Symptoms (in a few keywords separated by semicolons)
+# - Medical history (in a few keywords separated by semicolons)
+# - Examination description (in a few keywords separated by semicolons)
+# - Body temperature / Heart Rate / Oxygen saturation
+# - Procedure performed (in a few keywords)
+# - Diagnosis (in a few keywords)
+# - Prescription (in a few keywords)
+# - Follow-up (in a few keywords)
+# """
+
+
+# TASK = """
+# Extract delivery information from the manifest.
+
+# Header fields:
+# - Manifest number
+# - Carrier name
+# - Dispatch date (DD/MM/YYYY)
+# - Origin depot
+# - Destination depot
+# - Total weight (text string including the unit, e.g. "1250 kg")
+
+# For each shipment in the manifest:
+# - Tracking number
+# - Recipient name
+# - Recipient address
+# - Package count 
+# - Weight (text string including the unit, e.g. "18.5 kg")
+# - Service level (Standard, Express, or Overnight)
+# - Fragile (yes/no)
+# - Delivery instructions (if stated, else null)
+# """
+
 TASK = """
-Extract purchase order data.
-
-The output will include the following top-level fields:
-- date (DD-MM-YYYY)
-- purchase order number
-- supplier number
-- contact
-
-Also, the output will include the data for each line item.
-
-For each line item, extract these scalar fields:
-- item number
-- complete description
-- quantity
-- price
-- material number
+Extract the following from the security advisory:
+- CVE identifier (e.g. "CVE-2024-12345")
+- Affected product
+- Affected versions (text string as stated, e.g. "3.2.0 – 3.4.1")
+- Severity (Critical, High, Medium, or Low)
+- CVSS score (numeric, if stated, else null)
+- Attack vector (Network, Adjacent, Local, or Physical)
+- Patch available (yes/no)
+- Patched version (if stated, else null)
+- Published date (DD/MM/YYYY)
+- Summary (in a few keywords separated by semicolons)
 """
-
 
 def _annotation_repr(annotation) -> str:
     """Return a Python source representation for common Pydantic field types."""

@@ -1,0 +1,152 @@
+{
+  "model_name": "security_advisory_extraction_Extraction",
+  "requirements_type": "extraction",
+  "requirements": {
+    "use_case_name": "security_advisory_extraction",
+    "fields": [
+      {
+        "field_name": "cve_identifier",
+        "field_type": "str",
+        "description": "CVE identifier",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "affected_product",
+        "field_type": "str",
+        "description": "Affected product",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "affected_versions",
+        "field_type": "str",
+        "description": "Affected versions as stated",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "severity",
+        "field_type": "str",
+        "description": "Severity",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": [
+          "Critical",
+          "High",
+          "Medium",
+          "Low"
+        ],
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "cvss_score",
+        "field_type": "float",
+        "description": "CVSS score",
+        "required_in_output": true,
+        "nullable": true,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "attack_vector",
+        "field_type": "str",
+        "description": "Attack vector",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": [
+          "Network",
+          "Adjacent",
+          "Local",
+          "Physical"
+        ],
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "patch_available",
+        "field_type": "str",
+        "description": "Patch available",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "patched_version",
+        "field_type": "str",
+        "description": "Patched version",
+        "required_in_output": true,
+        "nullable": true,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "published_date",
+        "field_type": "date",
+        "description": "Published date",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": "",
+        "format": "%d/%m/%Y"
+      },
+      {
+        "field_name": "summary",
+        "field_type": "list[str]",
+        "description": "Summary in a few keywords separated by semicolons",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": "",
+        "format": ""
+      }
+    ]
+  }
+}

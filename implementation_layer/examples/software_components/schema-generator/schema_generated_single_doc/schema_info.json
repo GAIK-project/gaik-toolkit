@@ -1,0 +1,17 @@
+{
+  "model_name": "security_advisory_extraction_Extraction",
+  "structure_type": "flat",
+  "fields": [
+    "cve_identifier",
+    "affected_product",
+    "affected_versions",
+    "severity",
+    "cvss_score",
+    "attack_vector",
+    "patch_available",
+    "patched_version",
+    "published_date",
+    "summary"
+  ],
+  "field_count": 10
+}
