@@ -26,7 +26,11 @@ pip install "gaik[vision-extract]"
 ## Quick Start
 
 ```python
+from dotenv import load_dotenv
+import json
 from gaik.software_components.vision_extractor import VisionExtractor
+
+load_dotenv() #loads .env
 
 extractor = VisionExtractor(
     model_provider="openai",
@@ -49,16 +53,53 @@ result = extractor.extract(
     Line items:
     - item number
     - complete description
-    - quantity
-    - price
+    - quantity (text string showing number with a unit, e.g., 15.75 Kg)
+    - price (text string showing number with a unit, e.g., 150,00 USD)
     - material number
     """,
     schema_dir="schema_single",
 )
 
-print(result.data)
-print(result.usage.cost_usd if result.usage else None)
+print(json.dumps(result.data, indent=2, default=str, ensure_ascii=False))
+print(f"Cost: ${result.usage.cost_usd:.6f}" if result.usage else "Cost: N/A")
 ```
+## Environment Variables
+
+Set provider credentials before running the extractor. Put them in a `.env` file or export them in your shell/session; the toolkit configuration
+helpers load these values when building the provider config.
+
+The `.env` file can be saved in the same directory and loaded through `load_dotenv()`. 
+
+### OpenAI / Azure OpenAI
+
+| Variable | When | Description |
+|----------|------|-------------|
+| `AZURE_API_KEY` | `use_azure=True` | Azure OpenAI API key |
+| `AZURE_ENDPOINT` | `use_azure=True` | Azure OpenAI endpoint URL |
+| `AZURE_DEPLOYMENT` | `use_azure=True` | Azure deployment name |
+| `AZURE_API_VERSION` | `use_azure=True` | Azure API version |
+| `OPENAI_API_KEY` | `use_azure=False` | Standard OpenAI API key |
+| `OPENAI_MODEL` | `use_azure=False` | Default OpenAI model |
+
+### Claude
+
+| Variable | When | Description |
+|----------|------|-------------|
+| `AZURE_API_KEY` | `use_azure=True` | Anthropic Foundry API key |
+| `ANTHROPIC_FOUNDRY_RESOURCE` | `use_azure=True` | Foundry resource name |
+| `ANTHROPIC_API_KEY` | `use_azure=False` | Direct Anthropic API key |
+| `ANTHROPIC_MODEL` | Always | Default Claude model |
+
+### Google
+
+| Variable | When | Description |
+|----------|------|-------------|
+| `GOOGLE_PROJECT_ID` | `vertex_ai=True` | GCP project ID |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | `vertex_ai=True` | Service account JSON |
+| `GOOGLE_SCOPES` | `vertex_ai=True` | OAuth scopes |
+| `GOOGLE_GENERATE_CONTENT_URL` | `vertex_ai=True` | Vertex AI generateContent endpoint |
+| `GOOGLE_API_KEY` | `vertex_ai=False` | Direct Gemini API key |
+| `GOOGLE_MODEL` | Always | Default Gemini model |
 
 ---
 
@@ -211,7 +252,7 @@ Delete or change `schema_dir` when you want to force schema regeneration.
 extractor = VisionExtractor(
     model_provider="openai",
     model="gpt-5.4-mini",
-    use_azure=True,
+    use_azure=False,
     reasoning_effort="low",
 )
 ```
@@ -222,7 +263,7 @@ extractor = VisionExtractor(
 extractor = VisionExtractor(
     model_provider="claude",
     model="claude-sonnet-4-6",
-    use_azure=True,
+    use_azure=False,
     reasoning_effort="high",
 )
 ```
@@ -235,7 +276,7 @@ Claude uses tool calling for structured extraction. When thinking is enabled, fo
 extractor = VisionExtractor(
     model_provider="google",
     model="gemini-3.1-pro-preview",
-    vertex_ai=True,
+    vertex_ai=False,
     reasoning_effort="medium",
 )
 ```
@@ -248,65 +289,13 @@ See the runnable example script:
 
 ```text
 implementation_layer/examples/software_components/vision_extractor/vision_extractor_example.py
+implementation_layer/examples/software_components/vision_extractor/vision_extractor_example_minimal.py
 ```
 
 The example demonstrates single-document and multi-document extraction, schema
 persistence with `schema.py` and `requirements.json`, provider selection,
 reasoning effort, table-merge instructions, verification, token usage, and cost
 reporting.
-
----
-
-## Environment Variables
-
-The component uses the same provider configuration helpers as the multimodal parser.
-
-Set provider credentials before running the extractor. For local development, put them
-in a `.env` file or export them in your shell/session; the toolkit configuration
-helpers load these values when building the provider config.
-
-The configuration helpers call `load_dotenv()` without an explicit path. In a
-source checkout, a reliable location is the repository root:
-
-```text
-C:\Users\h02317\gaik-toolkit\.env
-```
-
-or another parent directory of `implementation_layer/src/gaik/software_components`.
-A `.env` file placed only in the example folder may not be discovered. If the
-package is installed into another environment, prefer exporting the variables in
-the shell/session or pass `api_config` explicitly.
-
-### OpenAI / Azure OpenAI
-
-| Variable | When | Description |
-|----------|------|-------------|
-| `AZURE_API_KEY` | `use_azure=True` | Azure OpenAI API key |
-| `AZURE_ENDPOINT` | `use_azure=True` | Azure OpenAI endpoint URL |
-| `AZURE_DEPLOYMENT` | `use_azure=True` | Azure deployment name |
-| `AZURE_API_VERSION` | `use_azure=True` | Azure API version |
-| `OPENAI_API_KEY` | `use_azure=False` | Standard OpenAI API key |
-| `OPENAI_MODEL` | `use_azure=False` | Default OpenAI model |
-
-### Claude
-
-| Variable | When | Description |
-|----------|------|-------------|
-| `AZURE_API_KEY` | `use_azure=True` | Anthropic Foundry API key |
-| `ANTHROPIC_FOUNDRY_RESOURCE` | `use_azure=True` | Foundry resource name |
-| `ANTHROPIC_API_KEY` | `use_azure=False` | Direct Anthropic API key |
-| `ANTHROPIC_MODEL` | Always | Default Claude model |
-
-### Google
-
-| Variable | When | Description |
-|----------|------|-------------|
-| `GOOGLE_PROJECT_ID` | `vertex_ai=True` | GCP project ID |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | `vertex_ai=True` | Service account JSON |
-| `GOOGLE_SCOPES` | `vertex_ai=True` | OAuth scopes |
-| `GOOGLE_GENERATE_CONTENT_URL` | `vertex_ai=True` | Vertex AI generateContent endpoint |
-| `GOOGLE_API_KEY` | `vertex_ai=False` | Direct Gemini API key |
-| `GOOGLE_MODEL` | Always | Default Gemini model |
 
 ---
 
