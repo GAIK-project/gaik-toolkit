@@ -96,7 +96,7 @@ result = extractor.extract(
     # --- Extraction task ---
     user_requirements=task,        # natural language description of what to extract
 
-    schema_dir="example_schema",         # directory to save/load schema.py + requirements.json
+    schema_dir="PO_schema",         # directory to save/load schema.py + requirements.json
 )
 
 total_s = round(time.perf_counter() - t_start, 3)
@@ -111,7 +111,7 @@ if result.usage:
 print("\nExtracted data:")
 print(json.dumps(result.data, indent=2, default=str, ensure_ascii=False))
 
-output_path = Path(__file__).parent / "result_minimal.json"
+output_path = Path(__file__).parent / "PO_result.json"
 output_path.write_text(
     json.dumps(result.data, indent=2, default=str, ensure_ascii=False), encoding="utf-8"
 )

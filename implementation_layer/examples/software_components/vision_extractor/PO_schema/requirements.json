@@ -1,0 +1,261 @@
+{
+  "model_name": "purchase_order_header_extraction_Extraction",
+  "requirements_type": "parent_with_nested_list",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "purchase_order_header_extraction",
+      "fields": [
+        {
+          "field_name": "purchase_order_number",
+          "field_type": "str",
+          "description": "Purchase order number",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "delivery_date",
+          "field_type": "date",
+          "description": "Delivery date (format: DD/MM/YYYY)",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": "%d/%m/%Y"
+        },
+        {
+          "field_name": "delivery_address",
+          "field_type": "str",
+          "description": "Delivery address (Format: company name, street, postal code, city, country)",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": "company name, street, postal code, city, country"
+        },
+        {
+          "field_name": "vendor_number",
+          "field_type": "str",
+          "description": "Vendor number",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "line_items",
+        "container_description": "Repeated purchase order line items listed in the document.",
+        "requirements": {
+          "use_case_name": "purchase_order_line_item",
+          "fields": [
+            {
+              "field_name": "item_number",
+              "field_type": "str",
+              "description": "Item number",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "article_code",
+              "field_type": "str",
+              "description": "Article code (internal supplier code)",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "dimensions",
+              "field_type": "str",
+              "description": "Dimensions (cross-section as stated)",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "product_form",
+              "field_type": "str",
+              "description": "Product form",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": [
+                "Flat",
+                "round",
+                "rectangular bar"
+              ],
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "material_grade",
+              "field_type": "str",
+              "description": "Material grade",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "standard_designation",
+              "field_type": "str",
+              "description": "Standard designation (alloy/standard code)",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "cut_length",
+              "field_type": "str",
+              "description": "Cut length including the unit",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "temper_or_condition",
+              "field_type": "str",
+              "description": "Temper or condition",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "hardness_hv",
+              "field_type": "float",
+              "description": "Hardness HV",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "min_bend_radius",
+              "field_type": "float",
+              "description": "Minimum bend radius",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "delivery_length_note",
+              "field_type": "str",
+              "description": "Delivery length note",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "applicable_standard",
+              "field_type": "str",
+              "description": "Applicable standard",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "special_flags",
+              "field_type": "str",
+              "description": "Special flags (any remaining codes)",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "quantity",
+              "field_type": "str",
+              "description": "Quantity including the unit",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
