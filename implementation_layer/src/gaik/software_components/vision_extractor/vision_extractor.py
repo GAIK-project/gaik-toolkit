@@ -513,7 +513,22 @@ def _load_saved_requirements(path: Path) -> tuple[str, RequirementsSpec]:
     data = json.loads(path.read_text(encoding="utf-8"))
     requirements_type = data.get("requirements_type", "extraction")
     if requirements_type == "parent_with_nested_list":
-        requirements = CompositeExtractionRequirements(**data["requirements"])
+        raw = data["requirements"]
+        # Migrate old single-child format (child_container_name / child_requirements)
+        # to the new children list format.
+        if "child_container_name" in raw and "children" not in raw:
+            from gaik.software_components.extractor.schema import ChildRequirements
+            raw = {
+                "parent_requirements": raw["parent_requirements"],
+                "children": [
+                    {
+                        "container_name": raw["child_container_name"],
+                        "container_description": "",
+                        "requirements": raw["child_requirements"],
+                    }
+                ],
+            }
+        requirements = CompositeExtractionRequirements(**raw)
     else:
         requirements = ExtractionRequirements(**data["requirements"])
     return data["model_name"], requirements
@@ -757,7 +772,7 @@ class VisionExtractor:
             text={
                 "format": {
                     "type": "json_schema",
-                    "name": extraction_model.__name__,
+                    "name": extraction_model.__name__[:64],
                     "schema": _make_schema_strict(extraction_model.model_json_schema()),
                     "strict": True,
                 }
@@ -919,12 +934,8 @@ class VisionExtractor:
 
     def _post_process(self, result_dict: dict, requirements: RequirementsSpec) -> dict:
         if isinstance(requirements, CompositeExtractionRequirements):
-            child_key = requirements.child_container_name
-            child_rows = result_dict.get(child_key, [])
-
-            parent_data = {
-                key: value for key, value in result_dict.items() if key != child_key
-            }
+            child_keys = {c.container_name for c in requirements.children}
+            parent_data = {k: v for k, v in result_dict.items() if k not in child_keys}
             parent_data = apply_field_policies(
                 parent_data, requirements.parent_requirements
             )
@@ -932,18 +943,20 @@ class VisionExtractor:
                 parent_data, requirements.parent_requirements
             )
 
-            if isinstance(child_rows, list):
-                parent_data[child_key] = [
-                    normalize_extracted_data(
-                        apply_field_policies(row, requirements.child_requirements),
-                        requirements.child_requirements,
-                    )
-                    if isinstance(row, dict)
-                    else row
-                    for row in child_rows
-                ]
-            else:
-                parent_data[child_key] = child_rows
+            for child in requirements.children:
+                child_rows = result_dict.get(child.container_name, [])
+                if isinstance(child_rows, list):
+                    parent_data[child.container_name] = [
+                        normalize_extracted_data(
+                            apply_field_policies(row, child.requirements),
+                            child.requirements,
+                        )
+                        if isinstance(row, dict)
+                        else row
+                        for row in child_rows
+                    ]
+                else:
+                    parent_data[child.container_name] = child_rows
 
             return parent_data
 

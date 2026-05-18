@@ -6,10 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from gaik.software_components.extractor.schema import (
+from gaik.software_components.extractor import (
+    ChildRequirements,
     CompositeExtractionRequirements,
     ExtractionRequirements,
     FieldSpec,
+)
+from gaik.software_components.extractor.schema import (
     _build_parse_requirements_prompt,
     _create_parent_with_nested_list_model,
     _ensure_no_list_dict_fields,
@@ -55,15 +58,22 @@ def child_requirements() -> ExtractionRequirements:
     )
 
 
+@pytest.fixture()
+def child_spec(child_requirements: ExtractionRequirements) -> ChildRequirements:
+    return ChildRequirements(
+        container_name="line_items",
+        container_description="Line item rows",
+        requirements=child_requirements,
+    )
+
+
 def test_combined_model_has_parent_fields_and_typed_child_rows(
     parent_requirements: ExtractionRequirements,
-    child_requirements: ExtractionRequirements,
+    child_spec: ChildRequirements,
 ):
     model = _create_parent_with_nested_list_model(
         parent_requirements=parent_requirements,
-        child_requirements=child_requirements,
-        child_container_name="line_items",
-        child_container_description="Line item rows",
+        children=[child_spec],
     )
 
     result = model.model_validate(
@@ -79,15 +89,41 @@ def test_combined_model_has_parent_fields_and_typed_child_rows(
     assert str(result.line_items[0].price) == "12.50"
 
 
-def test_openai_strict_schema_keeps_child_model_constrained(
+def test_combined_model_with_multiple_children(
     parent_requirements: ExtractionRequirements,
     child_requirements: ExtractionRequirements,
 ):
+    second_child = ChildRequirements(
+        container_name="notes",
+        container_description="Notes",
+        requirements=_requirements("note", [
+            FieldSpec(field_name="note_text", field_type="str", description="Note text"),
+        ]),
+    )
     model = _create_parent_with_nested_list_model(
         parent_requirements=parent_requirements,
-        child_requirements=child_requirements,
-        child_container_name="line_items",
-        child_container_description="Line item rows",
+        children=[
+            ChildRequirements(
+                container_name="line_items",
+                container_description="Line item rows",
+                requirements=child_requirements,
+            ),
+            second_child,
+        ],
+    )
+
+    assert "line_items" in model.model_fields
+    assert "notes" in model.model_fields
+    assert "document_number" in model.model_fields
+
+
+def test_openai_strict_schema_keeps_child_model_constrained(
+    parent_requirements: ExtractionRequirements,
+    child_spec: ChildRequirements,
+):
+    model = _create_parent_with_nested_list_model(
+        parent_requirements=parent_requirements,
+        children=[child_spec],
     )
 
     schema = _make_schema_strict(model.model_json_schema())
@@ -101,12 +137,11 @@ def test_openai_strict_schema_keeps_child_model_constrained(
 
 def test_composite_post_process_applies_parent_and_child_requirements(
     parent_requirements: ExtractionRequirements,
-    child_requirements: ExtractionRequirements,
+    child_spec: ChildRequirements,
 ):
     requirements = CompositeExtractionRequirements(
         parent_requirements=parent_requirements,
-        child_container_name="line_items",
-        child_requirements=child_requirements,
+        children=[child_spec],
     )
 
     result = VisionExtractor._post_process(
@@ -126,20 +161,57 @@ def test_composite_post_process_applies_parent_and_child_requirements(
     }
 
 
-def test_blank_numeric_child_value_is_repaired_before_validation(
+def test_composite_post_process_handles_multiple_children(
     parent_requirements: ExtractionRequirements,
     child_requirements: ExtractionRequirements,
 ):
+    note_req = _requirements("note", [
+        FieldSpec(field_name="note_text", field_type="str", description="Note text"),
+    ])
     requirements = CompositeExtractionRequirements(
         parent_requirements=parent_requirements,
-        child_container_name="line_items",
-        child_requirements=child_requirements,
+        children=[
+            ChildRequirements(
+                container_name="line_items",
+                container_description="Lines",
+                requirements=child_requirements,
+            ),
+            ChildRequirements(
+                container_name="notes",
+                container_description="Notes",
+                requirements=note_req,
+            ),
+        ],
+    )
+
+    result = VisionExtractor._post_process(
+        None,
+        {
+            "document_number": "PO-1",
+            "date": "2026-05-11",
+            "line_items": [{"item_number": "10", "quantity": 2, "price": "12.50"}],
+            "notes": [{"note_text": "Handle with care"}],
+        },
+        requirements,
+    )
+
+    assert "line_items" in result
+    assert "notes" in result
+    assert result["notes"][0]["note_text"] == "Handle with care"
+    assert result["document_number"] == "PO-1"
+
+
+def test_blank_numeric_child_value_is_repaired_before_validation(
+    parent_requirements: ExtractionRequirements,
+    child_spec: ChildRequirements,
+):
+    requirements = CompositeExtractionRequirements(
+        parent_requirements=parent_requirements,
+        children=[child_spec],
     )
     model = _create_parent_with_nested_list_model(
         parent_requirements=parent_requirements,
-        child_requirements=child_requirements,
-        child_container_name="line_items",
-        child_container_description="Line item rows",
+        children=[child_spec],
     )
     raw = {
         "document_number": "PO-1",
@@ -156,18 +228,15 @@ def test_blank_numeric_child_value_is_repaired_before_validation(
 def test_composite_requirements_and_schema_save_load_round_trip(
     tmp_path: Path,
     parent_requirements: ExtractionRequirements,
-    child_requirements: ExtractionRequirements,
+    child_spec: ChildRequirements,
 ):
     requirements = CompositeExtractionRequirements(
         parent_requirements=parent_requirements,
-        child_container_name="line_items",
-        child_requirements=child_requirements,
+        children=[child_spec],
     )
     model = _create_parent_with_nested_list_model(
         parent_requirements=parent_requirements,
-        child_requirements=child_requirements,
-        child_container_name="line_items",
-        child_container_description="Line item rows",
+        children=[child_spec],
     )
 
     schema_path = tmp_path / "schema.py"
@@ -179,6 +248,8 @@ def test_composite_requirements_and_schema_save_load_round_trip(
     loaded_model = _load_saved_schema(schema_path, model_name)
 
     assert isinstance(loaded_requirements, CompositeExtractionRequirements)
+    assert len(loaded_requirements.children) == 1
+    assert loaded_requirements.children[0].container_name == "line_items"
     loaded_model.model_validate(
         {
             "document_number": "PO-1",
@@ -186,6 +257,47 @@ def test_composite_requirements_and_schema_save_load_round_trip(
             "line_items": [{"item_number": "10", "quantity": 2, "price": "12.50"}],
         }
     )
+
+
+def test_backward_compat_shims_return_first_child(
+    parent_requirements: ExtractionRequirements,
+    child_spec: ChildRequirements,
+):
+    requirements = CompositeExtractionRequirements(
+        parent_requirements=parent_requirements,
+        children=[child_spec],
+    )
+
+    assert requirements.child_container_name == "line_items"
+    assert requirements.child_requirements is child_spec.requirements
+
+
+def test_load_old_format_requirements_json(
+    tmp_path: Path,
+    parent_requirements: ExtractionRequirements,
+    child_requirements: ExtractionRequirements,
+):
+    """Old requirements.json with child_container_name / child_requirements is migrated."""
+    import json
+
+    old_payload = {
+        "model_name": "OldModel_Extraction",
+        "requirements_type": "parent_with_nested_list",
+        "requirements": {
+            "structure_type": "parent_with_nested_list",
+            "parent_requirements": parent_requirements.model_dump(),
+            "child_container_name": "line_items",
+            "child_requirements": child_requirements.model_dump(),
+        },
+    }
+    req_path = tmp_path / "requirements.json"
+    req_path.write_text(json.dumps(old_payload), encoding="utf-8")
+
+    model_name, loaded = _load_saved_requirements(req_path)
+    assert model_name == "OldModel_Extraction"
+    assert isinstance(loaded, CompositeExtractionRequirements)
+    assert len(loaded.children) == 1
+    assert loaded.children[0].container_name == "line_items"
 
 
 def test_nested_item_requirements_reject_unconstrained_dict_rows():

@@ -31,24 +31,24 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 
 
 
-# TASK = """
-# Extract purchase order data.
+TASK = """
+Extract purchase order data.
 
-# The output will include the following top-level fields:
-# - date (DD-MM-YYYY)
-# - purchase order number
-# - supplier number
-# - contact
+The output will include the following top-level fields:
+- date (DD/MM/YYYY format when unambiguous)
+- purchase order number
+- supplier number
+- contact
 
-# Also, the output will include the data for each line item.
+Also, the output will include the data for each line item.
 
-# For each line item, extract these scalar fields:
-# - item number
-# - complete description
-# - quantity
-# - price 
-# - material number
-# """
+For each line item, extract these scalar fields:
+- item number
+- complete description
+- quantity
+- price 
+- material number
+"""
 
 
 # TASK = """
@@ -56,7 +56,7 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 
 # Top-level fields:
 # - Purchase order number
-# - Delivery date (format: DD-MM-YYYY)
+# - Delivery date (Delivery date in DD/MM/YYYY format when unambiguous)
 # - Delivery_address (Format: company name + street + postal code + city + country)
 # - Vendor number
 
@@ -86,7 +86,7 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 # is linked to its BOM via a Material Number.
 
 # For every item in the PO, extract the Material Number along with the basic item details:
-# Quantity, Description, and Delivery Date (Format: DD/MM/YYYY). Use the item's Material Number from the PO to find
+# Quantity, Description, and Delivery Date (Delivery date in DD/MM/YYYY format when unambiguous). Use the item's Material Number from the PO to find
 # the BOM having the same Material Number (represented as 'ID'). From the matching BOM, extract
 # the part's 'Type Part Designation' and Dimensions.
 
@@ -101,17 +101,28 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 
 
 # TASK = """
-# Extract the following from the audio:
-# - Date (DD/MM/YYYY) 
-# - Patient's date of birth ((DD-MM-YYYY))
-# - Symptoms (in a few keywords separated by semicolons)
-# - Medical history (in a few keywords separated by semicolons)
-# - Examination description (in a few keywords separated by semicolons)
-# - Body temperature / Heart Rate / Oxygen saturation
-# - Procedure performed (in a few keywords)
-# - Diagnosis (in a few keywords)
-# - Prescription (in a few keywords)
-# - Follow-up (in a few keywords)
+# Extract the following information from the medical audio.
+
+# Fields:
+# - Date (DD/MM/YYYY)
+# - Patient's date of birth (DD-MM-YYYY)
+# - Symptoms (few keywords separated by semicolons)
+# - Medical history (few keywords separated by semicolons)
+# - Examination description (few keywords separated by semicolons)
+# - Body temperature (value and unit exactly as stated)
+# - Heart rate (value and unit exactly as stated)
+# - Oxygen saturation (value and unit exactly as stated)
+# - Procedure performed (few keywords)
+# - Diagnosis (few keywords)
+# - Prescription (few keywords)
+# - Follow-up (few keywords)
+
+# Rules:
+# - Extract only information explicitly stated in the audio or transcript.
+# - Do not infer medical information.
+# - If a field is not mentioned, output an empty string.
+# - Preserve dates exactly if the required format cannot be inferred.
+# - For symptoms, medical history, and examination description, output short keyword phrases separated by semicolons.
 # """
 
 
@@ -137,19 +148,102 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 # - Delivery instructions (if stated, else null)
 # """
 
-TASK = """
-Extract the following from the security advisory:
-- CVE identifier (e.g. "CVE-2024-12345")
-- Affected product
-- Affected versions (text string as stated, e.g. "3.2.0 – 3.4.1")
-- Severity (Critical, High, Medium, or Low)
-- CVSS score (numeric, if stated, else null)
-- Attack vector (Network, Adjacent, Local, or Physical)
-- Patch available (yes/no)
-- Patched version (if stated, else null)
-- Published date (DD/MM/YYYY)
-- Summary (in a few keywords separated by semicolons)
-"""
+# TASK = """
+# Extract the following from the security advisory:
+# - CVE identifier (e.g. "CVE-2024-12345")
+# - Affected product
+# - Affected versions (text string as stated, e.g. "3.2.0 – 3.4.1")
+# - Severity (Critical, High, Medium, or Low)
+# - CVSS score (numeric, if stated, else null)
+# - Attack vector (Network, Adjacent, Local, or Physical)
+# - Patch available (yes/no)
+# - Patched version (if stated, else null)
+# - Published date (Format: DD/MM/YYYY)
+# - Summary (in a few keywords separated by semicolons)
+# """
+
+# TASK = """
+# Extract compliance-relevant information from the construction blueprint.
+
+# Top-level fields:
+# - Project address
+# - Drawing title
+# - Drawing number
+# - Sheet number
+# - Project number
+# - Scale
+# - Drawing date
+# - Owner
+# - Architect
+# - General contractor
+# - Surveyor
+
+# For each compliance-relevant item visible in the blueprint, extract:
+# - Item type (General note, Revision, Dimension, Elevation reference, Legend/material reference, Drawing view, Grid line, Section callout, Other)
+# - Label or number
+# - Exact text or value
+# - Related drawing element or location
+# - Compliance relevance (Dimensions, Structural reference, Utilities/fixtures, Survey/benchmarks, Specifications, Safety/compliance, Revision control, Material reference, Other)
+
+# Rules:
+# - Extract only explicitly visible information.
+# - Preserve original wording, dimensions, dates, and labels.
+# """
+
+# TASK = """
+# Extract compliance-relevant information from the construction blueprint.
+
+# Top-level fields:
+# - Project address
+# - Drawing title
+# - Drawing number
+# - Sheet number
+# - Project number
+# - Scale
+# - Drawing date
+# - Owner
+# - Architect
+# - General contractor
+# - Surveyor
+
+# Repeated records:
+# 1. General construction notes:
+#    - Note number
+#    - Note text
+#    - Compliance category: Dimensions, Structural reference, Utilities/fixtures, Survey/benchmarks, Specifications, Safety/compliance, Other
+
+# 2. Revision history:
+#    - Revision number
+#    - Revision date
+#    - Revision description
+
+# 3. Visible dimensions:
+#    - Dimension value exactly as written
+#    - Unit
+#    - Direction or orientation
+#    - Related element or view
+
+# 4. Elevation references:
+#    - Elevation value exactly as written
+#    - Related element or section
+
+# 5. Material and legend references:
+#    - Symbol or pattern name
+#    - Meaning
+#    - Location or view
+
+# 6. Drawing views, grid lines, and callouts:
+#    - Label
+#    - Type
+#    - View title or related drawing element
+#    - Compliance-relevant information shown
+
+# Rules:
+# - Extract only explicitly visible information.
+# - Do not infer compliance decisions.
+# - Preserve original wording, dimensions, dates, and labels.
+# - Use an empty string for missing or unreadable values.
+# """
 
 def _annotation_repr(annotation) -> str:
     """Return a Python source representation for common Pydantic field types."""

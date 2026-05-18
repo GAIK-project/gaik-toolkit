@@ -24,6 +24,7 @@ from gaik.software_components.config import create_openai_client, get_openai_con
 
 from .extractor import DataExtractor, ExtractionResult, save_to_json
 from .schema import (
+    ChildRequirements,
     CompositeExtractionRequirements,
     ExtractionRequirements,
     FieldSpec,
@@ -47,6 +48,7 @@ __all__ = [
     # Advanced - for custom schemas
     "FieldSpec",
     "ExtractionRequirements",
+    "ChildRequirements",
     "CompositeExtractionRequirements",
     "StructureAnalysis",
     "create_extraction_model",

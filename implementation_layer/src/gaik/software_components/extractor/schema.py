@@ -204,18 +204,42 @@ class ExtractionRequirements(BaseModel):
         return fields
 
 
+class ChildRequirements(BaseModel):
+    """Parsed requirements for one repeated child collection."""
+
+    container_name: str
+    container_description: str
+    requirements: ExtractionRequirements
+
+
 class CompositeExtractionRequirements(BaseModel):
-    """Requirements for one parent record with one repeated child collection."""
+    """Requirements for one parent record with one or more repeated child collections."""
 
     structure_type: Literal["parent_with_nested_list"] = "parent_with_nested_list"
     parent_requirements: ExtractionRequirements
-    child_container_name: str
-    child_requirements: ExtractionRequirements
+    children: list[ChildRequirements]
+
+    @property
+    def child_container_name(self) -> str:
+        """Backward-compat shim — returns the first child's container name."""
+        return self.children[0].container_name if self.children else ""
+
+    @property
+    def child_requirements(self) -> ExtractionRequirements:
+        """Backward-compat shim — returns the first child's requirements."""
+        return self.children[0].requirements if self.children else ExtractionRequirements(fields=[], use_case_name="")
 
 
 # -----------------------------------------------------------------------------
 # Structure Detection for Nested vs Flat Schemas
 # -----------------------------------------------------------------------------
+
+
+class ChildContainerSpec(BaseModel):
+    """Metadata for one repeated child collection identified by detect_structure_type."""
+
+    container_name: str = Field(description="snake_case field name for the list")
+    container_description: str = Field(description="Description of this child collection")
 
 
 class StructureAnalysis(BaseModel):
@@ -225,7 +249,7 @@ class StructureAnalysis(BaseModel):
         description=(
             "Type of structure: 'flat' for one object, 'nested_list' for only "
             "repeated records, or 'parent_with_nested_list' for one parent "
-            "object plus one repeated child collection"
+            "object plus one or more repeated child collections"
         )
     )
     parent_container_name: str = Field(
@@ -258,6 +282,14 @@ class StructureAnalysis(BaseModel):
         description=(
             "For parent_with_nested_list: extraction requirements for one repeated "
             "child row/item/record"
+        ),
+    )
+    child_containers: list[ChildContainerSpec] = Field(
+        default=[],
+        description=(
+            "For parent_with_nested_list: ALL distinct repeated child collections. "
+            "Each entry names one repeated section. Must have at least one entry "
+            "when structure_type is parent_with_nested_list."
         ),
     )
     reasoning: str = Field(description="Brief explanation of why this structure was chosen")
@@ -307,9 +339,12 @@ def detect_structure_type(
                     "  Repeated records: record_id, description, amount\n"
                     "  => parent_with_nested_list\n"
                     "- Return parent_fields_description as only the once-per-"
-                    "document fields, child_container_name as the repeated "
-                    "collection field name, and child_fields_description as "
-                    "only the fields for one child row/item/record.\n\n"
+                    "document fields.\n"
+                    "- Return child_containers as a list with one entry per "
+                    "distinct repeated section. Each entry needs a "
+                    "container_name (snake_case, e.g. 'revision_history', "
+                    "'action_items') and a container_description.\n"
+                    "- There is no limit on the number of child collections.\n\n"
                     "Use NESTED_LIST when:\n"
                     "- The DOCUMENT contains multiple items/records/rows "
                     "to extract, and there are no separate common/header/"
@@ -340,8 +375,8 @@ def detect_structure_type(
                     "header/document-level fields and another heading like "
                     "line items/rows/records/events/actions/findings, choose "
                     "PARENT_WITH_NESTED_LIST. If more than one repeated child "
-                    "collection is requested, choose the most central one and "
-                    "explain the limitation in reasoning.\n\n"
+                    "collection is requested, list ALL of them in "
+                    "child_containers — there is no limit.\n\n"
                     "Requirements:\n```txt\n" + user_description + "\n```"
                 ),
             },
@@ -378,32 +413,32 @@ def _ensure_no_list_dict_fields(requirements: ExtractionRequirements, *, context
 def _create_parent_with_nested_list_model(
     *,
     parent_requirements: ExtractionRequirements,
-    child_requirements: ExtractionRequirements,
-    child_container_name: str,
-    child_container_description: str,
+    children: list[ChildRequirements],
 ) -> type[BaseModel]:
     ParentFieldsModel = create_extraction_model(parent_requirements)  # noqa: N806
-    ChildModel = create_extraction_model(child_requirements)  # noqa: N806
 
     combined_fields = {
         name: (finfo.annotation, finfo)
         for name, finfo in ParentFieldsModel.model_fields.items()
     }
-    combined_fields[child_container_name] = (
-        list[ChildModel],
-        Field(description=child_container_description),
-    )
+    for child in children:
+        ChildModel = create_extraction_model(child.requirements)  # noqa: N806
+        combined_fields[child.container_name] = (
+            list[ChildModel],
+            Field(description=child.container_description),
+        )
 
     suffix = "_Extraction"
     base_name = sanitize_model_name(parent_requirements.use_case_name, suffix=suffix)
     model_name = base_name + suffix
+    child_names = ", ".join(c.container_name for c in children)
 
     return create_model(  # noqa: N806
         model_name,
         __config__=ConfigDict(extra="forbid"),
         __doc__=(
             f"Extraction model for {parent_requirements.use_case_name} "
-            f"with repeated {child_container_name}"
+            f"with repeated {child_names}"
         ),
         **combined_fields,
     )
@@ -475,57 +510,66 @@ def parse_nested_requirements(
             _usage_sink=_usage_sink,
         )
 
-        print("\nParsing child row fields...")
-        _child_task = (
-            "From the requirements below, parse only the fields for each repeated "
-            "row or item. Treat every field as a scalar value. "
-            "Ignore any once-per-document, header, or summary fields.\n\n"
-            + user_description
-        )
-        child_requirements = parse_user_requirements(
-            _child_task,
-            client=client,
-            model=model,
-            _usage_sink=_usage_sink,
-            parse_mode="repeated_item",
-        )
         _ensure_no_list_dict_fields(
             parent_requirements,
             context="Parent requirements for parent_with_nested_list",
         )
-        _ensure_no_list_dict_fields(
-            child_requirements,
-            context="Child requirements for parent_with_nested_list",
-        )
 
-        child_container_name = _sanitize_field_name(
-            analysis.child_container_name or analysis.parent_container_name,
-            fallback="records",
-        )
-        child_container_description = (
-            analysis.child_container_description
-            or analysis.parent_description
-            or f"Repeated {child_container_name} records"
-        )
+        # Resolve child containers — use child_containers list if populated,
+        # fall back to legacy single-child fields for backward compatibility.
+        raw_containers = list(analysis.child_containers)
+        if not raw_containers:
+            raw_containers = [
+                ChildContainerSpec(
+                    container_name=analysis.child_container_name or analysis.parent_container_name or "records",
+                    container_description=analysis.child_container_description or analysis.parent_description or "",
+                )
+            ]
+
+        children: list[ChildRequirements] = []
+        for spec in raw_containers:
+            cname = _sanitize_field_name(spec.container_name, fallback="records")
+            cdesc = spec.container_description or f"Repeated {cname} records"
+            print(f"\nParsing child fields for '{cname}'...")
+            _child_task = (
+                f"From the requirements below, parse only the fields for each repeated "
+                f"{cname.replace('_', ' ')} record. "
+                "Treat every field as a scalar value. "
+                "Ignore any once-per-document, header, or summary fields. "
+                "Ignore any other repeated sections not related to this collection.\n\n"
+                + user_description
+            )
+            child_req = parse_user_requirements(
+                _child_task,
+                client=client,
+                model=model,
+                _usage_sink=_usage_sink,
+                parse_mode="repeated_item",
+            )
+            _ensure_no_list_dict_fields(
+                child_req, context=f"Child requirements for '{cname}'"
+            )
+            print(f"  Fields: {[f.field_name for f in child_req.fields]}")
+            children.append(ChildRequirements(
+                container_name=cname,
+                container_description=cdesc,
+                requirements=child_req,
+            ))
 
         print(f"Identified parent fields: {[f.field_name for f in parent_requirements.fields]}")
-        print(f"Identified child fields: {[f.field_name for f in child_requirements.fields]}")
 
         print("\nCreating parent-with-nested-list Pydantic model...")
         extraction_model = _create_parent_with_nested_list_model(
             parent_requirements=parent_requirements,
-            child_requirements=child_requirements,
-            child_container_name=child_container_name,
-            child_container_description=child_container_description,
+            children=children,
         )
         composite_requirements = CompositeExtractionRequirements(
             parent_requirements=parent_requirements,
-            child_container_name=child_container_name,
-            child_requirements=child_requirements,
+            children=children,
         )
 
         print(f"Created combined model: {extraction_model.__name__}")
-        print(f"Child container field: '{child_container_name}'")
+        print(f"Child container fields: {[c.container_name for c in children]}")
 
         return extraction_model, composite_requirements, analysis
 

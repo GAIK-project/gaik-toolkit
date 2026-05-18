@@ -1,8 +1,8 @@
 Extract purchase order data.
 
 The output will include the following top-level fields:
-- Purchase order date (Output format: DD-MM-YYYY, only if the source format is unambiguous; otherwise, output the source format)
-- Delivery date (Use format: DD-MM-YYYY, only if the source format is unambiguous; otherwise, output the source format)
+- Purchase order date (DD/MM/YYYY format when unambiguous)
+- Delivery date (DD/MM/YYYY format when unambiguous)
 - Purchase order number (separated by a dash after every 4 digits)
 - Supplier number
 - Shipping address (Format: company name, street number, postal code, city, country)

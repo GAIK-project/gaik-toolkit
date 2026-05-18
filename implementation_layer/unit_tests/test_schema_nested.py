@@ -495,3 +495,217 @@ class TestFlatEmployee:
         assert field_map["employee_id"].field_type == "str", (
             f"employee_id should be str (text string), got {field_map['employee_id'].field_type}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Task 7 (provided) — parent_with_nested_list, construction blueprint
+# Taken from schema_generation_example.py (active task)
+# ---------------------------------------------------------------------------
+
+TASK_BLUEPRINT = """
+Extract compliance-relevant information from the construction blueprint.
+
+Top-level fields:
+- Project address
+- Drawing title
+- Drawing number
+- Sheet number
+- Project number
+- Scale
+- Drawing date
+- Owner
+- Architect
+- General contractor
+- Surveyor
+
+For each compliance-relevant item visible in the blueprint, extract:
+- Item type (General note, Revision, Dimension, Elevation reference, Legend/material reference, Drawing view, Grid line, Section callout, Other)
+- Label or number
+- Exact text or value
+- Related drawing element or location
+- Compliance relevance (Dimensions, Structural reference, Utilities/fixtures, Survey/benchmarks, Specifications, Safety/compliance, Revision control, Material reference, Other)
+
+Rules:
+- Extract only explicitly visible information.
+- Preserve original wording, dimensions, dates, and labels.
+"""
+
+
+@pytest.fixture(scope="module")
+def blueprint_schema():
+    return parse_nested_requirements(TASK_BLUEPRINT)
+
+
+class TestParentWithNestedListBlueprint:
+    """Construction blueprint — single child list under a large header."""
+
+    def test_structure_type(self, blueprint_schema):
+        _, _, analysis = blueprint_schema
+        assert analysis.structure_type == "parent_with_nested_list", (
+            f"Expected parent_with_nested_list, got {analysis.structure_type}"
+        )
+
+    def test_parent_has_header_fields(self, blueprint_schema):
+        _, composite, _ = blueprint_schema
+        parent_names = {f.field_name for f in composite.parent_requirements.fields}
+        expected = {"project_address", "drawing_title", "drawing_number"}
+        missing = expected - parent_names
+        assert not missing, f"Parent missing header fields: {missing}"
+
+    def test_parent_has_no_list_dict(self, blueprint_schema):
+        _, composite, _ = blueprint_schema
+        bad = [f.field_name for f in composite.parent_requirements.fields if f.field_type == "list[dict]"]
+        assert not bad, f"Parent should have no list[dict] fields: {bad}"
+
+    def test_child_has_no_list_dict(self, blueprint_schema):
+        _, composite, _ = blueprint_schema
+        for child in composite.children:
+            bad = [f.field_name for f in child.requirements.fields if f.field_type == "list[dict]"]
+            assert not bad, f"Child '{child.container_name}' has list[dict] fields: {bad}"
+
+    def test_item_type_has_enum(self, blueprint_schema):
+        _, composite, _ = blueprint_schema
+        for child in composite.children:
+            field_map = {f.field_name: f for f in child.requirements.fields}
+            if "item_type" in field_map:
+                assert field_map["item_type"].enum, "item_type should have enum values"
+                assert "General note" in field_map["item_type"].enum or any(
+                    "note" in v.lower() for v in field_map["item_type"].enum
+                ), f"item_type enum missing 'General note', got: {field_map['item_type'].enum}"
+                return
+        pytest.fail("item_type field not found in any child model")
+
+    def test_compliance_relevance_has_enum(self, blueprint_schema):
+        _, composite, _ = blueprint_schema
+        for child in composite.children:
+            field_map = {f.field_name: f for f in child.requirements.fields}
+            for fname, fspec in field_map.items():
+                if "compliance" in fname and fspec.enum:
+                    assert len(fspec.enum) >= 2, "compliance_relevance enum should have multiple values"
+                    return
+        pytest.fail("No enum field for compliance relevance found in any child model")
+
+
+# ---------------------------------------------------------------------------
+# Task 8 (custom) — parent_with_nested_list, multiple child collections
+# Tests the new multi-child capability
+# ---------------------------------------------------------------------------
+
+TASK_MULTI_CHILD = """
+Extract information from the project status report.
+
+Header fields:
+- Report title
+- Report date (DD/MM/YYYY)
+- Project name
+- Project manager
+
+For each action item:
+- Action description
+- Owner
+- Due date (DD/MM/YYYY)
+- Status (Open, In Progress, Completed, Cancelled)
+
+For each identified risk:
+- Risk description
+- Likelihood (Low, Medium, High)
+- Impact (Low, Medium, High)
+- Mitigation
+"""
+
+
+@pytest.fixture(scope="module")
+def multi_child_schema():
+    return parse_nested_requirements(TASK_MULTI_CHILD)
+
+
+class TestParentWithMultipleNestedLists:
+    """Project status report — two distinct child collections under one parent."""
+
+    def test_structure_type(self, multi_child_schema):
+        _, _, analysis = multi_child_schema
+        assert analysis.structure_type == "parent_with_nested_list", (
+            f"Expected parent_with_nested_list, got {analysis.structure_type}"
+        )
+
+    def test_has_multiple_child_containers(self, multi_child_schema):
+        _, composite, _ = multi_child_schema
+        assert len(composite.children) >= 2, (
+            f"Expected at least 2 child containers, got {len(composite.children)}: "
+            f"{[c.container_name for c in composite.children]}"
+        )
+
+    def test_parent_has_header_fields_only(self, multi_child_schema):
+        _, composite, _ = multi_child_schema
+        parent_names = {f.field_name for f in composite.parent_requirements.fields}
+        child_all_names = {
+            f.field_name
+            for child in composite.children
+            for f in child.requirements.fields
+        }
+        overlap = parent_names & child_all_names
+        assert not overlap, f"Parent and child share fields: {overlap}"
+
+    def test_parent_has_no_list_dict(self, multi_child_schema):
+        _, composite, _ = multi_child_schema
+        bad = [f.field_name for f in composite.parent_requirements.fields if f.field_type == "list[dict]"]
+        assert not bad, f"Parent should have no list[dict] fields: {bad}"
+
+    def test_no_child_has_list_dict(self, multi_child_schema):
+        _, composite, _ = multi_child_schema
+        for child in composite.children:
+            bad = [f.field_name for f in child.requirements.fields if f.field_type == "list[dict]"]
+            assert not bad, f"Child '{child.container_name}' has list[dict] fields: {bad}"
+
+    def test_child_fields_do_not_cross_contaminate(self, multi_child_schema):
+        """Fields from one child section must not appear in another child model."""
+        _, composite, _ = multi_child_schema
+        if len(composite.children) < 2:
+            pytest.skip("Needs at least 2 children")
+        all_field_sets = [
+            {f.field_name for f in child.requirements.fields}
+            for child in composite.children
+        ]
+        for i, names_i in enumerate(all_field_sets):
+            for j, names_j in enumerate(all_field_sets):
+                if i >= j:
+                    continue
+                overlap = names_i & names_j
+                assert not overlap, (
+                    f"Child '{composite.children[i].container_name}' and "
+                    f"'{composite.children[j].container_name}' share fields: {overlap}"
+                )
+
+    def test_action_item_status_has_enum(self, multi_child_schema):
+        _, composite, _ = multi_child_schema
+        for child in composite.children:
+            field_map = {f.field_name: f for f in child.requirements.fields}
+            if "status" in field_map and field_map["status"].enum:
+                enum_vals = field_map["status"].enum
+                assert any("Open" in v or "open" in v.lower() for v in enum_vals), (
+                    f"status enum missing 'Open', got: {enum_vals}"
+                )
+                return
+        pytest.fail("No status enum field found in any child model")
+
+    def test_risk_likelihood_has_enum(self, multi_child_schema):
+        _, composite, _ = multi_child_schema
+        for child in composite.children:
+            field_map = {f.field_name: f for f in child.requirements.fields}
+            if "likelihood" in field_map:
+                assert field_map["likelihood"].enum, "likelihood should have enum values"
+                assert any("Low" in v or "low" in v.lower() for v in field_map["likelihood"].enum), (
+                    f"likelihood enum missing 'Low', got: {field_map['likelihood'].enum}"
+                )
+                return
+        pytest.fail("likelihood field not found in any child model")
+
+    def test_pydantic_model_has_multiple_list_fields(self, multi_child_schema):
+        extraction_model, composite, _ = multi_child_schema
+        list_fields = [
+            name for name, finfo in extraction_model.model_fields.items()
+            if get_origin(finfo.annotation) is list
+        ]
+        assert len(list_fields) >= 2, (
+            f"Parent model should have at least 2 list fields, got: {list_fields}"
+        )

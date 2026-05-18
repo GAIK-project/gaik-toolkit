@@ -70,8 +70,8 @@ def run_case(label: str, file_paths: list[Path], task: str, schema_dir: Path) ->
     extractor = VisionExtractor(
         # --- Provider selection ---
         model_provider="openai",       # "openai" | "claude" | "google"
-        use_azure=True,                # True = Azure OpenAI, False = OpenAI direct
-        vertex_ai=True,                # True = Google Vertex AI, False = Gemini direct (google only)
+        use_azure=False,                # True = Azure OpenAI, False = OpenAI direct
+        vertex_ai=False,                # True = Google Vertex AI, False = Gemini direct (google only)
 
         # --- Model ---
         model="gpt-5.4-mini",    # None = use model from config/.env; e.g., gemini-3.1-flash-lite

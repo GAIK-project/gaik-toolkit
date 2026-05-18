@@ -43,6 +43,28 @@ For each line item, extract:
 - Quantity (text string including the unit, e.g. "8.600 kg")
 """
 
+# task = """
+# Extract the following set of key fields from the construction blueprint.
+
+# - Project address
+# - Drawing title
+# - Drawing number (drawing identifier, such as B-354)
+# - Sheet number
+# - Project number
+# - Drawing scale
+# - Drawing date (Format: DD/MM/YYYY)
+# - Drawing type (Foundation plan, Floor plan, Section detail, Site plan, Other)
+# - Drawing status (Issued for review, Issued for construction, Revised, Other)
+# - Primary drawing element (Foundation wall, Concrete slab, Footing, Lower level, Other)
+# - Total foundation width 
+# - Total foundation depth 
+# - Lower level elevation
+# - Top of wall elevation
+# - Slab thickness 
+# - Footing width 
+
+# Note: For all dimensions, the format should be a text string showing numbers with units, e.g., 100'-0"
+# """
 
 t_start = time.perf_counter()
 extractor = VisionExtractor(
