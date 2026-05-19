@@ -1,0 +1,82 @@
+{
+  "project_address": {
+    "value": "4821 Maple Ridge Drive, Cedar Falls, IA 50613",
+    "confidence_score": 0.99,
+    "confidence_reason": "Project address is explicitly shown in the title block."
+  },
+  "drawing_title": {
+    "value": "FOUNDATION PLAN, DIMENSIONS & DETAILS - LOWER LEVEL",
+    "confidence_score": 0.99,
+    "confidence_reason": "Drawing title is explicitly shown in the title block."
+  },
+  "drawing_number": {
+    "value": "A-201",
+    "confidence_score": 1.0,
+    "confidence_reason": "Drawing number is explicitly shown as A-201 in the title block."
+  },
+  "sheet_number": {
+    "value": "04 OF 18",
+    "confidence_score": 0.97,
+    "confidence_reason": "Sheet number is explicitly shown at the bottom right as 04 OF 18."
+  },
+  "project_number": {
+    "value": "PR-24087",
+    "confidence_score": 0.99,
+    "confidence_reason": "Project number is explicitly shown in the title block."
+  },
+  "drawing_scale": {
+    "value": "1\" = 10'-0\"",
+    "confidence_score": 0.99,
+    "confidence_reason": "Scale is explicitly shown in the title block."
+  },
+  "drawing_date": {
+    "value": "22/04/2026",
+    "confidence_score": 0.95,
+    "confidence_reason": "Date is explicitly shown in the title block and normalized to DD/MM/YYYY format."
+  },
+  "drawing_type": {
+    "value": "Foundation plan",
+    "confidence_score": 0.97,
+    "confidence_reason": "The sheet is labeled as a foundation plan in the title block."
+  },
+  "drawing_status": {
+    "value": "Issued for construction",
+    "confidence_score": 0.88,
+    "confidence_reason": "The latest revision table entry is marked ISSUED FOR CONSTRUCTION, which indicates the current drawing status."
+  },
+  "primary_drawing_element": {
+    "value": "Lower level",
+    "confidence_score": 0.91,
+    "confidence_reason": "The main plan and details center on the lower level foundation layout, so Lower level is the primary element."
+  },
+  "total_foundation_width": {
+    "value": "56'-0\"",
+    "confidence_score": 0.98,
+    "confidence_reason": "Overall horizontal dimension is explicitly labeled 56'-0\" across the top of the plan."
+  },
+  "total_foundation_depth": {
+    "value": "40'-0\"",
+    "confidence_score": 0.98,
+    "confidence_reason": "Overall vertical dimension is explicitly labeled 40'-0\" on the left side of the plan."
+  },
+  "lower_level_elevation": {
+    "value": "100'-0\"",
+    "confidence_score": 0.99,
+    "confidence_reason": "Lower level elevation is explicitly labeled in the plan as EL. 100'-0\"."
+  },
+  "top_of_wall_elevation": {
+    "value": "109'-2\"",
+    "confidence_score": 0.98,
+    "confidence_reason": "Top of wall elevation is explicitly labeled in detail A as EL. 109'-2\"."
+  },
+  "slab_thickness": {
+    "value": "4\"",
+    "confidence_score": 0.95,
+    "confidence_reason": "The slab section note explicitly calls out a 4\" concrete slab."
+  },
+  "footing_width": {
+    "value": "24\"",
+    "confidence_score": 0.98,
+    "confidence_reason": "The wall section explicitly shows the footing width as 24\"."
+  }
+}
