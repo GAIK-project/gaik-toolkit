@@ -212,6 +212,13 @@ const buildingBlocks: Demo[] = [
     icon: Volume2,
   },
   {
+    title: "PostgreSQL Agent",
+    description:
+      "Ask a database questions in plain language — the agent writes and runs read-only SQL",
+    href: "/postgres-agent",
+    icon: Database,
+  },
+  {
     title: "Retriever",
     description: "Search and retrieve relevant documents from vector database",
     href: "#",

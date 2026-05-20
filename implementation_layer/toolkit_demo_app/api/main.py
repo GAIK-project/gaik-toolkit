@@ -38,6 +38,7 @@ try:
         luvata_order,
         parser,
         pipeline,
+        postgres_agent,
         rag,
         text_to_speech,
         transcriber,
@@ -54,6 +55,7 @@ except ImportError:
         luvata_order,
         parser,
         pipeline,
+        postgres_agent,
         rag,
         text_to_speech,
         transcriber,
@@ -114,6 +116,7 @@ app.include_router(transcriber.router, prefix="/transcribe", tags=["Transcriber"
 app.include_router(text_to_speech.router, prefix="/text-to-speech", tags=["Text-to-Speech"])
 app.include_router(pipeline.router, prefix="/pipeline", tags=["Pipeline"])
 app.include_router(rag.router, prefix="/rag", tags=["RAG"])
+app.include_router(postgres_agent.router, prefix="/postgres-agent", tags=["Postgres Agent"])
 app.include_router(diary.router, prefix="/diary", tags=["Diary"])
 app.include_router(
     dental_transcription.router,
@@ -148,6 +151,7 @@ async def root():
             "text-to-speech": "/text-to-speech - Text-to-speech audio generation",
             "pipeline": "/pipeline - End-to-end pipelines (audio/document to structured data)",
             "rag": "/rag - RAG pipeline (document indexing and Q&A with citations)",
+            "postgres-agent": "/postgres-agent - PostgreSQL text-to-SQL query agent",
             "diary": "/diary - Construction diary (Työmaapäiväkirja) workflow",
             "dental-transcribe": "/dental-transcribe - Dental transcription with SRT/VTT subtitles",
             "video-search": "/video-search - Semantic dental video search (pgvector)",
