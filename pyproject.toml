@@ -62,6 +62,12 @@ pg-vector-store = [
     "langchain-core>=0.2.0",
 ]
 
+# PostgreSQL text-to-SQL query agent (schema introspection + LLM-generated SQL)
+postgres-agent = [
+    "psycopg[binary]>=3.1",
+    "sqlglot>=25.0",
+]
+
 retriever = [
     "gaik[embedder]",
     "gaik[vector-store]",
@@ -226,6 +232,7 @@ all = [
     "gaik[embedder]",
     "gaik[vector-store]",
     "gaik[pg-vector-store]",
+    "gaik[postgres-agent]",
     "gaik[retriever]",
     "gaik[answer-generator]",
     "gaik[rag-workflow]",
@@ -270,6 +277,7 @@ all-cpu = [
     "gaik[audio-to-structured-data]",
     "gaik[documents-to-structured-data-cpu]",
     "gaik[pg-vector-store]",
+    "gaik[postgres-agent]",
     "gaik[rag-workflow]",
     "gaik[finnish-rag]",
     "gaik[evaluators]",

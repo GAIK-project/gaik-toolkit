@@ -72,3 +72,12 @@ def test_answer_generator_import():
     from gaik.software_components.RAG import answer_generator
 
     assert answer_generator is not None
+
+
+def test_postgres_agent_import():
+    """Test that postgres_agent module can be imported (requires psycopg + sqlglot)."""
+    pytest.importorskip("psycopg")
+    pytest.importorskip("sqlglot")
+    from gaik.software_components import postgres_agent
+
+    assert postgres_agent is not None

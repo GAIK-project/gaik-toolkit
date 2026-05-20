@@ -22,6 +22,9 @@ Generate spoken audio from text using OpenAI or Azure OpenAI TTS.
 ### [RAG Components](./RAG)
 Individual examples for each of the five RAG components: Parser, Embedder, Vector Store, Retriever, and Answer Generator.
 
+### [PostgreSQL Agent](./postgres_agent)
+Read-only text-to-SQL query agent. Ask a PostgreSQL database questions in natural language; the agent introspects the schema, generates validated read-only SQL, runs it, and answers.
+
 ## Getting Started
 
 1. Choose the component you want to explore

@@ -15,4 +15,5 @@ __all__ = [
     "RAG",
     "agents",
     "vision_extractor",
+    "postgres_agent",
 ]
