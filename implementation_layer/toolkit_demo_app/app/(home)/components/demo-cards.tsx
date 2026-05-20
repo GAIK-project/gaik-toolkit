@@ -35,7 +35,6 @@ import {
   ScanEye,
   Search,
   Volume2,
-  SearchCode,
   Sparkles,
   Users,
   Video,
@@ -223,13 +222,6 @@ const buildingBlocks: Demo[] = [
     description: "Search and retrieve relevant documents from vector database",
     href: "#",
     icon: Search,
-    comingSoon: true,
-  },
-  {
-    title: "Query Engine",
-    description: "Process queries and return answers with relevant context",
-    href: "#",
-    icon: SearchCode,
     comingSoon: true,
   },
   {
