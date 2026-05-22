@@ -31,7 +31,8 @@ Usage::
 
     # Full benchmark (50 rows, ~$0.20-0.30 with Gemini Flash)
     python implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py \
-        --n 50 --provider google --out results/judgebench-comparison/
+        --n 50 --provider google \
+        --out implementation_layer/examples/software_components/validators/judgebench-comparison/
 
 Provider env vars (only those for the chosen provider are required)::
 

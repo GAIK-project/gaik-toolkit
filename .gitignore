@@ -60,3 +60,7 @@ implementation_layer/src/gaik/_version.py
 
 # Word temp files
 ~$*.docx
+
+# Benchmark / demo run output at repo root (committed snapshots live next
+# to their example scripts, e.g. examples/.../judgebench-comparison/)
+/results/
