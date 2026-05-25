@@ -89,11 +89,51 @@ PostgresAgent(
     statement_timeout_ms: int = 10_000,
     table_allowlist: list[str] | None = None,
     schema_name: str = "public",
+    extra_instructions: str | None = None,   # appended to the SQL prompt
+    answer_language: str = "en",             # ISO 639-1 for the answer
 )
 ```
 
 `config` is only resolved on the first LLM call, so `get_schema()` and
 `run_sql()` work without LLM credentials.
+
+#### `extra_instructions`
+
+Free-form text appended to the SQL-generation user prompt under
+`Additional context:`. Use it to inject a domain glossary, naming conventions,
+or canonical question→SQL examples. The agent stays schema-agnostic; this is
+the hook for project-specific knowledge that lives outside the table/column
+names.
+
+```python
+extra = """
+Domain notes:
+- discount_percent is the customer discount in %, 0–100.
+- A "discount customer" has discount_percent > 0.
+
+Examples:
+Q: Which customers have a discount?
+SQL: SELECT customer_id, name, discount_percent
+     FROM customers WHERE discount_percent > 0;
+"""
+
+with PostgresAgent(dsn, extra_instructions=extra) as agent:
+    print(agent.ask("Which customers have a discount?").answer)
+```
+
+#### `answer_language`
+
+ISO 639-1 code (e.g. `"en"`, `"fi"`, `"sv"`, `"de"`, `"fr"`, `"es"`,
+`"no"`, `"da"`). The default `"en"` does not touch the answer prompt. Any
+other value appends `Reply in <language>.` to the answer-synthesis system
+prompt; unknown codes are passed through verbatim.
+
+This only affects the natural-language answer from `ask()` — the generated
+SQL is always SQL, regardless of language.
+
+See
+[postgres_agent_with_context_example.py](../../../../examples/software_components/postgres_agent/postgres_agent_with_context_example.py)
+for a complete example using both options.
 
 ### Methods
 

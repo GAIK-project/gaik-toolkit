@@ -63,6 +63,19 @@ _ANSWER_SYSTEM_PROMPT = (
     "data was found. Never invent data that is not in the result."
 )
 
+# Language code -> human-readable name for the answer-synthesis directive.
+# Codes not listed here are passed through as-is in the directive.
+_LANGUAGE_NAMES: dict[str, str] = {
+    "en": "English",
+    "fi": "Finnish",
+    "sv": "Swedish",
+    "de": "German",
+    "fr": "French",
+    "es": "Spanish",
+    "no": "Norwegian",
+    "da": "Danish",
+}
+
 
 def _redact(connection_string: str) -> str:
     """Mask the password in a connection string for safe logging."""
@@ -129,6 +142,12 @@ class PostgresAgent:
         statement_timeout_ms: Per-statement timeout (0 disables it).
         table_allowlist: When given, queries may only touch these tables.
         schema_name: The single schema the agent operates on.
+        extra_instructions: Optional free-form text appended to the SQL-generation
+            user prompt under "Additional context:". Use this for a domain glossary,
+            naming conventions, or example question→SQL pairs. The agent stays
+            schema-agnostic; this is the hook to inject project-specific knowledge.
+        answer_language: ISO 639-1 code (e.g. ``"en"``, ``"fi"``, ``"sv"``) for the
+            synthesized natural-language answer. Defaults to ``"en"``.
     """
 
     def __init__(
@@ -142,6 +161,8 @@ class PostgresAgent:
         statement_timeout_ms: int = 10_000,
         table_allowlist: list[str] | None = None,
         schema_name: str = "public",
+        extra_instructions: str | None = None,
+        answer_language: str = "en",
     ) -> None:
         if not connection_string or not connection_string.strip():
             raise ValueError("connection_string must be a non-empty PostgreSQL URI.")
@@ -156,6 +177,8 @@ class PostgresAgent:
         self.max_rows = max(1, max_rows)
         self.statement_timeout_ms = max(0, statement_timeout_ms)
         self.table_allowlist = list(table_allowlist) if table_allowlist else None
+        self.extra_instructions = extra_instructions.strip() if extra_instructions else None
+        self.answer_language = (answer_language or "en").strip().lower()
 
         self._config = config
         self._model = model
@@ -260,6 +283,8 @@ class PostgresAgent:
             f"{schema.to_prompt_text()}\n\n"
             f"Question: {question}"
         )
+        if self.extra_instructions:
+            user_prompt += f"\n\nAdditional context:\n{self.extra_instructions}"
         if error_context:
             user_prompt += f"\n\nThe previous attempt failed -- fix it.\n{error_context}"
         messages = [
@@ -386,6 +411,10 @@ class PostgresAgent:
     def _synthesize_answer(self, question: str, query_result: QueryResult) -> str:
         """Turn query rows into a concise natural-language answer."""
         client = self._get_llm_client()
+        system_prompt = _ANSWER_SYSTEM_PROMPT
+        if self.answer_language != "en":
+            language = _LANGUAGE_NAMES.get(self.answer_language, self.answer_language)
+            system_prompt += f" Reply in {language}."
         user_prompt = (
             f"Question: {question}\n\n"
             f"SQL query used:\n{query_result.sql}\n\n"
@@ -393,7 +422,7 @@ class PostgresAgent:
             f"{_format_rows_for_prompt(query_result.rows)}"
         )
         messages = [
-            {"role": "system", "content": _ANSWER_SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
 
