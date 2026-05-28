@@ -1,13 +1,12 @@
 """Unit tests for the postgres_agent extra_instructions / answer_language hooks.
 
 These exercise the prompt-construction paths without touching a real database or
-a real LLM provider. Both the database connection and the LLM client are
-replaced with simple stubs that capture the prompts they receive.
+a real LLM provider. The LLM client is replaced with the shared
+``FakeProviderClient`` so the agent's ``isinstance(_, ProviderClient)``
+branch is exercised (see ``_pg_agent_fake_client.py`` for the why).
 """
 
 from __future__ import annotations
-
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -25,16 +24,12 @@ from gaik.software_components.postgres_agent.models import (  # noqa: E402
     TableInfo,
 )
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+from ._pg_agent_fake_client import FakeProviderClient  # noqa: E402
 
 
 def _make_agent(**kwargs) -> PostgresAgent:
     """Build a PostgresAgent without opening a real DB connection."""
     agent = PostgresAgent("postgresql://stub:stub@localhost:1/stub", **kwargs)
-    # Replace the schema cache so get_schema() does not hit psycopg.
     agent._schema = SchemaInfo(
         schema_name=agent.schema_name,
         tables=[
@@ -46,38 +41,24 @@ def _make_agent(**kwargs) -> PostgresAgent:
 
 
 def _stub_llm_for_sql(agent: PostgresAgent, captured: dict) -> None:
-    """Stub the ProviderClient.chat_parsed path so generate_sql records its prompt.
+    """Record the messages passed to chat_parsed; always return canned SQL."""
 
-    MagicMock satisfies the ``@runtime_checkable`` ProviderClient protocol via
-    duck typing, so the agent takes the ProviderClient branch — we stub
-    ``chat_parsed`` (which returns the parsed BaseModel directly).
-    """
-
-    def fake_chat_parsed(**kwargs):
+    def fake(**kwargs):
         captured["messages"] = kwargs["messages"]
         return GeneratedSQL(sql="SELECT 1", reasoning="stub")
 
-    client = MagicMock()
-    # Protocol attributes (silence Mock-auto-truthiness corner cases).
-    client.provider = "stub"
-    client.model = "stub-model"
-    client.chat_parsed.side_effect = fake_chat_parsed
-    agent._llm_client = client
+    agent._llm_client = FakeProviderClient(chat_parsed_impl=fake)
     agent._model = "stub-model"
 
 
 def _stub_llm_for_answer(agent: PostgresAgent, captured: dict) -> None:
-    """Stub the ProviderClient.chat path so _synthesize_answer records its prompt."""
+    """Record the messages passed to chat; always return a canned answer."""
 
-    def fake_chat(**kwargs):
+    def fake(**kwargs):
         captured["messages"] = kwargs["messages"]
         return ChatResponse(text="stub answer", model="stub-model", provider="stub")
 
-    client = MagicMock()
-    client.provider = "stub"
-    client.model = "stub-model"
-    client.chat.side_effect = fake_chat
-    agent._llm_client = client
+    agent._llm_client = FakeProviderClient(chat_impl=fake)
     agent._model = "stub-model"
 
 

@@ -8,22 +8,15 @@ then bail, instead of burning the full ``max_retries`` budget.
 
 from __future__ import annotations
 
-from typing import Any, Iterator
 from unittest.mock import MagicMock
 
 import pytest
-from pydantic import BaseModel
 
 pytest.importorskip("psycopg")
 pytest.importorskip("sqlglot")
 
 import psycopg  # noqa: E402
 
-from gaik.software_components.llm.base import (  # noqa: E402
-    ChatMessage,
-    ChatResponse,
-    ProviderClient,
-)
 from gaik.software_components.postgres_agent.agent import (  # noqa: E402
     PostgresAgent,
 )
@@ -33,46 +26,7 @@ from gaik.software_components.postgres_agent.models import (  # noqa: E402
     TableInfo,
 )
 
-
-class FakeProviderClient:
-    """Explicit ProviderClient implementation for stubbing.
-
-    A plain MagicMock no longer satisfies ``isinstance(_, ProviderClient)``
-    on Python 3.12+ (runtime_checkable Protocols now inspect class
-    attributes, not just method names), so tests need a concrete
-    implementation.
-    """
-
-    provider: str = "stub"
-    model: str = "stub-model"
-    raw: Any = None
-
-    def __init__(self, chat_parsed_impl=None, chat_impl=None) -> None:
-        self._chat_parsed = chat_parsed_impl or (
-            lambda **_: GeneratedSQL(sql="SELECT 1", reasoning="stub")
-        )
-        self._chat = chat_impl or (
-            lambda **_: ChatResponse(text="stub", model=self.model, provider=self.provider)
-        )
-
-    def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
-        return self._chat(messages=messages, **kwargs)
-
-    def chat_parsed(
-        self,
-        messages: list[ChatMessage],
-        response_format: type[BaseModel],
-        **kwargs: Any,
-    ) -> BaseModel:
-        return self._chat_parsed(messages=messages, response_format=response_format, **kwargs)
-
-    def chat_stream(
-        self, messages: list[ChatMessage], **kwargs: Any
-    ) -> Iterator[str]:
-        yield "stub"
-
-    def embed(self, texts: list[str], **kwargs: Any) -> list[list[float]]:
-        return [[0.0] for _ in texts]
+from ._pg_agent_fake_client import FakeProviderClient  # noqa: E402
 
 
 def _make_agent(**kwargs) -> PostgresAgent:
@@ -91,9 +45,7 @@ def _stub_llm_returns_sql(agent: PostgresAgent, sql: str, captured: dict) -> Non
         captured.setdefault("calls", []).append(kwargs["messages"])
         return GeneratedSQL(sql=sql, reasoning="stub")
 
-    client = FakeProviderClient(chat_parsed_impl=fake)
-    assert isinstance(client, ProviderClient)  # sanity
-    agent._llm_client = client
+    agent._llm_client = FakeProviderClient(chat_parsed_impl=fake)
     agent._model = "stub-model"
 
 
@@ -180,8 +132,7 @@ def test_query_succeeds_after_timeout_rewrite():
         sql = sql_to_return.pop(0)
         return GeneratedSQL(sql=sql, reasoning="stub")
 
-    client = FakeProviderClient(chat_parsed_impl=fake)
-    agent._llm_client = client
+    agent._llm_client = FakeProviderClient(chat_parsed_impl=fake)
     agent._model = "stub-model"
 
     cursor = MagicMock()
