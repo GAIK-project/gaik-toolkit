@@ -92,6 +92,7 @@ def _with_retries(call: Any, *, tries: int = 4) -> Any:
             if attempt == tries - 1:
                 raise
             time.sleep(2**attempt)
+    raise RuntimeError("_with_retries: loop terminated without return or raise")
 
 
 def _format_rows_for_prompt(rows: list[dict]) -> str:
@@ -365,6 +366,30 @@ class PostgresAgent:
                 result.error = str(exc)
                 error_context = f"The generated query was rejected as unsafe: {exc}"
                 continue
+            except psycopg.errors.QueryCanceled as exc:
+                # statement_timeout fired. Retrying the same logical query at
+                # the same scale will time out again, so give the LLM exactly
+                # one targeted shot at rewriting for performance, then bail.
+                # This keeps wall time bounded for the caller.
+                msg = str(exc).strip()
+                result.error = msg
+                if attempt == 1:
+                    error_context = (
+                        f"PostgreSQL canceled the query after "
+                        f"{self.statement_timeout_ms} ms (statement_timeout). "
+                        f"Failed SQL:\n{result.sql}\n\n"
+                        "Rewrite the query to do less work: prefer EXISTS over "
+                        "correlated subqueries, narrow the date range, drop "
+                        "unused JOINs, push filters into derived tables, or "
+                        "remove ORDER BY on un-indexed columns. Do NOT resubmit "
+                        "the same query."
+                    )
+                    continue
+                logger.warning(
+                    "PostgresAgent.query bailed on QueryCanceled after attempt %d",
+                    attempt,
+                )
+                return result
             except psycopg.Error as exc:
                 result.error = str(exc).strip()
                 error_context = (
@@ -378,7 +403,7 @@ class PostgresAgent:
             result.error = None
             return result
 
-        logger.info(
+        logger.warning(
             "PostgresAgent.query failed after %d attempt(s): %s",
             result.attempts,
             result.error,
