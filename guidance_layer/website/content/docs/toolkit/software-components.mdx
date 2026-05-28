@@ -64,7 +64,7 @@ flowchart LR
 
 ### Document Parser
 
-The Document Parser converts PDF, DOCX, and other file types into clean, structured markdown text. It offers two parsing strategies: a vision-based parser that uses GPT to interpret page layouts, tables, and visual structure; and local parsers (PyMuPDF, Docling) that process documents without API calls. The parsed markdown output preserves tables, headings, and multi-page structure, making it a reliable input for downstream extraction or indexing.
+The Document Parser converts PDF, DOCX, and other file types into clean, structured markdown text. The package ships **six parser variants** so you can match accuracy, cost, and infrastructure needs: vision-based parsing (GPT, Claude, or Gemini), local parsing (PyMuPDF, Docling), a Docling + vision hybrid that returns markdown plus metadata, and a remote Docling API client. The parsed markdown output preserves tables, headings, and multi-page structure, making it a reliable input for downstream extraction or indexing.
 
 <Mermaid chart={`
 flowchart LR
@@ -72,8 +72,9 @@ flowchart LR
 
     subgraph B["Document Parser"]
         direction TB
-        V["Vision Parser<br/>GPT-based layout parsing"]
-        L["Local Parser<br/>PyMuPDF / Docling"]
+        V["Vision Parsers<br/>VisionParser · MultimodalParser"]
+        L["Local Parsers<br/>PyMuPDF · DocxParser · Docling"]
+        H["Hybrid / Remote<br/>VisionPlusParser · DoclingApiClient"]
     end
 
     B --> C("📝 Markdown Text<br/>Tables & structure preserved")
@@ -83,8 +84,20 @@ flowchart LR
     style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 `} />
 
+**Parser variants:**
+
+| Parser | When to use |
+|--------|-------------|
+| `VisionParser` | Single-provider (OpenAI / Azure) vision parsing — page images → markdown |
+| `MultimodalParser` | Multi-provider PDF → markdown (OpenAI · Anthropic Claude · Google Gemini) with one API |
+| `PyMuPDFParser` | Fast local PDF text extraction, no API calls, lowest cost |
+| `DocxParser` | Local Word document (`.docx` / `.doc`) extraction via `python-docx` |
+| `DoclingParser` | Advanced local parsing with OCR, table extraction, multi-format support |
+| `VisionPlusParser` | Docling + vision hybrid that returns markdown **and** metadata in one pass |
+| `DoclingApiClientParser` | Remote client for a hosted Docling parsing service |
+
 **Key features:**
-- Vision-based and local parsing options to suit different accuracy and cost requirements
+- Six parsers covering local, vision, hybrid, and remote-service strategies
 - Preserves tables, headings, and document structure in markdown output
 - Multi-page processing with consistent formatting
 - Suitable for both simple forms and complex, visually rich documents
