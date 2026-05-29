@@ -90,7 +90,7 @@ See [Installation Reference](references/installation.md) for all available extra
 ```bash
 AZURE_API_KEY=your-key
 AZURE_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_DEPLOYMENT=gpt-5.1
+AZURE_DEPLOYMENT=gpt-5.4
 AZURE_API_VERSION=2025-03-01-preview
 ```
 
@@ -98,7 +98,7 @@ AZURE_API_VERSION=2025-03-01-preview
 
 ```bash
 OPENAI_API_KEY=your-key
-OPENAI_MODEL=gpt-5.1
+OPENAI_MODEL=gpt-5.4
 ```
 
 ## Configuration Pattern

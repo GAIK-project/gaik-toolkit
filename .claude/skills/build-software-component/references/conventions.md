@@ -4,6 +4,18 @@ This reference captures the conventions every new GAIK software component must
 follow. These patterns are extracted from existing components like `doc_classifier`,
 `enhance_transcript`, `extractor`, `transcriber`, and `parsers`.
 
+## Contents
+
+- Directory layout
+- `__init__.py` pattern
+- Main class constructor pattern
+- Result dataclass pattern
+- Shared config rule
+- `pyproject.toml` extras
+- Parent namespace `__init__.py`
+- When to pick nested vs top-level
+- Examples directory
+
 ## Directory layout
 
 A software component lives at

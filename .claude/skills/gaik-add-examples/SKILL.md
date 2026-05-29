@@ -13,6 +13,7 @@ description: >-
   BatchEvaluationRunner), form_understander, observability) and software_modules
   (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow). Not for creating a brand-new component
   package — use build-software-component for that.
+argument-hint: "[component name or feature to demonstrate]"
 ---
 
 # Add GAIK Examples

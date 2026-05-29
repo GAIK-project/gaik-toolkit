@@ -8,6 +8,9 @@ description: >-
   and verifies with import smoke tests. For the full release-ready flow
   (more examples, docs, demo app integration, PyPI release tag) delegates
   to the gaik-add-examples skill instead of duplicating that workflow.
+  Use when the user asks to create, build, or add a new GAIK software
+  component, wrap a library, or turn a codebase or API into a reusable
+  installable package.
 argument-hint: "[context: URLs, paths, PyPI package names, or description]"
 ---
 

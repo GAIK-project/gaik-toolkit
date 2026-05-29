@@ -3,7 +3,20 @@
 Literal templates for every file the skill creates or edits. Replace
 `{{PLACEHOLDER}}` markers with values from the approved plan.
 
-Placeholder reference:
+## Contents
+
+- Placeholder reference
+- Template 1 — `<component_name>/__init__.py`
+- Template 2 — `<component_name>/<component_name>.py` (LLM-based)
+- Template 3 — `<component_name>/<component_name>.py` (provider-agnostic)
+- Template 4 — `<component_name>/README.md`
+- Template 5 — Example file
+- Template 6 — `pyproject.toml` edit
+- Template 7 — `software_components/__init__.py` edit (top-level)
+- Template 8 — category `__init__.py` edit (nested)
+
+## Placeholder reference
+
 - `{{component_name}}` — snake_case directory/import name, e.g. `doc_classifier`.
 - `{{ComponentTitle}}` — human-readable title, e.g. `Document Classifier`.
 - `{{MainClassName}}` — PascalCase class name, e.g. `DocumentClassifier`.
