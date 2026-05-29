@@ -19,14 +19,21 @@
 #      oc login https://api.2.rahti.csc.fi:6443
 #   3. Select project:
 #      oc project gaik
-#   4. Login to container registry:
-#      oc registry login
+#   4. Login to container registry. The script will attempt this automatically
+#      via `docker login` using `oc whoami -t`. Manual fallback:
+#        Linux / WSL with podman or docker: `oc registry login`
+#        Windows + Docker Desktop (auth file lives in ~/.docker/, not
+#        ~/.config/containers/): pipe the oc token into docker directly:
+#          oc whoami -t | docker login -u "$(oc whoami)" \
+#            --password-stdin image-registry.apps.2.rahti.csc.fi
 #
 # =============================================================================
 set -e
 
 REGISTRY="image-registry.apps.2.rahti.csc.fi"
 PROJECT="gaik"
+API_DEPLOYMENT="gaik-demo-api"
+FRONTEND_DEPLOYMENT="gaik-demo"
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 DEMO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -69,14 +76,42 @@ check_docker() {
     fi
 }
 
+ensure_registry_login() {
+    # Docker on Windows/Mac (Docker Desktop) ignores `oc registry login` because
+    # that writes to ~/.config/containers/auth.json (podman's path). We pipe the
+    # OpenShift token straight into `docker login` so the credentials land in
+    # ~/.docker/config.json regardless of platform.
+    echo -e "${YELLOW}Authenticating Docker against $REGISTRY...${NC}"
+    if ! oc whoami -t | docker login -u "$(oc whoami)" --password-stdin "$REGISTRY" &> /dev/null; then
+        echo -e "${RED}Error: failed to log Docker into the Rahti registry${NC}"
+        echo "Manual recovery:"
+        echo "  oc whoami -t | docker login -u \"\$(oc whoami)\" --password-stdin $REGISTRY"
+        exit 1
+    fi
+}
+
+rollout_deployment() {
+    local deployment="$1"
+    # `:latest` images don't trigger a new rollout on their own — restart the
+    # deployment explicitly so the new image is pulled, then wait until it's
+    # actually healthy.
+    echo -e "${YELLOW}Rolling out deployment/$deployment...${NC}"
+    oc rollout restart "deployment/$deployment" -n "$PROJECT"
+    oc rollout status "deployment/$deployment" -n "$PROJECT" --timeout=240s
+}
+
 deploy_api() {
     echo -e "${YELLOW}Building API...${NC}"
     cd "$DEMO_DIR"
     docker build -t gaik-demo-api -f api/Dockerfile .
 
+    ensure_registry_login
+
     echo -e "${YELLOW}Tagging and pushing API...${NC}"
-    docker tag gaik-demo-api "$REGISTRY/$PROJECT/gaik-demo-api:latest"
-    docker push "$REGISTRY/$PROJECT/gaik-demo-api:latest"
+    docker tag gaik-demo-api "$REGISTRY/$PROJECT/$API_DEPLOYMENT:latest"
+    docker push "$REGISTRY/$PROJECT/$API_DEPLOYMENT:latest"
+
+    rollout_deployment "$API_DEPLOYMENT"
 
     echo -e "${GREEN}API deployed successfully${NC}"
 }
@@ -86,9 +121,13 @@ deploy_frontend() {
     cd "$DEMO_DIR"
     docker build -t gaik-demo .
 
+    ensure_registry_login
+
     echo -e "${YELLOW}Tagging and pushing frontend...${NC}"
-    docker tag gaik-demo "$REGISTRY/$PROJECT/gaik-demo:latest"
-    docker push "$REGISTRY/$PROJECT/gaik-demo:latest"
+    docker tag gaik-demo "$REGISTRY/$PROJECT/$FRONTEND_DEPLOYMENT:latest"
+    docker push "$REGISTRY/$PROJECT/$FRONTEND_DEPLOYMENT:latest"
+
+    rollout_deployment "$FRONTEND_DEPLOYMENT"
 
     echo -e "${GREEN}Frontend deployed successfully${NC}"
 }
@@ -160,7 +199,16 @@ case "$1" in
         verify_video_search
         ;;
     all)
-        deploy_db
+        # `all` is the common refresh path. Run db only when the password is
+        # provided AND the cluster doesn't already have pgvector-demo — DB is
+        # long-lived state, not part of every release.
+        if [ -n "${POSTGRESQL_PASSWORD:-}" ] && \
+           ! oc get deployment pgvector-demo -n "$PROJECT" &> /dev/null; then
+            deploy_db
+        else
+            echo -e "${YELLOW}Skipping db (already deployed or POSTGRESQL_PASSWORD unset).${NC}"
+            echo "  Run \`./deploy.sh db\` explicitly when you need to re-provision."
+        fi
         deploy_api
         deploy_frontend
         ;;
