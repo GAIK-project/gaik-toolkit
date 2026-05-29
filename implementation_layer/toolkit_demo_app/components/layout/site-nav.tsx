@@ -49,6 +49,7 @@ import {
   MessageSquare,
   Mic,
   Puzzle,
+  Scale,
   ScanEye,
   Search,
   ShieldAlert,
@@ -134,6 +135,7 @@ const navGroups: NavGroup[] = [
       { label: "Classifier", href: "/classifier", icon: Tags },
       { label: "Transcriber", href: "/transcriber", icon: Mic },
       { label: "Text-to-Speech", href: "/text-to-speech", icon: Volume2 },
+      { label: "LLM Judge", href: "/llm-judge", icon: Scale },
       {
         label: "PostgreSQL Agent",
         href: "/postgres-agent",

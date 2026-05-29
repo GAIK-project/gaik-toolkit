@@ -35,6 +35,7 @@ try:
         dental_transcription,
         diary,
         extractor,
+        llm_judge,
         luvata_order,
         parser,
         pipeline,
@@ -52,6 +53,7 @@ except ImportError:
         dental_transcription,
         diary,
         extractor,
+        llm_judge,
         luvata_order,
         parser,
         pipeline,
@@ -125,6 +127,7 @@ app.include_router(
 )
 app.include_router(video_search.router, prefix="/video-search", tags=["Video Search"])
 app.include_router(luvata_order.router, tags=["Luvata Order"])
+app.include_router(llm_judge.router, prefix="/llm-judge", tags=["LLM Judge"])
 
 
 @app.get("/health")
@@ -156,5 +159,6 @@ async def root():
             "dental-transcribe": "/dental-transcribe - Dental transcription with SRT/VTT subtitles",
             "video-search": "/video-search - Semantic dental video search (pgvector)",
             "luvata-order": "/luvata-order - Luvata ABB order processing with BOM matching",
+            "llm-judge": "/llm-judge - LLM-as-judge: text-pair, hallucinations, validate, panel",
         },
     }
