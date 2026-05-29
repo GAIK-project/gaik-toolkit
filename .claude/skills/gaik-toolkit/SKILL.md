@@ -213,7 +213,7 @@ All pipelines follow: `pipeline = Pipeline(use_azure=True)` → `result = pipeli
 
 ## Observability
 
-Token-usage, ajoaika ja providerikohtainen hinnoittelu kaikille LLM-kutsuille. Yhteinen `UsageRecord`-tyyppi varmistaa, että kaikki komponentit raportoivat saman muotoisen datan riippumatta providerista (OpenAI / Azure / Anthropic / Google).
+Token usage, execution time, and provider-specific pricing for all LLM calls. A shared `UsageRecord` type ensures all components report data in the same format regardless of provider (OpenAI / Azure / Anthropic / Google).
 
 ```python
 from gaik.observability import (
@@ -225,7 +225,7 @@ from gaik.observability import (
 )
 ```
 
-Käytä kun rakennat dashboardia, lokitusta tai compliance-pipelineä joka tarvitsee yhdenmukaisen kulu/aika-raportin yli providerien.
+Use when building a dashboard, logging pipeline, or compliance reporter that needs a unified cost/duration report across providers.
 
 ## Use Cases
 
