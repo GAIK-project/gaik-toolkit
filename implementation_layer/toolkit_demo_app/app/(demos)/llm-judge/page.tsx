@@ -56,11 +56,9 @@ import toast from "react-hot-toast";
 type Provider = "openai" | "azure" | "anthropic" | "google";
 
 // Demo on Rahtissa konfiguroitu vain Azure-tunnuksilla; muiden providereiden
-// valitseminen palauttaisi 503. Yksinkertaistetaan valikko ja viestitään
-// että ne vaativat extra-konfiguraatiota.
-const PROVIDER_OPTIONS: { value: Provider; label: string }[] = [
-  { value: "azure", label: "Azure OpenAI" },
-];
+// valitseminen palauttaisi 503. Kovakoodataan Azure ja viestitään muiden
+// vaativan extra-konfiguraatiota.
+const DEMO_PROVIDER: Provider = "azure";
 
 // Panel ajaa useampaa Azure-mallia rinnakkain — antaa kustannuksen ja
 // nopeuden välisen disagreement-signaalin myös ilman cross-provider-tunnuksia.
@@ -219,6 +217,42 @@ function RawJsonAccordion({ data, label = "Raw judge response" }: { data: unknow
   );
 }
 
+// Shared submit plumbing for the tabs: owns the abort controller, isLoading,
+// result state, and the standard AbortError / RateLimitError swallow. Each tab
+// keeps its own validation and request body via the `run(signal)` callback.
+function useJudgeSubmit<T>() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState<T | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  async function run(executor: (signal: AbortSignal) => Promise<T>) {
+    if (isLoading) return;
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    setIsLoading(true);
+    setResult(null);
+    try {
+      setResult(await executor(abortRef.current.signal));
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") return;
+      if (e instanceof RateLimitError) return;
+      toast.error(e instanceof Error ? e.message : "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return { isLoading, result, setResult, run };
+}
+
+// Extracts an error message from a !ok response, with a per-call fallback.
+async function readJudgeError(response: Response, fallback: string): Promise<string> {
+  const err = await response.json().catch(() => null);
+  return err?.detail ?? fallback;
+}
+
 // ─────────────────── Text-pair tab ───────────────────
 
 const TEXT_PAIR_PRESETS = [
@@ -248,24 +282,14 @@ function TextPairTab() {
   const [extracted, setExtracted] = useState("");
   const [expected, setExpected] = useState("");
   const [fieldName, setFieldName] = useState("");
-  const [provider] = useState<Provider>("azure");
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<TextPairResult | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => () => abortRef.current?.abort(), []);
+  const { isLoading, result, setResult, run } = useJudgeSubmit<TextPairResult>();
 
   async function handleSubmit() {
-    if (isLoading) return;
     if (!extracted.trim() || !expected.trim()) {
       toast.error("Please fill in both texts");
       return;
     }
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    setIsLoading(true);
-    setResult(null);
-    try {
+    await run(async (signal) => {
       const response = await apiFetch("/api/llm-judge/text-pair", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -273,24 +297,17 @@ function TextPairTab() {
           extracted_text: extracted,
           expected_text: expected,
           field_name: fieldName || undefined,
-          provider,
+          provider: DEMO_PROVIDER,
         }),
-        signal: abortRef.current.signal,
+        signal,
       });
       if (!response.ok) {
-        const err = await response.json().catch(() => null);
-        throw new Error(err?.detail ?? "Judge call failed");
+        throw new Error(await readJudgeError(response, "Judge call failed"));
       }
       const data = (await response.json()) as TextPairResult;
-      setResult(data);
-      posthog.capture("llm_judge_run", { tab: "text-pair", provider });
-    } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
-      if (e instanceof RateLimitError) return;
-      toast.error(e instanceof Error ? e.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
-    }
+      posthog.capture("llm_judge_run", { tab: "text-pair", provider: DEMO_PROVIDER });
+      return data;
+    });
   }
 
   return (
@@ -436,15 +453,9 @@ const HALLUCINATION_PRESET = {
 function HallucinationsTab() {
   const [sourceText, setSourceText] = useState("");
   const [extracted, setExtracted] = useState("");
-  const [provider] = useState<Provider>("azure");
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<HallucinationResult | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => () => abortRef.current?.abort(), []);
+  const { isLoading, result, setResult, run } = useJudgeSubmit<HallucinationResult>();
 
   async function handleSubmit() {
-    if (isLoading) return;
     if (!sourceText.trim()) {
       toast.error("Source text is required");
       return;
@@ -460,35 +471,24 @@ function HallucinationsTab() {
       toast.error("Extracted must be a JSON object");
       return;
     }
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    setIsLoading(true);
-    setResult(null);
-    try {
+    await run(async (signal) => {
       const response = await apiFetch("/api/llm-judge/hallucinations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           source_text: sourceText,
           extracted: parsed,
-          provider,
+          provider: DEMO_PROVIDER,
         }),
-        signal: abortRef.current.signal,
+        signal,
       });
       if (!response.ok) {
-        const err = await response.json().catch(() => null);
-        throw new Error(err?.detail ?? "Judge call failed");
+        throw new Error(await readJudgeError(response, "Judge call failed"));
       }
       const data = (await response.json()) as HallucinationResult;
-      setResult(data);
-      posthog.capture("llm_judge_run", { tab: "hallucinations", provider });
-    } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
-      if (e instanceof RateLimitError) return;
-      toast.error(e instanceof Error ? e.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
-    }
+      posthog.capture("llm_judge_run", { tab: "hallucinations", provider: DEMO_PROVIDER });
+      return data;
+    });
   }
 
   return (
@@ -652,16 +652,10 @@ function ValidatePdfTab() {
     JSON.stringify([{ field_name: "value" }], null, 2),
   );
   const [rubric, setRubric] = useState("");
-  const [provider] = useState<Provider>("azure");
   const [scoringMode, setScoringMode] = useState("likert_1_5");
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<ValidationResult | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => () => abortRef.current?.abort(), []);
+  const { isLoading, result, setResult, run } = useJudgeSubmit<ValidationResult>();
 
   async function handleSubmit() {
-    if (isLoading) return;
     if (!file) {
       toast.error("Please select a PDF first");
       return;
@@ -680,36 +674,25 @@ function ValidatePdfTab() {
         return;
       }
     }
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    setIsLoading(true);
-    setResult(null);
-    try {
+    await run(async (signal) => {
       const formData = new FormData();
       formData.append("pdf", file);
       formData.append("extracted", extracted);
       if (rubric.trim()) formData.append("rubric", rubric);
-      formData.append("provider", provider);
+      formData.append("provider", DEMO_PROVIDER);
       formData.append("scoring_mode", scoringMode);
       const response = await apiFetch("/api/llm-judge/validate", {
         method: "POST",
         body: formData,
-        signal: abortRef.current.signal,
+        signal,
       });
       if (!response.ok) {
-        const err = await response.json().catch(() => null);
-        throw new Error(err?.detail ?? "Validate call failed");
+        throw new Error(await readJudgeError(response, "Validate call failed"));
       }
       const data = (await response.json()) as ValidationResult;
-      setResult(data);
-      posthog.capture("llm_judge_run", { tab: "validate", provider });
-    } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
-      if (e instanceof RateLimitError) return;
-      toast.error(e instanceof Error ? e.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
-    }
+      posthog.capture("llm_judge_run", { tab: "validate", provider: DEMO_PROVIDER });
+      return data;
+    });
   }
 
   return (
@@ -919,23 +902,14 @@ function PanelTab() {
   const [extracted, setExtracted] = useState("");
   const [expected, setExpected] = useState("");
   const [fieldName, setFieldName] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<PanelResult | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => () => abortRef.current?.abort(), []);
+  const { isLoading, result, setResult, run } = useJudgeSubmit<PanelResult>();
 
   async function handleSubmit() {
-    if (isLoading) return;
     if (!extracted.trim() || !expected.trim()) {
       toast.error("Please fill in both texts");
       return;
     }
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    setIsLoading(true);
-    setResult(null);
-    try {
+    await run(async (signal) => {
       const response = await apiFetch("/api/llm-judge/panel/text-pair", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -948,9 +922,10 @@ function PanelTab() {
             model: j.model,
           })),
         }),
-        signal: abortRef.current.signal,
+        signal,
       });
       if (!response.ok) {
+        // Panel-vastauksen detail voi olla joko string tai { message, ... } -objekti.
         const err = await response.json().catch(() => null);
         const detail =
           typeof err?.detail === "string"
@@ -959,15 +934,9 @@ function PanelTab() {
         throw new Error(detail);
       }
       const data = (await response.json()) as PanelResult;
-      setResult(data);
       posthog.capture("llm_judge_run", { tab: "panel", provider: "panel" });
-    } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
-      if (e instanceof RateLimitError) return;
-      toast.error(e instanceof Error ? e.message : "An error occurred");
-    } finally {
-      setIsLoading(false);
-    }
+      return data;
+    });
   }
 
   return (

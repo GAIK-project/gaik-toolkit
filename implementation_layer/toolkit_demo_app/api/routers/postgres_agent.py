@@ -25,10 +25,6 @@ DEMO_TABLES = ["customers", "orders"]
 _seeded = False
 
 
-def _get_database_url() -> str | None:
-    return os.getenv("DATABASE_URL")
-
-
 def _llm_config() -> dict | None:
     """Return an Azure OpenAI config dict, or None when no API key is set."""
     from gaik.software_components.config import get_openai_config
@@ -99,7 +95,7 @@ def _seed_demo_schema(database_url: str) -> None:
 
 def _make_agent():
     """Build a fresh read-only PostgresAgent for the demo schema, or None."""
-    db_url = _get_database_url()
+    db_url = os.getenv("DATABASE_URL")
     if not db_url:
         return None
     _seed_demo_schema(db_url)
@@ -174,7 +170,7 @@ class StatusResponse(BaseModel):
 async def postgres_agent_status():
     """Report whether the demo database and LLM are configured."""
     return StatusResponse(
-        database_configured=_get_database_url() is not None,
+        database_configured=os.getenv("DATABASE_URL") is not None,
         llm_configured=bool(os.getenv("AZURE_API_KEY")),
         demo_schema=DEMO_SCHEMA,
         demo_tables=DEMO_TABLES,

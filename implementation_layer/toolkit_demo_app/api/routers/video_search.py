@@ -26,17 +26,13 @@ TABLE_NAME = "video_segments"
 FTS_LANGUAGE = "simple"
 
 
-def _get_database_url() -> str | None:
-    return os.getenv("DATABASE_URL")
-
-
 def _get_store():
     """Lazy-init PgVectorStore singleton."""
     global _store
     if _store is not None:
         return _store
 
-    db_url = _get_database_url()
+    db_url = os.getenv("DATABASE_URL")
     if not db_url:
         return None
 
