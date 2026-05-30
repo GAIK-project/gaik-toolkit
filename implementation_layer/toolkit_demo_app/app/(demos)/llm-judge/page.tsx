@@ -62,13 +62,25 @@ const DEMO_PROVIDER: Provider = "azure";
 
 // Panel ajaa useampaa Azure-mallia rinnakkain — antaa kustannuksen ja
 // nopeuden välisen disagreement-signaalin myös ilman cross-provider-tunnuksia.
+// Kolmas tuomari (gpt-5.1) on tarkoituksella eri sukupolvea, jotta paneeli ei
+// vain kopioi gpt-5.4-perheen vinoutumia.
 const PANEL_JUDGES: { provider: Provider; model: string; label: string }[] = [
   { provider: "azure", model: "gpt-5.4-mini", label: "gpt-5.4-mini" },
   { provider: "azure", model: "gpt-5.4", label: "gpt-5.4" },
+  { provider: "azure", model: "gpt-5.1", label: "gpt-5.1" },
 ];
 
 const JUDGE_DOCS_URL =
   "https://gaik-project.github.io/gaik-toolkit/toolkit/evals/llm-judge/";
+const JUDGE_BENCHMARK_DOCS_URL =
+  "https://gaik-project.github.io/gaik-toolkit/toolkit/evals/llm-judge-benchmark/";
+
+// Likert 1–5 ↔ severity mapping per gaik docs (1=wrong, 2-3=suspect, 4-5=ok).
+const LIKERT_GUIDE: { score: string; severity: Severity; label: string }[] = [
+  { score: "1", severity: "wrong", label: "Clearly wrong" },
+  { score: "2–3", severity: "suspect", label: "Suspect — review before confirming" },
+  { score: "4–5", severity: "ok", label: "Looks correct" },
+];
 
 interface Usage {
   provider?: string | null;
@@ -214,6 +226,29 @@ function RawJsonAccordion({ data, label = "Raw judge response" }: { data: unknow
         </AccordionContent>
       </AccordionItem>
     </Accordion>
+  );
+}
+
+// Compact Likert 1–5 ↔ severity guide. Surfaces the scoring rule the judge
+// uses so non-technical users can read result badges. Source: gaik docs.
+function ScoringGuide() {
+  return (
+    <div className="bg-muted/40 rounded-md border p-3 text-xs">
+      <p className="text-muted-foreground mb-2 font-medium">
+        How scoring works (Likert 1–5):
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {LIKERT_GUIDE.map((row) => (
+          <div key={row.score} className="flex items-center gap-1.5">
+            <Badge variant="secondary" className="font-mono">
+              {row.score}
+            </Badge>
+            <SeverityBadge severity={row.severity} />
+            <span className="text-muted-foreground">{row.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -883,25 +918,113 @@ function ValidatePdfTab() {
 
 // ─────────────────── Panel tab ───────────────────
 
-const PANEL_PRESETS = [
+interface PanelPreset {
+  label: string;
+  expected: string;
+  extracted: string;
+  fieldName: string;
+  hint: string;
+}
+
+const PANEL_PRESETS: PanelPreset[] = [
   {
     label: "Numeric mismatch",
     expected: "23",
     extracted: "23.3",
     fieldName: "quantity",
+    hint: "Easy: every judge should flag this as wrong (score 1/5).",
   },
   {
     label: "Paraphrase",
     expected: "The computer was not locked.",
     extracted: "Computer left unlocked at the workstation.",
     fieldName: "incident_summary",
+    hint: "Semantically equivalent — strict diff would fail, the judges shouldn't.",
+  },
+  {
+    label: "Subtle near-match",
+    expected:
+      "Maintenance technician arrived at 14:35 and replaced the worn bearing on the conveyor. Belt tension re-adjusted; line restarted at 15:10. Root cause logged as bearing wear.",
+    extracted:
+      "Maintenance technician arrived at 14:30 and replaced the worn bearing on the conveyor. Belt tension was re-adjusted and the line restarted at 15:10. Cause: bearing wear.",
+    fieldName: "maintenance_log_entry",
+    hint:
+      "Two factual differences (14:35 → 14:30 and small paraphrasing). Judges may split — that's the disagreement signal a panel is meant to surface.",
   },
 ];
+
+// Summarises the panel: surfaces the majority-vote severity, median score,
+// and a friendly read of the agreement rate per the gaik docs guidance.
+function PanelAggregation({ result }: { result: PanelResult }) {
+  const successful = result.per_judge.filter(
+    (e): e is PanelEntry & { severity: Severity } => !!e.severity,
+  );
+  if (successful.length === 0) return null;
+
+  const severityCounts = successful.reduce<Record<Severity, number>>(
+    (acc, e) => {
+      acc[e.severity] = (acc[e.severity] ?? 0) + 1;
+      return acc;
+    },
+    { ok: 0, suspect: 0, wrong: 0 },
+  );
+  // Tie-breaker per docs: when judges split evenly, surface the harshest verdict.
+  const severityRank: Record<Severity, number> = { ok: 0, suspect: 1, wrong: 2 };
+  const maxCount = Math.max(...Object.values(severityCounts));
+  const majority = (Object.keys(severityCounts) as Severity[])
+    .filter((s) => severityCounts[s] === maxCount)
+    .sort((a, b) => severityRank[b] - severityRank[a])[0];
+
+  const scores = successful
+    .map((e) => e.score)
+    .filter((s): s is number => typeof s === "number" && s > 0)
+    .sort((a, b) => a - b);
+  const median = scores.length
+    ? scores[Math.floor((scores.length - 1) / 2)]
+    : null;
+
+  const ratio = result.agreement_score;
+  const agreementText =
+    ratio >= 0.99
+      ? "Unanimous — every judge agreed."
+      : ratio >= 0.66
+        ? "Strong agreement — majority lines up."
+        : "Mixed — treat the panel verdict as advisory.";
+
+  return (
+    <div className="bg-muted/40 mb-4 space-y-2 rounded-md border p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-muted-foreground text-xs">Panel verdict:</span>
+        <SeverityBadge severity={majority} />
+        {median != null && (
+          <Badge variant="secondary" className="font-mono">
+            median {median}/5
+          </Badge>
+        )}
+        <span className="text-muted-foreground text-xs">
+          {severityCounts.wrong > 0 && `${severityCounts.wrong} wrong · `}
+          {severityCounts.suspect > 0 && `${severityCounts.suspect} suspect · `}
+          {severityCounts.ok > 0 && `${severityCounts.ok} ok`}
+        </span>
+      </div>
+      <p className="text-muted-foreground text-xs leading-relaxed">
+        {agreementText}{" "}
+        {ratio < 0.99 && (
+          <span>
+            Tie-breaker rule: when judges split, the panel surfaces the
+            harshest verdict so issues aren&apos;t silently dropped.
+          </span>
+        )}
+      </p>
+    </div>
+  );
+}
 
 function PanelTab() {
   const [extracted, setExtracted] = useState("");
   const [expected, setExpected] = useState("");
   const [fieldName, setFieldName] = useState("");
+  const [activeHint, setActiveHint] = useState<string | null>(null);
   const { isLoading, result, setResult, run } = useJudgeSubmit<PanelResult>();
 
   async function handleSubmit() {
@@ -991,6 +1114,7 @@ function PanelTab() {
                       setExpected(p.expected);
                       setExtracted(p.extracted);
                       setFieldName(p.fieldName);
+                      setActiveHint(p.hint);
                       setResult(null);
                     }}
                   >
@@ -998,7 +1122,14 @@ function PanelTab() {
                   </Button>
                 ))}
               </div>
+              {activeHint && (
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  {activeHint}
+                </p>
+              )}
             </div>
+
+            <ScoringGuide />
 
             <div className="space-y-2">
               <Label htmlFor="panel-expected">Expected</Label>
@@ -1062,6 +1193,7 @@ function PanelTab() {
             description={`Total $${result.total_cost_usd.toFixed(4)} · ${result.total_duration_s.toFixed(2)}s`}
             copyContent={JSON.stringify(result, null, 2)}
           >
+            <PanelAggregation result={result} />
             <div className="space-y-3">
               {result.per_judge.map((entry) => (
                 <div key={entry.provider} className="rounded-md border p-3">
@@ -1170,8 +1302,10 @@ export default function LlmJudgePage() {
             field to pass field-level instructions.
           </p>
           <p>
-            <strong>4. Panel.</strong> Runs the text-pair check across multiple Azure
-            models (gpt-5.4-mini and gpt-5.4) and reports an agreement score.
+            <strong>4. Panel.</strong> Runs the text-pair check across three
+            Azure models (gpt-5.4-mini, gpt-5.4 and gpt-5.1) and reports an
+            agreement score. Verdicts aggregate by majority vote; ties resolve
+            to the harshest severity so problems don&apos;t get silently dropped.
             Cross-provider panels (Azure + Claude + Gemini) are supported by the
             library but require extra credentials — see{" "}
             <a
@@ -1180,9 +1314,18 @@ export default function LlmJudgePage() {
               rel="noopener noreferrer"
               className="underline hover:no-underline"
             >
-              the docs
+              the LLM-as-Judge docs
             </a>{" "}
-            for setup.
+            for setup, and the{" "}
+            <a
+              href={JUDGE_BENCHMARK_DOCS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:no-underline"
+            >
+              JudgeBench prompt benchmark
+            </a>{" "}
+            for the research behind the scoring prompts.
           </p>
         </HowItWorksCard>
       </div>

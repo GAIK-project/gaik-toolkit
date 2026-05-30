@@ -32,6 +32,7 @@ ScoringMode = Literal["severity", "likert_1_5", "additive"]
 DEFAULT_PANEL_JUDGES: tuple[dict[str, str], ...] = (
     {"provider": "azure", "model": "gpt-5.4-mini"},
     {"provider": "azure", "model": "gpt-5.4"},
+    {"provider": "azure", "model": "gpt-5.1"},
 )
 JUDGE_NOT_AVAILABLE_DETAIL = (
     "LLMJudge requires gaik>=0.4.0. "

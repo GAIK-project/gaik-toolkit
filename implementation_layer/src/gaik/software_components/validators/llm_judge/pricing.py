@@ -18,6 +18,7 @@ JUDGE_PRICING_PER_M: dict[str, tuple[float, float]] = {
     "gpt-5.5":          (3.00, 15.00),
     "gpt-5.4":          (2.50, 10.00),
     "gpt-5.4-mini":     (0.25,  2.00),
+    "gpt-5.1":          (1.25,  10.00),
     "gpt-5-mini":       (0.25,  2.00),
     # Anthropic
     "claude-haiku-4-5":   (0.80,  4.00),
