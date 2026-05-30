@@ -4,18 +4,30 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 
 ## Features
 
+### Software Components
+
 - **Extractor** - Extract structured data from documents using natural language
+- **Vision Extractor** - One-call PDF/image → structured data (multi-doc, no intermediate parse)
 - **Parser** - Parse PDFs and Word documents with multiple backends
 - **Classifier** - Classify documents into predefined categories
 - **Transcriber** - Transcribe audio/video with Whisper and GPT enhancement
+- **Text-to-Speech** - Text to downloadable speech audio
+- **PostgreSQL Agent** - Plain-language → read-only SQL with a sandboxed demo DB
+- **LLM-as-Judge** - Score extractor output, detect hallucinations, run a multi-model judge panel
+
+### Software Modules
+
 - **RAG Builder** - Document upload, indexing, Q&A with citations and debug tools
 - **Audio Structured** - Audio to structured data pipeline
 - **Document Structured** - Document to structured data pipeline
+
+### Use Cases
+
 - **Incident Report** - Voice to structured incident report
-- **Diary** - Voice notes to construction diary
+- **Construction Diary** - Voice notes to construction diary
 - **Dental Transcription** - Audio/video to SRT/VTT subtitles
-- **Video Search** - Semantic video search with pgvector
-- **Text-to-Speech** - Text to downloadable speech audio
+- **Semantic Video Search** - Vector search across indexed video transcripts (pgvector)
+- **Purchase Order Processing** - PO + BOMs + price list → line-item prices and order draft
 
 ## Quick Start
 
@@ -23,7 +35,7 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 
 - Node.js 22+ / bun
 - Python 3.11+
-- OpenAI API key
+- Azure OpenAI access (or another supported provider)
 
 ### Setup
 
@@ -45,7 +57,9 @@ Edit `.env.local`:
 
 ```bash
 BACKEND_URL=http://localhost:8000
-OPENAI_API_KEY=sk-xxxxx
+AZURE_API_KEY=...
+AZURE_ENDPOINT=https://<resource>.openai.azure.com/
+AZURE_API_VERSION=latest
 BYPASS_AUTH=true
 ```
 
@@ -97,13 +111,16 @@ toolkit_demo_app/
 | `/parse` | Parse PDF/DOCX documents |
 | `/classify` | Classify documents |
 | `/extract` | Extract structured data |
+| `/extract-vision` | One-call vision extraction for PDFs/images |
 | `/transcribe` | Transcribe audio/video |
-| `/rag` | RAG pipeline (indexing, Q&A with SSE, debug) |
+| `/text-to-speech` | Text-to-speech audio generation |
 | `/pipeline` | End-to-end pipelines (audio/document to structured data) |
+| `/rag` | RAG pipeline (indexing, Q&A with SSE, debug) |
+| `/postgres-agent` | Natural-language SQL agent against the demo DB |
+| `/llm-judge` | LLM-as-judge: text-pair, hallucination, validate, multi-model panel |
 | `/diary` | Construction diary workflow |
 | `/dental-transcribe` | Dental transcription with SRT/VTT |
 | `/video-search` | Semantic dental video search |
-| `/text-to-speech` | Text-to-speech audio generation |
 
 API docs: <http://localhost:8000/docs> (Swagger UI)
 

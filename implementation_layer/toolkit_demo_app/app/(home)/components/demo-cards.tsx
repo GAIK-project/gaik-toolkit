@@ -32,6 +32,7 @@ import {
   type LucideIcon,
   MessageSquareQuote,
   Mic,
+  Scale,
   ScanEye,
   Search,
   Volume2,
@@ -216,6 +217,13 @@ const buildingBlocks: Demo[] = [
       "Ask a database questions in plain language — the agent writes and runs read-only SQL",
     href: "/postgres-agent",
     icon: Database,
+  },
+  {
+    title: "LLM-as-Judge",
+    description:
+      "Score extractor output, detect hallucinations, and run a multi-model judge panel",
+    href: "/llm-judge",
+    icon: Scale,
   },
   {
     title: "Retriever",
