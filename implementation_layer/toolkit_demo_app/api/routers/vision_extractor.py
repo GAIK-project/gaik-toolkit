@@ -267,7 +267,7 @@ async def generate_schema(request: GenerateSchemaRequest):
 async def extract_vision(
     files: list[UploadFile] = File(..., description="PDF/image files (multi-doc supported)"),
     user_requirements: str = Form(..., description="Natural-language extraction task"),
-    model_provider: Literal["openai", "claude", "google"] = Form("openai"),
+    model_provider: Literal["azure", "claude", "google"] = Form("azure"),
     include_verification: bool = Form(False),
 ):
     """Extract structured data from PDFs/images in a single LLM call.
@@ -304,9 +304,14 @@ async def extract_vision(
                 ),
             ) from e
 
+        # "azure" on demo-UI:n valinta Azure OpenAI:lle — muunnetaan kirjaston "openai"+use_azure=True-yhdistelmäksi
+        lib_provider = "openai" if model_provider == "azure" else model_provider
+        use_azure = model_provider == "azure"
+
         try:
             extractor = VisionExtractor(
-                model_provider=model_provider,
+                model_provider=lib_provider,
+                use_azure=use_azure,
                 include_verification=include_verification,
             )
         except Exception as e:

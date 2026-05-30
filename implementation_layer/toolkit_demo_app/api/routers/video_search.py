@@ -60,7 +60,7 @@ def _get_embedder():
         return _embedder
 
     use_azure = bool(os.getenv("AZURE_API_KEY"))
-    if not use_azure and not os.getenv("OPENAI_API_KEY"):
+    if not use_azure:
         return None
 
     from gaik.software_components.config import get_openai_config

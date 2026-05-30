@@ -112,7 +112,7 @@ interface GeneratedSchema {
   }>;
 }
 
-type Provider = "openai" | "claude" | "google";
+type Provider = "azure" | "claude" | "google";
 
 interface VerificationEntry {
   value: unknown;
@@ -309,7 +309,7 @@ function SchemaPreview({ schema }: SchemaPreviewProps) {
 export default function VisionExtractorPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [userRequirements, setUserRequirements] = useState("");
-  const [provider, setProvider] = useState<Provider>("openai");
+  const [provider, setProvider] = useState<Provider>("azure");
   const [includeVerification, setIncludeVerification] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingExample, setIsLoadingExample] = useState(false);
@@ -643,7 +643,7 @@ export default function VisionExtractorPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="openai">OpenAI / Azure</SelectItem>
+                      <SelectItem value="azure">Azure OpenAI</SelectItem>
                       <SelectItem value="claude">
                         Claude (Anthropic Foundry)
                       </SelectItem>
@@ -734,7 +734,7 @@ export default function VisionExtractorPage() {
               prompt and regenerate — no LLM document call is made yet.
             </p>
             <p>
-              <strong>4. Pick a provider.</strong> OpenAI/Azure works out of
+              <strong>4. Pick a provider.</strong> Azure OpenAI works out of
               the box. Claude (Anthropic Foundry) and Google (Vertex AI) need
               their respective credentials configured.
             </p>

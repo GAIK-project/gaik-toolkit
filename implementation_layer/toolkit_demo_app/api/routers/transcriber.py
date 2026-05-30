@@ -71,10 +71,10 @@ async def transcribe_audio(
     enhanced = fix_transcription_errors
 
     use_azure = bool(os.getenv("AZURE_API_KEY"))
-    if not use_azure and not os.getenv("OPENAI_API_KEY"):
+    if not use_azure:
         raise HTTPException(
             status_code=500,
-            detail="Either AZURE_API_KEY or OPENAI_API_KEY environment variable must be set",
+            detail="AZURE_API_KEY environment variable must be set",
         )
 
     suffix = Path(file.filename).suffix.lower()
