@@ -37,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import {
   AlertTriangle,
+  BookOpen,
   CheckCircle2,
   FileText,
   Gavel,
@@ -54,14 +55,22 @@ import toast from "react-hot-toast";
 
 type Provider = "openai" | "azure" | "anthropic" | "google";
 
+// Demo on Rahtissa konfiguroitu vain Azure-tunnuksilla; muiden providereiden
+// valitseminen palauttaisi 503. Yksinkertaistetaan valikko ja viestitään
+// että ne vaativat extra-konfiguraatiota.
 const PROVIDER_OPTIONS: { value: Provider; label: string }[] = [
-  { value: "azure", label: "Azure OpenAI (default)" },
-  { value: "openai", label: "OpenAI" },
-  { value: "anthropic", label: "Claude (Anthropic)" },
-  { value: "google", label: "Gemini (Google)" },
+  { value: "azure", label: "Azure OpenAI" },
 ];
 
-const PANEL_PROVIDERS: Provider[] = ["azure", "anthropic", "google"];
+// Panel ajaa useampaa Azure-mallia rinnakkain — antaa kustannuksen ja
+// nopeuden välisen disagreement-signaalin myös ilman cross-provider-tunnuksia.
+const PANEL_JUDGES: { provider: Provider; model: string; label: string }[] = [
+  { provider: "azure", model: "gpt-5.4-mini", label: "gpt-5.4-mini" },
+  { provider: "azure", model: "gpt-5.4", label: "gpt-5.4" },
+];
+
+const JUDGE_DOCS_URL =
+  "https://gaik-project.github.io/gaik-toolkit/toolkit/evals/llm-judge/";
 
 interface Usage {
   provider?: string | null;
@@ -239,7 +248,7 @@ function TextPairTab() {
   const [extracted, setExtracted] = useState("");
   const [expected, setExpected] = useState("");
   const [fieldName, setFieldName] = useState("");
-  const [provider, setProvider] = useState<Provider>("azure");
+  const [provider] = useState<Provider>("azure");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<TextPairResult | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -342,36 +351,15 @@ function TextPairTab() {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="field-name">Field name (optional)</Label>
-                <Input
-                  id="field-name"
-                  value={fieldName}
-                  onChange={(e) => setFieldName(e.target.value)}
-                  placeholder="e.g. incident_summary"
-                  disabled={isLoading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="provider-tp">Provider</Label>
-                <Select
-                  value={provider}
-                  onValueChange={(v) => setProvider(v as Provider)}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger id="provider-tp">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROVIDER_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="field-name">Field name (optional)</Label>
+              <Input
+                id="field-name"
+                value={fieldName}
+                onChange={(e) => setFieldName(e.target.value)}
+                placeholder="e.g. incident_summary"
+                disabled={isLoading}
+              />
             </div>
 
             <Button onClick={handleSubmit} disabled={isLoading} className="w-full" size="lg">
@@ -448,7 +436,7 @@ const HALLUCINATION_PRESET = {
 function HallucinationsTab() {
   const [sourceText, setSourceText] = useState("");
   const [extracted, setExtracted] = useState("");
-  const [provider, setProvider] = useState<Provider>("azure");
+  const [provider] = useState<Provider>("azure");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<HallucinationResult | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -508,15 +496,17 @@ function HallucinationsTab() {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1.5">
-                <CardTitle>Grounded JSON?</CardTitle>
-                <CardDescription>
-                  Paste a source text and an extracted JSON object. The judge flags
-                  any field whose value is not supported by the source.
-                </CardDescription>
-              </div>
+            <CardTitle>Grounded answer?</CardTitle>
+            <CardDescription>
+              Paste a source text and the extractor&apos;s output. The judge flags
+              any field whose value is not supported by the source.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Quick example</Label>
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 disabled={isLoading}
@@ -526,11 +516,10 @@ function HallucinationsTab() {
                   setResult(null);
                 }}
               >
-                Try example
+                <Sparkles className="mr-2 h-3.5 w-3.5" />
+                Load maintenance-report example
               </Button>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="source-text">Source text</Label>
               <Textarea
@@ -543,7 +532,12 @@ function HallucinationsTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="extracted-json">Extracted JSON</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="extracted-json">Extracted data (JSON)</Label>
+                <span className="text-muted-foreground text-xs">
+                  the fields the judge will check
+                </span>
+              </div>
               <Textarea
                 id="extracted-json"
                 rows={8}
@@ -553,25 +547,10 @@ function HallucinationsTab() {
                 disabled={isLoading}
                 className="font-mono text-sm"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="provider-hl">Provider</Label>
-              <Select
-                value={provider}
-                onValueChange={(v) => setProvider(v as Provider)}
-                disabled={isLoading}
-              >
-                <SelectTrigger id="provider-hl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROVIDER_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <p className="text-muted-foreground text-xs">
+                Each <code>key: value</code> pair is treated as one field. Empty
+                fields are skipped automatically.
+              </p>
             </div>
             <Button onClick={handleSubmit} disabled={isLoading} className="w-full" size="lg">
               {isLoading ? (
@@ -642,13 +621,38 @@ function HallucinationsTab() {
 
 // ─────────────────── PDF validation tab ───────────────────
 
+const VALIDATE_PDF_EXAMPLE = {
+  extracted: JSON.stringify(
+    [
+      {
+        invoice_number: "INV-2025-014",
+        vendor: "ACME Industrial Supplies",
+        total_amount: 1284.5,
+        currency: "EUR",
+      },
+    ],
+    null,
+    2,
+  ),
+  rubric: JSON.stringify(
+    {
+      field_checks: [
+        "total_amount must equal the sum of line items, not the subtotal",
+        "currency must be a 3-letter ISO code (e.g. EUR, USD)",
+      ],
+    },
+    null,
+    2,
+  ),
+};
+
 function ValidatePdfTab() {
   const [file, setFile] = useState<File | null>(null);
   const [extracted, setExtracted] = useState(
     JSON.stringify([{ field_name: "value" }], null, 2),
   );
   const [rubric, setRubric] = useState("");
-  const [provider, setProvider] = useState<Provider>("azure");
+  const [provider] = useState<Provider>("azure");
   const [scoringMode, setScoringMode] = useState("likert_1_5");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ValidationResult | null>(null);
@@ -720,8 +724,27 @@ function ValidatePdfTab() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Quick example</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                onClick={() => {
+                  setExtracted(VALIDATE_PDF_EXAMPLE.extracted);
+                  setRubric(VALIDATE_PDF_EXAMPLE.rubric);
+                  setResult(null);
+                  toast("Example JSON loaded — now upload an invoice PDF");
+                }}
+              >
+                <Sparkles className="mr-2 h-3.5 w-3.5" />
+                Load invoice example
+              </Button>
+            </div>
+
             <label
-              className={`flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-4 transition-all ${
+              className={`flex min-h-30 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-4 transition-all ${
                 isLoading
                   ? "cursor-not-allowed opacity-50"
                   : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50"
@@ -746,7 +769,7 @@ function ValidatePdfTab() {
             </label>
 
             <div className="space-y-2">
-              <Label htmlFor="validate-extracted">Extracted JSON</Label>
+              <Label htmlFor="validate-extracted">Extracted data (JSON)</Label>
               <Textarea
                 id="validate-extracted"
                 rows={6}
@@ -774,43 +797,22 @@ function ValidatePdfTab() {
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="provider-vp">Provider</Label>
-                <Select
-                  value={provider}
-                  onValueChange={(v) => setProvider(v as Provider)}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger id="provider-vp">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROVIDER_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="scoring-mode">Scoring mode</Label>
-                <Select
-                  value={scoringMode}
-                  onValueChange={setScoringMode}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger id="scoring-mode">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="likert_1_5">Likert 1–5</SelectItem>
-                    <SelectItem value="severity">Severity only</SelectItem>
-                    <SelectItem value="additive">Additive (per aspect)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="scoring-mode">Scoring mode</Label>
+              <Select
+                value={scoringMode}
+                onValueChange={setScoringMode}
+                disabled={isLoading}
+              >
+                <SelectTrigger id="scoring-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="likert_1_5">Likert 1–5</SelectItem>
+                  <SelectItem value="severity">Severity only</SelectItem>
+                  <SelectItem value="additive">Additive (per aspect)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <Button onClick={handleSubmit} disabled={isLoading || !file} className="w-full" size="lg">
@@ -898,6 +900,21 @@ function ValidatePdfTab() {
 
 // ─────────────────── Panel tab ───────────────────
 
+const PANEL_PRESETS = [
+  {
+    label: "Numeric mismatch",
+    expected: "23",
+    extracted: "23.3",
+    fieldName: "quantity",
+  },
+  {
+    label: "Paraphrase",
+    expected: "The computer was not locked.",
+    extracted: "Computer left unlocked at the workstation.",
+    fieldName: "incident_summary",
+  },
+];
+
 function PanelTab() {
   const [extracted, setExtracted] = useState("");
   const [expected, setExpected] = useState("");
@@ -926,7 +943,10 @@ function PanelTab() {
           extracted_text: extracted,
           expected_text: expected,
           field_name: fieldName || undefined,
-          providers: PANEL_PROVIDERS,
+          judges: PANEL_JUDGES.map((j) => ({
+            provider: j.provider,
+            model: j.model,
+          })),
         }),
         signal: abortRef.current.signal,
       });
@@ -955,14 +975,62 @@ function PanelTab() {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Run three judges in parallel</CardTitle>
-            <CardDescription>
-              Sends the same text-pair to Azure OpenAI, Anthropic Claude, and Google
-              Gemini and reports how often they agree. Provider extras must be installed
-              for each judge; missing ones are skipped.
-            </CardDescription>
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1.5">
+                <CardTitle>Run multiple judges in parallel</CardTitle>
+                <CardDescription>
+                  Sends the same text-pair to {PANEL_JUDGES.length} Azure models
+                  and reports how often they agree. A multi-model panel debiases
+                  any single model&apos;s quirks without requiring extra provider
+                  credentials.
+                </CardDescription>
+              </div>
+              <Button asChild variant="ghost" size="sm" className="shrink-0">
+                <a
+                  href={JUDGE_DOCS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="gap-1"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  How it works
+                </a>
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="bg-muted/40 flex flex-wrap items-center gap-2 rounded-md border p-3 text-xs">
+              <span className="text-muted-foreground">Judges:</span>
+              {PANEL_JUDGES.map((j) => (
+                <Badge key={j.label} variant="secondary" className="font-mono">
+                  azure · {j.label}
+                </Badge>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Quick examples</Label>
+              <div className="flex flex-wrap gap-2">
+                {PANEL_PRESETS.map((p) => (
+                  <Button
+                    key={p.label}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoading}
+                    onClick={() => {
+                      setExpected(p.expected);
+                      setExtracted(p.extracted);
+                      setFieldName(p.fieldName);
+                      setResult(null);
+                    }}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="panel-expected">Expected</Label>
               <Textarea
@@ -1015,8 +1083,8 @@ function PanelTab() {
       <div className="space-y-4">
         {isLoading && (
           <LoadingCard
-            message="Three providers, sequential calls…"
-            subMessage="Wall-clock = sum of three judges"
+            message={`${PANEL_JUDGES.length} judges, sequential calls…`}
+            subMessage={`Wall-clock = sum of ${PANEL_JUDGES.length} judges`}
           />
         )}
         {result && !isLoading && (
@@ -1056,7 +1124,7 @@ function PanelTab() {
               {result.skipped.length > 0 && (
                 <div className="bg-amber-500/10 rounded-md border border-amber-500/30 p-3">
                   <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-                    Skipped providers
+                    Skipped judges
                   </p>
                   {result.skipped.map((s) => (
                     <p key={s.provider} className="text-muted-foreground text-xs">
@@ -1072,7 +1140,7 @@ function PanelTab() {
           <EmptyStateCard
             icon={Users}
             title="No panel run yet"
-            description="Fill in both texts and run all three judges."
+            description={`Fill in both texts and run all ${PANEL_JUDGES.length} judges.`}
           />
         )}
       </div>
@@ -1088,7 +1156,7 @@ export default function LlmJudgePage() {
       <DemoPageHeader
         icon={Scale}
         title="LLM-as-Judge"
-        description="Score extractor output, detect hallucinations, compare texts, and run a multi-provider panel."
+        description="Score extractor output, detect hallucinations, compare texts, and run a multi-model judge panel."
         className="mb-8"
       />
 
@@ -1115,7 +1183,7 @@ export default function LlmJudgePage() {
       </Tabs>
 
       <div className="mt-8">
-        <HowItWorksCard description="A multi-provider LLM-as-judge built on the GAIK toolkit's validators package.">
+        <HowItWorksCard description="An LLM-as-judge built on the GAIK toolkit's validators package.">
           <p>
             <strong>1. Text pair.</strong> Two strings in, one verdict out. Useful when
             an extractor returns free-text values that paraphrase the ground truth — exact
@@ -1133,9 +1201,19 @@ export default function LlmJudgePage() {
             field to pass field-level instructions.
           </p>
           <p>
-            <strong>4. Panel.</strong> Runs the text-pair check across Azure OpenAI,
-            Claude, and Gemini, then reports an agreement score. Providers missing
-            credentials are skipped — at least two judges are required.
+            <strong>4. Panel.</strong> Runs the text-pair check across multiple Azure
+            models (gpt-5.4-mini and gpt-5.4) and reports an agreement score.
+            Cross-provider panels (Azure + Claude + Gemini) are supported by the
+            library but require extra credentials — see{" "}
+            <a
+              href={JUDGE_DOCS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:no-underline"
+            >
+              the docs
+            </a>{" "}
+            for setup.
           </p>
         </HowItWorksCard>
       </div>

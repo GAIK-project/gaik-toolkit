@@ -23,7 +23,16 @@ logger = logging.getLogger(__name__)
 
 JudgeProvider = Literal["openai", "azure", "anthropic", "google"]
 ScoringMode = Literal["severity", "likert_1_5", "additive"]
-PANEL_PROVIDERS: tuple[JudgeProvider, ...] = ("azure", "anthropic", "google")
+
+# Default panel: multi-model Azure (works on Rahti with only AZURE_API_KEY set).
+# Demos on Rahti tällä hetkellä on vain Azure-tunnus; ANTHROPIC_FOUNDRY_RESOURCE
+# ja GOOGLE_VERTEXAI_PROJECT eivät ole konfiguroituna deployment-podille, joten
+# cross-provider-paneeli kaatuisi. Useat Azure-mallit antavat silti hyödyllisen
+# disagreement-signaalin kustannusten ja nopeuden välillä.
+DEFAULT_PANEL_JUDGES: tuple[dict[str, str], ...] = (
+    {"provider": "azure", "model": "gpt-5.4-mini"},
+    {"provider": "azure", "model": "gpt-5.4"},
+)
 JUDGE_NOT_AVAILABLE_DETAIL = (
     "LLMJudge requires gaik>=0.4.0. "
     "Provider extras (gaik[llm-anthropic] / gaik[llm-google]) are needed "
@@ -229,41 +238,57 @@ async def validate_pdf(
 # ─────────────────── Panel (text-pair) ───────────────────
 
 
+class PanelJudgeSpec(BaseModel):
+    provider: JudgeProvider
+    model: str | None = None
+
+
 class PanelTextPairRequest(BaseModel):
     extracted_text: str
     expected_text: str
     field_name: str | None = None
     context: str | None = None
+    # Backwards-compatible: clients may still pass a flat provider list.
     providers: list[JudgeProvider] | None = None
+    # Preferred: explicit (provider, model) pairs — lets the UI run multiple
+    # Azure models when cross-provider credentials aren't configured.
+    judges: list[PanelJudgeSpec] | None = None
 
 
 @router.post("/panel/text-pair")
 async def panel_text_pair(request: PanelTextPairRequest):
-    """Run the text-pair judgement across multiple providers and report agreement."""
-    providers = tuple(request.providers) if request.providers else PANEL_PROVIDERS
-    if len(providers) < 2:
-        raise HTTPException(status_code=400, detail="Panel needs at least 2 providers")
+    """Run the text-pair judgement across multiple judges and report agreement."""
+    if request.judges:
+        specs: list[PanelJudgeSpec] = list(request.judges)
+    elif request.providers:
+        specs = [PanelJudgeSpec(provider=p) for p in request.providers]
+    else:
+        specs = [PanelJudgeSpec(**spec) for spec in DEFAULT_PANEL_JUDGES]
+
+    if len(specs) < 2:
+        raise HTTPException(status_code=400, detail="Panel needs at least 2 judges")
     if not request.extracted_text and not request.expected_text:
         raise HTTPException(status_code=400, detail="Both inputs are empty")
 
-    judges_per_provider: list[tuple[JudgeProvider, Any]] = []
+    built_judges: list[tuple[str, Any]] = []  # (label, judge)
     skipped: list[dict[str, str]] = []
 
-    for provider in providers:
+    for spec in specs:
+        label = f"{spec.provider}/{spec.model}" if spec.model else spec.provider
         try:
-            judge = _make_judge(provider, None)
+            judge = _make_judge(spec.provider, spec.model)
         except HTTPException as e:
             if e.status_code == 503:
-                skipped.append({"provider": provider, "reason": str(e.detail)})
+                skipped.append({"provider": label, "reason": str(e.detail)})
                 continue
             raise
-        judges_per_provider.append((provider, judge))
+        built_judges.append((label, judge))
 
-    if len(judges_per_provider) < 2:
+    if len(built_judges) < 2:
         raise HTTPException(
             status_code=503,
             detail={
-                "message": "Not enough provider SDKs / credentials configured for a panel",
+                "message": "Not enough judges available for a panel",
                 "skipped": skipped,
             },
         )
@@ -273,7 +298,7 @@ async def panel_text_pair(request: PanelTextPairRequest):
     total_cost = 0.0
     total_duration = 0.0
 
-    for provider, judge in judges_per_provider:
+    for label, judge in built_judges:
         try:
             verdict = judge.judge_text_pair(
                 extracted_text=request.extracted_text,
@@ -282,7 +307,7 @@ async def panel_text_pair(request: PanelTextPairRequest):
                 context=request.context,
             )
         except Exception as e:
-            per_judge.append({"provider": provider, "error": str(e)})
+            per_judge.append({"provider": label, "error": str(e)})
             continue
 
         severities.append(verdict.severity)
@@ -292,7 +317,7 @@ async def panel_text_pair(request: PanelTextPairRequest):
             total_duration += usage.get("duration_s") or 0.0
         per_judge.append(
             {
-                "provider": provider,
+                "provider": label,
                 "equivalent": verdict.equivalent,
                 "severity": verdict.severity,
                 "score": verdict.score,
