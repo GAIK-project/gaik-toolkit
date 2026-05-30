@@ -656,24 +656,32 @@ function HallucinationsTab() {
 
 // ─────────────────── PDF validation tab ───────────────────
 
+// The bundled invoice.pdf is a real (synthetic) Arctis Design invoice. The
+// example JSON below is *intentionally wrong* on total_amount: the value
+// 20290.00 is the subtotal, not the grand total (23901.62 after discount + VAT).
+// A correct extractor would have copied the GRAND TOTAL row — the judge should
+// flag the field and suggest 23901.62, demonstrating the rubric in action.
 const VALIDATE_PDF_EXAMPLE = {
+  pdfUrl: "/invoice.pdf",
+  pdfName: "invoice.pdf",
   extracted: JSON.stringify(
-    [
-      {
-        invoice_number: "INV-2025-014",
-        vendor: "ACME Industrial Supplies",
-        total_amount: 1284.5,
-        currency: "EUR",
-      },
-    ],
+    {
+      invoice_number: "INV-2026-00847",
+      vendor: "Arctis Design",
+      customer: "Nordwave Technologies Oy",
+      date_issued: "2026-03-16",
+      total_amount: 20290.0,
+      currency: "EUR",
+    },
     null,
     2,
   ),
   rubric: JSON.stringify(
     {
       field_checks: [
-        "total_amount must equal the sum of line items, not the subtotal",
+        "total_amount must equal the invoice's GRAND TOTAL (after discount and VAT), not the subtotal",
         "currency must be a 3-letter ISO code (e.g. EUR, USD)",
+        "date_issued must be in ISO YYYY-MM-DD format",
       ],
     },
     null,
@@ -688,7 +696,31 @@ function ValidatePdfTab() {
   );
   const [rubric, setRubric] = useState("");
   const [scoringMode, setScoringMode] = useState("likert_1_5");
+  const [isLoadingExample, setIsLoadingExample] = useState(false);
   const { isLoading, result, setResult, run } = useJudgeSubmit<ValidationResult>();
+
+  async function loadInvoiceExample() {
+    setIsLoadingExample(true);
+    try {
+      const response = await fetch(VALIDATE_PDF_EXAMPLE.pdfUrl);
+      if (!response.ok) {
+        throw new Error(`Could not load ${VALIDATE_PDF_EXAMPLE.pdfName}`);
+      }
+      const blob = await response.blob();
+      const fetchedFile = new File([blob], VALIDATE_PDF_EXAMPLE.pdfName, {
+        type: "application/pdf",
+      });
+      setFile(fetchedFile);
+      setExtracted(VALIDATE_PDF_EXAMPLE.extracted);
+      setRubric(VALIDATE_PDF_EXAMPLE.rubric);
+      setResult(null);
+      toast.success("Example loaded — click Validate against PDF");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to load example");
+    } finally {
+      setIsLoadingExample(false);
+    }
+  }
 
   async function handleSubmit() {
     if (!file) {
@@ -748,17 +780,21 @@ function ValidatePdfTab() {
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={isLoading}
-                onClick={() => {
-                  setExtracted(VALIDATE_PDF_EXAMPLE.extracted);
-                  setRubric(VALIDATE_PDF_EXAMPLE.rubric);
-                  setResult(null);
-                  toast("Example JSON loaded — now upload an invoice PDF");
-                }}
+                disabled={isLoading || isLoadingExample}
+                onClick={loadInvoiceExample}
               >
-                <Sparkles className="mr-2 h-3.5 w-3.5" />
+                {isLoadingExample ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-3.5 w-3.5" />
+                )}
                 Load invoice example
               </Button>
+              <p className="text-muted-foreground text-xs">
+                Loads a sample invoice PDF with intentionally-wrong
+                <code className="mx-1">total_amount</code> (subtotal instead of
+                grand total). The judge should flag it and suggest 23 901.62.
+              </p>
             </div>
 
             <label
