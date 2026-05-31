@@ -55,19 +55,19 @@ import toast from "react-hot-toast";
 
 type Provider = "openai" | "azure" | "anthropic" | "google";
 
-// Demo on Rahtissa konfiguroitu vain Azure-tunnuksilla; muiden providereiden
-// valitseminen palauttaisi 503. Kovakoodataan Azure ja viestitään muiden
-// vaativan extra-konfiguraatiota.
-const DEMO_PROVIDER: Provider = "azure";
+// Default provider for the demo. The backend auto-resolves this to whatever
+// credentials the deployment has (OpenAI on the 8Wave fork, Azure on Rahti),
+// so "openai" works as a sensible default on either.
+const DEMO_PROVIDER: Provider = "openai";
 
-// Panel ajaa useampaa Azure-mallia rinnakkain — antaa kustannuksen ja
-// nopeuden välisen disagreement-signaalin myös ilman cross-provider-tunnuksia.
-// Kolmas tuomari (gpt-5.1) on tarkoituksella eri sukupolvea, jotta paneeli ei
-// vain kopioi gpt-5.4-perheen vinoutumia.
+// Panel runs several models in parallel for a cost/speed disagreement signal.
+// The backend resolves the provider per judge to the configured credentials.
+// The third judge (gpt-5.1) is intentionally a different generation so the
+// panel does not just echo the gpt-5.4 family's biases.
 const PANEL_JUDGES: { provider: Provider; model: string; label: string }[] = [
-  { provider: "azure", model: "gpt-5.4-mini", label: "gpt-5.4-mini" },
-  { provider: "azure", model: "gpt-5.4", label: "gpt-5.4" },
-  { provider: "azure", model: "gpt-5.1", label: "gpt-5.1" },
+  { provider: "openai", model: "gpt-5.4-mini", label: "gpt-5.4-mini" },
+  { provider: "openai", model: "gpt-5.4", label: "gpt-5.4" },
+  { provider: "openai", model: "gpt-5.1", label: "gpt-5.1" },
 ];
 
 const JUDGE_DOCS_URL =

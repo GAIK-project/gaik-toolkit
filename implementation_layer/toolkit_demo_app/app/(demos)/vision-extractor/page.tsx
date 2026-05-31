@@ -643,7 +643,7 @@ export default function VisionExtractorPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="azure">Azure OpenAI</SelectItem>
+                      <SelectItem value="azure">OpenAI / Azure</SelectItem>
                       <SelectItem value="claude">
                         Claude (Anthropic Foundry)
                       </SelectItem>
@@ -734,9 +734,10 @@ export default function VisionExtractorPage() {
               prompt and regenerate — no LLM document call is made yet.
             </p>
             <p>
-              <strong>4. Pick a provider.</strong> Azure OpenAI works out of
-              the box. Claude (Anthropic Foundry) and Google (Vertex AI) need
-              their respective credentials configured.
+              <strong>4. Pick a provider.</strong> OpenAI / Azure works out of
+              the box (whichever key the deployment has). Claude (Anthropic
+              Foundry) and Google (Vertex AI) need their respective credentials
+              configured.
             </p>
             <p>
               <strong>5. Optional verification.</strong> When enabled, every

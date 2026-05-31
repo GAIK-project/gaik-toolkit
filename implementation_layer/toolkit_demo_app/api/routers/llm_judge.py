@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import tempfile
 from dataclasses import asdict
 from pathlib import Path
@@ -24,21 +25,48 @@ logger = logging.getLogger(__name__)
 JudgeProvider = Literal["openai", "azure", "anthropic", "google"]
 ScoringMode = Literal["severity", "likert_1_5", "additive"]
 
-# Default panel: multi-model Azure (works on Rahti with only AZURE_API_KEY set).
-# Demos on Rahti tällä hetkellä on vain Azure-tunnus; ANTHROPIC_FOUNDRY_RESOURCE
-# ja GOOGLE_VERTEXAI_PROJECT eivät ole konfiguroituna deployment-podille, joten
-# cross-provider-paneeli kaatuisi. Useat Azure-mallit antavat silti hyödyllisen
-# disagreement-signaalin kustannusten ja nopeuden välillä.
+# Default panel: three models giving a cost/speed disagreement signal. The
+# provider on each spec is auto-resolved at call time (see _resolve_provider)
+# to whatever credentials the deployment has — Azure on Rahti, OpenAI on the
+# 8Wave fork — so the same model names work on either. The frontend may send
+# its own panel specs to override this.
 DEFAULT_PANEL_JUDGES: tuple[dict[str, str], ...] = (
-    {"provider": "azure", "model": "gpt-5.4-mini"},
-    {"provider": "azure", "model": "gpt-5.4"},
-    {"provider": "azure", "model": "gpt-5.1"},
+    {"provider": "openai", "model": "gpt-5.4-mini"},
+    {"provider": "openai", "model": "gpt-5.4"},
+    {"provider": "openai", "model": "gpt-5.1"},
 )
 JUDGE_NOT_AVAILABLE_DETAIL = (
     "LLMJudge requires gaik>=0.4.0. "
     "Provider extras (gaik[llm-anthropic] / gaik[llm-google]) are needed "
     "for the matching providers."
 )
+
+# Which env var(s) signal that a provider is configured on this deployment.
+_PROVIDER_ENV_KEYS: dict[str, tuple[str, ...]] = {
+    "azure": ("AZURE_API_KEY",),
+    "openai": ("OPENAI_API_KEY",),
+    "anthropic": ("ANTHROPIC_API_KEY",),
+    "google": ("GOOGLE_API_KEY", "GEMINI_API_KEY"),
+}
+# Fallback preference order when the requested provider has no credentials.
+_PROVIDER_PREFERENCE: tuple[str, ...] = ("azure", "openai", "anthropic", "google")
+
+
+def _provider_configured(provider: str) -> bool:
+    return any(os.getenv(k) for k in _PROVIDER_ENV_KEYS.get(provider, ()))
+
+
+def _resolve_provider(requested: JudgeProvider) -> JudgeProvider:
+    """Return the requested provider if its credentials are present, otherwise
+    fall back to the first configured provider. Lets the demo run on an
+    OpenAI-only deployment (the 8Wave fork) as well as an Azure one without the
+    caller needing to know which keys exist."""
+    if _provider_configured(requested):
+        return requested
+    for candidate in _PROVIDER_PREFERENCE:
+        if _provider_configured(candidate):
+            return candidate  # type: ignore[return-value]
+    return requested  # nothing configured — let LLMJudge raise a clear error
 
 
 def _make_judge(provider: JudgeProvider, model: str | None):
@@ -48,6 +76,7 @@ def _make_judge(provider: JudgeProvider, model: str | None):
     except ImportError as e:
         raise HTTPException(status_code=503, detail=f"{JUDGE_NOT_AVAILABLE_DETAIL} ({e})") from e
 
+    provider = _resolve_provider(provider)
     try:
         return LLMJudge(model_provider=provider, model=model or None)
     except ImportError as e:

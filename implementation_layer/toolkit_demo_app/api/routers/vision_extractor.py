@@ -1,6 +1,7 @@
 """Vision Extractor router — single-pass PDF/image → structured data."""
 
 import logging
+import os
 import tempfile
 from pathlib import Path
 from typing import Any, Literal
@@ -304,9 +305,11 @@ async def extract_vision(
                 ),
             ) from e
 
-        # "azure" on demo-UI:n valinta Azure OpenAI:lle — muunnetaan kirjaston "openai"+use_azure=True-yhdistelmäksi
+        # "azure" is the demo-UI label for the OpenAI family — map it to the
+        # library's "openai" provider and auto-detect Azure vs plain OpenAI from
+        # the environment (Azure when AZURE_API_KEY is set, otherwise OPENAI_API_KEY).
         lib_provider = "openai" if model_provider == "azure" else model_provider
-        use_azure = model_provider == "azure"
+        use_azure = model_provider == "azure" and bool(os.getenv("AZURE_API_KEY"))
 
         try:
             extractor = VisionExtractor(

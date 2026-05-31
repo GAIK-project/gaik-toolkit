@@ -26,11 +26,19 @@ _seeded = False
 
 
 def _llm_config() -> dict | None:
-    """Return an Azure OpenAI config dict, or None when no API key is set."""
+    """Return an OpenAI/Azure config dict, or None when no API key is set.
+
+    Auto-detects the provider: Azure OpenAI when ``AZURE_API_KEY`` is set,
+    otherwise standard OpenAI when ``OPENAI_API_KEY`` is set. This lets the
+    demo run on either an Azure or a plain-OpenAI deployment without code
+    changes.
+    """
     from gaik.software_components.config import get_openai_config
 
     if os.getenv("AZURE_API_KEY"):
         return get_openai_config(use_azure=True)
+    if os.getenv("OPENAI_API_KEY"):
+        return get_openai_config(use_azure=False)
     return None
 
 
@@ -171,7 +179,7 @@ async def postgres_agent_status():
     """Report whether the demo database and LLM are configured."""
     return StatusResponse(
         database_configured=os.getenv("DATABASE_URL") is not None,
-        llm_configured=bool(os.getenv("AZURE_API_KEY")),
+        llm_configured=bool(os.getenv("AZURE_API_KEY") or os.getenv("OPENAI_API_KEY")),
         demo_schema=DEMO_SCHEMA,
         demo_tables=DEMO_TABLES,
     )
