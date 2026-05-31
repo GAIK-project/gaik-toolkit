@@ -26,20 +26,29 @@ async def validate_file_size(file: UploadFile) -> bytes:
 
 
 def get_api_config():
-    """Get Azure OpenAI configuration from environment variables.
+    """
+    Get OpenAI configuration from environment variables.
+
+    Checks for either Azure or standard OpenAI API keys and returns
+    the appropriate configuration.
 
     Raises:
-        HTTPException: If AZURE_API_KEY is not set.
+        HTTPException: If neither AZURE_API_KEY nor OPENAI_API_KEY is set.
     """
-    if not os.getenv("AZURE_API_KEY"):
+    use_azure = bool(os.getenv("AZURE_API_KEY"))
+    if not use_azure and not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(
             status_code=500,
-            detail="AZURE_API_KEY environment variable must be set",
+            detail=(
+                "Set AZURE_API_KEY or OPENAI_API_KEY. "
+                "For Gemini, set OPENAI_API_KEY=<google-api-key> and "
+                "OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/"
+            ),
         )
 
     from gaik.software_components.config import get_openai_config
 
-    return get_openai_config(use_azure=True)
+    return get_openai_config(use_azure=use_azure)
 
 
 def validate_vision_page_limit(file_path: str, suffix: str, parser_type: str) -> None:
