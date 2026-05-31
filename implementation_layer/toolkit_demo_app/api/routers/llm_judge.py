@@ -77,8 +77,12 @@ def _make_judge(provider: JudgeProvider, model: str | None):
         raise HTTPException(status_code=503, detail=f"{JUDGE_NOT_AVAILABLE_DETAIL} ({e})") from e
 
     provider = _resolve_provider(provider)
+    # LLMJudge defaults use_azure=True, which would force the Azure OpenAI config
+    # even for the plain "openai" provider. Drive it from the environment so an
+    # OpenAI-only deployment uses standard OpenAI.
+    use_azure = bool(os.getenv("AZURE_API_KEY"))
     try:
-        return LLMJudge(model_provider=provider, model=model or None)
+        return LLMJudge(model_provider=provider, model=model or None, use_azure=use_azure)
     except ImportError as e:
         raise HTTPException(
             status_code=503,
