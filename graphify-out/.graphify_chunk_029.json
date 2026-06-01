@@ -1,0 +1,583 @@
+{
+  "nodes": [
+    {
+      "id": "README_value_evaluation_framework",
+      "label": "Value Evaluation Framework",
+      "file_type": "document",
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": null,
+      "source_url": "https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/README.md",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "README_vef_informational_value",
+      "label": "Informational Value Dimension",
+      "file_type": "document",
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 10",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "README_vef_operational_value",
+      "label": "Operational Value Dimension",
+      "file_type": "document",
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 12",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "README_vef_economic_value",
+      "label": "Economic Value Dimension",
+      "file_type": "document",
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 14",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "README_vef_social_value",
+      "label": "Social Value Dimension",
+      "file_type": "document",
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 16",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "README_vef_emotional_value",
+      "label": "Emotional Value Dimension",
+      "file_type": "document",
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 18",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "README_vef_knowledge_process_matrix",
+      "label": "Value-Knowledge Process Matrix",
+      "file_type": "document",
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 24",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "README_vef_value_evaluation_pptx",
+      "label": "Value Evaluation Framework v0.1 (PPTX)",
+      "file_type": "document",
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 27",
+      "source_url": "https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/Value_evaluation_framework_v0.1.pptx",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "README_vef_incident_reporting_model",
+      "label": "Value Evaluation Model: Incident Reporting (PPTX)",
+      "file_type": "document",
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 36",
+      "source_url": "https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/Value_evaluation_model_for%20Incident_reporting_v0.1.pptx",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_usecase",
+      "label": "Incident Reporting Use Case",
+      "file_type": "document",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_genai_product_canvas",
+      "label": "GenAI Product Canvas for Incident Reporting",
+      "file_type": "document",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 18",
+      "source_url": "https://github.com/GAIK-project/gaik-toolkit/blob/main/business_layer/genAI_product_canvas/GenAI_product_canvas_Incident%20reporting_v0.1.pptx",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_transcriber_component",
+      "label": "Transcriber Software Component",
+      "file_type": "code",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 135",
+      "source_url": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_extractor_component",
+      "label": "Extractor Software Component",
+      "file_type": "code",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 163",
+      "source_url": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_requirement_parser",
+      "label": "Requirement Parser (Extractor Sub-Step)",
+      "file_type": "code",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 165",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_schema_generator",
+      "label": "Schema Generator (Extractor Sub-Step)",
+      "file_type": "code",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 165",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_data_extractor",
+      "label": "Data Extractor (LLM-Powered Field Extraction)",
+      "file_type": "code",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 165",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_audio_to_structured_data",
+      "label": "Audio to Structured Data Module",
+      "file_type": "code",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 225",
+      "source_url": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_prompt_templates",
+      "label": "Prompt Templates for Incident Report Writing (No-Code Asset)",
+      "file_type": "document",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 54",
+      "source_url": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/no-code-assets/prompts/Incident%20report%20writing/README.md",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_agent_skills",
+      "label": "Agent Skills for Incident Report Writing (No-Code Asset)",
+      "file_type": "document",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 55",
+      "source_url": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/no-code-assets/agent-skills/incident-report-writing/README.md",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_transcription_eval",
+      "label": "Transcription Evaluation Methods (WER)",
+      "file_type": "document",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 298",
+      "source_url": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/transcription_eval",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_extraction_eval",
+      "label": "Extraction Evaluation Methods (Cosine Similarity)",
+      "file_type": "document",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 303",
+      "source_url": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_gaik_demo",
+      "label": "GAIK Demo Application",
+      "file_type": "document",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 278",
+      "source_url": "https://gaik-demo.2.rahtiapp.fi/",
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "Incident_reporting_strategy_layer",
+      "label": "Strategy Layer: Value Evaluation for Incident Reporting",
+      "file_type": "document",
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 24",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "README_value_evaluation_framework",
+      "target": "README_vef_informational_value",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 10",
+      "weight": 1.0
+    },
+    {
+      "source": "README_value_evaluation_framework",
+      "target": "README_vef_operational_value",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 12",
+      "weight": 1.0
+    },
+    {
+      "source": "README_value_evaluation_framework",
+      "target": "README_vef_economic_value",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 14",
+      "weight": 1.0
+    },
+    {
+      "source": "README_value_evaluation_framework",
+      "target": "README_vef_social_value",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 16",
+      "weight": 1.0
+    },
+    {
+      "source": "README_value_evaluation_framework",
+      "target": "README_vef_emotional_value",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 18",
+      "weight": 1.0
+    },
+    {
+      "source": "README_value_evaluation_framework",
+      "target": "README_vef_knowledge_process_matrix",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 24",
+      "weight": 1.0
+    },
+    {
+      "source": "README_value_evaluation_framework",
+      "target": "README_vef_value_evaluation_pptx",
+      "relation": "has_artifact",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 27",
+      "weight": 1.0
+    },
+    {
+      "source": "README_value_evaluation_framework",
+      "target": "README_vef_incident_reporting_model",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "line 36",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_usecase",
+      "target": "Incident_reporting_genai_product_canvas",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 7",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_usecase",
+      "target": "Incident_reporting_strategy_layer",
+      "relation": "has_component",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 24",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_strategy_layer",
+      "target": "README_value_evaluation_framework",
+      "relation": "applies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 26",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_strategy_layer",
+      "target": "README_vef_incident_reporting_model",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 47",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_usecase",
+      "target": "Incident_reporting_prompt_templates",
+      "relation": "implements_via",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 54",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_usecase",
+      "target": "Incident_reporting_agent_skills",
+      "relation": "implements_via",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 55",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_audio_to_structured_data",
+      "target": "Incident_reporting_transcriber_component",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 117",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_audio_to_structured_data",
+      "target": "Incident_reporting_extractor_component",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 117",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_extractor_component",
+      "target": "Incident_reporting_requirement_parser",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 165",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_extractor_component",
+      "target": "Incident_reporting_schema_generator",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 165",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_extractor_component",
+      "target": "Incident_reporting_data_extractor",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 165",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_transcriber_component",
+      "target": "Incident_reporting_transcription_eval",
+      "relation": "evaluated_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 296",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_extractor_component",
+      "target": "Incident_reporting_extraction_eval",
+      "relation": "evaluated_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 302",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_usecase",
+      "target": "Incident_reporting_audio_to_structured_data",
+      "relation": "implemented_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 117",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_usecase",
+      "target": "Incident_reporting_gaik_demo",
+      "relation": "demonstrated_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 278",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_strategy_layer",
+      "target": "README_vef_informational_value",
+      "relation": "demonstrates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 35",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_strategy_layer",
+      "target": "README_vef_emotional_value",
+      "relation": "demonstrates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 38",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_requirement_parser",
+      "target": "Incident_reporting_schema_generator",
+      "relation": "feeds_into",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 179",
+      "weight": 1.0
+    },
+    {
+      "source": "Incident_reporting_schema_generator",
+      "target": "Incident_reporting_data_extractor",
+      "relation": "feeds_into",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 180",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_incident_reporting_layers",
+      "label": "Incident Reporting Cross-Cutting Use Case (Business + Strategy + Implementation layers)",
+      "nodes": [
+        "Incident_reporting_usecase",
+        "Incident_reporting_genai_product_canvas",
+        "Incident_reporting_strategy_layer",
+        "Incident_reporting_audio_to_structured_data"
+      ],
+      "relation": "cross_layer_integration",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "line 1-4",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_vef_dimensions",
+      "label": "Value Evaluation Framework Value Dimensions",
+      "nodes": [
+        "README_value_evaluation_framework",
+        "README_vef_informational_value",
+        "README_vef_operational_value",
+        "README_vef_economic_value",
+        "README_vef_social_value",
+        "README_vef_emotional_value"
+      ],
+      "relation": "composed_of",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/value_evaluation_framework/README.md",
+      "source_location": "lines 10-18",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_extractor_pipeline",
+      "label": "Extractor Internal Pipeline (Requirement Parser -> Schema Generator -> Data Extractor)",
+      "nodes": [
+        "Incident_reporting_extractor_component",
+        "Incident_reporting_requirement_parser",
+        "Incident_reporting_schema_generator",
+        "Incident_reporting_data_extractor"
+      ],
+      "relation": "sequential_pipeline",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "use_cases/Incident_reporting.md",
+      "source_location": "lines 165-181",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

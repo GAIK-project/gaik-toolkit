@@ -1,0 +1,777 @@
+{
+  "nodes": [
+    {
+      "id": "schema_generated_single_doc_requirements",
+      "label": "Schema Generator Single Doc Requirements (PO Header+Line Items)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/schema-generator/schema_generated_single_doc/requirements.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_generated_single_doc_schema",
+      "label": "Schema Generator Single Doc Pydantic Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/schema-generator/schema_generated_single_doc/schema.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_generated_single_doc_schema_info",
+      "label": "Schema Generator Single Doc Schema Info",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/schema-generator/schema_generated_single_doc/schema_info.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_generator_purchase_order_header_extraction",
+      "label": "PurchaseOrderHeaderExtraction Pydantic Model (schema-generator example)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/schema-generator/schema_generated_single_doc/schema.py",
+      "source_location": "class purchase_order_header_extraction_Extraction",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_generator_purchase_order_line_item",
+      "label": "PurchaseOrderLineItem Pydantic Model (schema-generator example)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/schema-generator/schema_generated_single_doc/schema.py",
+      "source_location": "class purchase_order_line_item_Extraction",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "text_to_speech_example",
+      "label": "Text-to-Speech Example Script",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/text_to_speech/text_to_speech_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_text_to_speech_component",
+      "label": "TextToSpeech Component (gaik.software_components.text_to_speech)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/text_to_speech/text_to_speech_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "local_whisper_subtitles_example",
+      "label": "Local Whisper Subtitles Example (SRT/VTT generation)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/transcriber/local_whisper_subtitles_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcriber_srt_utils",
+      "label": "Transcriber SRT Utils (segments_to_srt, segments_to_vtt, chunk_segments)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/transcriber/local_whisper_subtitles_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcriber_whisper_local",
+      "label": "Local Whisper Transcribe Function (whisper_local.transcribe)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/transcriber/local_whisper_subtitles_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcriber_example",
+      "label": "Transcriber Example Script (Azure/OpenAI Whisper)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/transcriber/transcriber_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcriber_example_local_model",
+      "label": "Transcriber Example Local Model Script",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/transcriber/transcriber_exmaple_local_model.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_transcriber_component",
+      "label": "Transcriber Component (gaik.software_components.transcriber)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/transcriber/transcriber_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_calibration",
+      "label": "Validator Calibration Demo (LLM Judge vs Human Labels)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_calibration.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_validators_calibrate",
+      "label": "calibrate_against_human_labels Function",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_calibration.py",
+      "source_location": "from gaik.software_components.validators import calibrate_against_human_labels",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_detect_hallucinations",
+      "label": "Validator Hallucination Detection Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_detect_hallucinations.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_judgebench_comparison",
+      "label": "JudgeBench Naive vs Research Prompt Comparison Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "judgebench_harness",
+      "label": "JudgeBenchmarkHarness Class",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py",
+      "source_location": "class JudgeBenchmarkHarness",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_likert_scoring",
+      "label": "Validator Likert 1-5 Scoring Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_likert_scoring.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_llm_judge",
+      "label": "LLM-as-Judge Demo (Vision/PDF Extraction Validation)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_llm_judge.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_llm_judge_text_pair",
+      "label": "LLM Judge Text-Pair Equivalence Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_llm_judge_text_pair.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_pairwise",
+      "label": "Pairwise A/B Extractor Comparison Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_pairwise.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_panel_jury",
+      "label": "LLM Judge Panel (Multi-Judge Jury) Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_panel_jury.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_llm_judge",
+      "label": "LLMJudge Component (gaik.software_components.validators.LLMJudge)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_llm_judge.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_llm_judge_panel",
+      "label": "LLMJudgePanel Component (gaik.software_components.validators.LLMJudgePanel)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_panel_jury.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_validation_rubric",
+      "label": "ValidationRubric Model (gaik.software_components.validators)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_llm_judge.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_compare_pairwise",
+      "label": "compare_pairwise Function (gaik.software_components.validators)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_pairwise.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_blueprint_result",
+      "label": "Vision Extractor Blueprint Extraction Result (foundation plan JSON)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/blueprint.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_po_result",
+      "label": "Vision Extractor PO Extraction Result (purchase order JSON)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO_result.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_example",
+      "label": "VisionExtractor Example Script (single/multi-doc)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/vision_extractor_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_example_minimal",
+      "label": "VisionExtractor Minimal Example Script",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/vision_extractor_example_minimal.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_vision_extractor_component",
+      "label": "VisionExtractor Component (gaik.software_components.vision_extractor)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/vision_extractor_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_po_schema_requirements",
+      "label": "VisionExtractor PO Schema Requirements (purchase order extraction)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO_schema/requirements.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_po_schema",
+      "label": "VisionExtractor PO Pydantic Schema (auto-generated)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO_schema/schema.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "audio_to_structured_data_pipeline_example",
+      "label": "AudioToStructuredData Pipeline Example Script",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/pipeline_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_audio_to_structured_data_module",
+      "label": "AudioToStructuredData Module (gaik.software_modules.audio_to_structured_data)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/pipeline_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "multimodal_parser_config",
+      "label": "Multimodal Parser Config (create_openai_client, get_openai_config)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py",
+      "source_location": "from gaik.software_components.parsers.multimodal_parser.config",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "schema_generated_single_doc_schema",
+      "target": "schema_generated_single_doc_requirements",
+      "relation": "generated_from",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/schema-generator/schema_generated_single_doc/schema.py",
+      "source_location": "module docstring: Auto-generated schema",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_generated_single_doc_schema_info",
+      "target": "schema_generated_single_doc_schema",
+      "relation": "describes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/schema-generator/schema_generated_single_doc/schema_info.json",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "schema_generator_purchase_order_header_extraction",
+      "target": "schema_generator_purchase_order_line_item",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/schema-generator/schema_generated_single_doc/schema.py",
+      "source_location": "line_items: list[purchase_order_line_item_Extraction]",
+      "weight": 1.0
+    },
+    {
+      "source": "text_to_speech_example",
+      "target": "gaik_text_to_speech_component",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/text_to_speech/text_to_speech_example.py",
+      "source_location": "tts = TextToSpeech(api_config=config); result = tts.synthesize(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "local_whisper_subtitles_example",
+      "target": "transcriber_whisper_local",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/transcriber/local_whisper_subtitles_example.py",
+      "source_location": "result = transcribe(audio_path=AUDIO_FILE, ...)",
+      "weight": 1.0
+    },
+    {
+      "source": "local_whisper_subtitles_example",
+      "target": "transcriber_srt_utils",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/transcriber/local_whisper_subtitles_example.py",
+      "source_location": "segments_to_srt, segments_to_vtt, chunk_segments",
+      "weight": 1.0
+    },
+    {
+      "source": "transcriber_example",
+      "target": "gaik_transcriber_component",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/transcriber/transcriber_example.py",
+      "source_location": "transcriber = Transcriber(...); result = transcriber.transcribe(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "transcriber_example_local_model",
+      "target": "gaik_transcriber_component",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/transcriber/transcriber_exmaple_local_model.py",
+      "source_location": "transcriber = Transcriber(..., transcription_model='whisper_local', ...)",
+      "weight": 1.0
+    },
+    {
+      "source": "transcriber_example_local_model",
+      "target": "transcriber_whisper_local",
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/examples/software_components/transcriber/transcriber_exmaple_local_model.py",
+      "source_location": "transcription_model='whisper_local'",
+      "weight": 0.9
+    },
+    {
+      "source": "demo_calibration",
+      "target": "gaik_llm_judge",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_calibration.py",
+      "source_location": "judge = LLMJudge(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_calibration",
+      "target": "gaik_validators_calibrate",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_calibration.py",
+      "source_location": "report = calibrate_against_human_labels(judge, dataset, rubric=rubric)",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_detect_hallucinations",
+      "target": "gaik_llm_judge",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_detect_hallucinations.py",
+      "source_location": "judge = LLMJudge(model_provider='azure'); report = judge.detect_hallucinations(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_judgebench_comparison",
+      "target": "judgebench_harness",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py",
+      "source_location": "bench = JudgeBenchmarkHarness(provider=args.provider, model=args.model)",
+      "weight": 1.0
+    },
+    {
+      "source": "judgebench_harness",
+      "target": "multimodal_parser_config",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py",
+      "source_location": "_call_openai: from gaik.software_components.parsers.multimodal_parser.config import create_openai_client",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_likert_scoring",
+      "target": "gaik_llm_judge",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_likert_scoring.py",
+      "source_location": "judge = LLMJudge(...); result = judge.validate(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_likert_scoring",
+      "target": "gaik_validation_rubric",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_likert_scoring.py",
+      "source_location": "rubric = ValidationRubric(scoring_mode='likert_1_5', ...)",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_llm_judge",
+      "target": "gaik_llm_judge",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_llm_judge.py",
+      "source_location": "judge = LLMJudge(...); result = judge.validate(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_llm_judge",
+      "target": "gaik_validation_rubric",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_llm_judge.py",
+      "source_location": "rubric = ValidationRubric(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_llm_judge_text_pair",
+      "target": "gaik_llm_judge",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_llm_judge_text_pair.py",
+      "source_location": "judge = LLMJudge(model_provider='azure'); verdict = judge.judge_text_pair(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_pairwise",
+      "target": "gaik_llm_judge",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_pairwise.py",
+      "source_location": "judge = LLMJudge(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_pairwise",
+      "target": "gaik_compare_pairwise",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_pairwise.py",
+      "source_location": "result = compare_pairwise(judge=judge, source_pages=pages, ...)",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_panel_jury",
+      "target": "gaik_llm_judge_panel",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_panel_jury.py",
+      "source_location": "panel = LLMJudgePanel(judges=[...]); result = panel.validate(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_panel_jury",
+      "target": "gaik_llm_judge",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_panel_jury.py",
+      "source_location": "LLMJudgePanel(judges=[LLMJudge(...), LLMJudge(...), LLMJudge(...)])",
+      "weight": 1.0
+    },
+    {
+      "source": "gaik_llm_judge_panel",
+      "target": "gaik_llm_judge",
+      "relation": "aggregates",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_panel_jury.py",
+      "source_location": "panel aggregates per-judge results via majority vote",
+      "weight": 0.9
+    },
+    {
+      "source": "vision_extractor_example",
+      "target": "gaik_vision_extractor_component",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/vision_extractor_example.py",
+      "source_location": "extractor = VisionExtractor(...); result = extractor.extract(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_example_minimal",
+      "target": "gaik_vision_extractor_component",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/vision_extractor_example_minimal.py",
+      "source_location": "extractor = VisionExtractor(...); result = extractor.extract(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_example_minimal",
+      "target": "vision_extractor_po_schema_requirements",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/vision_extractor_example_minimal.py",
+      "source_location": "schema_dir='PO_schema'",
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_example_minimal",
+      "target": "vision_extractor_po_result",
+      "relation": "produces",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/vision_extractor_example_minimal.py",
+      "source_location": "output_path = Path(__file__).parent / 'PO_result.json'",
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_po_schema",
+      "target": "vision_extractor_po_schema_requirements",
+      "relation": "generated_from",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO_schema/schema.py",
+      "source_location": "module docstring: Auto-generated schema",
+      "weight": 1.0
+    },
+    {
+      "source": "audio_to_structured_data_pipeline_example",
+      "target": "gaik_audio_to_structured_data_module",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/pipeline_example.py",
+      "source_location": "pipeline = AudioToStructuredData(use_azure=True); result = pipeline.run(...)",
+      "weight": 1.0
+    },
+    {
+      "source": "gaik_audio_to_structured_data_module",
+      "target": "gaik_transcriber_component",
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/pipeline_example.py",
+      "source_location": "transcriber_ctor config passed to pipeline.run; pipeline = transcription+schema+extraction",
+      "weight": 0.9
+    },
+    {
+      "source": "vision_extractor_example",
+      "target": "vision_extractor_blueprint_result",
+      "relation": "may_produce",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/vision_extractor_example.py",
+      "source_location": "blueprint task is commented out but included in the script",
+      "weight": 0.7
+    },
+    {
+      "source": "demo_likert_scoring",
+      "target": "demo_llm_judge",
+      "relation": "extends",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/examples/software_components/validators/demo_likert_scoring.py",
+      "source_location": "Requires same credentials as demo_llm_judge.py (module docstring)",
+      "weight": 0.7
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "he_validators_llm_judge_ecosystem",
+      "label": "LLMJudge validator ecosystem: judge, rubric, calibration, pairwise, panel demos all share the LLMJudge + ValidationRubric core",
+      "nodes": ["gaik_llm_judge", "gaik_validation_rubric", "gaik_validators_calibrate", "gaik_compare_pairwise", "gaik_llm_judge_panel", "demo_llm_judge", "demo_likert_scoring", "demo_pairwise", "demo_panel_jury", "demo_calibration"],
+      "relation": "ecosystem",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/examples/software_components/validators/",
+      "weight": 0.9
+    },
+    {
+      "id": "he_vision_extractor_schema_pipeline",
+      "label": "VisionExtractor schema-driven extraction pipeline: schema.py and requirements.json co-define extraction structure for vision extractor examples",
+      "nodes": ["gaik_vision_extractor_component", "vision_extractor_po_schema", "vision_extractor_po_schema_requirements", "vision_extractor_po_result", "vision_extractor_example_minimal"],
+      "relation": "pipeline",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/",
+      "weight": 1.0
+    },
+    {
+      "id": "he_audio_pipeline_components",
+      "label": "AudioToStructuredData pipeline orchestrates Transcriber + schema generator + data extractor",
+      "nodes": ["gaik_audio_to_structured_data_module", "gaik_transcriber_component", "audio_to_structured_data_pipeline_example"],
+      "relation": "orchestrates",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/pipeline_example.py",
+      "weight": 0.9
+    }
+  ],
+  "input_tokens": 12800,
+  "output_tokens": 2100
+}

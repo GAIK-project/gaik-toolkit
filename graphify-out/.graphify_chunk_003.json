@@ -1,0 +1,1014 @@
+{
+  "nodes": [
+    {
+      "id": "gt_sample14_form_safety_report",
+      "label": "GT Sample 14 Safety Report (Katja Nieminen - oil spill)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 14_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": "Katja Nieminen",
+      "contributor": null
+    },
+    {
+      "id": "gt_sample1_form_safety_report",
+      "label": "GT Sample 1 Safety Report (Matti Möttönen - water cart parking)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 1_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gt_sample2_form_safety_report",
+      "label": "GT Sample 2 Safety Report (Pegas-Gonda hall cleanup)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 2_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gt_sample3_form_safety_report",
+      "label": "GT Sample 3 Safety Report (unlocked computer, Konepaja building)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 3_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gt_sample4_form_safety_report",
+      "label": "GT Sample 4 Safety Report (forklift without lights, Supra warehouse)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 4_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pred_sample11_form_safety_report",
+      "label": "Prediction Sample 11 Safety Report (Jari Virtanen - ventilation issue)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 11_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pred_sample12_form_safety_report",
+      "label": "Prediction Sample 12 Safety Report (Sanna Lehtinen - dangerous door)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 12_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pred_sample14_form_safety_report",
+      "label": "Prediction Sample 14 Safety Report (Katja Nieminen - oil spill, type mismatch)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 14_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pred_sample1_form_safety_report",
+      "label": "Prediction Sample 1 Safety Report (Matti Möttönen - water cart positive safety)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 1_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pred_sample2_form_safety_report",
+      "label": "Prediction Sample 2 Safety Report (Pegas-Gonda hall cleanup)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 2_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pred_sample3_form_safety_report",
+      "label": "Prediction Sample 3 Safety Report (unlocked computer, Konepaja)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 3_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pred_sample4_form_safety_report",
+      "label": "Prediction Sample 4 Safety Report (forklift without lights)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 4_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcription_eval_config",
+      "label": "Transcription Eval Shared OpenAI/Azure Config",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/config.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcription_eval_config_get_openai_config",
+      "label": "get_openai_config() — build Azure/OpenAI config dict",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/config.py",
+      "source_location": "line 17",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcription_eval_config_create_openai_client",
+      "label": "create_openai_client() — instantiate AzureOpenAI or OpenAI",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/config.py",
+      "source_location": "line 52",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "enhance_transcript_module",
+      "label": "enhance_transcript.py — Two-Pass Finnish Transcript Enhancer (GPT)",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "enhance_transcript_pass1",
+      "label": "enhance_transcript_pass1() — spelling consistency pass",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": "line 154",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "enhance_transcript_pass2",
+      "label": "enhance_transcript_pass2() — context repair + ASR correction pass",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": "line 172",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "enhance_transcript_process_transcripts",
+      "label": "process_transcripts() — batch file processing orchestrator",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": "line 191",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "enhance_transcript_get_client",
+      "label": "get_client() — config + client factory helper",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": "line 146",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "eval_enhanced_module",
+      "label": "eval_enhanced.py — Batch WER/CER/Spelling Eval (Original vs Enhanced)",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/eval_enhanced.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "eval_enhanced_evaluate_batch",
+      "label": "evaluate_batch() — aggregate WER/CER comparison across transcript files",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/eval_enhanced.py",
+      "source_location": "line 89",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "eval_enhanced_evaluate_texts",
+      "label": "_evaluate_texts() — compute word and char alignment outputs",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/eval_enhanced.py",
+      "source_location": "line 72",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "eval_enhanced_spelling_error_count",
+      "label": "_spelling_error_count() — count near-miss spelling substitutions",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/eval_enhanced.py",
+      "source_location": "line 47",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "side_by_side_compare_module",
+      "label": "side_by_side_compare.py — Per-file WER/CER Report with Aligned Output",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/side_by_side_compare.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "side_by_side_compare_folders",
+      "label": "compare_folders() — produce per-file side-by-side reports",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/side_by_side_compare.py",
+      "source_location": "line 220",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "side_by_side_format_report",
+      "label": "_format_report() — render accuracy report text block",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/side_by_side_compare.py",
+      "source_location": "line 177",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "side_by_side_build_aligned_tokens",
+      "label": "_build_aligned_tokens() — annotate substitution/insertion/deletion tokens",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/transcription_eval/side_by_side_compare.py",
+      "source_location": "line 52",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "classification_example",
+      "label": "classification_example.py — DocumentClassifier Usage Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/classifier/classification_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_document_classifier",
+      "label": "DocumentClassifier (gaik.software_components.doc_classifier)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/classifier/classification_example.py",
+      "source_location": "line 17",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "enhance_transcript_example",
+      "label": "enhance_transcript_example.py — TranscriptEnhancer Component Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/enhance_transcript/enhance_transcript_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_transcript_enhancer",
+      "label": "TranscriptEnhancer (gaik.software_components.enhance_transcript)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/enhance_transcript/enhance_transcript_example.py",
+      "source_location": "line 10",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extraction_evaluator_example",
+      "label": "extraction_evaluator_example.py — ExtractionEvaluator + BatchRunner Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/evaluators/extraction_evaluator_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_extraction_evaluator",
+      "label": "ExtractionEvaluator (gaik.software_components.evaluators)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/evaluators/extraction_evaluator_example.py",
+      "source_location": "line 21",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_batch_evaluation_runner",
+      "label": "BatchEvaluationRunner (gaik.software_components.evaluators)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/evaluators/extraction_evaluator_example.py",
+      "source_location": "line 22",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_evaluation_dataset",
+      "label": "EvaluationDataset (gaik.software_components.evaluators)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/evaluators/extraction_evaluator_example.py",
+      "source_location": "line 23",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_evaluator_example",
+      "label": "rag_evaluator_example.py — RAGEvaluator + LLMJudge Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/evaluators/rag_evaluator_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_rag_evaluator",
+      "label": "RAGEvaluator (gaik.software_components.evaluators)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/evaluators/rag_evaluator_example.py",
+      "source_location": "line 27",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_llm_judge",
+      "label": "LLMJudge (gaik.software_components.validators)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/evaluators/rag_evaluator_example.py",
+      "source_location": "line 28",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_response_evaluator_example",
+      "label": "rag_response_evaluator_example.py — RAGResponseEvaluator Referenced + Pairwise Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/evaluators/rag_response_evaluator_example.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_rag_response_evaluator",
+      "label": "RAGResponseEvaluator (gaik.software_components.evaluators)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/evaluators/rag_response_evaluator_example.py",
+      "source_location": "line 35",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extraction_example_1",
+      "label": "extraction_example_1.py — SchemaGenerator + DataExtractor End-to-End Demo",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/extractor/extraction_example_1.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_schema_generator",
+      "label": "SchemaGenerator (gaik.software_components.extractor)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/extractor/extraction_example_1.py",
+      "source_location": "line 22",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_data_extractor",
+      "label": "DataExtractor (gaik.software_components.extractor)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_components/extractor/extraction_example_1.py",
+      "source_location": "line 22",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extraction_eval_gt_data",
+      "label": "Extraction Eval Ground-Truth Data Folder (Finnish safety forms)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extraction_eval_predictions_data",
+      "label": "Extraction Eval Predictions Data Folder (LLM-extracted safety forms)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "enhance_transcript_get_client",
+      "target": "transcription_eval_config_get_openai_config",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": "line 147",
+      "weight": 1.0
+    },
+    {
+      "source": "enhance_transcript_get_client",
+      "target": "transcription_eval_config_create_openai_client",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": "line 152",
+      "weight": 1.0
+    },
+    {
+      "source": "enhance_transcript_process_transcripts",
+      "target": "enhance_transcript_get_client",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": "line 207",
+      "weight": 1.0
+    },
+    {
+      "source": "enhance_transcript_process_transcripts",
+      "target": "enhance_transcript_pass1",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": "line 229",
+      "weight": 1.0
+    },
+    {
+      "source": "enhance_transcript_process_transcripts",
+      "target": "enhance_transcript_pass2",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": "line 235",
+      "weight": 1.0
+    },
+    {
+      "source": "eval_enhanced_evaluate_batch",
+      "target": "eval_enhanced_evaluate_texts",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/eval_enhanced.py",
+      "source_location": "line 160",
+      "weight": 1.0
+    },
+    {
+      "source": "eval_enhanced_evaluate_batch",
+      "target": "eval_enhanced_spelling_error_count",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/eval_enhanced.py",
+      "source_location": "line 172",
+      "weight": 1.0
+    },
+    {
+      "source": "side_by_side_compare_folders",
+      "target": "side_by_side_format_report",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/side_by_side_compare.py",
+      "source_location": "line 257",
+      "weight": 1.0
+    },
+    {
+      "source": "side_by_side_format_report",
+      "target": "side_by_side_build_aligned_tokens",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/side_by_side_compare.py",
+      "source_location": "line 133",
+      "weight": 1.0
+    },
+    {
+      "source": "classification_example",
+      "target": "gaik_document_classifier",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/classifier/classification_example.py",
+      "source_location": "line 28",
+      "weight": 1.0
+    },
+    {
+      "source": "enhance_transcript_example",
+      "target": "gaik_transcript_enhancer",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/enhance_transcript/enhance_transcript_example.py",
+      "source_location": "line 15",
+      "weight": 1.0
+    },
+    {
+      "source": "extraction_evaluator_example",
+      "target": "gaik_extraction_evaluator",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/evaluators/extraction_evaluator_example.py",
+      "source_location": "line 74",
+      "weight": 1.0
+    },
+    {
+      "source": "extraction_evaluator_example",
+      "target": "gaik_batch_evaluation_runner",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/evaluators/extraction_evaluator_example.py",
+      "source_location": "line 117",
+      "weight": 1.0
+    },
+    {
+      "source": "extraction_evaluator_example",
+      "target": "gaik_evaluation_dataset",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/evaluators/extraction_evaluator_example.py",
+      "source_location": "line 31",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_evaluator_example",
+      "target": "gaik_rag_evaluator",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/evaluators/rag_evaluator_example.py",
+      "source_location": "line 66",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_evaluator_example",
+      "target": "gaik_llm_judge",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/evaluators/rag_evaluator_example.py",
+      "source_location": "line 61",
+      "weight": 1.0
+    },
+    {
+      "source": "gaik_rag_evaluator",
+      "target": "gaik_llm_judge",
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/evaluators/rag_evaluator_example.py",
+      "source_location": "line 66",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_response_evaluator_example",
+      "target": "gaik_rag_response_evaluator",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/evaluators/rag_response_evaluator_example.py",
+      "source_location": "line 110",
+      "weight": 1.0
+    },
+    {
+      "source": "extraction_example_1",
+      "target": "gaik_schema_generator",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/extraction_example_1.py",
+      "source_location": "line 72",
+      "weight": 1.0
+    },
+    {
+      "source": "extraction_example_1",
+      "target": "gaik_data_extractor",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/extraction_example_1.py",
+      "source_location": "line 86",
+      "weight": 1.0
+    },
+    {
+      "source": "gaik_schema_generator",
+      "target": "gaik_data_extractor",
+      "relation": "produces_schema_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/extraction_example_1.py",
+      "source_location": "line 77",
+      "weight": 1.0
+    },
+    {
+      "source": "gt_sample14_form_safety_report",
+      "target": "extraction_eval_gt_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 14_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "gt_sample1_form_safety_report",
+      "target": "extraction_eval_gt_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 1_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "gt_sample2_form_safety_report",
+      "target": "extraction_eval_gt_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 2_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "gt_sample3_form_safety_report",
+      "target": "extraction_eval_gt_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 3_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "gt_sample4_form_safety_report",
+      "target": "extraction_eval_gt_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 4_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "pred_sample11_form_safety_report",
+      "target": "extraction_eval_predictions_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 11_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "pred_sample12_form_safety_report",
+      "target": "extraction_eval_predictions_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 12_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "pred_sample14_form_safety_report",
+      "target": "extraction_eval_predictions_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 14_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "pred_sample1_form_safety_report",
+      "target": "extraction_eval_predictions_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 1_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "pred_sample2_form_safety_report",
+      "target": "extraction_eval_predictions_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 2_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "pred_sample3_form_safety_report",
+      "target": "extraction_eval_predictions_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 3_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "pred_sample4_form_safety_report",
+      "target": "extraction_eval_predictions_data",
+      "relation": "belongs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 4_form.json",
+      "source_location": null,
+      "weight": 0.8
+    },
+    {
+      "source": "pred_sample14_form_safety_report",
+      "target": "gt_sample14_form_safety_report",
+      "relation": "is_prediction_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 14_form.json",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "pred_sample1_form_safety_report",
+      "target": "gt_sample1_form_safety_report",
+      "relation": "is_prediction_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 1_form.json",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "pred_sample2_form_safety_report",
+      "target": "gt_sample2_form_safety_report",
+      "relation": "is_prediction_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 2_form.json",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "pred_sample3_form_safety_report",
+      "target": "gt_sample3_form_safety_report",
+      "relation": "is_prediction_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 3_form.json",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "pred_sample4_form_safety_report",
+      "target": "gt_sample4_form_safety_report",
+      "relation": "is_prediction_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 4_form.json",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "enhance_transcript_module",
+      "target": "transcription_eval_config",
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": "line 13",
+      "weight": 1.0
+    },
+    {
+      "source": "eval_enhanced_module",
+      "target": "eval_enhanced_evaluate_batch",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/eval_enhanced.py",
+      "source_location": "line 89",
+      "weight": 1.0
+    },
+    {
+      "source": "side_by_side_compare_module",
+      "target": "side_by_side_compare_folders",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/side_by_side_compare.py",
+      "source_location": "line 220",
+      "weight": 1.0
+    },
+    {
+      "source": "enhance_transcript_module",
+      "target": "enhance_transcript_process_transcripts",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/transcription_eval/enhance_transcript.py",
+      "source_location": "line 191",
+      "weight": 1.0
+    },
+    {
+      "source": "gaik_extraction_evaluator",
+      "target": "gaik_evaluation_dataset",
+      "relation": "evaluates",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/examples/software_components/evaluators/extraction_evaluator_example.py",
+      "source_location": "line 75",
+      "weight": 1.0
+    },
+    {
+      "source": "gaik_batch_evaluation_runner",
+      "target": "gaik_extraction_evaluator",
+      "relation": "provides_outputs_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/examples/software_components/evaluators/extraction_evaluator_example.py",
+      "source_location": "line 125",
+      "weight": 0.9
+    },
+    {
+      "source": "pred_sample14_form_safety_report",
+      "target": "gt_sample14_form_safety_report",
+      "relation": "has_field_mismatch",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/predictions/Sample 14_form.json",
+      "source_location": "line 2",
+      "weight": 0.9
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_transcription_eval_pipeline",
+      "label": "Transcription Evaluation Pipeline: enhance then evaluate",
+      "members": [
+        "enhance_transcript_module",
+        "eval_enhanced_module",
+        "side_by_side_compare_module",
+        "transcription_eval_config"
+      ],
+      "relation": "forms_pipeline",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/eval_methods/transcription_eval",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_extraction_eval_data_pair",
+      "label": "Extraction Eval GT-Prediction pairs for samples 1-4 and 14",
+      "members": [
+        "extraction_eval_gt_data",
+        "extraction_eval_predictions_data",
+        "gaik_extraction_evaluator"
+      ],
+      "relation": "forms_evaluation_dataset",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data",
+      "source_location": null,
+      "weight": 0.9
+    },
+    {
+      "id": "hyperedge_gaik_evaluators_suite",
+      "label": "GAIK Evaluator Suite: ExtractionEvaluator, RAGEvaluator, RAGResponseEvaluator + BatchRunner",
+      "members": [
+        "gaik_extraction_evaluator",
+        "gaik_rag_evaluator",
+        "gaik_rag_response_evaluator",
+        "gaik_batch_evaluation_runner",
+        "gaik_llm_judge"
+      ],
+      "relation": "forms_evaluation_suite",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/examples/software_components/evaluators",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 9800,
+  "output_tokens": 2400
+}

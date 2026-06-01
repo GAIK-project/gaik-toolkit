@@ -1,0 +1,790 @@
+{
+  "nodes": [
+    {
+      "id": "SKILL_po_processing_skill",
+      "label": "Purchase Order Processing Skill",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/SKILL.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "SKILL_po_calc_breakdown_template",
+      "label": "PO Calculation Breakdown Template",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/CALCULATION_BREAKDOWN_TEMPLATE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "SKILL_po_calc_logic",
+      "label": "PO Calculation Logic Reference",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/CALCULATION_LOGIC.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "SKILL_po_extraction_fields",
+      "label": "PO Extraction Fields Reference",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/EXTRACTION_FIELDS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "SKILL_po_output_format",
+      "label": "PO Output Format Reference",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/OUTPUT_FORMAT.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "SKILL_po_pricing_rules",
+      "label": "PO Pricing Rules Reference",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/PRICING_RULES.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "converted_price_list_9d95c5ab",
+      "label": "Precision Steel Price List (Converted)",
+      "file_type": "document",
+      "source_file": "graphify-out/converted/price list_9d95c5ab.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": "Precision Steel & Components Ltd.",
+      "contributor": null
+    },
+    {
+      "id": "converted_sample_order_937033ea",
+      "label": "Sample Sales Order - Advanced Metalworks (Converted)",
+      "file_type": "document",
+      "source_file": "graphify-out/converted/sample_order_937033ea.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": "Advanced Metalworks Solutions Inc.",
+      "contributor": null
+    },
+    {
+      "id": "SKILL_report_writing_readme",
+      "label": "Report Writing Skill README",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "SKILL_report_writing_evaluation",
+      "label": "Report Writing Skill Evaluation Prompts",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing/EVALUATION.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "SKILL_report_writing_skill",
+      "label": "Report Writing Skill Definition",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing/SKILL.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "SKILL_report_writing_input_formats",
+      "label": "Report Writing Input Formats Reference",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing/reference/INPUT_FORMATS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "SKILL_report_writing_output_sections",
+      "label": "Report Writing Output Sections Reference",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing/reference/OUTPUT_SECTIONS.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "prompt_construction_diary_readme",
+      "label": "Construction Diary Extraction Prompt README",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "prompt_construction_diary_english",
+      "label": "Construction Diary English Extraction Prompt",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/English-prompt.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "prompt_construction_diary_finnish",
+      "label": "Construction Diary Finnish Extraction Prompt",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/Finnish-prompt.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "prompt_construction_diary_transcript_en",
+      "label": "Construction Diary English Transcript Sample",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/Transcripts/English.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "prompt_construction_diary_transcript_fi",
+      "label": "Construction Diary Finnish Transcript Sample",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/Transcripts/Finnish.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "prompt_incident_report_readme",
+      "label": "Incident Report Writing Prompt README",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/Incident report writing/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "prompt_incident_report_prompt",
+      "label": "Incident Report Extraction Prompt",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/Incident report writing/prompt.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "prompt_incident_transcript_1",
+      "label": "Incident Report Transcript Sample 1 (Finnish - Positive)",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/Incident report writing/data/transcript_1.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "prompt_incident_transcript_2",
+      "label": "Incident Report Transcript Sample 2 (Finnish - 5S Observation)",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/Incident report writing/data/transcript_2.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_po_processing_workflow",
+      "label": "Purchase Order Processing Workflow",
+      "file_type": "rationale",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/SKILL.md",
+      "source_location": "Workflow section",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_volume_discount_tiers",
+      "label": "Volume Discount Tier Structure",
+      "file_type": "rationale",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/PRICING_RULES.md",
+      "source_location": "Volume Discount Tiers section",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_bom_matching",
+      "label": "BOM to PO Item Matching Logic",
+      "file_type": "rationale",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/SKILL.md",
+      "source_location": "Step 3: Match PO Items with BOMs",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_sales_order_output",
+      "label": "Sales Order Output Document",
+      "file_type": "rationale",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/OUTPUT_FORMAT.md",
+      "source_location": "Sales Order Sections",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_report_content_inference",
+      "label": "Report Section Content Inference from Signals",
+      "file_type": "rationale",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing/SKILL.md",
+      "source_location": "Step 7.5: Analyze Content for Section Inference",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_construction_diary_json_schema",
+      "label": "Construction Diary JSON Output Schema",
+      "file_type": "rationale",
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/README.md",
+      "source_location": "Output schema section",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_incident_report_json_schema",
+      "label": "Incident Report JSON Output Schema",
+      "file_type": "rationale",
+      "source_file": "implementation_layer/no-code-assets/prompts/Incident report writing/README.md",
+      "source_location": "Output schema section",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_precision_steel_company",
+      "label": "Precision Steel & Components Ltd.",
+      "file_type": "rationale",
+      "source_file": "graphify-out/converted/price list_9d95c5ab.md",
+      "source_location": "Header row",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_anti_hallucination_guardrails",
+      "label": "Anti-Hallucination Guardrails Pattern",
+      "file_type": "rationale",
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/README.md",
+      "source_location": "Core guardrails section",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "concept_gaik_transcriber_mcp",
+      "label": "gaik-transcriber MCP Tool",
+      "file_type": "rationale",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing/SKILL.md",
+      "source_location": "Step 3 - Transcribe recordings",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "SKILL_po_processing_skill",
+      "target": "SKILL_po_calc_breakdown_template",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/SKILL.md",
+      "source_location": "Step 5 and Output Files sections",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_po_processing_skill",
+      "target": "SKILL_po_calc_logic",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/SKILL.md",
+      "source_location": "Step 5: Calculate Pricing",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_po_processing_skill",
+      "target": "SKILL_po_extraction_fields",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/SKILL.md",
+      "source_location": "Steps 1, 2",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_po_processing_skill",
+      "target": "SKILL_po_output_format",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/SKILL.md",
+      "source_location": "Step 6: Generate Sales Order",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_po_processing_skill",
+      "target": "SKILL_po_pricing_rules",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/SKILL.md",
+      "source_location": "Steps 4, 5",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_po_pricing_rules",
+      "target": "concept_volume_discount_tiers",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/PRICING_RULES.md",
+      "source_location": "Volume Discount Tiers section",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_po_calc_logic",
+      "target": "concept_volume_discount_tiers",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/CALCULATION_LOGIC.md",
+      "source_location": "Volume Discount Calculation section",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_po_processing_skill",
+      "target": "concept_bom_matching",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/SKILL.md",
+      "source_location": "Step 3: Match PO Items with BOMs",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_po_output_format",
+      "target": "concept_sales_order_output",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/OUTPUT_FORMAT.md",
+      "source_location": "Sales Order Sections",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_po_output_format",
+      "target": "converted_sample_order_937033ea",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/OUTPUT_FORMAT.md",
+      "source_location": "Sample-Style output mode description",
+      "weight": 0.85
+    },
+    {
+      "source": "SKILL_po_pricing_rules",
+      "target": "converted_price_list_9d95c5ab",
+      "relation": "uses_data_from",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/PRICING_RULES.md",
+      "source_location": "Price List Column Mapping",
+      "weight": 0.95
+    },
+    {
+      "source": "converted_price_list_9d95c5ab",
+      "target": "concept_precision_steel_company",
+      "relation": "authored_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "graphify-out/converted/price list_9d95c5ab.md",
+      "source_location": "Header",
+      "weight": 1.0
+    },
+    {
+      "source": "converted_sample_order_937033ea",
+      "target": "concept_sales_order_output",
+      "relation": "exemplifies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "graphify-out/converted/sample_order_937033ea.md",
+      "source_location": "Full document",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_report_writing_readme",
+      "target": "SKILL_report_writing_skill",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/README.md",
+      "source_location": "Technical Details / Project Structure section",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_report_writing_readme",
+      "target": "SKILL_report_writing_evaluation",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/README.md",
+      "source_location": "Project Structure section",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_report_writing_skill",
+      "target": "SKILL_report_writing_input_formats",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing/SKILL.md",
+      "source_location": "References section at end",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_report_writing_skill",
+      "target": "SKILL_report_writing_output_sections",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing/SKILL.md",
+      "source_location": "References section at end",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_report_writing_skill",
+      "target": "concept_report_content_inference",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing/SKILL.md",
+      "source_location": "Step 7.5",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_report_writing_skill",
+      "target": "concept_gaik_transcriber_mcp",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing/SKILL.md",
+      "source_location": "Step 3 - Transcribe recordings",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_report_writing_evaluation",
+      "target": "SKILL_report_writing_skill",
+      "relation": "evaluates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing/EVALUATION.md",
+      "source_location": "Full document",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_construction_diary_readme",
+      "target": "prompt_construction_diary_english",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/README.md",
+      "source_location": "Recommended repository structure",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_construction_diary_readme",
+      "target": "prompt_construction_diary_finnish",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/README.md",
+      "source_location": "Recommended repository structure",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_construction_diary_readme",
+      "target": "prompt_construction_diary_transcript_en",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/README.md",
+      "source_location": "Recommended repository structure / Transcripts folder",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_construction_diary_readme",
+      "target": "prompt_construction_diary_transcript_fi",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/README.md",
+      "source_location": "Recommended repository structure / Transcripts folder",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_construction_diary_readme",
+      "target": "concept_construction_diary_json_schema",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/README.md",
+      "source_location": "Output schema section",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_construction_diary_english",
+      "target": "concept_construction_diary_json_schema",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/English-prompt.txt",
+      "source_location": "REQUIRED OUTPUT section",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_construction_diary_finnish",
+      "target": "concept_construction_diary_json_schema",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/Finnish-prompt.txt",
+      "source_location": "PAKOTETTU ULOSTULO section",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_construction_diary_english",
+      "target": "concept_anti_hallucination_guardrails",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/English-prompt.txt",
+      "source_location": "ANTI-HALLUCINATION GUARDRAILS section",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_incident_report_readme",
+      "target": "prompt_incident_report_prompt",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/Incident report writing/README.md",
+      "source_location": "Recommended repository structure",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_incident_report_readme",
+      "target": "prompt_incident_transcript_1",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/Incident report writing/README.md",
+      "source_location": "Recommended repository structure / data folder",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_incident_report_readme",
+      "target": "prompt_incident_transcript_2",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/Incident report writing/README.md",
+      "source_location": "Recommended repository structure / data folder",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_incident_report_readme",
+      "target": "concept_incident_report_json_schema",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/Incident report writing/README.md",
+      "source_location": "Output schema section",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_incident_report_prompt",
+      "target": "concept_incident_report_json_schema",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/Incident report writing/prompt.txt",
+      "source_location": "OUTPUT (STRICT JSON) section",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_incident_report_prompt",
+      "target": "concept_anti_hallucination_guardrails",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/Incident report writing/prompt.txt",
+      "source_location": "CRITICAL ANTI-HALLUCINATION RULES section",
+      "weight": 1.0
+    },
+    {
+      "source": "prompt_construction_diary_readme",
+      "target": "concept_anti_hallucination_guardrails",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/README.md",
+      "source_location": "Core guardrails section",
+      "weight": 1.0
+    },
+    {
+      "source": "concept_construction_diary_json_schema",
+      "target": "concept_incident_report_json_schema",
+      "relation": "similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/README.md",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "SKILL_po_processing_skill",
+      "target": "concept_po_processing_workflow",
+      "relation": "defines",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/SKILL.md",
+      "source_location": "Workflow section",
+      "weight": 1.0
+    },
+    {
+      "source": "SKILL_po_calc_breakdown_template",
+      "target": "concept_sales_order_output",
+      "relation": "supplements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/reference/CALCULATION_BREAKDOWN_TEMPLATE.md",
+      "source_location": "Format Consistency section",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyper_po_skill_reference_docs",
+      "label": "PO Processing Skill Reference Document Set",
+      "nodes": [
+        "SKILL_po_processing_skill",
+        "SKILL_po_calc_breakdown_template",
+        "SKILL_po_calc_logic",
+        "SKILL_po_extraction_fields",
+        "SKILL_po_output_format",
+        "SKILL_po_pricing_rules"
+      ],
+      "relation": "comprises_skill_package",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing/SKILL.md",
+      "weight": 1.0
+    },
+    {
+      "id": "hyper_report_writing_skill_package",
+      "label": "Report Writing Skill Package",
+      "nodes": [
+        "SKILL_report_writing_readme",
+        "SKILL_report_writing_skill",
+        "SKILL_report_writing_evaluation",
+        "SKILL_report_writing_input_formats",
+        "SKILL_report_writing_output_sections"
+      ],
+      "relation": "comprises_skill_package",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/README.md",
+      "weight": 1.0
+    },
+    {
+      "id": "hyper_structured_extraction_prompts",
+      "label": "Structured JSON Extraction Prompt Pattern",
+      "nodes": [
+        "prompt_construction_diary_english",
+        "prompt_construction_diary_finnish",
+        "prompt_incident_report_prompt",
+        "concept_anti_hallucination_guardrails"
+      ],
+      "relation": "shares_pattern",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/no-code-assets/prompts/construction-diary-creation/README.md",
+      "weight": 0.95
+    }
+  ],
+  "input_tokens": 18500,
+  "output_tokens": 2800
+}

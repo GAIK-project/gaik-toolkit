@@ -1,455 +1,455 @@
 {
   "purchase_order_number": {
     "value": "560471823",
-    "confidence_score": 0.99,
-    "confidence_reason": "Document No. 560471823 is explicitly shown in the purchase order header."
+    "confidence_score": 1.0,
+    "confidence_reason": "Document No. 560471823 is explicitly stated in the purchase order header."
   },
   "delivery_date": {
     "value": "10/07/2025",
-    "confidence_score": 0.98,
-    "confidence_reason": "Delivery date is explicitly stated as 10.07.2025 and reformatted to DD/MM/YYYY."
+    "confidence_score": 1.0,
+    "confidence_reason": "Delivery date is explicitly stated as 10.07.2025 and normalized to DD/MM/YYYY."
   },
   "delivery_address": {
     "value": "Farview Dynamics LLC, 4820 Harbor Blvd, 97201, Portland, USA",
-    "confidence_score": 0.99,
-    "confidence_reason": "Delivery address is explicitly listed in the header block."
+    "confidence_score": 0.98,
+    "confidence_reason": "Delivery address is explicitly listed in the header block and normalized to the requested format."
   },
   "vendor_number": {
     "value": "518834",
-    "confidence_score": 0.99,
+    "confidence_score": 1.0,
     "confidence_reason": "Vendor No. 518834 is explicitly stated in the header."
   },
   "line_items": [
     {
       "item_number": {
         "value": "0010",
-        "confidence_score": 0.99,
+        "confidence_score": 1.0,
         "confidence_reason": "Item number 0010 is explicitly shown in the line-item table."
       },
       "article_code": {
         "value": "7041832",
-        "confidence_score": 0.99,
-        "confidence_reason": "Internal code 7041832 is explicitly shown next to item 0010."
+        "confidence_score": 1.0,
+        "confidence_reason": "Internal supplier code 7041832 is explicitly listed next to the item number."
       },
       "dimensions": {
         "value": "10x80mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "Dimensions 10x80mm are explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Dimensions are explicitly stated as 10x80mm."
       },
       "product_form": {
         "value": "Flat",
-        "confidence_score": 0.99,
-        "confidence_reason": "The item is explicitly described as a flat bar."
+        "confidence_score": 1.0,
+        "confidence_reason": "The description explicitly says Flat bar, which matches the allowed value Flat."
       },
       "material_grade": {
         "value": "A36 Steel",
-        "confidence_score": 0.88,
-        "confidence_reason": "A36 Steel is explicitly stated in the description; normalized to material grade."
+        "confidence_score": 0.97,
+        "confidence_reason": "Material grade is explicitly stated as A36 Steel in the description."
       },
       "standard_designation": {
-        "value": "ASTM A36",
-        "confidence_score": 0.84,
-        "confidence_reason": "ASTM A36 is explicitly stated later in the item description and matches the material."
+        "value": "",
+        "confidence_score": 0.2,
+        "confidence_reason": "No clear standard designation is stated for this line; the available text is only a product description and finish note."
       },
       "cut_length": {
         "value": "6000mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "6000mm is explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Cut length is explicitly stated as 6000mm."
       },
       "temper_or_condition": {
         "value": "HR Steel, mill finish",
-        "confidence_score": 0.91,
-        "confidence_reason": "HR Steel, mill finish is explicitly stated as the surface/condition."
+        "confidence_score": 0.96,
+        "confidence_reason": "Temper/condition is explicitly stated as HR Steel, mill finish."
       },
       "hardness_hv": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No hardness value is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No hardness value is stated for this line."
       },
       "min_bend_radius": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No minimum bend radius is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No minimum bend radius is stated for this line."
       },
       "delivery_length_note": {
         "value": null,
-        "confidence_score": 0.9,
+        "confidence_score": 0.98,
         "confidence_reason": "No separate delivery length note is stated beyond the cut length."
       },
       "applicable_standard": {
-        "value": "ASTM A36",
-        "confidence_score": 0.84,
-        "confidence_reason": "ASTM A36 is explicitly stated in the item description."
+        "value": null,
+        "confidence_score": 0.98,
+        "confidence_reason": "No applicable standard is stated for this line."
       },
       "special_flags": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No additional special flag is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No remaining special flag code is stated for this line."
       },
       "quantity": {
         "value": "4.200 kg",
-        "confidence_score": 0.99,
-        "confidence_reason": "Quantity 4.200 kg is explicitly stated in the table."
+        "confidence_score": 1.0,
+        "confidence_reason": "Quantity is explicitly stated as 4.200 kg."
       }
     },
     {
       "item_number": {
         "value": "0020",
-        "confidence_score": 0.99,
+        "confidence_score": 1.0,
         "confidence_reason": "Item number 0020 is explicitly shown in the line-item table."
       },
       "article_code": {
         "value": "7041833",
-        "confidence_score": 0.99,
-        "confidence_reason": "Internal code 7041833 is explicitly shown next to item 0020."
+        "confidence_score": 1.0,
+        "confidence_reason": "Internal supplier code 7041833 is explicitly listed next to the item number."
       },
       "dimensions": {
         "value": "12x50mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "Dimensions 12x50mm are explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Dimensions are explicitly stated as 12x50mm."
       },
       "product_form": {
         "value": "Flat",
-        "confidence_score": 0.99,
-        "confidence_reason": "The item is explicitly described as a flat bar."
+        "confidence_score": 1.0,
+        "confidence_reason": "The description explicitly says Flat bar, which matches the allowed value Flat."
       },
       "material_grade": {
         "value": "A36 Steel",
-        "confidence_score": 0.88,
-        "confidence_reason": "A36 Steel is explicitly stated in the description; normalized to material grade."
+        "confidence_score": 0.97,
+        "confidence_reason": "Material grade is explicitly stated as A36 Steel in the description."
       },
       "standard_designation": {
-        "value": "H085",
-        "confidence_score": 0.75,
-        "confidence_reason": "H085 appears in the item description as a condition/code, but no separate alloy/standard designation is clearly given."
+        "value": "",
+        "confidence_score": 0.2,
+        "confidence_reason": "No clear standard designation is stated for this line; the available text is only a product description and finish note."
       },
       "cut_length": {
         "value": "6000mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "6000mm is explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Cut length is explicitly stated as 6000mm."
       },
       "temper_or_condition": {
         "value": "HR Steel, mill finish, H085",
-        "confidence_score": 0.9,
-        "confidence_reason": "HR Steel, mill finish, H085 is explicitly stated in the description."
+        "confidence_score": 0.96,
+        "confidence_reason": "Temper/condition is explicitly stated as HR Steel, mill finish, H085."
       },
       "hardness_hv": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No hardness value is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No hardness value is stated for this line."
       },
       "min_bend_radius": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No minimum bend radius is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No minimum bend radius is stated for this line."
       },
       "delivery_length_note": {
         "value": "in lengths of 6000mm",
-        "confidence_score": 0.9,
-        "confidence_reason": "in lengths of 6000mm is explicitly stated as an additional note."
+        "confidence_score": 0.94,
+        "confidence_reason": "Delivery length note is explicitly stated as in lengths of 6000mm."
       },
       "applicable_standard": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No applicable standard is explicitly stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No applicable standard is stated for this line."
       },
       "special_flags": {
-        "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No additional special flag is stated for this item."
+        "value": "H085",
+        "confidence_score": 0.78,
+        "confidence_reason": "H085 appears as a remaining code in the description and is treated as a special flag, though it could also be read as a condition note."
       },
       "quantity": {
         "value": "2.800 kg",
-        "confidence_score": 0.99,
-        "confidence_reason": "Quantity 2.800 kg is explicitly stated in the table."
+        "confidence_score": 1.0,
+        "confidence_reason": "Quantity is explicitly stated as 2.800 kg."
       }
     },
     {
       "item_number": {
         "value": "0030",
-        "confidence_score": 0.99,
+        "confidence_score": 1.0,
         "confidence_reason": "Item number 0030 is explicitly shown in the line-item table."
       },
       "article_code": {
         "value": "7058901",
-        "confidence_score": 0.99,
-        "confidence_reason": "Internal code 7058901 is explicitly shown next to item 0030."
+        "confidence_score": 1.0,
+        "confidence_reason": "Internal supplier code 7058901 is explicitly listed next to the item number."
       },
       "dimensions": {
         "value": "8x100mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "Dimensions 8x100mm are explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Dimensions are explicitly stated as 8x100mm."
       },
       "product_form": {
         "value": "Flat",
-        "confidence_score": 0.99,
-        "confidence_reason": "The item is explicitly described as a flat bar."
+        "confidence_score": 1.0,
+        "confidence_reason": "The description explicitly says Flat bar, which matches the allowed value Flat."
       },
       "material_grade": {
         "value": "304 Stainless",
-        "confidence_score": 0.88,
-        "confidence_reason": "304 Stainless is explicitly stated in the description; normalized to material grade."
+        "confidence_score": 0.92,
+        "confidence_reason": "304 Stainless is explicitly stated in the description; minor normalization was applied to fit the requested material grade field."
       },
       "standard_designation": {
-        "value": "SS 304",
-        "confidence_score": 0.8,
-        "confidence_reason": "SS 304 is explicitly stated in the description and functions as the alloy/standard code here."
+        "value": "ASTM A276",
+        "confidence_score": 0.93,
+        "confidence_reason": "ASTM A276 is explicitly stated in the line description as the material standard."
       },
       "cut_length": {
         "value": "6000mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "6000mm is explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Cut length is explicitly stated as 6000mm."
       },
       "temper_or_condition": {
-        "value": "R200, H085",
-        "confidence_score": 0.88,
-        "confidence_reason": "R200, H085 are explicitly listed as condition codes in the description."
+        "value": "SS 304, R200, H085",
+        "confidence_score": 0.9,
+        "confidence_reason": "SS 304, R200, H085 is explicitly stated in the description and grouped as the condition/temper note."
       },
       "hardness_hv": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No hardness value is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No hardness value is stated for this line."
       },
       "min_bend_radius": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No minimum bend radius is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No minimum bend radius is stated for this line."
       },
       "delivery_length_note": {
         "value": "in lengths of 6000mm",
-        "confidence_score": 0.9,
-        "confidence_reason": "in lengths of 6000mm is explicitly stated as an additional note."
+        "confidence_score": 0.94,
+        "confidence_reason": "Delivery length note is explicitly stated as in lengths of 6000mm."
       },
       "applicable_standard": {
-        "value": "ASTM A276",
-        "confidence_score": 0.84,
-        "confidence_reason": "Material acc. to ASTM A276 is explicitly stated in the item description."
+        "value": null,
+        "confidence_score": 0.98,
+        "confidence_reason": "No separate applicable standard is stated beyond the ASTM reference already captured in standard designation."
       },
       "special_flags": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No additional special flag is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No remaining special flag code is stated for this line."
       },
       "quantity": {
         "value": "3.500 kg",
-        "confidence_score": 0.99,
-        "confidence_reason": "Quantity 3.500 kg is explicitly stated in the table."
+        "confidence_score": 1.0,
+        "confidence_reason": "Quantity is explicitly stated as 3.500 kg."
       }
     },
     {
       "item_number": {
         "value": "0040",
-        "confidence_score": 0.99,
+        "confidence_score": 1.0,
         "confidence_reason": "Item number 0040 is explicitly shown in the line-item table."
       },
       "article_code": {
         "value": "7058902",
-        "confidence_score": 0.99,
-        "confidence_reason": "Internal code 7058902 is explicitly shown next to item 0040."
+        "confidence_score": 1.0,
+        "confidence_reason": "Internal supplier code 7058902 is explicitly listed next to the item number."
       },
       "dimensions": {
         "value": "6x120mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "Dimensions 6x120mm are explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Dimensions are explicitly stated as 6x120mm."
       },
       "product_form": {
         "value": "Flat",
-        "confidence_score": 0.99,
-        "confidence_reason": "The item is explicitly described as a flat bar."
+        "confidence_score": 1.0,
+        "confidence_reason": "The description explicitly says Flat bar, which matches the allowed value Flat."
       },
       "material_grade": {
         "value": "304 Stainless",
-        "confidence_score": 0.88,
-        "confidence_reason": "304 Stainless is explicitly stated in the description; normalized to material grade."
+        "confidence_score": 0.92,
+        "confidence_reason": "304 Stainless is explicitly stated in the description; minor normalization was applied to fit the requested material grade field."
       },
       "standard_designation": {
-        "value": "R8",
-        "confidence_score": 0.82,
-        "confidence_reason": "R8 is explicitly included in the description and appears to be the only standard-like code for this item."
+        "value": "",
+        "confidence_score": 0.18,
+        "confidence_reason": "No clear standard designation is stated for this line; the visible text is a product description and a surface note."
       },
       "cut_length": {
         "value": "6000mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "6000mm is explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Cut length is explicitly stated as 6000mm."
       },
       "temper_or_condition": {
         "value": "SS 304, round sides",
         "confidence_score": 0.9,
-        "confidence_reason": "SS 304, round sides is explicitly stated as the condition/description."
+        "confidence_reason": "SS 304, round sides is explicitly stated in the description and treated as the condition note."
       },
       "hardness_hv": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No hardness value is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No hardness value is stated for this line."
       },
       "min_bend_radius": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No minimum bend radius is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No minimum bend radius is stated for this line."
       },
       "delivery_length_note": {
         "value": null,
-        "confidence_score": 0.9,
-        "confidence_reason": "No separate delivery length note is stated beyond the cut length."
+        "confidence_score": 0.98,
+        "confidence_reason": "No separate delivery length note is stated for this line."
       },
       "applicable_standard": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No applicable standard is explicitly stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No applicable standard is stated for this line."
       },
       "special_flags": {
-        "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No additional special flag is stated for this item."
+        "value": "R8",
+        "confidence_score": 0.76,
+        "confidence_reason": "R8 appears as a remaining code in the description and is treated as a special flag, though the parsing context is somewhat ambiguous."
       },
       "quantity": {
         "value": "1.600 kg",
-        "confidence_score": 0.99,
-        "confidence_reason": "Quantity 1.600 kg is explicitly stated in the table."
+        "confidence_score": 1.0,
+        "confidence_reason": "Quantity is explicitly stated as 1.600 kg."
       }
     },
     {
       "item_number": {
         "value": "0050",
-        "confidence_score": 0.99,
+        "confidence_score": 1.0,
         "confidence_reason": "Item number 0050 is explicitly shown in the line-item table."
       },
       "article_code": {
         "value": "7063217",
-        "confidence_score": 0.99,
-        "confidence_reason": "Internal code 7063217 is explicitly shown next to item 0050."
+        "confidence_score": 1.0,
+        "confidence_reason": "Internal supplier code 7063217 is explicitly listed next to the item number."
       },
       "dimensions": {
         "value": "15x60mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "Dimensions 15x60mm are explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Dimensions are explicitly stated as 15x60mm."
       },
       "product_form": {
         "value": "Flat",
-        "confidence_score": 0.99,
-        "confidence_reason": "The item is explicitly described as a flat bar."
+        "confidence_score": 1.0,
+        "confidence_reason": "The description explicitly says Flat bar, which matches the allowed value Flat."
       },
       "material_grade": {
         "value": "A36 Steel",
-        "confidence_score": 0.88,
-        "confidence_reason": "A36 Steel is explicitly stated in the description; normalized to material grade."
+        "confidence_score": 0.97,
+        "confidence_reason": "Material grade is explicitly stated as A36 Steel in the description."
       },
       "standard_designation": {
-        "value": "MK",
-        "confidence_score": 0.72,
-        "confidence_reason": "MK is explicitly stated before the steel description and appears to be the only remaining code in the item line."
+        "value": "ASTM 5011-04",
+        "confidence_score": 0.86,
+        "confidence_reason": "ASTM 5011-04 is explicitly stated after the slash and appears to be the referenced standard designation."
       },
       "cut_length": {
         "value": "6000mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "6000mm is explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Cut length is explicitly stated as 6000mm."
       },
       "temper_or_condition": {
-        "value": "MK HR Steel",
-        "confidence_score": 0.86,
-        "confidence_reason": "MK HR Steel / ASTM 5011-04 is explicitly stated and interpreted as condition plus standard."
+        "value": "HR Steel",
+        "confidence_score": 0.82,
+        "confidence_reason": "HR Steel is explicitly stated as the condition/finish note, though the line also includes a separate code."
       },
       "hardness_hv": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No hardness value is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No hardness value is stated for this line."
       },
       "min_bend_radius": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No minimum bend radius is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No minimum bend radius is stated for this line."
       },
       "delivery_length_note": {
         "value": null,
-        "confidence_score": 0.9,
-        "confidence_reason": "No separate delivery length note is stated beyond the cut length."
+        "confidence_score": 0.98,
+        "confidence_reason": "No separate delivery length note is stated for this line."
       },
       "applicable_standard": {
-        "value": "ASTM 5011-04",
-        "confidence_score": 0.84,
-        "confidence_reason": "ASTM 5011-04 is explicitly stated in the item description."
+        "value": null,
+        "confidence_score": 0.98,
+        "confidence_reason": "No separate applicable standard is stated beyond the standard designation already captured."
       },
       "special_flags": {
-        "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No additional special flag is stated for this item."
+        "value": "MK",
+        "confidence_score": 0.73,
+        "confidence_reason": "MK appears as an additional code in the description and is treated as a special flag, but its exact meaning is not explicit."
       },
       "quantity": {
         "value": "2.000 kg",
-        "confidence_score": 0.99,
-        "confidence_reason": "Quantity 2.000 kg is explicitly stated in the table."
+        "confidence_score": 1.0,
+        "confidence_reason": "Quantity is explicitly stated as 2.000 kg."
       }
     },
     {
       "item_number": {
         "value": "0060",
-        "confidence_score": 0.99,
+        "confidence_score": 1.0,
         "confidence_reason": "Item number 0060 is explicitly shown in the line-item table."
       },
       "article_code": {
         "value": "7041835",
-        "confidence_score": 0.99,
-        "confidence_reason": "Internal code 7041835 is explicitly shown next to item 0060."
+        "confidence_score": 1.0,
+        "confidence_reason": "Internal supplier code 7041835 is explicitly listed next to the item number."
       },
       "dimensions": {
         "value": "10x90mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "Dimensions 10x90mm are explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Dimensions are explicitly stated as 10x90mm."
       },
       "product_form": {
         "value": "Flat",
-        "confidence_score": 0.99,
-        "confidence_reason": "The item is explicitly described as a flat bar."
+        "confidence_score": 1.0,
+        "confidence_reason": "The description explicitly says Flat bar, which matches the allowed value Flat."
       },
       "material_grade": {
         "value": "A36 Steel",
-        "confidence_score": 0.88,
-        "confidence_reason": "A36 Steel is explicitly stated in the description; normalized to material grade."
+        "confidence_score": 0.97,
+        "confidence_reason": "Material grade is explicitly stated as A36 Steel in the description."
       },
       "standard_designation": {
-        "value": "H085",
-        "confidence_score": 0.8,
-        "confidence_reason": "H085 is explicitly stated in the item description and functions as a code alongside the material."
+        "value": "ASTM A36",
+        "confidence_score": 0.95,
+        "confidence_reason": "ASTM A36 is explicitly stated in the description as the material standard."
       },
       "cut_length": {
         "value": "6000mm",
-        "confidence_score": 0.99,
-        "confidence_reason": "6000mm is explicitly stated in the description."
+        "confidence_score": 1.0,
+        "confidence_reason": "Cut length is explicitly stated as 6000mm."
       },
       "temper_or_condition": {
         "value": "HR Steel, mill finish, H085",
-        "confidence_score": 0.9,
+        "confidence_score": 0.96,
         "confidence_reason": "HR Steel, mill finish, H085 is explicitly stated in the description."
       },
       "hardness_hv": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No hardness value is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No hardness value is stated for this line."
       },
       "min_bend_radius": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No minimum bend radius is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No minimum bend radius is stated for this line."
       },
       "delivery_length_note": {
         "value": "in lengths of 6000mm",
-        "confidence_score": 0.9,
-        "confidence_reason": "in lengths of 6000mm is explicitly stated as an additional note."
+        "confidence_score": 0.94,
+        "confidence_reason": "Delivery length note is explicitly stated as in lengths of 6000mm."
       },
       "applicable_standard": {
-        "value": "ASTM A36",
-        "confidence_score": 0.84,
-        "confidence_reason": "Material acc. to ASTM A36 is explicitly stated in the item description."
+        "value": null,
+        "confidence_score": 0.98,
+        "confidence_reason": "No separate applicable standard is stated beyond the standard designation already captured."
       },
       "special_flags": {
         "value": null,
-        "confidence_score": 0.95,
-        "confidence_reason": "No additional special flag is stated for this item."
+        "confidence_score": 0.98,
+        "confidence_reason": "No remaining special flag code is stated for this line."
       },
       "quantity": {
         "value": "1.800 kg",
-        "confidence_score": 0.99,
-        "confidence_reason": "Quantity 1.800 kg is explicitly stated in the table."
+        "confidence_score": 1.0,
+        "confidence_reason": "Quantity is explicitly stated as 1.800 kg."
       }
     }
   ]

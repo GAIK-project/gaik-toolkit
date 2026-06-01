@@ -1,0 +1,42 @@
+========== FIELD-LEVEL RESULTS ==========
+
+Field                             TP    TN    FP    FN   Prec.    Rec.      F1
+------------------------------------------------------------------------------
+raportinTyyppi                     1     0     0     0     1.0     1.0     1.0
+tarkkailijanNimi                   1     0     0     0     1.0     1.0     1.0
+tarkkailijanOrganisaatio           0     1     0     0     N/A     N/A     N/A
+tarkkailijaOnKesatyontekija        1     0     0     0     1.0     1.0     1.0
+paivamaara                         1     0     0     0     1.0     1.0     1.0
+kellonaika                         0     1     0     0     N/A     N/A     N/A
+rakennus                           1     0     0     0     1.0     1.0     1.0
+tapahtumapaikanTarkenne            1     0     0     0     1.0     1.0     1.0
+mitaTapahtui                       1     0     0     0     1.0     1.0     1.0
+lahellaPitiTilanne                 1     0     0     0     1.0     1.0     1.0
+mahdollisetSeuraukset              0     1     0     0     N/A     N/A     N/A
+toteutetutToimenpiteet             0     1     0     0     N/A     N/A     N/A
+ehdotus                            0     1     0     0     N/A     N/A     N/A
+------------------------------------------------------------------------------
+Overall Average                                            1.0     1.0     1.0
+
+(N/A fields excluded from overall average. 8/13 fields included.)
+
+
+========== FILE-LEVEL RESULTS ==========
+
+File                              TP    TN    FP    FN   Prec.    Rec.      F1
+------------------------------------------------------------------------------
+Sample1.json                       8     5     0     0     1.0     1.0     1.0
+
+
+========== AGGREGATE RESULTS ==========
+
+Total files evaluated:  1
+Total fields per file:  13
+
+Total TP: 8    Total TN: 5    Total FP: 0    Total FN: 0
+
+Precision  (P)  = TP/(TP+FP):              1.0  (100.0%)
+Recall     (R)  = TP/(TP+FN):              1.0  (100.0%)
+F1 Score   (F1) = 2·P·R/(P+R):             1.0  (100.0%)
+Exact Match Rate  (EMR) = (TP+TN)/(All):   1.0  (100.0%)
+Semantic Match Rate (SMR) = (TP+TN)/(All): 1.0  (100.0%)

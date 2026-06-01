@@ -1,174 +1,151 @@
 ---
 title: Extraction Evaluation
-description: Measuring structured information extraction accuracy
+description: Measuring structured information extraction accuracy at the field level using precision, recall, F1, and semantic similarity.
 ---
 
 ## The Problem
 
-When extracting structured information from text (like filling out form fields from a voice recording or document), accuracy is essential for business processes. Whether it's incident reports, construction diaries, or customer information, extracted data must be reliable and complete.
+When converting unstructured organizational inputs — voice recordings, field notes, inspection reports — into structured records, each extracted field must be reliable enough to feed downstream reporting, compliance systems, or databases. A single misclassified near-miss flag or a missing consequence description can invalidate a safety report.
 
 Key challenges include:
-- **Field accuracy** - Each extracted field must match the intended information
-- **Missing information** - Correctly identifying when information is not available
-- **Semantic understanding** - Capturing meaning, not just exact words
-- **Consistency** - Maintaining uniform formatting across extractions
-- **Domain terminology** - Understanding industry-specific language and context
+- **Field accuracy** — each extracted field must match the intended value, not a plausible-sounding alternative
+- **Empty field handling** — correctly recognizing when information is absent is as important as capturing what is present
+- **Semantic variation** — descriptive fields can be phrased many ways; wording-exact matching penalizes correct paraphrases
+- **Ambiguous spoken input** — boundaries between field values (e.g. near-miss vs. direct incident) are often unclear in natural speech
+- **Domain terminology** — industry-specific vocabulary and Finnish morphology can lead to systematic extraction errors
 
-For example, extracting incident report fields from a voice recording:
+For example, extracting an incident report from a spoken safety observation:
 - *Report type*: Safety observation
-- *Location*: Building A, Assembly line
-- *Date/Time*: 15.03.2024 14:30
-- *Severity*: Yes (near miss)
-- *Description*: Equipment malfunction, safety protocol followed
+- *Observer name*: Matti Möttönen
+- *Date*: 26.8.2025
+- *What happened*: A subcontractor's water cart was parked exemplarily, marked with cones and wheel chocks
+- *Near-miss*: No
 
 ---
 
 ## How We Evaluate
 
-Extraction quality is measured by comparing AI-extracted fields against verified reference data (ground truth). Each field is evaluated for accuracy using similarity scoring.
+Extraction quality is measured by comparing AI-extracted JSON fields against human-annotated ground-truth JSON files. Each field is evaluated individually using one of two comparison strategies depending on its type.
 
-### Field-Level Assessment
+### Exact Fields
 
-Fields are grouped into two categories based on required accuracy:
+Exact fields require precise agreement — category values, names, dates, and Yes/No flags. They are compared using normalized string matching:
+- Text is lowercased, whitespace collapsed, and punctuation stripped
+- Dates are normalized across Finnish (`26.8.2025`) and ISO (`2025-08-26`) formats before comparison
 
-**Exact Fields** - Require very high precision (95% similarity threshold)
-- Report types and categories
-- Dates and times
-- Yes/No answers
-- Predefined options (dropdown selections)
+**Exact fields in the incident-reporting schema:** report type, observer name, organization, summer-employee flag, date, time, near-miss flag.
 
-**Semantic Fields** - Focus on meaning over exact wording (80% similarity threshold)
-- Text descriptions and narratives
-- Location details
-- Action descriptions
-- Explanatory notes
+### Semantic Fields
 
-### Similarity Scoring
+Descriptive fields may be correctly extracted even when expressed with different wording. These are compared using OpenAI `text-embedding-3-large` embeddings and cosine similarity. A field is accepted as a match when similarity ≥ 0.50.
 
-Each extracted field is compared to its reference value using semantic similarity:
-- **PASS** - Field value is sufficiently similar to reference (above threshold)
-- **ERROR** - Field value differs significantly from reference (below threshold)
+**Semantic fields in the incident-reporting schema:** building/area, location detail, what happened, possible consequences, actions taken, suggestion.
 
-The evaluation measures:
-- **Overall matching rate** - Percentage of all fields correctly extracted
-- **True positives** - Correctly extracted non-empty fields
-- **False positives** - Incorrectly extracted or hallucinated content
-- **False negatives** - Missing fields that should have been extracted
-- **Field-wise accuracy** - Individual field performance for targeted improvements
+### Evaluation Metrics
+
+Five metrics are reported for each evaluation run:
+
+| Metric | Formula | What it measures |
+|--------|---------|-----------------|
+| **Precision** | TP / (TP + FP) | How often system-filled fields were correct |
+| **Recall** | TP / (TP + FN) | How often expected fields were captured |
+| **F1 Score** | 2·P·R / (P+R) | Balanced summary of precision and recall |
+| **Exact Match Rate (EMR)** | (TP+TN) / all exact fields | Correct handling of structured, unambiguous fields |
+| **Semantic Match Rate (SMR)** | (TP+TN) / all semantic fields | Correct handling of descriptive free-text fields |
+
+A True Negative (TN) is counted when both ground truth and prediction are empty — correctly recognizing absent information. A mismatch where both sides are non-empty counts as both a False Positive and a False Negative, applying strict field-level penalty.
 
 ---
 
 ## Benchmarking Results
 
-We evaluated multiple AI models for extracting structured incident report fields from Finnish transcripts.
+A pilot evaluation was conducted on 15 incident-reporting audio samples provided by a partner company. Employees recorded spoken safety observations, near misses, and incidents. Company representatives then manually filled in the ground-truth JSON for each recording. The AI workflow (transcription → 2-pass enhancement → schema-guided extraction) produced the predicted JSON files, which were compared against ground truth using `evaluate.py`.
 
-![Extraction Benchmark](/images/extraction-benchmark.png)
+### Aggregate Results
 
-### Model Performance Comparison
-
-Different AI models show varying performance for structured extraction tasks:
-
-- **Top performers** demonstrate strong semantic understanding and consistent field extraction
-- **Mid-range models** provide acceptable accuracy with faster processing
-- **Trade-offs** exist between extraction accuracy, processing speed, and cost
+| Metric | Score |
+|--------|------:|
+| **Precision** | **90.00%** |
+| **Recall** | **87.10%** |
+| **F1 Score** | **88.52%** |
+| **Exact Match Rate (EMR)** | **90.67%** |
+| **Semantic Match Rate (SMR)** | **87.78%** |
 
 ### Key Findings
 
-- **Model selection matters** - Different models excel at different field types
-- **Context understanding** - Better models correctly interpret domain terminology
-- **Error patterns** - Some models struggle with specific field categories
-- **Consistency varies** - Extraction reliability differs across content types
+- **Structured, unambiguous fields extract most reliably** — categorical and Yes/No fields that have a clear, expected value achieve the highest accuracy
+- **Ambiguous classification boundaries reduce exact field accuracy** — fields where the distinction between two valid values depends on interpretation (e.g. near-miss vs. direct incident) are the most error-prone exact fields
+- **Descriptive fields with implied content have lower recall** — when information is present in the audio but not explicitly stated, the extractor tends to leave the field empty rather than infer
+- **Enhancement improves extraction upstream** — transcript quality directly bounds extraction quality; 2-pass LLM enhancement reduces spelling and structural errors before extraction runs
+- **Semantic threshold calibration matters** — the 0.50 threshold was selected through analysis of matched pairs; different use cases may require different thresholds based on acceptable paraphrase tolerance
 
 ---
 
-## Common Extraction Errors
+## Error Classification
 
-### Field Confusion
+### Near-Miss and Category Ambiguity
 
-**Problem**: Information extracted into wrong fields
-- Date information appearing in location field
-- Severity mixed with event description
+**Problem**: Exact fields that require categorical judgment — particularly the near-miss flag and report type — can be misclassified when spoken descriptions blend event types or use ambiguous phrasing.
 
-**Impact**: Misorganized data requires manual correction
+**Impact**: A misclassified near-miss flag creates an inaccurate safety record, which may affect incident statistics and compliance reporting.
 
-### Missing Information Handling
+### Implied Information Not Captured
 
-**Problem**: Incorrectly marking fields as present or empty
-- Extracting placeholder text for unavailable information
-- Leaving populated fields blank
+**Problem**: Descriptive fields like possible consequences and suggestions are often left empty by the system when the information is implied rather than explicitly stated in the recording.
 
-**Impact**: Incomplete reports or false data
+**Impact**: Incomplete records that require manual review before submission to the reporting system.
 
-### Semantic Misunderstanding
+### Semantic Threshold Sensitivity
 
-**Problem**: Misinterpreting meaning despite similar words
-- "Near miss" vs. "Actual incident"
-- "Completed" vs. "Ongoing"
+**Problem**: Correctly extracted descriptions may score just below the 0.50 similarity threshold due to natural paraphrasing, Finnish morphological variation, or differing levels of detail.
 
-**Impact**: Critical information misrepresented
+**Impact**: True positives counted as mismatches, artificially lowering recall and SMR.
 
-### Formatting Inconsistency
+### False Positive Hallucinations
 
-**Problem**: Same information formatted differently across extractions
-- Date formats: "15.03.2024" vs. "March 15, 2024"
-- Time formats: "14:30" vs. "2:30 PM"
+**Problem**: The system occasionally fills a field (e.g. suggestion or location detail) when the ground truth is empty — producing a value that was not present in the spoken input.
 
-**Impact**: Data processing and analysis complications
+**Impact**: Hallucinated values require correction before the report reaches the receiving system.
 
 ---
 
 ## Real-World Applications
 
-Extraction evaluation supports these GAIK use cases:
+The same field-level evaluation methodology has been applied across multiple GAIK extraction use cases:
 
-- **Incident Reporting** - Extracting structured safety observations from voice recordings
-- **Construction Site Diaries** - Organizing daily field notes into standardized formats
-- **Document Processing** - Converting unstructured reports into database entries
-- **Form Filling** - Automatically populating forms from dictated or written content
+- **Incident reporting** — Converting spoken workplace safety observations into structured incident report fields. Pilot evaluation (15 samples): Precision 90.00%, Recall 87.10%, F1 88.52%.
+- **Construction site diary creation** — Extracting daily progress, tasks, and observations from field notes or voice recordings into standardized diary entries.
+- **Safety observation reporting** — Structuring safety walk-around observations and positive reinforcement notes into company reporting schemas.
+
+The evaluation schema and `evaluate.py` script are designed to be reused across these contexts by swapping the ground-truth and prediction data and adjusting field definitions and thresholds.
 
 ---
 
 ## Quality Considerations
 
-When evaluating extraction quality for your specific use case, consider:
+When deploying extraction evaluation in your own context, consider:
 
-**Critical vs. Optional Fields** - Which fields require perfect accuracy vs. reasonable approximation?
+**Threshold calibration** — The 0.50 semantic threshold was selected through manual analysis of matched pairs. For safety-critical or compliance reporting, a stricter threshold (0.60–0.70) may be more appropriate. For general reporting where paraphrase is acceptable, 0.45–0.50 is reasonable.
 
-**Error Tolerance** - What level of extraction error is acceptable before manual review is needed?
+**Field type assignment** — Deciding which fields are "exact" vs. "semantic" significantly affects scores. Fields with enumerated or structured values (dates, categories, Yes/No) should always be exact; open-ended descriptions should be semantic.
 
-**Field Dependencies** - Do certain fields depend on others being correct?
+**Empty field convention** — Consistent handling of missing values between ground truth and predictions is critical. If the ground truth uses empty strings and predictions use `null`, comparison logic must normalize both to the same representation.
 
-**Domain Specificity** - How well does the model understand your industry terminology?
+**Dataset size** — The pilot evaluation used 15 samples. More samples across diverse speakers, incident types, and audio conditions are needed for stable benchmarks.
 
-**Volume vs. Accuracy** - Is high-volume automated processing or perfect extraction more important?
-
----
-
-## Improving Extraction Quality
-
-Based on evaluation results, quality can be improved through:
-
-**Prompt Optimization** - Refining instructions for field extraction
-
-**Domain Examples** - Providing sample extractions from your specific context
-
-**Field Definitions** - Clarifying expectations and allowed values for each field
-
-**Validation Rules** - Adding checks for required fields and format consistency
-
-**Model Selection** - Choosing models that perform best for your field types
+**Upstream quality** — Extraction quality is bounded by transcription quality. Poor transcription produces poor inputs, regardless of extractor capability. Evaluate the full pipeline, not just the extraction step in isolation.
 
 ---
 
 ## Getting Started
 
-To evaluate extraction quality in your own context:
+To run extraction evaluation in your own context:
 
-1. Create reference extractions for sample text from your use case
-2. Define which fields are exact vs. semantic
-3. Test extraction with different models and compare accuracy
-4. Identify problematic field types requiring improvement
-5. Establish acceptable quality thresholds for deployment
-6. Monitor extraction quality on ongoing production data
+1. Define the extraction schema fields and classify each as exact or semantic
+2. Collect a representative set of input recordings and produce transcripts
+3. Have domain experts fill in ground-truth JSON files for each input
+4. Run the extraction workflow (transcription → enhancement → extraction) to produce predicted JSON files
+5. Place matched ground-truth and prediction files in `ground truth/` and `predictions/`, then run `python evaluate.py`
+6. Review `IE_report_70%.txt` and adjust the semantic threshold or extraction prompt based on field-level results
 
-For technical implementation details and evaluation tools, visit the [GAIK GitHub repository](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval).
+For technical implementation details, the evaluation script, and example data structures, visit the [GAIK GitHub repository](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval).

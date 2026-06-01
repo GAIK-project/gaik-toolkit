@@ -1,0 +1,859 @@
+{
+  "nodes": [
+    {
+      "id": "table_Table",
+      "label": "Table Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/table.tsx",
+      "source_location": "line 5",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "table_TableHeader",
+      "label": "TableHeader Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/table.tsx",
+      "source_location": "line 16",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "table_TableBody",
+      "label": "TableBody Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/table.tsx",
+      "source_location": "line 20",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "table_TableRow",
+      "label": "TableRow Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/table.tsx",
+      "source_location": "line 38",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "table_TableCell",
+      "label": "TableCell Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/table.tsx",
+      "source_location": "line 62",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tabs_Tabs",
+      "label": "Tabs Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tabs.tsx",
+      "source_location": "line 9",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tabs_TabsList",
+      "label": "TabsList Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tabs.tsx",
+      "source_location": "line 43",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tabs_TabsTrigger",
+      "label": "TabsTrigger Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tabs.tsx",
+      "source_location": "line 59",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tabs_TabsContent",
+      "label": "TabsContent Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tabs.tsx",
+      "source_location": "line 78",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "textarea_Textarea",
+      "label": "Textarea Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/textarea.tsx",
+      "source_location": "line 5",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "toaster_Toaster",
+      "label": "Toaster Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/toaster.tsx",
+      "source_location": "line 5",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "toggle_Toggle",
+      "label": "Toggle Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/toggle.tsx",
+      "source_location": "line 31",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "toggle_toggleVariants",
+      "label": "Toggle Variants (CVA)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/toggle.tsx",
+      "source_location": "line 9",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "toggle-group_ToggleGroup",
+      "label": "ToggleGroup Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/toggle-group.tsx",
+      "source_location": "line 20",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "toggle-group_ToggleGroupItem",
+      "label": "ToggleGroupItem Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/toggle-group.tsx",
+      "source_location": "line 55",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tooltip_Tooltip",
+      "label": "Tooltip Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tooltip.tsx",
+      "source_location": "line 21",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tooltip_TooltipProvider",
+      "label": "TooltipProvider Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tooltip.tsx",
+      "source_location": "line 8",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "tooltip_TooltipContent",
+      "label": "TooltipContent Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tooltip.tsx",
+      "source_location": "line 37",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transition-panel_TransitionPanel",
+      "label": "TransitionPanel Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/transition-panel.tsx",
+      "source_location": "line 19",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_getAccessStatus",
+      "label": "getAccessStatus (data layer)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/data/auth.ts",
+      "source_location": "line 3",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "use-mobile_useIsMobile",
+      "label": "useIsMobile Hook",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/hooks/use-mobile.ts",
+      "source_location": "line 5",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api-client_apiFetch",
+      "label": "apiFetch (API Client)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/api-client.ts",
+      "source_location": "line 16",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api-client_RateLimitError",
+      "label": "RateLimitError",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/api-client.ts",
+      "source_location": "line 3",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "link-previews_getGithubPreview",
+      "label": "getGithubPreview",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/link-previews.ts",
+      "source_location": "line 11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "link-previews_getGithubPreviewSafe",
+      "label": "getGithubPreviewSafe",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/link-previews.ts",
+      "source_location": "line 15",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rate-limit_createRateLimiter",
+      "label": "createRateLimiter (Upstash Redis)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/rate-limit.ts",
+      "source_location": "line 9",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rate-limit_ratelimit",
+      "label": "ratelimit (singleton)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/rate-limit.ts",
+      "source_location": "line 29",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sse_parseSSEEvents",
+      "label": "parseSSEEvents",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/sse.ts",
+      "source_location": "line 34",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sse_processSSEStream",
+      "label": "processSSEStream",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/sse.ts",
+      "source_location": "line 106",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sse_SSEStep",
+      "label": "SSEStep Interface",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/sse.ts",
+      "source_location": "line 12",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sse_SSEEvent",
+      "label": "SSEEvent Interface",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/sse.ts",
+      "source_location": "line 19",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "types_DemoType",
+      "label": "DemoType Union Type",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/types.ts",
+      "source_location": "line 8",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "types_Feedback",
+      "label": "Feedback Interface",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/types.ts",
+      "source_location": "line 27",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "types_Source",
+      "label": "Source Interface (RAG citation)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/types.ts",
+      "source_location": "line 48",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_cn",
+      "label": "cn (className merge utility)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/utils.ts",
+      "source_location": "line 4",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_formatFieldName",
+      "label": "formatFieldName",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/utils.ts",
+      "source_location": "line 12",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_formatFileSize",
+      "label": "formatFileSize",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/utils.ts",
+      "source_location": "line 22",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "access_getUserAccessStatus",
+      "label": "getUserAccessStatus (cached query)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/queries/access.ts",
+      "source_location": "line 11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "supabase-client_createClient",
+      "label": "createClient (Browser Supabase)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/supabase/client.ts",
+      "source_location": "line 3",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "supabase-proxy_updateSession",
+      "label": "updateSession (middleware proxy)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/supabase/proxy.ts",
+      "source_location": "line 34",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "supabase-server_createClient",
+      "label": "createClient (Server Supabase)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/supabase/server.ts",
+      "source_location": "line 5",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "supabase-server_createServiceClient",
+      "label": "createServiceClient (Admin Supabase)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/supabase/server.ts",
+      "source_location": "line 34",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deploy_deployScript",
+      "label": "Rahti 2 Deployment Script",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/deploy.sh",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "example-index_exampleIndex",
+      "label": "Example Index (RAG chunks + embeddings)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/public/example-index.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "table_Table",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/table.tsx",
+      "source_location": "line 9",
+      "weight": 1.0
+    },
+    {
+      "source": "table_TableHeader",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/table.tsx",
+      "source_location": "line 17",
+      "weight": 1.0
+    },
+    {
+      "source": "table_TableBody",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/table.tsx",
+      "source_location": "line 22",
+      "weight": 1.0
+    },
+    {
+      "source": "table_TableRow",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/table.tsx",
+      "source_location": "line 41",
+      "weight": 1.0
+    },
+    {
+      "source": "table_TableCell",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/table.tsx",
+      "source_location": "line 65",
+      "weight": 1.0
+    },
+    {
+      "source": "tabs_Tabs",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tabs.tsx",
+      "source_location": "line 19",
+      "weight": 1.0
+    },
+    {
+      "source": "tabs_TabsList",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tabs.tsx",
+      "source_location": "line 53",
+      "weight": 1.0
+    },
+    {
+      "source": "tabs_TabsTrigger",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tabs.tsx",
+      "source_location": "line 66",
+      "weight": 1.0
+    },
+    {
+      "source": "textarea_Textarea",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/textarea.tsx",
+      "source_location": "line 9",
+      "weight": 1.0
+    },
+    {
+      "source": "toggle_Toggle",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/toggle.tsx",
+      "source_location": "line 41",
+      "weight": 1.0
+    },
+    {
+      "source": "toggle_Toggle",
+      "target": "toggle_toggleVariants",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/toggle.tsx",
+      "source_location": "line 41",
+      "weight": 1.0
+    },
+    {
+      "source": "toggle-group_ToggleGroup",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/toggle-group.tsx",
+      "source_location": "line 42",
+      "weight": 1.0
+    },
+    {
+      "source": "toggle-group_ToggleGroupItem",
+      "target": "toggle_toggleVariants",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/toggle-group.tsx",
+      "source_location": "line 72",
+      "weight": 1.0
+    },
+    {
+      "source": "toggle-group_ToggleGroupItem",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/toggle-group.tsx",
+      "source_location": "line 71",
+      "weight": 1.0
+    },
+    {
+      "source": "tooltip_Tooltip",
+      "target": "tooltip_TooltipProvider",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tooltip.tsx",
+      "source_location": "line 25",
+      "weight": 1.0
+    },
+    {
+      "source": "tooltip_TooltipContent",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/tooltip.tsx",
+      "source_location": "line 48",
+      "weight": 1.0
+    },
+    {
+      "source": "transition-panel_TransitionPanel",
+      "target": "utils_cn",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/transition-panel.tsx",
+      "source_location": "line 28",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_getAccessStatus",
+      "target": "supabase-server_createClient",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/auth.ts",
+      "source_location": "line 8",
+      "weight": 1.0
+    },
+    {
+      "source": "api-client_apiFetch",
+      "target": "api-client_RateLimitError",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/api-client.ts",
+      "source_location": "line 33",
+      "weight": 1.0
+    },
+    {
+      "source": "link-previews_getGithubPreviewSafe",
+      "target": "link-previews_getGithubPreview",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/link-previews.ts",
+      "source_location": "line 17",
+      "weight": 1.0
+    },
+    {
+      "source": "rate-limit_ratelimit",
+      "target": "rate-limit_createRateLimiter",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/rate-limit.ts",
+      "source_location": "line 29",
+      "weight": 1.0
+    },
+    {
+      "source": "sse_processSSEStream",
+      "target": "sse_parseSSEEvents",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/sse.ts",
+      "source_location": "line 121",
+      "weight": 1.0
+    },
+    {
+      "source": "access_getUserAccessStatus",
+      "target": "supabase-server_createClient",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/queries/access.ts",
+      "source_location": "line 18",
+      "weight": 1.0
+    },
+    {
+      "source": "supabase-proxy_updateSession",
+      "target": "supabase-server_createClient",
+      "relation": "calls",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/supabase/proxy.ts",
+      "source_location": "line 53",
+      "weight": 0.95
+    },
+    {
+      "source": "toggle-group_ToggleGroup",
+      "target": "toggle_toggleVariants",
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/toggle-group.tsx",
+      "source_location": "line 8",
+      "weight": 1.0
+    },
+    {
+      "source": "types_Feedback",
+      "target": "types_DemoType",
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/types.ts",
+      "source_location": "line 31",
+      "weight": 1.0
+    },
+    {
+      "source": "deploy_deployScript",
+      "target": "supabase-server_createClient",
+      "relation": "related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.55,
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/deploy.sh",
+      "source_location": null,
+      "weight": 0.55
+    },
+    {
+      "source": "example-index_exampleIndex",
+      "target": "types_Source",
+      "relation": "related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "implementation_layer/toolkit_demo_app/public/example-index.json",
+      "source_location": null,
+      "weight": 0.75
+    },
+    {
+      "source": "utils_cn",
+      "target": "table_Table",
+      "relation": "used_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/utils.ts",
+      "source_location": "line 4",
+      "weight": 1.0
+    },
+    {
+      "source": "supabase-server_createClient",
+      "target": "auth_getAccessStatus",
+      "relation": "used_by",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/supabase/server.ts",
+      "source_location": "line 5",
+      "weight": 0.95
+    },
+    {
+      "source": "supabase-server_createServiceClient",
+      "target": "supabase-server_createClient",
+      "relation": "sibling_of",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/supabase/server.ts",
+      "source_location": "line 34",
+      "weight": 0.85
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_supabase_auth_stack",
+      "label": "Supabase Auth Stack",
+      "nodes": [
+        "supabase-client_createClient",
+        "supabase-server_createClient",
+        "supabase-server_createServiceClient",
+        "supabase-proxy_updateSession",
+        "auth_getAccessStatus",
+        "access_getUserAccessStatus"
+      ],
+      "relation": "forms_subsystem",
+      "description": "All Supabase auth-related utilities form a unified authentication and access-control subsystem used across client, server, and middleware layers",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/supabase/",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_ui_primitives_cn",
+      "label": "UI Primitives using cn() utility",
+      "nodes": [
+        "utils_cn",
+        "table_Table",
+        "tabs_Tabs",
+        "textarea_Textarea",
+        "toggle_Toggle",
+        "toggle-group_ToggleGroup",
+        "tooltip_TooltipContent",
+        "transition-panel_TransitionPanel"
+      ],
+      "relation": "shared_dependency",
+      "description": "All UI primitive components share the cn() className merging utility from lib/utils.ts as a universal styling helper",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/utils.ts",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_sse_streaming_pipeline",
+      "label": "SSE Streaming Pipeline",
+      "nodes": [
+        "sse_parseSSEEvents",
+        "sse_processSSEStream",
+        "sse_SSEStep",
+        "sse_SSEEvent",
+        "api-client_apiFetch"
+      ],
+      "relation": "forms_subsystem",
+      "description": "SSE utilities and the API fetch client together form the real-time streaming pipeline used for processing multi-step backend responses in the demo app",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/toolkit_demo_app/lib/sse.ts",
+      "weight": 0.9
+    }
+  ],
+  "input_tokens": 5800,
+  "output_tokens": 1900
+}

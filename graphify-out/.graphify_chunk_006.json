@@ -1,0 +1,861 @@
+{
+  "nodes": [
+    {
+      "id": "diary_creation_workflow_main",
+      "label": "Diary Creation Workflow (main)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/diary_creation_workflow.py",
+      "source_location": "main()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "diary_creation_workflow_create_pdf_report",
+      "label": "create_pdf_report()",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/diary_creation_workflow.py",
+      "source_location": "create_pdf_report()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pdf_generator_generate_diary_pdf",
+      "label": "generate_diary_pdf()",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "generate_diary_pdf()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pdf_generator_build_header_table",
+      "label": "_build_header_table()",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "_build_header_table()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pdf_generator_build_info_table",
+      "label": "_build_info_table()",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "_build_info_table()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pdf_generator_build_main_table",
+      "label": "_build_main_table()",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "_build_main_table()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pdf_generator_build_signature_table",
+      "label": "_build_signature_table()",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "_build_signature_table()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pdf_generator_build_image_grid",
+      "label": "_build_image_grid()",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "_build_image_grid()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pdf_generator_format_resurssit_henkilosto",
+      "label": "_format_resurssit_henkilosto()",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "_format_resurssit_henkilosto()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "diary_schema_extraction_model",
+      "label": "Ty_maap_iv_kirja Extraction Model (Pydantic)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/schema/schema.py",
+      "source_location": "Ty_maap_iv_kirja_kenttien_poiminta_nitallenteesta_Extraction",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "diary_schema_requirements_json",
+      "label": "Diary Schema Requirements JSON",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/schema/schema_requirements.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "audio2sd_schema_medical_extraction_model",
+      "label": "Medical Consultation Summary Extraction Model (Pydantic)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/schema/schema.py",
+      "source_location": "standard_medical_consultation_summary_Extraction",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "audio2sd_schema_requirements_json",
+      "label": "Medical Consultation Schema Requirements JSON",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/schema/schema_requirements.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "documents2sd_pipeline_example_main",
+      "label": "DocumentsToStructuredData Pipeline Example (main)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/documents_to_structured_data/pipeline_example.py",
+      "source_location": "main()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_workflow_pipeline_example_main",
+      "label": "RAGWorkflow Pipeline Example (main)",
+      "file_type": "code",
+      "source_file": "implementation_layer/examples/software_modules/RAG_workflow/pipeline_example.py",
+      "source_location": "main()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "mcp_server_construction_diary",
+      "label": "Construction Diary MCP Server (transcription)",
+      "file_type": "code",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/construction-diary-creation/transcription-MCP/server.py",
+      "source_location": "transcribe_audio()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "mcp_server_incident_report",
+      "label": "Incident Report MCP Server (transcription)",
+      "file_type": "code",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/incident-report-writing/transcription-MCP/server.py",
+      "source_location": "transcribe_audio()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "mcp_server_report_writing",
+      "label": "Report Writing MCP Server (transcription)",
+      "file_type": "code",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/transcription-MCP/server.py",
+      "source_location": "transcribe_audio()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_init",
+      "label": "GAIK Package __init__",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/__init__.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "observability_pricing",
+      "label": "Observability Pricing Module",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/observability/pricing.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "observability_pricing_lookup_price",
+      "label": "lookup_price()",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/observability/pricing.py",
+      "source_location": "lookup_price()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "observability_pricing_compute_cost_usd",
+      "label": "compute_cost_usd()",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/observability/pricing.py",
+      "source_location": "compute_cost_usd()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "observability_providers",
+      "label": "Observability Providers Module",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/observability/providers.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "observability_providers_openai_usage_to_dict",
+      "label": "openai_usage_to_dict()",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/observability/providers.py",
+      "source_location": "openai_usage_to_dict()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "observability_timing",
+      "label": "Observability Timing Module",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/observability/timing.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "observability_timing_measure_duration",
+      "label": "measure_duration() context manager",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/observability/timing.py",
+      "source_location": "measure_duration()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "observability_usage",
+      "label": "Observability Usage Module",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/observability/usage.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "observability_usage_UsageRecord",
+      "label": "UsageRecord (dataclass)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/observability/usage.py",
+      "source_location": "UsageRecord",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "observability_usage_build_usage_record",
+      "label": "build_usage_record()",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/observability/usage.py",
+      "source_location": "build_usage_record()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "observability_init",
+      "label": "Observability Package __init__",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/observability/__init__.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "software_components_config",
+      "label": "Software Components Config (get_openai_config / create_openai_client)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/config.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "software_components_init",
+      "label": "Software Components Package __init__",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/__init__.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "doc_classifier_classifier",
+      "label": "DocumentClassifier",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/doc_classifier/classifier.py",
+      "source_location": "DocumentClassifier",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "doc_classifier_init",
+      "label": "DocumentClassifier Package __init__",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/doc_classifier/__init__.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "enhance_transcript_TranscriptEnhancer",
+      "label": "TranscriptEnhancer",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/enhance_transcript/enhance_transcript.py",
+      "source_location": "TranscriptEnhancer",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "enhance_transcript_TranscriptEnhancerResult",
+      "label": "TranscriptEnhancerResult (Pydantic)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/enhance_transcript/enhance_transcript.py",
+      "source_location": "TranscriptEnhancerResult",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "enhance_transcript_apply_domain_rules",
+      "label": "apply_domain_rules()",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/enhance_transcript/enhance_transcript.py",
+      "source_location": "apply_domain_rules()",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_AudioToStructuredData",
+      "label": "AudioToStructuredData (pipeline module)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/audio_to_structured_data",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_DocumentsToStructuredData",
+      "label": "DocumentsToStructuredData (pipeline module)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/documents_to_structured_data",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_RAGWorkflow",
+      "label": "RAGWorkflow (pipeline module)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_Transcriber",
+      "label": "Transcriber (software component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/transcriber",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "diary_creation_workflow_main",
+      "target": "gaik_AudioToStructuredData",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/diary_creation_workflow.py",
+      "source_location": "main()",
+      "weight": 1.0
+    },
+    {
+      "source": "diary_creation_workflow_main",
+      "target": "diary_creation_workflow_create_pdf_report",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/diary_creation_workflow.py",
+      "source_location": "main()",
+      "weight": 1.0
+    },
+    {
+      "source": "diary_creation_workflow_create_pdf_report",
+      "target": "pdf_generator_generate_diary_pdf",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/diary_creation_workflow.py",
+      "source_location": "create_pdf_report()",
+      "weight": 1.0
+    },
+    {
+      "source": "pdf_generator_generate_diary_pdf",
+      "target": "pdf_generator_build_header_table",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "generate_diary_pdf()",
+      "weight": 1.0
+    },
+    {
+      "source": "pdf_generator_generate_diary_pdf",
+      "target": "pdf_generator_build_info_table",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "generate_diary_pdf()",
+      "weight": 1.0
+    },
+    {
+      "source": "pdf_generator_generate_diary_pdf",
+      "target": "pdf_generator_build_main_table",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "generate_diary_pdf()",
+      "weight": 1.0
+    },
+    {
+      "source": "pdf_generator_generate_diary_pdf",
+      "target": "pdf_generator_build_signature_table",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "generate_diary_pdf()",
+      "weight": 1.0
+    },
+    {
+      "source": "pdf_generator_build_main_table",
+      "target": "pdf_generator_build_image_grid",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "_build_main_table()",
+      "weight": 1.0
+    },
+    {
+      "source": "pdf_generator_build_main_table",
+      "target": "pdf_generator_format_resurssit_henkilosto",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/pdf_generator.py",
+      "source_location": "_build_main_table()",
+      "weight": 1.0
+    },
+    {
+      "source": "diary_creation_workflow_main",
+      "target": "diary_schema_extraction_model",
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/diary_creation_workflow.py",
+      "source_location": "main()",
+      "weight": 0.85
+    },
+    {
+      "source": "diary_schema_extraction_model",
+      "target": "diary_schema_requirements_json",
+      "relation": "defined_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/schema/schema_requirements.json",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "audio2sd_schema_medical_extraction_model",
+      "target": "audio2sd_schema_requirements_json",
+      "relation": "defined_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/schema/schema_requirements.json",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "documents2sd_pipeline_example_main",
+      "target": "gaik_DocumentsToStructuredData",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/documents_to_structured_data/pipeline_example.py",
+      "source_location": "main()",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_workflow_pipeline_example_main",
+      "target": "gaik_RAGWorkflow",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/RAG_workflow/pipeline_example.py",
+      "source_location": "main()",
+      "weight": 1.0
+    },
+    {
+      "source": "mcp_server_construction_diary",
+      "target": "gaik_Transcriber",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/construction-diary-creation/transcription-MCP/server.py",
+      "source_location": "transcribe_audio()",
+      "weight": 1.0
+    },
+    {
+      "source": "mcp_server_incident_report",
+      "target": "gaik_Transcriber",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/incident-report-writing/transcription-MCP/server.py",
+      "source_location": "transcribe_audio()",
+      "weight": 1.0
+    },
+    {
+      "source": "mcp_server_report_writing",
+      "target": "gaik_Transcriber",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/transcription-MCP/server.py",
+      "source_location": "transcribe_audio()",
+      "weight": 1.0
+    },
+    {
+      "source": "mcp_server_construction_diary",
+      "target": "software_components_config",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/construction-diary-creation/transcription-MCP/server.py",
+      "source_location": "transcribe_audio()",
+      "weight": 1.0
+    },
+    {
+      "source": "mcp_server_incident_report",
+      "target": "software_components_config",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/incident-report-writing/transcription-MCP/server.py",
+      "source_location": "transcribe_audio()",
+      "weight": 1.0
+    },
+    {
+      "source": "mcp_server_report_writing",
+      "target": "software_components_config",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/report-writing-skill/transcription-MCP/server.py",
+      "source_location": "transcribe_audio()",
+      "weight": 1.0
+    },
+    {
+      "source": "observability_init",
+      "target": "observability_pricing",
+      "relation": "re_exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/observability/__init__.py",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "observability_init",
+      "target": "observability_providers",
+      "relation": "re_exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/observability/__init__.py",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "observability_init",
+      "target": "observability_timing",
+      "relation": "re_exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/observability/__init__.py",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "observability_init",
+      "target": "observability_usage",
+      "relation": "re_exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/observability/__init__.py",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "observability_usage_build_usage_record",
+      "target": "observability_pricing_compute_cost_usd",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/observability/usage.py",
+      "source_location": "build_usage_record()",
+      "weight": 1.0
+    },
+    {
+      "source": "observability_pricing_compute_cost_usd",
+      "target": "observability_pricing_lookup_price",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/observability/pricing.py",
+      "source_location": "compute_cost_usd()",
+      "weight": 1.0
+    },
+    {
+      "source": "doc_classifier_init",
+      "target": "doc_classifier_classifier",
+      "relation": "re_exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/doc_classifier/__init__.py",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "doc_classifier_init",
+      "target": "software_components_config",
+      "relation": "re_exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/doc_classifier/__init__.py",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "doc_classifier_classifier",
+      "target": "software_components_config",
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/src/gaik/software_components/doc_classifier/classifier.py",
+      "source_location": "DocumentClassifier.__init__()",
+      "weight": 0.95
+    },
+    {
+      "source": "enhance_transcript_TranscriptEnhancer",
+      "target": "software_components_config",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/enhance_transcript/enhance_transcript.py",
+      "source_location": "TranscriptEnhancer.__init__()",
+      "weight": 1.0
+    },
+    {
+      "source": "enhance_transcript_TranscriptEnhancer",
+      "target": "enhance_transcript_TranscriptEnhancerResult",
+      "relation": "produces",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/enhance_transcript/enhance_transcript.py",
+      "source_location": "enhance_text()",
+      "weight": 1.0
+    },
+    {
+      "source": "enhance_transcript_TranscriptEnhancer",
+      "target": "enhance_transcript_apply_domain_rules",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/enhance_transcript/enhance_transcript.py",
+      "source_location": "_enhance_pass1(), _enhance_pass2()",
+      "weight": 1.0
+    },
+    {
+      "source": "mcp_server_construction_diary",
+      "target": "diary_creation_workflow_main",
+      "relation": "supports",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/construction-diary-creation/transcription-MCP/server.py",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "gaik_init",
+      "target": "software_components_init",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/__init__.py",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "software_components_init",
+      "target": "doc_classifier_init",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/__init__.py",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_mcp_servers_transcriber",
+      "label": "All three no-code agent MCP servers share identical transcribe_audio implementation via Transcriber",
+      "nodes": [
+        "mcp_server_construction_diary",
+        "mcp_server_incident_report",
+        "mcp_server_report_writing",
+        "gaik_Transcriber",
+        "software_components_config"
+      ],
+      "relation": "shared_implementation_pattern",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/*/transcription-MCP/server.py",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_observability_stack",
+      "label": "Observability stack: pricing + providers + timing + usage form a unified token accounting layer",
+      "nodes": [
+        "observability_init",
+        "observability_pricing",
+        "observability_providers",
+        "observability_timing",
+        "observability_usage",
+        "observability_usage_UsageRecord",
+        "observability_usage_build_usage_record"
+      ],
+      "relation": "forms_subsystem",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/observability/__init__.py",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_diary_pipeline",
+      "label": "Construction diary pipeline: audio -> AudioToStructuredData -> DiaryExtractionModel -> generate_diary_pdf -> PDF output",
+      "nodes": [
+        "diary_creation_workflow_main",
+        "gaik_AudioToStructuredData",
+        "diary_schema_extraction_model",
+        "diary_creation_workflow_create_pdf_report",
+        "pdf_generator_generate_diary_pdf"
+      ],
+      "relation": "pipeline_flow",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/diary_creation_workflow.py",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 9200,
+  "output_tokens": 2100
+}

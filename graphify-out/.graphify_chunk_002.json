@@ -1,0 +1,888 @@
+{
+  "nodes": [
+    {
+      "id": "main_FastAPIApp",
+      "label": "GAIK Toolkit FastAPI Application",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/main.py",
+      "source_location": "line 40",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "main_lifespanHandler",
+      "label": "Application Lifespan Handler",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/main.py",
+      "source_location": "line 31",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "dependencies_verifyApiKey",
+      "label": "verify_api_key Dependency",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/dependencies.py",
+      "source_location": "line 12",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "router_transcribe",
+      "label": "Transcribe Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/transcribe.py",
+      "source_location": "line 14",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "router_parse",
+      "label": "Parse Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/parse.py",
+      "source_location": "line 13",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "router_pipeline",
+      "label": "Pipeline Router (Diary & Incident Report)",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 17",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "router_extractForm",
+      "label": "Extract Form Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/extract_form.py",
+      "source_location": "line 30",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "router_formUnderstand",
+      "label": "Form Understand Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/form_understand.py",
+      "source_location": "line 18",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_TranscribeResponse",
+      "label": "TranscribeResponse Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/schemas/transcribe.py",
+      "source_location": "line 6",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_ParseResponse",
+      "label": "ParseResponse Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/schemas/parse.py",
+      "source_location": "line 8",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_DiaryResponse",
+      "label": "DiaryResponse Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/schemas/pipeline.py",
+      "source_location": "line 8",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_IncidentReportResponse",
+      "label": "IncidentReportResponse Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/schemas/pipeline.py",
+      "source_location": "line 35",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_validateUpload",
+      "label": "validate_upload Utility",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/utils/__init__.py",
+      "source_location": "line 13",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_validateFileSize",
+      "label": "validate_file_size Utility",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/utils/__init__.py",
+      "source_location": "line 33",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_tempFile",
+      "label": "temp_file Context Manager",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/utils/__init__.py",
+      "source_location": "line 43",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "diary_pdf_generateDiaryPdf",
+      "label": "generate_diary_pdf (ReportLab PDF)",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/utils/diary_pdf.py",
+      "source_location": "line 363",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pdf_generator_StructuredDataToPDF",
+      "label": "StructuredDataToPDF (fpdf2 PDF generator)",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/utils/pdf_generator.py",
+      "source_location": "line 83",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pdf_generator_GAIKPdf",
+      "label": "GAIKPdf FPDF Subclass",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/utils/pdf_generator.py",
+      "source_location": "line 20",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "deploy_deployScript",
+      "label": "OpenShift Rahti 2 Deploy Script",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/openshift/deploy.sh",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ie_extractFieldsFromText",
+      "label": "extract_fields_from_text (IE extraction)",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/IE.py",
+      "source_location": "line 23",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ie_runFieldExtraction",
+      "label": "run_field_extraction (batch IE pipeline)",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/IE.py",
+      "source_location": "line 81",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ie_eval_evaluateFieldMatching",
+      "label": "evaluate_field_matching (cosine similarity eval)",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/IE_evaluation.py",
+      "source_location": "line 28",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ie_main_entrypoint",
+      "label": "IE Eval Main Entrypoint",
+      "file_type": "code",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/main.py",
+      "source_location": "line 21",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gt_sample11",
+      "label": "Ground Truth Sample 11 (IE Evaluation Data)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 11_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gt_sample12",
+      "label": "Ground Truth Sample 12 (IE Evaluation Data)",
+      "file_type": "document",
+      "source_file": "implementation_layer/eval_methods/extraction_eval/data/GT/Sample 12_form.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extcomp_DataExtractor",
+      "label": "gaik DataExtractor (external component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/extract_form.py",
+      "source_location": "line 19",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extcomp_FormUnderstander",
+      "label": "gaik FormUnderstander (external component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/form_understand.py",
+      "source_location": "line 12",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extcomp_Transcriber",
+      "label": "gaik Transcriber (external component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/transcribe.py",
+      "source_location": "line 4",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extcomp_AudioToStructuredData",
+      "label": "gaik AudioToStructuredData Pipeline",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 97",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extcomp_DocumentsToStructuredData",
+      "label": "gaik DocumentsToStructuredData Pipeline",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 310",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extcomp_DocxParser",
+      "label": "gaik DocxParser",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/parse.py",
+      "source_location": "line 6",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extcomp_PyMuPDFParser",
+      "label": "gaik PyMuPDFParser",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/parse.py",
+      "source_location": "line 6",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extcomp_VisionParser",
+      "label": "gaik VisionParser",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/parse.py",
+      "source_location": "line 6",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extcomp_SchemaGenerator",
+      "label": "gaik SchemaGenerator",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 203",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_IncomingField",
+      "label": "IncomingField Request Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/extract_form.py",
+      "source_location": "line 33",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_ExtractFormRequest",
+      "label": "ExtractFormRequest Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/api/routers/extract_form.py",
+      "source_location": "line 45",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "main_FastAPIApp",
+      "target": "router_transcribe",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/main.py",
+      "source_location": "line 61",
+      "weight": 1.0
+    },
+    {
+      "source": "main_FastAPIApp",
+      "target": "router_parse",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/main.py",
+      "source_location": "line 62",
+      "weight": 1.0
+    },
+    {
+      "source": "main_FastAPIApp",
+      "target": "router_pipeline",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/main.py",
+      "source_location": "line 63",
+      "weight": 1.0
+    },
+    {
+      "source": "main_FastAPIApp",
+      "target": "router_extractForm",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/main.py",
+      "source_location": "line 64",
+      "weight": 1.0
+    },
+    {
+      "source": "main_FastAPIApp",
+      "target": "router_formUnderstand",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/main.py",
+      "source_location": "line 65",
+      "weight": 1.0
+    },
+    {
+      "source": "router_transcribe",
+      "target": "dependencies_verifyApiKey",
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/transcribe.py",
+      "source_location": "line 16",
+      "weight": 1.0
+    },
+    {
+      "source": "router_parse",
+      "target": "dependencies_verifyApiKey",
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/parse.py",
+      "source_location": "line 9",
+      "weight": 1.0
+    },
+    {
+      "source": "router_pipeline",
+      "target": "dependencies_verifyApiKey",
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 13",
+      "weight": 1.0
+    },
+    {
+      "source": "router_extractForm",
+      "target": "dependencies_verifyApiKey",
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/extract_form.py",
+      "source_location": "line 29",
+      "weight": 1.0
+    },
+    {
+      "source": "router_formUnderstand",
+      "target": "dependencies_verifyApiKey",
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/form_understand.py",
+      "source_location": "line 16",
+      "weight": 1.0
+    },
+    {
+      "source": "router_transcribe",
+      "target": "extcomp_Transcriber",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/transcribe.py",
+      "source_location": "line 43",
+      "weight": 1.0
+    },
+    {
+      "source": "router_transcribe",
+      "target": "schema_TranscribeResponse",
+      "relation": "returns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/transcribe.py",
+      "source_location": "line 16",
+      "weight": 1.0
+    },
+    {
+      "source": "router_parse",
+      "target": "extcomp_DocxParser",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/parse.py",
+      "source_location": "line 25",
+      "weight": 1.0
+    },
+    {
+      "source": "router_parse",
+      "target": "extcomp_PyMuPDFParser",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/parse.py",
+      "source_location": "line 32",
+      "weight": 1.0
+    },
+    {
+      "source": "router_parse",
+      "target": "extcomp_VisionParser",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/parse.py",
+      "source_location": "line 39",
+      "weight": 1.0
+    },
+    {
+      "source": "router_parse",
+      "target": "schema_ParseResponse",
+      "relation": "returns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/parse.py",
+      "source_location": "line 89",
+      "weight": 1.0
+    },
+    {
+      "source": "router_pipeline",
+      "target": "extcomp_AudioToStructuredData",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 101",
+      "weight": 1.0
+    },
+    {
+      "source": "router_pipeline",
+      "target": "extcomp_DocumentsToStructuredData",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 322",
+      "weight": 1.0
+    },
+    {
+      "source": "router_pipeline",
+      "target": "extcomp_DataExtractor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 208",
+      "weight": 1.0
+    },
+    {
+      "source": "router_pipeline",
+      "target": "extcomp_SchemaGenerator",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 205",
+      "weight": 1.0
+    },
+    {
+      "source": "router_pipeline",
+      "target": "diary_pdf_generateDiaryPdf",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 119",
+      "weight": 1.0
+    },
+    {
+      "source": "router_pipeline",
+      "target": "pdf_generator_StructuredDataToPDF",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 358",
+      "weight": 1.0
+    },
+    {
+      "source": "router_pipeline",
+      "target": "schema_DiaryResponse",
+      "relation": "returns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 69",
+      "weight": 1.0
+    },
+    {
+      "source": "router_pipeline",
+      "target": "schema_IncidentReportResponse",
+      "relation": "returns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 142",
+      "weight": 1.0
+    },
+    {
+      "source": "router_extractForm",
+      "target": "extcomp_DataExtractor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/extract_form.py",
+      "source_location": "line 154",
+      "weight": 1.0
+    },
+    {
+      "source": "router_formUnderstand",
+      "target": "extcomp_FormUnderstander",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/form_understand.py",
+      "source_location": "line 58",
+      "weight": 1.0
+    },
+    {
+      "source": "router_transcribe",
+      "target": "utils_validateUpload",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/transcribe.py",
+      "source_location": "line 35",
+      "weight": 1.0
+    },
+    {
+      "source": "router_transcribe",
+      "target": "utils_validateFileSize",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/transcribe.py",
+      "source_location": "line 38",
+      "weight": 1.0
+    },
+    {
+      "source": "router_transcribe",
+      "target": "utils_tempFile",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/transcribe.py",
+      "source_location": "line 40",
+      "weight": 1.0
+    },
+    {
+      "source": "router_parse",
+      "target": "utils_validateUpload",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/parse.py",
+      "source_location": "line 115",
+      "weight": 1.0
+    },
+    {
+      "source": "router_parse",
+      "target": "utils_tempFile",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/parse.py",
+      "source_location": "line 120",
+      "weight": 1.0
+    },
+    {
+      "source": "router_pipeline",
+      "target": "utils_validateUpload",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 88",
+      "weight": 1.0
+    },
+    {
+      "source": "router_pipeline",
+      "target": "utils_tempFile",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": "line 93",
+      "weight": 1.0
+    },
+    {
+      "source": "pdf_generator_StructuredDataToPDF",
+      "target": "pdf_generator_GAIKPdf",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/utils/pdf_generator.py",
+      "source_location": "line 114",
+      "weight": 1.0
+    },
+    {
+      "source": "ie_main_entrypoint",
+      "target": "ie_runFieldExtraction",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/main.py",
+      "source_location": "line 24",
+      "weight": 1.0
+    },
+    {
+      "source": "ie_main_entrypoint",
+      "target": "ie_eval_evaluateFieldMatching",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/main.py",
+      "source_location": "line 33",
+      "weight": 1.0
+    },
+    {
+      "source": "ie_runFieldExtraction",
+      "target": "ie_extractFieldsFromText",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/IE.py",
+      "source_location": "line 91",
+      "weight": 1.0
+    },
+    {
+      "source": "ie_eval_evaluateFieldMatching",
+      "target": "gt_sample11",
+      "relation": "consumes",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/IE_evaluation.py",
+      "source_location": "line 42",
+      "weight": 0.85
+    },
+    {
+      "source": "ie_eval_evaluateFieldMatching",
+      "target": "gt_sample12",
+      "relation": "consumes",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/IE_evaluation.py",
+      "source_location": "line 42",
+      "weight": 0.85
+    },
+    {
+      "source": "deploy_deployScript",
+      "target": "main_FastAPIApp",
+      "relation": "deploys",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/api/openshift/deploy.sh",
+      "source_location": "line 76",
+      "weight": 0.95
+    },
+    {
+      "source": "router_extractForm",
+      "target": "schema_IncomingField",
+      "relation": "uses_schema",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/extract_form.py",
+      "source_location": "line 33",
+      "weight": 1.0
+    },
+    {
+      "source": "router_extractForm",
+      "target": "schema_ExtractFormRequest",
+      "relation": "uses_schema",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/routers/extract_form.py",
+      "source_location": "line 140",
+      "weight": 1.0
+    },
+    {
+      "source": "ie_extractFieldsFromText",
+      "target": "extcomp_DataExtractor",
+      "relation": "parallel_concept",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/IE.py",
+      "source_location": "line 23",
+      "weight": 0.65
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "he_api_auth_gate",
+      "label": "All API endpoints guarded by X-API-Key authentication",
+      "members": [
+        "dependencies_verifyApiKey",
+        "router_transcribe",
+        "router_parse",
+        "router_pipeline",
+        "router_extractForm",
+        "router_formUnderstand"
+      ],
+      "relation": "shared_security_boundary",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/api/dependencies.py",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "id": "he_pdf_generation",
+      "label": "PDF generation subsystem: diary (ReportLab) vs general (fpdf2)",
+      "members": [
+        "diary_pdf_generateDiaryPdf",
+        "pdf_generator_StructuredDataToPDF",
+        "pdf_generator_GAIKPdf",
+        "router_pipeline"
+      ],
+      "relation": "architectural_subsystem",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/api/routers/pipeline.py",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "id": "he_ie_eval_pipeline",
+      "label": "IE evaluation pipeline: extraction -> cosine similarity -> ground truth comparison",
+      "members": [
+        "ie_main_entrypoint",
+        "ie_runFieldExtraction",
+        "ie_extractFieldsFromText",
+        "ie_eval_evaluateFieldMatching",
+        "gt_sample11",
+        "gt_sample12"
+      ],
+      "relation": "data_pipeline",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/eval_methods/extraction_eval/main.py",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

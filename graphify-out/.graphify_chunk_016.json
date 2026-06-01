@@ -1,0 +1,619 @@
+{
+  "nodes": [
+    {
+      "id": "feedback_feedbackbutton",
+      "label": "FeedbackButton",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/feedback-button.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "feedback_feedbackdialog",
+      "label": "FeedbackDialog",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/feedback-dialog.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "feedback_starrating",
+      "label": "StarRating",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/star-rating.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "feedback_usefeedback",
+      "label": "useFeedback Hook",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/use-feedback.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "feedback_index",
+      "label": "Feedback Module Index",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/index.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "glimpse_index",
+      "label": "Glimpse Component (Client)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/kibo-ui/glimpse/index.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "glimpse_server",
+      "label": "Glimpse Server Utility",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/kibo-ui/glimpse/server.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "layout_footerserver",
+      "label": "FooterServer",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/footer-server.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "layout_footer",
+      "label": "Footer",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/footer.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "layout_mainlayout",
+      "label": "MainLayout",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/main-layout.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "layout_sitenavserver",
+      "label": "SiteNavServer",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav-server.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "layout_sitenav",
+      "label": "SiteNav",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "layout_mobilenav",
+      "label": "MobileNav",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "layout_githublink",
+      "label": "GitHubLink",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "providers_posthog",
+      "label": "PostHogProvider",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/providers/posthog-provider.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_accordion",
+      "label": "Accordion UI Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/accordion.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_alert",
+      "label": "Alert UI Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/alert.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_avatar",
+      "label": "Avatar UI Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/avatar.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_badge",
+      "label": "Badge UI Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/badge.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_buttongroup",
+      "label": "ButtonGroup UI Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/button-group.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_button",
+      "label": "Button UI Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/button.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_calendar",
+      "label": "Calendar UI Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/calendar.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_card",
+      "label": "Card UI Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/card.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ui_carousel",
+      "label": "Carousel UI Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/carousel.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "lib_supabase_client",
+      "label": "Supabase Client",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/supabase/client.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "lib_linkpreviews",
+      "label": "Link Previews Lib",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/lib/link-previews.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "feedback_feedbackbutton",
+      "target": "feedback_feedbackdialog",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/feedback-button.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "feedback_feedbackbutton",
+      "target": "feedback_usefeedback",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/feedback-button.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "feedback_feedbackbutton",
+      "target": "ui_button",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/feedback-button.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "feedback_feedbackdialog",
+      "target": "feedback_starrating",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/feedback-dialog.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "feedback_feedbackdialog",
+      "target": "ui_button",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/feedback-dialog.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "feedback_usefeedback",
+      "target": "lib_supabase_client",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/use-feedback.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "feedback_index",
+      "target": "feedback_feedbackbutton",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/index.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "feedback_index",
+      "target": "feedback_feedbackdialog",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/index.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "feedback_index",
+      "target": "feedback_starrating",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/index.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "feedback_index",
+      "target": "feedback_usefeedback",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/index.ts",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_mainlayout",
+      "target": "layout_footerserver",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/main-layout.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_mainlayout",
+      "target": "layout_sitenavserver",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/main-layout.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_footerserver",
+      "target": "layout_footer",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/footer-server.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_footerserver",
+      "target": "lib_linkpreviews",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/footer-server.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_footer",
+      "target": "glimpse_index",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/footer.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_sitenavserver",
+      "target": "layout_sitenav",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav-server.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_sitenavserver",
+      "target": "lib_linkpreviews",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav-server.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_sitenav",
+      "target": "glimpse_index",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_sitenav",
+      "target": "ui_button",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_sitenav",
+      "target": "layout_mobilenav",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_sitenav",
+      "target": "layout_githublink",
+      "relation": "renders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "layout_mobilenav",
+      "target": "glimpse_index",
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav.tsx",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "layout_githublink",
+      "target": "glimpse_index",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/site-nav.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "ui_calendar",
+      "target": "ui_button",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/calendar.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "ui_carousel",
+      "target": "ui_button",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/carousel.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "ui_buttongroup",
+      "target": "ui_button",
+      "relation": "composes",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/button-group.tsx",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "glimpse_index",
+      "target": "ui_button",
+      "relation": "depends_on",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "implementation_layer/toolkit_demo_app/components/kibo-ui/glimpse/index.tsx",
+      "source_location": null,
+      "weight": 0.75
+    },
+    {
+      "source": "feedback_usefeedback",
+      "target": "feedback_feedbackbutton",
+      "relation": "provides_data_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/feedback-button.tsx",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "providers_posthog",
+      "target": "layout_mainlayout",
+      "relation": "wraps",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "implementation_layer/toolkit_demo_app/components/providers/posthog-provider.tsx",
+      "source_location": null,
+      "weight": 0.75
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_feedback_system",
+      "label": "Feedback System",
+      "nodes": ["feedback_feedbackbutton", "feedback_feedbackdialog", "feedback_starrating", "feedback_usefeedback", "lib_supabase_client"],
+      "relation": "forms_subsystem",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/components/feedback/index.ts",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "id": "hyperedge_layout_system",
+      "label": "App Layout System",
+      "nodes": ["layout_mainlayout", "layout_sitenavserver", "layout_sitenav", "layout_footerserver", "layout_footer"],
+      "relation": "forms_subsystem",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/components/layout/main-layout.tsx",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "id": "hyperedge_ui_primitives",
+      "label": "UI Primitive Components",
+      "nodes": ["ui_button", "ui_badge", "ui_avatar", "ui_card", "ui_accordion", "ui_alert", "ui_carousel", "ui_buttongroup", "ui_calendar"],
+      "relation": "forms_design_system",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/components/ui/button.tsx",
+      "source_location": null,
+      "weight": 0.95
+    }
+  ],
+  "input_tokens": 9800,
+  "output_tokens": 1200
+}

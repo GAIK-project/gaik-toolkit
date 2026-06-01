@@ -1,0 +1,888 @@
+{
+  "nodes": [
+    {
+      "id": "transcriber_router",
+      "label": "Transcriber Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:15",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcriber_TranscribeResponse",
+      "label": "TranscribeResponse Model",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:38",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcriber_transcribe_audio",
+      "label": "transcribe_audio Endpoint",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:52",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcriber_Transcriber",
+      "label": "gaik Transcriber Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:94",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcriber_summarize_corrections",
+      "label": "_summarize_corrections Helper",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:203",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "transcriber_build_diff_chunks",
+      "label": "_build_diff_chunks Helper",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:233",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "video_search_router",
+      "label": "Video Search Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:21",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "video_search_PgVectorStore",
+      "label": "PgVectorStore (Video Search)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:43",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "video_search_Embedder",
+      "label": "Embedder (Video Search)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:66",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "video_search_search_videos",
+      "label": "search_videos Endpoint",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:191",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "video_search_ingest_srt_stream",
+      "label": "ingest_srt_stream Endpoint (SSE)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:259",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "video_search_format_search_results",
+      "label": "format_search_results Helper",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:217",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "video_search_ingest_video_segments",
+      "label": "ingest_video_segments Helper",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:329",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_router",
+      "label": "Vision Extractor Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:28",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_generate_schema",
+      "label": "generate_schema Endpoint",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:214",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_extract_vision",
+      "label": "extract_vision Endpoint",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:266",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_VisionExtractor",
+      "label": "gaik VisionExtractor Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:296",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_SchemaGenerator",
+      "label": "gaik SchemaGenerator Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:226",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_VisionExtractResponse",
+      "label": "VisionExtractResponse Model",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:205",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "routers_init",
+      "label": "Routers Package Init",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/__init__.py",
+      "source_location": "__init__.py:1",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_medical_audio_requirements",
+      "label": "Medical Audio Extraction Requirements",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/audio_structured_medical_default_requirements.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_medical_audio_schema",
+      "label": "medical_audio_extraction_Extraction Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/audio_structured_medical_default_schema.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_bom_requirements",
+      "label": "BOM Material Extraction Requirements",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/bom_requirements.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_bom_schema",
+      "label": "material_extraction_Extraction Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/bom_schema.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_construction_diary_requirements",
+      "label": "Construction Diary Extraction Requirements",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/construction_diary_requirements.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_construction_diary_schema",
+      "label": "construction_diary_extraction_Extraction Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/construction_diary_schema.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_document_kpi_requirements",
+      "label": "Document KPI Extraction Requirements",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/document_structured_business_default_requirements.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_document_kpi_schema",
+      "label": "document_kpi_extraction_Extraction Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/document_structured_business_default_schema.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_invoice_requirements",
+      "label": "Invoice Extraction Requirements",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/extractor_e1f98f627acc8960_requirements.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_invoice_schema",
+      "label": "invoice_extraction_ExtractionNormalized Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/extractor_e1f98f627acc8960_schema.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_incident_report_requirements",
+      "label": "Incident Report Extraction Requirements",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/incident_report_requirements.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_incident_report_schema",
+      "label": "incident_details_extraction_Extraction Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/incident_report_schema.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_po_requirements",
+      "label": "Purchase Order Line Item Extraction Requirements",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/po_requirements.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_po_schema",
+      "label": "line_item_and_document_extraction Schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/po_schema.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "scripts_seed_dental_demo",
+      "label": "Seed Dental Demo Script",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/scripts/seed_dental_demo.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "scripts_verify_video_search_deployment",
+      "label": "Verify Video Search Deployment Script",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/scripts/verify_video_search_deployment.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_config",
+      "label": "API Config Utilities",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/config.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_pdf_generator",
+      "label": "PDF Generator Utility",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/pdf_generator.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_pdf_generator_GAIKPdf",
+      "label": "GAIKPdf (FPDF Subclass)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/pdf_generator.py",
+      "source_location": "pdf_generator.py:21",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_pdf_generator_StructuredDataToPDF",
+      "label": "StructuredDataToPDF Generator",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/pdf_generator.py",
+      "source_location": "pdf_generator.py:99",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_validate_file_size",
+      "label": "validate_file_size Utility",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/config.py",
+      "source_location": "config.py:16",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_get_api_config",
+      "label": "get_api_config Utility",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/config.py",
+      "source_location": "config.py:28",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "seed_transcriber_whisper_local",
+      "label": "gaik whisper_local transcribe Function",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/scripts/seed_dental_demo.py",
+      "source_location": "seed_dental_demo.py:118",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "seed_srt_utils",
+      "label": "gaik srt_utils (chunk_segments, segments_to_srt)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/scripts/seed_dental_demo.py",
+      "source_location": "seed_dental_demo.py:197",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "transcriber_transcribe_audio",
+      "target": "transcriber_Transcriber",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:122",
+      "weight": 1.0
+    },
+    {
+      "source": "transcriber_transcribe_audio",
+      "target": "utils_validate_file_size",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:88",
+      "weight": 1.0
+    },
+    {
+      "source": "transcriber_transcribe_audio",
+      "target": "transcriber_summarize_corrections",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:151",
+      "weight": 1.0
+    },
+    {
+      "source": "transcriber_transcribe_audio",
+      "target": "transcriber_build_diff_chunks",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:155",
+      "weight": 1.0
+    },
+    {
+      "source": "transcriber_transcribe_audio",
+      "target": "transcriber_TranscribeResponse",
+      "relation": "returns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:160",
+      "weight": 1.0
+    },
+    {
+      "source": "video_search_search_videos",
+      "target": "video_search_PgVectorStore",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:207",
+      "weight": 1.0
+    },
+    {
+      "source": "video_search_search_videos",
+      "target": "video_search_Embedder",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:210",
+      "weight": 1.0
+    },
+    {
+      "source": "video_search_search_videos",
+      "target": "video_search_format_search_results",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:248",
+      "weight": 1.0
+    },
+    {
+      "source": "video_search_ingest_srt_stream",
+      "target": "video_search_ingest_video_segments",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:333",
+      "weight": 1.0
+    },
+    {
+      "source": "video_search_ingest_srt_stream",
+      "target": "video_search_PgVectorStore",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:269",
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_extract_vision",
+      "target": "vision_extractor_VisionExtractor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:307",
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_extract_vision",
+      "target": "utils_validate_file_size",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:289",
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_extract_vision",
+      "target": "vision_extractor_VisionExtractResponse",
+      "relation": "returns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:330",
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_generate_schema",
+      "target": "vision_extractor_SchemaGenerator",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:239",
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_generate_schema",
+      "target": "utils_get_api_config",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:228",
+      "weight": 1.0
+    },
+    {
+      "source": "utils_get_api_config",
+      "target": "utils_config",
+      "relation": "defined_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/config.py",
+      "source_location": "config.py:28",
+      "weight": 1.0
+    },
+    {
+      "source": "utils_validate_file_size",
+      "target": "utils_config",
+      "relation": "defined_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/config.py",
+      "source_location": "config.py:16",
+      "weight": 1.0
+    },
+    {
+      "source": "utils_pdf_generator_StructuredDataToPDF",
+      "target": "utils_pdf_generator_GAIKPdf",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/pdf_generator.py",
+      "source_location": "pdf_generator.py:137",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_seed_dental_demo",
+      "target": "seed_transcriber_whisper_local",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/scripts/seed_dental_demo.py",
+      "source_location": "seed_dental_demo.py:118",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_seed_dental_demo",
+      "target": "seed_srt_utils",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/scripts/seed_dental_demo.py",
+      "source_location": "seed_dental_demo.py:197",
+      "weight": 1.0
+    },
+    {
+      "source": "scripts_seed_dental_demo",
+      "target": "video_search_ingest_video_segments",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/scripts/seed_dental_demo.py",
+      "source_location": "seed_dental_demo.py:247",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_medical_audio_requirements",
+      "target": "schema_medical_audio_schema",
+      "relation": "generates",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/audio_structured_medical_default_requirements.json",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "schema_bom_requirements",
+      "target": "schema_bom_schema",
+      "relation": "generates",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/bom_requirements.json",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "schema_construction_diary_requirements",
+      "target": "schema_construction_diary_schema",
+      "relation": "generates",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/construction_diary_requirements.json",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "schema_document_kpi_requirements",
+      "target": "schema_document_kpi_schema",
+      "relation": "generates",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/document_structured_business_default_requirements.json",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "schema_invoice_requirements",
+      "target": "schema_invoice_schema",
+      "relation": "generates",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/extractor_e1f98f627acc8960_requirements.json",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "schema_incident_report_requirements",
+      "target": "schema_incident_report_schema",
+      "relation": "generates",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/incident_report_requirements.json",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "schema_po_requirements",
+      "target": "schema_po_schema",
+      "relation": "generates",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas/po_requirements.json",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "scripts_verify_video_search_deployment",
+      "target": "video_search_router",
+      "relation": "tests",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/api/scripts/verify_video_search_deployment.py",
+      "source_location": "verify_video_search_deployment.py:87",
+      "weight": 0.95
+    },
+    {
+      "source": "transcriber_router",
+      "target": "transcriber_transcribe_audio",
+      "relation": "exposes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/transcriber.py",
+      "source_location": "transcriber.py:52",
+      "weight": 1.0
+    },
+    {
+      "source": "video_search_router",
+      "target": "video_search_search_videos",
+      "relation": "exposes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:191",
+      "weight": 1.0
+    },
+    {
+      "source": "video_search_router",
+      "target": "video_search_ingest_srt_stream",
+      "relation": "exposes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": "video_search.py:259",
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_router",
+      "target": "vision_extractor_generate_schema",
+      "relation": "exposes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:214",
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_router",
+      "target": "vision_extractor_extract_vision",
+      "relation": "exposes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/vision_extractor.py",
+      "source_location": "vision_extractor.py:266",
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_video_search_pipeline",
+      "label": "Video Search Ingest Pipeline",
+      "members": [
+        "video_search_ingest_srt_stream",
+        "seed_srt_utils",
+        "video_search_Embedder",
+        "video_search_PgVectorStore",
+        "video_search_ingest_video_segments"
+      ],
+      "relation": "pipeline",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/video_search.py",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "id": "hyperedge_demo_schemas",
+      "label": "Demo App Persisted Extraction Schemas",
+      "members": [
+        "schema_medical_audio_schema",
+        "schema_bom_schema",
+        "schema_construction_diary_schema",
+        "schema_document_kpi_schema",
+        "schema_invoice_schema",
+        "schema_incident_report_schema",
+        "schema_po_schema"
+      ],
+      "relation": "group",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/api/schemas",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "id": "hyperedge_seed_dental_demo_pipeline",
+      "label": "Dental Demo Seed Pipeline",
+      "members": [
+        "scripts_seed_dental_demo",
+        "seed_transcriber_whisper_local",
+        "seed_srt_utils",
+        "video_search_ingest_video_segments",
+        "video_search_PgVectorStore",
+        "video_search_Embedder"
+      ],
+      "relation": "pipeline",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/scripts/seed_dental_demo.py",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 9200,
+  "output_tokens": 1850
+}

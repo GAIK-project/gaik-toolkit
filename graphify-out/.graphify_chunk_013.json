@@ -1,0 +1,962 @@
+{
+  "nodes": [
+    {
+      "id": "s3_create_s3_client",
+      "label": "create_s3_client",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/s3.py",
+      "source_location": "line 11",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "s3_ensure_object_exists",
+      "label": "ensure_object_exists",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/s3.py",
+      "source_location": "line 46",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "s3_generate_presigned_url",
+      "label": "generate_presigned_url",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/s3.py",
+      "source_location": "line 61",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_clean_numeric_string",
+      "label": "clean_numeric_string",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 45",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_normalize_decimal_value",
+      "label": "normalize_decimal_value",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 65",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_normalize_float_value",
+      "label": "normalize_float_value",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 83",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_normalize_int_value",
+      "label": "normalize_int_value",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 99",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_wrap_schema_with_numeric_normalizers",
+      "label": "wrap_schema_with_numeric_normalizers",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 117",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_save_schema",
+      "label": "save_schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 224",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_load_schema",
+      "label": "load_schema",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 253",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_schema_id_from_requirements",
+      "label": "schema_id_from_requirements",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 293",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "schema_schema_paths",
+      "label": "schema_paths",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 212",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sse_sse_event",
+      "label": "sse_event",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/sse.py",
+      "source_location": "line 10",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sse_sse_error_response",
+      "label": "sse_error_response",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/sse.py",
+      "source_location": "line 16",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_init",
+      "label": "API Utils __init__ (re-exports)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/__init__.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "app_error_page",
+      "label": "Error Page (Next.js error boundary)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/error.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "app_root_layout",
+      "label": "Root Layout (Next.js app shell)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/layout.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "app_loading_page",
+      "label": "Root Loading Spinner",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/loading.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "app_not_found_page",
+      "label": "404 Not Found Page",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/not-found.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_actions",
+      "label": "Auth Server Actions (signUp, signIn, signOut)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/actions.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_layout",
+      "label": "Auth Route Layout",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/layout.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_loading",
+      "label": "Auth Loading Screen",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/loading.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_access_pending_page",
+      "label": "Access Pending Page",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/access-pending/page.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_access_polling",
+      "label": "AccessPolling Component (client-side auto-refresh)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/components/access-polling.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_auth_shell",
+      "label": "AuthShell / AuthBackdrop Components",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/components/auth-shell.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_privacy_dialog",
+      "label": "PrivacyDialog Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/components/privacy-dialog.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_success_animation",
+      "label": "SuccessAnimation (Lottie) Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/components/success-animation.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_sign_in_page",
+      "label": "Sign In Page",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/sign-in/page.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_sign_up_page",
+      "label": "Sign Up / Request Access Page",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/sign-up/page.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demos_layout",
+      "label": "Demos Route Layout (wraps MainLayout)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/layout.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demos_audio_structured_page",
+      "label": "Audio to Structured Data Demo Page",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/audio-structured/page.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demos_classifier_page",
+      "label": "Document Classifier Demo Page",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/classifier/page.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demos_dental_transcription_page",
+      "label": "Dental/Video Transcription Demo Page",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/dental-transcription/page.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extractor_ExtractionRequirements",
+      "label": "ExtractionRequirements (gaik extractor)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "import",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extractor_print_pydantic_schema",
+      "label": "print_pydantic_schema (gaik extractor schema)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "import",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "supabase_createClient",
+      "label": "Supabase createClient (server)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/actions.ts",
+      "source_location": "import",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "data_auth_getAccessStatus",
+      "label": "getAccessStatus (data/auth)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/access-pending/page.tsx",
+      "source_location": "import",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "lib_api_client_apiFetch",
+      "label": "apiFetch (lib/api-client)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/audio-structured/page.tsx",
+      "source_location": "import",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "lib_sse_processSSEStream",
+      "label": "processSSEStream (lib/sse)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/audio-structured/page.tsx",
+      "source_location": "import",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "component_posthog_provider",
+      "label": "PostHogProvider Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/layout.tsx",
+      "source_location": "import",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "component_stars_background",
+      "label": "StarsBackground Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/components/auth-shell.tsx",
+      "source_location": "import",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "component_privacy_content",
+      "label": "PrivacyContent Component",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/components/privacy-dialog.tsx",
+      "source_location": "import",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "s3_generate_presigned_url",
+      "target": "s3_create_s3_client",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/s3.py",
+      "source_location": "line 76",
+      "weight": 1.0
+    },
+    {
+      "source": "s3_generate_presigned_url",
+      "target": "s3_ensure_object_exists",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/s3.py",
+      "source_location": "line 78",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_normalize_decimal_value",
+      "target": "schema_clean_numeric_string",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 73",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_normalize_float_value",
+      "target": "schema_clean_numeric_string",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 89",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_normalize_int_value",
+      "target": "schema_clean_numeric_string",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 108",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_wrap_schema_with_numeric_normalizers",
+      "target": "schema_normalize_decimal_value",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 146",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_wrap_schema_with_numeric_normalizers",
+      "target": "schema_normalize_float_value",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 155",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_wrap_schema_with_numeric_normalizers",
+      "target": "schema_normalize_int_value",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 164",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_save_schema",
+      "target": "schema_schema_paths",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 233",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_save_schema",
+      "target": "extractor_print_pydantic_schema",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 237",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_load_schema",
+      "target": "schema_schema_paths",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 264",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_load_schema",
+      "target": "schema_wrap_schema_with_numeric_normalizers",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 285",
+      "weight": 1.0
+    },
+    {
+      "source": "schema_load_schema",
+      "target": "extractor_ExtractionRequirements",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/schema.py",
+      "source_location": "line 279",
+      "weight": 1.0
+    },
+    {
+      "source": "sse_sse_error_response",
+      "target": "sse_sse_event",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/sse.py",
+      "source_location": "line 20",
+      "weight": 1.0
+    },
+    {
+      "source": "utils_init",
+      "target": "s3_create_s3_client",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/__init__.py",
+      "source_location": "line 11",
+      "weight": 1.0
+    },
+    {
+      "source": "utils_init",
+      "target": "s3_ensure_object_exists",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/__init__.py",
+      "source_location": "line 11",
+      "weight": 1.0
+    },
+    {
+      "source": "utils_init",
+      "target": "s3_generate_presigned_url",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/__init__.py",
+      "source_location": "line 11",
+      "weight": 1.0
+    },
+    {
+      "source": "utils_init",
+      "target": "schema_load_schema",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/__init__.py",
+      "source_location": "line 12",
+      "weight": 1.0
+    },
+    {
+      "source": "utils_init",
+      "target": "schema_save_schema",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/__init__.py",
+      "source_location": "line 12",
+      "weight": 1.0
+    },
+    {
+      "source": "utils_init",
+      "target": "sse_sse_event",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/__init__.py",
+      "source_location": "line 19",
+      "weight": 1.0
+    },
+    {
+      "source": "utils_init",
+      "target": "sse_sse_error_response",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/__init__.py",
+      "source_location": "line 19",
+      "weight": 1.0
+    },
+    {
+      "source": "app_root_layout",
+      "target": "component_posthog_provider",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/layout.tsx",
+      "source_location": "line 70",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_layout",
+      "target": "auth_auth_shell",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/layout.tsx",
+      "source_location": "line 4",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_access_pending_page",
+      "target": "auth_access_polling",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/access-pending/page.tsx",
+      "source_location": "line 7",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_access_pending_page",
+      "target": "auth_success_animation",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/access-pending/page.tsx",
+      "source_location": "line 9",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_access_pending_page",
+      "target": "auth_actions",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/access-pending/page.tsx",
+      "source_location": "line 3",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_access_pending_page",
+      "target": "data_auth_getAccessStatus",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/access-pending/page.tsx",
+      "source_location": "line 14",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_auth_shell",
+      "target": "component_stars_background",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/components/auth-shell.tsx",
+      "source_location": "line 8",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_privacy_dialog",
+      "target": "component_privacy_content",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/components/privacy-dialog.tsx",
+      "source_location": "line 11",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_sign_in_page",
+      "target": "auth_actions",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/sign-in/page.tsx",
+      "source_location": "line 6",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_sign_in_page",
+      "target": "auth_auth_shell",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/sign-in/page.tsx",
+      "source_location": "line 7",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_sign_up_page",
+      "target": "auth_actions",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/sign-up/page.tsx",
+      "source_location": "line 6",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_sign_up_page",
+      "target": "auth_auth_shell",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/sign-up/page.tsx",
+      "source_location": "line 7",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_sign_up_page",
+      "target": "auth_privacy_dialog",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/sign-up/page.tsx",
+      "source_location": "line 12",
+      "weight": 1.0
+    },
+    {
+      "source": "auth_actions",
+      "target": "supabase_createClient",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/actions.ts",
+      "source_location": "line 44",
+      "weight": 1.0
+    },
+    {
+      "source": "demos_audio_structured_page",
+      "target": "lib_api_client_apiFetch",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/audio-structured/page.tsx",
+      "source_location": "line 138",
+      "weight": 1.0
+    },
+    {
+      "source": "demos_audio_structured_page",
+      "target": "lib_sse_processSSEStream",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/audio-structured/page.tsx",
+      "source_location": "line 150",
+      "weight": 1.0
+    },
+    {
+      "source": "demos_classifier_page",
+      "target": "lib_api_client_apiFetch",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/classifier/page.tsx",
+      "source_location": "line 119",
+      "weight": 1.0
+    },
+    {
+      "source": "demos_dental_transcription_page",
+      "target": "lib_api_client_apiFetch",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/dental-transcription/page.tsx",
+      "source_location": "line 135",
+      "weight": 1.0
+    },
+    {
+      "source": "demos_dental_transcription_page",
+      "target": "lib_sse_processSSEStream",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/dental-transcription/page.tsx",
+      "source_location": "line 200",
+      "weight": 1.0
+    },
+    {
+      "source": "demos_audio_structured_page",
+      "target": "demos_layout",
+      "relation": "part_of",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/layout.tsx",
+      "source_location": null,
+      "weight": 0.9
+    },
+    {
+      "source": "demos_classifier_page",
+      "target": "demos_layout",
+      "relation": "part_of",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/layout.tsx",
+      "source_location": null,
+      "weight": 0.9
+    },
+    {
+      "source": "demos_dental_transcription_page",
+      "target": "demos_layout",
+      "relation": "part_of",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/layout.tsx",
+      "source_location": null,
+      "weight": 0.9
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_api_utils_bundle",
+      "label": "API Utils Module Bundle (s3 + schema + sse unified exports)",
+      "members": [
+        "s3_create_s3_client",
+        "s3_ensure_object_exists",
+        "s3_generate_presigned_url",
+        "schema_load_schema",
+        "schema_save_schema",
+        "schema_wrap_schema_with_numeric_normalizers",
+        "schema_schema_id_from_requirements",
+        "sse_sse_event",
+        "sse_sse_error_response",
+        "utils_init"
+      ],
+      "relation": "grouped_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/utils/__init__.py",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_auth_flow",
+      "label": "Auth Flow (sign-up, sign-in, access-pending, server actions, components)",
+      "members": [
+        "auth_actions",
+        "auth_sign_in_page",
+        "auth_sign_up_page",
+        "auth_access_pending_page",
+        "auth_access_polling",
+        "auth_auth_shell",
+        "auth_privacy_dialog",
+        "auth_success_animation",
+        "auth_layout",
+        "supabase_createClient",
+        "data_auth_getAccessStatus"
+      ],
+      "relation": "grouped_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(auth)/actions.ts",
+      "weight": 0.95
+    },
+    {
+      "id": "hyperedge_demo_pages_sse",
+      "label": "Demo Pages using SSE streaming pipeline (audio, classifier, dental-transcription)",
+      "members": [
+        "demos_audio_structured_page",
+        "demos_classifier_page",
+        "demos_dental_transcription_page",
+        "lib_api_client_apiFetch",
+        "lib_sse_processSSEStream",
+        "demos_layout"
+      ],
+      "relation": "grouped_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/app/(demos)/layout.tsx",
+      "weight": 0.95
+    }
+  ],
+  "input_tokens": 9800,
+  "output_tokens": 1800
+}

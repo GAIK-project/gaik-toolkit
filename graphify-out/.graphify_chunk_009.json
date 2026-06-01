@@ -1,0 +1,853 @@
+{
+  "nodes": [
+    {
+      "id": "embedder_Embedder",
+      "label": "Embedder",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/embedder/embedder.py",
+      "source_location": "class Embedder",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "embedder_embed_texts",
+      "label": "embed_texts (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/embedder/embedder.py",
+      "source_location": "def embed_texts",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "normalize_tokenize",
+      "label": "tokenize (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/normalize.py",
+      "source_location": "def tokenize",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "normalize_normalize_unicode",
+      "label": "normalize_unicode (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/normalize.py",
+      "source_location": "def normalize_unicode",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "normalize_remove_stopwords",
+      "label": "remove_stopwords (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/normalize.py",
+      "source_location": "def remove_stopwords",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "normalize_DEFAULT_FINNISH_STOPWORDS",
+      "label": "DEFAULT_FINNISH_STOPWORDS",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/normalize.py",
+      "source_location": "DEFAULT_FINNISH_STOPWORDS",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "backends_LemmatizationBackend",
+      "label": "LemmatizationBackend (ABC)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "class LemmatizationBackend",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "backends_SimpleBackend",
+      "label": "SimpleBackend",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "class SimpleBackend",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "backends_UralicNLPBackend",
+      "label": "UralicNLPBackend",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "class UralicNLPBackend",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "backends_SpacyBackend",
+      "label": "SpacyBackend",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "class SpacyBackend",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "backends_VoikkoBackend",
+      "label": "VoikkoBackend",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "class VoikkoBackend",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "backends_discover_auto_backend",
+      "label": "discover_auto_backend (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "def discover_auto_backend",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "processor_FinnishTextProcessor",
+      "label": "FinnishTextProcessor",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/processor.py",
+      "source_location": "class FinnishTextProcessor",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pg_vector_store_PgVectorStore",
+      "label": "PgVectorStore",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/pg_vector_store.py",
+      "source_location": "class PgVectorStore",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pg_vector_store_format_vector",
+      "label": "_format_vector (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/pg_vector_store.py",
+      "source_location": "def _format_vector",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pg_vector_store_build_filter_clause",
+      "label": "_build_filter_clause (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/pg_vector_store.py",
+      "source_location": "def _build_filter_clause",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "video_search_helpers_ingest_video_segments",
+      "label": "ingest_video_segments (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/video_search_helpers.py",
+      "source_location": "def ingest_video_segments",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "video_search_helpers_format_search_results",
+      "label": "format_search_results (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/video_search_helpers.py",
+      "source_location": "def format_search_results",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "video_search_helpers_format_timestamp",
+      "label": "format_timestamp (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/video_search_helpers.py",
+      "source_location": "def format_timestamp",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sql_0000_initial_schema",
+      "label": "SQL: Initial Schema (s3_videos, s3_segments, pgvector HNSW)",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/sql/0000_initial_schema.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sql_0001_add_fulltext_search",
+      "label": "SQL: Add Full-Text Search (tsvector, GIN index, hybrid_search fn)",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/sql/0001_add_fulltext_search.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sql_0002_add_subtitle_cues",
+      "label": "SQL: Add Subtitle Cues Migration",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/sql/0002_add_subtitle_cues.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sql_0003_add_trigram_search",
+      "label": "SQL: Add Trigram Search Migration",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/sql/0003_add_trigram_search.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sql_0004_prefix_tsquery_finnish",
+      "label": "SQL: Prefix TSQuery Finnish Migration",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/sql/0004_prefix_tsquery_finnish.sql",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_parser_docling_DoclingRagParser",
+      "label": "DoclingRagParser",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_docling/parser.py",
+      "source_location": "class DoclingRagParser",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_parser_docling_pick_accelerator",
+      "label": "pick_accelerator (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_docling/parser.py",
+      "source_location": "def pick_accelerator",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_parser_docling_parse_pdf_to_markdown",
+      "label": "parse_pdf_to_markdown (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_docling/parser.py",
+      "source_location": "def parse_pdf_to_markdown",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_parser_docling_parse_pdf_to_chunks",
+      "label": "parse_pdf_to_chunks_with_metadata (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_docling/parser.py",
+      "source_location": "def parse_pdf_to_chunks_with_metadata",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_parser_vision_VisionRagParser",
+      "label": "VisionRagParser",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_vision/parser.py",
+      "source_location": "class VisionRagParser",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_parser_vision_parse_doc_to_chunks_with_vision",
+      "label": "parse_doc_to_chunks_with_vision (function)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_vision/parser.py",
+      "source_location": "def parse_doc_to_chunks_with_vision",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "retriever_Retriever",
+      "label": "Retriever",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/retriever/retriever.py",
+      "source_location": "class Retriever",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vector_store_VectorStore",
+      "label": "VectorStore",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/vector_store/vector_store.py",
+      "source_location": "class VectorStore",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "text_to_speech_TextToSpeech",
+      "label": "TextToSpeech",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/text_to_speech/text_to_speech.py",
+      "source_location": "class TextToSpeech",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "text_to_speech_SpeechSynthesisResult",
+      "label": "SpeechSynthesisResult",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_components/text_to_speech/text_to_speech.py",
+      "source_location": "class SpeechSynthesisResult",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "backends_SimpleBackend",
+      "target": "backends_LemmatizationBackend",
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "class SimpleBackend(LemmatizationBackend)",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_UralicNLPBackend",
+      "target": "backends_LemmatizationBackend",
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "class UralicNLPBackend(LemmatizationBackend)",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_SpacyBackend",
+      "target": "backends_LemmatizationBackend",
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "class SpacyBackend(LemmatizationBackend)",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_VoikkoBackend",
+      "target": "backends_LemmatizationBackend",
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "class VoikkoBackend(LemmatizationBackend)",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_SimpleBackend",
+      "target": "normalize_tokenize",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "SimpleBackend.lemmatize",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_SimpleBackend",
+      "target": "normalize_normalize_unicode",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "SimpleBackend.lemmatize",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_SimpleBackend",
+      "target": "normalize_remove_stopwords",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "SimpleBackend.lemmatize",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_SimpleBackend",
+      "target": "normalize_DEFAULT_FINNISH_STOPWORDS",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "SimpleBackend.__init__",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_UralicNLPBackend",
+      "target": "normalize_tokenize",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "UralicNLPBackend.lemmatize",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_UralicNLPBackend",
+      "target": "normalize_normalize_unicode",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "UralicNLPBackend.lemmatize",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_VoikkoBackend",
+      "target": "normalize_tokenize",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "VoikkoBackend.lemmatize",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_VoikkoBackend",
+      "target": "normalize_normalize_unicode",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "VoikkoBackend.lemmatize",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_SpacyBackend",
+      "target": "normalize_normalize_unicode",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "SpacyBackend.lemmatize",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_discover_auto_backend",
+      "target": "backends_VoikkoBackend",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "discover_auto_backend",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_discover_auto_backend",
+      "target": "backends_SpacyBackend",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "discover_auto_backend",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_discover_auto_backend",
+      "target": "backends_UralicNLPBackend",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "discover_auto_backend",
+      "weight": 1.0
+    },
+    {
+      "source": "backends_discover_auto_backend",
+      "target": "backends_SimpleBackend",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "source_location": "discover_auto_backend fallback",
+      "weight": 1.0
+    },
+    {
+      "source": "processor_FinnishTextProcessor",
+      "target": "backends_LemmatizationBackend",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/processor.py",
+      "source_location": "FinnishTextProcessor._backend",
+      "weight": 1.0
+    },
+    {
+      "source": "processor_FinnishTextProcessor",
+      "target": "backends_discover_auto_backend",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/processor.py",
+      "source_location": "FinnishTextProcessor._resolve_backend",
+      "weight": 1.0
+    },
+    {
+      "source": "processor_FinnishTextProcessor",
+      "target": "backends_VoikkoBackend",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/processor.py",
+      "source_location": "FinnishTextProcessor._resolve_backend",
+      "weight": 1.0
+    },
+    {
+      "source": "processor_FinnishTextProcessor",
+      "target": "backends_SpacyBackend",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/processor.py",
+      "source_location": "FinnishTextProcessor._resolve_backend",
+      "weight": 1.0
+    },
+    {
+      "source": "processor_FinnishTextProcessor",
+      "target": "backends_UralicNLPBackend",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/processor.py",
+      "source_location": "FinnishTextProcessor._resolve_backend",
+      "weight": 1.0
+    },
+    {
+      "source": "processor_FinnishTextProcessor",
+      "target": "backends_SimpleBackend",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/processor.py",
+      "source_location": "FinnishTextProcessor._resolve_backend",
+      "weight": 1.0
+    },
+    {
+      "source": "pg_vector_store_PgVectorStore",
+      "target": "processor_FinnishTextProcessor",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/pg_vector_store.py",
+      "source_location": "PgVectorStore.__init__ text_processor param",
+      "weight": 1.0
+    },
+    {
+      "source": "pg_vector_store_PgVectorStore",
+      "target": "pg_vector_store_format_vector",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/pg_vector_store.py",
+      "source_location": "PgVectorStore.add, search_semantic, search_hybrid",
+      "weight": 1.0
+    },
+    {
+      "source": "pg_vector_store_PgVectorStore",
+      "target": "pg_vector_store_build_filter_clause",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/pg_vector_store.py",
+      "source_location": "PgVectorStore.search_keyword",
+      "weight": 1.0
+    },
+    {
+      "source": "video_search_helpers_ingest_video_segments",
+      "target": "pg_vector_store_PgVectorStore",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/video_search_helpers.py",
+      "source_location": "ingest_video_segments store param",
+      "weight": 1.0
+    },
+    {
+      "source": "video_search_helpers_ingest_video_segments",
+      "target": "embedder_Embedder",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/video_search_helpers.py",
+      "source_location": "ingest_video_segments embedder param",
+      "weight": 1.0
+    },
+    {
+      "source": "video_search_helpers_format_search_results",
+      "target": "video_search_helpers_format_timestamp",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/video_search_helpers.py",
+      "source_location": "format_search_results",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_parser_docling_DoclingRagParser",
+      "target": "rag_parser_docling_pick_accelerator",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_docling/parser.py",
+      "source_location": "DoclingRagParser.__init__",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_parser_docling_parse_pdf_to_markdown",
+      "target": "rag_parser_docling_DoclingRagParser",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_docling/parser.py",
+      "source_location": "parse_pdf_to_markdown",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_parser_docling_parse_pdf_to_chunks",
+      "target": "rag_parser_docling_DoclingRagParser",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_docling/parser.py",
+      "source_location": "parse_pdf_to_chunks_with_metadata",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_parser_vision_VisionRagParser",
+      "target": "rag_parser_docling_pick_accelerator",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_vision/parser.py",
+      "source_location": "VisionRagParser.__init__",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_parser_vision_VisionRagParser",
+      "target": "rag_parser_docling_DoclingRagParser",
+      "relation": "depends_on",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_vision/parser.py",
+      "source_location": "VisionRagParser imports _build_ocr_options, pick_accelerator from rag_parser_docling.parser",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_parser_vision_parse_doc_to_chunks_with_vision",
+      "target": "rag_parser_vision_VisionRagParser",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_vision/parser.py",
+      "source_location": "parse_doc_to_chunks_with_vision",
+      "weight": 1.0
+    },
+    {
+      "source": "retriever_Retriever",
+      "target": "embedder_Embedder",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/retriever/retriever.py",
+      "source_location": "Retriever.__init__ embedder param",
+      "weight": 1.0
+    },
+    {
+      "source": "retriever_Retriever",
+      "target": "vector_store_VectorStore",
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/retriever/retriever.py",
+      "source_location": "Retriever.__init__ vector_store param (duck-typed)",
+      "weight": 1.0
+    },
+    {
+      "source": "retriever_Retriever",
+      "target": "pg_vector_store_PgVectorStore",
+      "relation": "compatible_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/pg_vector_store.py",
+      "source_location": "PgVectorStore.search docstring: drop-in replacement for VectorStore.search",
+      "weight": 0.9
+    },
+    {
+      "source": "embedder_embed_texts",
+      "target": "embedder_Embedder",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/embedder/embedder.py",
+      "source_location": "embed_texts",
+      "weight": 1.0
+    },
+    {
+      "source": "text_to_speech_TextToSpeech",
+      "target": "text_to_speech_SpeechSynthesisResult",
+      "relation": "returns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/text_to_speech/text_to_speech.py",
+      "source_location": "TextToSpeech.synthesize -> SpeechSynthesisResult",
+      "weight": 1.0
+    },
+    {
+      "source": "pg_vector_store_PgVectorStore",
+      "target": "sql_0000_initial_schema",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/pg_vector_store.py",
+      "source_location": "PgVectorStore.setup creates tables/indexes similar to SQL migrations",
+      "weight": 0.8
+    },
+    {
+      "source": "pg_vector_store_PgVectorStore",
+      "target": "sql_0001_add_fulltext_search",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/pg_vector_store.py",
+      "source_location": "PgVectorStore.setup creates hybrid search functions matching migration SQL",
+      "weight": 0.8
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_rag_pipeline",
+      "label": "RAG Hybrid Search Pipeline",
+      "node_ids": [
+        "embedder_Embedder",
+        "processor_FinnishTextProcessor",
+        "pg_vector_store_PgVectorStore",
+        "retriever_Retriever"
+      ],
+      "relation": "forms_pipeline",
+      "description": "Embedder generates vector representations, FinnishTextProcessor lemmatizes Finnish text for FTS, PgVectorStore persists and retrieves via semantic+keyword hybrid search (RRF), Retriever orchestrates embedding + store search with optional BM25 hybrid and cross-encoder re-ranking.",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/pg_vector_store.py",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_docling_vision_pipeline",
+      "label": "Document Parsing Pipeline (Docling + Vision)",
+      "node_ids": [
+        "rag_parser_docling_DoclingRagParser",
+        "rag_parser_vision_VisionRagParser",
+        "rag_parser_docling_pick_accelerator"
+      ],
+      "relation": "forms_pipeline",
+      "description": "DoclingRagParser performs structure-aware PDF parsing and chunking via HierarchicalChunker; VisionRagParser extends it by extracting images and sending them to a vision model for AI descriptions; both share pick_accelerator for GPU/CPU selection.",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/rag_parser_vision/parser.py",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_finnish_lemmatizer_backends",
+      "label": "Finnish Lemmatization Backend Selection",
+      "node_ids": [
+        "backends_VoikkoBackend",
+        "backends_SpacyBackend",
+        "backends_UralicNLPBackend",
+        "backends_SimpleBackend",
+        "backends_discover_auto_backend",
+        "processor_FinnishTextProcessor"
+      ],
+      "relation": "strategy_pattern",
+      "description": "FinnishTextProcessor selects the best available lemmatization backend at runtime: Voikko (best morphology+compound splitting) > spaCy > UralicNLP (pure-Python) > Simple (regex fallback). discover_auto_backend probes in order and returns the first importable backend.",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/backends.py",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 9800,
+  "output_tokens": 2100
+}

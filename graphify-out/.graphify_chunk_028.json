@@ -1,0 +1,845 @@
+{
+  "nodes": [
+    {
+      "id": "vision_extractor_readme_visionextractor",
+      "label": "VisionExtractor Component",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_components/vision_extractor/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_readme_visionextractionresult",
+      "label": "VisionExtractionResult",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_components/vision_extractor/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_readme_schemagenerator",
+      "label": "SchemaGenerator (Vision)",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_components/vision_extractor/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_readme_usagerecord",
+      "label": "UsageRecord",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_components/vision_extractor/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "audio_to_structured_data_readme_audiostructureddata",
+      "label": "AudioToStructuredData Module",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_modules/audio_to_structured_data/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "audio_to_structured_data_readme_pipelineresult_audio",
+      "label": "PipelineResult (Audio)",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_modules/audio_to_structured_data/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "audio_to_structured_data_readme_transcriber",
+      "label": "Transcriber Component",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_modules/audio_to_structured_data/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "documents_to_structured_data_readme_documentstostructureddata",
+      "label": "DocumentsToStructuredData Module",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_modules/documents_to_structured_data/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "documents_to_structured_data_readme_pipelineresult_docs",
+      "label": "PipelineResult (Documents)",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_modules/documents_to_structured_data/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "documents_to_structured_data_readme_parserchoice",
+      "label": "Parser Choice (vision_parser/docling/pymupdf/docx)",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_modules/documents_to_structured_data/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_workflow_readme_ragworkflow",
+      "label": "RAGWorkflow Module",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_workflow_readme_chromavectorstore",
+      "label": "Chroma Vector Store",
+      "file_type": "document",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "toolkit_demo_app_claudemd_demoapp",
+      "label": "GAIK Toolkit Demo App",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/CLAUDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "toolkit_demo_app_readme_nextjsfrontend",
+      "label": "Next.js Frontend (Demo App)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "toolkit_demo_app_readme_fastapibackend",
+      "label": "FastAPI Backend (Demo App)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "toolkit_demo_app_readme_supabaseauth",
+      "label": "Supabase Authentication",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "toolkit_demo_app_dockercompose_dockercompose",
+      "label": "Docker Compose (Demo App)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/docker-compose.yml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "toolkit_demo_app_requirements_gaikpackage",
+      "label": "gaik[all-cpu,multimodal-parser] Dependency",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/api/requirements.txt",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_flow_supabaseaccesscontrol",
+      "label": "Supabase Access Control Flow",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/docs/AUTH_FLOW.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "auth_flow_accessrequests_table",
+      "label": "access_requests Table",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/docs/AUTH_FLOW.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "luvata_order_demo_plan_luvataorderprocessing",
+      "label": "Luvata Order Processing Demo Plan",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/docs/luvata-order-demo-plan.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "luvata_order_demo_plan_abbpricingformula",
+      "label": "ABB Pricing Formula",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/docs/luvata-order-demo-plan.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "openshift_deploymentapi_gaikdemoapicontainer",
+      "label": "gaik-demo-api Deployment (OpenShift)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/deployment-api.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "openshift_deploymentfrontend_gaikdemofrontend",
+      "label": "gaik-demo Frontend Deployment (OpenShift)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/deployment-frontend.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "openshift_pgvector_pgvectordeployment",
+      "label": "pgvector PostgreSQL Deployment (OpenShift)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/pgvector.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "openshift_readme_cscrahti2",
+      "label": "CSC Rahti 2 OpenShift Deployment",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "openshift_route_gaikdemoroute",
+      "label": "gaik-demo.2.rahtiapp.fi Route",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/route.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "openshift_services_clusteripservices",
+      "label": "ClusterIP Services (gaik-demo + gaik-demo-api)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/services.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pricelist_5b7fe70d_precisionsteelpricelist",
+      "label": "Precision Steel & Components Price List (5b7fe70d)",
+      "file_type": "document",
+      "source_file": "graphify-out/converted/price list_5b7fe70d.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "pricelist_a368bce6_precisionsteelpricelist",
+      "label": "Precision Steel & Components Price List (a368bce6)",
+      "file_type": "document",
+      "source_file": "graphify-out/converted/price list_a368bce6.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "requirements_layer_readme_requirementslayer",
+      "label": "Requirements Layer",
+      "file_type": "document",
+      "source_file": "requirements_layer/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "judgebench_leaderboard_judgebenchcomparison",
+      "label": "JudgeBench Prompt Comparison Leaderboard",
+      "file_type": "document",
+      "source_file": "results/judgebench-comparison/leaderboard.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "judgebench_leaderboard_geminiflashjudge",
+      "label": "google/gemini-3-flash-preview (JudgeBench Judge)",
+      "file_type": "document",
+      "source_file": "results/judgebench-comparison/leaderboard.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "judgebench_leaderboard_scalerlabdataset",
+      "label": "ScalerLab/JudgeBench Dataset",
+      "file_type": "document",
+      "source_file": "results/judgebench-comparison/leaderboard.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "security_compliance_layer_readme_securitylayer",
+      "label": "Security and Compliance Layer",
+      "file_type": "document",
+      "source_file": "security_compliance_layer/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "strategy_layer_readme_strategylayer",
+      "label": "Strategy Layer",
+      "file_type": "document",
+      "source_file": "strategy_layer/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "strategy_layer_readme_usecaseselectionframework",
+      "label": "Use Case Selection Framework",
+      "file_type": "document",
+      "source_file": "strategy_layer/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "strategy_layer_readme_valueevaluationframework",
+      "label": "Value Evaluation Framework",
+      "file_type": "document",
+      "source_file": "strategy_layer/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "strategy_layer_readme_aicapdev",
+      "label": "AICapDev (AI Implementation Capability Assessment Tool)",
+      "file_type": "document",
+      "source_file": "strategy_layer/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "strategy_layer_readme_genaisuccesscanvas",
+      "label": "GenAI Success Canvas",
+      "file_type": "document",
+      "source_file": "strategy_layer/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "vision_extractor_readme_visionextractor",
+      "target": "vision_extractor_readme_visionextractionresult",
+      "relation": "returns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/vision_extractor/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_readme_visionextractor",
+      "target": "vision_extractor_readme_schemagenerator",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/vision_extractor/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "vision_extractor_readme_visionextractor",
+      "target": "vision_extractor_readme_usagerecord",
+      "relation": "produces",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_components/vision_extractor/README.md",
+      "source_location": null,
+      "weight": 0.9
+    },
+    {
+      "source": "audio_to_structured_data_readme_audiostructureddata",
+      "target": "audio_to_structured_data_readme_transcriber",
+      "relation": "wraps",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/audio_to_structured_data/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "audio_to_structured_data_readme_audiostructureddata",
+      "target": "audio_to_structured_data_readme_pipelineresult_audio",
+      "relation": "returns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/audio_to_structured_data/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "documents_to_structured_data_readme_documentstostructureddata",
+      "target": "documents_to_structured_data_readme_parserchoice",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/documents_to_structured_data/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "documents_to_structured_data_readme_documentstostructureddata",
+      "target": "documents_to_structured_data_readme_pipelineresult_docs",
+      "relation": "returns",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/documents_to_structured_data/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "rag_workflow_readme_ragworkflow",
+      "target": "rag_workflow_readme_chromavectorstore",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "toolkit_demo_app_readme_nextjsfrontend",
+      "target": "toolkit_demo_app_readme_fastapibackend",
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "toolkit_demo_app_readme_nextjsfrontend",
+      "target": "toolkit_demo_app_readme_supabaseauth",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "toolkit_demo_app_readme_fastapibackend",
+      "target": "toolkit_demo_app_requirements_gaikpackage",
+      "relation": "depends_on",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/requirements.txt",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "toolkit_demo_app_dockercompose_dockercompose",
+      "target": "toolkit_demo_app_readme_nextjsfrontend",
+      "relation": "deploys",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/docker-compose.yml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "toolkit_demo_app_dockercompose_dockercompose",
+      "target": "toolkit_demo_app_readme_fastapibackend",
+      "relation": "deploys",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/docker-compose.yml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "auth_flow_supabaseaccesscontrol",
+      "target": "auth_flow_accessrequests_table",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/docs/AUTH_FLOW.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "auth_flow_supabaseaccesscontrol",
+      "target": "toolkit_demo_app_readme_supabaseauth",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/docs/AUTH_FLOW.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "luvata_order_demo_plan_luvataorderprocessing",
+      "target": "luvata_order_demo_plan_abbpricingformula",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/docs/luvata-order-demo-plan.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "luvata_order_demo_plan_luvataorderprocessing",
+      "target": "toolkit_demo_app_readme_fastapibackend",
+      "relation": "extends",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/toolkit_demo_app/docs/luvata-order-demo-plan.md",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "openshift_readme_cscrahti2",
+      "target": "openshift_deploymentapi_gaikdemoapicontainer",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "openshift_readme_cscrahti2",
+      "target": "openshift_deploymentfrontend_gaikdemofrontend",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "openshift_readme_cscrahti2",
+      "target": "openshift_pgvector_pgvectordeployment",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "openshift_readme_cscrahti2",
+      "target": "openshift_route_gaikdemoroute",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "openshift_readme_cscrahti2",
+      "target": "openshift_services_clusteripservices",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "openshift_route_gaikdemoroute",
+      "target": "openshift_deploymentfrontend_gaikdemofrontend",
+      "relation": "routes_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/route.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "openshift_services_clusteripservices",
+      "target": "openshift_deploymentapi_gaikdemoapicontainer",
+      "relation": "exposes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/services.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "openshift_services_clusteripservices",
+      "target": "openshift_deploymentfrontend_gaikdemofrontend",
+      "relation": "exposes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/services.yaml",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "pricelist_5b7fe70d_precisionsteelpricelist",
+      "target": "pricelist_a368bce6_precisionsteelpricelist",
+      "relation": "duplicate_of",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "graphify-out/converted/price list_5b7fe70d.md",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "judgebench_leaderboard_judgebenchcomparison",
+      "target": "judgebench_leaderboard_geminiflashjudge",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "results/judgebench-comparison/leaderboard.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "judgebench_leaderboard_judgebenchcomparison",
+      "target": "judgebench_leaderboard_scalerlabdataset",
+      "relation": "uses",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "results/judgebench-comparison/leaderboard.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "strategy_layer_readme_strategylayer",
+      "target": "strategy_layer_readme_usecaseselectionframework",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "strategy_layer_readme_strategylayer",
+      "target": "strategy_layer_readme_valueevaluationframework",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "strategy_layer_readme_strategylayer",
+      "target": "strategy_layer_readme_aicapdev",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "strategy_layer_readme_strategylayer",
+      "target": "strategy_layer_readme_genaisuccesscanvas",
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/README.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "toolkit_demo_app_claudemd_demoapp",
+      "target": "toolkit_demo_app_readme_nextjsfrontend",
+      "relation": "documents",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/CLAUDE.md",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "luvata_order_demo_plan_luvataorderprocessing",
+      "target": "pricelist_5b7fe70d_precisionsteelpricelist",
+      "relation": "references_similar_data",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "implementation_layer/toolkit_demo_app/docs/luvata-order-demo-plan.md",
+      "source_location": null,
+      "weight": 0.65
+    },
+    {
+      "source": "openshift_pgvector_pgvectordeployment",
+      "target": "rag_workflow_readme_ragworkflow",
+      "relation": "supports",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/pgvector.yaml",
+      "source_location": null,
+      "weight": 0.75
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_openshift_deployment_cluster",
+      "label": "OpenShift Deployment Cluster (Frontend + API + pgvector + Route + Services)",
+      "nodes": [
+        "openshift_deploymentfrontend_gaikdemofrontend",
+        "openshift_deploymentapi_gaikdemoapicontainer",
+        "openshift_pgvector_pgvectordeployment",
+        "openshift_route_gaikdemoroute",
+        "openshift_services_clusteripservices"
+      ],
+      "relation": "forms_deployment_unit",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/openshift/README.md",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_gaik_software_modules",
+      "label": "GAIK Software Modules (Audio, Documents, RAG pipelines)",
+      "nodes": [
+        "audio_to_structured_data_readme_audiostructureddata",
+        "documents_to_structured_data_readme_documentstostructureddata",
+        "rag_workflow_readme_ragworkflow"
+      ],
+      "relation": "constitute_software_modules",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/src/gaik/software_modules/audio_to_structured_data/README.md",
+      "weight": 0.95
+    },
+    {
+      "id": "hyperedge_strategy_layer_tools",
+      "label": "Strategy Layer Tools (Use Case Selection, Value Evaluation, AICapDev, Success Canvas)",
+      "nodes": [
+        "strategy_layer_readme_usecaseselectionframework",
+        "strategy_layer_readme_valueevaluationframework",
+        "strategy_layer_readme_aicapdev",
+        "strategy_layer_readme_genaisuccesscanvas"
+      ],
+      "relation": "constitute_strategy_tools",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "strategy_layer/README.md",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 9500,
+  "output_tokens": 2100
+}

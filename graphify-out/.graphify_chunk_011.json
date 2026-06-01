@@ -1,0 +1,932 @@
+{
+  "nodes": [
+    {
+      "id": "documents_to_structured_data_init",
+      "label": "DocumentsToStructuredData Package Init",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/documents_to_structured_data/__init__.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_workflow_pipeline_RAGWorkflow",
+      "label": "RAGWorkflow",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": "line 37",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_workflow_pipeline_IndexResult",
+      "label": "IndexResult",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": "line 24",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_workflow_pipeline_RAGWorkflowResult",
+      "label": "RAGWorkflowResult",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": "line 31",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_workflow_init",
+      "label": "RAG Workflow Package Init",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/__init__.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_components_VisionRagParser",
+      "label": "VisionRagParser (RAG component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_components_Embedder",
+      "label": "Embedder (RAG component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_components_VectorStore",
+      "label": "VectorStore (RAG component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_components_Retriever",
+      "label": "Retriever (RAG component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "rag_components_AnswerGenerator",
+      "label": "AnswerGenerator (RAG component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_app_components_json",
+      "label": "Demo App shadcn/ui Components Config",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/components.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_app_eslint_config",
+      "label": "Demo App ESLint Config",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/eslint.config.mjs",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_app_instrumentation_client",
+      "label": "PostHog Instrumentation Client",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/instrumentation-client.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_app_next_config",
+      "label": "Next.js Config",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/next.config.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_app_package_json",
+      "label": "Demo App package.json",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/package.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_app_tsconfig",
+      "label": "Demo App TypeScript Config",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/tsconfig.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_app_proxy",
+      "label": "Next.js Middleware Proxy",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/proxy.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_main",
+      "label": "GAIK Demo API Main (FastAPI)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/main.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_classifier",
+      "label": "Classifier Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/classifier.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_dental_transcription",
+      "label": "Dental Transcription Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/dental_transcription.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_diary",
+      "label": "Construction Diary Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/diary.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_extractor",
+      "label": "Extractor Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/extractor.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_luvata_order",
+      "label": "Luvata Order Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/luvata_order.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_parser",
+      "label": "Parser Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/parser.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_pipeline",
+      "label": "Pipeline Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/pipeline.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_rag",
+      "label": "RAG Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/rag.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_text_to_speech",
+      "label": "Text-to-Speech Router",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/text_to_speech.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sc_DocumentClassifier",
+      "label": "DocumentClassifier (software component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/classifier.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sc_Transcriber",
+      "label": "Transcriber (software component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/pipeline.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sc_DataExtractor",
+      "label": "DataExtractor (software component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/extractor.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sc_SchemaGenerator",
+      "label": "SchemaGenerator (software component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/extractor.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sc_TextToSpeech",
+      "label": "TextToSpeech (software component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/text_to_speech.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sc_PyMuPDFParser",
+      "label": "PyMuPDFParser (software component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/parser.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sc_VisionParser",
+      "label": "VisionParser (software component)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/parser.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "sm_AudioToStructuredData",
+      "label": "AudioToStructuredData (software module)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/pipeline.py",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_rag_DemoRagWorkflow",
+      "label": "DemoRagWorkflow",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/rag.py",
+      "source_location": "line 188",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_luvata_PurchaseOrder",
+      "label": "PurchaseOrder (Pydantic Model)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/luvata_order.py",
+      "source_location": "line 157",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "demo_api_router_luvata_BOMData",
+      "label": "BOMData (Pydantic Model)",
+      "file_type": "code",
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/luvata_order.py",
+      "source_location": "line 168",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "rag_workflow_init",
+      "target": "rag_workflow_pipeline_RAGWorkflow",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/__init__.py",
+      "source_location": "line 3",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_workflow_init",
+      "target": "rag_workflow_pipeline_RAGWorkflowResult",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/__init__.py",
+      "source_location": "line 3",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_workflow_init",
+      "target": "rag_workflow_pipeline_IndexResult",
+      "relation": "exports",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/__init__.py",
+      "source_location": "line 3",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_workflow_pipeline_RAGWorkflow",
+      "target": "rag_components_VisionRagParser",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": "line 79",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_workflow_pipeline_RAGWorkflow",
+      "target": "rag_components_Embedder",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": "line 80",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_workflow_pipeline_RAGWorkflow",
+      "target": "rag_components_VectorStore",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": "line 81",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_workflow_pipeline_RAGWorkflow",
+      "target": "rag_components_Retriever",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": "line 86",
+      "weight": 1.0
+    },
+    {
+      "source": "rag_workflow_pipeline_RAGWorkflow",
+      "target": "rag_components_AnswerGenerator",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py",
+      "source_location": "line 94",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_main",
+      "target": "demo_api_router_classifier",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/main.py",
+      "source_location": "line 105",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_main",
+      "target": "demo_api_router_extractor",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/main.py",
+      "source_location": "line 107",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_main",
+      "target": "demo_api_router_parser",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/main.py",
+      "source_location": "line 105",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_main",
+      "target": "demo_api_router_pipeline",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/main.py",
+      "source_location": "line 115",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_main",
+      "target": "demo_api_router_rag",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/main.py",
+      "source_location": "line 116",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_main",
+      "target": "demo_api_router_dental_transcription",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/main.py",
+      "source_location": "line 118",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_main",
+      "target": "demo_api_router_diary",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/main.py",
+      "source_location": "line 117",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_main",
+      "target": "demo_api_router_text_to_speech",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/main.py",
+      "source_location": "line 114",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_main",
+      "target": "demo_api_router_luvata_order",
+      "relation": "includes_router",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/main.py",
+      "source_location": "line 124",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_classifier",
+      "target": "sc_DocumentClassifier",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/classifier.py",
+      "source_location": "line 47",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_dental_transcription",
+      "target": "sc_Transcriber",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/dental_transcription.py",
+      "source_location": "line 106",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_diary",
+      "target": "sc_DataExtractor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/diary.py",
+      "source_location": "line 201",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_diary",
+      "target": "sc_Transcriber",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/diary.py",
+      "source_location": "line 213",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_diary",
+      "target": "sc_SchemaGenerator",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/diary.py",
+      "source_location": "line 101",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_extractor",
+      "target": "sc_DataExtractor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/extractor.py",
+      "source_location": "line 175",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_extractor",
+      "target": "sc_SchemaGenerator",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/extractor.py",
+      "source_location": "line 117",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_luvata_order",
+      "target": "sc_DataExtractor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/luvata_order.py",
+      "source_location": "line 592",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_luvata_order",
+      "target": "sc_SchemaGenerator",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/luvata_order.py",
+      "source_location": "line 583",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_luvata_order",
+      "target": "sc_PyMuPDFParser",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/luvata_order.py",
+      "source_location": "line 277",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_luvata_order",
+      "target": "demo_api_router_luvata_PurchaseOrder",
+      "relation": "produces",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/luvata_order.py",
+      "source_location": "line 555",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_luvata_order",
+      "target": "demo_api_router_luvata_BOMData",
+      "relation": "produces",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/luvata_order.py",
+      "source_location": "line 666",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_parser",
+      "target": "sc_PyMuPDFParser",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/parser.py",
+      "source_location": "line 73",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_parser",
+      "target": "sc_VisionParser",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/parser.py",
+      "source_location": "line 78",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_parser",
+      "target": "rag_components_VisionRagParser",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/parser.py",
+      "source_location": "line 88",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_pipeline",
+      "target": "sm_AudioToStructuredData",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/pipeline.py",
+      "source_location": "line 253",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_pipeline",
+      "target": "sc_DataExtractor",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/pipeline.py",
+      "source_location": "line 432",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_pipeline",
+      "target": "sc_Transcriber",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/pipeline.py",
+      "source_location": "line 683",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_rag",
+      "target": "demo_api_router_rag_DemoRagWorkflow",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/rag.py",
+      "source_location": "line 226",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_rag_DemoRagWorkflow",
+      "target": "rag_components_Embedder",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/rag.py",
+      "source_location": "line 196",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_rag_DemoRagWorkflow",
+      "target": "rag_components_VectorStore",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/rag.py",
+      "source_location": "line 197",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_rag_DemoRagWorkflow",
+      "target": "rag_components_Retriever",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/rag.py",
+      "source_location": "line 202",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_rag_DemoRagWorkflow",
+      "target": "rag_components_AnswerGenerator",
+      "relation": "instantiates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/rag.py",
+      "source_location": "line 206",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_text_to_speech",
+      "target": "sc_TextToSpeech",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/text_to_speech.py",
+      "source_location": "line 67",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_app_proxy",
+      "target": "demo_api_main",
+      "relation": "proxies_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/proxy.ts",
+      "source_location": "line 5",
+      "weight": 1.0
+    },
+    {
+      "source": "demo_api_router_rag",
+      "target": "rag_components_VisionRagParser",
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/rag.py",
+      "source_location": "line 268",
+      "weight": 1.0
+    },
+    {
+      "source": "documents_to_structured_data_init",
+      "target": "sc_DataExtractor",
+      "relation": "depends_on",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/src/gaik/software_modules/documents_to_structured_data/__init__.py",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "demo_app_instrumentation_client",
+      "target": "demo_app_next_config",
+      "relation": "configured_by",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "implementation_layer/toolkit_demo_app/instrumentation-client.ts",
+      "source_location": null,
+      "weight": 0.75
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_rag_workflow_components",
+      "label": "RAGWorkflow orchestrates core RAG components",
+      "nodes": [
+        "rag_workflow_pipeline_RAGWorkflow",
+        "rag_components_VisionRagParser",
+        "rag_components_Embedder",
+        "rag_components_VectorStore",
+        "rag_components_Retriever",
+        "rag_components_AnswerGenerator"
+      ],
+      "relation": "orchestrates",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/src/gaik/software_modules/RAG_workflow/pipeline.py"
+    },
+    {
+      "id": "hyperedge_demo_api_routers",
+      "label": "GAIK Demo API includes all feature routers",
+      "nodes": [
+        "demo_api_main",
+        "demo_api_router_classifier",
+        "demo_api_router_dental_transcription",
+        "demo_api_router_diary",
+        "demo_api_router_extractor",
+        "demo_api_router_luvata_order",
+        "demo_api_router_parser",
+        "demo_api_router_pipeline",
+        "demo_api_router_rag",
+        "demo_api_router_text_to_speech"
+      ],
+      "relation": "composes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/main.py"
+    },
+    {
+      "id": "hyperedge_luvata_order_pipeline",
+      "label": "Luvata Order router uses DataExtractor, SchemaGenerator, PyMuPDFParser to process PO and BOM PDFs",
+      "nodes": [
+        "demo_api_router_luvata_order",
+        "sc_DataExtractor",
+        "sc_SchemaGenerator",
+        "sc_PyMuPDFParser",
+        "demo_api_router_luvata_PurchaseOrder",
+        "demo_api_router_luvata_BOMData"
+      ],
+      "relation": "implements_pipeline",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/api/routers/luvata_order.py"
+    }
+  ],
+  "input_tokens": 12800,
+  "output_tokens": 2200
+}

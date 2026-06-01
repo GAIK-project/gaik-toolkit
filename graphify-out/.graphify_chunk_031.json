@@ -1,0 +1,780 @@
+{
+  "nodes": [
+    {
+      "id": "PO_autotech_po_2025_15903",
+      "label": "Purchase Order PO-2025-15903 (AutoTech Manufacturing)",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-10-12",
+      "author": "Patricia Henderson",
+      "contributor": null
+    },
+    {
+      "id": "PO_autotech_mfg_corp",
+      "label": "AutoTech Manufacturing Corp.",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "PO_precision_steel_components",
+      "label": "Precision Steel & Components Ltd.",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "PO_material_al001",
+      "label": "Material AL-001: Aluminum Angle Bar",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "PO_material_ss001",
+      "label": "Material SS-001: Stainless Steel Sheet",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "PO_material_cs001",
+      "label": "Material CS-001: Seamless Steel Pipe",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "luvata_po_4512560923",
+      "label": "ABB Purchase Order 4512560923 (Luvata Pori Oy)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-02-03",
+      "author": "Karthik Gundumalla",
+      "contributor": null
+    },
+    {
+      "id": "luvata_vendor_luvata_pori",
+      "label": "Luvata Pori Oy (Vendor)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "luvata_buyer_abb_oy",
+      "label": "ABB Oy Motors and Generators Helsinki (Buyer)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "luvata_material_3AFP201773229",
+      "label": "Material 3AFP201773229: CU Short Circuit Bar RTAN_CU",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "luvata_material_3AFP201773267",
+      "label": "Material 3AFP201773267: CU Short Circuit Bar RTAN_CU",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "luvata_material_3AFP201773305",
+      "label": "Material 3AFP201773305: CU Short Circuit Bar RTAN_CU",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "bom_3AFP201773229A",
+      "label": "BOM 3AFP201773229A: CU Short Circuit Bar AXR 500MR6",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773229A-BOM.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-01-28",
+      "author": "Narhi, Veli-Pekka",
+      "contributor": null
+    },
+    {
+      "id": "bom_3AFP201773267A",
+      "label": "BOM 3AFP201773267A: CU Short Circuit Bar AXR 500MR6",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773267A-BOM.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-01-28",
+      "author": "Narhi, Veli-Pekka",
+      "contributor": null
+    },
+    {
+      "id": "bom_3AFP201773305A",
+      "label": "BOM 3AFP201773305A: CU Short Circuit Bar AXR 500MR6",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773305A-BOM.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-01-28",
+      "author": "Narhi, Veli-Pekka",
+      "contributor": null
+    },
+    {
+      "id": "bom_part_3AFP9073612",
+      "label": "Part 3AFP9073612: Round Edged Tapered Flat Copper Bar BKMJ 50X10/7.00",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773229A-BOM.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "bom_machine_AXR500MR6",
+      "label": "Machine Type AXR 500MR6 (ABB Large Motor)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773229A-BOM.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "bom_al001_aluminum_angle",
+      "label": "BOM AL-001: Aluminum Angle L-Profile 6061-T6 (AutoTech PO)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM1.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-10-10",
+      "author": "Technical Dept.",
+      "contributor": null
+    },
+    {
+      "id": "bom_ss001_stainless_sheet",
+      "label": "BOM SS-001: Stainless Steel Sheet Grade 304 (AutoTech PO)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM2.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-10-10",
+      "author": "Technical Dept.",
+      "contributor": null
+    },
+    {
+      "id": "bom_cs001_steel_pipe",
+      "label": "BOM CS-001: Seamless Carbon Steel Pipe ASTM A106 Grade B (AutoTech PO)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM3.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-10-10",
+      "author": "Technical Dept.",
+      "contributor": null
+    },
+    {
+      "id": "gaik_test_doc_aurora_annual_report",
+      "label": "Aurora Digital Solutions Inc. Annual Report 2024 Q4 (GAIK Demo)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2024-12-15",
+      "author": "Michael Stevens",
+      "contributor": null
+    },
+    {
+      "id": "gaik_test_aurora_digital_solutions",
+      "label": "Aurora Digital Solutions Inc.",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_test_techcorp_industries",
+      "label": "TechCorp Industries LLC",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "invoice_aurora_inv_2024_08472",
+      "label": "Invoice INV-2024-08472 Aurora Digital to TechCorp",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2024-12-15",
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "invoice_arctis_inv_2026_00847",
+      "label": "Invoice INV-2026-00847 Arctis Design Studio to Nordwave Technologies",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/public/invoice.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2026-03-16",
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "invoice_arctis_design_studio",
+      "label": "Arctis Design Studio",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/public/invoice.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "invoice_nordwave_technologies",
+      "label": "Nordwave Technologies Oy",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/public/invoice.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_po_autotech_po_2025_15903",
+      "label": "Purchase Order PO-2025-15903 (Vision Extractor Example)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/public/vision-extractor-example/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-10-12",
+      "author": "Patricia Henderson",
+      "contributor": null
+    },
+    {
+      "id": "vision_bom_mat2401_aluminum",
+      "label": "BOM MAT-2401: Aluminum Angle L-Profile (Vision Extractor Example)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/public/vision-extractor-example/BOM1.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-10-10",
+      "author": "Technical Dept.",
+      "contributor": null
+    },
+    {
+      "id": "project_prj_at_2025_q4b",
+      "label": "Project PRJ-AT-2025-Q4B (AutoTech Q4 Materials)",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "gaik_service_agreement_agr_2024",
+      "label": "Service Agreement AGR-2024-NTS-00234 Aurora to TechCorp",
+      "file_type": "document",
+      "source_file": "implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2024-12-15",
+      "author": "Michael Stevens",
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "PO_autotech_po_2025_15903",
+      "target": "PO_autotech_mfg_corp",
+      "relation": "issued_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "PO_autotech_po_2025_15903",
+      "target": "PO_precision_steel_components",
+      "relation": "sent_to_supplier",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "PO_autotech_po_2025_15903",
+      "target": "PO_material_al001",
+      "relation": "orders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "PO_autotech_po_2025_15903",
+      "target": "PO_material_ss001",
+      "relation": "orders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "PO_autotech_po_2025_15903",
+      "target": "PO_material_cs001",
+      "relation": "orders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "PO_autotech_po_2025_15903",
+      "target": "project_prj_at_2025_q4b",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_al001_aluminum_angle",
+      "target": "PO_autotech_po_2025_15903",
+      "relation": "fulfills",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM1.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_ss001_stainless_sheet",
+      "target": "PO_autotech_po_2025_15903",
+      "relation": "fulfills",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM2.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_cs001_steel_pipe",
+      "target": "PO_autotech_po_2025_15903",
+      "relation": "fulfills",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM3.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_al001_aluminum_angle",
+      "target": "PO_material_al001",
+      "relation": "specifies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM1.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_ss001_stainless_sheet",
+      "target": "PO_material_ss001",
+      "relation": "specifies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM2.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_cs001_steel_pipe",
+      "target": "PO_material_cs001",
+      "relation": "specifies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM3.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "luvata_po_4512560923",
+      "target": "luvata_buyer_abb_oy",
+      "relation": "issued_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "luvata_po_4512560923",
+      "target": "luvata_vendor_luvata_pori",
+      "relation": "sent_to_supplier",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "luvata_po_4512560923",
+      "target": "luvata_material_3AFP201773229",
+      "relation": "orders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "luvata_po_4512560923",
+      "target": "luvata_material_3AFP201773267",
+      "relation": "orders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "luvata_po_4512560923",
+      "target": "luvata_material_3AFP201773305",
+      "relation": "orders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_3AFP201773229A",
+      "target": "luvata_material_3AFP201773229",
+      "relation": "specifies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773229A-BOM.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_3AFP201773267A",
+      "target": "luvata_material_3AFP201773267",
+      "relation": "specifies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773267A-BOM.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_3AFP201773305A",
+      "target": "luvata_material_3AFP201773305",
+      "relation": "specifies",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773305A-BOM.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_3AFP201773229A",
+      "target": "bom_part_3AFP9073612",
+      "relation": "contains_part",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773229A-BOM.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_3AFP201773267A",
+      "target": "bom_part_3AFP9073612",
+      "relation": "contains_part",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773267A-BOM.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_3AFP201773305A",
+      "target": "bom_part_3AFP9073612",
+      "relation": "contains_part",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773305A-BOM.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_3AFP201773229A",
+      "target": "bom_machine_AXR500MR6",
+      "relation": "part_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773229A-BOM.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom_3AFP201773229A",
+      "target": "luvata_buyer_abb_oy",
+      "relation": "created_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/bom/3AFP201773229A-BOM.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "gaik_test_doc_aurora_annual_report",
+      "target": "gaik_test_aurora_digital_solutions",
+      "relation": "describes",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "invoice_aurora_inv_2024_08472",
+      "target": "gaik_test_aurora_digital_solutions",
+      "relation": "issued_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "invoice_aurora_inv_2024_08472",
+      "target": "gaik_test_techcorp_industries",
+      "relation": "billed_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "gaik_service_agreement_agr_2024",
+      "target": "gaik_test_aurora_digital_solutions",
+      "relation": "party",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "gaik_service_agreement_agr_2024",
+      "target": "gaik_test_techcorp_industries",
+      "relation": "party",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "invoice_arctis_inv_2026_00847",
+      "target": "invoice_arctis_design_studio",
+      "relation": "issued_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/public/invoice.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "invoice_arctis_inv_2026_00847",
+      "target": "invoice_nordwave_technologies",
+      "relation": "billed_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/public/invoice.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "vision_po_autotech_po_2025_15903",
+      "target": "PO_autotech_po_2025_15903",
+      "relation": "variant_of",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/toolkit_demo_app/public/vision-extractor-example/PO.pdf",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "vision_bom_mat2401_aluminum",
+      "target": "vision_po_autotech_po_2025_15903",
+      "relation": "fulfills",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/public/vision-extractor-example/BOM1.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "vision_bom_mat2401_aluminum",
+      "target": "bom_al001_aluminum_angle",
+      "relation": "variant_of",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "implementation_layer/toolkit_demo_app/public/vision-extractor-example/BOM1.pdf",
+      "source_location": null,
+      "weight": 0.85
+    },
+    {
+      "source": "PO_precision_steel_components",
+      "target": "bom_al001_aluminum_angle",
+      "relation": "supplier_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM1.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "PO_precision_steel_components",
+      "target": "bom_ss001_stainless_sheet",
+      "relation": "supplier_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM2.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "PO_precision_steel_components",
+      "target": "bom_cs001_steel_pipe",
+      "relation": "supplier_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/BOM3.pdf",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_autotech_po_bom_set",
+      "label": "AutoTech PO-2025-15903 with BOM set (AL-001, SS-001, CS-001)",
+      "node_ids": [
+        "PO_autotech_po_2025_15903",
+        "bom_al001_aluminum_angle",
+        "bom_ss001_stainless_sheet",
+        "bom_cs001_steel_pipe",
+        "project_prj_at_2025_q4b"
+      ],
+      "relation": "procurement_package",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/po-bom-example/PO.pdf",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_abb_luvata_order_bom_set",
+      "label": "ABB PO 4512560923 with three CU Short Circuit Bar BOMs for AXR 500MR6",
+      "node_ids": [
+        "luvata_po_4512560923",
+        "bom_3AFP201773229A",
+        "bom_3AFP201773267A",
+        "bom_3AFP201773305A",
+        "bom_part_3AFP9073612",
+        "bom_machine_AXR500MR6"
+      ],
+      "relation": "procurement_package",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/data/luvata-order/PO_4512560923.pdf",
+      "weight": 1.0
+    },
+    {
+      "id": "hyperedge_aurora_digital_services_contract",
+      "label": "Aurora Digital Solutions - TechCorp service contract, invoice, and annual report cluster",
+      "node_ids": [
+        "gaik_test_aurora_digital_solutions",
+        "gaik_test_techcorp_industries",
+        "invoice_aurora_inv_2024_08472",
+        "gaik_service_agreement_agr_2024",
+        "gaik_test_doc_aurora_annual_report"
+      ],
+      "relation": "business_relationship",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf",
+      "weight": 1.0
+    }
+  ],
+  "input_tokens": 12500,
+  "output_tokens": 2200
+}

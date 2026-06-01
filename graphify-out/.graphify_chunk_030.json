@@ -1,0 +1,773 @@
+{
+  "nodes": [
+    {
+      "id": "precisionsteel_vendor",
+      "label": "Precision Steel & Components Ltd.",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM1.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": "Thomas Richardson",
+      "contributor": null
+    },
+    {
+      "id": "autotech_customer",
+      "label": "AutoTech Manufacturing Corp.",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": "Patricia Henderson",
+      "contributor": null
+    },
+    {
+      "id": "po_2025_15903",
+      "label": "Purchase Order PO-2025-15903",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-10-12",
+      "author": "Patricia Henderson",
+      "contributor": null
+    },
+    {
+      "id": "project_prj_at_2025_q4b",
+      "label": "Project PRJ-AT-2025-Q4B",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "bom1_mat2401_aluminum_angle",
+      "label": "BOM MAT-2401: Aluminum Angle L-Profile 6061-T6",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM1.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-10-10",
+      "author": "Thomas Richardson",
+      "contributor": null
+    },
+    {
+      "id": "bom2_mat3567_stainless_steel_sheet",
+      "label": "BOM MAT-3567: Stainless Steel Sheet Grade 304",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM2.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-10-10",
+      "author": "Thomas Richardson",
+      "contributor": null
+    },
+    {
+      "id": "bom3_mat4829_carbon_steel_pipe",
+      "label": "BOM MAT-4829: Seamless Carbon Steel Pipe ASTM A106 Grade B",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM3.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-10-10",
+      "author": "Thomas Richardson",
+      "contributor": null
+    },
+    {
+      "id": "mat_6061t6_aluminum",
+      "label": "Aluminum Alloy 6061-T6 (ASTM B221)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM1.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "mat_ss304_sheet",
+      "label": "Stainless Steel 304 Sheet (ASTM A240)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM2.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "mat_a106_gradeb_pipe",
+      "label": "Carbon Steel Pipe ASTM A106 Grade B",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM3.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "wef_future_of_jobs_2025",
+      "label": "WEF Future of Jobs Report 2025 - Drivers of Labour-Market Transformation",
+      "file_type": "paper",
+      "source_file": "implementation_layer/examples/software_components/parsers/WEF-page-10.pdf",
+      "source_location": "Chapter 1, Section 1.1",
+      "source_url": null,
+      "captured_at": "2025-01",
+      "author": "World Economic Forum",
+      "contributor": null
+    },
+    {
+      "id": "acme_annual_report_2024",
+      "label": "ACME Corp Annual Organizational Report FY2024",
+      "file_type": "paper",
+      "source_file": "implementation_layer/examples/software_components/parsers/sample_report.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2024",
+      "author": "ACME Corp",
+      "contributor": null
+    },
+    {
+      "id": "patient_anna_thompson_summary",
+      "label": "Medical Consultation Summary - Patient Anna Thompson",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/patient_summary.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-02-03",
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "po_farview_560471823",
+      "label": "Purchase Order 560471823 - Farview Dynamics LLC",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-02-05",
+      "author": "Karen Ostrowski",
+      "contributor": null
+    },
+    {
+      "id": "farview_dynamics",
+      "label": "Farview Dynamics LLC",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "highpoint_manufacturing",
+      "label": "Highpoint Manufacturing Co.",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "po_vantex_7200445321",
+      "label": "Purchase Order 7200445321 - Vantex Precision Industries Ltd",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO2.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2026-02-15",
+      "author": "Marta Lindqvist",
+      "contributor": null
+    },
+    {
+      "id": "vantex_precision_industries",
+      "label": "Vantex Precision Industries Ltd (Wallisellen, Switzerland)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO2.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "ferralux_dayton",
+      "label": "Ferralux Dayton Inc",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO2.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "mat_6061t6_roundbar_alrd00882",
+      "label": "6061-T6 Aluminium Alloy Round Bar ALRD00882",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO2.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "mat_7075t651_roundbar_alrd01240",
+      "label": "7075-T651 Aluminium Alloy Round Bar ALRD01240",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO2.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "nexon_bom_4bgq312884416",
+      "label": "BOM 4BGQ312884416 Rev B: AL Rotor Bar AFKG 45X8/6 (BXR 630LR4)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/BOM1.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-03-10",
+      "author": "Mäkinen, Juha",
+      "contributor": null
+    },
+    {
+      "id": "nexon_bom_4bgq312884378",
+      "label": "BOM 4BGQ312884378 Rev B: AL Rotor Bar AFKG 35X9/8 (BXR 630LR4)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/BOM2.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-03-10",
+      "author": "Mäkinen, Juha",
+      "contributor": null
+    },
+    {
+      "id": "nexon_bom_4bgq312884340",
+      "label": "BOM 4BGQ312884340 Rev B: AL Rotor Bar AFKG 50X9/7 (BXR 630LR4)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/BOM3.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-03-10",
+      "author": "Mäkinen, Juha",
+      "contributor": null
+    },
+    {
+      "id": "nexon_motors_drives",
+      "label": "Nexon Motors & Drives Oy (Large Drives & Generators)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "nordic_copper_solutions",
+      "label": "Nordic Copper Solutions Oy",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "po_nexon_28374910",
+      "label": "Purchase Order 28374910 - Nexon Motors AL Rotor Bars",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-03-15",
+      "author": "Michael Brennan",
+      "contributor": null
+    },
+    {
+      "id": "mat_alloy1350h14_rotor_bar",
+      "label": "Tapered Flat Aluminum Bar Alloy 1350-H14 (Rotor Bar)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/BOM1.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "diary_lotus_demolition_2025",
+      "label": "Construction Site Diary - Lotus Demolition (Revontulentie 3, Espoo)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_modules/audio_to_structured_data/diary_workflow/diary.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-04-10",
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "invoice_techsolutions_inv_2025_1247",
+      "label": "Invoice INV-2025-1247 - TechSolutions LLC to GlobalTech Industries",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_modules/documents_to_structured_data/input/invoice.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": "2025-12-12",
+      "author": "TechSolutions LLC",
+      "contributor": null
+    },
+    {
+      "id": "techsolutions_llc",
+      "label": "TechSolutions LLC (San Francisco, CA)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_modules/documents_to_structured_data/input/invoice.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "globaltech_industries",
+      "label": "GlobalTech Industries Inc. (Austin, TX)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_modules/documents_to_structured_data/input/invoice.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "nocode_agent_po_processing",
+      "label": "No-Code Agent Skill: Purchase Order Processing Sample Data",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/sample_data/customer_data/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "nocode_prompt_po_processing",
+      "label": "No-Code Prompt: Purchase Order Processing Customer Data",
+      "file_type": "document",
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/BOM1.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "extractor_example_dir",
+      "label": "Extractor Example Input Documents (BOM+PO set)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "vision_extractor_example_dir",
+      "label": "Vision Extractor Example Documents (BOM+PO set, Nexon BOMs)",
+      "file_type": "document",
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO.pdf",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "po_2025_15903",
+      "target": "autotech_customer",
+      "relation": "issued_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_2025_15903",
+      "target": "precisionsteel_vendor",
+      "relation": "sent_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_2025_15903",
+      "target": "project_prj_at_2025_q4b",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_2025_15903",
+      "target": "bom1_mat2401_aluminum_angle",
+      "relation": "requires_bom",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_2025_15903",
+      "target": "bom2_mat3567_stainless_steel_sheet",
+      "relation": "requires_bom",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_2025_15903",
+      "target": "bom3_mat4829_carbon_steel_pipe",
+      "relation": "requires_bom",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom1_mat2401_aluminum_angle",
+      "target": "mat_6061t6_aluminum",
+      "relation": "specifies_material",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM1.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom2_mat3567_stainless_steel_sheet",
+      "target": "mat_ss304_sheet",
+      "relation": "specifies_material",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM2.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom3_mat4829_carbon_steel_pipe",
+      "target": "mat_a106_gradeb_pipe",
+      "relation": "specifies_material",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM3.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom1_mat2401_aluminum_angle",
+      "target": "precisionsteel_vendor",
+      "relation": "authored_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM1.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom2_mat3567_stainless_steel_sheet",
+      "target": "precisionsteel_vendor",
+      "relation": "authored_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM2.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "bom3_mat4829_carbon_steel_pipe",
+      "target": "precisionsteel_vendor",
+      "relation": "authored_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/BOM3.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_farview_560471823",
+      "target": "farview_dynamics",
+      "relation": "issued_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_farview_560471823",
+      "target": "highpoint_manufacturing",
+      "relation": "sent_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_vantex_7200445321",
+      "target": "vantex_precision_industries",
+      "relation": "issued_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO2.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_vantex_7200445321",
+      "target": "ferralux_dayton",
+      "relation": "sent_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO2.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_vantex_7200445321",
+      "target": "mat_6061t6_roundbar_alrd00882",
+      "relation": "orders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO2.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_vantex_7200445321",
+      "target": "mat_7075t651_roundbar_alrd01240",
+      "relation": "orders",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO2.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_nexon_28374910",
+      "target": "nexon_motors_drives",
+      "relation": "issued_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_nexon_28374910",
+      "target": "nordic_copper_solutions",
+      "relation": "sent_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_nexon_28374910",
+      "target": "nexon_bom_4bgq312884340",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_nexon_28374910",
+      "target": "nexon_bom_4bgq312884378",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "po_nexon_28374910",
+      "target": "nexon_bom_4bgq312884416",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/PO.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "nexon_bom_4bgq312884416",
+      "target": "mat_alloy1350h14_rotor_bar",
+      "relation": "specifies_material",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/BOM1.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "nexon_bom_4bgq312884378",
+      "target": "mat_alloy1350h14_rotor_bar",
+      "relation": "specifies_material",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/BOM2.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "nexon_bom_4bgq312884340",
+      "target": "mat_alloy1350h14_rotor_bar",
+      "relation": "specifies_material",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/BOM3.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "nexon_bom_4bgq312884416",
+      "target": "nexon_motors_drives",
+      "relation": "authored_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/BOM1.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "invoice_techsolutions_inv_2025_1247",
+      "target": "techsolutions_llc",
+      "relation": "issued_by",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/documents_to_structured_data/input/invoice.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "invoice_techsolutions_inv_2025_1247",
+      "target": "globaltech_industries",
+      "relation": "billed_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_modules/documents_to_structured_data/input/invoice.pdf",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "nocode_agent_po_processing",
+      "target": "po_2025_15903",
+      "relation": "reuses_sample_data",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/no-code-assets/agent-skills/purchase-order-processing/sample_data/customer_data/PO.pdf",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "nocode_prompt_po_processing",
+      "target": "po_2025_15903",
+      "relation": "reuses_sample_data",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/no-code-assets/prompts/purchase-order-processing/data/customer_data/BOM1.pdf",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "extractor_example_dir",
+      "target": "po_2025_15903",
+      "relation": "contains",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "vision_extractor_example_dir",
+      "target": "po_nexon_28374910",
+      "relation": "contains",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/PO.pdf",
+      "source_location": null,
+      "weight": 0.95
+    },
+    {
+      "source": "wef_future_of_jobs_2025",
+      "target": "acme_annual_report_2024",
+      "relation": "co_located_example_docs",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "implementation_layer/examples/software_components/parsers/WEF-page-10.pdf",
+      "source_location": null,
+      "weight": 0.75
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hyperedge_po_2025_15903_bom_set",
+      "label": "PO-2025-15903 with associated BOMs (MAT-2401, MAT-3567, MAT-4829)",
+      "node_ids": ["po_2025_15903", "bom1_mat2401_aluminum_angle", "bom2_mat3567_stainless_steel_sheet", "bom3_mat4829_carbon_steel_pipe", "autotech_customer", "precisionsteel_vendor"],
+      "relation": "purchase_order_bom_package",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf"
+    },
+    {
+      "id": "hyperedge_nexon_rotor_bar_set",
+      "label": "Nexon PO 28374910 with three AL Rotor Bar BOMs for BXR 630LR4",
+      "node_ids": ["po_nexon_28374910", "nexon_bom_4bgq312884340", "nexon_bom_4bgq312884378", "nexon_bom_4bgq312884416", "nexon_motors_drives", "nordic_copper_solutions"],
+      "relation": "purchase_order_bom_package",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "implementation_layer/examples/software_components/vision_extractor/PO/PO.pdf"
+    },
+    {
+      "id": "hyperedge_po_sample_data_reuse",
+      "label": "AutoTech/Precision Steel PO+BOM sample data reused across extractor, vision_extractor, agent-skills, and prompts",
+      "node_ids": ["po_2025_15903", "extractor_example_dir", "vision_extractor_example_dir", "nocode_agent_po_processing", "nocode_prompt_po_processing"],
+      "relation": "shared_sample_dataset",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "implementation_layer/examples/software_components/extractor/input/PO.pdf"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}
