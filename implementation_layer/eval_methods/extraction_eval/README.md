@@ -125,6 +125,10 @@ The folders `data/ground truth/` and `data/predictions/` each contain one sample
 
 ### 3.1 Evaluation Setup / Context
 
+The figure below shows the end-to-end incident reporting workflow that was evaluated. Employees record a spoken safety observation on a mobile device; the audio is transcribed, enhanced using a 2-pass LLM method, and passed to the data extractor, which fills in the structured incident report fields. The user reviews the result before the report is transferred to the company's reporting system.
+
+![Incident Reporting and Safety Observation Workflow](images/figure3.png)
+
 Evaluation context:
 - Domain: Workplace safety — incident reports and safety observations
 - Language: Finnish
@@ -313,6 +317,10 @@ REPORT_FILE = Path("IE_report.txt")  # output report filename
 ---
 
 ## Integration with GAIK Toolkit
+
+The figure below shows the internal steps of the GAIK knowledge extraction component. Plain-language requirements are parsed into field specifications, a Pydantic schema is generated, and the extractor applies that schema to parsed or transcribed text to produce a validated structured JSON output.
+
+![GAIK Knowledge Extraction Component Pipeline](images/figure1.png)
 
 ### Generating Predictions with the GAIK Extractor
 

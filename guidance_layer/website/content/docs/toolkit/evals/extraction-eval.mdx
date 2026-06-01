@@ -27,6 +27,10 @@ For example, extracting an incident report from a spoken safety observation:
 
 Extraction quality is measured by comparing AI-extracted JSON fields against human-annotated ground-truth JSON files. Each field is evaluated individually using one of two comparison strategies depending on its type.
 
+The figure below shows the internal steps of the GAIK extraction component: plain-language requirements are parsed into field specifications, a Pydantic schema is generated, and the extractor applies that schema to parsed or transcribed text to produce a validated structured JSON output.
+
+![GAIK Knowledge Extraction Component Pipeline](/images/extraction-eval-pipeline.png)
+
 ### Exact Fields
 
 Exact fields require precise agreement — category values, names, dates, and Yes/No flags. They are compared using normalized string matching:
@@ -59,7 +63,11 @@ A True Negative (TN) is counted when both ground truth and prediction are empty 
 
 ## Benchmarking Results
 
-A pilot evaluation was conducted on 15 incident-reporting audio samples provided by a partner company. Employees recorded spoken safety observations, near misses, and incidents. Company representatives then manually filled in the ground-truth JSON for each recording. The AI workflow (transcription → 2-pass enhancement → schema-guided extraction) produced the predicted JSON files, which were compared against ground truth using `evaluate.py`.
+A pilot evaluation was conducted on 15 incident-reporting audio samples provided by a partner company. The figure below shows the evaluated workflow: employees record spoken safety observations on a mobile device; the audio is transcribed, enhanced using a 2-pass LLM method, and passed to the data extractor, which fills in the structured incident report fields for user review before transfer to the reporting system.
+
+![Incident Reporting and Safety Observation Workflow](/images/extraction-eval-workflow.png)
+
+Company representatives manually filled in the ground-truth JSON for each recording. The AI workflow (transcription → 2-pass enhancement → schema-guided extraction) produced the predicted JSON files, which were compared against ground truth using `evaluate.py`.
 
 ### Aggregate Results
 
@@ -83,29 +91,35 @@ A pilot evaluation was conducted on 15 incident-reporting audio samples provided
 
 ## Error Classification
 
-### Near-Miss and Category Ambiguity
+### Transcription Errors
 
-**Problem**: Exact fields that require categorical judgment — particularly the near-miss flag and report type — can be misclassified when spoken descriptions blend event types or use ambiguous phrasing.
+**Problem**: Errors introduced during speech-to-text conversion propagate directly into the extraction step. If a word is misheard or dropped in the transcript, the extractor works from faulty input and cannot recover the correct value.
 
-**Impact**: A misclassified near-miss flag creates an inaccurate safety record, which may affect incident statistics and compliance reporting.
+**Impact**: Extraction errors that originate in transcription cannot be fixed by improving the extraction prompt alone — they require better transcription models or post-transcription enhancement.
 
-### Implied Information Not Captured
+### Proper Noun Errors
 
-**Problem**: Descriptive fields like possible consequences and suggestions are often left empty by the system when the information is implied rather than explicitly stated in the recording.
+**Problem**: Names of people, organizations, locations, and products are frequently garbled during transcription or misidentified during extraction, as they fall outside standard vocabulary and model training data.
 
-**Impact**: Incomplete records that require manual review before submission to the reporting system.
+**Impact**: Observer names, company names, and location identifiers may be recorded incorrectly, requiring manual correction before the report is submitted.
 
-### Semantic Threshold Sensitivity
+### Formatting Inconsistency
 
-**Problem**: Correctly extracted descriptions may score just below the 0.50 similarity threshold due to natural paraphrasing, Finnish morphological variation, or differing levels of detail.
+**Problem**: The same information can be formatted differently across extractions — dates written as `26.8.2025` vs. `2025-08-26`, names with varying capitalization, or numbers expressed as digits vs. words.
 
-**Impact**: True positives counted as mismatches, artificially lowering recall and SMR.
+**Impact**: Inconsistent formatting complicates downstream processing, database storage, and automated comparison against ground truth.
 
-### False Positive Hallucinations
+### Missing Information
 
-**Problem**: The system occasionally fills a field (e.g. suggestion or location detail) when the ground truth is empty — producing a value that was not present in the spoken input.
+**Problem**: When the spoken input is ambiguous, fragmented, or uses implied rather than explicit language, the extractor may leave fields empty even when the relevant information is present in the transcript.
 
-**Impact**: Hallucinated values require correction before the report reaches the receiving system.
+**Impact**: Incomplete records that require manual review and completion before use in reporting or compliance workflows.
+
+### Misinterpreted Information
+
+**Problem**: An imprecise or ambiguous extraction prompt can cause the model to assign a value to the wrong field, use an incorrect category, or conflate two distinct concepts (e.g. consequences vs. actions taken).
+
+**Impact**: Structurally valid but semantically incorrect records that may pass automated validation while containing wrong data.
 
 ---
 
@@ -145,7 +159,7 @@ To run extraction evaluation in your own context:
 2. Collect a representative set of input recordings and produce transcripts
 3. Have domain experts fill in ground-truth JSON files for each input
 4. Run the extraction workflow (transcription → enhancement → extraction) to produce predicted JSON files
-5. Place matched ground-truth and prediction files in `ground truth/` and `predictions/`, then run `python evaluate.py`
+5. Place matched ground-truth and prediction files in `data/ground truth/` and `data/predictions/`, then run `python evaluate.py`
 6. Review `IE_report_70%.txt` and adjust the semantic threshold or extraction prompt based on field-level results
 
 For technical implementation details, the evaluation script, and example data structures, visit the [GAIK GitHub repository](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval).
