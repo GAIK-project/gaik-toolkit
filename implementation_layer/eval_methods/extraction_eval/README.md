@@ -174,7 +174,23 @@ Aggregate results from the pilot evaluation (15 samples):
 | **Exact Match Rate (EMR)** | **90.67%** |
 | **Semantic Match Rate (SMR)** | **87.78%** |
 
-For a detailed discussion of error analysis, improvement directions, and semantic threshold calibration, refer to the [IFKAD-2026 paper](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval).
+For a detailed discussion of the evaluation design and results in the context of incident reporting, refer to the IFKAD-2026 paper.
+
+---
+
+## 4. Performance Issues
+
+- **Extraction prompt quality** — Extraction quality depends heavily on how well the LLM is guided to extract each field. Vague or ambiguous prompt instructions lead to inconsistent or incorrect field values, regardless of model capability.
+- **Semantic threshold sensitivity** — The performance metrics, particularly recall and F1, are directly affected by the chosen similarity threshold. A higher threshold is stricter and will classify more borderline matches as errors, which may lower F1. The appropriate threshold depends on the domain and the acceptable level of paraphrase tolerance.
+- **Model selection** — Extraction quality varies across LLM providers and model sizes. Smaller or less capable models may struggle with multi-field structured extraction, especially for domain-specific vocabulary or fields that require contextual inference.
+
+---
+
+## 5. Improvement Strategies
+
+- **Calibrate the semantic threshold** — Before finalizing the evaluation threshold, manually examine a sample of ground-truth and prediction pairs. Select a threshold that correctly classifies the borderline cases for your domain rather than relying on the default.
+- **Inspect and refine the generated schema** — Examine the Pydantic model and `requirements.json` produced by the GAIK Schema Generator. Small adjustments to field descriptions, type constraints, or enum values in the schema can meaningfully improve extraction consistency.
+- **Finetune the extraction prompt** — Observe field-level results and iteratively improve the extraction prompt for underperforming fields. Our experiments show that extraction quality is strongly influenced by how clearly the prompt defines each field and what counts as a valid value.
 
 ---
 
