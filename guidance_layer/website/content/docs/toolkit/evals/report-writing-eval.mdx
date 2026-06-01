@@ -1,43 +1,131 @@
 ---
 title: Report Writing Evaluation
-description: Assessing automatically generated report quality
+description: Assessing AI-generated report quality using an LLM-as-judge approach with issue-based scoring across factual accuracy, completeness, and clarity.
 ---
 
-<Callout type="warn">
-**Coming Soon:** Detailed documentation for report writing evaluation is under development.
-</Callout>
+## The Problem
 
-## Overview
+Automatically generated reports synthesize information from multiple sources — voice recordings, field notes, documents, images — into professional documents that must be accurate, complete, and clear enough for business use. A report that omits a required section, contains a factual error, or uses unclear language can mislead decision-makers, fail compliance checks, or require costly manual correction.
 
-Automatically generated reports synthesize information from multiple sources into professional documents. Evaluation methods assess completeness, coherence, accuracy, and professional quality of generated reports.
-
-### What Report Writing Evaluation Measures
-
-**Content Quality**
-- Are all required sections included and properly structured?
-- Is the information accurate and consistent with source materials?
-- Are key findings and recommendations clearly presented?
-
-**Writing Quality**
-- Is the report professionally written and grammatically correct?
-- Does the content flow logically from section to section?
-- Is technical terminology used appropriately?
-
-**Completeness**
-- Does the report address all specified requirements?
-- Are citations and references properly included?
-- Is supporting data and evidence adequately presented?
+Key challenges include:
+- **Factual accuracy** — the report must reflect only what is present in the source material; hallucinated or paraphrased values can invalidate the document
+- **Structural completeness** — different report types have different required sections; a missing section may render the report unusable
+- **Element completeness** — even when all sections are present, mandatory content elements (dates, names, action items) can be missing within them
+- **Clarity** — reports that are technically correct but poorly written or ambiguous create interpretation errors and slow review cycles
+- **Source diversity** — reports generated from speech transcripts, scanned documents, and field notes each introduce different quality risks upstream
 
 ---
 
-## Use Cases
+## How We Evaluate
 
-Report writing evaluation will support:
-- Construction site report generation from multiple sources
-- Business intelligence report synthesis
-- Sales proposal generation
-- Executive summaries and briefings
+Report quality is assessed using an **LLM-as-judge** approach. The generated report and its source material are passed to an LLM judge, which reviews the report against four criteria and returns a structured list of identified issues. Each issue includes the criterion type, severity level, the affected section, and a brief description. A final quality score from 0 to 10 is computed from the issues and their severities.
+
+### Evaluation Criteria
+
+| Criterion | What it measures |
+|-----------|-----------------|
+| **Factual Error** | Information that is incorrect or inconsistent with the source material |
+| **Missing Section** | A structurally required section of the report is entirely absent |
+| **Required Elements Missing** | Specific mandatory content elements are absent within an existing section |
+| **Clarity Issues** | Language that is ambiguous, poorly structured, or difficult to understand |
+
+### Severity Levels
+
+Each identified issue is classified at one of three severity levels:
+
+| Severity | Meaning |
+|----------|---------|
+| **High** | Significantly affects report usability or correctness — must be corrected before use |
+| **Medium** | Reduces quality but does not invalidate core content — should be corrected |
+| **Low** | Minor imperfection with minimal practical impact — acceptable for most use cases |
+
+### Scoring
+
+Reports receive a score from 0 to 10, starting at 10 with deductions applied per issue:
+
+| Severity | Deduction |
+|----------|----------:|
+| High | 2.0 points |
+| Medium | 1.0 point |
+| Low | 0.5 points |
+
+| Score | Assessment |
+|-------|-----------|
+| **9–10** | Excellent — meets all requirements with only minor issues |
+| **7–8** | Good — usable, with a few medium-severity corrections needed |
+| **5–6** | Fair — requires revision before use |
+| **3–4** | Poor — significant issues affect correctness or completeness |
+| **0–2** | Unacceptable — must be regenerated |
 
 ---
 
-For updates on report writing evaluation methods, check the [GAIK GitHub repository](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods).
+## Benchmarking Results
+
+_N/A — to be completed._
+
+---
+
+## Error Classification
+
+### Factual Errors
+
+**Problem**: The report contains values, dates, names, or descriptions that do not match the source material — either because the LLM hallucinated content or misread the input.
+
+**Impact**: Incorrect facts in safety reports, construction diaries, or compliance documents can lead to wrong decisions, regulatory violations, or liability issues. High-severity factual errors may invalidate the report entirely.
+
+### Missing Sections
+
+**Problem**: A structurally required section of the report is entirely absent — not empty, but not generated at all.
+
+**Impact**: Reports with missing sections cannot be submitted to receiving systems or used for compliance purposes without manual addition of the missing content, increasing review time and risk of errors.
+
+### Required Elements Missing
+
+**Problem**: A section exists in the report but one or more mandatory content elements within it are absent — for example, an incident header that is missing the date or observer name, or an actions section that lists no responsible party.
+
+**Impact**: Incomplete elements create gaps in the knowledge record that make it difficult to act on, follow up, or audit the report.
+
+### Clarity Issues
+
+**Problem**: The report uses language that is ambiguous, inconsistent, overly complex, or difficult to understand for the intended audience — even when the underlying information is factually correct.
+
+**Impact**: Unclear reports slow review cycles, increase the likelihood of misinterpretation, and reduce confidence in the AI-generated output among end users.
+
+---
+
+## Real-World Applications
+
+Report writing evaluation supports the following GAIK workflows:
+
+- **Incident reporting** — Evaluating AI-generated safety observation reports produced from employee voice recordings, ensuring factual accuracy and required field completeness before submission to the company's incident management system
+- **Construction site diary creation** — Assessing daily diary entries synthesized from field notes and voice memos, checking that all required progress, weather, and activity elements are present
+- **Construction site report generation** — Evaluating multi-source inspection and progress reports combining documents, images, and transcripts, where factual consistency across sources is particularly critical
+
+---
+
+## Quality Considerations
+
+**Prompt design is the primary quality lever** — the most direct way to reduce missing sections, missing elements, and clarity issues is to provide the report generation prompt with an explicit structure template, required element list, and style guidelines.
+
+**Threshold for human review** — define a minimum acceptable score for your use case before deployment. For safety-critical or compliance reporting, consider requiring a score of 8 or above before the report is delivered to the user.
+
+**Severity calibration** — the default deduction weights (High: 2.0, Medium: 1.0, Low: 0.5) may need adjustment depending on the use case. For legal or compliance contexts, High issues may warrant larger deductions or automatic rejection.
+
+**Source quality bounds output quality** — factual errors and missing elements often originate upstream in transcription or extraction, not in the report generation step. Evaluate the full pipeline, not just the final report.
+
+**LLM judge consistency** — LLM judges can vary between runs. Use a fixed judge model, temperature 0, and a structured output schema to maximize reproducibility across evaluations.
+
+---
+
+## Getting Started
+
+To evaluate report quality in your own context:
+
+1. Define the required sections and mandatory elements for your report type
+2. Generate a set of sample reports using your GAIK workflow
+3. Collect the corresponding source materials for each report
+4. Run the LLM-as-judge evaluation, passing each report and its source material to the judge with a prompt that references the required structure
+5. Review the issue list and score for each report; use field-level findings to identify which prompt or upstream step to improve
+6. Set a minimum acceptable score for your use case and monitor it as the workflow evolves
+
+For technical implementation details and the evaluation script, visit the [GAIK GitHub repository](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/report_writing_eval).

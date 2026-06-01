@@ -370,6 +370,7 @@ Path("predictions/Sample1.json").write_text(
 This evaluation methodology has been applied to the following GAIK extraction workflows:
 
 - **Incident reporting** — Converting voice-recorded workplace safety observations into structured incident report fields (pilot evaluation: P=90.00%, R=87.10%, F1=88.52%)
+- **Purchase order processing** — Extracting header and line items information from purchase orders. 
 - **Construction site diary creation** — Extracting daily progress, observations, and tasks from field notes or voice recordings into standardized diary entries
 - **Safety observation reporting** — Structuring safety walk-around observations and positive reinforcement notes into company reporting schemas
 
