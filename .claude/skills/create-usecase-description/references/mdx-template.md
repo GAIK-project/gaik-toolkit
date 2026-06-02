@@ -292,7 +292,7 @@ Rules:
 
 ---
 
-### 6. `## Defining What to Extract: User Requirements` *(extraction use cases only; omit otherwise)*
+### 6. `## Defining What to Extract: User Requirements` *(include when the use case involves schema-guided extraction with user-defined fields; omit for other use cases)*
 
 ```markdown
 ## Defining What to Extract: User Requirements

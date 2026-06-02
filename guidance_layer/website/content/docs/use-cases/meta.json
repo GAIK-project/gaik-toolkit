@@ -5,9 +5,9 @@
     "purchase-order-processing",
     "transcription-captioning-translation",
     "semantic-video-search",
-    "dental-learning-assistant",
-    "report-writing",
     "construction-site-diary-creation",
-    "safety-observation-reporting"
+    "safety-observation-reporting",
+    "dental-learning-assistant",
+    "report-writing"
   ]
 }

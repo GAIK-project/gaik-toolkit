@@ -62,7 +62,7 @@ Implementation — No-Code                   ✅ / Coming Soon
 Implementation — Code-Based (diagram)      ✅ / Coming Soon
 Software Components (N GAIK components)    ✅ / Coming Soon
   Downstream tasks subsection              ✅ / omit
-Defining What to Extract                   ✅ / Coming Soon / omit
+Defining What to Extract                   ✅ / omit
 Software Module (diagram + outputs)        ✅ / Coming Soon / omit
 Adaptable to Other Domains                 ✅ / Coming Soon
 Evaluation Methods                         ✅ / Coming Soon
@@ -159,9 +159,9 @@ Use Structure B when both `implementation_layer/no-code-assets/prompts/` and `im
 - Clarify that these steps are outside the GenAI pipeline and may require organisation-specific customisation
 - Do NOT add a diagram for downstream tasks — prose only
 
-**Defining What to Extract (`## Defining What to Extract: User Requirements`)** *(extraction use cases only)*:
-- 1–2 sentence intro
-- Plain-text code block with field specs in the exact format of the incident-reporting example
+**Defining What to Extract (`## Defining What to Extract: User Requirements`)** *(include when the use case involves schema-guided extraction with user-defined fields; omit for other use cases)*:
+- 1–2 sentence intro explaining that fields are specified in plain language
+- Plain-text code block showing the field specification in the exact format used in `incident-reporting.mdx` (field name + optional constraint in brackets, followed by output rules)
 - Output rules as a bullet list inside the code block
 
 **Software Module (`## Software Module: {ModuleName}`)** *(if a combined GAIK module is used)*:
