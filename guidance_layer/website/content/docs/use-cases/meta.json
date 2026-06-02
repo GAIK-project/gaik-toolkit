@@ -1,4 +1,4 @@
-﻿{
+{
   "title": "Use Cases",
   "pages": [
     "incident-reporting",
@@ -8,7 +8,6 @@
     "dental-learning-assistant",
     "report-writing",
     "construction-site-diary-creation",
-    "sales-proposal-generation",
-    "customer-onboarding-sales-assistant"
+    "safety-observation-reporting"
   ]
 }
