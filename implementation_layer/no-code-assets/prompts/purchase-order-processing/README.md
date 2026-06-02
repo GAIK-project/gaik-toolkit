@@ -1,196 +1,160 @@
-# Purchase Order Processing Prompt (PO → Sales Order)
+# Purchase Order Processing Prompts
 
-This repository contains a **prompt-only workflow** you can use in ChatGPT to process a customer **Purchase Order (PO)** and generate:
-
-1) a **price matching table**  
-2) a **calculation breakdown** (audit trail)  
-3) a **Sales Order** in a consistent, professional format (Markdown/text)  
-4) a list of **flags/assumptions** for anything missing or ambiguous  
-
-It is designed as a **demo / prototype** approach: no file server, no code, no external tools required. You upload the documents directly in ChatGPT and paste the prompt.
+A prompt-only workflow for processing customer purchase orders in ChatGPT. No code, no file server, no external tools required. Upload the documents, paste a prompt, and get structured JSON output with extracted fields and calculated pricing.
 
 ---
 
-## What this prompt does
+## Two prompt types
 
-This prompt automates purchase order processing in two scenarios:
+### `prompt_single_document_PO.txt` — Single PDF purchase order
 
-### Scenario A: PO + multiple BOMs
-If the PO references multiple items and each item has a separate **Bill of Materials (BOM)**, the prompt:
+Use this when the purchase order is a **single PDF** that contains all required information (item descriptions, quantities, material numbers) without accompanying Bill of Material files.
 
-- Extracts from the PO:
-  - Line items: **Material Number, Quantity, Unit, Delivery Date**
-  - Customer info: **Name, Address, Contact**
-  - Order details: **PO Number, Payment Terms, Shipping Terms, Project Code**
-  - Special requirements / instructions
+**What it does:**
+- Extracts PO header fields: order date, delivery date, PO number, supplier number, shipping address, payment terms
+- Extracts line items: item number, description, quantity, material number
+- Matches each line item against the price list to retrieve unit price and fee rates
+- Calculates per-line costs: material cost, cutting cost, testing cost, certification cost
+- Computes order totals: material subtotal, volume discount, net material cost, total fees, tax, and grand total
+- Returns everything as a single JSON object
 
-- For each line item, extracts from the matching BOM:
-  - **Type/Part Designation**
-  - **Dimensions**
-  - **Material Grade**
-  - **Technical/spec notes** (if present)
-  - Fee calculation fields:
-    - `cutting_required`
-    - `num_cuts`
-    - `testing_lots_required`
-    - `certificates_required`
+**Files to upload in ChatGPT:**
+- `PO.pdf` — the purchase order
+- Price list content — paste the full content of `price_list.md` directly in your message, or upload the file
 
-- Matches pricing from a master price list:
-  - Uses **lookup key / item key** (preferred) or “best match” logic as defined in the prompt
-  - Retrieves:
-    - **unit price**
-    - **cutting fee**
-    - **testing fee**
-    - **certification fee**
-
-- Calculates:
-  - Per-line costs:
-    - Material cost
-    - Cutting cost
-    - Testing cost
-    - Certification cost
-  - Order totals:
-    - Material subtotal
-    - **Volume discount** based on subtotal tiers
-    - Net material cost after discount
-    - Aggregated fees
-    - Shipping
-    - Tax
-    - Grand total
-
-- Produces a final **Sales Order** in Markdown/text format using your `sample_order.docx` / `sample_report.md` as the formatting reference.
-
-### Scenario B: PO contains all information (no BOMs)
-If the PO itself includes the fields normally found in BOMs (type/part designation, dimensions, etc.), the prompt uses the PO as the source for those fields. Missing values are left blank (null) and flagged.
+**Sample data:** `data/single document PO/`
+```
+single document PO/
+├── customer_data/
+│   └── PO.pdf
+└── price_list/
+    └── price_list.md
+```
 
 ---
 
-## Key design rules (important)
+### `prompt_multi_document_PO.txt` — Purchase order with multiple Bills of Material
 
-- **PO unit prices are treated as reference only** (not used for calculations).
-- **Only the price list values** are used for unit prices and fees.
-- **No guessing**: if a numeric value is missing (e.g., `num_cuts`) the prompt flags it instead of inventing it.
-- **Discount applies only to the material subtotal** (not to fees/shipping/tax).
-- **Tax base** = Net material cost (after discount) + fees (shipping excluded), unless you change the rules in the prompt.
-- Output always includes an **audit trail** so you can verify calculations.
+Use this when the purchase order is accompanied by **one or more BOM PDFs**. Each PO line item is linked to a BOM via a material number, and the BOM provides the technical details (part designation, dimensions, fee flags) needed for pricing.
 
----
+**What it does:**
+- Extracts PO header fields: order date, buyer, sales person, shipping address, payment terms
+- Extracts PO line items: material number, quantity, description, delivery date
+- Reads each BOM and extracts: BOM ID, part designation, part dimension, cutting/testing/cert fee flags
+- Cross-references PO line items with BOMs by matching material number to BOM ID
+- Matches each enriched line item against the price list
+- Calculates per-line costs and order totals (same pricing logic as single-document prompt)
+- Returns everything as a single JSON object
 
-## Repository contents (suggested)
+**Files to upload in ChatGPT:**
+- `PO.pdf` — the purchase order
+- `BOM1.pdf`, `BOM2.pdf`, `BOM3.pdf`, ... — all BOM files (upload all at once)
+- Price list content — paste the full content of `price_list.md` directly in your message, or upload the file
 
-- `prompt.txt` (or `custom_gpt_prompt.txt`)  
-  The combined prompt you paste into ChatGPT or Custom GPT instructions.
-
-- `sample_report.md`  
-  The sample Markdown output format (used to mimic layout).
-
-- `sample_order.docx`  
-  Optional format reference (structure/wording/layout cues).
-
-- `examples/` (optional)  
-  Example input files and an example generated output.
-
----
-
-## How to use (ChatGPT, prompt-paste workflow)
-
-### Step 1: Upload documents
-Upload the following files in ChatGPT:
-
-- `PO.pdf`
-- `BOM1.pdf, BOM2.pdf, ...` (as many as you have)
-- `price_list.md`
-- `sample_report.md` and/or `sample_order.docx`
-
-> Tip: Always upload `sample_report.md` for the most consistent formatting.
-
-### Step 2: Paste the prompt
-Copy the content of `prompt.txt` and paste it into ChatGPT.
-
-### Step 3: Run the task
-In the next message, write something short like:
-
-- “Process these files and generate the Sales Order.”
-
-ChatGPT will return the output in this strict order:
-1) PRICE_MATCHING  
-2) CALCULATION BREAKDOWN  
-3) SALES ORDER (Markdown)  
-4) FLAGS / ASSUMPTIONS  
+**Sample data:** `data/multi document PO/`
+```
+multi document PO/
+├── customer_data/
+│   ├── PO.pdf
+│   ├── BOM1.pdf
+│   ├── BOM2.pdf
+│   └── BOM3.pdf
+└── price_list/
+    └── price_list.md
+```
 
 ---
 
-## How to use (Custom GPT)
+## Pricing logic (same in both prompts)
 
-1. Create a new Custom GPT in ChatGPT.
-2. Paste the full prompt into the **Instructions** field.
-3. Save the Custom GPT.
-4. In each run:
-   - Upload `PO.pdf`, BOMs, `price_list.md`, and `sample_report.md` (recommended).
-   - Ask: “Process the uploaded PO and generate the Sales Order.”
+Both prompts apply the following calculation rules:
 
-> If you do not upload the sample output files in a run, the GPT will still follow the described structure, but formatting may drift slightly.
+**Per line item:**
+- `material_cost = quantity × unit_price`
+- `cutting_cost = cutting_fee × num_cuts` (0 if cutting not required; flagged if num_cuts unknown)
+- `testing_cost = testing_fee × testing_lots` (default: 1 lot if not stated)
+- `cert_cost = cert_fee × certificates` (default: 1 cert if not stated)
+- `line_total = material_cost + cutting_cost + testing_cost + cert_cost`
+
+**Order totals:**
+
+| Material Subtotal | Volume Discount |
+|-------------------|----------------|
+| $0 – $4,999 | 0% |
+| $5,000 – $14,999 | 3% |
+| $15,000 – $29,999 | 5% |
+| $30,000 – $49,999 | 7.5% |
+| $50,000+ | 10% |
+
+- Discount applies to material subtotal only (not fees, shipping, or tax)
+- `tax_base = net_material_cost + total_fees` (shipping excluded)
+- `grand_total = net_material_cost + total_fees + shipping + tax`
+
+**Key rules:**
+- PO unit prices are reference only — only price list values are used for calculations
+- Missing numeric values are never invented; they are set to `null` and flagged
+- All assumptions (e.g., default fee counts) are recorded in the `flags` field
 
 ---
 
-## Inputs expected
+## How to use
 
-### Purchase Order (PO)
-The prompt expects the PO to contain (where available):
-- PO number, PO date
-- Customer details (name/address/contact)
-- Line items with material numbers and quantities
-- Delivery dates
-- Payment/shipping terms
-- Tax rate and shipping amount (if present)
-- Special instructions
+### Step 1 — Open ChatGPT (GPT-4o recommended)
 
-### Bills of Material (BOMs)
-Each BOM should be identifiable by a `BOM_ID` or equivalent field matching the PO material number.
+### Step 2 — Upload documents
+- For single-document PO: upload `PO.pdf`
+- For multi-document PO: upload `PO.pdf` and all BOM PDFs together
 
-### Price list
-The price list (`price_list.md`) should include, per item:
-- Lookup key (item/material key)
-- Unit price
-- Cutting fee
-- Testing fee
-- Certification fee
-- A row identifier (row number or key)
+### Step 3 — Paste the price list
+Copy the full content of `price_list.md` and paste it in the same message as the prompt, or upload the file directly.
+
+### Step 4 — Paste the prompt
+Copy the full content of the relevant prompt file and paste it into ChatGPT.
+
+### Step 5 — Send
+ChatGPT will return a single JSON object with all extracted fields, calculated line costs, order totals, and a `flags` list for any missing or ambiguous values.
 
 ---
 
 ## Output format
 
-The prompt outputs:
+Both prompts return a JSON object with this structure:
 
-- **Price matching table**
-  - Shows which price list row was used per material and what fees/prices were applied
-
-- **Calculation breakdown**
-  - Step-by-step per-line calculations and full order totals (audit-friendly)
-
-- **Sales order (Markdown/text)**
-  - Professional layout mimicking the sample template
-
-- **Flags/assumptions**
-  - Missing fields, ambiguous matches, non-computable items, and any inconsistencies
+```json
+{
+  "order_summary": { ... },
+  "line_items": [
+    {
+      "material_number": "...",
+      "description": "...",
+      "unit_price": 28.50,
+      "material_cost": 5700.00,
+      "cutting_cost": 0,
+      "testing_cost": 15.00,
+      "cert_cost": 25.00,
+      "line_total": 5740.00,
+      "flags": []
+    }
+  ],
+  "totals": {
+    "material_subtotal": 25567.50,
+    "volume_discount_rate": "5%",
+    "volume_discount_amount": 1278.38,
+    "net_material_cost": 24289.12,
+    "total_fees": 165.00,
+    "tax_base": 24454.12,
+    "tax_amount": 1467.25,
+    "grand_total": 26371.37
+  },
+  "flags": []
+}
+```
 
 ---
 
-## Known limitations (prototype scope)
+## Known limitations
 
-This is a **prompt-based** system. It is suitable for demos and early prototypes, but note:
-
-- Very large price lists may reduce accuracy unless the prompt extracts only the relevant rows.
-- Scanned PDFs or complex tables may lead to extraction errors.
-- If BOMs differ in Bill To / Ship To data, the prompt chooses the most complete and flags inconsistencies.
-- For production automation, you would typically add:
-  - deterministic parsing (PDF table extraction)
-  - programmatic calculations
-  - validation rules and unit tests
-
----
-
-## License / disclaimer
-
-This repository provides a prompt-only workflow for demonstration and prototyping. Always verify pricing and terms before using outputs in real customer transactions.
+This is a prompt-based prototype suitable for demos and early evaluation:
+- Very large price lists may reduce match accuracy; paste only the relevant section if needed
+- Scanned or complex-layout PDFs may lead to extraction errors — the multimodal parser in the GAIK code-based pipeline handles these cases more robustly
+- For production automation, use the code-based pipeline in `implementation_layer/src/gaik/`

@@ -1,10 +1,10 @@
 ---
 title: Purchase Order Processing
-description: Automated purchase order extraction, BOM matching, and priced sales-order generation using AI-powered parsing and schema-guided extraction.
+description: Automated purchase order extraction and priced sales-order generation using AI-powered parsing and schema-guided extraction.
 ---
 # Purchase Order Processing Generic Use Case (Cross-Cutting Use Case)
 
-The purchase order processing use case shows how the GAIK toolkit turns incoming customer purchase orders — PDFs, scanned documents, and accompanying bills of material — into structured, priced sales orders ready for review and ERP intake, eliminating repetitive manual reading, matching, and arithmetic.
+The purchase order processing use case shows how the GAIK toolkit turns incoming customer purchase orders (PDFs, scanned documents, and accompanying bills of material) into structured, priced sales orders ready for review and ERP intake, eliminating repetitive manual reading, matching, and arithmetic.
 
 ## Business layer – use case specification
 
@@ -12,7 +12,8 @@ At the business layer, the use case targets the manual workflow that follows a c
 
 Concrete example fragments reflected in the use case design include:
 - Purchase orders arrive as PDFs, scanned documents, or email attachments with varying layouts from different customers
-- Each line item links to a bill of material via a material number, and pricing requires matching that material against a master price list
+- The purchase order could be in a single PDF, or with accompanying bill of materials (BoMs)
+- If accompanied by BoMs, each line item in the purchase order links to a bill of material via a material number, and pricing requires matching that material against a master price list
 - Conditional fees — cutting, testing, certification — apply per line only when the BOM flags them as required
 - Success is defined as faster order handling, reduced data entry errors, consistent pricing, and an audit-ready calculation breakdown
 
@@ -126,9 +127,7 @@ This makes the result:
 
 ## Implementation Layer Using Code-Based Method.
 
-Three to five software components — **Parser**, **Schema Generator + DataExtractor**, and optionally the **VisionExtractor** (which combines parsing and extraction in a single LLM call), together with the **Pricing Matcher & Calculator** and a **PDF Generator** — combine to turn raw purchase order documents into a priced, formatted sales order.
-
-Two pipeline variants are available:
+Four software components combine to turn raw purchase order documents into a priced, formatted sales order: **Parser**, **Schema Generator + DataExtractor** (packaged together in the `DocumentsToStructuredData` module), **Pricing Matcher & Calculator**, and **PDF Generator**. Alternatively, the **VisionExtractor** software component can replace the Parser + Extractor steps with a single LLM vision call, feeding the same Pricing Matcher and PDF Generator downstream.
 
 ```mermaid
 flowchart LR
@@ -139,8 +138,8 @@ flowchart LR
 
     subgraph PIPE["Purchase Order Processing"]
         direction TB
-        P1["🗂️ Option A: Parser + Extractor\n(parse → schema → extract)"]
-        P2["🤖 Option B: VisionExtractor\n(single LLM call)"]
+        P1["🗂️ Documents to Structured Data\n(Parser → Schema Gen → Extractor)"]
+        P2["🤖 VisionExtractor component\n(single LLM call — alternative)"]
         M["🔗 Pricing Matcher & Calculator"]
         G["📑 PDF Generator"]
         P1 --> M
@@ -338,9 +337,13 @@ The Schema Generator parses this description into a typed Pydantic model and sav
 
 ---
 
-## Software Module: Purchase Order Processing
+## Software Module: Documents to Structured Data
 
-Packages the full pipeline into one end-to-end workflow. Two variants are supported: the parse → extract path for maximum flexibility and parser choice, and the VisionExtractor path for lower latency and fewer API calls.
+The **Documents to Structured Data** module packages the Parser and the Schema Generator + DataExtractor into a single reusable workflow. Provide document files and plain-language requirements — the module handles parsing, schema generation (cached after the first run), and structured extraction, returning typed field data ready for downstream processing.
+
+As an alternative to this module, the **VisionExtractor** software component (described in the Software Components section above) can be used directly when a single LLM vision call is preferred over the two-step parse → extract approach, reducing latency and the number of API calls.
+
+Both paths feed into the same Pricing Matcher & Calculator and PDF Generator steps to produce the final priced sales order.
 
 ```mermaid
 flowchart TD
@@ -349,59 +352,63 @@ flowchart TD
     IN3("📊 Price List") --> MOD
     IN4("📋 User Requirements") --> MOD
 
-    subgraph MOD["Purchase Order Processing"]
+    subgraph MOD["Documents to Structured Data\n(module)"]
         direction TB
 
-        subgraph PA["Option A · Parser + Extractor"]
+        subgraph PA["Step 1 · Parser"]
             direction LR
-            PAR["Parser\n(PyMuPDF / Docling / Multimodal)"] --> EXTR["Schema Generator\n+ Data Extractor"]
+            PAR["Parser\n(PyMuPDF / Docling / Multimodal)"]
         end
 
-        subgraph PB["Option B · VisionExtractor"]
+        subgraph PB["Step 2 · Schema Generator + DataExtractor"]
             direction LR
-            VIS["🤖 Vision LLM\n(single call, schema cached)"]
+            SG["Schema Generator\n(cached)"] --> EXTR["Data Extractor\nLLM field extraction"]
         end
 
-        subgraph P["Pricing Matcher & Calculator"]
-            direction LR
-            MM["Material →\nBOM"] --> MP["BOM →\nPrice"] --> CC["Calculate\nfees + total"]
-        end
-
-        subgraph D["PDF Generator"]
-            direction LR
-            REND["Render\nSales Order Draft"]
-        end
-
-        PA -->|"structured PO + BOM data"| P
-        PB -->|"structured PO + BOM data"| P
-        P -->|"enriched line items"| D
+        PA -->|"parsed document text"| PB
     end
 
-    MOD --> O1("📋 Structured PO + BOM JSON")
-    MOD --> O2("💰 Enriched Lines with Fees")
-    MOD --> O3("✅ Sales Order Draft PDF")
+    MOD --> STRUC("📋 Structured PO + BOM Data")
+
+    subgraph CALC["Pricing Matcher & Calculator"]
+        direction LR
+        MM["Material →\nBOM"] --> MP["BOM →\nPrice"] --> CC["Calculate\nfees + total"]
+    end
+
+    subgraph GEN["PDF Generator"]
+        direction LR
+        REND["Render\nSales Order Draft"]
+    end
+
+    STRUC --> CALC
+    CALC -->|"enriched line items"| GEN
+
+    GEN --> O1("💰 Enriched Lines with Fees")
+    GEN --> O2("✅ Sales Order Draft PDF")
 
     style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style IN2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style IN3 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style IN4 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style STRUC fill:#fefce8,stroke:#ca8a04,color:#713f12
     style O1 fill:#fefce8,stroke:#ca8a04,color:#713f12
-    style O2 fill:#fefce8,stroke:#ca8a04,color:#713f12
-    style O3 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
     style MOD fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
     style PA fill:#faf5ff,stroke:#9333ea,color:#2e1065
     style PB fill:#faf5ff,stroke:#9333ea,color:#2e1065
-    style P fill:#faf5ff,stroke:#9333ea,color:#2e1065
-    style D fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style CALC fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+    style GEN fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
 ```
 
 Example output from the demo — uploading a purchase order with three BOM files and a price list, then viewing the calculated order summary and generated sales order draft:
 
 <p>
-  <img src="/images/po-demo-1.png" alt="Purchase order processing demo: uploading PO, BOM files, and price list" style={{ width: "45%", height: "auto", display: "inline-block" }} />
-  <img src="/images/po-demo-2.png" alt="Purchase order processing demo: order summary with calculated line items and sales order draft preview" style={{ width: "45%", height: "auto", display: "inline-block" }} />
+  <img src="/gaik-toolkit/images/po-demo-1.png" alt="Purchase order processing demo: uploading PO, BOM files, and price list" style={{ width: "45%", height: "auto", display: "inline-block" }} />
+  <img src="/gaik-toolkit/images/po-demo-2.png" alt="Purchase order processing demo: order summary with calculated line items and sales order draft preview" style={{ width: "45%", height: "auto", display: "inline-block" }} />
 </p>
 
+> 📁 [`implementation_layer/src/gaik/software_modules/documents_to_structured_data/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/documents_to_structured_data)
+>
 > 📁 [`implementation_layer/examples/software_components/vision_extractor/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/vision_extractor)
 
 To test a smaller version of the purchase order use case, please visit the [GAIK demo link](https://gaik-demo.2.rahtiapp.fi/). Access is available upon registration request.
@@ -440,6 +447,7 @@ The quality of structured information extraction is evaluated using precision, r
 |----------|------|
 | Parser components | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/parsers) |
 | Schema Generator + DataExtractor | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor) |
+| Documents to Structured Data module | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/documents_to_structured_data) |
 | VisionExtractor component | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/vision_extractor) |
 | Vision Extractor PO + BOM example | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/vision_extractor) |
 | No-code Claude Desktop skill | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing) |
