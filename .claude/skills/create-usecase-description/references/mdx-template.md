@@ -2,81 +2,46 @@
 
 Canonical structure for `guidance_layer/website/content/docs/use-cases/{slug}.mdx`.
 
-Reference: `incident-reporting.mdx` (gold standard, 338 lines) and `purchase-order-processing.mdx` (463 lines).
+**Primary reference:** `incident-reporting.mdx` — read it fully before generating any content.
 
 ---
 
-## Frontmatter
-
-```yaml
----
-title: {{Use Case Display Name}}
-description: {{One-sentence description for SEO and sidebar navigation}}
----
-```
-
-Only `title` and `description`. No other keys.
-
----
-
-## Page Structure
-
-### Opening (before first H2)
-
-```markdown
-# {{Use Case Display Name}} Generic Use Case (Cross-Cutting Use Case)
-
-{{1–2 sentence business context. What problem does this solve? Who benefits?}}
-```
-
-If a live demo exists, add immediately after the intro:
+## Frontmatter + Opening
 
 ```mdx
-<Callout type="info">
-**Live Demo Available →** [Try it here](https://gaik-demo.2.rahtiapp.fi/)
-</Callout>
+---
+title: {Use Case Display Name}
+description: {One-sentence description for SEO and sidebar}
+---
+# {Use Case Display Name} Generic Use Case (Cross-Cutting Use Case)
+
+{1–2 sentence business context. What problem does this solve and who benefits?}
 ```
+
+The H1 heading always ends exactly with "Generic Use Case (Cross-Cutting Use Case)".
 
 ---
 
-## Section Order (all H2)
-
-All sections are separated by `---` horizontal dividers. Order is fixed; omit optional sections only if the user explicitly declines them.
+## Section Order and Content
 
 ### 1. `## Business layer – use case specification` *(required)*
 
-Structure:
 ```markdown
 ## Business layer – use case specification
 
-{{1–2 sentences describing the business context and the problem being solved.}}
+{1–2 sentence description of what the canvas covers and who the users are.}
 
-{{Optional: reference to canvas image}}
-![{{Alt text}}](/images/{{canvas-image}}.png)
-[Download the Use Case Canvas (PowerPoint) →](https://github.com/GAIK-project/gaik-toolkit/blob/main/...)
+Concrete example fragments reflected in the use case design include:
+- {Fragment describing the input/trigger}
+- {Fragment describing the goal}
+- {Fragment describing the delivery context}
+- {Fragment defining success}
 
-**Concrete example:**
+{1 sentence on what the canvas provides — shared understanding without technical detail.}
 
-The following fragments illustrate a typical {{use case}} scenario:
+![GenAI Product Description for {Use Case}](/images/{canvas-image}.png)
 
-- {{Actor/role}}: {{what they do or say}}
-- {{Actor/role}}: {{what they do or say}}
-- {{Actor/role}}: {{what they do or say}}
-```
-
-Value outcomes (functional/informational/emotional):
-```markdown
-**Value outcomes:**
-
-**Functional value:**
-- {{faster, more accurate, more consistent outcome}}
-- {{reduction in manual steps or errors}}
-
-**Informational value:**
-- {{better data, audit trail, structured knowledge}}
-
-**Emotional value:**
-- {{less stress, higher confidence, easier to use}}
+- **Reference GenAI Product Description for {Use Case}** - [Download Raw File ({filename}.pptx)]({github_url})
 ```
 
 ---
@@ -86,105 +51,186 @@ Value outcomes (functional/informational/emotional):
 ```markdown
 ## Strategy layer – value evaluation and monitoring
 
-{{Link to value evaluation framework + monitoring approach.}}
+At the strategy layer, the value evaluation model applies the [Value Evaluation Framework]({github_url}) to this generic use case and makes value assumptions explicit.
 
-[Value Evaluation Framework →](https://github.com/GAIK-project/gaik-toolkit/...)
-```
+Example value fragments from the model include:
 
-If not yet available:
-```mdx
-<Callout type="info">
-Value evaluation and monitoring documentation is in preparation.
-</Callout>
+Functional value (primary):
+"{Fragment 1}", "{Fragment 2}", "{Fragment 3}"
+→ Outcome: {outcome sentence}
+
+Informational value:
+"{Fragment 1}", "{Fragment 2}"
+→ Outcome: {outcome sentence}
+
+Emotional value:
+"{Fragment 1}", "{Fragment 2}"
+→ Outcome: {outcome sentence}
+
+{Optional: value evaluation image reference}
+![Value evaluation model: {Use Case}](/images/{value-image}.jpg)
+
+{Optional: PowerPoint download link}
+The source version of the **Value evaluation model: {Use Case}** - [Download Raw File ({filename}.pptx)]({github_url})
+
+The same model can be used both before implementation (to evaluate expected value) and after deployment (to monitor realized value across different dimensions).
 ```
 
 ---
 
 ### 3. `## Implementation layer using No-Code` *(required)*
 
-Written for non-technical business users. Three fixed sub-sections:
-
 ```markdown
 ## Implementation layer using No-Code
 
-{{1–2 sentence overview of the no-code approach.}}
+{Use case name} can be supported by Generative AI using a no-code approach.
+At the implementation layer, the use case is realized using no-code assets from the toolkit:
+1) [Prompt templates for {task}]({github_url})
+2) [Reusable agent skills for {task}]({github_url})
 
-**What the business user sets up (once):**
+{1–2 sentences explaining what the assets specify and how organizations can adapt them.}
 
-{{Numbered or bulleted list of one-time setup steps.}}
-1. {{Step}}
-2. {{Step}}
+What the business user sets up (once):
 
-**What happens in daily work:**
+{Role} defines a {template/policy}, not code. Conceptually, it says:
+- "{Rule 1}"
+- "{Rule 2}"
+- "{Rule 3}"
+- "{Rule 4}"
 
-1. {{Step — what the user does}}
-2. {{Step — what the AI does automatically}}
+What happens in daily work:
 
-**Example of what the business gets out:**
+**Step 1 – {Action name}**
+{Description of what the user does.}
+- {Detail}
+- {Detail}
 
-{{1 sentence framing the output.}}
+**Step 2 – {Action name} (no-code logic)**
+{Description of what the system does automatically.}
+- {Rule applied}
+- {Rule applied}
 
-- {{Output field or result item}}
-- {{Output field or result item}}
-- {{Output field or result item}}
+Example of what the business gets out:
+
+{1 sentence framing the output. Instead of {old way}, the output is a {new way}:}
+
+- {Output field}: {value}
+- {Output field}: {value}
+- {Output field}: {value}
+
+This makes the result:
+- easy to paste into an existing system
+- safe to store in a database
+- reliable for analytics and reporting
+- suitable for audits and compliance
 ```
+
+Divider `---` follows immediately after this section.
 
 ---
 
 ### 4. `## Implementation Layer Using Code-Based Method.` *(required)*
 
-Note: the trailing period in the heading is intentional — match it exactly from the reference.
+Note: trailing period in heading — match exactly.
 
 ```markdown
 ## Implementation Layer Using Code-Based Method.
 
+{1–2 sentences naming the components and module used end-to-end.}
+
 ```mermaid
-graph LR
-  A[/"{{Input}}"/] --> B["{{Component 1}}"]
-  B --> C["{{Component 2}}"]
-  C --> D[/"{{Output}}"/]
+flowchart LR
+    A("🎙️ {Input}") --> B
 
-  style A fill:#dbeafe
-  style B fill:#f5f3ff
-  style C fill:#f5f3ff
-  style D fill:#dcfce7
+    subgraph B["{Module Name}"]
+        direction TB
+        C1["{Component 1}"]
+        C2["✨ {Component 2} (optional)"]
+        C3["🤖 {Component 3}"]
+        C1 --> C2 --> C3
+    end
+
+    D("📋 {Config Input}") --> B
+    B --> E("✅ {Structured Output}")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style D fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style E fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+    style C2 stroke-dasharray: 5 5
+```
 ```
 
-{{1–2 sentences naming the components and their roles.}}
-```
+Divider `---` follows.
 
 ---
 
 ### 5. `## Software Components` *(required)*
 
-One `###` per component, in pipeline order.
+One `###` per component, numbered, each ending with `---`:
 
 ```markdown
 ## Software Components
 
-### 1. {{ComponentName}}
+### 1. {ComponentName}
 
-{{2–3 sentences describing what this component does, its inputs, and its outputs.}}
+{2–3 sentences: what it does, its inputs, its outputs.}
 
 ```mermaid
-graph LR / TD
-  ...
+flowchart LR
+    A("🎙️ {Input File}") --> B
+
+    subgraph B["{ComponentName}"]
+        direction TB
+        S1["{Step 1}"]
+        S2["{Step 2}"]
+        S1 --> S2
+    end
+
+    B --> C("📄 {Output 1}")
+    B --> D("✨ {Output 2}")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 ```
 
-```python
-from gaik.software_components.{{module}} import {{ClassName}}, get_openai_config
+> 📁 [`implementation_layer/src/gaik/software_components/{component}/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/{component})
 
-config = get_openai_config(use_azure=True)
-{{component}} = {{ClassName}}(api_config=config)
-result = {{component}}.{{main_method}}(...)
-print(result.{{output_field}})
+---
+
+### 2. {ComponentName}
+
+{Description.}
+
+```mermaid
+flowchart TD
+    A("📄 {Input}") --> B
+    C("📋 {Config}") --> D
+
+    subgraph EXT["{ComponentName}"]
+        direction TB
+        D["{Step 1}"]
+        E["{Step 2}"]
+        F["{Step 3}"]
+        D -.->|"output"| E
+        E -.->|"output"| F
+    end
+
+    EXT --> G("✅ {Structured Output}")
+    EXT --> H("🗂️ {Reusable Artifact}")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style G fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style H fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style EXT fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 ```
 
-> 📁 [Source →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/{{module}})
+> 📁 [`implementation_layer/src/gaik/software_components/{component}/`](...)
 
-### 2. {{ComponentName}}
-
-...
+---
 ```
 
 ---
@@ -194,45 +240,84 @@ print(result.{{output_field}})
 ```markdown
 ## Defining What to Extract: User Requirements
 
-{{1–2 sentences explaining what plain-language requirements do.}}
+Fields are specified in plain language — no code, no schema configuration. Each line names a field and optionally defines allowed values or extraction rules:
 
 ```
-{{Plain-text requirements spec — field names and descriptions, one per line}}
-```
+Extract the following fields from the {document type}.
+- {FieldName} [Choose one from: Option1, Option2, ""]
+- {FieldName}
+- {FieldName} [output "Yes" only if explicitly stated; otherwise ""]
+- {FieldName} [date text exactly as written; do not normalize]
 
 Output rules:
-- {{Rule 1}}
-- {{Rule 2}}
+- Return every schema field.
+- For missing/unknown/not stated values, always return "".
+- {Domain-specific rule.}
 ```
+```
+
+Divider `---` follows.
 
 ---
 
-### 7. `## Software Module: {{ModuleName}}` *(optional; include if a combined GAIK module is used)*
+### 7. `## Software Module: {ModuleName}` *(optional; include if a combined GAIK module is used)*
 
 ```markdown
-## Software Module: {{ModuleName}}
+## Software Module: {ModuleName}
+
+{1–2 sentences: what the module packages and what you provide vs. what it returns.}
 
 ```mermaid
-graph TD
-  subgraph Input
-    A[/"{{Input type}}"/]
-  end
-  subgraph "{{Module Name}}"
-    B["{{Step 1}}"]
-    C["{{Step 2}}"]
-    D["{{Step 3}}"]
-  end
-  subgraph Output
-    E[/"{{Output type}}"/]
-  end
-  A --> B --> C --> D --> E
+flowchart TD
+    IN1("🎙️ {Input 1}") --> MOD
+    IN2("📋 {Input 2}") --> MOD
+
+    subgraph MOD["{Module Name}"]
+        direction TB
+
+        subgraph T["Step 1 · {Component 1}"]
+            direction LR
+            S1["{Sub-step 1}"] --> S2["{Sub-step 2}"]
+        end
+
+        subgraph X["Step 2 · {Component 2}"]
+            direction LR
+            S3["{Sub-step 1}"] --> S4["{Sub-step 2}"] --> S5["{Sub-step 3}"]
+        end
+
+        T -->|"output"| X
+    end
+
+    MOD --> O1("📄 {Output 1}")
+    MOD --> O2("✨ {Output 2}")
+    MOD --> O3("✅ {Output 3}")
+    MOD --> O4("🗂️ {Output 4}")
+
+    style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style IN2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style O2 fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style O3 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O4 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style MOD fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+    style T fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style X fill:#faf5ff,stroke:#9333ea,color:#2e1065
 ```
 
-{{Prose: inputs, outputs, and what the module does.}}
+{Optional: example output images — side-by-side JSX if two images are available:}
 
-> 📁 [Module →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/{{module}})
-> 📁 [Examples →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/{{module}})
+<p>
+  <img src="/gaik-toolkit/images/{image1}.png" alt="{alt1}" style={{ width: "45%", height: "auto", display: "inline-block" }} />
+  <img src="/gaik-toolkit/images/{image2}.png" alt="{alt2}" style={{ width: "45%", height: "auto", display: "inline-block" }} />
+</p>
+
+> 📁 [`implementation_layer/src/gaik/software_modules/{module}/`](...)
+> 📁 [`implementation_layer/examples/software_modules/`](...)
+
+{Optional demo link:} To test the {use case} use case, please visit the [GAIK demo link]({url}).
 ```
+
+Divider `---` follows.
 
 ---
 
@@ -241,11 +326,12 @@ graph TD
 ```markdown
 ## Adaptable to Other Domains
 
-The same pipeline can be applied to:
-- **{{Domain}}** — {{one-sentence description}}
-- **{{Domain}}** — {{one-sentence description}}
-- **{{Domain}}** — {{one-sentence description}}
+The same pipeline applies to any domain requiring {core task description} — only the **User Requirements** definition changes:
+
+- {Domain 1}, {Domain 2}, {Domain 3}, {Domain 4}
 ```
+
+Divider `---` follows. Keep this section short — one sentence + one bullet line.
 
 ---
 
@@ -254,42 +340,34 @@ The same pipeline can be applied to:
 ```markdown
 ## Evaluation Methods
 
-### {{Evaluator Name}} Evaluation
+The quality of this use case is evaluated by assessing each software component independently:
 
-{{1–2 sentences describing what is evaluated and how.}}
+### {Component} Evaluation
 
-[Evaluation details →](/toolkit/evals/{{eval-slug}})
-[Evaluation code →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/{{eval_folder}})
+{1–2 sentences describing what is measured and the key metric used.}
+
+> 📊 **{Title}:** [`implementation_layer/eval_methods/{folder}/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/{folder})
 ```
 
-If no evaluation exists yet:
-```mdx
-<Callout type="warn">
-**Coming Soon:** Evaluation methods for this use case are under development.
-</Callout>
-```
+Divider `---` follows.
 
 ---
 
 ### 10. `## Related Resources` *(required)*
 
-Always the last section. 3-column Markdown table:
+**2-column table** — `Resource | Link` — not 3 columns:
 
 ```markdown
 ## Related Resources
 
-| Resource | Link | Notes |
-|----------|------|-------|
-| {{Resource name}} | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/...) | {{brief note}} |
-| {{Resource name}} | [Docs →](/toolkit/...) | {{brief note}} |
+| Resource | Link |
+|----------|------|
+| {Component name} | [GitHub →]({url}) |
+| {Module name} | [GitHub →]({url}) |
+| {Examples} | [GitHub →]({url}) |
+| GenAI Product Canvas ({Use Case}) | [Download →]({url}) |
+| Implementation Layer overview | [GitHub →]({url}) |
 ```
-
-Typical rows to include:
-- Source code for each component
-- Example scripts
-- Eval folder (if exists)
-- Demo link (if exists)
-- Related use-case pages
 
 ---
 
@@ -297,13 +375,18 @@ Typical rows to include:
 
 | Rule | Detail |
 |------|--------|
-| Dividers | `---` between every H2 section |
-| Callout: info | Demo links, helpful tips, in-preparation notes |
-| Callout: warn | Coming Soon stubs only |
-| Code blocks | `python` for Python, plain (no lang tag) for requirements specs |
-| Images | `![alt](/images/filename.png)` — file must exist in `guidance_layer/website/public/images/` |
-| GitHub links | Pattern: `https://github.com/GAIK-project/gaik-toolkit/tree/main/[path]` |
-| Internal links | Pattern: `/toolkit/evals/[slug]` or `/use-cases/[slug]` |
-| H3 numbering | Number components: `### 1. ComponentName`, `### 2. ComponentName` |
-| Trailing period | `## Implementation Layer Using Code-Based Method.` — keep the period (matches reference) |
-| Coming Soon text | Must start with `**Coming Soon:**` inside the Callout |
+| `---` dividers | After every H2 section |
+| H1 heading | Always `# {Title} Generic Use Case (Cross-Cutting Use Case)` |
+| Mermaid keyword | `flowchart` (not `graph`) |
+| Node emojis | 🎙️ audio · 📋 config/requirements · 📄 text output · ✨ enhanced · ✅ structured output · 🗂️ schema/reusable · 🤖 AI step |
+| Node style colors | Input: `fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f` · Processing subgraph: `fill:#f5f3ff,stroke:#7c3aed,color:#2e1065` · Output: `fill:#dcfce7,stroke:#16a34a,color:#14532d` · Intermediate: `fill:#fefce8,stroke:#ca8a04,color:#713f12` · Module: `fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b` |
+| Optional steps | `stroke-dasharray: 5 5` on the node style |
+| GitHub links | `> 📁 [\`path/\`](full_github_url)` |
+| Eval links | `> 📊 **Title:** [\`path/\`](full_github_url)` |
+| Value type format | `Functional value (primary):` / `"Fragment"` / `→ Outcome: sentence` |
+| Step headers (No-Code) | Bold `**Step N – description**` |
+| Related Resources | 2 columns only (`Resource \| Link`) |
+| Coming Soon | `<Callout type="warn">**Coming Soon:** [placeholder]</Callout>` |
+| Demo link | Inline text before `📁` links in Module section |
+| Side-by-side images | JSX `<p>` with `style={{ width: "45%", ... }}` — only when 2 images available |
+| Generic content | Never use specific company, organization, or client names |

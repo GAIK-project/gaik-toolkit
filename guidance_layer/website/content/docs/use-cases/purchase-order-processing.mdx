@@ -1,91 +1,86 @@
 ---
 title: Purchase Order Processing
-description: Automated purchase order extraction, BOM matching, and priced sales-order generation
+description: Automated purchase order extraction, BOM matching, and priced sales-order generation using AI-powered parsing and schema-guided extraction.
 ---
-
 # Purchase Order Processing Generic Use Case (Cross-Cutting Use Case)
 
-The purchase order processing use case demonstrates how the toolkit turns
-multi-document customer paperwork — a purchase order PDF, one or more bills of
-material (BOMs), and a master price list — into a single structured, priced
-sales order ready for ERP intake. It illustrates how the toolkit's
-`VisionExtractor`, schema-driven extraction, and downstream business logic
-compose into a complete workflow for industrial procurement.
+The purchase order processing use case shows how the GAIK toolkit turns incoming customer purchase orders — PDFs, scanned documents, and accompanying bills of material — into structured, priced sales orders ready for review and ERP intake, eliminating repetitive manual reading, matching, and arithmetic.
 
 ## Business layer – use case specification
 
-At the business layer, the use case targets the manual workflow that follows a
-customer purchase order arriving by email or portal upload. Procurement staff
-today read the PO, look up each material in the company's own BOM library,
-find unit prices and applicable fees in the master price list, add
-cutting/testing/certification fees per item, and assemble a sales order to be
-entered into the ERP. The GAIK pipeline replaces the manual reading, matching,
-and arithmetic steps with a single automated pass while leaving the sales
-person in control of the final review.
+At the business layer, the use case targets the manual workflow that follows a customer purchase order arriving by email or portal upload. Operations staff must read each document, look up every line item against internal material records and price lists, apply conditional fees, and assemble a sales order to be entered into the system. The GAIK pipeline replaces the manual reading, matching, and arithmetic steps with a single automated pass while leaving the reviewer in control of the final output.
 
-Concrete example fragments reflected in the use case design:
-- The customer's PO and BOM PDFs may be unstructured or vendor-specific layouts
-- Each PO line item links to a BOM via a Material Number
-- Pricing combines unit price × quantity with conditional cutting, testing,
-  and certification fees (only billed when the BOM flags them as required)
-- Success is defined in terms of cycle-time reduction, fewer arithmetic
-  errors, and an audit-ready calculation breakdown
+Concrete example fragments reflected in the use case design include:
+- Purchase orders arrive as PDFs, scanned documents, or email attachments with varying layouts from different customers
+- Each line item links to a bill of material via a material number, and pricing requires matching that material against a master price list
+- Conditional fees — cutting, testing, certification — apply per line only when the BOM flags them as required
+- Success is defined as faster order handling, reduced data entry errors, consistent pricing, and an audit-ready calculation breakdown
 
-<Callout type="info">
-Business canvas materials (GenAI Product Canvas) for this use case are in
-preparation. The Implementation Layer sections below describe the working
-code-based reference architecture.
-</Callout>
+The canvas clarifies the purpose of the solution, the main users (order handling staff, customer service, procurement, operations, and finance teams), and the expected outcomes.
+
+[![GenAI Product Canvas for Purchase Order Processing](/images/po-canvas.png)](/images/po-canvas.png)
+
+- **Reference GenAI Product Canvas for Purchase Order Processing** — [Download (po-canvas.png)](/images/po-canvas.png)
+
+---
 
 ## Strategy layer – value evaluation and monitoring
 
-The same Value Evaluation Framework used for incident reporting applies here:
+At the strategy layer, the value evaluation model for purchase order processing applies the [Value Evaluation Framework](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/README.md) to this generic use case and makes value assumptions explicit.
+
+Example value fragments from the model include:
 
 Functional value (primary):
-"Shorter order cycle time", "Fewer arithmetic errors", "Automatic fee
-calculation", "Audit-ready breakdown"
-→ Outcome: more orders processed per day, fewer corrections, cleaner ERP data
+"Faster PO processing", "Consistent data extraction", "Validation and compliance checks", "Easy integration with ERP systems", "Audit trail and traceability"
+→ Outcome: More purchase orders processed faster and with higher quality
 
 Informational value:
-"Structured BOM/PO data for analytics", "Cross-customer pricing visibility",
-"Margin tracking per material"
-→ Outcome: faster decisions on pricing changes and stock policies
+"Accurate PO data capture", "Real-time visibility", "Fewer errors and exceptions", "Better data for analysis"
+→ Outcome: Better decisions with trusted data
+
+Financial value:
+"Lower material processing cost", "Reduced data entry errors", "Faster cash-to-cycle", "Early payment discounts captured"
+→ Outcome: Reduced operating costs and better financial performance
 
 Emotional value:
-"Less rote data entry", "Confidence in math", "Visible audit trail"
-→ Outcome: procurement and sales teams free for higher-value work
+"Increased satisfaction and trust", "Less stress and frustration", "More confidence in data"
+→ Outcome: Happier teams and higher engagement
 
-<Callout type="info">
-Value evaluation model materials for this use case are in preparation.
-</Callout>
+Social value:
+"Better collaboration across teams", "Stronger supplier relationships", "Promotes transparency and fairness"
+→ Outcome: Stronger partnerships and reputation
+
+[![Value Evaluation Model for Purchase Order Processing](/images/po-value.png)](/images/po-value.png)
+
+- **Reference Value Evaluation Model for Purchase Order Processing** — [Download (po-value.png)](/images/po-value.png)
+
+The same model can be used both before implementation (to evaluate expected value) and after deployment (to monitor realized value across different dimensions).
+
+---
 
 ## Implementation layer using No-Code
 
-The purchase order workflow can be operated through a Claude Desktop **agent
-skill** without any coding.
+Purchase order processing can be supported by Generative AI using a no-code approach.
+At the implementation layer, the use case is realized using a no-code agent skill from the toolkit:
+1) [Claude Desktop agent skill for purchase order processing](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing)
 
-The skill at
-[`implementation_layer/no-code-assets/agent-skills/purchase-order-processing/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing)
-defines the inputs, fields, calculation rules, and output format declaratively
-— no programming required. A salesperson installs the skill into Claude
-Desktop, points it to a folder containing the PO, BOMs, and price list, and
-Claude returns a complete sales order document plus a calculation breakdown.
+The skill defines the extraction fields, matching logic, pricing calculation rules, and output format declaratively in plain-text reference files — no programming required. A sales operations manager installs the skill into Claude Desktop, points it to a folder containing the purchase order, bills of material, and price list, and Claude returns a complete sales order document plus a step-by-step calculation audit trail.
+
+For a detailed walkthrough of this no-code implementation, see the article: [I Created a Claude Skill for Processing Complex Purchase Orders](https://medium.com/data-science-collective/i-created-a-claude-skill-for-processing-complex-purchase-orders-9f14f10308cd?sk=77bf841514627a9fc68129cb8cd7cdbd)
 
 **What the business user sets up (once):**
 
-A sales operations manager edits five plain-text reference files to match
-company conventions:
-- `EXTRACTION_FIELDS.md` — which fields the PO, BOM, and price list contain
-- `PRICING_RULES.md` — volume-discount tiers, default tax rate
-- `CALCULATION_LOGIC.md` — how to combine subtotal, fees, discounts, tax
-- `OUTPUT_FORMAT.md` — the sales-order template (or drop in a sample DOCX)
-- `BOM_TEMPLATE_WITH_FEES.md` — the BOM-side fields used for fee logic
+A sales operations manager edits five plain-text reference files to match company conventions — no coding required:
+- `EXTRACTION_FIELDS.md` — which fields to extract from the PO, BOM, and price list
+- `PRICING_RULES.md` — volume-discount tiers, fee types, and matching logic
+- `CALCULATION_LOGIC.md` — formulas for combining material cost, fees, discounts, and tax
+- `OUTPUT_FORMAT.md` — the sales-order document template
+- `BOM_TEMPLATE_WITH_FEES.md` — the BOM-side fields used for fee flags
 
 **What happens in daily work:**
 
-**Step 1 – Drop the folder**
-
-The user organises the input as:
+**Step 1 – Organise the input folder**
+The user prepares an input folder with the following structure:
 
 ```
 My-Order/
@@ -101,83 +96,158 @@ My-Order/
 ```
 
 **Step 2 – Ask Claude to process it**
-
 ```
 Process the purchase order in C:\Orders\Project-Q4 using purchase-order-processing skill
 ```
 
-Claude extracts each PO line item, looks up the matching BOM by Material
-Number, finds the row in the price list, calculates `qty × unit_price` plus
-the cutting / testing / certification fees that the BOM flags as required,
-and emits two files:
+Claude extracts each PO line item, looks up the matching BOM by material number, finds the corresponding row in the price list, calculates the material subtotal plus any applicable cutting, testing, and certification fees, and emits two output files:
 
-- `SO-{number}_{Customer}_{Date}.docx` — the sales-order document
-- `Calculation_Breakdown.txt` — a step-by-step audit trail
+- `SO-{number}_{Date}.docx` — the formatted sales order document
+- `Calculation_Breakdown.txt` — a step-by-step audit trail of all extractions, matches, and calculations
 
-Workflow at a glance:
+**Example of what the business gets out:**
 
-![Purchase Order Processing Workflow](/images/PO-skill.png)
+Instead of manual data entry, the output is a ready-to-use structured sales order with full pricing transparency:
 
-The no-code asset enforces the company's calculation rules through plain-text
-specification — the same logic surfaces in the code-based path below.
+- Material Subtotal: $25,567.50
+- Volume Discount (5%): −$1,278.38
+- Net Material Cost: $24,289.12
+- Total Testing / Certification Fees: $75.00
+- Tax (6%): $1,488.85
+- Grand Total: $26,302.97
+
+This makes the result:
+- easy to paste into an existing ERP system
+- safe to store in a database with a full audit trail
+- reliable for pricing analytics and compliance review
+- suitable for audits requiring itemised fee breakdowns
 
 ---
 
-## Implementation Layer Using Code-Based Method
+## Implementation Layer Using Code-Based Method.
 
-Three software components — **VisionExtractor** for one-pass multi-document
-extraction, the **Pricing Matcher & Calculator** for BOM/price-list lookup,
-and a **PDF Generator** for the final sales-order draft — combine into a
-single workflow that turns raw PDFs into a priced order ready for review.
+Three to five software components — **Parser**, **Schema Generator + DataExtractor**, and optionally the **VisionExtractor** (which combines parsing and extraction in a single LLM call), together with the **Pricing Matcher & Calculator** and a **PDF Generator** — combine to turn raw purchase order documents into a priced, formatted sales order.
+
+Two pipeline variants are available:
 
 ```mermaid
 flowchart LR
-    A("📄 Purchase Order PDF") --> V
-    B("📄 BOM PDFs (1..N)") --> V
-    C("📊 Price List (XLSX/CSV)") --> M
+    A("📄 PO PDF") --> PIPE
+    B("📄 BOM PDFs") --> PIPE
+    C("📊 Price List (Excel)") --> PIPE
+    D("📋 User Requirements") --> PIPE
 
     subgraph PIPE["Purchase Order Processing"]
         direction TB
-        V["🤖 VisionExtractor<br/>Multi-document<br/>structured extraction"]
-        M["🔗 Pricing Matcher<br/>Material → BOM → Price"]
-        G["📑 PDF Generator<br/>Sales Order Draft"]
-        V --> M --> G
+        P1["🗂️ Option A: Parser + Extractor\n(parse → schema → extract)"]
+        P2["🤖 Option B: VisionExtractor\n(single LLM call)"]
+        M["🔗 Pricing Matcher & Calculator"]
+        G["📑 PDF Generator"]
+        P1 --> M
+        P2 --> M
+        M --> G
     end
 
-    PIPE --> D("✅ Priced Sales Order<br/>+ structured JSON<br/>+ audit breakdown")
+    PIPE --> E("✅ Priced Sales Order PDF\n+ Structured JSON\n+ Audit Breakdown")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style C fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style D fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style E fill:#dcfce7,stroke:#16a34a,color:#14532d
     style PIPE fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+    style P2 stroke-dasharray: 5 5
 ```
 
 ---
 
 ## Software Components
 
-### 1. VisionExtractor
+### 1. Parser
 
-A single LLM-based component that converts PDF/image inputs into structured
-data in one pass, without a separate text-parsing stage. In multi-document
-mode it accepts one PO plus N BOM files in a single call, and the model
-aligns each PO line item with its matching BOM via Material Number.
+Converts purchase order PDFs and BOM documents into structured text for downstream extraction. Three parser options are available, balancing speed, cost, and accuracy for different document layouts:
+
+- **PyMuPDF (simple)** — fast local text extraction, no API calls; works well for clean, text-based PDFs
+- **Docling** — higher-quality document parsing with table and layout detection
+- **Multimodal parser** — GAIK's custom vision-based parser that delivers best performance for complex layouts, scanned documents, and PDFs with merged cells or non-standard table structures
 
 ```mermaid
 flowchart LR
-    A("📄 PO + BOM PDFs") --> B
-    R("📋 User Requirements<br/>Field specification") --> B
+    A("📄 PO / BOM PDF") --> B
+
+    subgraph B["Parser"]
+        direction TB
+        O1["PyMuPDF\n(fast, local)"]
+        O2["Docling\n(layout-aware)"]
+        O3["🤖 Multimodal Parser\n(vision-based, complex layouts)"]
+    end
+
+    B --> C("📄 Parsed Document Text\nStructured for extraction")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+    style O3 stroke-dasharray: 5 5
+```
+
+For more details on the multimodal parser's approach to complex document layouts, see the article: [How to Accurately Extract Everything from Documents Using AI](https://medium.com/ai-advances/how-to-accurately-extract-everything-from-documents-using-ai-cf12d0125238?sk=a2a6db49c124da35bdd06addd0af6fde)
+
+> 📁 [`implementation_layer/src/gaik/software_components/parsers/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/parsers)
+
+---
+
+### 2. Schema Generator + DataExtractor
+
+Takes the parsed document text and a plain-language field specification, then returns structured data. The Schema Generator builds a typed Pydantic schema from the user's plain-language description — this schema is generated once and **saved for reuse** on all subsequent runs. The DataExtractor uses an LLM to fill each field from the parsed text according to the schema.
+
+```mermaid
+flowchart TD
+    A("📄 Parsed Document Text") --> DE
+    B("📋 User Requirements\nPlain language field definitions") --> RP
+
+    subgraph EXT["Schema Generator + DataExtractor"]
+        direction TB
+        RP["Requirement Parser\nIdentify fields & constraints"]
+        SG["Schema Generator\nBuild typed Pydantic schema"]
+        DE["Data Extractor\nLLM-powered field extraction"]
+        RP -.->|"parsed fields"| SG
+        SG -.->|"typed schema (cached)"| DE
+    end
+
+    EXT --> C("✅ Structured Fields\nPO header + line items")
+    EXT --> D("🗂️ Reusable Schema\nschema.py + requirements.json")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style EXT fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+```
+
+> 📁 [`implementation_layer/src/gaik/software_components/extractor/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor)
+
+---
+
+### 3. VisionExtractor (Alternative Pipeline)
+
+An alternative to the Parser + Extractor pipeline that combines document parsing and field extraction in a **single LLM vision call**, reducing cost, latency, and the number of API calls. In multi-document mode it accepts the PO and all BOM files together, and the model aligns each PO line item with its matching BOM via material number in one pass.
+
+The VisionExtractor also supports multiple model providers (OpenAI, Claude, Gemini) and can return per-field confidence scores when verification is enabled.
+
+```mermaid
+flowchart LR
+    A("📄 PO + BOM PDFs\n(all in one call)") --> B
+    R("📋 User Requirements\nField specification") --> B
 
     subgraph B["VisionExtractor"]
         direction TB
-        S["🗂️ Schema Generator<br/>Build typed schema<br/>(cached after first run)"]
-        L["🤖 LLM<br/>Vision-capable model<br/>(OpenAI / Claude / Gemini)"]
+        S["🗂️ Schema Generator\nBuild typed schema\n(cached after first run)"]
+        L["🤖 Vision LLM\nOpenAI / Claude / Gemini"]
         S -.->|"typed schema"| L
     end
 
-    B --> C("✅ Typed Pydantic Output<br/>PO header + aligned line items")
-    B --> D("🗂️ Reusable Schema<br/>schema.py + requirements.json")
+    B --> C("✅ Typed Structured Output\nPO header + aligned line items")
+    B --> D("🗂️ Reusable Schema\nschema.py + requirements.json")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style R fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -186,73 +256,35 @@ flowchart LR
     style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 ```
 
-A minimal usage example:
-
-```python
-from gaik.software_components.vision_extractor import VisionExtractor
-
-extractor = VisionExtractor(
-    model_provider="openai",
-    use_azure=True,
-    reasoning_effort="low",
-    merge_table=True,
-    include_verification=True,
-)
-
-result = extractor.extract(
-    file_paths=["PO/PO.pdf", "PO/BOM1.pdf", "PO/BOM2.pdf", "PO/BOM3.pdf"],
-    user_requirements=task_multi_doc_text,
-    schema_dir="schema_multi",   # cached after first run
-)
-
-print(result.data)            # typed dict (PO header + aligned line items)
-print(result.usage.cost_usd)  # cost per run
-```
+For more details on the VisionExtractor's approach to structured data extraction from complex documents, see the article: [How to Accurately Extract Structured Data from Complex Documents Using AI](https://medium.com/ai-advances/how-to-accurately-extract-structured-data-from-complex-documents-using-ai-a400f412332a?sk=b347340578b0e587fa293368a58677f1)
 
 > 📁 [`implementation_layer/src/gaik/software_components/vision_extractor/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/vision_extractor)
 >
-> 📁 [`implementation_layer/examples/software_components/vision_extractor/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/vision_extractor) — includes a runnable `PO/` example with one PO and three BOM PDFs
+> 📁 [`implementation_layer/examples/software_components/vision_extractor/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/vision_extractor)
 
 ---
 
-### 2. Pricing Matcher & Calculator
+### 4. Pricing Matcher & Calculator
 
-Takes the structured PO line items, the BOMs, and the parsed price list, and
-produces enriched rows with calculated pricing.
+Takes the structured PO line items and the parsed price list, and produces enriched rows with calculated pricing. Matching is two-stage: first the material number links each PO line to its BOM, then the BOM's type designation is matched against the price list. Per-line totals are calculated by combining the material subtotal with conditional fees — cutting, testing, and certification fees are only applied when the BOM flags them as required.
 
-Matching is two-stage:
-1. **Material → BOM**: exact case-insensitive match on `material_id`
-2. **BOM → Price List**: normalised type-designation match (lowercase,
-   stripped of whitespace and punctuation), with a substring fallback
-
-Per-line calculation:
-
-```
-material_subtotal = quantity × unit_price
-cutting_fee       = pricing.cutting_fee  if bom.cutting_required       else 0
-testing_fee       = pricing.testing_fee  if bom.testing_required       else 0
-cert_fee          = pricing.cert_fee     if bom.certificates_required  else 0
-line_total        = material_subtotal + cutting_fee + testing_fee + cert_fee
-```
-
-The fee flags live on the BOM, the rates on the price list — so the
-calculation requires both before it can complete.
+The price calculation logic can vary per use case. While the extraction task can be changed by updating the user requirements, the pricing calculation requires customisation to match each organisation's specific fee structure, discount tiers, and currency rules.
 
 ```mermaid
 flowchart TD
-    A("📦 PO line items") --> M1
-    B("🔩 BOMs") --> M1
-    C("💰 Price List rows") --> M2
+    A("📦 PO Line Items") --> M1
+    B("🔩 BOM Data") --> M1
+    C("💰 Price List") --> M2
 
     subgraph PM["Pricing Matcher & Calculator"]
         direction TB
         M1["🔗 Match material → BOM"]
-        M2["🔗 Match BOM.type → Pricing"]
-        CALC["🧮 Calculate<br/>subtotal + fees"]
+        M2["🔗 Match BOM type → Price List"]
+        CALC["🧮 Calculate\nmaterial subtotal + conditional fees"]
         M1 --> M2 --> CALC
     end
 
-    PM --> O("✅ Enriched line items<br/>with subtotal, fees, total")
+    PM --> O("✅ Enriched Line Items\nwith subtotal, fees, and line total")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -261,62 +293,54 @@ flowchart TD
     style PM fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
 ```
 
-> 📁 Reference implementation in the demo app: [`toolkit_demo_app/api/routers/luvata_order.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/toolkit_demo_app/api/routers/luvata_order.py) — functions `match_material_to_bom`, `match_pricing`, `calculate_simple_pricing`, `enrich_products`
-
 ---
 
-### 3. PDF Generator
+### 5. PDF Generator
 
-Renders the enriched data into a sales-order draft PDF — company logo, buyer
-and delivery addresses, item table with per-line fee breakdown, summary
-totals — using `fpdf` for deterministic layout.
+Renders the enriched order data into a formatted sales order draft — including buyer and delivery addresses, line item table with per-line fee breakdown, and order totals — using a deterministic layout engine.
 
-The generated PDF is held in an in-memory store keyed by job ID with a
-one-hour TTL, so the demo UI can fetch it after the SSE stream completes
-without persisting customer documents to disk.
-
-> 📁 Reference: [`toolkit_demo_app/api/routers/luvata_order.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/toolkit_demo_app/api/routers/luvata_order.py) — `generate_pdf()` and surrounding helpers
+> 📁 [`implementation_layer/src/gaik/software_components/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components)
 
 ---
 
 ## Defining What to Extract: User Requirements
 
-The VisionExtractor accepts plain-language instructions describing fields,
-units, alignment rules, and aggregation logic. Example for a multi-document
-PO + BOM extraction:
+Fields are specified in plain language — no code, no schema configuration. The user describes what to extract; the Schema Generator builds the typed schema automatically and saves it for reuse.
+
+Example for a purchase order with BOM alignment:
 
 ```
-The task is to extract key fields from customer documents (Purchase Order
-(PO) and Bill of Material (BOM)), and align them so that each PO item is
-enriched with the correct technical details. Begin with the customer's
-purchase order, which may include multiple items. Each item is linked to its
-BOM via a Material Number.
+Extract purchase order data.
 
-For every item in the PO, extract the Material Number along with the basic
-item details: Quantity, Description, and Delivery Date (Format: DD/MM/YYYY).
-Use the item's Material Number from the PO to find the BOM having the same
-Material Number (represented as 'ID'). From the matching BOM, extract the
-part's 'Part Designation' and part dimension (length followed by unit, e.g.,
-1487mm).
+The output will include the following top-level fields:
+- Purchase order date (DD/MM/YYYY format when unambiguous)
+- Delivery date (DD/MM/YYYY format when unambiguous)
+- Purchase order number (separated by a dash after every 4 digits)
+- Supplier number
+- Shipping address (Format: company name, street number, postal code, city, country)
 
-The final output should contain as many lines as the number of items in the
-PO. Each line should have: Material Number, Quantity, Description, Delivery
-Date (from PO), Part Designation, part dimension (from BOM).
+Also, the output will include the data for each line item.
 
-Also, extract the following header information from the PO: Order Date,
-Buyer, Sales Person, Shipping Address, Payment Terms.
+For each line item, extract these scalar fields:
+- Item number (e.g., 010, 020)
+- Complete description
+- Quantity (text string including the unit, e.g., "8.600 LB")
+- Price per currency
+- Material number
+
+Output rules:
+- Return every schema field.
+- For missing or not stated values, always return "".
+- Keep wording close to the source document where possible.
 ```
 
-The Schema Generator parses this into a typed Pydantic model and saves both
-the model code (`schema.py`) and the parsed requirements
-(`requirements.json`) into a `schema_dir`. Subsequent runs reuse the cached
-schema — no re-parsing required.
+The Schema Generator parses this description into a typed Pydantic model and saves both the model code (`schema.py`) and the parsed requirements (`requirements.json`) into a `schema_dir`. Subsequent runs reuse the cached schema — no re-parsing required.
 
 ---
 
 ## Software Module: Purchase Order Processing
 
-Combines the three components into one end-to-end workflow:
+Packages the full pipeline into one end-to-end workflow. Two variants are supported: the parse → extract path for maximum flexibility and parser choice, and the VisionExtractor path for lower latency and fewer API calls.
 
 ```mermaid
 flowchart TD
@@ -325,31 +349,37 @@ flowchart TD
     IN3("📊 Price List") --> MOD
     IN4("📋 User Requirements") --> MOD
 
-    subgraph MOD["Purchase-Order-Processing"]
+    subgraph MOD["Purchase Order Processing"]
         direction TB
 
-        subgraph V["Step 1 · VisionExtractor"]
+        subgraph PA["Option A · Parser + Extractor"]
             direction LR
-            SG["Schema<br/>(cached)"] --> LLM["Vision LLM<br/>multi-doc"]
+            PAR["Parser\n(PyMuPDF / Docling / Multimodal)"] --> EXTR["Schema Generator\n+ Data Extractor"]
         end
 
-        subgraph P["Step 2 · Match & Calculate"]
+        subgraph PB["Option B · VisionExtractor"]
             direction LR
-            MM["Material →<br/>BOM"] --> MP["BOM →<br/>Price"] --> CC["Calculate<br/>fees + total"]
+            VIS["🤖 Vision LLM\n(single call, schema cached)"]
         end
 
-        subgraph D["Step 3 · PDF Generator"]
+        subgraph P["Pricing Matcher & Calculator"]
             direction LR
-            REND["Render<br/>fpdf"]
+            MM["Material →\nBOM"] --> MP["BOM →\nPrice"] --> CC["Calculate\nfees + total"]
         end
 
-        V -->|"typed PO + BOM data"| P
+        subgraph D["PDF Generator"]
+            direction LR
+            REND["Render\nSales Order Draft"]
+        end
+
+        PA -->|"structured PO + BOM data"| P
+        PB -->|"structured PO + BOM data"| P
         P -->|"enriched line items"| D
     end
 
     MOD --> O1("📋 Structured PO + BOM JSON")
-    MOD --> O2("💰 Enriched lines with fees")
-    MOD --> O3("📑 Sales Order Draft PDF")
+    MOD --> O2("💰 Enriched Lines with Fees")
+    MOD --> O3("✅ Sales Order Draft PDF")
 
     style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style IN2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -359,92 +389,48 @@ flowchart TD
     style O2 fill:#fefce8,stroke:#ca8a04,color:#713f12
     style O3 fill:#dcfce7,stroke:#16a34a,color:#14532d
     style MOD fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
-    style V fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style PA fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style PB fill:#faf5ff,stroke:#9333ea,color:#2e1065
     style P fill:#faf5ff,stroke:#9333ea,color:#2e1065
     style D fill:#faf5ff,stroke:#9333ea,color:#2e1065
 ```
 
-A live implementation of this module is available in the GAIK demo app at
-[`gaik-demo.2.rahtiapp.fi/luvata-order`](https://gaik-demo.2.rahtiapp.fi/luvata-order)
-(access available upon registration request). The demo accepts a PO PDF, a
-folder of BOM PDFs, and a price list, then streams progress over SSE while
-the pipeline runs.
+Example output from the demo — uploading a purchase order with three BOM files and a price list, then viewing the calculated order summary and generated sales order draft:
 
-Example output from the demo with the bundled sample data — three line items
-with calculated material subtotals, conditional cutting/testing/certification
-fees, and a generated order-draft PDF previewed in place:
+<p>
+  <img src="/images/po-demo-1.png" alt="Purchase order processing demo: uploading PO, BOM files, and price list" style={{ width: "45%", height: "auto", display: "inline-block" }} />
+  <img src="/images/po-demo-2.png" alt="Purchase order processing demo: order summary with calculated line items and sales order draft preview" style={{ width: "45%", height: "auto", display: "inline-block" }} />
+</p>
 
-![Purchase order processing demo output: AL-001, SS-001, and CS-001 line items with calculated pricing and order-draft PDF preview](/images/purchase-order-demo-result.png)
+> 📁 [`implementation_layer/examples/software_components/vision_extractor/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/vision_extractor)
 
-> **Note on the live demo's current implementation:** the production demo
-> currently composes the parsing and extraction stages separately
-> (`DoclingApiClientParser` plus `DataExtractor`) rather than using
-> `VisionExtractor`. New projects should prefer the `VisionExtractor`-based
-> pattern documented above because it requires one LLM call instead of
-> two, has native multi-document alignment via Material Number, and can
-> return per-field confidence scores when verification is enabled.
-
-> 📁 [`implementation_layer/examples/software_components/vision_extractor/PO/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/vision_extractor) — runnable PO + three BOM example
->
-> 📁 [`implementation_layer/toolkit_demo_app/api/routers/luvata_order.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/toolkit_demo_app/api/routers/luvata_order.py) — live demo source
-
-To try the use case end-to-end, visit the [GAIK demo](https://gaik-demo.2.rahtiapp.fi/luvata-order)
-(access is available upon registration request).
+To test a smaller version of the purchase order use case, please visit the [GAIK demo link](https://gaik-demo.2.rahtiapp.fi/). Access is available upon registration request.
 
 ---
 
 ## Adaptable to Other Domains
 
-The same VisionExtractor + matcher + generator pattern fits many
-multi-document procurement and back-office tasks — only the field
-requirements, the matching keys, and the calculation logic change between
-domains:
+The same parse → extract → match → calculate → generate pipeline applies to any procurement or back-office workflow requiring structured extraction from multi-document inputs — only the user requirements, matching keys, and pricing logic change:
 
-- Vendor invoice processing with line-item reconciliation
-- Sales order intake and ERP staging
-- Request-for-quote (RFQ) ingestion with cost lookup
-- Vendor catalogue normalisation across mismatched formats
-- Shipment and customs documentation aggregation
+- Vendor invoice processing with line-item reconciliation, sales order intake and ERP staging, request-for-quote ingestion with cost lookup, vendor catalogue normalisation, shipment and customs documentation aggregation
 
 ---
 
 ## Evaluation Methods
 
-Quality is measured per component and end-to-end.
+The quality of this use case is evaluated by assessing each pipeline component independently:
 
-### Extraction Accuracy
+### Parser Evaluation
 
-`ExtractionEvaluator` (in `gaik.software_components.evaluators`) compares
-ground-truth field values against extracted output, reporting per-field
-precision / recall / F1 and an overall hallucination rate. Switch to
-semantic mode by passing an `LLMJudge` instance to evaluate fields where
-exact string match is too strict (free-text descriptions, addresses, dates
-in non-canonical formats).
+Parsing quality is benchmarked across different parsers — including the simple PyMuPDF parser, Docling, and GAIK's custom multimodal parser — on purchase order documents with varying layouts, including complex tables and non-standard column arrangements. The benchmark measures how accurately each parser recovers field values and table structures from challenging document formats.
 
-> 📊 **Extraction evaluation methods:** [`implementation_layer/src/gaik/software_components/evaluators/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/evaluators)
+> 📊 **Parsing evaluation methods:** [`implementation_layer/eval_methods/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods)
 
-### Matching Quality
+### Extractor Evaluation
 
-A simple metric tracks the share of PO line items that successfully matched
-both a BOM and a price-list row. The demo's `enrich_products()` returns the
-per-line `bom_match` / `price_match` booleans and an `errors` list — those
-feed directly into the metric.
+The quality of structured information extraction is evaluated using precision, recall, and F1 score — computed separately for exact-match fields (item numbers, dates, quantities) and semantic-match fields (descriptions, addresses). This measures how accurately the extracted fields match the expected values across a set of reference purchase orders.
 
-### Total-Price Accuracy
-
-Compare the pipeline's final per-line `line_total` and the order's grand
-total against a manually verified reference. A handful of representative
-orders is enough to surface arithmetic regressions when the pricing rules
-evolve.
-
-### Hallucination Detection
-
-`LLMJudge.detect_hallucinations(source, extracted)` is a schema-agnostic
-post-validator that flags extracted values which have no support in the
-source documents — useful when the VisionExtractor returns confident-
-looking but unsupported field values for unusual layouts.
-
-> 📊 Example reference output: [`PO_result.json`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/vision_extractor/PO_result.json)
+> 📊 **Extraction evaluation methods:** [`implementation_layer/eval_methods/extraction_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval)
 
 ---
 
@@ -452,12 +438,9 @@ looking but unsupported field values for unusual layouts.
 
 | Resource | Link |
 |----------|------|
+| Parser components | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/parsers) |
+| Schema Generator + DataExtractor | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor) |
 | VisionExtractor component | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/vision_extractor) |
-| SchemaGenerator + DataExtractor | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/extractor) |
-| Vision Extractor PO + BOMs example | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/vision_extractor) |
-| Live demo | [gaik-demo.2.rahtiapp.fi/luvata-order →](https://gaik-demo.2.rahtiapp.fi/luvata-order) |
-| Demo source code | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/toolkit_demo_app/api/routers/luvata_order.py) |
+| Vision Extractor PO + BOM example | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/vision_extractor) |
 | No-code Claude Desktop skill | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing) |
-| ExtractionEvaluator | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/evaluators) |
-| LLMJudge (hallucination detection) | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/validators) |
 | Implementation Layer overview | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer) |
