@@ -11,7 +11,7 @@ This use case demonstrates how the GAIK toolkit converts spoken field observatio
 At the business layer, the use case targets construction projects where daily site diaries are a legal and operational requirement. Site supervisors and foremen must document daily activities, workforce, weather conditions, work phases, and observations — a time-consuming process that is typically done at the end of a long workday from memory. Errors, omissions, and delays in diary completion create compliance risks and make it harder to track project progress. The AI-supported workflow allows field workers to record observations by voice throughout the day and converts them into a structured, standardised diary entry ready for review and submission.
 
 Concrete example fragments reflected in the use case design include:
-- Site supervisors record daily observations by voice on a mobile device during or after work
+- Site supervisors record daily observations by voice — either by uploading an audio file or recording directly in the browser — on a mobile device or tablet during or after work
 - The diary must capture work phases (started, ongoing, completed, interrupted), personnel, weather, and any inspections or extensions
 - Manual form completion is slow, inconsistent, and prone to missing information
 - The structured output must align with the organisation's standard diary format and be ready for PDF export and archival
@@ -57,7 +57,43 @@ The same model can be used both before implementation (to evaluate expected valu
 
 ## Implementation layer using No-Code
 
-_N/A — no no-code implementation is currently available for this use case._
+Construction site diary creation can be supported by Generative AI using a no-code prompt-based approach.
+At the implementation layer, the use case is realized using a ready-made extraction prompt from the toolkit:
+1) [Prompt for construction site diary extraction from audio transcripts](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts/construction-diary-creation)
+
+The prompt converts a spoken audio transcript into a strict JSON object covering all 20 required diary fields — site address, date, personnel, work phases, events, supervisor notes, and signatures. It can be pasted directly into ChatGPT, Claude.ai, or Gemini, or set up as a Custom GPT for repeated daily use.
+
+**What the business user sets up (once):**
+
+A site supervisor copies the prompt from `prompt.txt` and optionally sets it up as a Custom GPT or saved conversation. The prompt defines:
+- All 20 diary fields with extraction rules and format requirements
+- A fixed list of allowed work phase values (started / ongoing / completed / interrupted)
+- Anti-hallucination guardrails (only extract what is explicitly stated; leave fields blank otherwise)
+
+**What happens in daily work:**
+
+**Step 1 – Record a voice note**
+The supervisor records a short spoken summary of the day's events on a mobile device — work tasks, personnel, weather, work phases, and any observations.
+
+**Step 2 – Transcribe and extract**
+Paste the transcript into the AI assistant along with the prompt. The assistant extracts all diary fields and returns a structured JSON object plus a readable summary table.
+
+**Example of what the business gets out:**
+
+The output is a ready-to-review structured diary entry with all form fields populated:
+
+- Kohde (site address): as stated
+- Päivämäärä: dd.mm.yyyy
+- Resurssit – Henkilöstö: Työnjohtajat: N hlö, Työntekijät: N hlö, Alihankkijat: N hlö, Yhteensä: N hlö
+- Päivän työt: brief task keywords
+- Käynnissä olevat työvaiheet: e.g. sisäpurku, rungon purku
+- Valvojan huomiot: key observations if stated
+
+This makes the result:
+- easy to paste into the official diary form or a digital system
+- safe to store as a structured record for compliance and audit
+- reliable as input to the PDF generation step in the code-based pipeline
+- suitable for daily project reporting and handover documentation
 
 ---
 
@@ -164,8 +200,9 @@ Once the Extractor produces the structured diary entry, the result feeds into do
 After report generation, the structured result can be passed to any further step:
 
 - **Generate a formatted site diary PDF** — render the structured fields into a professional daily diary document using a template engine or PDF library
+- **Email the report to stakeholders** — send the generated PDF directly to the supervisor, project manager, or client via SMTP; the use case supports authenticated email delivery through identity providers
+- **Archive to cloud storage** — upload both the audio recording and the generated PDF to S3-compatible object storage for long-term archival and later retrieval
 - **Store in a project management system** — persist the structured diary record for progress tracking, analytics, and project handovers
-- **Submit for compliance archival** — export the diary entry to document management or compliance systems for audit trail purposes
 
 ---
 
@@ -195,7 +232,7 @@ Output rules:
 - Keep wording close to the source when possible.
 ```
 
-The Schema Generator parses this description into a typed Pydantic model and saves both the model code (`schema.py`) and the parsed requirements (`requirements.json`). Subsequent diary entries reuse the cached schema — no re-parsing required.
+The Schema Generator parses this description into a typed Pydantic model and saves both the model code (`schema.py`) and the parsed requirements (`requirements.json`). Subsequent diary entries reuse the cached schema — no re-parsing required. The extraction task can also be edited directly in the application UI before running extraction, making it easy to adjust field definitions for different project types without modifying code.
 
 ---
 
@@ -265,9 +302,19 @@ The same pipeline applies to any domain requiring structured daily or periodic r
 
 ## Evaluation Methods
 
-<Callout type="warn">
-**Coming Soon:** Evaluation methods for the construction site diary creation use case are under development.
-</Callout>
+The quality of this use case is evaluated at two levels: the GAIK software components (transcription and extraction) are assessed independently.
+
+### Transcription Evaluation
+
+Transcription quality is measured using **Word Error Rate (WER)** and related metrics (Character Error Rate, Spelling Error Rate, Substitution/Deletion/Insertion rates), comparing the AI-generated transcript against a verified reference. The evaluation also benchmarks the benefit of the two-pass enhancement step.
+
+> 📊 **Transcription evaluation methods:** [`implementation_layer/eval_methods/transcription_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/transcription_eval)
+
+### Extraction Evaluation
+
+The quality of structured field extraction is evaluated using precision, recall, and F1 score — computed separately for exact-match fields (dates, names, categorical values) and semantic-match fields (descriptive text such as work tasks and observations). This measures how accurately the extracted fields match the expected values across a set of reference diary recordings.
+
+> 📊 **Extraction evaluation methods:** [`implementation_layer/eval_methods/extraction_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval)
 
 ---
 

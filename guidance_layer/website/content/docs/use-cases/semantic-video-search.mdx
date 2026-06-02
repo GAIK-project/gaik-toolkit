@@ -61,7 +61,7 @@ The same model can be used both before implementation (to evaluate expected valu
 
 ## Implementation Layer
 
-The code-based implementation uses GAIK's **Embedder** and **PgVectorStore** components to build a searchable index of video segments. The pipeline has two phases: an offline **indexing** phase that processes transcripts and stores them with their timestamps, and an online **search** phase that embeds a user query and retrieves the most relevant segments for playback navigation.
+The code-based implementation uses GAIK's **Embedder** and **PgVectorStore** components to build a searchable index of video segments. The SRT transcript segments used as index input typically come from the [Transcription, Captioning & Translation](/use-cases/transcription-captioning-translation) pipeline — the Transcriber and TranscriptEnhancer components produce the timestamped text that feeds the indexing phase. The pipeline itself has two phases: an offline **indexing** phase that stores transcript segments as vectors, and an online **search** phase that retrieves the most relevant segments for playback navigation.
 
 ```mermaid
 flowchart LR
@@ -129,6 +129,10 @@ flowchart LR
 
 A PostgreSQL-backed vector store with HNSW indexing for fast similarity search. For the semantic video search use case it stores each transcript segment together with its video metadata — title, video ID, start time, and end time — enabling results to be returned not just as text but as navigable timestamps. Supports three search modes: **semantic** (pure vector similarity), **keyword** (full-text via tsvector), and **hybrid** (Reciprocal Rank Fusion combining both). An optional Finnish text processor can be plugged in to improve search quality for morphologically complex languages.
 
+**Cross-language search** is supported through query translation: when a user queries in a language different from the indexed content, the query is automatically translated before embedding. Both the original query embedding and the translated query embedding are used in the semantic search, and their rankings are fused via RRF — enabling users to find content regardless of the language they search in.
+
+**Multi-language indexing** allows the same video to be indexed in multiple languages simultaneously (e.g. Finnish and Swedish subtitles stored as separate segment sets). Each language is independently indexed so searches can be scoped to a specific language or run across all indexed languages.
+
 Video-specific helper functions (`ingest_video_segments`, `format_search_results`) handle the segment ingestion and result formatting workflows, wrapping the store's general-purpose API in a video-oriented interface.
 
 ```mermaid
@@ -182,6 +186,16 @@ flowchart LR
 ```
 
 > 📁 [`implementation_layer/src/gaik/software_components/RAG/retriever/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG/retriever)
+
+---
+
+### Downstream tasks
+
+Once video segments are indexed, two downstream steps further enrich the system outside the GAIK RAG pipeline.
+
+**AI-generated video metadata** is produced automatically after a video is indexed. An LLM analyses the transcript and generates a title, summary, description, list of topics, and content type classification for each video. This metadata is stored alongside the video record and makes the library more discoverable — users can browse by topic or content type in addition to searching by query. The metadata can be generated on demand or triggered automatically on ingestion.
+
+**Video playback integration** is the final downstream step: search results are returned with precise start and end timestamps, allowing the application to jump the video player directly to the relevant moment. Subtitle tracks (in one or more languages) can also be attached to the player, enabling in-video caption display during playback.
 
 ---
 

@@ -1,16 +1,12 @@
 # Construction Site Diary Extraction Prompt (Audio Transcript → JSON)
 
-This repository contains a **prompt-only** information extraction workflow for creating official **Daily Construction Site Diary** entries.
+This folder contains a **prompt-only** information extraction workflow for the official **Työmaapäiväkirja** (daily construction site diary) used in construction projects.
 
-You can use the prompts in two ways:
+You can use the prompt in two ways:
 1. **As a Custom GPT** (paste into Custom GPT Instructions), or
 2. **Directly in ChatGPT** (paste the prompt into a chat, then paste the transcript)
 
-The prompts convert a spoken **audio transcript** from a construction site supervisor into a **strict JSON object** containing all required fields for an official construction diary entry.
-
-**Available in two languages:**
-- English version: [English-prompt.txt](English-prompt.txt)
-- Finnish version: [Finnish-prompt.txt](Finnish-prompt.txt)
+The prompt converts a spoken **audio transcript** from a site supervisor into a **strict JSON object** containing all 20 fields required for the standard daily diary form.
 
 ---
 
@@ -18,37 +14,32 @@ The prompts convert a spoken **audio transcript** from a construction site super
 
 ### Input
 A transcript of an audio recording made by a construction site supervisor describing:
-- Daily work activities and progress
+- Daily site activities and work tasks
+- Personnel and subcontractors present on site
+- Work phases started, ongoing, completed, or interrupted
 - Weather conditions
-- Personnel resources
-- Work phases (started, ongoing, completed, interrupted)
-- Unusual events or deviations
-- Inspections and observations
-- Attachments (photos, documents)
+- Any unusual events, deviations, or inspections
+- Attachments such as photos or documents
 
 ### Output
-A **single JSON object** with a fixed schema and field order, containing:
-- Site/project identification and author
-- Date, week number, and weather conditions
-- Personnel resource breakdown
-- Work activities and phases
-- Events, deviations, and issues
-- Inspections and requested extensions
-- Supervisor notes and signatures
-- Attachments information
+A **single JSON object** with a fixed 20-field schema matching the Työmaapäiväkirja form, including:
+- Site address and date
+- Personnel breakdown (supervisors, workers, subcontractors, total)
+- Day's tasks and events
+- Work phases categorised from a fixed allowed list
+- Supervisor observations, remarks, and signatures
 
-**No extra text is allowed** in the output. The response must be **valid JSON only**.
+**No extra text is allowed** in the output. The response must be **valid JSON only**, followed by a 2-column table for readability.
 
 ---
 
 ## Why the output is strictly structured
 
 This prompt **forces a structured JSON output** to reduce errors and hallucinations, and to make the result easy to:
-- paste into an official diary form
-- store in a database
-- validate automatically
-- send to downstream workflows (construction management systems, compliance reporting)
-- archive for legal/regulatory purposes
+- display in a review UI for supervisor approval
+- render into a formatted PDF diary document
+- store in a project management database
+- send to downstream workflows (compliance reporting, analytics, ERP)
 
 ---
 
@@ -58,163 +49,185 @@ The prompt enforces these rules:
 
 - **Use only what is explicitly stated** in the transcript.
 - If a field is missing, output **""** (empty string).
-  - Exception: "Day's Events (Unusual)" returns **"No events"** when no unusual/unplanned event is mentioned.
-- Keep values extremely short (few keywords). No long sentences.
-- Keep numbers as digits (do not rewrite numbers into words).
-- If conflicting details exist, pick the most explicit/latest mention; otherwise output "".
-- For **work phase fields**, output **only** an allowed work phase exactly as written; otherwise output "".
+- Keep every extracted value extremely short — tight keywords, no full sentences.
+- Keep numbers as digits — do not rewrite in words.
+- For **work phase fields**, output **only** a value from the allowed list; otherwise **""**.
 - Output must be **valid JSON only**, no explanations.
 
 ---
 
-## Normalization rules
+## Work phase options (fixed list)
 
-- **Date**:
-  - If date with year: `dd.mm.yyyy`
-  - If date without year: `dd.mm` (zero-pad: `20.5 → 20.05`)
+The four work phase fields (started / ongoing / completed / interrupted) each accept **only** values from this list:
 
-- **Weather**:
-  - If numeric metrics exist: keep compact (e.g., `"3 °C, 2 m/s, 78 %, Kp: -1.4 C"`)
-  - If weather is described verbally: keep short keywords (e.g., `"cloudy, drizzle"`)
+```
+Asbestipurku, sisäpurku, rungon purku, lajittelu, työmaan aitaus,
+pölynhallinta, massojen ajo, romun ajo, perusten purku, pulverointi,
+timanttityöt, suojaustyöt, metalli- ja putkipurku työt, polttoleikkaus
+```
 
-- **Resources - Personnel**:
-  - **ALWAYS** output exactly in the format:
-    `"Supervisors: X ppl, Workers: Y ppl, Subcontractors: Z ppl, Total: N ppl"`
-  - If a subgroup count is not mentioned, use `0` for that subgroup.
-  - Compute Total as X+Y+Z using the available numbers (or 0). Do not guess beyond stated counts.
-
-- **Week Number**:
-  - Return digits only (e.g., `"2"`) if explicitly stated; otherwise `""`.
-
-- **Attachments**:
-  - Extract counts and types if explicitly mentioned (e.g., `"4 photos, 1 email"`)
-  - If type is mentioned without a count, return only the type (e.g., `"photos"`)
-  - Otherwise `""`
+If the transcript describes a phase not matching any option, the field is left blank.
 
 ---
 
-## Fields extracted
-
-The prompt extracts the following fields:
-
-### Metadata fields
-- Site / Project (Address or Subject)
-- Author
-- Date
-- Week Number
-- Attachments
-
-### Conditions and resources
-- Weather
-- Resources - Personnel (structured format)
-
-### Work tracking
-- Today's Work (brief description)
-- Day's Events (Unusual)
-- Day's Deviations / Issues
-
-### Work phase tracking (fixed-option fields)
-**Work Phases Started / Ongoing / Completed / Interrupted** must use ONLY these allowed values:
-- `Asbestos removal`
-- `Interior demolition`
-- `Structural demolition`
-- `Sorting`
-- `Site fencing`
-- `Dust control`
-- `Hauling soil/masses`
-- `Hauling scrap`
-- `Foundation demolition`
-- `Pulverization`
-- `Diamond cutting`
-- `Protection works`
-- `Metal and pipe demolition`
-- `Oxy-fuel cutting`
-
-**Mapping guardrail:**
-- Add a work phase ONLY if the transcript clearly states that it started / was ongoing / ended / was interrupted.
-- If the transcript describes work that does not clearly match an allowed label, return `""` for those work phase fields.
-- Each field may contain a comma-separated list of allowed labels, a single label, or `""`.
-
-### Supervisor observations
-- Supervisor's Notes
-- Supervisor's Remarks
-- Inspections Performed
-- Requested Extensions
-
-### Signatures
-- Supervisor's Signature
-- Responsible Manager's Signature
-
----
-
-## Output schema (strict JSON)
-
-The prompt returns exactly this JSON object, with keys in this exact order:
+## Output schema (strict JSON — 20 fields)
 
 ```json
 {
-  "Site / Project (Address or Subject)": "",
-  "Author": "",
-  "Weather": "",
-  "Date": "",
-  "Resources - Personnel": "",
-  "Week Number": "",
-  "Today's Work": "",
-  "Day's Events (Unusual)": "",
-  "Attachments": "",
-  "Supervisor's Notes": "",
-  "Day's Deviations / Issues": "",
-  "Work Phases Started": "",
-  "Work Phases Ongoing": "",
-  "Work Phases Completed": "",
-  "Work Phases Interrupted": "",
-  "Requested Extensions": "",
-  "Inspections Performed": "",
-  "Supervisor's Remarks": "",
-  "Supervisor's Signature": "",
-  "Responsible Manager's Signature": ""
+  "kohde": "",
+  "laatija": "",
+  "saa": "",
+  "paivamaara": "",
+  "resurssit_henkilosto": "",
+  "tyoviikko": "",
+  "paivan_tyot": "",
+  "paivan_tapahtumat": "",
+  "liitteet": "",
+  "valvojan_huomiot": "",
+  "paivan_poikkeamat": "",
+  "aloitetut_tyovaiheet": "",
+  "kaynnissa_olevat_tyovaiheet": "",
+  "paattyneet_tyovaiheet": "",
+  "keskeytyneet_tyovaiheet": "",
+  "pyydetyt_lisaajat": "",
+  "tehdyt_katselmukset": "",
+  "valvojan_huomautukset": "",
+  "valvojan_allekirjoitus": "",
+  "vastaavan_allekirjoitus": ""
 }
 ```
 
 ---
 
-## How to use in ChatGPT (paste-in workflow)
+## How to use
 
-1. Copy the prompt text from [English-prompt.txt](English-prompt.txt) or [Finnish-prompt.txt](Finnish-prompt.txt)
-2. Paste it into a new ChatGPT conversation
-3. Paste the transcript after the prompt, for example:
-   ```
-   TRANSCRIPT:
-   [Paste transcript here]
-   ```
-4. The model will return a single JSON object
+### Option 1 — Paste directly into ChatGPT
+
+1. Open `prompt.txt` and copy its full content.
+2. Open a conversation in any capable AI assistant — **ChatGPT**, **Claude.ai**, or **Gemini** all work.
+3. Paste the prompt into the message box.
+4. In the **same message**, add the transcript below the prompt:
+```
+TRANSCRIPT:
+[Paste your transcript text here]
+```
+5. Send. The model returns a valid JSON object followed by a 2-column summary table.
+
+To try with the included sample, paste the content of `data/transcript_1.txt` as the transcript.
+
+### Option 2 — Custom GPT (reusable setup)
+
+For a permanent setup that does not require re-pasting the prompt each time:
+
+1. Go to **ChatGPT → Explore GPTs → Create**.
+2. Open `prompt.txt` and paste its full content into the **Instructions** field.
+3. Give the GPT a name (e.g. "Site Diary Extractor") and save it.
+4. Each time: open the Custom GPT, paste the transcript text, and send. No prompt copy-paste needed.
+
+This is recommended for regular daily use on a project site.
 
 ---
 
-## How to use as a Custom GPT
+## How to customise for a different use case
 
-1. Create a new Custom GPT
-2. Paste the prompt (English or Finnish version) into the Instructions field
-3. Save the Custom GPT
-4. For each run:
-   - Paste the transcript into the chat
-   - Ask the GPT to extract the diary fields
+The prompt in `prompt.txt` is structured so that each part can be changed independently. Here is what to edit for common customisation scenarios.
 
-**Tip:** Keep the transcript in one message for best extraction consistency.
+### 1. Change the fields to extract
 
----
+Find the **FIELDS TO EXTRACT** section in `prompt.txt`. Each numbered line defines one field. To adapt to a different domain:
 
-## Recommended repository structure
+- **Rename** a field by changing its label and the matching key in the JSON schema at the bottom of the prompt.
+- **Remove** a field by deleting its numbered line and its corresponding key from the JSON schema.
+- **Add** a field by adding a new numbered line (with instructions) and a new key in the JSON schema.
+
+Example — replacing the construction-specific `Päivän poikkeamat` with a general `Issues or incidents` field:
+
+*Before:*
+```
+11. Päivän poikkeamat [Any issues or deviations in work (ONLY tight keywords)...]
+```
+*After:*
+```
+11. Issues or incidents [Any problems, accidents, or deviations (ONLY tight keywords); return "" if none]
+```
+Then update the JSON schema key from `"paivan_poikkeamat"` to `"issues_or_incidents"`.
+
+### 2. Change the fixed work phase options
+
+The work phase fields use a **controlled vocabulary** list. To adapt to a different type of project:
+
+Find the four work phase fields (lines 12–15) and replace the allowed options list with your own set of activity types. Keep the same format:
 
 ```
-.
+12. Started activities [CHOOSE FROM this list or return "" if no match: Activity A, Activity B, Activity C, ...]
+```
+
+Example for a renovation project:
+```
+12. Started activities [CHOOSE FROM: Demolition, Electrical work, Plumbing, Plastering, Painting, Flooring, Tiling, Insulation, Roofing]
+```
+
+### 3. Change the output language
+
+The current prompt extracts into Finnish field names and values. To extract into English:
+
+- Change all field labels in the **FIELDS TO EXTRACT** section to English.
+- Change all JSON keys in the **OUTPUT (STRICT JSON)** block to English equivalents.
+- Update the normalization rules if date or personnel formats differ.
+
+Example JSON key change:
+```json
+"kohde"      → "site_address"
+"paivamaara" → "date"
+"saa"        → "weather"
+```
+
+### 4. Change the output format
+
+By default the prompt returns a JSON object **plus** a 2-column table. To return only JSON (e.g. for programmatic use), delete or comment out this instruction from the **OUTPUT FORMAT** section:
+
+```
+2.	Then, present the same JSON content as a 2-column table...
+```
+
+To return only the table and skip the JSON, reverse which step is step 1 and which is optional.
+
+### 5. Change the domain entirely
+
+To reuse this prompt pattern for a completely different domain (e.g. daily health and safety inspection, field service report, environmental monitoring log):
+
+1. Replace the opening task description with your domain.
+2. Replace all fields in **FIELDS TO EXTRACT** with your fields.
+3. Replace the allowed work phase lists with your domain's activity categories (or remove them if not applicable).
+4. Update the JSON schema to match.
+5. Replace the sample transcript in `data/` with a sample from your domain.
+
+The anti-hallucination rules, normalization guidelines, and output format instructions at the top of the prompt can be kept as-is — they are domain-agnostic.
+
+---
+
+## Repository structure
+
+```
+construction-diary-creation/
 ├── README.md
-├── English-prompt.txt
-├── Finnish-prompt.txt
-└── Transcripts/
-    ├── English.txt
-    └── Finnish.txt
+├── prompt.txt            ← paste this into ChatGPT or Custom GPT
+└── data/
+    └── transcript_1.txt  ← sample Finnish site supervisor recording
 ```
+
+---
+
+## Sample transcript (data/transcript_1.txt)
+
+The sample transcript is a spoken recording by a site supervisor (in Finnish). It covers:
+- Site address and date
+- Personnel count (4 subcontractors + 1 own machine operator)
+- Ongoing work phases (rungon purku, sisäpurku)
+- A utility disconnection task (water, electricity, district heating)
+- A call to a waste collection service
+
+Use it to test the prompt end-to-end in ChatGPT.
 
 ---
 
@@ -222,21 +235,18 @@ The prompt returns exactly this JSON object, with keys in this exact order:
 
 This is a prompt-only prototype. Common limitations include:
 
-- If a transcript is vague (no explicit date/time, no explicit work phases), outputs will be empty strings by design.
-- If the supervisor describes work that doesn't match the predefined work phase list, those fields will be blank.
-- No external validation is performed (e.g., verifying site names, week numbers against dates).
-- Work phase categorization depends on explicit verbal cues; implied activities may not be captured.
+- If a transcript is vague (no explicit date, no explicit work phase), outputs will be empty strings by design.
+- Work phase fields return blank if the spoken description doesn't match the fixed list.
+- Personnel totals must be directly calculable from stated numbers — not estimated from context.
 
 For production use, you would typically add:
 
-- controlled input capture (standardized voice recording with prompts)
-- post-validation rules (e.g., date/week consistency checks)
-- human review UI for flagged or empty fields
-- integration with construction management systems
-- multi-language support beyond English/Finnish
+- controlled mobile voice capture with prompts guiding the supervisor
+- post-extraction human review UI
+- PDF rendering of the structured diary output (see the code-based pipeline)
 
 ---
 
 ## Disclaimer
 
-This prompt is intended for demo and prototyping. Always review extracted data before submitting official construction diary entries. Official construction documentation may have legal and regulatory implications.
+This prompt is intended for demo and prototyping. Always review extracted data before submitting official construction site diary entries.
