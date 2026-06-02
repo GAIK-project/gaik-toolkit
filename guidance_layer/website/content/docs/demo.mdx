@@ -145,7 +145,7 @@ Upload a lecture, podcast, or training video and receive accurate transcripts wi
 
 **Business value:** Accessible video content, searchable transcripts, compliance with captioning requirements.
 
-[Try it live →](https://gaik-demo.2.rahtiapp.fi/dental-transcription) · [Read more →](/docs/use-cases/dental-transcription-close-captioning)
+[Try it live →](https://gaig-demo.2.rahtiapp.fi/dental-transcription) · [Read more →](/docs/use-cases/transcription-captioning-translation)
 
 ![Transcription Demo](/demo-images/dental-transcription.png)
 
@@ -157,7 +157,7 @@ Search across an entire video library by describing what you're looking for in p
 
 **Business value:** Instant access to specific knowledge within video libraries, improved learning efficiency.
 
-[Try it live →](https://gaik-demo.2.rahtiapp.fi/video-search) · [Read more →](/docs/use-cases/semantic-dental-video-search)
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/video-search) · [Read more →](/docs/use-cases/semantic-video-search)
 
 ![Video Search Demo](/demo-images/video-search.png)
 
@@ -169,16 +169,32 @@ To test the software demos, visit the [GAIK demo link](https://gaik-demo.2.rahti
 
 ## No-Code Assets
 
-Ready-to-use prompt templates and agent skills that enable rapid deployment without custom development. These assets provide pre-configured workflows for common knowledge management tasks.
+Ready-to-use prompt templates and agent skills that enable rapid deployment without custom development. Paste a prompt directly into ChatGPT, Claude.ai, or Gemini, or install an agent skill into Claude Desktop — no coding required.
 
 ### Prompt Templates
 
-Curated prompt collections for document processing, data extraction, and report generation. Each template includes task instructions, business rules, and sample data for immediate use.
+Each prompt pack includes task instructions, field definitions, business rules, and sample data for immediate testing. Adapt to your domain by editing field names and allowed values.
 
-**Browse templates:** [implementation_layer/no-code-assets/prompts](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts)
+| Prompt pack | Description |
+|-------------|-------------|
+| **Construction diary creation** | Extract structured daily diary fields from a site supervisor's voice recording |
+| **Incident report writing** | Extract structured incident and safety observation fields from a spoken report |
+| **Purchase-order processing** | Extract and price purchase order line items from single or multi-document PDFs |
+| **Safety observation reporting** | Extract structured safety observation fields from a voice note or typed description |
+
+**Browse all templates:** [implementation_layer/no-code-assets/prompts](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts)
+
+---
 
 ### Agent Skills
 
-Fully packaged, ready-to-run solution bundles for specific use cases. Each skill includes prompts, sample data, setup scripts, and workflow artifacts — everything needed for operational deployment.
+Fully packaged, ready-to-run solution bundles for Claude Desktop. Each skill includes prompts, reference files, sample data, and workflow artifacts — everything needed for operational deployment.
 
-**Browse skills:** [implementation_layer/no-code-assets/agent-skills](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills)
+| Agent skill | Description |
+|-------------|-------------|
+| **Construction diary creation** | Voice-to-diary workflow with configurable schema and export |
+| **Incident report writing** | Safety observation capture with structured report output |
+| **Purchase-order processing** | End-to-end PO extraction, BOM matching, pricing, and sales order generation |
+| **Report writing skill** | Structured report generation from notes, documents, or voice input |
+
+**Browse all skills:** [implementation_layer/no-code-assets/agent-skills](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills)
