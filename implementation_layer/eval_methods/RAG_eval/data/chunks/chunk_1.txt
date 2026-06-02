@@ -1,0 +1,1 @@
+Retrieval-Augmented Generation (RAG) combines a retrieval step with a language model to answer questions grounded in a specific document corpus. When a user submits a query, the retrieval component searches a vector index and returns the most relevant text chunks.

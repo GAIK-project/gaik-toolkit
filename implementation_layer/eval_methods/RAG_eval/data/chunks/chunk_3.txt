@@ -1,0 +1,1 @@
+The retrieval component searches a vector index and returns the most relevant text chunks based on semantic similarity to the query. If relevant passages are missing or ranked too low, the model cannot produce a correct response.

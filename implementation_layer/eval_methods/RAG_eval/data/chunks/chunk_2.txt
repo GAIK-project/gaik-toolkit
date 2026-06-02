@@ -1,0 +1,1 @@
+These chunks are then passed to the language model as context, allowing it to generate an answer that is factually grounded in the source documents rather than relying solely on parametric knowledge.
