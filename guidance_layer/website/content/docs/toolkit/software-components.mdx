@@ -62,6 +62,49 @@ flowchart LR
 
 ---
 
+### Transcript Enhancer
+
+The Transcript Enhancer improves the quality of raw speech-to-text output through a controlled two-pass LLM workflow — without rewriting or paraphrasing the content. It is designed to reduce the transcription errors that downstream extraction would otherwise inherit. Pass 1 corrects obvious spelling mistakes and normalises repeated terms to a consistent form. Pass 2 uses sentence-level context to repair remaining ASR errors: fixing split or merged compound words, correcting misheard words, and cleaning up minor grammar issues where the correction is unambiguous. The result stays faithful to the spoken content; the goal is error reduction, not prose improvement.
+
+<Mermaid chart={`
+flowchart LR
+    A("📄 Raw Transcript") --> B
+
+    subgraph B["Transcript Enhancer"]
+        direction TB
+        P1["Pass 1\\nSpelling & consistency"]
+        P2["Pass 2\\nASR error repair"]
+        P1 --> P2
+    end
+
+    B --> C("✨ Enhanced Transcript")
+    B --> D("📊 Correction Summary\\n(optional diff)")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style D fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- Two-pass workflow: spelling/consistency first, context-based ASR repair second
+- Optional correction summary (total changes, insertions, deletions, substitutions)
+- Optional diff output showing exactly which spans changed
+- `additional_instructions` parameter to add domain-specific rules (e.g. preserve brand names)
+- Tuned for Finnish; same structure can be adapted for other languages
+
+**Potential applications:**
+- Improving transcription quality before structured extraction
+- Construction site diary and safety observation reporting from voice
+- Medical dictation cleanup before clinical data extraction
+- Meeting and interview transcription polishing
+- Any domain where ASR errors would propagate into downstream structured records
+
+- **Implementation code**: [software_components/enhance_transcript](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/enhance_transcript)
+- **Usage examples**: [examples/enhance_transcript](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/enhance_transcript)
+
+---
+
 ### Document Parser
 
 The Document Parser converts PDF, DOCX, and other file types into clean, structured markdown text. The package ships **six parser variants** so you can match accuracy, cost, and infrastructure needs: vision-based parsing (GPT, Claude, or Gemini), local parsing (PyMuPDF, Docling), a Docling + vision hybrid that returns markdown plus metadata, and a remote Docling API client. The parsed markdown output preserves tables, headings, and multi-page structure, making it a reliable input for downstream extraction or indexing.
@@ -291,6 +334,45 @@ flowchart LR
 
 - **Implementation code**: [software_components/validators/llm_judge](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/validators/llm_judge)
 - **Usage examples**: [examples/validators](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/validators)
+
+---
+
+### Text-to-Speech
+
+The Text-to-Speech component converts written text into spoken audio using OpenAI or Azure OpenAI TTS models. It accepts plain text and returns an audio file in a configurable format, with control over voice, language, speed, and output format. It is useful anywhere a workflow needs to deliver information aurally — generating audio versions of extracted content, reading back structured report summaries, or producing narration for instructional content.
+
+<Mermaid chart={`
+flowchart LR
+    A("📝 Text Input") --> B
+    C("🎛️ Voice / Language\\nFormat / Speed") --> B
+
+    subgraph B["Text-to-Speech"]
+        direction TB
+        M["TTS Model\\n(OpenAI / Azure)"]
+    end
+
+    B --> D("🔊 Audio File\\nMP3 / WAV / FLAC")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- Supports OpenAI and Azure OpenAI TTS backends with the same interface
+- Configurable voice, language (Finnish and English), speed, and audio format
+- Returns a `SpeechSynthesisResult` with audio bytes, model, and metadata
+- Simple `result.save("output_dir")` for persisting audio to disk
+
+**Potential applications:**
+- Audio delivery of extracted report summaries for field workers
+- Accessibility features for reading back structured content aloud
+- Voice notifications in automated workflow pipelines
+- Generating narration for training or instructional content
+
+- **Implementation code**: [software_components/text_to_speech](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/text_to_speech)
+- **Usage examples**: [examples/text_to_speech](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/text_to_speech)
 
 ---
 
