@@ -50,21 +50,24 @@ Generates a use-case documentation page under `guidance_layer/website/content/do
 Present a section-by-section status table before writing anything:
 
 ```
-Section                                Status
-────────────────────────────────────── ──────────
-Frontmatter + H1 heading               ✅
-Intro paragraph                        ✅ / Coming Soon
-Business layer                         ✅ / Coming Soon
-Strategy layer                         ✅ / Coming Soon
-Implementation — No-Code               ✅ / Coming Soon
-Implementation — Code-Based (diagram)  ✅ / Coming Soon
-Software Components (N components)     ✅ / Coming Soon
-Defining What to Extract               ✅ / Coming Soon / omit
-Software Module (diagram + outputs)    ✅ / Coming Soon / omit
-Adaptable to Other Domains             ✅ / Coming Soon
-Evaluation Methods                     ✅ / Coming Soon
-Related Resources                      ✅
-meta.json                              update / no change needed
+Section                                    Status
+────────────────────────────────────────── ──────────
+Frontmatter + H1 heading                   ✅
+Intro paragraph                            ✅ / Coming Soon
+Business layer                             ✅ / Coming Soon
+Strategy layer                             ✅ / Coming Soon
+Implementation — No-Code                   ✅ / Coming Soon
+  (Structure A: single asset)              or
+  (Structure B: Prompt-based + Claude Skill)
+Implementation — Code-Based (diagram)      ✅ / Coming Soon
+Software Components (N GAIK components)    ✅ / Coming Soon
+  Downstream tasks subsection              ✅ / omit
+Defining What to Extract                   ✅ / Coming Soon / omit
+Software Module (diagram + outputs)        ✅ / Coming Soon / omit
+Adaptable to Other Domains                 ✅ / Coming Soon
+Evaluation Methods                         ✅ / Coming Soon
+Related Resources                          ✅
+meta.json                                  update / no change needed
 ```
 
 ### Phase 3 — Plan Review *(never skip)*
@@ -102,25 +105,22 @@ The H1 heading always ends with "Generic Use Case (Cross-Cutting Use Case)".
 
 **Strategy layer (`## Strategy layer – value evaluation and monitoring`):**
 - Link to the Value Evaluation Framework
-- Three value type blocks, each formatted exactly as:
+- Value type blocks, each formatted exactly as:
   ```
-  Functional value (primary):
+  {Value type} value (primary / secondary):
   "Fragment 1", "Fragment 2", "Fragment 3"
   → Outcome: {outcome sentence}
-
-  Informational value:
-  "Fragment 1", "Fragment 2"
-  → Outcome: {outcome sentence}
-
-  Emotional value:
-  "Fragment 1", "Fragment 2"
-  → Outcome: {outcome sentence}
   ```
+  Use **however many value types the user-provided value model contains** — the model may include 3 (Functional, Informational, Emotional) or up to 5–6 (also Financial, Social, Operational, etc.). Do not limit to exactly 3.
 - Value evaluation image — if provided
 - PowerPoint download link — if provided
 - Closing sentence about using the model before and after deployment
 
 **Implementation — No-Code (`## Implementation layer using No-Code`):**
+
+This section can take two different structures depending on what no-code assets exist for the use case.
+
+*Structure A — Single asset (one Claude Skill or one set of prompt templates):*
 - Opening paragraph
 - Numbered list of 1–3 GitHub asset links (prompt templates, agent skills)
 - Explanation of what the no-code assets do
@@ -129,19 +129,35 @@ The H1 heading always ends with "Generic Use Case (Cross-Cutting Use Case)".
 - **"Example of what the business gets out:"** — intro sentence + structured bullet list of output fields
 - Closing 4-bullet list: easy to paste / safe to store / reliable for analytics / suitable for audits
 
+*Structure B — Two co-existing approaches (prompt-based AND Claude Skill):*
+- Opening paragraph introducing both approaches and when to use each
+- `### Prompt-based approach` subsection — describe the prompt(s) briefly, what they do, GitHub link
+- `### Claude Skill` subsection — brief introduction (2–4 sentences) covering what it does, when to prefer it over the prompt-based approach, and GitHub link; **do not** include detailed setup steps or daily workflow — link to the documentation instead
+- Use **"Claude Skill"** as the term — not "Claude Desktop agent skill", not "Claude Desktop Skill"
+
+Use Structure B when both `implementation_layer/no-code-assets/prompts/` and `implementation_layer/no-code-assets/agent-skills/` assets exist for the use case. Use Structure A for all other cases.
+
 **Implementation — Code-Based (`## Implementation Layer Using Code-Based Method.`):**
 - Note: heading ends with a period — match exactly
-- 1–2 sentence overview naming the components and module
-- `flowchart LR` Mermaid diagram with subgraph for the module — follow `references/mermaid-guide.md` diagram style (emojis, stroke colors, subgraph pattern)
+- 1–2 sentence overview naming the GAIK components used and noting any downstream (non-GenAI) steps
+- `flowchart LR` Mermaid diagram with subgraph for the GAIK extraction pipeline — follow `references/mermaid-guide.md` diagram style (emojis, stroke colors, subgraph pattern)
+- If the pipeline output feeds into downstream org-specific steps (pricing, ERP, document generation), add a downstream node **after** the GAIK output in the diagram, styled yellow (`fill:#fefce8`) or green (`fill:#dcfce7`), and labelled clearly as downstream/org-specific
 - `---` divider after this section
 
 **Software Components (`## Software Components`):**
+- **Only list actual GAIK software components** — i.e. classes/modules from `implementation_layer/src/gaik/software_components/` or `software_modules/`. Do NOT list business-specific logic (pricing calculators, PDF renderers, ERP connectors) as software components — these belong in the "Downstream tasks" subsection instead.
 - One `###` per component, numbered: `### 1. ComponentName`
 - Each component gets:
   1. 2–3 sentence description
   2. `flowchart LR` or `flowchart TD` Mermaid diagram with subgraph — use emojis and stroke colors
   3. GitHub source link: `> 📁 [\`path/to/component/\`](https://github.com/GAIK-project/gaik-toolkit/tree/main/...)`
   4. `---` divider after each component
+
+**Downstream tasks (`### Downstream tasks`)** *(add when the use case involves post-extraction non-GenAI steps)*:
+- Add this unnumbered subsection after the last software component when the pipeline output feeds into business-specific or conventional (non-AI) processing steps
+- Describe what happens to the structured output: price calculation, document generation, ERP integration, database storage, etc.
+- Clarify that these steps are outside the GenAI pipeline and may require organisation-specific customisation
+- Do NOT add a diagram for downstream tasks — prose only
 
 **Defining What to Extract (`## Defining What to Extract: User Requirements`)** *(extraction use cases only)*:
 - 1–2 sentence intro

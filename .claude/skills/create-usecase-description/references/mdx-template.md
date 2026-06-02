@@ -55,6 +55,8 @@ At the strategy layer, the value evaluation model applies the [Value Evaluation 
 
 Example value fragments from the model include:
 
+{Repeat one block per value type present in the user-provided model. Common types: Functional (primary), Informational, Financial, Emotional, Social, Operational. Use exactly the types the model contains — do not limit to 3.}
+
 Functional value (primary):
 "{Fragment 1}", "{Fragment 2}", "{Fragment 3}"
 → Outcome: {outcome sentence}
@@ -79,6 +81,8 @@ The same model can be used both before implementation (to evaluate expected valu
 ---
 
 ### 3. `## Implementation layer using No-Code` *(required)*
+
+**Use Structure A when only one type of no-code asset exists.**
 
 ```markdown
 ## Implementation layer using No-Code
@@ -112,9 +116,8 @@ What happens in daily work:
 
 Example of what the business gets out:
 
-{1 sentence framing the output. Instead of {old way}, the output is a {new way}:}
+{1 sentence framing the output.}
 
-- {Output field}: {value}
 - {Output field}: {value}
 - {Output field}: {value}
 
@@ -125,7 +128,34 @@ This makes the result:
 - suitable for audits and compliance
 ```
 
-Divider `---` follows immediately after this section.
+**Use Structure B when both prompt-based assets AND a Claude Skill exist.**
+
+```markdown
+## Implementation layer using No-Code
+
+{Use case name} can be supported by Generative AI using two no-code approaches: a **prompt-based approach** for quick experimentation directly in ChatGPT, and a **Claude Skill** for a more structured, repeatable workflow in Claude Desktop.
+
+### Prompt-based approach
+
+{1–2 sentences describing the prompt(s) and what they do. Mention if there are variants (e.g. single-document vs multi-document).}
+
+{Brief bullet list of what each prompt does.}
+
+> 📁 [{Display name} →]({github_url_to_prompts_folder})
+
+### Claude Skill
+
+{2–4 sentences: what the skill does, when to prefer it over the prompt-based approach, and where to find documentation.}
+
+For a detailed walkthrough, see the article: [{Article title}]({url})
+
+> 📁 [{Display name} →]({github_url_to_skill_folder})
+```
+
+**Key rules for both structures:**
+- Use **"Claude Skill"** — never "Claude Desktop agent skill" or "Claude Desktop Skill"
+- In Structure B, keep each subsection concise — do not include detailed setup steps in the Claude Skill subsection; link to the documentation instead
+- Divider `---` follows immediately after this section
 
 ---
 
@@ -232,6 +262,33 @@ flowchart TD
 
 ---
 ```
+
+---
+
+### 5b. `### Downstream tasks` *(add when non-GenAI steps follow the GAIK extraction)*
+
+Add this unnumbered subsection **after the last numbered software component** when the pipeline output feeds into business-specific or conventional (non-AI) processing — such as pricing calculation, document rendering, ERP integration, or database storage.
+
+**Do NOT list these as software components.** Only include them here.
+
+```markdown
+### Downstream tasks
+
+Once the GAIK extraction components produce the structured {output type}, the result feeds into downstream tasks that are outside the GenAI pipeline and specific to each organisation's business rules.
+
+**{Primary downstream step}** is the main downstream task for this use case. {1–2 sentences describing what it does with the structured output and why it requires customisation per organisation.}
+
+After {primary step}, the enriched result can be passed to any further step:
+
+- **{Step}** — {brief description}
+- **{Step}** — {brief description}
+- **{Step}** — {brief description}
+```
+
+Rules:
+- Prose only — no diagram for downstream tasks
+- Explicitly state that these steps are outside the GenAI pipeline
+- Mention that pricing/calculation logic may vary per organisation if applicable
 
 ---
 
