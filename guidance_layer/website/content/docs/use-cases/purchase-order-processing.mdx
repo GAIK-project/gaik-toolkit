@@ -61,73 +61,34 @@ The same model can be used both before implementation (to evaluate expected valu
 
 ## Implementation layer using No-Code
 
-Purchase order processing can be supported by Generative AI using a no-code approach.
-At the implementation layer, the use case is realized using a no-code agent skill from the toolkit:
-1) [Claude Desktop agent skill for purchase order processing](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing)
+Purchase order processing can be supported by Generative AI using two no-code approaches: a **prompt-based approach** for quick experimentation directly in ChatGPT, and a **Claude Skill** for a more structured, repeatable workflow in Claude Desktop.
 
-The skill defines the extraction fields, matching logic, pricing calculation rules, and output format declaratively in plain-text reference files — no programming required. A sales operations manager installs the skill into Claude Desktop, points it to a folder containing the purchase order, bills of material, and price list, and Claude returns a complete sales order document plus a step-by-step calculation audit trail.
+### Prompt-based approach
 
-For a detailed walkthrough of this no-code implementation, see the article: [I Created a Claude Skill for Processing Complex Purchase Orders](https://medium.com/data-science-collective/i-created-a-claude-skill-for-processing-complex-purchase-orders-9f14f10308cd?sk=77bf841514627a9fc68129cb8cd7cdbd)
+The toolkit provides two ready-to-use prompts that can be copied and pasted directly into ChatGPT along with your documents — no setup or installation required.
 
-**What the business user sets up (once):**
+- **Single-document PO prompt** — for purchase orders that contain all required information in one PDF. Upload the PO and the price list, paste the prompt, and receive a structured JSON output with extracted fields, matched pricing, and calculated totals.
+- **Multi-document PO prompt** — for purchase orders accompanied by one or more Bill of Material PDFs. Upload the PO, all BOMs, and the price list together; the prompt cross-references them by material number and returns an enriched JSON with BOM-derived technical details and calculated pricing.
 
-A sales operations manager edits five plain-text reference files to match company conventions — no coding required:
-- `EXTRACTION_FIELDS.md` — which fields to extract from the PO, BOM, and price list
-- `PRICING_RULES.md` — volume-discount tiers, fee types, and matching logic
-- `CALCULATION_LOGIC.md` — formulas for combining material cost, fees, discounts, and tax
-- `OUTPUT_FORMAT.md` — the sales-order document template
-- `BOM_TEMPLATE_WITH_FEES.md` — the BOM-side fields used for fee flags
+Both prompts include price list matching, per-line cost calculation (material cost, cutting, testing, certification fees), volume discount, and tax computation. Sample purchase orders, BOMs, and price lists are included to try the prompts immediately.
 
-**What happens in daily work:**
+> 📁 [Prompt-based PO processing →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts/purchase-order-processing)
 
-**Step 1 – Organise the input folder**
-The user prepares an input folder with the following structure:
+### Claude Skill
 
-```
-My-Order/
-├── customer_data/
-│   ├── PO.pdf
-│   ├── BOM1.pdf
-│   ├── BOM2.pdf
-│   └── BOM3.pdf
-├── price_list/
-│   └── price_list.xlsx
-└── sample_sales_order/        ← optional
-    └── sample_order.docx
-```
+The toolkit also provides a Claude Skill for purchase order processing — a declarative, reusable workflow that runs inside Claude Desktop. The skill defines the extraction fields, BOM matching logic, pricing rules, and output format in plain-text reference files. A user points Claude at a folder containing the PO, BOMs, and price list, and Claude produces a formatted sales order document with a full calculation audit trail.
 
-**Step 2 – Ask Claude to process it**
-```
-Process the purchase order in C:\Orders\Project-Q4 using purchase-order-processing skill
-```
+The Claude Skill is better suited for repeated use on a defined order format, while the prompt-based approach is more flexible for ad-hoc or one-off orders.
 
-Claude extracts each PO line item, looks up the matching BOM by material number, finds the corresponding row in the price list, calculates the material subtotal plus any applicable cutting, testing, and certification fees, and emits two output files:
+For a detailed walkthrough of the Claude Skill, see the article: [I Created a Claude Skill for Processing Complex Purchase Orders](https://medium.com/data-science-collective/i-created-a-claude-skill-for-processing-complex-purchase-orders-9f14f10308cd?sk=77bf841514627a9fc68129cb8cd7cdbd)
 
-- `SO-{number}_{Date}.docx` — the formatted sales order document
-- `Calculation_Breakdown.txt` — a step-by-step audit trail of all extractions, matches, and calculations
-
-**Example of what the business gets out:**
-
-Instead of manual data entry, the output is a ready-to-use structured sales order with full pricing transparency:
-
-- Material Subtotal: $25,567.50
-- Volume Discount (5%): −$1,278.38
-- Net Material Cost: $24,289.12
-- Total Testing / Certification Fees: $75.00
-- Tax (6%): $1,488.85
-- Grand Total: $26,302.97
-
-This makes the result:
-- easy to paste into an existing ERP system
-- safe to store in a database with a full audit trail
-- reliable for pricing analytics and compliance review
-- suitable for audits requiring itemised fee breakdowns
+> 📁 [Claude Skill for PO processing →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing)
 
 ---
 
 ## Implementation Layer Using Code-Based Method.
 
-Four software components combine to turn raw purchase order documents into a priced, formatted sales order: **Parser**, **Schema Generator + DataExtractor** (packaged together in the `DocumentsToStructuredData` module), **Pricing Matcher & Calculator**, and **PDF Generator**. Alternatively, the **VisionExtractor** software component can replace the Parser + Extractor steps with a single LLM vision call, feeding the same Pricing Matcher and PDF Generator downstream.
+Two GAIK software components handle the document extraction step: the **Parser** + **Schema Generator + DataExtractor** (packaged in the `DocumentsToStructuredData` module), or the **VisionExtractor** which combines parsing and extraction in a single LLM vision call. The extracted structured data then feeds into downstream tasks — primarily price matching and calculation (which is specific to each organisation's pricing structure) — followed by document generation or ERP integration.
 
 ```mermaid
 flowchart LR
@@ -140,20 +101,17 @@ flowchart LR
         direction TB
         P1["🗂️ Documents to Structured Data\n(Parser → Schema Gen → Extractor)"]
         P2["🤖 VisionExtractor component\n(single LLM call — alternative)"]
-        M["🔗 Pricing Matcher & Calculator"]
-        G["📑 PDF Generator"]
-        P1 --> M
-        P2 --> M
-        M --> G
     end
 
-    PIPE --> E("✅ Priced Sales Order PDF\n+ Structured JSON\n+ Audit Breakdown")
+    PIPE --> E("✅ Structured JSON\n(PO header + line items)")
+    E --> F("🔗 Downstream: Price Matching\n& Calculation (org-specific)")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style C fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style D fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style E fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style E fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style F fill:#dcfce7,stroke:#16a34a,color:#14532d
     style PIPE fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
     style P2 stroke-dasharray: 5 5
 ```
@@ -263,42 +221,17 @@ For more details on the VisionExtractor's approach to structured data extraction
 
 ---
 
-### 4. Pricing Matcher & Calculator
+### Downstream tasks
 
-Takes the structured PO line items and the parsed price list, and produces enriched rows with calculated pricing. Matching is two-stage: first the material number links each PO line to its BOM, then the BOM's type designation is matched against the price list. Per-line totals are calculated by combining the material subtotal with conditional fees — cutting, testing, and certification fees are only applied when the BOM flags them as required.
+Once the GAIK extraction components produce the structured PO and BOM data, the result feeds into downstream tasks that are outside the GenAI pipeline and specific to each organisation's business rules.
 
-The price calculation logic can vary per use case. While the extraction task can be changed by updating the user requirements, the pricing calculation requires customisation to match each organisation's specific fee structure, discount tiers, and currency rules.
+**Price matching and calculation** is the primary downstream step for this use case. It takes the structured line items and a price list, matches each material to its pricing row, and computes per-line totals — combining material subtotal with conditional fees (cutting, testing, certification) that apply only when the BOM flags them as required. The calculation logic — fee structure, discount tiers, currency rules — varies per organisation and requires customisation.
 
-```mermaid
-flowchart TD
-    A("📦 PO Line Items") --> M1
-    B("🔩 BOM Data") --> M1
-    C("💰 Price List") --> M2
+After pricing, the enriched structured result can be passed to any further step:
 
-    subgraph PM["Pricing Matcher & Calculator"]
-        direction TB
-        M1["🔗 Match material → BOM"]
-        M2["🔗 Match BOM type → Price List"]
-        CALC["🧮 Calculate\nmaterial subtotal + conditional fees"]
-        M1 --> M2 --> CALC
-    end
-
-    PM --> O("✅ Enriched Line Items\nwith subtotal, fees, and line total")
-
-    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style C fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style O fill:#dcfce7,stroke:#16a34a,color:#14532d
-    style PM fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
-```
-
----
-
-### 5. PDF Generator
-
-Renders the enriched order data into a formatted sales order draft — including buyer and delivery addresses, line item table with per-line fee breakdown, and order totals — using a deterministic layout engine.
-
-> 📁 [`implementation_layer/src/gaik/software_components/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components)
+- **Generate a formatted sales order PDF** — render the structured data into a professional document using a template engine or PDF library
+- **Push to ERP** — map the structured fields directly to ERP intake formats (e.g. SAP, Dynamics, or custom systems)
+- **Store in a database** — persist the structured order record for analytics, audit trails, or downstream reporting
 
 ---
 
@@ -343,13 +276,12 @@ The **Documents to Structured Data** module packages the Parser and the Schema G
 
 As an alternative to this module, the **VisionExtractor** software component (described in the Software Components section above) can be used directly when a single LLM vision call is preferred over the two-step parse → extract approach, reducing latency and the number of API calls.
 
-Both paths feed into the same Pricing Matcher & Calculator and PDF Generator steps to produce the final priced sales order.
+Both paths produce structured JSON output that feeds into downstream tasks such as price matching, calculation, and document generation.
 
 ```mermaid
 flowchart TD
     IN1("📄 PO PDF") --> MOD
     IN2("📄 BOM PDFs") --> MOD
-    IN3("📊 Price List") --> MOD
     IN4("📋 User Requirements") --> MOD
 
     subgraph MOD["Documents to Structured Data\n(module)"]
@@ -368,36 +300,15 @@ flowchart TD
         PA -->|"parsed document text"| PB
     end
 
-    MOD --> STRUC("📋 Structured PO + BOM Data")
-
-    subgraph CALC["Pricing Matcher & Calculator"]
-        direction LR
-        MM["Material →\nBOM"] --> MP["BOM →\nPrice"] --> CC["Calculate\nfees + total"]
-    end
-
-    subgraph GEN["PDF Generator"]
-        direction LR
-        REND["Render\nSales Order Draft"]
-    end
-
-    STRUC --> CALC
-    CALC -->|"enriched line items"| GEN
-
-    GEN --> O1("💰 Enriched Lines with Fees")
-    GEN --> O2("✅ Sales Order Draft PDF")
+    MOD --> STRUC("✅ Structured PO + BOM Data\nReady for downstream use")
 
     style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style IN2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style IN3 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style IN4 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
-    style STRUC fill:#fefce8,stroke:#ca8a04,color:#713f12
-    style O1 fill:#fefce8,stroke:#ca8a04,color:#713f12
-    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style STRUC fill:#dcfce7,stroke:#16a34a,color:#14532d
     style MOD fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
     style PA fill:#faf5ff,stroke:#9333ea,color:#2e1065
     style PB fill:#faf5ff,stroke:#9333ea,color:#2e1065
-    style CALC fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
-    style GEN fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
 ```
 
 Example output from the demo — uploading a purchase order with three BOM files and a price list, then viewing the calculated order summary and generated sales order draft:
@@ -417,7 +328,7 @@ To test a smaller version of the purchase order use case, please visit the [GAIK
 
 ## Adaptable to Other Domains
 
-The same parse → extract → match → calculate → generate pipeline applies to any procurement or back-office workflow requiring structured extraction from multi-document inputs — only the user requirements, matching keys, and pricing logic change:
+The same parse → extract → match → calculate pipeline applies to any procurement or back-office workflow requiring structured extraction from multi-document inputs — only the user requirements, matching keys, and pricing logic change:
 
 - Vendor invoice processing with line-item reconciliation, sales order intake and ERP staging, request-for-quote ingestion with cost lookup, vendor catalogue normalisation, shipment and customs documentation aggregation
 
