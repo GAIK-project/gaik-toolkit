@@ -1,0 +1,43 @@
+# Keep the free-tier Supabase project (GAIK-demo) from pausing.
+#
+# Supabase free-tier projects are paused after 7 days with no API activity.
+# This CronJob hits the PostgREST endpoint daily, which executes a real query
+# against Postgres and resets the inactivity timer. The publishable (anon) key
+# is public by design, so no Secret is required.
+#
+# Apply with:  oc apply -f supabase-keepalive.yaml -n gaik
+# Run now:     oc create job --from=cronjob/supabase-keepalive supabase-keepalive-manual -n gaik
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: supabase-keepalive
+  namespace: gaik
+  labels:
+    app.kubernetes.io/part-of: gaik-demo
+spec:
+  # 06:00 UTC every day. The 7-day pause window leaves plenty of margin even
+  # if several consecutive runs fail.
+  schedule: "0 6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 60
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: curl
+              image: curlimages/curl:8.11.1
+              command:
+                - curl
+                - -sf
+                - --max-time
+                - "30"
+                - -H
+                - "apikey: sb_publishable_APwVOGuvbIRawMsMQsQLig_mS49Q4t9"
+                - "https://yugjbagmodcjxojksrbl.supabase.co/rest/v1/profiles?select=id&limit=1"
+              # No explicit resources: the namespace LimitRange supplies
+              # defaults (min cpu request 50m, max limit/request ratio 8).
