@@ -70,9 +70,7 @@ class BatchEvaluationRunner:
             except BaseException as exc:
                 if self.on_error == "raise":
                     raise
-                logger.warning(
-                    "Pipeline failed on item %d: %s", idx, exc, exc_info=True
-                )
+                logger.warning("Pipeline failed on item %d: %s", idx, exc, exc_info=True)
                 failures.append((idx, exc))
                 outputs.append(None)
             else:

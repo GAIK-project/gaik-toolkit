@@ -25,6 +25,7 @@ from gaik.software_components.extractor.schema import parse_nested_requirements
 # Shared helper
 # ---------------------------------------------------------------------------
 
+
 def _field_map(model: type[BaseModel]) -> dict:
     """Return {field_name: FieldInfo} for a Pydantic model."""
     return model.model_fields
@@ -180,6 +181,7 @@ Extract the following fields from an employee profile.
 # Tests — parent_with_nested_list
 # ===========================================================================
 
+
 class TestParentWithNestedListPO:
     """Task 1: English PO with rich type qualifiers."""
 
@@ -195,20 +197,31 @@ class TestParentWithNestedListPO:
     def test_parent_has_no_list_dict(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         assert isinstance(requirements, CompositeExtractionRequirements)
-        bad = [f.field_name for f in requirements.parent_requirements.fields if f.field_type == "list[dict]"]
+        bad = [
+            f.field_name
+            for f in requirements.parent_requirements.fields
+            if f.field_type == "list[dict]"
+        ]
         assert bad == [], f"Parent has list[dict] fields: {bad}"
 
     def test_child_has_no_list_dict(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         assert isinstance(requirements, CompositeExtractionRequirements)
-        bad = [f.field_name for f in requirements.child_requirements.fields if f.field_type == "list[dict]"]
+        bad = [
+            f.field_name
+            for f in requirements.child_requirements.fields
+            if f.field_type == "list[dict]"
+        ]
         assert bad == [], f"Child has list[dict] fields: {bad}"
 
     def test_parent_fields_are_header_only(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         parent_names = {f.field_name for f in requirements.parent_requirements.fields}
         # Must not contain child/item fields
         assert "cut_length" not in parent_names
@@ -218,6 +231,7 @@ class TestParentWithNestedListPO:
     def test_child_fields_do_not_include_parent_fields(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         child_names = {f.field_name for f in requirements.child_requirements.fields}
         assert "purchase_order_number" not in child_names
         assert "delivery_date" not in child_names
@@ -226,6 +240,7 @@ class TestParentWithNestedListPO:
     def test_cut_length_is_str(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         child_fields = {f.field_name: f for f in requirements.child_requirements.fields}
         assert "cut_length" in child_fields, "cut_length field missing"
         assert child_fields["cut_length"].field_type == "str", (
@@ -235,6 +250,7 @@ class TestParentWithNestedListPO:
     def test_quantity_is_str(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         child_fields = {f.field_name: f for f in requirements.child_requirements.fields}
         assert "quantity" in child_fields, "quantity field missing"
         assert child_fields["quantity"].field_type == "str", (
@@ -244,6 +260,7 @@ class TestParentWithNestedListPO:
     def test_product_form_has_enum(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         child_fields = {f.field_name: f for f in requirements.child_requirements.fields}
         assert "product_form" in child_fields, "product_form field missing"
         assert child_fields["product_form"].enum, (
@@ -253,6 +270,7 @@ class TestParentWithNestedListPO:
     def test_hardness_hv_is_nullable_numeric(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         child_fields = {f.field_name: f for f in requirements.child_requirements.fields}
         assert "hardness_hv" in child_fields, "hardness_hv field missing"
         f = child_fields["hardness_hv"]
@@ -264,6 +282,7 @@ class TestParentWithNestedListPO:
     def test_delivery_length_note_is_nullable(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         child_fields = {f.field_name: f for f in requirements.child_requirements.fields}
         assert "delivery_length_note" in child_fields, "delivery_length_note field missing"
         assert child_fields["delivery_length_note"].nullable is True, (
@@ -286,12 +305,18 @@ class TestParentWithNestedListInvoice:
     def test_child_has_no_list_dict(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
-        bad = [f.field_name for f in requirements.child_requirements.fields if f.field_type == "list[dict]"]
+
+        bad = [
+            f.field_name
+            for f in requirements.child_requirements.fields
+            if f.field_type == "list[dict]"
+        ]
         assert bad == [], f"Child has list[dict] fields: {bad}"
 
     def test_currency_has_enum(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         parent_fields = {f.field_name: f for f in requirements.parent_requirements.fields}
         assert "currency" in parent_fields, "currency field missing from parent"
         assert parent_fields["currency"].enum, "currency should have enum (USD, EUR, GBP)"
@@ -299,6 +324,7 @@ class TestParentWithNestedListInvoice:
     def test_unit_price_is_str(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         child_fields = {f.field_name: f for f in requirements.child_requirements.fields}
         assert "unit_price" in child_fields, "unit_price field missing"
         assert child_fields["unit_price"].field_type == "str", (
@@ -309,6 +335,7 @@ class TestParentWithNestedListInvoice:
     def test_discount_is_nullable_numeric(self, schema):
         _, requirements, _ = schema
         from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
         child_fields = {f.field_name: f for f in requirements.child_requirements.fields}
         assert "discount_percentage" in child_fields, "discount_percentage field missing"
         f = child_fields["discount_percentage"]
@@ -321,6 +348,7 @@ class TestParentWithNestedListInvoice:
 # ===========================================================================
 # Tests — nested_list
 # ===========================================================================
+
 
 class TestNestedListPO:
     """Task 2 (provided): Simple PO line items."""
@@ -405,14 +433,13 @@ class TestNestedListLabResults:
         _, requirements, _ = schema
         field_map = {f.field_name: f for f in requirements.fields}
         assert "flag" in field_map, "flag field missing"
-        assert field_map["flag"].nullable is True, (
-            "flag should be nullable (if stated, else null)"
-        )
+        assert field_map["flag"].nullable is True, "flag should be nullable (if stated, else null)"
 
 
 # ===========================================================================
 # Tests — flat
 # ===========================================================================
+
 
 class TestFlatIncident:
     """Task 3 (provided): Finnish incident report — verifies flat path unchanged."""
@@ -554,7 +581,11 @@ class TestParentWithNestedListBlueprint:
 
     def test_parent_has_no_list_dict(self, blueprint_schema):
         _, composite, _ = blueprint_schema
-        bad = [f.field_name for f in composite.parent_requirements.fields if f.field_type == "list[dict]"]
+        bad = [
+            f.field_name
+            for f in composite.parent_requirements.fields
+            if f.field_type == "list[dict]"
+        ]
         assert not bad, f"Parent should have no list[dict] fields: {bad}"
 
     def test_child_has_no_list_dict(self, blueprint_schema):
@@ -581,7 +612,9 @@ class TestParentWithNestedListBlueprint:
             field_map = {f.field_name: f for f in child.requirements.fields}
             for fname, fspec in field_map.items():
                 if "compliance" in fname and fspec.enum:
-                    assert len(fspec.enum) >= 2, "compliance_relevance enum should have multiple values"
+                    assert len(fspec.enum) >= 2, (
+                        "compliance_relevance enum should have multiple values"
+                    )
                     return
         pytest.fail("No enum field for compliance relevance found in any child model")
 
@@ -639,16 +672,18 @@ class TestParentWithMultipleNestedLists:
         _, composite, _ = multi_child_schema
         parent_names = {f.field_name for f in composite.parent_requirements.fields}
         child_all_names = {
-            f.field_name
-            for child in composite.children
-            for f in child.requirements.fields
+            f.field_name for child in composite.children for f in child.requirements.fields
         }
         overlap = parent_names & child_all_names
         assert not overlap, f"Parent and child share fields: {overlap}"
 
     def test_parent_has_no_list_dict(self, multi_child_schema):
         _, composite, _ = multi_child_schema
-        bad = [f.field_name for f in composite.parent_requirements.fields if f.field_type == "list[dict]"]
+        bad = [
+            f.field_name
+            for f in composite.parent_requirements.fields
+            if f.field_type == "list[dict]"
+        ]
         assert not bad, f"Parent should have no list[dict] fields: {bad}"
 
     def test_no_child_has_list_dict(self, multi_child_schema):
@@ -663,8 +698,7 @@ class TestParentWithMultipleNestedLists:
         if len(composite.children) < 2:
             pytest.skip("Needs at least 2 children")
         all_field_sets = [
-            {f.field_name for f in child.requirements.fields}
-            for child in composite.children
+            {f.field_name for f in child.requirements.fields} for child in composite.children
         ]
         for i, names_i in enumerate(all_field_sets):
             for j, names_j in enumerate(all_field_sets):
@@ -694,16 +728,17 @@ class TestParentWithMultipleNestedLists:
             field_map = {f.field_name: f for f in child.requirements.fields}
             if "likelihood" in field_map:
                 assert field_map["likelihood"].enum, "likelihood should have enum values"
-                assert any("Low" in v or "low" in v.lower() for v in field_map["likelihood"].enum), (
-                    f"likelihood enum missing 'Low', got: {field_map['likelihood'].enum}"
-                )
+                assert any(
+                    "Low" in v or "low" in v.lower() for v in field_map["likelihood"].enum
+                ), f"likelihood enum missing 'Low', got: {field_map['likelihood'].enum}"
                 return
         pytest.fail("likelihood field not found in any child model")
 
     def test_pydantic_model_has_multiple_list_fields(self, multi_child_schema):
         extraction_model, composite, _ = multi_child_schema
         list_fields = [
-            name for name, finfo in extraction_model.model_fields.items()
+            name
+            for name, finfo in extraction_model.model_fields.items()
             if get_origin(finfo.annotation) is list
         ]
         assert len(list_fields) >= 2, (

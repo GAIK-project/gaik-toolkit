@@ -63,9 +63,7 @@ class OpenAIProvider:
             raise ValueError("OpenAI parse() returned None — check the model/schema.")
         return parsed
 
-    def chat_stream(
-        self, messages: list[ChatMessage], **kwargs: Any
-    ) -> Iterator[str]:
+    def chat_stream(self, messages: list[ChatMessage], **kwargs: Any) -> Iterator[str]:
         stream = self.raw.chat.completions.create(
             model=kwargs.pop("model", self.model),
             messages=messages,

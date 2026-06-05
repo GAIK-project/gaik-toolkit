@@ -227,7 +227,11 @@ class CompositeExtractionRequirements(BaseModel):
     @property
     def child_requirements(self) -> ExtractionRequirements:
         """Backward-compat shim — returns the first child's requirements."""
-        return self.children[0].requirements if self.children else ExtractionRequirements(fields=[], use_case_name="")
+        return (
+            self.children[0].requirements
+            if self.children
+            else ExtractionRequirements(fields=[], use_case_name="")
+        )
 
 
 # -----------------------------------------------------------------------------
@@ -269,8 +273,7 @@ class StructureAnalysis(BaseModel):
     child_container_name: str = Field(
         default="",
         description=(
-            "For parent_with_nested_list: snake_case name of the repeated child "
-            "collection field"
+            "For parent_with_nested_list: snake_case name of the repeated child collection field"
         ),
     )
     child_container_description: str = Field(
@@ -418,8 +421,7 @@ def _create_parent_with_nested_list_model(
     ParentFieldsModel = create_extraction_model(parent_requirements)  # noqa: N806
 
     combined_fields = {
-        name: (finfo.annotation, finfo)
-        for name, finfo in ParentFieldsModel.model_fields.items()
+        name: (finfo.annotation, finfo) for name, finfo in ParentFieldsModel.model_fields.items()
     }
     for child in children:
         ChildModel = create_extraction_model(child.requirements)  # noqa: N806
@@ -437,8 +439,7 @@ def _create_parent_with_nested_list_model(
         model_name,
         __config__=ConfigDict(extra="forbid"),
         __doc__=(
-            f"Extraction model for {parent_requirements.use_case_name} "
-            f"with repeated {child_names}"
+            f"Extraction model for {parent_requirements.use_case_name} with repeated {child_names}"
         ),
         **combined_fields,
     )
@@ -521,8 +522,12 @@ def parse_nested_requirements(
         if not raw_containers:
             raw_containers = [
                 ChildContainerSpec(
-                    container_name=analysis.child_container_name or analysis.parent_container_name or "records",
-                    container_description=analysis.child_container_description or analysis.parent_description or "",
+                    container_name=analysis.child_container_name
+                    or analysis.parent_container_name
+                    or "records",
+                    container_description=analysis.child_container_description
+                    or analysis.parent_description
+                    or "",
                 )
             ]
 
@@ -546,15 +551,15 @@ def parse_nested_requirements(
                 _usage_sink=_usage_sink,
                 parse_mode="repeated_item",
             )
-            _ensure_no_list_dict_fields(
-                child_req, context=f"Child requirements for '{cname}'"
-            )
+            _ensure_no_list_dict_fields(child_req, context=f"Child requirements for '{cname}'")
             print(f"  Fields: {[f.field_name for f in child_req.fields]}")
-            children.append(ChildRequirements(
-                container_name=cname,
-                container_description=cdesc,
-                requirements=child_req,
-            ))
+            children.append(
+                ChildRequirements(
+                    container_name=cname,
+                    container_description=cdesc,
+                    requirements=child_req,
+                )
+            )
 
         print(f"Identified parent fields: {[f.field_name for f in parent_requirements.fields]}")
 
@@ -581,8 +586,7 @@ def parse_nested_requirements(
     _item_task = (
         "From the requirements below, parse only the fields for each repeated "
         "item. Treat every field as a scalar value. "
-        "Ignore any once-per-document, header, or summary fields.\n\n"
-        + user_description
+        "Ignore any once-per-document, header, or summary fields.\n\n" + user_description
     )
     item_requirements = parse_user_requirements(
         _item_task,
@@ -926,9 +930,7 @@ def _is_date_field(name: str, description: str) -> bool:
     return False
 
 
-def _apply_type_overrides(
-    requirements: ExtractionRequirements, original_text: str = ""
-) -> None:
+def _apply_type_overrides(requirements: ExtractionRequirements, original_text: str = "") -> None:
     """
     Apply deterministic heuristics to FieldSpec entries to enforce critical types
     even when the LLM guesses incorrectly (e.g., date fields must be typed as date).
@@ -1023,9 +1025,7 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
                 annotated = Literal[tuple(values)]  # type: ignore[misc,call-arg]
 
         uses_numeric_fallback = (
-            f.field_type in NUMERIC_FIELD_TYPES
-            and not f.has_explicit_default
-            and not f.nullable
+            f.field_type in NUMERIC_FIELD_TYPES and not f.has_explicit_default and not f.nullable
         )
 
         if f.nullable or uses_numeric_fallback:
@@ -1313,11 +1313,7 @@ def apply_field_policies(data: dict, requirements: ExtractionRequirements) -> di
                 continue
             value = _resolve_fallback(field)
 
-        if (
-            field.field_type in NUMERIC_FIELD_TYPES
-            and isinstance(value, str)
-            and not value.strip()
-        ):
+        if field.field_type in NUMERIC_FIELD_TYPES and isinstance(value, str) and not value.strip():
             value = _resolve_fallback(field)
 
         if field.enum and value not in field.enum:
@@ -1544,9 +1540,8 @@ class SchemaGenerator:
                     f.field_name for f in requirements.child_requirements.fields
                 ],
             }
-            field_count = (
-                len(requirements.parent_requirements.fields)
-                + len(requirements.child_requirements.fields)
+            field_count = len(requirements.parent_requirements.fields) + len(
+                requirements.child_requirements.fields
             )
         else:
             fields = [f.field_name for f in requirements.fields] if requirements else []

@@ -86,6 +86,7 @@ def _evaluate_texts(reference_text, hypothesis_text):
     )
     return word_output, char_output
 
+
 def evaluate_batch(reference_dir: str, original_dir: str, enhanced_dir: str):
     """
     Evaluate original and enhanced transcripts against ground truth.
@@ -173,7 +174,9 @@ def evaluate_batch(reference_dir: str, original_dir: str, enhanced_dir: str):
         orig_total_char_subs += orig_cer_output.substitutions
         orig_total_char_dels += orig_cer_output.deletions
         orig_total_char_ins += orig_cer_output.insertions
-        orig_total_ref_chars += orig_cer_output.hits + orig_cer_output.substitutions + orig_cer_output.deletions
+        orig_total_ref_chars += (
+            orig_cer_output.hits + orig_cer_output.substitutions + orig_cer_output.deletions
+        )
 
         enh_total_subs += enh_output.substitutions
         enh_total_dels += enh_output.deletions
@@ -183,7 +186,9 @@ def evaluate_batch(reference_dir: str, original_dir: str, enhanced_dir: str):
         enh_total_char_subs += enh_cer_output.substitutions
         enh_total_char_dels += enh_cer_output.deletions
         enh_total_char_ins += enh_cer_output.insertions
-        enh_total_ref_chars += enh_cer_output.hits + enh_cer_output.substitutions + enh_cer_output.deletions
+        enh_total_ref_chars += (
+            enh_cer_output.hits + enh_cer_output.substitutions + enh_cer_output.deletions
+        )
 
         evaluated += 1
 
@@ -199,7 +204,9 @@ def evaluate_batch(reference_dir: str, original_dir: str, enhanced_dir: str):
             status = "SAME"
             unchanged += 1
 
-        print(f"{stem:40s} | Orig: {orig_wer:6.2%} | Enh: {enh_wer:6.2%} | Delta: {diff:+.2%} | {status}")
+        print(
+            f"{stem:40s} | Orig: {orig_wer:6.2%} | Enh: {enh_wer:6.2%} | Delta: {diff:+.2%} | {status}"
+        )
 
     if evaluated == 0:
         print("No files evaluated.")
@@ -209,8 +216,16 @@ def evaluate_batch(reference_dir: str, original_dir: str, enhanced_dir: str):
     orig_wer = (orig_total_subs + orig_total_dels + orig_total_ins) / orig_total_ref_words
     enh_wer = (enh_total_subs + enh_total_dels + enh_total_ins) / enh_total_ref_words
 
-    orig_cer = (orig_total_char_subs + orig_total_char_dels + orig_total_char_ins) / orig_total_ref_chars if orig_total_ref_chars else 0
-    enh_cer = (enh_total_char_subs + enh_total_char_dels + enh_total_char_ins) / enh_total_ref_chars if enh_total_ref_chars else 0
+    orig_cer = (
+        (orig_total_char_subs + orig_total_char_dels + orig_total_char_ins) / orig_total_ref_chars
+        if orig_total_ref_chars
+        else 0
+    )
+    enh_cer = (
+        (enh_total_char_subs + enh_total_char_dels + enh_total_char_ins) / enh_total_ref_chars
+        if enh_total_ref_chars
+        else 0
+    )
 
     orig_spelling_rate = orig_total_spelling_errors / orig_total_ref_words
     enh_spelling_rate = enh_total_spelling_errors / enh_total_ref_words
@@ -239,12 +254,24 @@ def evaluate_batch(reference_dir: str, original_dir: str, enhanced_dir: str):
     print("=" * 80)
     print(f"{'Metric':<30s} | {'Original':>10s} | {'Enhanced':>10s} | {'Change':>10s}")
     print("-" * 80)
-    print(f"{'Word Error Rate (WER)':<30s} | {orig_wer:>10.2%} | {enh_wer:>10.2%} | {(enh_wer - orig_wer):>+10.2%}")
-    print(f"{'Character Error Rate (CER)':<30s} | {orig_cer:>10.2%} | {enh_cer:>10.2%} | {(enh_cer - orig_cer):>+10.2%}")
-    print(f"{'Spelling Error Rate':<30s} | {orig_spelling_rate:>10.2%} | {enh_spelling_rate:>10.2%} | {(enh_spelling_rate - orig_spelling_rate):>+10.2%}")
-    print(f"{'Substitution Rate':<30s} | {orig_sub_rate:>10.2%} | {enh_sub_rate:>10.2%} | {(enh_sub_rate - orig_sub_rate):>+10.2%}")
-    print(f"{'Deletion Rate':<30s} | {orig_del_rate:>10.2%} | {enh_del_rate:>10.2%} | {(enh_del_rate - orig_del_rate):>+10.2%}")
-    print(f"{'Insertion Rate':<30s} | {orig_ins_rate:>10.2%} | {enh_ins_rate:>10.2%} | {(enh_ins_rate - orig_ins_rate):>+10.2%}")
+    print(
+        f"{'Word Error Rate (WER)':<30s} | {orig_wer:>10.2%} | {enh_wer:>10.2%} | {(enh_wer - orig_wer):>+10.2%}"
+    )
+    print(
+        f"{'Character Error Rate (CER)':<30s} | {orig_cer:>10.2%} | {enh_cer:>10.2%} | {(enh_cer - orig_cer):>+10.2%}"
+    )
+    print(
+        f"{'Spelling Error Rate':<30s} | {orig_spelling_rate:>10.2%} | {enh_spelling_rate:>10.2%} | {(enh_spelling_rate - orig_spelling_rate):>+10.2%}"
+    )
+    print(
+        f"{'Substitution Rate':<30s} | {orig_sub_rate:>10.2%} | {enh_sub_rate:>10.2%} | {(enh_sub_rate - orig_sub_rate):>+10.2%}"
+    )
+    print(
+        f"{'Deletion Rate':<30s} | {orig_del_rate:>10.2%} | {enh_del_rate:>10.2%} | {(enh_del_rate - orig_del_rate):>+10.2%}"
+    )
+    print(
+        f"{'Insertion Rate':<30s} | {orig_ins_rate:>10.2%} | {enh_ins_rate:>10.2%} | {(enh_ins_rate - orig_ins_rate):>+10.2%}"
+    )
     print("=" * 80)
 
     if enh_wer < orig_wer:
@@ -256,16 +283,19 @@ def evaluate_batch(reference_dir: str, original_dir: str, enhanced_dir: str):
     else:
         print("\n>>> Overall WER unchanged.")
 
+
 def main():
     if len(sys.argv) != 4:
         print("Usage: python eval_enhanced.py <reference_dir> <original_dir> <enhanced_dir>")
         print()
         print("Example:")
-        print('  python eval_enhanced.py "C:\\Users\\h02317\\Downloads\\transcripts" transcripts enhanced')
+        print(
+            '  python eval_enhanced.py "C:\\Users\\h02317\\Downloads\\transcripts" transcripts enhanced'
+        )
         sys.exit(1)
 
     evaluate_batch(sys.argv[1], sys.argv[2], sys.argv[3])
 
+
 if __name__ == "__main__":
     main()
-

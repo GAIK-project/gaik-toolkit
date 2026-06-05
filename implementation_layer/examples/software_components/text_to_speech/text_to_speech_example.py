@@ -10,7 +10,7 @@ def main() -> None:
     result = tts.synthesize(
         "Tama on GAIKin tekstista puheeksi -esimerkki. Talla komponentilla voi tuottaa puhetta suomeksi tai englanniksi.",
         language="fi",
-        voice="marin"
+        voice="marin",
     )
 
     output_dir = Path("output")

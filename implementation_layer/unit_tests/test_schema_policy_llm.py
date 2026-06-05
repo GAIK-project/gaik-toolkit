@@ -68,7 +68,6 @@ FIELDS:
 """
 
 
-
 def test_finnish_incident_report_schema():
     """Parse the Finnish incident report task and verify the generated model."""
     print("\n" + "=" * 80)

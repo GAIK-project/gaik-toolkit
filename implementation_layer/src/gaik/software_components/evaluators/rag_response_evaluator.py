@@ -80,7 +80,9 @@ class CorrectnessScore(BaseModel):
         )
     )
     coverage_score: Literal[0, 1, 2, 3] = Field(description="Coverage score 0-3 (see rubric)")
-    contradiction_score: Literal[0, 1, 2] = Field(description="Contradiction score 0-2 (see rubric)")
+    contradiction_score: Literal[0, 1, 2] = Field(
+        description="Contradiction score 0-2 (see rubric)"
+    )
     relevance_score: Literal[0, 1, 2] = Field(description="Relevance score 0-2 (see rubric)")
     precision_score: Literal[0, 1, 2] = Field(description="Precision score 0-2 (see rubric)")
     overall_score: Literal[0, 1, 2, 3, 4] = Field(
@@ -489,9 +491,7 @@ def _score_distributions(result: RAGResponseEvalResult):
     systems = [a.system for a in result.per_system]
     dims = list(spec.score_fields.keys())
     n_sys, n_dim = len(systems), len(dims)
-    fig, axes = plt.subplots(
-        n_sys, n_dim, figsize=(2.6 * n_dim, 2.2 * n_sys), squeeze=False
-    )
+    fig, axes = plt.subplots(n_sys, n_dim, figsize=(2.6 * n_dim, 2.2 * n_sys), squeeze=False)
     for r, system in enumerate(systems):
         for c, dim in enumerate(dims):
             ax = axes[r][c]
@@ -518,9 +518,7 @@ def _per_system_means(result: RAGResponseEvalResult):
     spec = result.spec
     systems = [a.system for a in result.per_system]
     dims = list(spec.score_fields.keys())
-    data = np.array(
-        [[a.norms.get(d, math.nan) for d in dims] for a in result.per_system]
-    )
+    data = np.array([[a.norms.get(d, math.nan) for d in dims] for a in result.per_system])
     x = np.arange(len(dims))
     width = max(0.8 / max(len(systems), 1), 0.12)
     fig, ax = plt.subplots(figsize=(1.4 * len(dims) + 2, 4))
@@ -629,8 +627,9 @@ def _pairwise_win_matrix(result: RAGPairwiseEvalResult):
     for i in range(n):
         for j in range(n):
             if not np.isnan(matrix[i, j]):
-                ax.text(j, i, f"{matrix[i, j]:.2f}", ha="center", va="center",
-                        color="black", fontsize=8)
+                ax.text(
+                    j, i, f"{matrix[i, j]:.2f}", ha="center", va="center", color="black", fontsize=8
+                )
     ax.set_title("Pairwise win rate: row A vs col B")
     fig.colorbar(im, ax=ax, shrink=0.7, label="P(A wins)")
     fig.tight_layout()
@@ -693,9 +692,7 @@ def _wilson_ci(p: np.ndarray, n: np.ndarray, z: float = 1.96) -> tuple[np.ndarra
     safe_n = np.where(n > 0, n, 1)
     denom = 1 + z**2 / safe_n
     centre = (p + z**2 / (2 * safe_n)) / denom
-    margin = (
-        z * np.sqrt(p * (1 - p) / safe_n + z**2 / (4 * safe_n**2)) / denom
-    )
+    margin = z * np.sqrt(p * (1 - p) / safe_n + z**2 / (4 * safe_n**2)) / denom
     lo = np.clip(centre - margin, 0, 1)
     hi = np.clip(centre + margin, 0, 1)
     lo = np.where(n > 0, lo, p)
@@ -762,7 +759,7 @@ class RAGResponseEvaluator:
                 last_error = e
                 logger.warning("Judge attempt %d/%d failed: %s", attempt + 1, self.retry_count, e)
                 if attempt < self.retry_count - 1:
-                    time.sleep(self.retry_backoff_base ** attempt)
+                    time.sleep(self.retry_backoff_base**attempt)
         raise RuntimeError(
             f"Judge failed after {self.retry_count} attempts: {last_error}"
         ) from last_error
@@ -787,7 +784,7 @@ class RAGResponseEvaluator:
                 last_error = e
                 logger.warning("Judge attempt %d/%d failed: %s", attempt + 1, self.retry_count, e)
                 if attempt < self.retry_count - 1:
-                    await asyncio.sleep(self.retry_backoff_base ** attempt)
+                    await asyncio.sleep(self.retry_backoff_base**attempt)
         raise RuntimeError(
             f"Judge failed after {self.retry_count} attempts: {last_error}"
         ) from last_error
@@ -809,9 +806,7 @@ class RAGResponseEvaluator:
         if candidate_cols is None:
             candidate_cols = [c for c in df.columns if c.endswith("_response")]
         if not candidate_cols:
-            raise ValueError(
-                "No candidate columns supplied and no '*_response' columns found."
-            )
+            raise ValueError("No candidate columns supplied and no '*_response' columns found.")
         for col in (question_col, reference_col, *candidate_cols):
             if col not in df.columns:
                 raise ValueError(f"Column '{col}' missing from DataFrame")
@@ -849,13 +844,23 @@ class RAGResponseEvaluator:
         else:
             asyncio.run(
                 self._evaluate_referenced_async(
-                    df, scored_df, pending, question_col, reference_col, total, t0, on_progress,
+                    df,
+                    scored_df,
+                    pending,
+                    question_col,
+                    reference_col,
+                    total,
+                    t0,
+                    on_progress,
                 )
             )
 
         aggregates = [_aggregate_referenced(scored_df, col, spec) for col in candidate_cols]
         return RAGResponseEvalResult(
-            scored_df=scored_df, per_system=aggregates, spec=spec, duration_s=time.time() - t0,
+            scored_df=scored_df,
+            per_system=aggregates,
+            spec=spec,
+            duration_s=time.time() - t0,
         )
 
     async def _evaluate_referenced_async(
@@ -953,14 +958,23 @@ class RAGResponseEvaluator:
             else:
                 asyncio.run(
                     self._evaluate_pairwise_async(
-                        comp_df, pending, swap_and_average, rng, total, t0, on_progress,
+                        comp_df,
+                        pending,
+                        swap_and_average,
+                        rng,
+                        total,
+                        t0,
+                        on_progress,
                     )
                 )
 
         comp_df_out = comp_df.drop(columns=["_resp_a", "_resp_b"])
         ranking = _aggregate_pairwise(comp_df_out, candidate_cols, spec)
         return RAGPairwiseEvalResult(
-            comparisons_df=comp_df_out, ranking=ranking, spec=spec, duration_s=time.time() - t0,
+            comparisons_df=comp_df_out,
+            ranking=ranking,
+            spec=spec,
+            duration_s=time.time() - t0,
         )
 
     async def _evaluate_pairwise_async(
@@ -1005,13 +1019,15 @@ class RAGResponseEvaluator:
         flip_first = rng.random() < 0.5
         first_a, first_b = (resp_b, resp_a) if flip_first else (resp_a, resp_b)
         v1 = self._judge_once(
-            _pairwise_messages(spec.system_prompt, question, first_a, first_b), spec.schema,
+            _pairwise_messages(spec.system_prompt, question, first_a, first_b),
+            spec.schema,
         )
         v1_canon = _canonicalize_verdict(v1, spec, flipped=flip_first)
         if not swap_and_average:
             return _build_outcome(v1_canon, None, spec)
         v2 = self._judge_once(
-            _pairwise_messages(spec.system_prompt, question, resp_b, resp_a), spec.schema,
+            _pairwise_messages(spec.system_prompt, question, resp_b, resp_a),
+            spec.schema,
         )
         v2_canon = _canonicalize_verdict(v2, spec, flipped=True)
         return _build_outcome(v1_canon, v2_canon, spec)
@@ -1061,9 +1077,7 @@ class RAGResponseEvaluator:
             _summary_referenced_csv(result).to_csv(out / "rag_eval_summary.csv", index=False)
         else:
             result.comparisons_df.to_csv(out / "rag_eval_pairwise.csv", index=False)
-            _summary_pairwise_csv(result).to_csv(
-                out / "rag_eval_pairwise_ranking.csv", index=False
-            )
+            _summary_pairwise_csv(result).to_csv(out / "rag_eval_pairwise_ranking.csv", index=False)
         if write_plots:
             figs = self.plots(result)
             for name, fig in figs.items():
@@ -1117,9 +1131,7 @@ def _referenced_messages(
     return [{"role": "system", "content": system_prompt}, {"role": "user", "content": user}]
 
 
-def _pairwise_messages(
-    system_prompt: str, question: str, resp_a: str, resp_b: str
-) -> list[dict]:
+def _pairwise_messages(system_prompt: str, question: str, resp_a: str, resp_b: str) -> list[dict]:
     user = (
         f"User question:\n<question>\n{question}\n</question>\n\n"
         f"Response A:\n<response_a>\n{resp_a}\n</response_a>\n\n"
@@ -1141,24 +1153,28 @@ def _canonicalize_verdict(
     winner = getattr(verdict, spec.winner_field)
     confidence = getattr(verdict, spec.confidence_field)
     reason = getattr(verdict, spec.reason_field)
-    summary_text = " | ".join(
-        f"[{f}] {getattr(verdict, f, '')}" for f in spec.summary_fields
-    )
+    summary_text = " | ".join(f"[{f}] {getattr(verdict, f, '')}" for f in spec.summary_fields)
     if flipped:
         winner = {"A": "B", "B": "A", "tie": "tie"}[winner]
         aspect_a, aspect_b = aspect_second, aspect_first
     else:
         aspect_a, aspect_b = aspect_first, aspect_second
     return _CanonVerdict(
-        winner=winner, confidence=confidence, aspect_a=aspect_a, aspect_b=aspect_b,
-        reason=reason, summary_text=summary_text,
+        winner=winner,
+        confidence=confidence,
+        aspect_a=aspect_a,
+        aspect_b=aspect_b,
+        reason=reason,
+        summary_text=summary_text,
     )
 
 
 def _build_outcome(v1: _CanonVerdict, v2: _CanonVerdict | None, spec: PairwiseSpec) -> _PairOutcome:
     if v2 is None:
         return _PairOutcome(
-            winner=v1.winner, confidence=v1.confidence, swap_consistent=True,
+            winner=v1.winner,
+            confidence=v1.confidence,
+            swap_consistent=True,
             aspect_a={k: float(v) for k, v in v1.aspect_a.items()},
             aspect_b={k: float(v) for k, v in v1.aspect_b.items()},
             reason=f"{v1.summary_text} | [reason] {v1.reason}",
@@ -1173,8 +1189,12 @@ def _build_outcome(v1: _CanonVerdict, v2: _CanonVerdict | None, spec: PairwiseSp
         else f"Disagreement under swap: '{v1.reason}' vs '{v2.reason}'"
     )
     return _PairOutcome(
-        winner=winner, confidence=v1.confidence if swap_consistent else "low",
-        swap_consistent=swap_consistent, aspect_a=aspect_a, aspect_b=aspect_b, reason=reason,
+        winner=winner,
+        confidence=v1.confidence if swap_consistent else "low",
+        swap_consistent=swap_consistent,
+        aspect_a=aspect_a,
+        aspect_b=aspect_b,
+        reason=reason,
     )
 
 
@@ -1182,7 +1202,10 @@ def _build_outcome(v1: _CanonVerdict, v2: _CanonVerdict | None, spec: PairwiseSp
 
 
 def _validate_referenced(
-    df: pd.DataFrame, question_col: str, reference_col: str, candidate_cols: list[str],
+    df: pd.DataFrame,
+    question_col: str,
+    reference_col: str,
+    candidate_cols: list[str],
 ) -> None:
     if df[question_col].duplicated().any():
         dups = df.loc[df[question_col].duplicated(), question_col].head(3).tolist()
@@ -1203,13 +1226,14 @@ def _validate_referenced(
         short = df[col].astype(str).str.len() < MIN_RESPONSE_CHARS
         if short.any():
             logger.warning(
-                "%s: %d response(s) shorter than %d chars", col, int(short.sum()), MIN_RESPONSE_CHARS,
+                "%s: %d response(s) shorter than %d chars",
+                col,
+                int(short.sum()),
+                MIN_RESPONSE_CHARS,
             )
 
 
-def _validate_pairwise(
-    df: pd.DataFrame, question_col: str, candidate_cols: list[str]
-) -> None:
+def _validate_pairwise(df: pd.DataFrame, question_col: str, candidate_cols: list[str]) -> None:
     if df[question_col].duplicated().any():
         dups = df.loc[df[question_col].duplicated(), question_col].head(3).tolist()
         raise ValueError(f"Duplicate questions: {dups}")
@@ -1234,7 +1258,11 @@ def _init_scored_df(
     score_fields: list[str],
     resume_from: pd.DataFrame | None,
 ) -> pd.DataFrame:
-    scored = resume_from.copy() if (resume_from is not None and len(resume_from) == len(df)) else df.copy()
+    scored = (
+        resume_from.copy()
+        if (resume_from is not None and len(resume_from) == len(df))
+        else df.copy()
+    )
     for col in candidate_cols:
         for field_name in score_fields:
             colname = f"{col}_{field_name}"
@@ -1246,7 +1274,11 @@ def _init_scored_df(
 
 
 def _write_referenced_row(
-    scored_df: pd.DataFrame, idx: int, col: str, verdict: BaseModel, spec: ScoringSpec,
+    scored_df: pd.DataFrame,
+    idx: int,
+    col: str,
+    verdict: BaseModel,
+    spec: ScoringSpec,
 ) -> None:
     for field_name in spec.score_fields:
         scored_df.at[idx, f"{col}_{field_name}"] = int(getattr(verdict, field_name))
@@ -1286,7 +1318,12 @@ def _aggregate_referenced(
             divergence = float((overall_series - comp_series).abs().mean())
 
     return RAGResponseAggregate(
-        system=col, n=n, means=means, norms=norms, composite=composite, divergence=divergence,
+        system=col,
+        n=n,
+        means=means,
+        norms=norms,
+        composite=composite,
+        divergence=divergence,
         constraint_violations=_count_constraint_violations(sub, col, spec),
     )
 
@@ -1301,18 +1338,33 @@ def _count_constraint_violations(sub: pd.DataFrame, col: str, spec: ScoringSpec)
     violations = 0
     for idx in sub.index[(sub[rel_col] == 0) & (sub[ov_col] > 1)]:
         violations += 1
-        logger.warning("Constraint violation [%s] row %s: relevance=0 but overall=%s", col, idx, sub.at[idx, ov_col])
+        logger.warning(
+            "Constraint violation [%s] row %s: relevance=0 but overall=%s",
+            col,
+            idx,
+            sub.at[idx, ov_col],
+        )
     for idx in sub.index[(sub[con_col] == 0) & (sub[ov_col] > 2)]:
         violations += 1
-        logger.warning("Constraint violation [%s] row %s: contradiction=0 but overall=%s", col, idx, sub.at[idx, ov_col])
+        logger.warning(
+            "Constraint violation [%s] row %s: contradiction=0 but overall=%s",
+            col,
+            idx,
+            sub.at[idx, ov_col],
+        )
     return violations
 
 
 def _summary_referenced_csv(result: RAGResponseEvalResult) -> pd.DataFrame:
     rows = []
     for agg in result.per_system:
-        row = {"system": agg.system, "n": agg.n, "composite": agg.composite,
-               "divergence": agg.divergence, "constraint_violations": agg.constraint_violations}
+        row = {
+            "system": agg.system,
+            "n": agg.n,
+            "composite": agg.composite,
+            "divergence": agg.divergence,
+            "constraint_violations": agg.constraint_violations,
+        }
         for k, v in agg.means.items():
             row[f"mean_{k}"] = v
         for k, v in agg.norms.items():
@@ -1342,8 +1394,17 @@ def _init_pairwise_df(
     ):
         prior = resume_from.set_index(["question", "system_a", "system_b"]).copy()
 
-    base_cols = ["question", "system_a", "system_b", "winner", "confidence",
-                 "swap_consistent", "reason", "_resp_a", "_resp_b"]
+    base_cols = [
+        "question",
+        "system_a",
+        "system_b",
+        "winner",
+        "confidence",
+        "swap_consistent",
+        "reason",
+        "_resp_a",
+        "_resp_b",
+    ]
     aspect_cols = [f"{a}_a" for a in spec.aspect_fields] + [f"{a}_b" for a in spec.aspect_fields]
 
     rows: list[dict[str, Any]] = []
@@ -1351,20 +1412,29 @@ def _init_pairwise_df(
         q = row[question_col]
         for a, b in pairs:
             entry: dict[str, Any] = {
-                "question": q, "system_a": a, "system_b": b,
-                "winner": pd.NA, "confidence": pd.NA, "swap_consistent": pd.NA,
-                "reason": pd.NA, "_resp_a": row[a], "_resp_b": row[b],
+                "question": q,
+                "system_a": a,
+                "system_b": b,
+                "winner": pd.NA,
+                "confidence": pd.NA,
+                "swap_consistent": pd.NA,
+                "reason": pd.NA,
+                "_resp_a": row[a],
+                "_resp_b": row[b],
                 **{ac: pd.NA for ac in aspect_cols},
             }
             if prior is not None and (q, a, b) in prior.index:
                 pr = prior.loc[(q, a, b)]
                 if pd.notna(pr.get("winner", pd.NA)):
-                    entry.update({
-                        "winner": pr["winner"], "confidence": pr.get("confidence", pd.NA),
-                        "swap_consistent": pr.get("swap_consistent", pd.NA),
-                        "reason": pr.get("reason", pd.NA),
-                        **{ac: pr[ac] for ac in aspect_cols if ac in pr},
-                    })
+                    entry.update(
+                        {
+                            "winner": pr["winner"],
+                            "confidence": pr.get("confidence", pd.NA),
+                            "swap_consistent": pr.get("swap_consistent", pd.NA),
+                            "reason": pr.get("reason", pd.NA),
+                            **{ac: pr[ac] for ac in aspect_cols if ac in pr},
+                        }
+                    )
             rows.append(entry)
     return pd.DataFrame(rows, columns=base_cols + aspect_cols)
 
@@ -1386,8 +1456,13 @@ def _aggregate_pairwise(
 ) -> list[PairwiseRanking]:
     """Pool wins/losses/ties + per-aspect means per system."""
     stats: dict[str, dict[str, Any]] = {
-        s: {"wins": 0, "losses": 0, "ties": 0,
-            "aspect_sums": {a: 0.0 for a in spec.aspect_fields}, "aspect_counts": 0}
+        s: {
+            "wins": 0,
+            "losses": 0,
+            "ties": 0,
+            "aspect_sums": {a: 0.0 for a in spec.aspect_fields},
+            "aspect_counts": 0,
+        }
         for s in candidate_cols
     }
     for _, row in comp_df[comp_df["winner"].notna()].iterrows():
@@ -1415,22 +1490,33 @@ def _aggregate_pairwise(
         avg_score = (s["wins"] - s["losses"]) / n_comp if n_comp else math.nan
         aspect_means = (
             {a: s["aspect_sums"][a] / s["aspect_counts"] for a in spec.aspect_fields}
-            if s["aspect_counts"] else {a: math.nan for a in spec.aspect_fields}
+            if s["aspect_counts"]
+            else {a: math.nan for a in spec.aspect_fields}
         )
-        rankings.append(PairwiseRanking(
-            system=system, wins=s["wins"], losses=s["losses"], ties=s["ties"],
-            win_rate=win_rate, avg_score=avg_score, aspect_means=aspect_means, rank=0,
-        ))
+        rankings.append(
+            PairwiseRanking(
+                system=system,
+                wins=s["wins"],
+                losses=s["losses"],
+                ties=s["ties"],
+                win_rate=win_rate,
+                avg_score=avg_score,
+                aspect_means=aspect_means,
+                rank=0,
+            )
+        )
 
     def _aspect_avg(r: PairwiseRanking) -> float:
         vals = [v for v in r.aspect_means.values() if not math.isnan(v)]
         return sum(vals) / len(vals) if vals else 0.0
 
-    rankings.sort(key=lambda r: (
-        -(r.win_rate if not math.isnan(r.win_rate) else -1),
-        -_aspect_avg(r),
-        -(r.avg_score if not math.isnan(r.avg_score) else -1),
-    ))
+    rankings.sort(
+        key=lambda r: (
+            -(r.win_rate if not math.isnan(r.win_rate) else -1),
+            -_aspect_avg(r),
+            -(r.avg_score if not math.isnan(r.avg_score) else -1),
+        )
+    )
     for i, r in enumerate(rankings):
         r.rank = i + 1
     return rankings
@@ -1439,8 +1525,15 @@ def _aggregate_pairwise(
 def _summary_pairwise_csv(result: RAGPairwiseEvalResult) -> pd.DataFrame:
     rows = []
     for r in result.ranking:
-        row = {"rank": r.rank, "system": r.system, "wins": r.wins, "losses": r.losses,
-               "ties": r.ties, "win_rate": r.win_rate, "avg_score": r.avg_score}
+        row = {
+            "rank": r.rank,
+            "system": r.system,
+            "wins": r.wins,
+            "losses": r.losses,
+            "ties": r.ties,
+            "win_rate": r.win_rate,
+            "avg_score": r.avg_score,
+        }
         for k, v in r.aspect_means.items():
             row[f"mean_{k}"] = v
         rows.append(row)
@@ -1459,4 +1552,8 @@ def _emit(
     **detail: Any,
 ) -> None:
     if cb:
-        cb(ProgressEvent(mode=mode, done=done, total=total, elapsed_s=time.time() - t0, detail=detail))
+        cb(
+            ProgressEvent(
+                mode=mode, done=done, total=total, elapsed_s=time.time() - t0, detail=detail
+            )
+        )

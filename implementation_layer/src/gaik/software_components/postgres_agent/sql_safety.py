@@ -13,8 +13,7 @@ try:
     from sqlglot import exp
 except ImportError as exc:
     raise ImportError(
-        "postgres_agent requires 'sqlglot'. "
-        "Install extras with 'pip install gaik[postgres-agent]'"
+        "postgres_agent requires 'sqlglot'. Install extras with 'pip install gaik[postgres-agent]'"
     ) from exc
 
 
@@ -71,9 +70,7 @@ def validate_read_only(
 
     statements = [s for s in parsed if s is not None]
     if len(statements) != 1:
-        raise UnsafeSQLError(
-            f"Expected exactly one SQL statement, found {len(statements)}."
-        )
+        raise UnsafeSQLError(f"Expected exactly one SQL statement, found {len(statements)}.")
     statement = statements[0]
 
     if not isinstance(statement, (exp.Select, exp.Union)):
@@ -95,13 +92,9 @@ def validate_read_only(
         schema = table.db or ""
         catalog = table.catalog or ""
         if catalog:
-            raise UnsafeSQLError(
-                f"Cross-database references are not allowed ('{catalog}')."
-            )
+            raise UnsafeSQLError(f"Cross-database references are not allowed ('{catalog}').")
         if schema and schema.lower() != schema_name.lower():
-            raise UnsafeSQLError(
-                f"Cross-schema reference is not allowed: '{schema}.{name}'."
-            )
+            raise UnsafeSQLError(f"Cross-schema reference is not allowed: '{schema}.{name}'.")
         if not schema and name in cte_names:
             continue
         if allowed is not None and name and name not in allowed:

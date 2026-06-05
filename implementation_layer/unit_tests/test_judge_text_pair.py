@@ -32,9 +32,7 @@ def test_parse_text_judgement_clean_json():
 
 def test_parse_text_judgement_with_markdown_fence():
     raw = (
-        "```json\n"
-        '{"equivalent": false, "severity": "wrong", "score": 1, "reason": "diverges"}\n'
-        "```"
+        '```json\n{"equivalent": false, "severity": "wrong", "score": 1, "reason": "diverges"}\n```'
     )
     eq, sev, sc, reason = parse_text_judgement(raw)
     assert eq is False
@@ -101,9 +99,7 @@ def test_judge_text_pair_both_empty_raises():
 
 def test_judge_text_pair_returns_text_judgement():
     judge = LLMJudge(model_provider="azure")
-    fake_response = (
-        '{"equivalent": true, "severity": "ok", "score": 5, "reason": "match"}'
-    )
+    fake_response = '{"equivalent": true, "severity": "ok", "score": 5, "reason": "match"}'
     with patch.object(
         judge,
         "_dispatch_text",
@@ -207,9 +203,7 @@ def test_extraction_evaluator_semantic_mode_dataset_path():
             usage=MagicMock(),
         ),
     ):
-        result = evaluator.evaluate_dataset(
-            dataset, [{"x": "alpha-prime"}, {"x": "beta-2"}]
-        )
+        result = evaluator.evaluate_dataset(dataset, [{"x": "alpha-prime"}, {"x": "beta-2"}])
 
     # Both items judged equivalent, so aggregate F1 should be 1.0.
     assert result.aggregate.f1 == 1.0

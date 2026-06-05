@@ -356,16 +356,13 @@ class JudgeBenchmarkHarness:
             build_user_prompt(row["question"], row["response_b"], row["response_a"]),
         )
         winner_swapped, sa_swapped, sb_swapped, reason2 = _parse(raw2)
-        winner2 = (
-            "b" if winner_swapped == "a" else "a" if winner_swapped == "b" else "tie"
-        )
+        winner2 = "b" if winner_swapped == "a" else "a" if winner_swapped == "b" else "tie"
         sa2, sb2 = sb_swapped, sa_swapped
 
         consistent = winner1 == winner2
         winner_final = winner1 if consistent else "tie"
         reason_final = (
-            reason1 if consistent
-            else f"Disagreement under swap: '{reason1}' vs '{reason2}'"
+            reason1 if consistent else f"Disagreement under swap: '{reason1}' vs '{reason2}'"
         )
 
         return PairResult(
@@ -435,9 +432,7 @@ class JudgeBenchmarkHarness:
             system=system,
             messages=[{"role": "user", "content": user}],
         )
-        text = "".join(
-            block.text for block in resp.content if getattr(block, "type", "") == "text"
-        )
+        text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
         return text, resp.usage.input_tokens, resp.usage.output_tokens
 
     def _call_google(self, system: str, user: str) -> tuple[str, int, int]:
@@ -451,9 +446,7 @@ class JudgeBenchmarkHarness:
                 location=os.environ.get("GOOGLE_VERTEXAI_LOCATION", "global"),
             )
         else:
-            api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get(
-                "GOOGLE_API_KEY"
-            )
+            api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
             if not api_key:
                 raise RuntimeError("Set GOOGLE_VERTEXAI_PROJECT or GOOGLE_GEMINI_API_KEY")
             client = genai.Client(api_key=api_key)
@@ -545,8 +538,8 @@ def _print_leaderboard(report: BenchmarkReport) -> None:
     for s in report.prompts:
         print(
             f"{s.prompt:<10} "
-            f"{s.accuracy*100:>8.1f} % "
-            f"{s.position_bias_rate*100:>13.1f} % "
+            f"{s.accuracy * 100:>8.1f} % "
+            f"{s.position_bias_rate * 100:>13.1f} % "
             f"{s.mean_cost_usd:>10.4f} $ "
             f"{s.mean_duration_s:>12.2f} s"
         )
@@ -572,7 +565,7 @@ def _leaderboard_md(report: BenchmarkReport) -> str:
     ]
     for s in report.prompts:
         lines.append(
-            f"| `{s.prompt}` | {s.accuracy*100:.1f}% | {s.position_bias_rate*100:.1f}% | "
+            f"| `{s.prompt}` | {s.accuracy * 100:.1f}% | {s.position_bias_rate * 100:.1f}% | "
             f"{s.ties} | {s.mean_cost_usd:.4f} | {s.mean_duration_s:.2f} |"
         )
     lines.append("")
@@ -614,9 +607,7 @@ def main() -> int:
     args = parser.parse_args()
 
     print(f"Loading JudgeBench split={args.split} (n={args.n}) ...")
-    rows, dataset_name, split = JudgeBenchmarkHarness.load_judgebench(
-        n=args.n, split=args.split
-    )
+    rows, dataset_name, split = JudgeBenchmarkHarness.load_judgebench(n=args.n, split=args.split)
     print(f"Loaded {len(rows)} rows from {dataset_name}.")
 
     bench = JudgeBenchmarkHarness(provider=args.provider, model=args.model)

@@ -1,7 +1,7 @@
 """Standalone schema generation example.
 
 This example uses SchemaGenerator to output a reusable Pydantic schema plus requirements
-metadata that another component can use later for extraction. 
+metadata that another component can use later for extraction.
 It contains the examples of several task requirements.
 """
 
@@ -28,7 +28,6 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 # - a Pydantic model class
 # - requirements metadata used for post-processing/normalization
 # Several extraction task descriptions to test
-
 
 
 TASK = """
@@ -78,7 +77,6 @@ For each line item, extract these scalar fields:
 # """
 
 
-
 # TASK = """
 # The task is to extract key fields from customer documents (Purchase Order (PO) and Bill of
 # Material (BOM)), and align them so that each PO item is enriched with the correct technical
@@ -97,7 +95,6 @@ For each line item, extract these scalar fields:
 # Also extract the following header information from the PO: Order Date, Buyer, Sales Person,
 # Shipping Address, Payment Terms.
 # """
-
 
 
 # TASK = """
@@ -141,7 +138,7 @@ For each line item, extract these scalar fields:
 # - Tracking number
 # - Recipient name
 # - Recipient address
-# - Package count 
+# - Package count
 # - Weight (text string including the unit, e.g. "18.5 kg")
 # - Service level (Standard, Express, or Overnight)
 # - Fragile (yes/no)
@@ -245,6 +242,7 @@ For each line item, extract these scalar fields:
 # - Use an empty string for missing or unreadable values.
 # """
 
+
 def _annotation_repr(annotation) -> str:
     """Return a Python source representation for common Pydantic field types."""
     origin = get_origin(annotation)
@@ -339,9 +337,7 @@ def save_schema_to_python(model: type[BaseModel], path: Path) -> None:
 
             annotation = _annotation_repr(field.annotation)
             if field_args:
-                lines.append(
-                    f"    {field_name}: {annotation} = Field({', '.join(field_args)})"
-                )
+                lines.append(f"    {field_name}: {annotation} = Field({', '.join(field_args)})")
             else:
                 lines.append(f"    {field_name}: {annotation}")
 

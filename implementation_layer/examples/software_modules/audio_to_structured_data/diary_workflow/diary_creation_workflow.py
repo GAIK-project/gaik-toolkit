@@ -49,6 +49,7 @@ def create_pdf_report(extracted_fields: list[dict]) -> Path | None:
         print(f"Failed to generate PDF: {exc}")
         return None
 
+
 USER_REQUIREMENTS = """
     The task is to extract all the required fields needed for the official Työmaapäiväkirja (daily construction site diary) 
     from the transcript of an audio recorded by a construction site supervisor who verbally describes the day's events on the 
@@ -81,6 +82,7 @@ USER_REQUIREMENTS = """
     20. Vastaavan allekirjoitus
 """
 
+
 def main() -> None:
     extract_options = {"generate_schema": False}
     generate_schema = extract_options.pop("generate_schema", True)
@@ -88,7 +90,11 @@ def main() -> None:
 
     pipeline = AudioToStructuredData(use_azure=True)
 
-    existing = None if generate_schema else pipeline.load_schema(Path(__file__).parent / "schema", schema_name)
+    existing = (
+        None
+        if generate_schema
+        else pipeline.load_schema(Path(__file__).parent / "schema", schema_name)
+    )
     schema = requirements = None
     if existing:
         schema, requirements = existing
@@ -102,9 +108,12 @@ def main() -> None:
     )
 
     if result.schema and result.requirements and generate_schema:
-        pipeline.save_schema(result.schema, result.requirements, Path(__file__).parent / "schema", schema_name)
+        pipeline.save_schema(
+            result.schema, result.requirements, Path(__file__).parent / "schema", schema_name
+        )
 
     create_pdf_report(result.extracted_fields)
+
 
 if __name__ == "__main__":
     main()

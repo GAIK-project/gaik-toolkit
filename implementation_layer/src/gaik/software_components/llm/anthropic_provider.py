@@ -52,10 +52,14 @@ class AnthropicProvider:
         params.update(kwargs)
         response = self.raw.messages.create(**params)
         text_blocks = [b.text for b in response.content if getattr(b, "type", None) == "text"]
-        usage = {
-            "prompt_tokens": getattr(response.usage, "input_tokens", 0),
-            "completion_tokens": getattr(response.usage, "output_tokens", 0),
-        } if getattr(response, "usage", None) else {}
+        usage = (
+            {
+                "prompt_tokens": getattr(response.usage, "input_tokens", 0),
+                "completion_tokens": getattr(response.usage, "output_tokens", 0),
+            }
+            if getattr(response, "usage", None)
+            else {}
+        )
         return ChatResponse(
             text="".join(text_blocks),
             model=response.model,
@@ -74,7 +78,9 @@ class AnthropicProvider:
         tool_name = response_format.__name__
         tool = {
             "name": tool_name,
-            "description": (response_format.__doc__ or f"Return data matching {tool_name}.").strip(),
+            "description": (
+                response_format.__doc__ or f"Return data matching {tool_name}."
+            ).strip(),
             "input_schema": schema,
         }
         system, rest = self._split_system(messages)
@@ -92,13 +98,9 @@ class AnthropicProvider:
         for block in response.content:
             if getattr(block, "type", None) == "tool_use" and block.name == tool_name:
                 return response_format.model_validate(block.input)
-        raise ValueError(
-            f"Anthropic response did not return tool_use for '{tool_name}'."
-        )
+        raise ValueError(f"Anthropic response did not return tool_use for '{tool_name}'.")
 
-    def chat_stream(
-        self, messages: list[ChatMessage], **kwargs: Any
-    ) -> Iterator[str]:
+    def chat_stream(self, messages: list[ChatMessage], **kwargs: Any) -> Iterator[str]:
         system, rest = self._split_system(messages)
         params: dict[str, Any] = {
             "model": kwargs.pop("model", self.model),

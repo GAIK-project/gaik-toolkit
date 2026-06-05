@@ -79,8 +79,7 @@ class UralicNLPBackend(LemmatizationBackend):
             from uralicNLP import uralicApi  # type: ignore[import-not-found]
         except ImportError as exc:  # pragma: no cover - import error path
             raise ImportError(
-                "UralicNLPBackend requires uralicNLP. "
-                "Install with: pip install gaik[finnish-rag]"
+                "UralicNLPBackend requires uralicNLP. Install with: pip install gaik[finnish-rag]"
             ) from exc
         # Ensure the Finnish model is downloaded (no-op if already present).
         try:
@@ -121,15 +120,13 @@ class SpacyBackend(LemmatizationBackend):
             import spacy  # type: ignore[import-not-found]
         except ImportError as exc:  # pragma: no cover - import error path
             raise ImportError(
-                "SpacyBackend requires spacy. "
-                "Install with: pip install gaik[finnish-rag]"
+                "SpacyBackend requires spacy. Install with: pip install gaik[finnish-rag]"
             ) from exc
         try:
             self._nlp = spacy.load(model, disable=["parser", "ner"])
         except OSError as exc:
             raise ImportError(
-                f"spaCy model '{model}' is not installed. "
-                f"Run: python -m spacy download {model}"
+                f"spaCy model '{model}' is not installed. Run: python -m spacy download {model}"
             ) from exc
         self._stopwords = DEFAULT_FINNISH_STOPWORDS
 

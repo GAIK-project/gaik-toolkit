@@ -14,7 +14,6 @@ Usage:
   python scr/translation_evaluation.py
 """
 
-
 import csv
 from pathlib import Path
 import numpy as np
@@ -27,33 +26,36 @@ from sentence_transformers import SentenceTransformer
 from rapidfuzz import process, fuzz
 
 import spacy as _spacy
+
 _nlp = _spacy.load("en_core_web_sm")
+
 
 def clean_text_translation(text: str) -> str:
     return " ".join([t.lemma_ for t in _nlp(text) if t.is_alpha])
 
+
 # 1. USER CONFIG
-_BASE                = Path(__file__).parent.parent
-REFERENCE_FOLDER     = _BASE / "data/ground_truth"
-TOOL_RESULTS_FOLDER  = _BASE / "data/translation_results"  # subfolders = one model each
-OUTPUT_FOLDER        = _BASE / "evaluation_results"
+_BASE = Path(__file__).parent.parent
+REFERENCE_FOLDER = _BASE / "data/ground_truth"
+TOOL_RESULTS_FOLDER = _BASE / "data/translation_results"  # subfolders = one model each
+OUTPUT_FOLDER = _BASE / "evaluation_results"
 
-TARGET_MODELS        = []  
-
+TARGET_MODELS = []
 
 
 # 2. helper function to match fuzzy filenames
 
+
 def _fuzzy_match_filename(target_name: str, candidate_paths: list) -> Path:
     """
-    Given a ground truth filename (e.g. 'ABC_20210115_Final.txt'), 
+    Given a ground truth filename (e.g. 'ABC_20210115_Final.txt'),
     finds the best match in a list of Paths (e.g. 'ABCTranslated.txt').
     """
     candidate_names = [p.name for p in candidate_paths]
     # Use rapidfuzz to find the closest matching filename
     best_match_tuple = process.extractOne(target_name, candidate_names, scorer=fuzz.WRatio)
-    
-    if best_match_tuple and best_match_tuple[1] > 60: # Confidence threshold
+
+    if best_match_tuple and best_match_tuple[1] > 60:  # Confidence threshold
         best_match_name = best_match_tuple[0]
         for p in candidate_paths:
             if p.name == best_match_name:
@@ -61,7 +63,15 @@ def _fuzzy_match_filename(target_name: str, candidate_paths: list) -> Path:
     return None
 
 
-def evaluate_model(model_name: str, ref_dir: Path, hyp_dir: Path, txt_file, csv_writer, transformer_model, ter_metric):
+def evaluate_model(
+    model_name: str,
+    ref_dir: Path,
+    hyp_dir: Path,
+    txt_file,
+    csv_writer,
+    transformer_model,
+    ter_metric,
+):
     """Evaluates a single model against all ground truth files. Returns average scores dict or None."""
 
     ref_files = sorted(ref_dir.glob("*.txt"))
@@ -93,40 +103,47 @@ def evaluate_model(model_name: str, ref_dir: Path, hyp_dir: Path, txt_file, csv_
         with open(hyp_file, "r", encoding="utf-8") as f:
             hyp_text = f.read()
 
-        gt_clean  = clean_text_translation(gt_text)
+        gt_clean = clean_text_translation(gt_text)
         hyp_clean = clean_text_translation(hyp_text)
 
         if not gt_clean:
             print("skipped (empty after cleaning)")
             continue
 
-        gt_tokens  = gt_clean.split()
+        gt_tokens = gt_clean.split()
         hyp_tokens = hyp_clean.split()
-        smoothie   = SmoothingFunction().method4
-        bleu       = sentence_bleu([gt_tokens], hyp_tokens, smoothing_function=smoothie) * 100
-        chrf       = sentence_chrf(gt_clean, hyp_clean) * 100
-        ter        = ter_metric([hyp_clean], [[gt_clean]]).item() * 100
-        emb_gt     = transformer_model.encode(gt_clean)
-        emb_hyp    = transformer_model.encode(hyp_clean)
-        cos_sim    = (np.dot(emb_gt, emb_hyp) / (np.linalg.norm(emb_gt) * np.linalg.norm(emb_hyp))) * 100
+        smoothie = SmoothingFunction().method4
+        bleu = sentence_bleu([gt_tokens], hyp_tokens, smoothing_function=smoothie) * 100
+        chrf = sentence_chrf(gt_clean, hyp_clean) * 100
+        ter = ter_metric([hyp_clean], [[gt_clean]]).item() * 100
+        emb_gt = transformer_model.encode(gt_clean)
+        emb_hyp = transformer_model.encode(hyp_clean)
+        cos_sim = (
+            np.dot(emb_gt, emb_hyp) / (np.linalg.norm(emb_gt) * np.linalg.norm(emb_hyp))
+        ) * 100
 
         print(f"BLEU={bleu:.1f}  chrF={chrf:.1f}  TER={ter:.1f}  Cosine={cos_sim:.1f}")
 
         txt_file.write(
             f"{ref_file.name} | BLEU={bleu:.2f} | chrF={chrf:.2f} | TER={ter:.2f} | Cosine={cos_sim:.2f}\n"
         )
-        csv_writer.writerow({
-            "model": model_name, "file": ref_file.name,
-            "BLEU": round(bleu, 2), "chrF": round(chrf, 2),
-            "TER": round(ter, 2), "CosineSim": round(cos_sim, 2),
-            "type": "per_file"
-        })
+        csv_writer.writerow(
+            {
+                "model": model_name,
+                "file": ref_file.name,
+                "BLEU": round(bleu, 2),
+                "chrF": round(chrf, 2),
+                "TER": round(ter, 2),
+                "CosineSim": round(cos_sim, 2),
+                "type": "per_file",
+            }
+        )
 
         total_bleu += bleu
         total_chrf += chrf
-        total_ter  += ter
-        total_cos  += cos_sim
-        evaluated  += 1
+        total_ter += ter
+        total_cos += cos_sim
+        evaluated += 1
 
     if evaluated == 0:
         txt_file.write("No files evaluated.\n")
@@ -135,28 +152,42 @@ def evaluate_model(model_name: str, ref_dir: Path, hyp_dir: Path, txt_file, csv_
 
     avg_bleu = total_bleu / evaluated
     avg_chrf = total_chrf / evaluated
-    avg_ter  = total_ter  / evaluated
-    avg_cos  = total_cos  / evaluated
+    avg_ter = total_ter / evaluated
+    avg_cos = total_cos / evaluated
 
     txt_file.write(f"\n--- AVERAGE ({evaluated} files) ---\n")
-    txt_file.write(f"BLEU={avg_bleu:.2f}\nchrF={avg_chrf:.2f}\nTER={avg_ter:.2f}\nCosineSim={avg_cos:.2f}\n")
+    txt_file.write(
+        f"BLEU={avg_bleu:.2f}\nchrF={avg_chrf:.2f}\nTER={avg_ter:.2f}\nCosineSim={avg_cos:.2f}\n"
+    )
 
-    csv_writer.writerow({
-        "model": model_name, "file": "AVERAGE",
-        "BLEU": round(avg_bleu, 2), "chrF": round(avg_chrf, 2),
-        "TER": round(avg_ter, 2), "CosineSim": round(avg_cos, 2),
-        "type": "average"
-    })
+    csv_writer.writerow(
+        {
+            "model": model_name,
+            "file": "AVERAGE",
+            "BLEU": round(avg_bleu, 2),
+            "chrF": round(avg_chrf, 2),
+            "TER": round(avg_ter, 2),
+            "CosineSim": round(avg_cos, 2),
+            "type": "average",
+        }
+    )
 
-    print(f"  ─── Average: BLEU={avg_bleu:.2f}  chrF={avg_chrf:.2f}  TER={avg_ter:.2f}  Cosine={avg_cos:.2f}  ({evaluated}/{n_ref} files)")
-    return {"model": model_name, "BLEU": avg_bleu, "chrF": avg_chrf, "TER": avg_ter, "CosineSim": avg_cos}
-
+    print(
+        f"  ─── Average: BLEU={avg_bleu:.2f}  chrF={avg_chrf:.2f}  TER={avg_ter:.2f}  Cosine={avg_cos:.2f}  ({evaluated}/{n_ref} files)"
+    )
+    return {
+        "model": model_name,
+        "BLEU": avg_bleu,
+        "chrF": avg_chrf,
+        "TER": avg_ter,
+        "CosineSim": avg_cos,
+    }
 
 
 def main():
-    ref_dir     = Path(REFERENCE_FOLDER)
+    ref_dir = Path(REFERENCE_FOLDER)
     results_dir = Path(TOOL_RESULTS_FOLDER)
-    out_dir     = Path(OUTPUT_FOLDER)
+    out_dir = Path(OUTPUT_FOLDER)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if not ref_dir.exists():
@@ -168,7 +199,7 @@ def main():
 
     if TARGET_MODELS:
         model_dirs = [d for d in model_dirs if d.name in TARGET_MODELS]
-        suffix   = "_".join(TARGET_MODELS)
+        suffix = "_".join(TARGET_MODELS)
         txt_path = out_dir / f"results_{suffix}.txt"
         csv_path = out_dir / f"results_{suffix}.csv"
     else:
@@ -191,7 +222,7 @@ def main():
 
     print("\nLoading SentenceTransformer and TER models (once for all models)...")
     transformer_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
-    ter_metric        = TranslationEditRate()
+    ter_metric = TranslationEditRate()
     print("Models loaded.\n")
 
     csv_fields = ["model", "file", "BLEU", "chrF", "TER", "CosineSim", "type"]
@@ -226,11 +257,14 @@ def main():
     print(f"  {'Model':<20} {'BLEU':>7} {'chrF':>7} {'TER':>7} {'Cosine':>8}")
     print("  " + "-" * 50)
     for r in all_averages:
-        print(f"  {r['model']:<20} {r['BLEU']:7.2f} {r['chrF']:7.2f} {r['TER']:7.2f} {r['CosineSim']:8.2f}")
+        print(
+            f"  {r['model']:<20} {r['BLEU']:7.2f} {r['chrF']:7.2f} {r['TER']:7.2f} {r['CosineSim']:8.2f}"
+        )
     print("=" * 70)
     print(f"\n✅ Results written to:")
     print(f"   {txt_path}")
     print(f"   {csv_path}")
+
 
 if __name__ == "__main__":
     main()

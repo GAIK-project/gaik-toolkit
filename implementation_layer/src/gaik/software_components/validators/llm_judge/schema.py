@@ -168,9 +168,7 @@ class CalibrationReport:
         else:
             pr = f"{self.pearson_r:.3f}"
             verdict = (
-                " ✓ at HF reference"
-                if self.pearson_r >= ref
-                else f" (HF reference {ref:.2f})"
+                " ✓ at HF reference" if self.pearson_r >= ref else f" (HF reference {ref:.2f})"
             )
         return (
             f"CalibrationReport(n={self.n_items}, "

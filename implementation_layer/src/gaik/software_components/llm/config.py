@@ -126,9 +126,7 @@ def _vertex_config() -> dict:
         "project_id": _require("GOOGLE_PROJECT_ID"),
         "service_account_json": _require("GOOGLE_SERVICE_ACCOUNT_JSON"),
         "scopes": [
-            scope.strip()
-            for scope in _require("GOOGLE_SCOPES").split(",")
-            if scope.strip()
+            scope.strip() for scope in _require("GOOGLE_SCOPES").split(",") if scope.strip()
         ],
         "generate_content_url": _require("GOOGLE_GENERATE_CONTENT_URL"),
         "model": os.getenv("GOOGLE_MODEL", "gemini-2.5-flash"),

@@ -25,7 +25,9 @@ def main() -> None:
         print("No sample PDF found.")
         print(f"Expected: {sample_pdf}")
         print("\nTo test the vision parser:")
-        print("  1. Place a PDF file in implementation_layer/implementation_layer/examples/software_modules/parsers/")
+        print(
+            "  1. Place a PDF file in implementation_layer/implementation_layer/examples/software_modules/parsers/"
+        )
         print("  2. Update sample_pdf in this script")
         return
 
@@ -36,7 +38,7 @@ def main() -> None:
         save_markdown=True,
         enable_ocr=False,
         enable_table_structure=True,
-        enable_formula_enrichment=False
+        enable_formula_enrichment=False,
     )
 
     print("\nConverting to markdown and chunks...")

@@ -1,4 +1,4 @@
-﻿"""Example for DoclingApiClientParser (remote parsing service).
+"""Example for DoclingApiClientParser (remote parsing service).
 
 This example returns parsed markdown and metadata without saving output files.
 To use this service, request API_BASE and PASSWORD from Haaga-Helia.
@@ -57,9 +57,8 @@ def main() -> None:
     else:
         print("\nNo parsed markdown returned.")
 
-
     print(f"\nTime taken: {result['elapsed_seconds']}s")
+
 
 if __name__ == "__main__":
     main()
-

@@ -747,9 +747,7 @@ class ParallelTranscriber:
         results: list[str | None] = [None] * total
         max_workers = min(parallelism, total)
 
-        logger.info(
-            "Transcribing %d chunks (parallel=%d, model=whisper_local)", total, max_workers
-        )
+        logger.info("Transcribing %d chunks (parallel=%d, model=whisper_local)", total, max_workers)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_map = {executor.submit(_transcribe_one, item): item[0] for item in indexed}

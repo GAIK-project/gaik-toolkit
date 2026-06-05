@@ -87,9 +87,7 @@ class AnswerGenerator:
 
         if isinstance(self.client, ProviderClient):
             result = _with_retries(
-                lambda: self.client.chat(
-                    messages=messages, model=self.model, temperature=0.0
-                )
+                lambda: self.client.chat(messages=messages, model=self.model, temperature=0.0)
             )
             answer = result.text or ""
         else:

@@ -76,8 +76,7 @@ def test_query_timeout_bails_after_one_retry():
 
     assert not result.succeeded
     assert result.attempts == 2, (
-        f"Expected to bail after attempt 2 (one retry with hint), "
-        f"got attempts={result.attempts}"
+        f"Expected to bail after attempt 2 (one retry with hint), got attempts={result.attempts}"
     )
     assert "statement timeout" in (result.error or "").lower()
 

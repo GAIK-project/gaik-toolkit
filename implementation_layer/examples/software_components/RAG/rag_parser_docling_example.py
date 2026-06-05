@@ -12,14 +12,15 @@ from gaik.software_components.RAG.rag_parser_docling import DoclingRagParser
 
 
 def main() -> None:
-
     sample_pdf = Path(__file__).parent.parent / "parsers" / "WEF-page-10.pdf"
 
     if not sample_pdf.exists():
         print("No sample PDF found.")
         print(f"Expected: {sample_pdf}")
         print("\nTo test the parser:")
-        print("  1. Place a PDF file in implementation_layer/implementation_layer/examples/software_modules/parsers/")
+        print(
+            "  1. Place a PDF file in implementation_layer/implementation_layer/examples/software_modules/parsers/"
+        )
         print("  2. Update sample_pdf in this script")
         return
 

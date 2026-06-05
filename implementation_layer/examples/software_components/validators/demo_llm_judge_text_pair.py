@@ -34,25 +34,25 @@ PAIRS = [
         "incident_summary",
         "The computer was not locked.",
         "Computer left unlocked at the workstation.",
-        "ok",          # same fact, different phrasing
+        "ok",  # same fact, different phrasing
     ),
     (
         "location_detail",
         "kieppipeittaus",
         "kieppipeittauksessa",
-        "ok",          # Finnish morphological case variation
+        "ok",  # Finnish morphological case variation
     ),
     (
         "incident_summary",
         "Coolant leaked under unit B.",
         "Production output increased by 12 %.",
-        "wrong",       # entirely different facts
+        "wrong",  # entirely different facts
     ),
     (
         "report_date",
         "26.8.2025",
         "2025-08-26",
-        "ok",           # same date, different format
+        "ok",  # same date, different format
     ),
 ]
 

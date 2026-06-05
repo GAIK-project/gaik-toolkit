@@ -72,10 +72,14 @@ class GoogleProvider:
             contents=self._to_contents(rest),
             config=self._config_for(system, kwargs or None),
         )
-        usage = {
-            "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", 0),
-            "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", 0),
-        } if getattr(response, "usage_metadata", None) else {}
+        usage = (
+            {
+                "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", 0),
+                "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", 0),
+            }
+            if getattr(response, "usage_metadata", None)
+            else {}
+        )
         return ChatResponse(
             text=response.text or "",
             model=model,
@@ -148,9 +152,7 @@ class GoogleProvider:
             return response_format.model_validate(response.parsed)
         return response_format.model_validate_json(response.text or "")
 
-    def chat_stream(
-        self, messages: list[ChatMessage], **kwargs: Any
-    ) -> Iterator[str]:
+    def chat_stream(self, messages: list[ChatMessage], **kwargs: Any) -> Iterator[str]:
         system, rest = self._split_system(messages)
         model = kwargs.pop("model", self.model)
         stream = self.raw.models.generate_content_stream(

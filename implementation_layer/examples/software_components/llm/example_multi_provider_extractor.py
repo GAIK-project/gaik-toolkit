@@ -99,8 +99,10 @@ def main() -> None:
         candidates.append("google")
 
     if not candidates:
-        print("No provider env vars set. Set at least one of: AZURE_API_KEY, "
-              "OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY.")
+        print(
+            "No provider env vars set. Set at least one of: AZURE_API_KEY, "
+            "OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY."
+        )
         return
 
     for provider in candidates:

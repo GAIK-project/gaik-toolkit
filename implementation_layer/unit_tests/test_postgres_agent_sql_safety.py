@@ -21,9 +21,7 @@ def test_accepts_plain_select():
 
 
 def test_accepts_cte():
-    out = validate_read_only(
-        "WITH recent AS (SELECT * FROM orders) SELECT count(*) FROM recent"
-    )
+    out = validate_read_only("WITH recent AS (SELECT * FROM orders) SELECT count(*) FROM recent")
     assert "recent" in out.lower()
 
 

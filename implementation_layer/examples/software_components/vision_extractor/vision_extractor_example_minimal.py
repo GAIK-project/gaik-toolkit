@@ -1,5 +1,5 @@
 """
-VisionExtractor example 
+VisionExtractor example
 """
 
 from __future__ import annotations
@@ -56,12 +56,12 @@ For each line item, extract:
 # - Drawing type (Foundation plan, Floor plan, Section detail, Site plan, Other)
 # - Drawing status (Issued for review, Issued for construction, Revised, Other)
 # - Primary drawing element (Foundation wall, Concrete slab, Footing, Lower level, Other)
-# - Total foundation width 
-# - Total foundation depth 
+# - Total foundation width
+# - Total foundation depth
 # - Lower level elevation
 # - Top of wall elevation
-# - Slab thickness 
-# - Footing width 
+# - Slab thickness
+# - Footing width
 
 # Note: For all dimensions, the format should be a text string showing numbers with units, e.g., 100'-0"
 # """
@@ -69,34 +69,29 @@ For each line item, extract:
 t_start = time.perf_counter()
 extractor = VisionExtractor(
     # --- Provider selection ---
-    model_provider="openai",       # "openai" | "claude" | "google"
-    use_azure=True,                # True = Azure OpenAI, False = OpenAI direct
-    vertex_ai=False,                # True = Google Vertex AI, False = Gemini direct (google only)
-
+    model_provider="openai",  # "openai" | "claude" | "google"
+    use_azure=True,  # True = Azure OpenAI, False = OpenAI direct
+    vertex_ai=False,  # True = Google Vertex AI, False = Gemini direct (google only)
     # --- Model ---
-    model="gpt-5.4-mini",    # None = use model from config/.env; e.g., gemini-3.1-flash-lite
-    api_config=None,               # None = auto-build from .env; or pass a config dict directly
-
+    model="gpt-5.4-mini",  # None = use model from config/.env; e.g., gemini-3.1-flash-lite
+    api_config=None,  # None = auto-build from .env; or pass a config dict directly
     # --- Reasoning ---
-    reasoning_effort="low",     # "low" | "medium" | "high"
-
+    reasoning_effort="low",  # "low" | "medium" | "high"
     # --- Table handling ---
-    merge_table=True,             # True = merge tables split across pages
-
+    merge_table=True,  # True = merge tables split across pages
     # --- Extra instructions ---
     additional_instructions=None,  # str appended to the user prompt, or None
-
     # --- Verification ---
-    include_verification=True,    # True = add confidence_score + reasoning per field
+    include_verification=True,  # True = add confidence_score + reasoning per field
 )
 result = extractor.extract(
     # --- Input files ---
-    file_paths=["./PO.pdf"],        # list of PDF or image paths (.pdf .png .jpg .jpeg .gif .webp .tiff .bmp)
-
+    file_paths=[
+        "./PO.pdf"
+    ],  # list of PDF or image paths (.pdf .png .jpg .jpeg .gif .webp .tiff .bmp)
     # --- Extraction task ---
-    user_requirements=task,        # natural language description of what to extract
-
-    schema_dir="PO_schema",         # directory to save/load schema.py + requirements.json
+    user_requirements=task,  # natural language description of what to extract
+    schema_dir="PO_schema",  # directory to save/load schema.py + requirements.json
 )
 
 total_s = round(time.perf_counter() - t_start, 3)
@@ -116,4 +111,3 @@ output_path.write_text(
     json.dumps(result.data, indent=2, default=str, ensure_ascii=False), encoding="utf-8"
 )
 print(f"\nSaved to {output_path}")
-

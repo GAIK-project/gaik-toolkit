@@ -35,13 +35,21 @@ def compute_retrieval_metrics(
     n_gram: int = 4,
 ) -> dict:
     zeros = {
-        "token_recall": None, "retrieval_efficiency": None, "token_f1": None,
-        "coverage_continuity": None, "gap_count": None, "mean_gap_size": None,
+        "token_recall": None,
+        "retrieval_efficiency": None,
+        "token_f1": None,
+        "coverage_continuity": None,
+        "gap_count": None,
+        "mean_gap_size": None,
         "chunk_redundancy": None,
-        f"{n_gram}gram_recall": None, f"{n_gram}gram_precision": None,
-        f"{n_gram}gram_f1": None, f"{n_gram}gram_iou": None,
-        "mrr": None, "rank_weighted_coverage": None,
-        "effective_chunk_ratio": None, "min_k_full_coverage": None,
+        f"{n_gram}gram_recall": None,
+        f"{n_gram}gram_precision": None,
+        f"{n_gram}gram_f1": None,
+        f"{n_gram}gram_iou": None,
+        "mrr": None,
+        "rank_weighted_coverage": None,
+        "effective_chunk_ratio": None,
+        "min_k_full_coverage": None,
     }
     if not target_text or not chunks:
         return zeros
@@ -112,7 +120,8 @@ def compute_retrieval_metrics(
     mean_gap_size = sum(gap_sizes) / len(gap_sizes) if gap_sizes else 0.0
     chunk_redundancy = (
         (total_matched_tokens - unique_covered) / total_matched_tokens
-        if total_matched_tokens > 0 else 0.0
+        if total_matched_tokens > 0
+        else 0.0
     )
     mrr = 1.0 / first_hit_rank if first_hit_rank is not None else 0.0
     rank_weighted_coverage = sum(cumulative_coverages) / n_chunks
@@ -125,28 +134,44 @@ def compute_retrieval_metrics(
             break
 
     def _ngrams(tokens, n):
-        return {tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1)}
+        return {tuple(tokens[i : i + n]) for i in range(len(tokens) - n + 1)}
 
     target_ngrams = _ngrams(target_tokens, n_gram)
     result = {
-        "token_recall": round(tok_rec, 4), "retrieval_efficiency": round(tok_eff, 4),
-        "token_f1": round(tok_f1, 4), "coverage_continuity": round(coverage_continuity, 4),
-        "gap_count": gap_count, "mean_gap_size": round(mean_gap_size, 4),
-        "chunk_redundancy": round(chunk_redundancy, 4), "mrr": round(mrr, 4),
+        "token_recall": round(tok_rec, 4),
+        "retrieval_efficiency": round(tok_eff, 4),
+        "token_f1": round(tok_f1, 4),
+        "coverage_continuity": round(coverage_continuity, 4),
+        "gap_count": gap_count,
+        "mean_gap_size": round(mean_gap_size, 4),
+        "chunk_redundancy": round(chunk_redundancy, 4),
+        "mrr": round(mrr, 4),
         "rank_weighted_coverage": round(rank_weighted_coverage, 4),
         "effective_chunk_ratio": round(effective_chunk_ratio, 4),
         "min_k_full_coverage": min_k_full,
     }
     if not target_ngrams:
-        result.update({f"{n_gram}gram_recall": None, f"{n_gram}gram_precision": None,
-                       f"{n_gram}gram_f1": None, f"{n_gram}gram_iou": None})
+        result.update(
+            {
+                f"{n_gram}gram_recall": None,
+                f"{n_gram}gram_precision": None,
+                f"{n_gram}gram_f1": None,
+                f"{n_gram}gram_iou": None,
+            }
+        )
         return result
     retrieved_ngrams = set()
     for ct in chunks_tokenized:
         retrieved_ngrams.update(_ngrams(ct, n_gram))
     if not retrieved_ngrams:
-        result.update({f"{n_gram}gram_recall": None, f"{n_gram}gram_precision": None,
-                       f"{n_gram}gram_f1": None, f"{n_gram}gram_iou": None})
+        result.update(
+            {
+                f"{n_gram}gram_recall": None,
+                f"{n_gram}gram_precision": None,
+                f"{n_gram}gram_f1": None,
+                f"{n_gram}gram_iou": None,
+            }
+        )
         return result
     intersection = target_ngrams & retrieved_ngrams
     union = target_ngrams | retrieved_ngrams
@@ -155,18 +180,23 @@ def compute_retrieval_metrics(
     ng_prec = len_i / len_r
     ng_f1 = 2 * ng_rec * ng_prec / (ng_rec + ng_prec) if (ng_rec + ng_prec) > 0 else 0.0
     ng_iou = len_i / len(union)
-    result.update({
-        f"{n_gram}gram_recall": round(ng_rec, 4), f"{n_gram}gram_precision": round(ng_prec, 4),
-        f"{n_gram}gram_f1": round(ng_f1, 4), f"{n_gram}gram_iou": round(ng_iou, 4),
-    })
+    result.update(
+        {
+            f"{n_gram}gram_recall": round(ng_rec, 4),
+            f"{n_gram}gram_precision": round(ng_prec, 4),
+            f"{n_gram}gram_f1": round(ng_f1, 4),
+            f"{n_gram}gram_iou": round(ng_iou, 4),
+        }
+    )
     return result
+
 
 # ---------------------------------------------------------------------------
 # Configuration — edit these paths to point to your own data
 # ---------------------------------------------------------------------------
 
 TARGET_FILE = "data/target.txt"
-CHUNKS_DIR  = "data/chunks"   # .txt files in this folder, loaded in sorted order
+CHUNKS_DIR = "data/chunks"  # .txt files in this folder, loaded in sorted order
 
 # ---------------------------------------------------------------------------
 # Load data
@@ -199,21 +229,37 @@ print("RETRIEVAL EVALUATION RESULTS")
 print("=" * 60)
 
 print("\n--- Token Coverage ---")
-print(f"  token_recall         : {metrics['token_recall']:.4f}   (fraction of target tokens covered)")
-print(f"  retrieval_efficiency : {metrics['retrieval_efficiency']:.4f}   (coverage per retrieved token)")
-print(f"  token_f1             : {metrics['token_f1']:.4f}   (harmonic mean of recall and efficiency)")
+print(
+    f"  token_recall         : {metrics['token_recall']:.4f}   (fraction of target tokens covered)"
+)
+print(
+    f"  retrieval_efficiency : {metrics['retrieval_efficiency']:.4f}   (coverage per retrieved token)"
+)
+print(
+    f"  token_f1             : {metrics['token_f1']:.4f}   (harmonic mean of recall and efficiency)"
+)
 
 print("\n--- Coverage Structure ---")
-print(f"  coverage_continuity  : {metrics['coverage_continuity']:.4f}   (longest contiguous covered span / target)")
+print(
+    f"  coverage_continuity  : {metrics['coverage_continuity']:.4f}   (longest contiguous covered span / target)"
+)
 print(f"  gap_count            : {metrics['gap_count']}          (internal uncovered gaps)")
 print(f"  mean_gap_size        : {metrics['mean_gap_size']:.4f}   (average gap length in tokens)")
-print(f"  chunk_redundancy     : {metrics['chunk_redundancy']:.4f}   (fraction of matched tokens that are duplicates)")
+print(
+    f"  chunk_redundancy     : {metrics['chunk_redundancy']:.4f}   (fraction of matched tokens that are duplicates)"
+)
 
 print("\n--- Rank-Aware ---")
 print(f"  mrr                  : {metrics['mrr']:.4f}   (mean reciprocal rank of first hit)")
-print(f"  rank_weighted_cov    : {metrics['rank_weighted_coverage']:.4f}   (avg cumulative coverage over all ranks)")
-print(f"  effective_chunk_ratio: {metrics['effective_chunk_ratio']:.4f}   (fraction of chunks that add new coverage)")
-print(f"  min_k_full_coverage  : {metrics['min_k_full_coverage']}          (fewest top-k chunks for full coverage)")
+print(
+    f"  rank_weighted_cov    : {metrics['rank_weighted_coverage']:.4f}   (avg cumulative coverage over all ranks)"
+)
+print(
+    f"  effective_chunk_ratio: {metrics['effective_chunk_ratio']:.4f}   (fraction of chunks that add new coverage)"
+)
+print(
+    f"  min_k_full_coverage  : {metrics['min_k_full_coverage']}          (fewest top-k chunks for full coverage)"
+)
 
 print("\n--- 4-Gram Overlap ---")
 print(f"  4gram_recall         : {metrics['4gram_recall']:.4f}")

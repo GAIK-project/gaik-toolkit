@@ -163,9 +163,7 @@ class DataExtractor:
             for key, value in list(result_dict.items()):
                 if isinstance(value, list) and value and isinstance(value[0], dict):
                     has_nested = True
-                    result_dict[key] = [
-                        apply_field_policies(item, requirements) for item in value
-                    ]
+                    result_dict[key] = [apply_field_policies(item, requirements) for item in value]
             if not has_nested:
                 result_dict = apply_field_policies(result_dict, requirements)
 

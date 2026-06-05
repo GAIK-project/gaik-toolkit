@@ -93,9 +93,7 @@ def get_google_config(vertex_ai: bool = True) -> dict:
             "service_account_json": require_env("GOOGLE_SERVICE_ACCOUNT_JSON"),
             "model": model,
             "scopes": [
-                scope.strip()
-                for scope in require_env("GOOGLE_SCOPES").split(",")
-                if scope.strip()
+                scope.strip() for scope in require_env("GOOGLE_SCOPES").split(",") if scope.strip()
             ],
             "generate_content_url": require_env("GOOGLE_GENERATE_CONTENT_URL"),
         }

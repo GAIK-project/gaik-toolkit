@@ -42,9 +42,7 @@ class FakeProviderClient:
             lambda **_: GeneratedSQL(sql="SELECT 1", reasoning="stub")
         )
         self._chat = chat_impl or (
-            lambda **_: ChatResponse(
-                text="stub answer", model=self.model, provider=self.provider
-            )
+            lambda **_: ChatResponse(text="stub answer", model=self.model, provider=self.provider)
         )
 
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
@@ -56,13 +54,9 @@ class FakeProviderClient:
         response_format: type[BaseModel],
         **kwargs: Any,
     ) -> BaseModel:
-        return self._chat_parsed(
-            messages=messages, response_format=response_format, **kwargs
-        )
+        return self._chat_parsed(messages=messages, response_format=response_format, **kwargs)
 
-    def chat_stream(
-        self, messages: list[ChatMessage], **kwargs: Any
-    ) -> Iterator[str]:
+    def chat_stream(self, messages: list[ChatMessage], **kwargs: Any) -> Iterator[str]:
         yield "stub"
 
     def embed(self, texts: list[str], **kwargs: Any) -> list[list[float]]:

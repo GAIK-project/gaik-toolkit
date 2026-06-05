@@ -133,7 +133,7 @@ def main() -> None:
         print()
 
         # 6. Semantic search with metadata filter
-        print('--- Semantic Search (filtered by video_id) ---')
+        print("--- Semantic Search (filtered by video_id) ---")
         results = store.search_semantic(
             query_embedding,
             top_k=3,

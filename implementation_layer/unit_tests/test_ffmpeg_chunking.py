@@ -54,7 +54,10 @@ class TestSplitIntoChunksPreflight:
 class TestSplitIntoChunksErrors:
     """Tests for structured error reporting and retry."""
 
-    @patch("gaik.software_components.parallel_transcriber.ffmpeg.check_ffmpeg_available", return_value=True)
+    @patch(
+        "gaik.software_components.parallel_transcriber.ffmpeg.check_ffmpeg_available",
+        return_value=True,
+    )
     def test_all_chunks_fail_includes_error_detail(self, _mock_ffmpeg, tmp_path: Path):
         """When all chunks fail, the RuntimeError includes FFmpeg error details."""
         specs = [_make_spec(0, tmp_path), _make_spec(1, tmp_path)]
@@ -67,7 +70,10 @@ class TestSplitIntoChunksErrors:
             with pytest.raises(RuntimeError, match="encoder error"):
                 split_into_chunks("test.mp3", specs)
 
-    @patch("gaik.software_components.parallel_transcriber.ffmpeg.check_ffmpeg_available", return_value=True)
+    @patch(
+        "gaik.software_components.parallel_transcriber.ffmpeg.check_ffmpeg_available",
+        return_value=True,
+    )
     def test_error_message_not_generic(self, _mock_ffmpeg, tmp_path: Path):
         """Error message must NOT be the old generic 'No chunks were successfully created'."""
         specs = [_make_spec(0, tmp_path)]
@@ -86,7 +92,10 @@ class TestSplitIntoChunksErrors:
 class TestSplitIntoChunksRetry:
     """Tests for sequential retry of failed chunks."""
 
-    @patch("gaik.software_components.parallel_transcriber.ffmpeg.check_ffmpeg_available", return_value=True)
+    @patch(
+        "gaik.software_components.parallel_transcriber.ffmpeg.check_ffmpeg_available",
+        return_value=True,
+    )
     def test_retry_recovers_failed_chunks(self, _mock_ffmpeg, tmp_path: Path):
         """Chunks that fail in parallel pass but succeed on retry are included."""
         specs = [_make_spec(0, tmp_path)]
@@ -116,7 +125,10 @@ class TestSplitIntoChunksRetry:
         assert len(results) == 1
         assert "file" in results[0]
 
-    @patch("gaik.software_components.parallel_transcriber.ffmpeg.check_ffmpeg_available", return_value=True)
+    @patch(
+        "gaik.software_components.parallel_transcriber.ffmpeg.check_ffmpeg_available",
+        return_value=True,
+    )
     def test_partial_success_still_retries_failures(self, _mock_ffmpeg, tmp_path: Path):
         """When some chunks succeed and some fail, failures are still retried."""
         specs = [_make_spec(0, tmp_path), _make_spec(1, tmp_path)]

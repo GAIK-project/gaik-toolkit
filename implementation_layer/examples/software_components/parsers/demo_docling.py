@@ -1,4 +1,4 @@
-﻿"""Simple demonstration of DoclingParser for advanced PDF parsing.
+"""Simple demonstration of DoclingParser for advanced PDF parsing.
 
 This example shows how to use DoclingParser for OCR-aware parsing,
 table extraction, and markdown output.

@@ -404,9 +404,7 @@ class LLMJudge:
                 }
             ],
         )
-        text = "".join(
-            block.text for block in resp.content if getattr(block, "type", "") == "text"
-        )
+        text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
         return text, resp.usage.input_tokens, resp.usage.output_tokens
 
     def _call_google(
@@ -425,9 +423,7 @@ class LLMJudge:
                 location=os.environ.get("GOOGLE_VERTEXAI_LOCATION", "global"),
             )
         else:
-            api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get(
-                "GOOGLE_API_KEY"
-            )
+            api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
             if not api_key:
                 raise RuntimeError(
                     "No Google credentials. Set GOOGLE_VERTEXAI_PROJECT (+ "
@@ -456,7 +452,6 @@ class LLMJudge:
             getattr(meta, "prompt_token_count", 0) or 0,
             getattr(meta, "candidates_token_count", 0) or 0,
         )
-
 
     # ── Text-only provider callers (no images) ────────────────────
 
@@ -513,9 +508,7 @@ class LLMJudge:
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
         )
-        text = "".join(
-            block.text for block in resp.content if getattr(block, "type", "") == "text"
-        )
+        text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
         return text, resp.usage.input_tokens, resp.usage.output_tokens
 
     def _call_google_text(
@@ -533,9 +526,7 @@ class LLMJudge:
                 location=os.environ.get("GOOGLE_VERTEXAI_LOCATION", "global"),
             )
         else:
-            api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get(
-                "GOOGLE_API_KEY"
-            )
+            api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
             if not api_key:
                 raise RuntimeError(
                     "No Google credentials. Set GOOGLE_VERTEXAI_PROJECT (+ "

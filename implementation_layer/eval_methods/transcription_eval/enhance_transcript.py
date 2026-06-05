@@ -143,6 +143,7 @@ Output:
 Return ONLY the repaired transcript text with no commentary.
 """
 
+
 def get_client(use_azure: bool = True):
     config = get_openai_config(use_azure=use_azure)
     config["model"] = DEFAULT_MODEL_AZURE if use_azure else DEFAULT_MODEL_OPENAI
@@ -150,6 +151,7 @@ def get_client(use_azure: bool = True):
         key_name = "AZURE_API_KEY" if use_azure else "OPENAI_API_KEY"
         raise SystemExit(f"{key_name} not found in environment")
     return create_openai_client(config), config
+
 
 def enhance_transcript_pass1(client, transcript_text: str, model: str = DEFAULT_MODEL_AZURE) -> str:
     """
@@ -162,12 +164,16 @@ def enhance_transcript_pass1(client, transcript_text: str, model: str = DEFAULT_
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Edit this Finnish dental transcript for spelling consistency:\n\n{transcript_text}"}
+            {
+                "role": "user",
+                "content": f"Edit this Finnish dental transcript for spelling consistency:\n\n{transcript_text}",
+            },
         ],
         temperature=0.0,
     )
 
     return response.choices[0].message.content.strip()
+
 
 def enhance_transcript_pass2(client, transcript_text: str, model: str = DEFAULT_MODEL_AZURE) -> str:
     """
@@ -181,14 +187,20 @@ def enhance_transcript_pass2(client, transcript_text: str, model: str = DEFAULT_
         model=model,
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Repair remaining ASR errors in this Finnish dental transcript:\n\n{transcript_text}"}
+            {
+                "role": "user",
+                "content": f"Repair remaining ASR errors in this Finnish dental transcript:\n\n{transcript_text}",
+            },
         ],
         temperature=0.0,
     )
 
     return response.choices[0].message.content.strip()
 
-def process_transcripts(transcripts_dir: str, output_dir: str, model: str | None = None, use_azure: bool = True):
+
+def process_transcripts(
+    transcripts_dir: str, output_dir: str, model: str | None = None, use_azure: bool = True
+):
     """Process all transcripts in directory
 
     Args:
@@ -228,7 +240,9 @@ def process_transcripts(transcripts_dir: str, output_dir: str, model: str | None
         print("  Pass 1: Spelling consistency...")
         pass1_text = enhance_transcript_pass1(client, original_text, model=model)
         pass1_word_count = len(pass1_text.split())
-        print(f"    -> {pass1_word_count} words (delta: {pass1_word_count - original_word_count:+d})")
+        print(
+            f"    -> {pass1_word_count} words (delta: {pass1_word_count - original_word_count:+d})"
+        )
 
         # Pass 2: Context-based repair + number conversion
         print("  Pass 2: Context repair + number conversion...")
@@ -238,7 +252,9 @@ def process_transcripts(transcripts_dir: str, output_dir: str, model: str | None
 
         # Final result
         enhanced_text = pass2_text
-        print(f"  Total change: {original_word_count} -> {pass2_word_count} words ({pass2_word_count - original_word_count:+d})")
+        print(
+            f"  Total change: {original_word_count} -> {pass2_word_count} words ({pass2_word_count - original_word_count:+d})"
+        )
 
         # Save enhanced transcript
         output_file = output_path / transcript_file.name
@@ -248,12 +264,11 @@ def process_transcripts(transcripts_dir: str, output_dir: str, model: str | None
 
     print(f"Done! Enhanced transcripts saved to: {output_path}")
 
+
 def main():
     import argparse
 
-    ap = argparse.ArgumentParser(
-        description="Enhance transcripts using GPT-5.1"
-    )
+    ap = argparse.ArgumentParser(description="Enhance transcripts using GPT-5.1")
     ap.add_argument(
         "--transcripts-dir",
         type=str,
@@ -275,15 +290,8 @@ def main():
 
     args = ap.parse_args()
 
-    process_transcripts(
-        args.transcripts_dir,
-        args.output_dir,
-        args.model,
-        use_azure=True
-    )
+    process_transcripts(args.transcripts_dir, args.output_dir, args.model, use_azure=True)
+
 
 if __name__ == "__main__":
     main()
-
-
-

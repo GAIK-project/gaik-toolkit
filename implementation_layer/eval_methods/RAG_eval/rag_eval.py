@@ -41,13 +41,15 @@ def _strip_hws_heading_prefix(node) -> str:
     reversed. Must be kept in lock-step with rag_engine._parse_nodes mutations.
     """
     from src.rag_engine import _extract_heading_prefix
+
     content = node.get_content()
     heading = _extract_heading_prefix(node)
     if heading:
         prefix = f"{heading}\n\n"
         if content.startswith(prefix):
-            return content[len(prefix):]
+            return content[len(prefix) :]
     return content
+
 
 # Cache of whitespace-normalized file contents keyed by absolute path.
 # Files are read once per run; the same node appears in hundreds of configs.
@@ -77,8 +79,8 @@ FORCE_REBUILD_INDICES = False
 # Embedding API endpoints
 # SnowflakeV2 uses local LM Studio (default in Settings)
 # OpenAITextEmbedding3Large uses Azure OpenAI
-AZURE_EMBEDDING_API_BASE    = "https://haagahelia-poc-gaik.openai.azure.com/"
-AZURE_EMBEDDING_API_KEY     = os.getenv("AZURE_API_KEY", "")  # from .env — never commit real keys
+AZURE_EMBEDDING_API_BASE = "https://haagahelia-poc-gaik.openai.azure.com/"
+AZURE_EMBEDDING_API_KEY = os.getenv("AZURE_API_KEY", "")  # from .env — never commit real keys
 AZURE_EMBEDDING_API_VERSION = "2023-05-15"
 
 _EMBEDDING_API_OVERRIDES = {
@@ -92,13 +94,18 @@ _EMBEDDING_API_OVERRIDES = {
 }
 
 # Config grid — all combinations are generated automatically below.
-_EMBEDDINGS        = ["FinParaphrase","VoyageNano","Gemma300m","SnowflakeV2"] # "OpenAITextEmbedding3Large"
-_CHUNK_SIZES       = [2000,300,500,700,800,900,1500]
-_RERANK_TOP_N      = [8]
-_USE_RERANKER      = [True, False]
-_RETRIEVERS        = ["hybrid"]
-_HWS_RETRIEVERS    = ["hybrid","automerging"]  # automerging only valid for hierarchical chunkings
-_HWS_CHUNK_SIZES   = [600,800,1000,1400]
+_EMBEDDINGS = [
+    "FinParaphrase",
+    "VoyageNano",
+    "Gemma300m",
+    "SnowflakeV2",
+]  # "OpenAITextEmbedding3Large"
+_CHUNK_SIZES = [2000, 300, 500, 700, 800, 900, 1500]
+_RERANK_TOP_N = [8]
+_USE_RERANKER = [True, False]
+_RETRIEVERS = ["hybrid"]
+_HWS_RETRIEVERS = ["hybrid", "automerging"]  # automerging only valid for hierarchical chunkings
+_HWS_CHUNK_SIZES = [600, 800, 1000, 1400]
 _SIMILARITY_TOP_KS = [15]
 CONFIGS = [
     dict(
@@ -112,7 +119,7 @@ CONFIGS = [
         similarity_top_k=stk,
     )
     for emb in _EMBEDDINGS
-    for cs  in _CHUNK_SIZES
+    for cs in _CHUNK_SIZES
     for rtn in _RERANK_TOP_N
     for rnk in _USE_RERANKER
     for ret in _RETRIEVERS
@@ -138,21 +145,26 @@ CONFIGS = [
 
 def _validate_config(cfg: dict) -> None:
     """Crash immediately if a config is missing required keys."""
-    assert "embedding"        in cfg, f"Config missing 'embedding': {cfg}"
-    assert "chunking"         in cfg, f"Config missing 'chunking': {cfg}"
-    assert "retriever"        in cfg, f"Config missing 'retriever': {cfg}"
-    assert "rerank_top_n"     in cfg, f"Config missing 'rerank_top_n': {cfg}"
-    assert "use_reranker"     in cfg, f"Config missing 'use_reranker': {cfg}"
+    assert "embedding" in cfg, f"Config missing 'embedding': {cfg}"
+    assert "chunking" in cfg, f"Config missing 'chunking': {cfg}"
+    assert "retriever" in cfg, f"Config missing 'retriever': {cfg}"
+    assert "rerank_top_n" in cfg, f"Config missing 'rerank_top_n': {cfg}"
+    assert "use_reranker" in cfg, f"Config missing 'use_reranker': {cfg}"
     assert isinstance(cfg["use_reranker"], bool), f"Config 'use_reranker' must be bool: {cfg}"
     assert "similarity_top_k" in cfg, f"Config missing 'similarity_top_k': {cfg}"
     if cfg["chunking"] == "simple":
-        assert "chunk_size"    in cfg, f"Config with chunking='simple' missing 'chunk_size': {cfg}"
-        assert "chunk_overlap" in cfg, f"Config with chunking='simple' missing 'chunk_overlap': {cfg}"
+        assert "chunk_size" in cfg, f"Config with chunking='simple' missing 'chunk_size': {cfg}"
+        assert "chunk_overlap" in cfg, (
+            f"Config with chunking='simple' missing 'chunk_overlap': {cfg}"
+        )
     if cfg["chunking"] == "hierarchical_with_structure":
-        assert "hws_chunk_size" in cfg, f"Config with chunking='hierarchical_with_structure' missing 'hws_chunk_size': {cfg}"
-    assert cfg["retriever"] != "automerging" or cfg["chunking"] in ("hierarchical", "hierarchical_with_structure"), (
-        f"retriever='automerging' requires hierarchical chunking: {cfg}"
-    )
+        assert "hws_chunk_size" in cfg, (
+            f"Config with chunking='hierarchical_with_structure' missing 'hws_chunk_size': {cfg}"
+        )
+    assert cfg["retriever"] != "automerging" or cfg["chunking"] in (
+        "hierarchical",
+        "hierarchical_with_structure",
+    ), f"retriever='automerging' requires hierarchical chunking: {cfg}"
     if cfg["chunking"] == "lightrag":
         assert cfg["retriever"] == "lightrag", (
             f"chunking='lightrag' requires retriever='lightrag': {cfg}"
@@ -161,6 +173,7 @@ def _validate_config(cfg: dict) -> None:
         assert cfg["chunking"] == "lightrag", (
             f"retriever='lightrag' requires chunking='lightrag': {cfg}"
         )
+
 
 def _config_name(cfg: dict) -> str:
     """Auto-generate a unique, human-readable config name from its parameters."""
@@ -287,7 +300,9 @@ def _testdata(csv_path: str = TEST_CSV) -> None:
 
 
 def verify_chunks_in_source(
-    node_meta, retrieved_chunks: list[str], retrieved_node_ids: list[str],
+    node_meta,
+    retrieved_chunks: list[str],
+    retrieved_node_ids: list[str],
     chunking: str = "unknown",
 ) -> None:
     """Assert every retrieved chunk is a substring of its source file.
@@ -376,11 +391,17 @@ def compute_retrieval_metrics(
     """
 
     zeros = {
-        "token_recall": None, "retrieval_efficiency": None, "token_f1": None,
-        "coverage_continuity": None, "gap_count": None, "mean_gap_size": None,
+        "token_recall": None,
+        "retrieval_efficiency": None,
+        "token_f1": None,
+        "coverage_continuity": None,
+        "gap_count": None,
+        "mean_gap_size": None,
         "chunk_redundancy": None,
-        f"{n_gram}gram_recall": None, f"{n_gram}gram_precision": None,
-        f"{n_gram}gram_f1": None, f"{n_gram}gram_iou": None,
+        f"{n_gram}gram_recall": None,
+        f"{n_gram}gram_precision": None,
+        f"{n_gram}gram_f1": None,
+        f"{n_gram}gram_iou": None,
         "mrr": None,
         "rank_weighted_coverage": None,
         "effective_chunk_ratio": None,
@@ -480,7 +501,8 @@ def compute_retrieval_metrics(
     # Chunk redundancy
     chunk_redundancy = (
         (total_matched_tokens - unique_covered) / total_matched_tokens
-        if total_matched_tokens > 0 else 0.0
+        if total_matched_tokens > 0
+        else 0.0
     )
 
     # MRR
@@ -509,22 +531,28 @@ def compute_retrieval_metrics(
     target_ngrams = _ngrams(target_tokens, n_gram)
 
     result: dict = {
-        "token_recall":           round(tok_rec, 4),
-        "retrieval_efficiency":   round(tok_eff, 4),
-        "token_f1":               round(tok_f1, 4),
-        "coverage_continuity":    round(coverage_continuity, 4),
-        "gap_count":              gap_count,
-        "mean_gap_size":          round(mean_gap_size, 4),
-        "chunk_redundancy":       round(chunk_redundancy, 4),
-        "mrr":                    round(mrr, 4),
+        "token_recall": round(tok_rec, 4),
+        "retrieval_efficiency": round(tok_eff, 4),
+        "token_f1": round(tok_f1, 4),
+        "coverage_continuity": round(coverage_continuity, 4),
+        "gap_count": gap_count,
+        "mean_gap_size": round(mean_gap_size, 4),
+        "chunk_redundancy": round(chunk_redundancy, 4),
+        "mrr": round(mrr, 4),
         "rank_weighted_coverage": round(rank_weighted_coverage, 4),
-        "effective_chunk_ratio":  round(effective_chunk_ratio, 4),
-        "min_k_full_coverage":    min_k_full,
+        "effective_chunk_ratio": round(effective_chunk_ratio, 4),
+        "min_k_full_coverage": min_k_full,
     }
 
     if not target_ngrams:
-        result.update({f"{n_gram}gram_recall": None, f"{n_gram}gram_precision": None,
-                       f"{n_gram}gram_f1": None, f"{n_gram}gram_iou": None})
+        result.update(
+            {
+                f"{n_gram}gram_recall": None,
+                f"{n_gram}gram_precision": None,
+                f"{n_gram}gram_f1": None,
+                f"{n_gram}gram_iou": None,
+            }
+        )
         return result
 
     retrieved_ngrams: set[tuple[str, ...]] = set()
@@ -532,27 +560,35 @@ def compute_retrieval_metrics(
         retrieved_ngrams.update(_ngrams(ct, n_gram))
 
     if not retrieved_ngrams:
-        result.update({f"{n_gram}gram_recall": None, f"{n_gram}gram_precision": None,
-                       f"{n_gram}gram_f1": None, f"{n_gram}gram_iou": None})
+        result.update(
+            {
+                f"{n_gram}gram_recall": None,
+                f"{n_gram}gram_precision": None,
+                f"{n_gram}gram_f1": None,
+                f"{n_gram}gram_iou": None,
+            }
+        )
         return result
 
     intersection = target_ngrams & retrieved_ngrams
-    union        = target_ngrams | retrieved_ngrams
+    union = target_ngrams | retrieved_ngrams
     len_i = len(intersection)
     len_t = len(target_ngrams)
     len_r = len(retrieved_ngrams)
 
-    ng_rec  = len_i / len_t
+    ng_rec = len_i / len_t
     ng_prec = len_i / len_r
-    ng_f1   = 2 * ng_rec * ng_prec / (ng_rec + ng_prec) if (ng_rec + ng_prec) > 0 else 0.0
-    ng_iou  = len_i / len(union)
+    ng_f1 = 2 * ng_rec * ng_prec / (ng_rec + ng_prec) if (ng_rec + ng_prec) > 0 else 0.0
+    ng_iou = len_i / len(union)
 
-    result.update({
-        f"{n_gram}gram_recall":    round(ng_rec, 4),
-        f"{n_gram}gram_precision": round(ng_prec, 4),
-        f"{n_gram}gram_f1":        round(ng_f1, 4),
-        f"{n_gram}gram_iou":       round(ng_iou, 4),
-    })
+    result.update(
+        {
+            f"{n_gram}gram_recall": round(ng_rec, 4),
+            f"{n_gram}gram_precision": round(ng_prec, 4),
+            f"{n_gram}gram_f1": round(ng_f1, 4),
+            f"{n_gram}gram_iou": round(ng_iou, 4),
+        }
+    )
     return result
 
 
@@ -633,9 +669,9 @@ def build_or_load_index(
     if key in _INDEX_CACHE:
         return _INDEX_CACHE[key]
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"[Index] Building/loading: {_config_name(cfg)}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     storage_path = _storage_path_for(cfg)
 
@@ -654,7 +690,9 @@ def build_or_load_index(
     settings = Settings(**settings_kwargs)
     # Bypass production storage: point to isolated test index folder
     settings.chroma_storage_path = storage_path
-    hcs_suffix = f"_hcs{cfg['hws_chunk_size']}" if cfg["chunking"] == "hierarchical_with_structure" else ""
+    hcs_suffix = (
+        f"_hcs{cfg['hws_chunk_size']}" if cfg["chunking"] == "hierarchical_with_structure" else ""
+    )
     settings.chroma_collection_name = f"test_{cfg['embedding']}_{cfg['chunking']}{hcs_suffix}"
 
     # Load only the nodes needed for this benchmark run
@@ -680,7 +718,8 @@ def build_or_load_index(
         {
             "file_id": nid,
             "filepath": data_processor.nodes[nid].data_path,
-            "title": data_processor.nodes[nid].level3_label or data_processor.nodes[nid].level2_label,
+            "title": data_processor.nodes[nid].level3_label
+            or data_processor.nodes[nid].level2_label,
         }
         for nid in resolved_node_ids
     ]
@@ -713,8 +752,8 @@ def build_or_load_index(
 # RESULT FILES
 # ==============================================================================
 
-DETAIL_CSV          = os.path.join(OUTPUT_DIR, "results_detail.csv")
-DETAIL_PICKLE       = os.path.join(OUTPUT_DIR, "results_detail.pkl")
+DETAIL_CSV = os.path.join(OUTPUT_DIR, "results_detail.csv")
+DETAIL_PICKLE = os.path.join(OUTPUT_DIR, "results_detail.pkl")
 EMBEDDING_CACHE_PKL = os.path.join(OUTPUT_DIR, "query_embedding_cache.pkl")
 
 
@@ -735,16 +774,28 @@ def save_embedding_cache() -> None:
     with open(EMBEDDING_CACHE_PKL, "wb") as f:
         pickle.dump(_QUERY_EMBEDDING_CACHE, f)
 
+
 _RETRIEVAL_COLS = [
-    "token_recall", "retrieval_efficiency", "token_f1",
-    "coverage_continuity", "gap_count", "mean_gap_size", "chunk_redundancy",
-    "mrr", "rank_weighted_coverage", "effective_chunk_ratio", "min_k_full_coverage",
-    "4gram_recall", "4gram_precision", "4gram_f1", "4gram_iou",
-    "num_chunks_retrieved", "retrieval_ms",
+    "token_recall",
+    "retrieval_efficiency",
+    "token_f1",
+    "coverage_continuity",
+    "gap_count",
+    "mean_gap_size",
+    "chunk_redundancy",
+    "mrr",
+    "rank_weighted_coverage",
+    "effective_chunk_ratio",
+    "min_k_full_coverage",
+    "4gram_recall",
+    "4gram_precision",
+    "4gram_f1",
+    "4gram_iou",
+    "num_chunks_retrieved",
+    "retrieval_ms",
 ]
 _TOP1_RETRIEVAL_COLS = [
-    "top1_" + col for col in _RETRIEVAL_COLS
-    if col not in ("num_chunks_retrieved", "retrieval_ms")
+    "top1_" + col for col in _RETRIEVAL_COLS if col not in ("num_chunks_retrieved", "retrieval_ms")
 ]
 
 _LAST_SAVE_TIME: float = 0.0
@@ -786,6 +837,7 @@ def save_detail(df: pd.DataFrame, force: bool = False) -> None:
 # EVALUATION LOOP
 # ==============================================================================
 
+
 def run_benchmark() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     load_embedding_cache()
@@ -804,7 +856,9 @@ def run_benchmark() -> None:
 
     required_cols = {"node", "question", "files", "answer"}
     missing_cols = required_cols - set(test_df.columns)
-    assert not missing_cols, f"Test CSV missing columns: {missing_cols}. Found: {list(test_df.columns)}"
+    assert not missing_cols, (
+        f"Test CSV missing columns: {missing_cols}. Found: {list(test_df.columns)}"
+    )
     assert "citations" in test_df.columns or "citation" in test_df.columns, (
         f"Test CSV must have 'citations' or 'citation' column. Found: {list(test_df.columns)}"
     )
@@ -817,8 +871,7 @@ def run_benchmark() -> None:
         test_df["_parsed_citations"] = test_df["citations"].apply(parse_citations)
     else:
         test_df["_parsed_citations"] = [
-            [(str(row["files"]), str(row["citation"]))]
-            for _, row in test_df.iterrows()
+            [(str(row["files"]), str(row["citation"]))] for _, row in test_df.iterrows()
         ]
 
     test_node_ids: set[str] = set(test_df["node"].astype(str).unique())
@@ -834,53 +887,55 @@ def run_benchmark() -> None:
     all_rows: list[dict] = []
     for cfg in CONFIGS:
         for _, sample in test_df.iterrows():
-            all_rows.append({
-                "config":           _config_name(cfg),
-                "embedding":        cfg["embedding"],
-                "chunking":         cfg["chunking"],
-                "retriever":        cfg["retriever"],
-                "chunk_size":       cfg.get("chunk_size", ""),
-                "chunk_overlap":    cfg.get("chunk_overlap", ""),
-                "hws_chunk_size":   cfg.get("hws_chunk_size", ""),
-                "rerank_top_n":     cfg.get("rerank_top_n", 8),
-                "use_reranker":     cfg.get("use_reranker", True),
-                "similarity_top_k": cfg["similarity_top_k"],
-                "node_raw":         str(sample["node"]),
-                "question":         str(sample["question"]),
-                "gold_answer":      str(sample["answer"]),
-                "_parsed_citations": sample["_parsed_citations"],
-                # Results (filled in during phases below)
-                "token_recall":             None,
-                "retrieval_efficiency":     None,
-                "token_f1":                 None,
-                "coverage_continuity":      None,
-                "gap_count":                None,
-                "mean_gap_size":            None,
-                "chunk_redundancy":         None,
-                "mrr":                      None,
-                "rank_weighted_coverage":   None,
-                "effective_chunk_ratio":    None,
-                "min_k_full_coverage":      None,
-                "4gram_recall":             None,
-                "4gram_precision":          None,
-                "4gram_f1":                 None,
-                "4gram_iou":                None,
-                **{col: None for col in _TOP1_RETRIEVAL_COLS},
-                "raw_chunks":           "",   # JSON list of all retrieved chunks (Phase 3a)
-                "reranked_chunks":      "",   # JSON list of reranked chunks; "" if no reranker (Phase 3a)
-                "chunk_file_names":     "",   # JSON list of filenames (Phase 3a)
-                "num_chunks_retrieved": float("nan"),
-                "retrieval_ms":         float("nan"),
-                "synthesized_answer":   "",
-                "synthesis_ms":         float("nan"),
-                "semantic_similarity":  float("nan"),
-                "coverage":             pd.NA,
-                "contradiction":        pd.NA,
-                "relevance":            pd.NA,
-                "precision":            pd.NA,
-                "overall":              pd.NA,
-                "reason":               "",
-            })
+            all_rows.append(
+                {
+                    "config": _config_name(cfg),
+                    "embedding": cfg["embedding"],
+                    "chunking": cfg["chunking"],
+                    "retriever": cfg["retriever"],
+                    "chunk_size": cfg.get("chunk_size", ""),
+                    "chunk_overlap": cfg.get("chunk_overlap", ""),
+                    "hws_chunk_size": cfg.get("hws_chunk_size", ""),
+                    "rerank_top_n": cfg.get("rerank_top_n", 8),
+                    "use_reranker": cfg.get("use_reranker", True),
+                    "similarity_top_k": cfg["similarity_top_k"],
+                    "node_raw": str(sample["node"]),
+                    "question": str(sample["question"]),
+                    "gold_answer": str(sample["answer"]),
+                    "_parsed_citations": sample["_parsed_citations"],
+                    # Results (filled in during phases below)
+                    "token_recall": None,
+                    "retrieval_efficiency": None,
+                    "token_f1": None,
+                    "coverage_continuity": None,
+                    "gap_count": None,
+                    "mean_gap_size": None,
+                    "chunk_redundancy": None,
+                    "mrr": None,
+                    "rank_weighted_coverage": None,
+                    "effective_chunk_ratio": None,
+                    "min_k_full_coverage": None,
+                    "4gram_recall": None,
+                    "4gram_precision": None,
+                    "4gram_f1": None,
+                    "4gram_iou": None,
+                    **{col: None for col in _TOP1_RETRIEVAL_COLS},
+                    "raw_chunks": "",  # JSON list of all retrieved chunks (Phase 3a)
+                    "reranked_chunks": "",  # JSON list of reranked chunks; "" if no reranker (Phase 3a)
+                    "chunk_file_names": "",  # JSON list of filenames (Phase 3a)
+                    "num_chunks_retrieved": float("nan"),
+                    "retrieval_ms": float("nan"),
+                    "synthesized_answer": "",
+                    "synthesis_ms": float("nan"),
+                    "semantic_similarity": float("nan"),
+                    "coverage": pd.NA,
+                    "contradiction": pd.NA,
+                    "relevance": pd.NA,
+                    "precision": pd.NA,
+                    "overall": pd.NA,
+                    "reason": "",
+                }
+            )
 
     # Build detail_df: start from existing or fresh
     if existing_detail is not None:
@@ -893,15 +948,14 @@ def run_benchmark() -> None:
         if "retrieved_chunks" in detail_df.columns:
             detail_df = detail_df.drop(columns=["retrieved_chunks"])
         if "hws_chunk_size" not in detail_df.columns:
-            detail_df["hws_chunk_size"] = detail_df["config"].str.extract(r'hcs(\d+)', expand=False).fillna("")
+            detail_df["hws_chunk_size"] = (
+                detail_df["config"].str.extract(r"hcs(\d+)", expand=False).fillna("")
+            )
         if "use_reranker" not in detail_df.columns:
             detail_df["use_reranker"] = ~detail_df["config"].str.contains("norerank")
         # Ensure all expected rows exist (add new configs/samples)
         existing_keys = set(zip(detail_df["config"], detail_df["question"]))
-        new_rows = [
-            r for r in all_rows
-            if (r["config"], r["question"]) not in existing_keys
-        ]
+        new_rows = [r for r in all_rows if (r["config"], r["question"]) not in existing_keys]
         if new_rows:
             print(f"  [Resume] Adding {len(new_rows)} new rows not in existing results")
             new_df = pd.DataFrame(new_rows).drop(columns=["_parsed_citations"])
@@ -921,9 +975,11 @@ def run_benchmark() -> None:
     # ── Phase 1.5: Preflight index audit (read-only, no changes) ─────────────
     # Report every index status BEFORE touching anything.
     # Uses sqlite3 directly — no ChromaDB client, no file lock risk.
-    print(f"\n{'='*70}")
-    print(f"[Preflight] Auditing {len(set(_index_cache_key(c) for c in CONFIGS))} unique indices...")
-    print(f"{'='*70}")
+    print(f"\n{'=' * 70}")
+    print(
+        f"[Preflight] Auditing {len(set(_index_cache_key(c) for c in CONFIGS))} unique indices..."
+    )
+    print(f"{'=' * 70}")
     _audit_ok, _audit_stale, _audit_missing = [], [], []
     _seen_audit: set[tuple] = set()
     for cfg in CONFIGS:
@@ -941,7 +997,8 @@ def run_benchmark() -> None:
                 _audit_missing.append(label)
             else:
                 node_dirs = [
-                    d for d in os.listdir(variant_path)
+                    d
+                    for d in os.listdir(variant_path)
                     if os.path.isdir(os.path.join(variant_path, d))
                 ]
                 ready = sum(
@@ -964,6 +1021,7 @@ def run_benchmark() -> None:
             _audit_stale.append(label)
         else:
             import sqlite3 as _sq3
+
             try:
                 _conn = _sq3.connect(f"file:{db_path}?mode=ro", uri=True)
                 _count = _conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
@@ -977,20 +1035,24 @@ def run_benchmark() -> None:
             except Exception as _e:
                 print(f"  [ERROR   ] {label}  ← {_e}")
                 _audit_stale.append(label)
-    print(f"\n  {len(_audit_ok)} OK  |  {len(_audit_stale)} stale/broken  |  {len(_audit_missing)} missing")
+    print(
+        f"\n  {len(_audit_ok)} OK  |  {len(_audit_stale)} stale/broken  |  {len(_audit_missing)} missing"
+    )
     if _audit_stale:
-        print(f"  WARNING: {len(_audit_stale)} stale director{'y' if len(_audit_stale)==1 else 'ies'} will be DELETED and rebuilt:")
+        print(
+            f"  WARNING: {len(_audit_stale)} stale director{'y' if len(_audit_stale) == 1 else 'ies'} will be DELETED and rebuilt:"
+        )
         for p in _audit_stale:
             print(f"    - {p}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     # ── Phase 2: Build missing indices on disk ────────────────────────────────
     if not FORCE_REBUILD_INDICES and not configs_needing_retrieval:
         print(f"\n[Phase 2] Skipped — all chunks already in table.")
     else:
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"[Phase 2] Checking/building indices ({n_configs} configs)...")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         seen_index_keys: set[tuple] = set()
         for cfg in CONFIGS:
             key = _index_cache_key(cfg)
@@ -1009,9 +1071,9 @@ def run_benchmark() -> None:
     # ── Phase 3: Retrieval + metrics (no LLM) ─────────────────────────────────
     # Process one index at a time: load → precompute embeddings → run all its
     # configs → teardown → next. Never holds more than one index in memory.
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"[Phase 3] Running retrieval + metrics for all configs...")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     all_questions = list(test_df["question"].astype(str).unique())
     precomputed_embedding_models: set[str] = set()
@@ -1039,12 +1101,16 @@ def run_benchmark() -> None:
         if emb_name not in precomputed_embedding_models:
             missing = [q for q in all_questions if (emb_name, q) not in _QUERY_EMBEDDING_CACHE]
             if missing:
-                print(f"\n  [{emb_name}] Embedding {len(missing)}/{len(all_questions)} new questions (rest cached)...")
+                print(
+                    f"\n  [{emb_name}] Embedding {len(missing)}/{len(all_questions)} new questions (rest cached)..."
+                )
                 embeddings = rag_engine.embed_queries_batch(missing)
                 for q, emb in zip(missing, embeddings):
                     _QUERY_EMBEDDING_CACHE[(emb_name, q)] = emb
                 save_embedding_cache()
-                print(f"  [{emb_name}] Cache updated ({len(_QUERY_EMBEDDING_CACHE)} total entries).")
+                print(
+                    f"  [{emb_name}] Cache updated ({len(_QUERY_EMBEDDING_CACHE)} total entries)."
+                )
             else:
                 print(f"\n  [{emb_name}] All {len(all_questions)} query embeddings already cached.")
             precomputed_embedding_models.add(emb_name)
@@ -1056,14 +1122,16 @@ def run_benchmark() -> None:
             rerank_top_n = cfg["rerank_top_n"]
             use_reranker = cfg.get("use_reranker", True)
 
-            print(f"\n{'─'*70}")
+            print(f"\n{'─' * 70}")
             print(f"[Config] {config_name}")
-            print(f"{'─'*70}")
+            print(f"{'─' * 70}")
 
             _ok = detail_df["raw_chunks"].apply(
                 lambda v: pd.notna(v) and bool(str(v).strip()) and str(v).strip() != "nan"
             )
-            needs_retrieval = detail_df[(detail_df["config"] == config_name) & ~_ok].to_dict("records")
+            needs_retrieval = detail_df[(detail_df["config"] == config_name) & ~_ok].to_dict(
+                "records"
+            )
 
             if not needs_retrieval:
                 print(f"  [Skip] All {n_samples} samples already retrieved")
@@ -1076,7 +1144,9 @@ def run_benchmark() -> None:
 
                 node_id = _resolve_node_id(raw_node, all_node_ids)
                 node_meta = data_processor.nodes[node_id]
-                print(f"  [{i}/{len(needs_retrieval)}] node={node_id} | {question[:60]}...", end=" ")
+                print(
+                    f"  [{i}/{len(needs_retrieval)}] node={node_id} | {question[:60]}...", end=" "
+                )
 
                 t0 = time.time()
                 # Temporarily null out reranker for no-reranker configs so
@@ -1093,15 +1163,21 @@ def run_benchmark() -> None:
                     elif chunking == "lightrag":
                         # LightRAG uses its own async retrieval (owns chunking +
                         # embedding + reranking inside the per-node graph).
-                        result = asyncio.run(rag_engine.aretrieve_filtered(
-                            question=question,
-                            node_ids=[node_id],
-                            chunking=chunking,
-                            retriever_type=retriever_type,
-                            rerank_top_n=rerank_top_n,
-                        ))
+                        result = asyncio.run(
+                            rag_engine.aretrieve_filtered(
+                                question=question,
+                                node_ids=[node_id],
+                                chunking=chunking,
+                                retriever_type=retriever_type,
+                                rerank_top_n=rerank_top_n,
+                            )
+                        )
                         raw_chunks = [n.node.get_content() for n in result.raw]
-                        reranked_chunks = [n.node.get_content() for n in result.reranked] if result.reranked is not None else []
+                        reranked_chunks = (
+                            [n.node.get_content() for n in result.reranked]
+                            if result.reranked is not None
+                            else []
+                        )
                         file_names = [n.node.metadata.get("file_name", "") for n in result.raw]
                         # LightRAG's tiktoken chunker may shift whitespace at chunk
                         # boundaries vs. the raw source file — skip the substring check.
@@ -1116,12 +1192,22 @@ def run_benchmark() -> None:
                         )
                         if chunking == "hierarchical_with_structure":
                             raw_chunks = [_strip_hws_heading_prefix(n.node) for n in result.raw]
-                            reranked_chunks = [_strip_hws_heading_prefix(n.node) for n in result.reranked] if result.reranked is not None else []
+                            reranked_chunks = (
+                                [_strip_hws_heading_prefix(n.node) for n in result.reranked]
+                                if result.reranked is not None
+                                else []
+                            )
                         else:
                             raw_chunks = [n.node.get_content() for n in result.raw]
-                            reranked_chunks = [n.node.get_content() for n in result.reranked] if result.reranked is not None else []
+                            reranked_chunks = (
+                                [n.node.get_content() for n in result.reranked]
+                                if result.reranked is not None
+                                else []
+                            )
                         file_names = [n.node.metadata.get("file_name", "") for n in result.raw]
-                        verify_chunks_in_source(node_meta, raw_chunks, file_names, chunking=chunking)
+                        verify_chunks_in_source(
+                            node_meta, raw_chunks, file_names, chunking=chunking
+                        )
                 finally:
                     rag_engine._reranker = _saved_reranker
 
@@ -1131,11 +1217,11 @@ def run_benchmark() -> None:
                 mask = (detail_df["config"] == config_name) & (detail_df["question"] == question)
                 assert mask.sum() == 1
                 idx = detail_df.index[mask][0]
-                detail_df.at[idx, "raw_chunks"]           = json.dumps(raw_chunks)
-                detail_df.at[idx, "reranked_chunks"]      = json.dumps(reranked_chunks)
-                detail_df.at[idx, "chunk_file_names"]     = json.dumps(file_names)
+                detail_df.at[idx, "raw_chunks"] = json.dumps(raw_chunks)
+                detail_df.at[idx, "reranked_chunks"] = json.dumps(reranked_chunks)
+                detail_df.at[idx, "chunk_file_names"] = json.dumps(file_names)
                 detail_df.at[idx, "num_chunks_retrieved"] = len(raw_chunks)
-                detail_df.at[idx, "retrieval_ms"]         = retrieval_ms
+                detail_df.at[idx, "retrieval_ms"] = retrieval_ms
                 save_detail(detail_df)  # throttled — writes at most every 5 minutes
 
         # Teardown this index before loading the next
@@ -1146,14 +1232,13 @@ def run_benchmark() -> None:
     save_detail(detail_df, force=True)
 
     # ── Phase 3b: Compute metrics from saved chunks (no LLM, no index) ────────
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"[Phase 3b] Computing retrieval metrics from saved chunks...")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     # Build lookup: (config, question) → citation_segments
     citation_lookup: dict[tuple[str, str], list] = {
-        (row["config"], row["question"]): row["_parsed_citations"]
-        for row in all_rows
+        (row["config"], row["question"]): row["_parsed_citations"] for row in all_rows
     }
 
     if "coverage_continuity" not in detail_df.columns:
@@ -1161,26 +1246,33 @@ def run_benchmark() -> None:
     if "top1_token_recall" not in detail_df.columns:
         detail_df["top1_token_recall"] = None
 
-    needs_full  = set(detail_df[pd.isna(detail_df["coverage_continuity"])].index)
-    needs_top1  = set(detail_df[pd.isna(detail_df["top1_token_recall"])].index)
+    needs_full = set(detail_df[pd.isna(detail_df["coverage_continuity"])].index)
+    needs_top1 = set(detail_df[pd.isna(detail_df["top1_token_recall"])].index)
     needs_metrics = sorted(needs_full | needs_top1)
-    print(f"  {len(needs_metrics)} rows need metric computation ({len(needs_full)} full, {len(needs_top1)} top1).")
+    print(
+        f"  {len(needs_metrics)} rows need metric computation ({len(needs_full)} full, {len(needs_top1)} top1)."
+    )
     for i, idx in enumerate(needs_metrics, 1):
         row = detail_df.loc[idx]
         raw_str = row.get("raw_chunks", "")
-        assert pd.notna(raw_str) and str(raw_str).strip(), \
+        assert pd.notna(raw_str) and str(raw_str).strip(), (
             f"Row {idx} has no saved raw_chunks — Phase 3a must complete first"
+        )
         raw_chunks = json.loads(str(raw_str))
-        assert isinstance(raw_chunks, list) and len(raw_chunks) > 0, \
+        assert isinstance(raw_chunks, list) and len(raw_chunks) > 0, (
             f"Row {idx}: raw_chunks is empty — retrieval must have returned nothing"
+        )
         expected_n = int(row["num_chunks_retrieved"])
-        assert len(raw_chunks) == expected_n, \
+        assert len(raw_chunks) == expected_n, (
             f"Row {idx}: chunk count mismatch: {len(raw_chunks)} in JSON vs {expected_n} in num_chunks_retrieved"
+        )
 
         reranked_str = row.get("reranked_chunks", "")
-        reranked_chunks = (json.loads(str(reranked_str))
-                           if pd.notna(reranked_str) and str(reranked_str).strip() not in ("", "nan", "[]")
-                           else [])
+        reranked_chunks = (
+            json.loads(str(reranked_str))
+            if pd.notna(reranked_str) and str(reranked_str).strip() not in ("", "nan", "[]")
+            else []
+        )
 
         # Use reranked if available, else raw; cap both at rerank_top_n for fair comparison
         rerank_top_n_val = int(row.get("rerank_top_n", 8))
@@ -1204,7 +1296,7 @@ def run_benchmark() -> None:
         if idx in needs_top1:
             top1_metrics = compute_retrieval_metrics(target_text, effective[:1])
             for col in _TOP1_RETRIEVAL_COLS:
-                detail_df.at[idx, col] = top1_metrics[col[len("top1_"):]]
+                detail_df.at[idx, col] = top1_metrics[col[len("top1_") :]]
 
         save_detail(detail_df)  # throttled
 
@@ -1214,6 +1306,7 @@ def run_benchmark() -> None:
     print(f"\nResults saved:")
     print(f"  Detail:  {DETAIL_CSV}")
     print(f"  Summary: {os.path.join(OUTPUT_DIR, 'results_summary.csv')}")
+
 
 # ==============================================================================
 # ENTRY POINT

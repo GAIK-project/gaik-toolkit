@@ -30,9 +30,11 @@ MARGIN = 15 * mm
 CONTENT_WIDTH = PAGE_WIDTH - (2 * MARGIN)
 
 # Styling constants
-HEADER_LABEL_BG = colors.Color(0.77, 0.65, 0.46)  # #C4A574 tan/brown for header rows (Kohde, Sää, etc.)
-MAIN_LABEL_BG = colors.Color(0.91, 0.87, 0.79)    # #E8DEC9 light brown/beige for main content labels
-LIGHT_GRAY = colors.Color(0.93, 0.93, 0.93)       # #EDEDED light gray for main table labels
+HEADER_LABEL_BG = colors.Color(
+    0.77, 0.65, 0.46
+)  # #C4A574 tan/brown for header rows (Kohde, Sää, etc.)
+MAIN_LABEL_BG = colors.Color(0.91, 0.87, 0.79)  # #E8DEC9 light brown/beige for main content labels
+LIGHT_GRAY = colors.Color(0.93, 0.93, 0.93)  # #EDEDED light gray for main table labels
 WHITE = colors.white
 BLACK = colors.black
 
@@ -158,27 +160,32 @@ def _format_resurssit_henkilosto(value: str, styles: dict) -> Table:
     # Create inner grid table
     col_width = (VALUE_COL_WIDTH - 20) / 2
     grid_table = Table(grid_data, colWidths=[col_width, col_width])
-    grid_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
+    grid_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
+    )
 
     # Combine header and grid
-    content_table = Table(
-        [[header], [grid_table]],
-        colWidths=[VALUE_COL_WIDTH - 10]
+    content_table = Table([[header], [grid_table]], colWidths=[VALUE_COL_WIDTH - 10])
+    content_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]
+        )
     )
-    content_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
 
     return content_table
 
@@ -239,22 +246,22 @@ def _build_image_grid(images: list[str], max_cols: int = 5) -> Table:
 
     col_width = THUMB_SIZE + 4
     grid_table = Table(rows, colWidths=[col_width] * max_cols)
-    grid_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 2),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 2),
-        ("TOPPADDING", (0, 0), (-1, -1), 2),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-    ]))
+    grid_table.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 2),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]
+        )
+    )
     return grid_table
 
 
-def _build_header_table(
-    data: dict[str, Any],
-    styles: dict,
-    logo_path: str | None = None
-) -> Table:
+def _build_header_table(data: dict[str, Any], styles: dict, logo_path: str | None = None) -> Table:
     """Build the header section with logo and title."""
     # Logo placeholder or actual logo
     if logo_path and Path(logo_path).exists():
@@ -266,16 +273,17 @@ def _build_header_table(
     title = Paragraph("<b>TYÖMAAPÄIVÄKIRJA</b>", styles["title"])
 
     header_data = [[logo, title]]
-    header_table = Table(
-        header_data,
-        colWidths=[CONTENT_WIDTH * 0.5, CONTENT_WIDTH * 0.5]
+    header_table = Table(header_data, colWidths=[CONTENT_WIDTH * 0.5, CONTENT_WIDTH * 0.5])
+    header_table.setStyle(
+        TableStyle(
+            [
+                ("ALIGN", (0, 0), (0, 0), "LEFT"),
+                ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ]
+        )
     )
-    header_table.setStyle(TableStyle([
-        ("ALIGN", (0, 0), (0, 0), "LEFT"),
-        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-    ]))
     return header_table
 
 
@@ -305,25 +313,29 @@ def _build_info_table(data: dict[str, Any], styles: dict) -> Table:
     # Fourth column reduced by half, second column increased by same amount
     remaining_width = CONTENT_WIDTH - LABEL_COL_WIDTH
     fourth_col_width = remaining_width * 0.165  # Half of original 0.33
-    extra_width = remaining_width * 0.165       # Added to second column
+    extra_width = remaining_width * 0.165  # Added to second column
     col_widths = [
-        LABEL_COL_WIDTH,                        # Kohde/Sää label - same as main table
-        remaining_width * 0.50 + extra_width,   # Kohde/Sää value (wider)
-        remaining_width * 0.17,                 # Laatija/Päivämäärä label
-        fourth_col_width,                       # Laatija/Päivämäärä value (narrower)
+        LABEL_COL_WIDTH,  # Kohde/Sää label - same as main table
+        remaining_width * 0.50 + extra_width,  # Kohde/Sää value (wider)
+        remaining_width * 0.17,  # Laatija/Päivämäärä label
+        fourth_col_width,  # Laatija/Päivämäärä value (narrower)
     ]
     info_table = Table(info_data, colWidths=col_widths)
     # All columns white background
-    info_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), WHITE),
-        ("BOX", (0, 0), (-1, -1), 1, BLACK),
-        ("INNERGRID", (0, 0), (-1, -1), 0.5, BLACK),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 5),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-    ]))
+    info_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), WHITE),
+                ("BOX", (0, 0), (-1, -1), 1, BLACK),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, BLACK),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
     return info_table
 
 
@@ -331,7 +343,7 @@ def _build_main_table(
     data: dict[str, Any],
     styles: dict,
     images: list[str] | None = None,
-    field_specs: list | None = None
+    field_specs: list | None = None,
 ) -> Table:
     """Build the main content table with all diary fields dynamically.
 
@@ -393,8 +405,17 @@ def _build_main_table(
         # Normalize field name for special handling
         normalized_field = normalize_key(field_name)
         is_liitteet = normalized_field == "liitteet"
-        is_resurssit = normalized_field in ("resurssit_henkilosto", "resurssit_henkilöstö", "resurssit")
-        is_paivan_tyot = normalized_field in ("paivan_tyot_omat_tyot", "päivän_työt_omat_työt", "päivän_työt", "paivan_tyot")
+        is_resurssit = normalized_field in (
+            "resurssit_henkilosto",
+            "resurssit_henkilöstö",
+            "resurssit",
+        )
+        is_paivan_tyot = normalized_field in (
+            "paivan_tyot_omat_tyot",
+            "päivän_työt_omat_työt",
+            "päivän_työt",
+            "paivan_tyot",
+        )
 
         # Use the provided label or fallback to generated label
         label = field.get("label") or get_display_label(field_name)
@@ -408,55 +429,68 @@ def _build_main_table(
                 count_text = f"{len(images)} kuvaa"
                 content = Table(
                     [[Paragraph(count_text, styles["value"])], [image_grid]],
-                    colWidths=[VALUE_COL_WIDTH - 10]
+                    colWidths=[VALUE_COL_WIDTH - 10],
                 )
-                content.setStyle(TableStyle([
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                    ("TOPPADDING", (0, 0), (-1, -1), 0),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-                ]))
-                table_data.append([
-                    _make_label_cell(label, styles),
-                    content,
-                ])
+                content.setStyle(
+                    TableStyle(
+                        [
+                            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                            ("TOPPADDING", (0, 0), (-1, -1), 0),
+                            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                        ]
+                    )
+                )
+                table_data.append(
+                    [
+                        _make_label_cell(label, styles),
+                        content,
+                    ]
+                )
             else:
-                table_data.append([
-                    _make_label_cell(label, styles),
-                    _make_value_cell(value or f"{len(images)} kuvaa", styles),
-                ])
+                table_data.append(
+                    [
+                        _make_label_cell(label, styles),
+                        _make_value_cell(value or f"{len(images)} kuvaa", styles),
+                    ]
+                )
         # Special handling for resurssit_henkilosto - 2x2 table format
         elif is_resurssit and value:
             content = _format_resurssit_henkilosto(value, styles)
-            table_data.append([
-                _make_label_cell(label, styles),
-                content,
-            ])
+            table_data.append(
+                [
+                    _make_label_cell(label, styles),
+                    content,
+                ]
+            )
         # Special handling for paivan_tyot_omat_tyot - each item on new line
         elif is_paivan_tyot and value:
             content = _format_multiline_list(value, styles)
-            table_data.append([
-                _make_label_cell(label, styles),
-                content,
-            ])
+            table_data.append(
+                [
+                    _make_label_cell(label, styles),
+                    content,
+                ]
+            )
         else:
-            table_data.append([
-                _make_label_cell(label, styles),
-                _make_value_cell(value, styles),
-            ])
+            table_data.append(
+                [
+                    _make_label_cell(label, styles),
+                    _make_value_cell(value, styles),
+                ]
+            )
 
     # If no fields found, add a placeholder row
     if not table_data:
-        table_data.append([
-            _make_label_cell("Ei kenttiä", styles),
-            _make_value_cell("Ei tietoja", styles),
-        ])
+        table_data.append(
+            [
+                _make_label_cell("Ei kenttiä", styles),
+                _make_value_cell("Ei tietoja", styles),
+            ]
+        )
 
-    main_table = Table(
-        table_data,
-        colWidths=[LABEL_COL_WIDTH, VALUE_COL_WIDTH]
-    )
+    main_table = Table(table_data, colWidths=[LABEL_COL_WIDTH, VALUE_COL_WIDTH])
 
     # Apply styling
     style_commands = [
@@ -480,12 +514,8 @@ def _build_main_table(
 
 def _build_signature_table(data: dict[str, Any], styles: dict) -> Table:
     """Build the signature section."""
-    valvojan_allekirjoitus = _get_value(
-        data, "valvojan_allekirjoitus", "Valvojan allekirjoitus"
-    )
-    vastaavan_allekirjoitus = _get_value(
-        data, "vastaavan_allekirjoitus", "Vastaavan allekirjoitus"
-    )
+    valvojan_allekirjoitus = _get_value(data, "valvojan_allekirjoitus", "Valvojan allekirjoitus")
+    vastaavan_allekirjoitus = _get_value(data, "vastaavan_allekirjoitus", "Vastaavan allekirjoitus")
 
     sig_data = [
         [
@@ -499,17 +529,21 @@ def _build_signature_table(data: dict[str, Any], styles: dict) -> Table:
     ]
 
     sig_table = Table(sig_data, colWidths=[LABEL_COL_WIDTH, VALUE_COL_WIDTH])
-    sig_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (0, -1), LIGHT_GRAY),
-        ("BACKGROUND", (1, 0), (1, -1), WHITE),
-        ("BOX", (0, 0), (-1, -1), 1, BLACK),
-        ("INNERGRID", (0, 0), (-1, -1), 0.5, BLACK),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 5),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 15),  # Extra space for signature
-    ]))
+    sig_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (0, -1), LIGHT_GRAY),
+                ("BACKGROUND", (1, 0), (1, -1), WHITE),
+                ("BOX", (0, 0), (-1, -1), 1, BLACK),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, BLACK),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 15),  # Extra space for signature
+            ]
+        )
+    )
     return sig_table
 
 

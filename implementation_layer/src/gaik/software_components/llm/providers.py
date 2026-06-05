@@ -42,7 +42,5 @@ def resolve_provider(
 def _validate(name: str) -> str:
     name = name.strip().lower()
     if name not in _VALID:
-        raise ValueError(
-            f"Unknown LLM provider '{name}'. Expected one of: {sorted(_VALID)}"
-        )
+        raise ValueError(f"Unknown LLM provider '{name}'. Expected one of: {sorted(_VALID)}")
     return name

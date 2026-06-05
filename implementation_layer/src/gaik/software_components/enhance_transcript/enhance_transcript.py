@@ -203,7 +203,9 @@ class TranscriptEnhancer:
         model: str | None = None,
         reasoning_effort: str | None = None,
     ) -> None:
-        config = dict(api_config) if api_config is not None else get_openai_config(use_azure=use_azure)
+        config = (
+            dict(api_config) if api_config is not None else get_openai_config(use_azure=use_azure)
+        )
         config["model"] = model or self._default_model_for_config(config)
         if not config.get("api_key"):
             key_name = "AZURE_API_KEY" if config.get("use_azure", False) else "OPENAI_API_KEY"
@@ -244,9 +246,13 @@ class TranscriptEnhancer:
             original_text=transcript_text,
             enhanced_text=enhanced_text,
             correction_summary=(
-                self._summarize_corrections(transcript_text, enhanced_text) if generate_summary else None
+                self._summarize_corrections(transcript_text, enhanced_text)
+                if generate_summary
+                else None
             ),
-            diff_chunks=self._build_diff_chunks(transcript_text, enhanced_text) if diff_chunks else None,
+            diff_chunks=self._build_diff_chunks(transcript_text, enhanced_text)
+            if diff_chunks
+            else None,
         )
 
     @staticmethod
@@ -325,14 +331,10 @@ class TranscriptEnhancer:
         domain_rules: str | None = None,
     ) -> str:
         user_prompt = (
-            f"Repair remaining ASR errors in this Finnish transcript:\n\n"
-            f"{transcript_text}"
+            f"Repair remaining ASR errors in this Finnish transcript:\n\n{transcript_text}"
         )
         if additional_instructions and additional_instructions.strip():
-            user_prompt += (
-                "\n\nADDITIONAL INSTRUCTIONS:\n"
-                f"{additional_instructions.strip()}"
-            )
+            user_prompt += f"\n\nADDITIONAL INSTRUCTIONS:\n{additional_instructions.strip()}"
 
         messages = [
             {
@@ -385,7 +387,9 @@ class TranscriptEnhancer:
         elif isinstance(content, list):
             parts: list[str] = []
             for item in content:
-                text_part = item.get("text") if isinstance(item, dict) else getattr(item, "text", None)
+                text_part = (
+                    item.get("text") if isinstance(item, dict) else getattr(item, "text", None)
+                )
                 if isinstance(text_part, str) and text_part.strip():
                     parts.append(text_part.strip())
             if parts:

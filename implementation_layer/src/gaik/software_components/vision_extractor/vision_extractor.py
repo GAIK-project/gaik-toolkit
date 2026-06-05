@@ -194,9 +194,7 @@ def _combine_with_verification(data: dict, verification: dict) -> dict:
             for i, row in enumerate(value):
                 row_ver = verification[field][i] if i < len(verification[field]) else {}
                 combined_rows.append(
-                    _combine_with_verification(row, row_ver)
-                    if isinstance(row, dict)
-                    else row
+                    _combine_with_verification(row, row_ver) if isinstance(row, dict) else row
                 )
             result[field] = combined_rows
         else:
@@ -225,24 +223,32 @@ def _make_schema_strict(schema: dict) -> dict:
     if schema.get("type") == "object" and "properties" in schema:
         schema["required"] = list(schema["properties"].keys())
         schema["additionalProperties"] = False
-        schema["properties"] = {
-            k: _make_schema_strict(v) for k, v in schema["properties"].items()
-        }
+        schema["properties"] = {k: _make_schema_strict(v) for k, v in schema["properties"].items()}
     if "$defs" in schema:
-        schema["$defs"] = {
-            k: _make_schema_strict(v) for k, v in schema["$defs"].items()
-        }
+        schema["$defs"] = {k: _make_schema_strict(v) for k, v in schema["$defs"].items()}
     if schema.get("type") == "array" and "items" in schema:
         schema["items"] = _make_schema_strict(schema["items"])
     return schema
 
 
-_GEMINI_UNSUPPORTED_KEYS = frozenset({
-    "additionalProperties", "title", "default",
-    "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum",
-    "minLength", "maxLength", "minItems", "maxItems",
-    "pattern", "$schema", "definitions",
-})
+_GEMINI_UNSUPPORTED_KEYS = frozenset(
+    {
+        "additionalProperties",
+        "title",
+        "default",
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "minLength",
+        "maxLength",
+        "minItems",
+        "maxItems",
+        "pattern",
+        "$schema",
+        "definitions",
+    }
+)
 
 
 def _prepare_google_schema(schema: dict) -> dict:
@@ -329,8 +335,7 @@ def _normalize_schema_value(value):
         return _normalize_gemini_schema(value)
     if isinstance(value, list):
         return [
-            _normalize_gemini_schema(item) if isinstance(item, dict) else item
-            for item in value
+            _normalize_gemini_schema(item) if isinstance(item, dict) else item for item in value
         ]
     return value
 
@@ -349,7 +354,9 @@ def _strip_gemini_unsupported(schema: dict) -> dict:
         if isinstance(value, dict):
             result[key] = _strip_gemini_unsupported(value)
         elif isinstance(value, list):
-            result[key] = [_strip_gemini_unsupported(i) if isinstance(i, dict) else i for i in value]
+            result[key] = [
+                _strip_gemini_unsupported(i) if isinstance(i, dict) else i for i in value
+            ]
         else:
             result[key] = value
     return result
@@ -368,7 +375,7 @@ def _inline_schema_refs(schema: dict) -> dict:
         if "$ref" in node:
             ref = node["$ref"]
             if ref.startswith("#/$defs/"):
-                name = ref[len("#/$defs/"):]
+                name = ref[len("#/$defs/") :]
                 if name in defs:
                     return resolve(dict(defs[name]))
             return node
@@ -416,6 +423,7 @@ def _save_schema_to_python(model: type[BaseModel], path: Path) -> None:
             return f"Union[{', '.join(ann_repr(a) for a in args)}]"
         try:
             import types as _t
+
             if isinstance(ann, _t.UnionType):
                 args = get_args(ann)
                 non_none = [a for a in args if a is not type(None)]
@@ -517,7 +525,7 @@ def _load_saved_requirements(path: Path) -> tuple[str, RequirementsSpec]:
         # Migrate old single-child format (child_container_name / child_requirements)
         # to the new children list format.
         if "child_container_name" in raw and "children" not in raw:
-            from gaik.software_components.extractor.schema import ChildRequirements
+
             raw = {
                 "parent_requirements": raw["parent_requirements"],
                 "children": [
@@ -658,11 +666,13 @@ class VisionExtractor:
             from gaik.software_components.parsers.multimodal_parser.config import (
                 get_claude_config,
             )
+
             self.config = get_claude_config(use_azure=use_azure)
         elif model_provider == "google":
             from gaik.software_components.parsers.multimodal_parser.config import (
                 get_google_config,
             )
+
             self.config = get_google_config(vertex_ai=vertex_ai)
         else:
             raise ValueError(f"Unknown model_provider '{model_provider}'")
@@ -697,9 +707,7 @@ class VisionExtractor:
             3. Otherwise → generate via SchemaGenerator (text LLM call).
         """
         if extraction_model is None or requirements is None:
-            extraction_model, requirements = self._resolve_schema(
-                user_requirements, schema_dir
-            )
+            extraction_model, requirements = self._resolve_schema(user_requirements, schema_dir)
 
         llm_model = (
             _wrap_model_for_verification(extraction_model)
@@ -709,9 +717,7 @@ class VisionExtractor:
 
         file_path_list = [Path(p) for p in file_paths]
         t0 = time.perf_counter()
-        result_dict, usage = self._extract(
-            file_path_list, llm_model, user_requirements
-        )
+        result_dict, usage = self._extract(file_path_list, llm_model, user_requirements)
         duration_s = round(time.perf_counter() - t0, 3)
 
         result_dict = self._normalize_numeric_placeholders(result_dict, requirements)
@@ -799,9 +805,7 @@ class VisionExtractor:
 
         file_path_list = [Path(p) for p in file_paths]
         t0 = time.perf_counter()
-        result_dict, usage = self._extract(
-            file_path_list, _RequirementsSuggestion, prompt
-        )
+        result_dict, usage = self._extract(file_path_list, _RequirementsSuggestion, prompt)
         duration_s = round(time.perf_counter() - t0, 3)
 
         validated = _RequirementsSuggestion.model_validate(result_dict)
@@ -821,9 +825,7 @@ class VisionExtractor:
         return model.model_validate(result_dict).model_dump()
 
     @staticmethod
-    def _normalize_numeric_placeholders(
-        result_dict: dict, requirements: RequirementsSpec
-    ) -> dict:
+    def _normalize_numeric_placeholders(result_dict: dict, requirements: RequirementsSpec) -> dict:
         """Convert blank numeric placeholders to None before Pydantic validation."""
 
         def coerce_fields(data: dict, req: ExtractionRequirements) -> None:
@@ -935,16 +937,20 @@ class VisionExtractor:
             mime = _detect_mime_type(fp)
             b64 = _encode_pdf_base64(fp)
             if _is_pdf(fp):
-                content.append({
-                    "type": "document",
-                    "title": fp.name,
-                    "source": {"type": "base64", "media_type": mime, "data": b64},
-                })
+                content.append(
+                    {
+                        "type": "document",
+                        "title": fp.name,
+                        "source": {"type": "base64", "media_type": mime, "data": b64},
+                    }
+                )
             else:
-                content.append({
-                    "type": "image",
-                    "source": {"type": "base64", "media_type": mime, "data": b64},
-                })
+                content.append(
+                    {
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": mime, "data": b64},
+                    }
+                )
         content.append({"type": "text", "text": user_prompt})
 
         tool_schema = {
@@ -973,7 +979,9 @@ class VisionExtractor:
                 result_dict = block.input
                 break
         if not result_dict:
-            raise ValueError(f"Claude did not call the extract_data tool. Response: {response.content}")
+            raise ValueError(
+                f"Claude did not call the extract_data tool. Response: {response.content}"
+            )
 
         usage_dict = _extract_claude_usage(response)
         usage = (
@@ -1045,9 +1053,7 @@ class VisionExtractor:
         # Exclude thought blocks (present when includeThoughts=True) — they are
         # not JSON and must not be passed to json.loads.
         text_parts = [
-            p.get("text", "")
-            for p in candidate_parts
-            if p.get("text") and not p.get("thought")
+            p.get("text", "") for p in candidate_parts if p.get("text") and not p.get("thought")
         ]
         if not text_parts:
             raise ValueError(f"Gemini response had no text parts: {payload}")
@@ -1067,12 +1073,8 @@ class VisionExtractor:
         if isinstance(requirements, CompositeExtractionRequirements):
             child_keys = {c.container_name for c in requirements.children}
             parent_data = {k: v for k, v in result_dict.items() if k not in child_keys}
-            parent_data = apply_field_policies(
-                parent_data, requirements.parent_requirements
-            )
-            parent_data = normalize_extracted_data(
-                parent_data, requirements.parent_requirements
-            )
+            parent_data = apply_field_policies(parent_data, requirements.parent_requirements)
+            parent_data = normalize_extracted_data(parent_data, requirements.parent_requirements)
 
             for child in requirements.children:
                 child_rows = result_dict.get(child.container_name, [])
@@ -1101,9 +1103,7 @@ class VisionExtractor:
 
         for key, value in list(result_dict.items()):
             if isinstance(value, list) and value and isinstance(value[0], dict):
-                result_dict[key] = [
-                    normalize_extracted_data(item, requirements) for item in value
-                ]
+                result_dict[key] = [normalize_extracted_data(item, requirements) for item in value]
         result_dict = normalize_extracted_data(result_dict, requirements)
         return result_dict
 
@@ -1133,7 +1133,9 @@ class VisionExtractor:
             schema_dir = Path(schema_dir)
             schema_dir.mkdir(parents=True, exist_ok=True)
             _save_schema_to_python(extraction_model, schema_dir / "schema.py")
-            _save_requirements(requirements, extraction_model.__name__, schema_dir / "requirements.json")
+            _save_requirements(
+                requirements, extraction_model.__name__, schema_dir / "requirements.json"
+            )
             print(f"Schema saved to {schema_dir}")
 
         return extraction_model, requirements
@@ -1147,9 +1149,7 @@ class VisionExtractor:
         return prompt
 
     def _get_user_prompt(self, user_requirements: str) -> str:
-        prompt = USER_PROMPTS[self.model_provider].format(
-            user_requirements=user_requirements
-        )
+        prompt = USER_PROMPTS[self.model_provider].format(user_requirements=user_requirements)
         if self.merge_table:
             prompt = prompt.rstrip() + "\nIf a table is split across multiple pages, combine it.\n"
         if self.additional_instructions:

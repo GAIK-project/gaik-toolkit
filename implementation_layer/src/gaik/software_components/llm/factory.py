@@ -37,8 +37,7 @@ def create_llm_client(config: dict) -> ProviderClient:
             from gaik.software_components.llm.google_provider import GoogleProvider
         except ImportError as exc:
             raise ImportError(
-                "Google provider requires the 'llm-google' extra: "
-                "pip install 'gaik[llm-google]'"
+                "Google provider requires the 'llm-google' extra: pip install 'gaik[llm-google]'"
             ) from exc
         return GoogleProvider(config)
     raise ValueError(f"Unsupported provider: {name}")

@@ -245,7 +245,9 @@ async def validate_pdf(
         try:
             from gaik.software_components.validators import ValidationRubric
         except ImportError as e:
-            raise HTTPException(status_code=503, detail=f"{JUDGE_NOT_AVAILABLE_DETAIL} ({e})") from e
+            raise HTTPException(
+                status_code=503, detail=f"{JUDGE_NOT_AVAILABLE_DETAIL} ({e})"
+            ) from e
 
         try:
             rubric_obj = ValidationRubric(**rubric_payload)

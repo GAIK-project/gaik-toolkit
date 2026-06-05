@@ -83,9 +83,7 @@ class PDFResult:
 class StructuredDataToPDF:
     """Generate PDF documents from Pydantic model instances or dicts."""
 
-    def __init__(
-        self, title: str = "Document", logo_path: str | Path | None = None
-    ) -> None:
+    def __init__(self, title: str = "Document", logo_path: str | Path | None = None) -> None:
         """Initialize the PDF generator.
 
         Args:
@@ -228,9 +226,7 @@ class StructuredDataToPDF:
         pdf.set_font(self._font_family, style="", size=11)
         pdf.ln(1)
 
-    def _write_key_value(
-        self, pdf: FPDF, key: str, value: str, indent: int = 0
-    ) -> None:
+    def _write_key_value(self, pdf: FPDF, key: str, value: str, indent: int = 0) -> None:
         """Write a key-value pair with bold key."""
         left_margin = 10 + (indent * 10)
         pdf.set_x(left_margin)
@@ -246,9 +242,7 @@ class StructuredDataToPDF:
         else:
             pdf.cell(0, 7, value, ln=True)
 
-    def _write_line(
-        self, pdf: FPDF, text: str, indent: int = 0, bold: bool = False
-    ) -> None:
+    def _write_line(self, pdf: FPDF, text: str, indent: int = 0, bold: bool = False) -> None:
         """Write a line of text to the PDF."""
         left_margin = 10 + (indent * 10)
         pdf.set_x(left_margin)

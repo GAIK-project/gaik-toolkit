@@ -87,9 +87,7 @@ def main() -> None:
                 if v.is_hallucination
                 else "WRONG"
             )
-            print(
-                f"  [{tag}] {v.field}: expected={v.expected!r}  extracted={v.extracted!r}"
-            )
+            print(f"  [{tag}] {v.field}: expected={v.expected!r}  extracted={v.extracted!r}")
         print()
 
     print("=== Aggregate ===")

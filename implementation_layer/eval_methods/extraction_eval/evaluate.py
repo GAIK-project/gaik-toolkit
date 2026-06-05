@@ -18,7 +18,7 @@ EXACT_FIELDS = [
     "tarkkailijaOnKesatyontekija",
     "paivamaara",
     "kellonaika",
-    "lahellaPitiTilanne"
+    "lahellaPitiTilanne",
 ]
 
 # The fields requiring semantic matching
@@ -28,7 +28,7 @@ SEMANTIC_FIELDS = [
     "mitaTapahtui",
     "mahdollisetSeuraukset",
     "toteutetutToimenpiteet",
-    "ehdotus"
+    "ehdotus",
 ]
 
 # The order in which the fields should appear
@@ -45,7 +45,7 @@ FIELD_ORDER = [
     "lahellaPitiTilanne",
     "mahdollisetSeuraukset",
     "toteutetutToimenpiteet",
-    "ehdotus"
+    "ehdotus",
 ]
 
 ALL_FIELDS = FIELD_ORDER
@@ -93,10 +93,7 @@ def normalize_date(text):
 
 
 def get_embedding(text):
-    response = client.embeddings.create(
-        model=MODEL_NAME,
-        input=text
-    )
+    response = client.embeddings.create(model=MODEL_NAME, input=text)
     return response.data[0].embedding
 
 
@@ -105,7 +102,6 @@ def cosine_sim(a, b):
 
 
 def compare_field(field, gt_value, sample_value):
-
     gt_value = "" if gt_value is None else str(gt_value).strip()
     sample_value = "" if sample_value is None else str(sample_value).strip()
 
@@ -119,7 +115,6 @@ def compare_field(field, gt_value, sample_value):
         return "FN"
 
     if field in EXACT_FIELDS:
-
         if field == "paivamaara":
             match = normalize_date(gt_value) == normalize_date(sample_value)
         else:
@@ -131,7 +126,6 @@ def compare_field(field, gt_value, sample_value):
             return "BOTH_ERR"
 
     elif field in SEMANTIC_FIELDS:
-
         emb1 = get_embedding(gt_value)
         emb2 = get_embedding(sample_value)
 
@@ -157,15 +151,13 @@ def compute_metrics(tp, tn, fp, fn):
 
 
 def evaluate():
-
     file_results = []
-    field_results = defaultdict(lambda: {"TP":0,"TN":0,"FP":0,"FN":0})
+    field_results = defaultdict(lambda: {"TP": 0, "TN": 0, "FP": 0, "FN": 0})
 
     total_TP = total_TN = total_FP = total_FN = 0
     total_files = 0
 
     for gt_file in sorted(GT_FOLDER.iterdir()):
-
         if gt_file.suffix != ".json":
             continue
 
@@ -184,7 +176,6 @@ def evaluate():
         TP = TN = FP = FN = 0
 
         for field in ALL_FIELDS:
-
             gt_value = gt.get(field)
             sample_value = sample.get(field)
 
@@ -214,16 +205,18 @@ def evaluate():
 
         precision, recall, f1 = compute_metrics(TP, TN, FP, FN)
 
-        file_results.append({
-            "file": gt_file.name,
-            "TP": TP,
-            "TN": TN,
-            "FP": FP,
-            "FN": FN,
-            "precision": round(precision, 4) if precision is not None else None,
-            "recall": round(recall, 4) if recall is not None else None,
-            "f1": round(f1, 4) if f1 is not None else None
-        })
+        file_results.append(
+            {
+                "file": gt_file.name,
+                "TP": TP,
+                "TN": TN,
+                "FP": FP,
+                "FN": FN,
+                "precision": round(precision, 4) if precision is not None else None,
+                "recall": round(recall, 4) if recall is not None else None,
+                "f1": round(f1, 4) if f1 is not None else None,
+            }
+        )
 
         total_TP += TP
         total_TN += TN
@@ -237,7 +230,23 @@ def evaluate():
 
     precision, recall, f1 = compute_metrics(total_TP, total_TN, total_FP, total_FN)
 
-    return file_results, field_results, total_TP, total_TN, total_FP, total_FN, avg_TP, avg_TN, avg_FP, avg_FN, precision, recall, f1, total_files
+    return (
+        file_results,
+        field_results,
+        total_TP,
+        total_TN,
+        total_FP,
+        total_FN,
+        avg_TP,
+        avg_TN,
+        avg_FP,
+        avg_FN,
+        precision,
+        recall,
+        f1,
+        total_files,
+    )
+
 
 def fmt(val, decimals=4):
     if val is None:
@@ -246,8 +255,22 @@ def fmt(val, decimals=4):
 
 
 def write_report():
-
-    file_results, field_results, total_TP, total_TN, total_FP, total_FN, avg_TP, avg_TN, avg_FP, avg_FN, precision, recall, f1, total_files = evaluate()
+    (
+        file_results,
+        field_results,
+        total_TP,
+        total_TN,
+        total_FP,
+        total_FN,
+        avg_TP,
+        avg_TN,
+        avg_FP,
+        avg_FN,
+        precision,
+        recall,
+        f1,
+        total_files,
+    ) = evaluate()
 
     def is_na(d):
         return d["TN"] > 0 and d["TP"] == 0 and d["FP"] == 0 and d["FN"] == 0
@@ -256,13 +279,19 @@ def write_report():
     exact_tp_total = sum(field_results[f]["TP"] for f in exact_active)
     exact_tn_total = sum(field_results[f]["TN"] for f in exact_active)
     total_exact_evaluated = len(exact_active) * total_files
-    exact_match_rate = (exact_tp_total + exact_tn_total) / total_exact_evaluated if total_exact_evaluated else 0
+    exact_match_rate = (
+        (exact_tp_total + exact_tn_total) / total_exact_evaluated if total_exact_evaluated else 0
+    )
 
     sem_active = [f for f in SEMANTIC_FIELDS if not is_na(field_results[f])]
     semantic_tp_total = sum(field_results[f]["TP"] for f in sem_active)
     semantic_tn_total = sum(field_results[f]["TN"] for f in sem_active)
     total_semantic_evaluated = len(sem_active) * total_files
-    semantic_match_rate = (semantic_tp_total + semantic_tn_total) / total_semantic_evaluated if total_semantic_evaluated else 0
+    semantic_match_rate = (
+        (semantic_tp_total + semantic_tn_total) / total_semantic_evaluated
+        if total_semantic_evaluated
+        else 0
+    )
 
     field_metrics = {}
     prec_vals = []
@@ -293,7 +322,6 @@ def write_report():
     sep = "-" * len(header)
 
     with open(REPORT_FILE, "w", encoding="utf-8") as f:
-
         f.write("========== FIELD-LEVEL RESULTS ==========\n\n")
         f.write(header + "\n")
         f.write(sep + "\n")
@@ -314,7 +342,9 @@ def write_report():
             f"{fmt(avg_prec):>{met_w}}{fmt(avg_rec):>{met_w}}{fmt(avg_f1):>{met_w}}\n"
         )
 
-        f.write(f"\n(N/A fields excluded from overall average. {len(prec_vals)}/{len(FIELD_ORDER)} fields included.)\n")
+        f.write(
+            f"\n(N/A fields excluded from overall average. {len(prec_vals)}/{len(FIELD_ORDER)} fields included.)\n"
+        )
 
         f.write("\n\n========== FILE-LEVEL RESULTS ==========\n\n")
 
@@ -338,13 +368,25 @@ def write_report():
         f.write(f"Total files evaluated:  {total_files}\n")
         f.write(f"Total fields per file:  {len(FIELD_ORDER)}\n\n")
 
-        f.write(f"Total TP: {total_TP}    Total TN: {total_TN}    Total FP: {total_FP}    Total FN: {total_FN}\n\n")
+        f.write(
+            f"Total TP: {total_TP}    Total TN: {total_TN}    Total FP: {total_FP}    Total FN: {total_FN}\n\n"
+        )
 
-        f.write(f"Precision  (P)  = TP/(TP+FP):              {fmt(precision)}  ({round(precision * 100, 2) if precision is not None else 'N/A'}%)\n")
-        f.write(f"Recall     (R)  = TP/(TP+FN):              {fmt(recall)}  ({round(recall * 100, 2) if recall is not None else 'N/A'}%)\n")
-        f.write(f"F1 Score   (F1) = 2·P·R/(P+R):             {fmt(f1)}  ({round(f1 * 100, 2) if f1 is not None else 'N/A'}%)\n")
-        f.write(f"Exact Match Rate  (EMR) = (TP+TN)/(All):   {fmt(exact_match_rate)}  ({round(exact_match_rate * 100, 2)}%)\n")
-        f.write(f"Semantic Match Rate (SMR) = (TP+TN)/(All): {fmt(semantic_match_rate)}  ({round(semantic_match_rate * 100, 2)}%)\n")
+        f.write(
+            f"Precision  (P)  = TP/(TP+FP):              {fmt(precision)}  ({round(precision * 100, 2) if precision is not None else 'N/A'}%)\n"
+        )
+        f.write(
+            f"Recall     (R)  = TP/(TP+FN):              {fmt(recall)}  ({round(recall * 100, 2) if recall is not None else 'N/A'}%)\n"
+        )
+        f.write(
+            f"F1 Score   (F1) = 2·P·R/(P+R):             {fmt(f1)}  ({round(f1 * 100, 2) if f1 is not None else 'N/A'}%)\n"
+        )
+        f.write(
+            f"Exact Match Rate  (EMR) = (TP+TN)/(All):   {fmt(exact_match_rate)}  ({round(exact_match_rate * 100, 2)}%)\n"
+        )
+        f.write(
+            f"Semantic Match Rate (SMR) = (TP+TN)/(All): {fmt(semantic_match_rate)}  ({round(semantic_match_rate * 100, 2)}%)\n"
+        )
 
 
 write_report()

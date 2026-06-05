@@ -69,9 +69,7 @@ def calibrate_against_human_labels(
     for item in dataset:
         result = judge.validate(item.source_pages, item.extracted, rubric)
         relevant = (
-            [f for f in result.flags if f.field == field_filter]
-            if field_filter
-            else result.flags
+            [f for f in result.flags if f.field == field_filter] if field_filter else result.flags
         )
 
         scores = [f.score for f in relevant if f.score]
@@ -101,11 +99,7 @@ def calibrate_against_human_labels(
     human_scores = [float(p["human_score"]) for p in per_item]
     pearson = _pearson(judge_scores, human_scores) if n > 1 else None
 
-    sev_compared = [
-        p
-        for p in per_item
-        if p["human_severity"] is not None
-    ]
+    sev_compared = [p for p in per_item if p["human_severity"] is not None]
     sev_agree = (
         sum(1 for p in sev_compared if p["human_severity"] == p["judge_severity"])
         / len(sev_compared)

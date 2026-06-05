@@ -77,11 +77,15 @@ def main() -> None:
 
     print("=== Per-judge results ===")
     for r, j in zip(result.per_judge, panel.judges, strict=True):
-        print(f"\n[{j.model_provider}/{j.model}] cost=${r.usage.cost_usd:.4f}, dur={r.usage.duration_s:.1f}s")
+        print(
+            f"\n[{j.model_provider}/{j.model}] cost=${r.usage.cost_usd:.4f}, dur={r.usage.duration_s:.1f}s"
+        )
         for flag in r.flags:
             suggestion = f" -> {flag.suggested_value!r}" if flag.suggested_value else ""
             score = f" {flag.score}/5" if flag.score else ""
-            print(f"  [{flag.severity:7s}{score}] item {flag.item_index} field={flag.field}{suggestion}")
+            print(
+                f"  [{flag.severity:7s}{score}] item {flag.item_index} field={flag.field}{suggestion}"
+            )
 
     print("\n=== Aggregated (majority vote, ties → worst severity) ===")
     print(f"Agreement: {result.agreement_score:.1%}")
@@ -89,7 +93,9 @@ def main() -> None:
     for flag in result.aggregated_flags:
         suggestion = f" -> {flag.suggested_value!r}" if flag.suggested_value else ""
         score = f" median {flag.score}/5" if flag.score else ""
-        print(f"  [{flag.severity:7s}{score}] item {flag.item_index} field={flag.field}{suggestion}")
+        print(
+            f"  [{flag.severity:7s}{score}] item {flag.item_index} field={flag.field}{suggestion}"
+        )
 
 
 if __name__ == "__main__":

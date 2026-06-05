@@ -174,9 +174,7 @@ def _evaluate_texts(reference_text, hypothesis_text):
     return word_output, char_output
 
 
-def _format_report(
-    output, cer_output=None, max_alignment_chars=2000, max_side_by_side_lines=120
-):
+def _format_report(output, cer_output=None, max_alignment_chars=2000, max_side_by_side_lines=120):
     ref_words = output.hits + output.substitutions + output.deletions
     if ref_words:
         sub_rate = output.substitutions / ref_words

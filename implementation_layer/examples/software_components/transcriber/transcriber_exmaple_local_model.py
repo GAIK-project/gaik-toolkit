@@ -1,4 +1,4 @@
-﻿"""Example for local transcription model usage with Transcriber.
+"""Example for local transcription model usage with Transcriber.
 
 Edit the configuration values below and run the script directly.
 This example keeps transcript error fixing disabled.
@@ -19,6 +19,7 @@ from gaik.software_components.transcriber import Transcriber, get_openai_config
 # ------------------------------------------------------------------
 AUDIO_FILE = Path("Sample.m4a")
 
+
 def main() -> None:
     # API config is still required for optional transcript error fixing.
     config = get_openai_config(use_azure=True)
@@ -36,7 +37,7 @@ def main() -> None:
         min_speakers=None,  # Minimum speakers for diarization range
         max_speakers=None,  # Maximum speakers for diarization range
         initial_prompt=None,  # Optional prompt hint for the local transcriber
-        enhanced_transcript_instructions=""
+        enhanced_transcript_instructions="",
     )
 
     result = transcriber.transcribe(file_path=AUDIO_FILE)
@@ -54,5 +55,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

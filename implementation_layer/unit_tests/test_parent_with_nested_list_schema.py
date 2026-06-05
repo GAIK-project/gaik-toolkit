@@ -96,9 +96,12 @@ def test_combined_model_with_multiple_children(
     second_child = ChildRequirements(
         container_name="notes",
         container_description="Notes",
-        requirements=_requirements("note", [
-            FieldSpec(field_name="note_text", field_type="str", description="Note text"),
-        ]),
+        requirements=_requirements(
+            "note",
+            [
+                FieldSpec(field_name="note_text", field_type="str", description="Note text"),
+            ],
+        ),
     )
     model = _create_parent_with_nested_list_model(
         parent_requirements=parent_requirements,
@@ -165,9 +168,12 @@ def test_composite_post_process_handles_multiple_children(
     parent_requirements: ExtractionRequirements,
     child_requirements: ExtractionRequirements,
 ):
-    note_req = _requirements("note", [
-        FieldSpec(field_name="note_text", field_type="str", description="Note text"),
-    ])
+    note_req = _requirements(
+        "note",
+        [
+            FieldSpec(field_name="note_text", field_type="str", description="Note text"),
+        ],
+    )
     requirements = CompositeExtractionRequirements(
         parent_requirements=parent_requirements,
         children=[

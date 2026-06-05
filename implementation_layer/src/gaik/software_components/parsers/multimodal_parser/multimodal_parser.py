@@ -27,9 +27,7 @@ from .usage import UsageRecord, build_usage_record
 
 logger = logging.getLogger(__name__)
 
-FENCED_BLOCK_RE = re.compile(
-    r"^```[a-zA-Z0-9_-]*\s*\n(?P<body>.*?)(?:\n```\s*)?$", re.DOTALL
-)
+FENCED_BLOCK_RE = re.compile(r"^```[a-zA-Z0-9_-]*\s*\n(?P<body>.*?)(?:\n```\s*)?$", re.DOTALL)
 DIV_BLOCK_RE = re.compile(r"<div\b[^>]*>\s*(.*?)\s*</div>", re.DOTALL)
 MARKDOWN_RENDERER = MarkdownIt("commonmark", {"html": True}).enable("table")
 
@@ -222,9 +220,7 @@ class MultimodalParser:
             "google": self._call_google,
         }
         start = time.perf_counter()
-        raw_output, usage_dict = callers[self.model_provider](
-            pdf_path, system_prompt, user_prompt
-        )
+        raw_output, usage_dict = callers[self.model_provider](pdf_path, system_prompt, user_prompt)
         duration_s = time.perf_counter() - start
         raw_markdown = _unwrap_fenced_output(raw_output)
 
@@ -248,9 +244,7 @@ class MultimodalParser:
         )
 
         clean_md = _clean_markdown(raw_markdown)
-        html_output = (
-            _markdown_to_html(clean_md, title=pdf_path.stem) if self.create_html else None
-        )
+        html_output = _markdown_to_html(clean_md, title=pdf_path.stem) if self.create_html else None
 
         return ParseResult(
             raw_markdown=raw_markdown,
@@ -318,9 +312,7 @@ class MultimodalParser:
         ) as stream:
             response = stream.get_final_message()
         text_blocks = [
-            block.text
-            for block in response.content
-            if getattr(block, "type", None) == "text"
+            block.text for block in response.content if getattr(block, "type", None) == "text"
         ]
         if not text_blocks:
             raise ValueError("The Claude response did not contain any text blocks.")
@@ -376,15 +368,9 @@ def _extract_openai_usage(response) -> dict[str, int]:
     usage = getattr(response, "usage", None)
     if usage is None:
         return {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0, "total_tokens": 0}
-    input_tok = (
-        getattr(usage, "input_tokens", None)
-        or getattr(usage, "prompt_tokens", 0)
-        or 0
-    )
+    input_tok = getattr(usage, "input_tokens", None) or getattr(usage, "prompt_tokens", 0) or 0
     output_tok = (
-        getattr(usage, "output_tokens", None)
-        or getattr(usage, "completion_tokens", 0)
-        or 0
+        getattr(usage, "output_tokens", None) or getattr(usage, "completion_tokens", 0) or 0
     )
     total_tok = getattr(usage, "total_tokens", 0) or (input_tok + output_tok)
     # Reasoning tokens (o-series / gpt-5.x)

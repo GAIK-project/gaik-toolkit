@@ -79,9 +79,7 @@ class EvaluationDataset:
                 try:
                     raw = json.loads(line)
                 except json.JSONDecodeError as exc:
-                    raise ValueError(
-                        f"Invalid JSON on {path}:{line_no}: {exc}"
-                    ) from exc
+                    raise ValueError(f"Invalid JSON on {path}:{line_no}: {exc}") from exc
                 items.append(_item_from_dict(raw))
         return cls(items=items)
 

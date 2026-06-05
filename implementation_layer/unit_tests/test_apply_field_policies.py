@@ -127,11 +127,7 @@ class TestStringRequired:
 class TestNullableString:
     def test_nullable_allows_none(self):
         reqs = _make_requirements(
-            [
-                FieldSpec(
-                    field_name="note", field_type="str", description="note", nullable=True
-                )
-            ]
+            [FieldSpec(field_name="note", field_type="str", description="note", nullable=True)]
         )
         model = create_extraction_model(reqs)
         info = model.model_fields["note"]
@@ -212,20 +208,14 @@ class TestBooleanEnum:
 
 class TestPolicyFixesNull:
     def test_null_to_empty(self):
-        reqs = _make_requirements(
-            [FieldSpec(field_name="val", field_type="str", description="v")]
-        )
+        reqs = _make_requirements([FieldSpec(field_name="val", field_type="str", description="v")])
         data = {"val": None}
         result = apply_field_policies(data, reqs)
         assert result["val"] == ""
 
     def test_null_nullable_stays_none(self):
         reqs = _make_requirements(
-            [
-                FieldSpec(
-                    field_name="val", field_type="str", description="v", nullable=True
-                )
-            ]
+            [FieldSpec(field_name="val", field_type="str", description="v", nullable=True)]
         )
         data = {"val": None}
         result = apply_field_policies(data, reqs)
@@ -249,9 +239,7 @@ class TestPolicyFixesNull:
         assert result["s"] == "a"
 
     def test_preserves_extra_keys(self):
-        reqs = _make_requirements(
-            [FieldSpec(field_name="x", field_type="str", description="x")]
-        )
+        reqs = _make_requirements([FieldSpec(field_name="x", field_type="str", description="x")])
         data = {"x": "ok", "extra_key": 42}
         result = apply_field_policies(data, reqs)
         assert result["extra_key"] == 42

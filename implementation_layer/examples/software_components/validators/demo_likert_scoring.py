@@ -100,8 +100,7 @@ def main() -> None:
         suggestion = f" -> {flag.suggested_value!r}" if flag.suggested_value else ""
         score = f" {flag.score}/5" if flag.score else ""
         print(
-            f"  [{flag.severity:7s}{score}] item {flag.item_index}"
-            f" field={flag.field}{suggestion}"
+            f"  [{flag.severity:7s}{score}] item {flag.item_index} field={flag.field}{suggestion}"
         )
         print(f"      {flag.reason}")
 

@@ -77,7 +77,7 @@ def main() -> None:
         start = chunk.get("start", 0)
         end = chunk.get("end", 0)
         text_preview = chunk.get("text", "")[:80]
-        print(f"  [{i+1}] {start:.1f}s - {end:.1f}s: {text_preview}...")
+        print(f"  [{i + 1}] {start:.1f}s - {end:.1f}s: {text_preview}...")
 
     if len(chunks) > 5:
         print(f"  ... and {len(chunks) - 5} more chunks")

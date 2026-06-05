@@ -71,10 +71,16 @@ def main() -> None:
     for i, r in enumerate(result.per_item):
         print(f"Item {i}: query={r.query!r}")
         print(f"  faithfulness     = {r.faithfulness_score}/5  ({r.reasons['faithfulness']})")
-        print(f"  answer_relevance = {r.answer_relevance_score}/5  ({r.reasons['answer_relevance']})")
-        print(f"  context_precision= {r.context_precision_score}/5  ({r.reasons['context_precision']})")
+        print(
+            f"  answer_relevance = {r.answer_relevance_score}/5  ({r.reasons['answer_relevance']})"
+        )
+        print(
+            f"  context_precision= {r.context_precision_score}/5  ({r.reasons['context_precision']})"
+        )
         if r.context_recall_score is not None:
-            print(f"  context_recall   = {r.context_recall_score}/5  ({r.reasons['context_recall']})")
+            print(
+                f"  context_recall   = {r.context_recall_score}/5  ({r.reasons['context_recall']})"
+            )
         print(f"  cost             = ${r.cost_usd:.4f}")
         print()
 

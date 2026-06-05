@@ -2,13 +2,13 @@
 Auto-generated schema module (do not edit manually).
 """
 
-
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class standard_medical_consultation_summary_Extraction(BaseModel):
     """Extraction model for standard_medical_consultation_summary"""
-    model_config = ConfigDict(extra='forbid')
+
+    model_config = ConfigDict(extra="forbid")
 
     patient_name: str = Field(description="Patient Name")
     date_of_birth: str = Field(description="Date of Birth in this format: dd-mm-yyyy")

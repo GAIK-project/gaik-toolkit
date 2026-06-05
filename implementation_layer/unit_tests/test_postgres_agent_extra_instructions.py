@@ -115,9 +115,7 @@ def test_extra_instructions_combined_with_error_context():
     # Extra context comes before retry feedback.
     assert "Additional context:" in user_prompt
     assert "syntax error near FOO" in user_prompt
-    assert user_prompt.index("Additional context:") < user_prompt.index(
-        "previous attempt failed"
-    )
+    assert user_prompt.index("Additional context:") < user_prompt.index("previous attempt failed")
 
 
 # ---------------------------------------------------------------------------
@@ -140,9 +138,7 @@ def test_english_default_does_not_inject_directive():
     agent = _make_agent()
     _stub_llm_for_answer(agent, captured)
 
-    qr = QueryResult(
-        question="q", sql="SELECT 1", rows=[{"x": 1}], row_count=1, succeeded=True
-    )
+    qr = QueryResult(question="q", sql="SELECT 1", rows=[{"x": 1}], row_count=1, succeeded=True)
     agent._synthesize_answer("q", qr)
 
     system_prompt = captured["messages"][0]["content"]
@@ -154,9 +150,7 @@ def test_finnish_injects_reply_directive():
     agent = _make_agent(answer_language="fi")
     _stub_llm_for_answer(agent, captured)
 
-    qr = QueryResult(
-        question="q", sql="SELECT 1", rows=[{"x": 1}], row_count=1, succeeded=True
-    )
+    qr = QueryResult(question="q", sql="SELECT 1", rows=[{"x": 1}], row_count=1, succeeded=True)
     agent._synthesize_answer("q", qr)
 
     system_prompt = captured["messages"][0]["content"]
@@ -168,9 +162,7 @@ def test_unknown_language_code_passes_through():
     agent = _make_agent(answer_language="xx")
     _stub_llm_for_answer(agent, captured)
 
-    qr = QueryResult(
-        question="q", sql="SELECT 1", rows=[{"x": 1}], row_count=1, succeeded=True
-    )
+    qr = QueryResult(question="q", sql="SELECT 1", rows=[{"x": 1}], row_count=1, succeeded=True)
     agent._synthesize_answer("q", qr)
 
     system_prompt = captured["messages"][0]["content"]

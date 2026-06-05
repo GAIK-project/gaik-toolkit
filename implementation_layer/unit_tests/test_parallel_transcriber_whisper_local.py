@@ -72,15 +72,19 @@ class TestTooLongAudioRejected:
         transcriber = ParallelTranscriber(_api_cfg(), cfg)
 
         # 11 minutes exceeds the 10-minute cap; pipeline must fail fast.
-        with patch(
-            "gaik.software_components.parallel_transcriber.pipeline.has_video_stream",
-            return_value=False,
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.has_audio_stream",
-            return_value=True,
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.get_audio_duration",
-            return_value=11 * 60,
+        with (
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.has_video_stream",
+                return_value=False,
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.has_audio_stream",
+                return_value=True,
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.get_audio_duration",
+                return_value=11 * 60,
+            ),
         ):
             with pytest.raises(ValueError, match="Audio too long for whisper_local"):
                 transcriber.transcribe(audio)
@@ -108,16 +112,21 @@ class TestSinglePassWhisperLocal:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch(
-            "gaik.software_components.parallel_transcriber.pipeline.has_video_stream",
-            return_value=False,
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.has_audio_stream",
-            return_value=True,
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.get_audio_duration",
-            return_value=120.0,  # 2 min — under chunk_duration_minutes
-        ), patch("requests.post", return_value=mock_response):
+        with (
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.has_video_stream",
+                return_value=False,
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.has_audio_stream",
+                return_value=True,
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.get_audio_duration",
+                return_value=120.0,  # 2 min — under chunk_duration_minutes
+            ),
+            patch("requests.post", return_value=mock_response),
+        ):
             result = transcriber.transcribe(audio)
 
         assert result.format == "srt"
@@ -144,10 +153,20 @@ class TestChunkedWhisperLocal:
         for p in chunk_paths:
             Path(p).write_bytes(b"\x00")
         chunk_metadata = [
-            {"index": 0, "nominal_start": 0.0, "actual_start": 0.0,
-             "overlap_start": 0.0, "overlap_end": 15.0},
-            {"index": 1, "nominal_start": 1200.0, "actual_start": 1185.0,
-             "overlap_start": 15.0, "overlap_end": 0.0},
+            {
+                "index": 0,
+                "nominal_start": 0.0,
+                "actual_start": 0.0,
+                "overlap_start": 0.0,
+                "overlap_end": 15.0,
+            },
+            {
+                "index": 1,
+                "nominal_start": 1200.0,
+                "actual_start": 1185.0,
+                "overlap_start": 15.0,
+                "overlap_end": 0.0,
+            },
         ]
 
         mock_response = MagicMock()
@@ -157,21 +176,28 @@ class TestChunkedWhisperLocal:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch(
-            "gaik.software_components.parallel_transcriber.pipeline.has_video_stream",
-            return_value=False,
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.has_audio_stream",
-            return_value=True,
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.get_audio_duration",
-            return_value=40 * 60,  # 40 min — forces chunking
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.split_audio",
-            return_value=(chunk_paths, chunk_metadata),
-        ), patch(
-            "requests.post", return_value=mock_response,
-        ) as mock_post:
+        with (
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.has_video_stream",
+                return_value=False,
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.has_audio_stream",
+                return_value=True,
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.get_audio_duration",
+                return_value=40 * 60,  # 40 min — forces chunking
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.split_audio",
+                return_value=(chunk_paths, chunk_metadata),
+            ),
+            patch(
+                "requests.post",
+                return_value=mock_response,
+            ) as mock_post,
+        ):
             result = transcriber.transcribe(audio)
 
         # One POST per chunk
@@ -198,10 +224,20 @@ class TestChunkedWhisperLocal:
         for p in chunk_paths:
             Path(p).write_bytes(b"\x00")
         chunk_metadata = [
-            {"index": 0, "nominal_start": 0.0, "actual_start": 0.0,
-             "overlap_start": 0.0, "overlap_end": 0.0},
-            {"index": 1, "nominal_start": 1200.0, "actual_start": 1200.0,
-             "overlap_start": 0.0, "overlap_end": 0.0},
+            {
+                "index": 0,
+                "nominal_start": 0.0,
+                "actual_start": 0.0,
+                "overlap_start": 0.0,
+                "overlap_end": 0.0,
+            },
+            {
+                "index": 1,
+                "nominal_start": 1200.0,
+                "actual_start": 1200.0,
+                "overlap_start": 0.0,
+                "overlap_end": 0.0,
+            },
         ]
 
         mock_response = MagicMock()
@@ -213,19 +249,25 @@ class TestChunkedWhisperLocal:
 
         events: list[tuple[str, int, int, str]] = []
 
-        with patch(
-            "gaik.software_components.parallel_transcriber.pipeline.has_video_stream",
-            return_value=False,
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.has_audio_stream",
-            return_value=True,
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.get_audio_duration",
-            return_value=40 * 60,
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.split_audio",
-            return_value=(chunk_paths, chunk_metadata),
-        ), patch("requests.post", return_value=mock_response):
+        with (
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.has_video_stream",
+                return_value=False,
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.has_audio_stream",
+                return_value=True,
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.get_audio_duration",
+                return_value=40 * 60,
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.split_audio",
+                return_value=(chunk_paths, chunk_metadata),
+            ),
+            patch("requests.post", return_value=mock_response),
+        ):
             transcriber.transcribe(audio, progress_callback=lambda *args: events.append(args))
 
         transcribing = [e for e in events if e[0] == "transcribing"]
@@ -252,16 +294,21 @@ class TestRequestPayload:
         mock_response.json.return_value = {"segments": [], "text": ""}
         mock_response.raise_for_status = MagicMock()
 
-        with patch(
-            "gaik.software_components.parallel_transcriber.pipeline.has_video_stream",
-            return_value=False,
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.has_audio_stream",
-            return_value=True,
-        ), patch(
-            "gaik.software_components.parallel_transcriber.pipeline.get_audio_duration",
-            return_value=60.0,
-        ), patch("requests.post", return_value=mock_response) as mock_post:
+        with (
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.has_video_stream",
+                return_value=False,
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.has_audio_stream",
+                return_value=True,
+            ),
+            patch(
+                "gaik.software_components.parallel_transcriber.pipeline.get_audio_duration",
+                return_value=60.0,
+            ),
+            patch("requests.post", return_value=mock_response) as mock_post,
+        ):
             transcriber.transcribe(audio)
 
         # Verify request shape

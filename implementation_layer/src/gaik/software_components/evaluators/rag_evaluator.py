@@ -141,9 +141,7 @@ class RAGEvaluator:
                 ground_truth=ground_truth,
             )
         elif not self.skip_context_recall:
-            raise ValueError(
-                "context_recall requires ground_truth when skip_context_recall=False"
-            )
+            raise ValueError("context_recall requires ground_truth when skip_context_recall=False")
 
         total_cost = faith_cost + relev_cost + prec_cost + recall_cost
         return RAGItemResult(
@@ -244,16 +242,12 @@ class RAGEvaluator:
 
 _ASPECT: dict[str, str] = {
     "faithfulness": (
-        "Does the answer stay grounded in the retrieved context, "
-        "without inventing facts?"
+        "Does the answer stay grounded in the retrieved context, without inventing facts?"
     ),
     "answer_relevance": "Does the answer actually address the user's question?",
-    "context_precision": (
-        "Were the retrieved passages relevant to the question (low noise)?"
-    ),
+    "context_precision": ("Were the retrieved passages relevant to the question (low noise)?"),
     "context_recall": (
-        "Does the retrieved context contain the information needed to "
-        "answer per the ground truth?"
+        "Does the retrieved context contain the information needed to answer per the ground truth?"
     ),
 }
 
@@ -286,9 +280,7 @@ def _aggregate(per_item: list[RAGItemResult]) -> RAGMetrics:
     relev = sum(r.answer_relevance_score for r in per_item) / (5 * n)
     prec = sum(r.context_precision_score for r in per_item) / (5 * n)
 
-    recall_scores = [
-        r.context_recall_score for r in per_item if r.context_recall_score is not None
-    ]
+    recall_scores = [r.context_recall_score for r in per_item if r.context_recall_score is not None]
     recall = sum(recall_scores) / (5 * len(recall_scores)) if recall_scores else None
 
     return RAGMetrics(

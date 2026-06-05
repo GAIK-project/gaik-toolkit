@@ -165,9 +165,7 @@ def _format_multiline_list(value: str, styles: dict) -> Paragraph:
     return Paragraph(formatted, styles["value"])
 
 
-def _build_header_table(
-    data: dict[str, Any], styles: dict, logo_path: str | None = None
-) -> Table:
+def _build_header_table(data: dict[str, Any], styles: dict, logo_path: str | None = None) -> Table:
     """Build the header section with logo and title."""
     if logo_path and Path(logo_path).exists():
         logo = Image(logo_path, width=140, height=35)
@@ -255,8 +253,7 @@ def _build_main_table(data: dict[str, Any], styles: dict) -> Table:
     fields_to_display = [
         {"name": key, "label": get_display_label(key)}
         for key in data.keys()
-        if normalize_key(key) not in HEADER_FIELDS
-        and normalize_key(key) not in SIGNATURE_FIELDS
+        if normalize_key(key) not in HEADER_FIELDS and normalize_key(key) not in SIGNATURE_FIELDS
     ]
 
     table_data = []
@@ -292,9 +289,7 @@ def _build_main_table(data: dict[str, Any], styles: dict) -> Table:
             content = _format_multiline_list(value, styles)
             table_data.append([_make_label_cell(label, styles), content])
         else:
-            table_data.append(
-                [_make_label_cell(label, styles), _make_value_cell(value, styles)]
-            )
+            table_data.append([_make_label_cell(label, styles), _make_value_cell(value, styles)])
 
     if not table_data:
         table_data.append(
@@ -323,12 +318,8 @@ def _build_main_table(data: dict[str, Any], styles: dict) -> Table:
 
 def _build_signature_table(data: dict[str, Any], styles: dict) -> Table:
     """Build the signature section."""
-    valvojan_allekirjoitus = _get_value(
-        data, "valvojan_allekirjoitus", "Valvojan allekirjoitus"
-    )
-    vastaavan_allekirjoitus = _get_value(
-        data, "vastaavan_allekirjoitus", "Vastaavan allekirjoitus"
-    )
+    valvojan_allekirjoitus = _get_value(data, "valvojan_allekirjoitus", "Valvojan allekirjoitus")
+    vastaavan_allekirjoitus = _get_value(data, "vastaavan_allekirjoitus", "Vastaavan allekirjoitus")
 
     sig_data = [
         [

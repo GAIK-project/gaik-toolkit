@@ -187,9 +187,7 @@ class ExtractionEvaluator:
         per_item: list[ExtractionItemResult] = []
         for item, extracted in zip(dataset, extracted_outputs, strict=True):
             if not isinstance(item.expected, dict):
-                raise TypeError(
-                    "ExtractionEvaluator requires item.expected to be a dict"
-                )
+                raise TypeError("ExtractionEvaluator requires item.expected to be a dict")
             per_item.append(self.evaluate_item(item.expected, extracted))
 
         aggregate = _aggregate_micro(per_item)
@@ -242,9 +240,7 @@ class ExtractionEvaluator:
             return a == b
         return a == b
 
-    def _semantic_match(
-        self, field_name: str, expected: Any, extracted: Any
-    ) -> tuple[int, str]:
+    def _semantic_match(self, field_name: str, expected: Any, extracted: Any) -> tuple[int, str]:
         """Use ``LLMJudge.judge_text_pair`` to grade ambiguous matches on a 1-5 Likert scale.
 
         Replaces an older empty-bytes ``validate(source_pages=[b""])`` workaround
@@ -281,14 +277,8 @@ def _compute_metrics(verdicts: list[FieldVerdict]) -> ExtractionMetrics:
 
     precision = n_correct / n_extracted if n_extracted else 0.0
     recall = n_correct / n_expected if n_expected else 0.0
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if (precision + recall) > 0
-        else 0.0
-    )
-    hallucination_rate = (
-        n_hallucination / n_extracted if n_extracted else 0.0
-    )
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+    hallucination_rate = n_hallucination / n_extracted if n_extracted else 0.0
 
     return ExtractionMetrics(
         precision=precision,
@@ -305,20 +295,12 @@ def _aggregate_micro(per_item: list[ExtractionItemResult]) -> ExtractionMetrics:
     total_correct = sum(r.metrics.n_correct for r in per_item)
     total_expected = sum(r.metrics.n_expected for r in per_item)
     total_extracted = sum(r.metrics.n_extracted for r in per_item)
-    total_hallucination = sum(
-        sum(1 for v in r.verdicts if v.is_hallucination) for r in per_item
-    )
+    total_hallucination = sum(sum(1 for v in r.verdicts if v.is_hallucination) for r in per_item)
 
     precision = total_correct / total_extracted if total_extracted else 0.0
     recall = total_correct / total_expected if total_expected else 0.0
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if (precision + recall) > 0
-        else 0.0
-    )
-    hallucination_rate = (
-        total_hallucination / total_extracted if total_extracted else 0.0
-    )
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+    hallucination_rate = total_hallucination / total_extracted if total_extracted else 0.0
     return ExtractionMetrics(
         precision=precision,
         recall=recall,

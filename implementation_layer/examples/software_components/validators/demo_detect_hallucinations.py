@@ -39,8 +39,8 @@ EXTRACTED = {
     "location": "unit B",
     "issue_type": "coolant leak",
     "actions_taken": "absorbent mat applied",
-    "priority": "high",                # ← hallucinated: source never says priority
-    "follow_up_date": "2025-09-15",    # ← hallucinated: source never says when
+    "priority": "high",  # ← hallucinated: source never says priority
+    "follow_up_date": "2025-09-15",  # ← hallucinated: source never says when
 }
 
 # Optional per-field rules teach the judge which "soft defaults" are

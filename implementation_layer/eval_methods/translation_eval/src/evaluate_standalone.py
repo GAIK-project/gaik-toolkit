@@ -37,10 +37,10 @@ def clean_text_translation(text: str) -> str:
 # Configuration
 # ---------------------------------------------------------------------------
 
-_BASE           = Path(__file__).parent.parent
-GT_DIR          = _BASE / "data/ground_truth"
+_BASE = Path(__file__).parent.parent
+GT_DIR = _BASE / "data/ground_truth"
 TRANSLATION_DIR = _BASE / "data/translation_results/gpt-5.1"
-MODEL_NAME      = "gpt-5.1"
+MODEL_NAME = "gpt-5.1"
 
 # ---------------------------------------------------------------------------
 # Load models (once)
@@ -48,8 +48,8 @@ MODEL_NAME      = "gpt-5.1"
 
 print("Loading models...")
 transformer_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
-ter_metric        = TranslationEditRate()
-smoothing         = SmoothingFunction().method1
+ter_metric = TranslationEditRate()
+smoothing = SmoothingFunction().method1
 print("Models loaded.\n")
 
 # ---------------------------------------------------------------------------
@@ -71,20 +71,22 @@ for gt_file in gt_files:
         print(f"  [SKIP] No matching translation for {gt_file.name}")
         continue
 
-    gt_raw  = gt_file.read_text(encoding="utf-8")
+    gt_raw = gt_file.read_text(encoding="utf-8")
     hyp_raw = trans_file.read_text(encoding="utf-8")
 
-    gt_clean  = clean_text_translation(gt_raw)
+    gt_clean = clean_text_translation(gt_raw)
     hyp_clean = clean_text_translation(hyp_raw)
-    gt_tokens  = gt_clean.split()
+    gt_tokens = gt_clean.split()
     hyp_tokens = hyp_clean.split()
 
-    bleu   = sentence_bleu([gt_tokens], hyp_tokens, smoothing_function=smoothing) * 100
-    chrf   = sentence_chrf(gt_clean, hyp_clean) * 100
-    ter    = ter_metric([hyp_clean], [[gt_clean]]).item() * 100
-    emb_gt  = transformer_model.encode(gt_raw,  convert_to_numpy=True)
+    bleu = sentence_bleu([gt_tokens], hyp_tokens, smoothing_function=smoothing) * 100
+    chrf = sentence_chrf(gt_clean, hyp_clean) * 100
+    ter = ter_metric([hyp_clean], [[gt_clean]]).item() * 100
+    emb_gt = transformer_model.encode(gt_raw, convert_to_numpy=True)
     emb_hyp = transformer_model.encode(hyp_raw, convert_to_numpy=True)
-    cosine  = float(np.dot(emb_gt, emb_hyp) / (np.linalg.norm(emb_gt) * np.linalg.norm(emb_hyp))) * 100
+    cosine = (
+        float(np.dot(emb_gt, emb_hyp) / (np.linalg.norm(emb_gt) * np.linalg.norm(emb_hyp))) * 100
+    )
 
     bleu_scores.append(bleu)
     chrf_scores.append(chrf)
@@ -102,8 +104,14 @@ print("\n" + "=" * 60)
 print(f"TRANSLATION EVALUATION — {MODEL_NAME}")
 print(f"Files evaluated: {evaluated}")
 print("=" * 60)
-print(f"  BLEU            : {sum(bleu_scores)/evaluated:.2f}%   (higher is better; n-gram overlap)")
-print(f"  chrF            : {sum(chrf_scores)/evaluated:.2f}%   (higher is better; character n-gram F-score)")
-print(f"  TER             : {sum(ter_scores)/evaluated:.2f}%   (lower is better; edit rate)")
-print(f"  Cosine Sim      : {sum(cosine_scores)/evaluated:.2f}%   (higher is better; semantic similarity)")
+print(
+    f"  BLEU            : {sum(bleu_scores) / evaluated:.2f}%   (higher is better; n-gram overlap)"
+)
+print(
+    f"  chrF            : {sum(chrf_scores) / evaluated:.2f}%   (higher is better; character n-gram F-score)"
+)
+print(f"  TER             : {sum(ter_scores) / evaluated:.2f}%   (lower is better; edit rate)")
+print(
+    f"  Cosine Sim      : {sum(cosine_scores) / evaluated:.2f}%   (higher is better; semantic similarity)"
+)
 print("=" * 60)

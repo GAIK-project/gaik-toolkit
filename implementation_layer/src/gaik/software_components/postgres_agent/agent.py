@@ -251,9 +251,7 @@ class PostgresAgent:
             A :class:`~gaik.software_components.postgres_agent.models.SchemaInfo`.
         """
         need_refresh = (
-            refresh
-            or self._schema is None
-            or (include_samples and not self._schema_has_samples)
+            refresh or self._schema is None or (include_samples and not self._schema_has_samples)
         )
         if need_refresh:
             conn = self._get_conn()
@@ -393,8 +391,7 @@ class PostgresAgent:
             except psycopg.Error as exc:
                 result.error = str(exc).strip()
                 error_context = (
-                    f"PostgreSQL rejected the query: {str(exc).strip()}\n"
-                    f"Failed SQL:\n{result.sql}"
+                    f"PostgreSQL rejected the query: {str(exc).strip()}\nFailed SQL:\n{result.sql}"
                 )
                 continue
             result.rows = rows

@@ -1,4 +1,4 @@
-﻿"""Simple demonstration of VisionPlusParser (Docling + Vision, no chunking)."""
+"""Simple demonstration of VisionPlusParser (Docling + Vision, no chunking)."""
 
 from __future__ import annotations
 

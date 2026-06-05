@@ -120,6 +120,5 @@ class FinnishTextProcessor:
         if backend == "simple":
             return SimpleBackend()
         raise ValueError(
-            f"Unknown backend: {backend!r}. "
-            "Expected one of auto/voikko/spacy/uralic/simple."
+            f"Unknown backend: {backend!r}. Expected one of auto/voikko/spacy/uralic/simple."
         )

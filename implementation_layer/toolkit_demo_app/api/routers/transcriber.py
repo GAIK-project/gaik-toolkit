@@ -183,9 +183,7 @@ def _categorize_fallback_reason(exc: Exception) -> str:
     current: BaseException | None = exc
     while current is not None:
         causes.append(current)
-        current = getattr(current, "__cause__", None) or getattr(
-            current, "__context__", None
-        )
+        current = getattr(current, "__cause__", None) or getattr(current, "__context__", None)
 
     for cause in causes:
         cause_type = type(cause).__name__.lower()

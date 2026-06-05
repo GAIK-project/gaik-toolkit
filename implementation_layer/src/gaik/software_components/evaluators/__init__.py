@@ -68,9 +68,9 @@ __version__ = "0.1.0"
 
 try:
     from .rag_response_evaluator import (
-        CorrectnessScore,
         DEFAULT_PAIRWISE_SPEC,
         DEFAULT_SCORING_SPEC,
+        CorrectnessScore,
         PairwiseComparison,
         PairwiseRanking,
         PairwiseSpec,
@@ -82,6 +82,7 @@ try:
         RAGResponseEvaluator,
         ScoringSpec,
     )
+
     __all__ += [
         "RAGResponseEvaluator",
         "RAGResponseEvalResult",

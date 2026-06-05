@@ -1,4 +1,5 @@
 """MCP Server for GAIK Transcriber"""
+
 import sys
 from pathlib import Path
 
@@ -10,6 +11,7 @@ load_dotenv(Path(__file__).with_name(".env"))
 
 # Initialize MCP server
 mcp = FastMCP("gaik-transcriber")
+
 
 @mcp.tool()
 def transcribe_audio(file_path: str, enhanced: bool = False) -> str:
@@ -59,10 +61,11 @@ def transcribe_audio(file_path: str, enhanced: bool = False) -> str:
 
     except Exception as e:
         import traceback
+
         error_msg = f"Error: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
         print(error_msg, file=sys.stderr)
         return error_msg
 
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")
-

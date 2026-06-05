@@ -56,9 +56,7 @@ def introspect_schema(
         (schema_name,),
     ).fetchall()
     table_names = [
-        r["table_name"]
-        for r in table_rows
-        if allowed is None or r["table_name"].lower() in allowed
+        r["table_name"] for r in table_rows if allowed is None or r["table_name"].lower() in allowed
     ]
 
     column_rows = conn.execute(
