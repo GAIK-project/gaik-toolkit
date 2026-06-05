@@ -551,6 +551,62 @@ class VisionExtractionResult:
     documents_processed: int
 
 
+@dataclass
+class RequirementsSuggestionResult:
+    """Result from :meth:`VisionExtractor.suggest_requirements_with_usage`.
+
+    Attributes:
+        requirements_text: Natural-language description of which fields are
+            worth extracting from this kind of document. Suitable as the
+            ``user_requirements`` argument to :meth:`VisionExtractor.extract`
+            or as input to :class:`~gaik.software_components.extractor.SchemaGenerator`.
+        usage: Token usage for the single vision call, or ``None`` when the
+            provider returned no usage payload.
+        duration_s: Wall-clock seconds the vision call took.
+        model: Resolved model identifier the call used.
+        documents_processed: Number of input files sent in the call.
+    """
+
+    requirements_text: str
+    usage: UsageRecord | None
+    duration_s: float
+    model: str
+    documents_processed: int
+
+
+# ---------------------------------------------------------------------------
+# Requirements-suggestion meta-model + prompt
+# ---------------------------------------------------------------------------
+
+
+class _RequirementsSuggestion(BaseModel):
+    """Internal meta-model for :meth:`VisionExtractor.suggest_requirements`.
+
+    Runs the normal vision pipeline but, instead of extracting data, asks the
+    model to *describe* the fields worth extracting as a single natural-language
+    string. That string then feeds schema generation (or :meth:`extract`).
+    """
+
+    requirements_text: str = Field(
+        description=(
+            "A concise natural-language description of which fields to extract from "
+            "this kind of document, suitable as input to a schema generator. List the "
+            "top-level fields, and if the document has a repeating table, describe the "
+            "per-line-item fields too. Format like a short spec, e.g. 'Top-level "
+            "fields: ... For each line item: ...'."
+        )
+    )
+
+
+_SUGGEST_REQUIREMENTS_PROMPT = (
+    "You are helping a user set up a reusable document-extraction template. "
+    "Look at the attached document(s) and propose which fields are worth extracting. "
+    "Return a single natural-language description (requirements_text) suitable as input "
+    "to a schema generator: list the top-level fields, and if there is a repeating "
+    "table, describe the per-line-item fields too."
+)
+
+
 # ---------------------------------------------------------------------------
 # Main class
 # ---------------------------------------------------------------------------
@@ -676,6 +732,81 @@ class VisionExtractor:
         return VisionExtractionResult(
             data=result_dict,
             verification=verification,
+            usage=usage,
+            duration_s=duration_s,
+            model=self.model,
+            documents_processed=len(file_path_list),
+        )
+
+    # -- public API: requirements suggestion ----------------------------------
+
+    def suggest_requirements(
+        self,
+        *,
+        file_paths: list[str | Path],
+        instructions: str = "",
+    ) -> str:
+        """Suggest extraction requirements from one or more sample documents.
+
+        Runs a single vision pass over ``file_paths`` and, instead of extracting
+        data, returns a natural-language description of which fields are worth
+        extracting from this kind of document. The returned text is suitable as
+        the ``user_requirements`` argument to :meth:`extract`, or as input to
+        :class:`~gaik.software_components.extractor.SchemaGenerator`.
+
+        This reuses the same provider/model configuration the extractor was
+        constructed with, so it is provider-agnostic (openai/claude/google).
+        ``include_verification`` is ignored for this call.
+
+        Args:
+            file_paths: PDF or image paths. All are sent in one call so the
+                model can describe fields spanning related documents.
+            instructions: Optional extra guidance appended to the prompt, e.g.
+                "Focus on financial fields" or "Suggest fields in Finnish".
+
+        Returns:
+            The suggested requirements as a single natural-language string.
+            Empty string if the model returned no text.
+
+        Usage::
+
+            extractor = VisionExtractor(model_provider="openai", use_azure=True)
+            requirements = extractor.suggest_requirements(file_paths=["invoice.pdf"])
+            result = extractor.extract(
+                file_paths=["invoice.pdf"], user_requirements=requirements
+            )
+        """
+        return self.suggest_requirements_with_usage(
+            file_paths=file_paths, instructions=instructions
+        ).requirements_text
+
+    def suggest_requirements_with_usage(
+        self,
+        *,
+        file_paths: list[str | Path],
+        instructions: str = "",
+    ) -> RequirementsSuggestionResult:
+        """Suggest extraction requirements and report token usage + latency.
+
+        Same input and behaviour as :meth:`suggest_requirements`; returns a
+        :class:`RequirementsSuggestionResult` carrying the suggested text plus
+        usage, duration, resolved model, and document count for the single
+        vision call.
+        """
+        prompt = _SUGGEST_REQUIREMENTS_PROMPT
+        if instructions.strip():
+            prompt += f"\n\nAdditional user guidance to follow: {instructions.strip()}"
+
+        file_path_list = [Path(p) for p in file_paths]
+        t0 = time.perf_counter()
+        result_dict, usage = self._extract(
+            file_path_list, _RequirementsSuggestion, prompt
+        )
+        duration_s = round(time.perf_counter() - t0, 3)
+
+        validated = _RequirementsSuggestion.model_validate(result_dict)
+        return RequirementsSuggestionResult(
+            requirements_text=validated.requirements_text,
             usage=usage,
             duration_s=duration_s,
             model=self.model,

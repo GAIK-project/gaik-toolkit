@@ -7,14 +7,20 @@ output of DataExtractor — no intermediate markdown step.
 Main class:
     VisionExtractor: Extract structured data from PDFs/images via vision LLM.
 
-Result type:
+Result types:
     VisionExtractionResult: data dict + optional verification metadata + usage stats.
+    RequirementsSuggestionResult: suggested extraction requirements + usage stats.
 
 Verification:
     VerifiableField: Per-field wrapper with confidence_score and reasoning (opt-in).
+
+Requirements suggestion:
+    VisionExtractor.suggest_requirements: describe which fields to extract from a
+    sample document (feeds SchemaGenerator / extract).
 """
 
 from .vision_extractor import (
+    RequirementsSuggestionResult,
     VerifiableField,
     VisionExtractionResult,
     VisionExtractor,
@@ -23,6 +29,7 @@ from .vision_extractor import (
 __all__ = [
     "VisionExtractor",
     "VisionExtractionResult",
+    "RequirementsSuggestionResult",
     "VerifiableField",
 ]
 
