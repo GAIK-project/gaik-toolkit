@@ -58,6 +58,12 @@ jobs:
     - name: Smoke test basic import
       run: python -c "from gaik import __version__; print(f'gaik {__version__} OK')"
 
+    - name: Ruff format check (+ non-blocking lint)
+      run: |
+        # Pinned ruff version so formatting is deterministic across CI runs.
+        uvx ruff@0.14.10 format --check implementation_layer/
+        uvx ruff@0.14.10 check implementation_layer/src/gaik/ || echo "::warning::ruff check reported non-blocking style issues (e.g. long prompt strings)"
+
     - name: Run tests
       env:
         AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
