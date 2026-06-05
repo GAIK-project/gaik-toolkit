@@ -525,7 +525,6 @@ def _load_saved_requirements(path: Path) -> tuple[str, RequirementsSpec]:
         # Migrate old single-child format (child_container_name / child_requirements)
         # to the new children list format.
         if "child_container_name" in raw and "children" not in raw:
-
             raw = {
                 "parent_requirements": raw["parent_requirements"],
                 "children": [
