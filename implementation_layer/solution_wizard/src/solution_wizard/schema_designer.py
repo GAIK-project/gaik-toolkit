@@ -40,7 +40,7 @@ _TYPE_MAP: Dict[str, str] = {
     "int": "int",
     "boolean": "bool",
     "bool": "bool",
-    "date": "str",       # dates as ISO strings; add a description note
+    "date": "str",  # dates as ISO strings; add a description note
     "datetime": "str",
     "list": "list[str]",
     "array": "list[str]",
@@ -63,6 +63,7 @@ def _py_type(type_name: str) -> str:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def build_requirements_text(target_output_spec: Dict[str, Any]) -> str:
     """Build a plain-text user requirements string from target_output_spec.
@@ -143,10 +144,7 @@ def build_pydantic_model(
         vals = allowed_values.get(field, [])
         if vals and all(isinstance(v, str) for v in vals):
             enum_name = "".join(w.title() for w in field.split("_")) + "Enum"
-            members = "\n".join(
-                f'    {_safe_enum_member(v)} = "{v}"'
-                for v in vals
-            )
+            members = "\n".join(f'    {_safe_enum_member(v)} = "{v}"' for v in vals)
             enum_blocks.append(f"class {enum_name}(str, Enum):\n{members}\n")
 
     field_lines = []
@@ -194,14 +192,22 @@ def build_pydantic_model(
 # Maps our field_types vocabulary to the AllowedTypes Literal expected by
 # ExtractionRequirements / FieldSpec in gaik.software_components.extractor.schema
 _ALLOWED_TYPES_MAP: Dict[str, str] = {
-    "string": "str", "str": "str", "text": "str",
-    "integer": "int", "int": "int",
-    "number": "float", "float": "float",
+    "string": "str",
+    "str": "str",
+    "text": "str",
+    "integer": "int",
+    "int": "int",
+    "number": "float",
+    "float": "float",
     "decimal": "decimal",
-    "boolean": "bool", "bool": "bool",
-    "list": "list[str]", "array": "list[str]",
-    "date": "date", "datetime": "date",
-    "object": "list[dict]", "dict": "list[dict]",
+    "boolean": "bool",
+    "bool": "bool",
+    "list": "list[str]",
+    "array": "list[str]",
+    "date": "date",
+    "datetime": "date",
+    "object": "list[dict]",
+    "dict": "list[dict]",
 }
 _DEFAULT_ALLOWED_TYPE = "str"
 
@@ -253,19 +259,21 @@ def build_requirements_json(
         raw_type = field_types.get(f, "string")
         allowed = allowed_values.get(f, [])
         enum_vals = [str(v) for v in allowed] if allowed else None
-        field_specs.append({
-            "field_name": f,
-            "field_type": _to_allowed_type(raw_type),
-            "description": field_descriptions.get(f, f.replace("_", " ").capitalize()),
-            "required_in_output": is_required,
-            "nullable": not is_required,
-            "enum": enum_vals,
-            "default": None,
-            "has_explicit_default": False,
-            "required": is_required,
-            "pattern": None,
-            "format": None,
-        })
+        field_specs.append(
+            {
+                "field_name": f,
+                "field_type": _to_allowed_type(raw_type),
+                "description": field_descriptions.get(f, f.replace("_", " ").capitalize()),
+                "required_in_output": is_required,
+                "nullable": not is_required,
+                "enum": enum_vals,
+                "default": None,
+                "has_explicit_default": False,
+                "required": is_required,
+                "pattern": None,
+                "format": None,
+            }
+        )
 
     return {
         "model_name": class_name,
@@ -329,9 +337,7 @@ def write_schema_files(
     return results
 
 
-def write_extraction_requirements(
-    target_output_spec: Dict[str, Any], output_dir: Path
-) -> Path:
+def write_extraction_requirements(target_output_spec: Dict[str, Any], output_dir: Path) -> Path:
     """Write prompts/extraction_requirements.md -- passed as user_requirements at runtime."""
     prompts_dir = output_dir / "prompts"
     prompts_dir.mkdir(parents=True, exist_ok=True)

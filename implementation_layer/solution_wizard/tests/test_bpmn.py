@@ -29,8 +29,15 @@ NS = {
 }
 
 FLOW_NODE_TAGS = {
-    "startEvent", "endEvent", "task", "userTask", "serviceTask", "sendTask",
-    "manualTask", "exclusiveGateway", "parallelGateway",
+    "startEvent",
+    "endEvent",
+    "task",
+    "userTask",
+    "serviceTask",
+    "sendTask",
+    "manualTask",
+    "exclusiveGateway",
+    "parallelGateway",
 }
 
 
@@ -44,49 +51,174 @@ def _hospital_blueprint() -> Blueprint:
     external party that hands the referral in via a message flow)."""
     data = {
         "blueprint_version": "1.0",
-        "use_case": {"id": "hosp", "name": "Hospital Admissions", "description": "x", "domain": "healthcare"},
+        "use_case": {
+            "id": "hosp",
+            "name": "Hospital Admissions",
+            "description": "x",
+            "domain": "healthcare",
+        },
         "business_spec": {
             "intended_users": ["doctor", "administrative_staff"],
             "reviewers": ["supervisor"],
         },
         "technical_spec": {
-            "input_types": ["audio", "pdf"], "output_types": ["structured_json"],
-            "language": "en", "human_review_required": True,
+            "input_types": ["audio", "pdf"],
+            "output_types": ["structured_json"],
+            "language": "en",
+            "human_review_required": True,
             "integration_targets": ["patient_management_system"],
         },
-        "target_output_spec": {"schema_name": "Rec", "fields": ["full_name", "allergies"], "required_fields": []},
+        "target_output_spec": {
+            "schema_name": "Rec",
+            "fields": ["full_name", "allergies"],
+            "required_fields": [],
+        },
         "components": {
             "selected_modules": [],
-            "selected_building_blocks": ["Transcriber", "PyMuPDFParser", "DataExtractor", "LLMJudge"],
+            "selected_building_blocks": [
+                "Transcriber",
+                "PyMuPDFParser",
+                "DataExtractor",
+                "LLMJudge",
+            ],
             "custom_components": [],
         },
         "artifacts": {
             "voice_note_audio": {"type": "audio", "source": "user_upload", "optional": False},
             "referral_pdf": {"type": "pdf", "source": "user_upload", "optional": True},
-            "raw_transcript": {"type": "transcript", "source": "generated", "optional": False, "produced_by": "transcribe_audio"},
-            "parsed_referral_text": {"type": "parsed_text", "source": "generated", "optional": True, "produced_by": "parse_referral_pdf"},
-            "combined_clinical_text": {"type": "text", "source": "generated", "optional": False, "produced_by": "merge_sources"},
-            "patient_record_json": {"type": "structured_json", "source": "generated", "optional": False, "final_output": True, "produced_by": "extract_clinical_fields", "schema_ref": "schemas/output_schema.py"},
-            "validation_report": {"type": "validation_report", "source": "generated", "optional": False, "produced_by": "validate_record"},
-            "approved_patient_record": {"type": "structured_json", "source": "generated", "optional": False, "final_output": True, "produced_by": "human_review"},
+            "raw_transcript": {
+                "type": "transcript",
+                "source": "generated",
+                "optional": False,
+                "produced_by": "transcribe_audio",
+            },
+            "parsed_referral_text": {
+                "type": "parsed_text",
+                "source": "generated",
+                "optional": True,
+                "produced_by": "parse_referral_pdf",
+            },
+            "combined_clinical_text": {
+                "type": "text",
+                "source": "generated",
+                "optional": False,
+                "produced_by": "merge_sources",
+            },
+            "patient_record_json": {
+                "type": "structured_json",
+                "source": "generated",
+                "optional": False,
+                "final_output": True,
+                "produced_by": "extract_clinical_fields",
+                "schema_ref": "schemas/output_schema.py",
+            },
+            "validation_report": {
+                "type": "validation_report",
+                "source": "generated",
+                "optional": False,
+                "produced_by": "validate_record",
+            },
+            "approved_patient_record": {
+                "type": "structured_json",
+                "source": "generated",
+                "optional": False,
+                "final_output": True,
+                "produced_by": "human_review",
+            },
         },
-        "workflow": {"steps": [
-            {"id": "upload_inputs", "name": "Upload inputs", "type": "user_task", "inputs": [], "outputs": ["voice_note_audio", "referral_pdf"]},
-            {"id": "transcribe_audio", "name": "Transcribe", "type": "automated_task", "component": "Transcriber", "inputs": ["voice_note_audio"], "outputs": ["raw_transcript"], "depends_on": ["upload_inputs"]},
-            {"id": "parse_referral_pdf", "name": "Parse referral", "type": "automated_task", "component": "PyMuPDFParser", "inputs": ["referral_pdf"], "outputs": ["parsed_referral_text"], "depends_on": ["upload_inputs"]},
-            {"id": "merge_sources", "name": "Merge", "type": "automated_task", "component": "custom", "inputs": ["raw_transcript", "parsed_referral_text"], "outputs": ["combined_clinical_text"], "depends_on": ["transcribe_audio", "parse_referral_pdf"]},
-            {"id": "extract_clinical_fields", "name": "Extract", "type": "automated_task", "component": "DataExtractor", "inputs": ["combined_clinical_text"], "outputs": ["patient_record_json"], "depends_on": ["merge_sources"]},
-            {"id": "validate_record", "name": "Validate", "type": "automated_task", "component": "LLMJudge", "inputs": ["patient_record_json", "combined_clinical_text"], "outputs": ["validation_report"], "depends_on": ["extract_clinical_fields"]},
-            {"id": "human_review", "name": "Supervisor review", "type": "human_review", "inputs": ["patient_record_json", "validation_report"], "outputs": ["approved_patient_record"], "depends_on": ["validate_record"]},
-        ]},
-        "governance": {"data_handling": {"contains_personal_data": "yes", "output_sensitivity": "high", "audit_log_required": True}},
+        "workflow": {
+            "steps": [
+                {
+                    "id": "upload_inputs",
+                    "name": "Upload inputs",
+                    "type": "user_task",
+                    "inputs": [],
+                    "outputs": ["voice_note_audio", "referral_pdf"],
+                },
+                {
+                    "id": "transcribe_audio",
+                    "name": "Transcribe",
+                    "type": "automated_task",
+                    "component": "Transcriber",
+                    "inputs": ["voice_note_audio"],
+                    "outputs": ["raw_transcript"],
+                    "depends_on": ["upload_inputs"],
+                },
+                {
+                    "id": "parse_referral_pdf",
+                    "name": "Parse referral",
+                    "type": "automated_task",
+                    "component": "PyMuPDFParser",
+                    "inputs": ["referral_pdf"],
+                    "outputs": ["parsed_referral_text"],
+                    "depends_on": ["upload_inputs"],
+                },
+                {
+                    "id": "merge_sources",
+                    "name": "Merge",
+                    "type": "automated_task",
+                    "component": "custom",
+                    "inputs": ["raw_transcript", "parsed_referral_text"],
+                    "outputs": ["combined_clinical_text"],
+                    "depends_on": ["transcribe_audio", "parse_referral_pdf"],
+                },
+                {
+                    "id": "extract_clinical_fields",
+                    "name": "Extract",
+                    "type": "automated_task",
+                    "component": "DataExtractor",
+                    "inputs": ["combined_clinical_text"],
+                    "outputs": ["patient_record_json"],
+                    "depends_on": ["merge_sources"],
+                },
+                {
+                    "id": "validate_record",
+                    "name": "Validate",
+                    "type": "automated_task",
+                    "component": "LLMJudge",
+                    "inputs": ["patient_record_json", "combined_clinical_text"],
+                    "outputs": ["validation_report"],
+                    "depends_on": ["extract_clinical_fields"],
+                },
+                {
+                    "id": "human_review",
+                    "name": "Supervisor review",
+                    "type": "human_review",
+                    "inputs": ["patient_record_json", "validation_report"],
+                    "outputs": ["approved_patient_record"],
+                    "depends_on": ["validate_record"],
+                },
+            ]
+        },
+        "governance": {
+            "data_handling": {
+                "contains_personal_data": "yes",
+                "output_sensitivity": "high",
+                "audit_log_required": True,
+            }
+        },
         "business_process": {
             "participants": [
-                {"id": "doctor", "name": "Doctor", "kind": "human_role", "default_lane_for": ["user_task"]},
-                {"id": "supervisor", "name": "Supervisor", "kind": "human_role", "default_lane_for": ["human_review"]},
+                {
+                    "id": "doctor",
+                    "name": "Doctor",
+                    "kind": "human_role",
+                    "default_lane_for": ["user_task"],
+                },
+                {
+                    "id": "supervisor",
+                    "name": "Supervisor",
+                    "kind": "human_role",
+                    "default_lane_for": ["human_review"],
+                },
             ],
             "external_parties": [
-                {"id": "external_clinic", "name": "External Clinic", "sends": ["referral_pdf"], "to_step": "upload_inputs"},
+                {
+                    "id": "external_clinic",
+                    "name": "External Clinic",
+                    "sends": ["referral_pdf"],
+                    "to_step": "upload_inputs",
+                },
             ],
         },
     }
@@ -99,17 +231,47 @@ def _simple_blueprint() -> Blueprint:
     data = {
         "blueprint_version": "1.0",
         "use_case": {"id": "simp", "name": "Simple", "description": "x", "domain": "test"},
-        "technical_spec": {"input_types": ["pdf"], "output_types": ["structured_json"], "language": "en"},
+        "technical_spec": {
+            "input_types": ["pdf"],
+            "output_types": ["structured_json"],
+            "language": "en",
+        },
         "target_output_spec": {"required_fields": ["a"]},
-        "components": {"selected_modules": [], "selected_building_blocks": ["DataExtractor"], "custom_components": []},
+        "components": {
+            "selected_modules": [],
+            "selected_building_blocks": ["DataExtractor"],
+            "custom_components": [],
+        },
         "artifacts": {
             "src": {"type": "pdf", "source": "user_upload", "optional": False},
-            "out": {"type": "structured_json", "source": "generated", "optional": False, "final_output": True, "produced_by": "extract"},
+            "out": {
+                "type": "structured_json",
+                "source": "generated",
+                "optional": False,
+                "final_output": True,
+                "produced_by": "extract",
+            },
         },
-        "workflow": {"steps": [
-            {"id": "upload", "name": "Upload", "type": "user_task", "inputs": [], "outputs": ["src"]},
-            {"id": "extract", "name": "Extract", "type": "automated_task", "component": "DataExtractor", "inputs": ["src"], "outputs": ["out"], "depends_on": ["upload"]},
-        ]},
+        "workflow": {
+            "steps": [
+                {
+                    "id": "upload",
+                    "name": "Upload",
+                    "type": "user_task",
+                    "inputs": [],
+                    "outputs": ["src"],
+                },
+                {
+                    "id": "extract",
+                    "name": "Extract",
+                    "type": "automated_task",
+                    "component": "DataExtractor",
+                    "inputs": ["src"],
+                    "outputs": ["out"],
+                    "depends_on": ["upload"],
+                },
+            ]
+        },
     }
     return Blueprint.model_validate(data)
 
@@ -122,6 +284,7 @@ def _parse(blueprint: Blueprint):
 # ---------------------------------------------------------------------------
 # Well-formedness
 # ---------------------------------------------------------------------------
+
 
 def test_bpmn_is_well_formed():
     xml, root = _parse(_hospital_blueprint())
@@ -139,14 +302,25 @@ def test_empty_workflow_still_well_formed():
 # Element types present
 # ---------------------------------------------------------------------------
 
+
 def test_contains_expected_element_types():
     xml, root = _parse(_hospital_blueprint())
     proc = root.find("bpmn:process", NS)
     present = {_local(e) for e in proc}
-    for expected in {"laneSet", "startEvent", "endEvent", "userTask", "serviceTask",
-                     "sendTask", "parallelGateway", "exclusiveGateway",
-                     "dataObjectReference", "dataStoreReference", "textAnnotation",
-                     "sequenceFlow"}:
+    for expected in {
+        "laneSet",
+        "startEvent",
+        "endEvent",
+        "userTask",
+        "serviceTask",
+        "sendTask",
+        "parallelGateway",
+        "exclusiveGateway",
+        "dataObjectReference",
+        "dataStoreReference",
+        "textAnnotation",
+        "sequenceFlow",
+    }:
         assert expected in present, f"missing {expected}"
     # message flow lives in the collaboration
     collab = root.find("bpmn:collaboration", NS)
@@ -181,6 +355,7 @@ def test_lanes_use_business_process_participants():
 # ---------------------------------------------------------------------------
 # DI completeness (guards against blank-canvas renders)
 # ---------------------------------------------------------------------------
+
 
 def test_every_flow_node_has_a_shape_with_nonzero_bounds():
     xml, root = _parse(_hospital_blueprint())
@@ -219,6 +394,7 @@ def test_data_objects_and_store_have_shapes():
 # Stable ids + mapping
 # ---------------------------------------------------------------------------
 
+
 def test_activity_ids_trace_to_steps():
     bp = _hospital_blueprint()
     xml, root = _parse(bp)
@@ -227,7 +403,7 @@ def test_activity_ids_trace_to_steps():
     for e in proc:
         nid = e.get("id") or ""
         if nid.startswith("Activity_") and not nid.startswith("Activity_submit_"):
-            assert nid[len("Activity_"):] in step_ids
+            assert nid[len("Activity_") :] in step_ids
 
 
 def test_bpmn_mapping_written_and_covers_flow_nodes():
@@ -248,6 +424,7 @@ def test_bpmn_mapping_written_and_covers_flow_nodes():
 # Enrichment conventions
 # ---------------------------------------------------------------------------
 
+
 def test_approval_gateway_present_with_human_review():
     """The 'Approved?' gateway is generated from the human_review step.
     By default (no exception defined), the 'No' path goes to a 'Rejected' end
@@ -258,9 +435,12 @@ def test_approval_gateway_present_with_human_review():
     assert any(g.get("name") == "Approved?" for g in gateways)
     # Default rejection: a 'Rejected' end event connected from the approval gateway.
     end_events = {e.get("id") for e in proc if _local(e) == "endEvent"}
-    no_flows = [f for f in proc.findall("bpmn:sequenceFlow", NS)
-                if f.get("sourceRef", "").startswith("Gateway_approve_")
-                and f.get("name", "").lower().startswith("no")]
+    no_flows = [
+        f
+        for f in proc.findall("bpmn:sequenceFlow", NS)
+        if f.get("sourceRef", "").startswith("Gateway_approve_")
+        and f.get("name", "").lower().startswith("no")
+    ]
     assert no_flows, "expected a 'No' path from the approval gateway"
     assert no_flows[0].get("targetRef") in end_events, (
         "default rejection should go to an end event, not a rework loop to an AI step"
@@ -279,8 +459,11 @@ def test_integration_target_makes_send_task_and_data_store():
     stores = [e for e in proc if _local(e) == "dataStoreReference"]
     assert send_tasks and stores
     # send task is on the approved path to the end event
-    end_in = [f.get("sourceRef") for f in proc.findall("bpmn:sequenceFlow", NS)
-              if f.get("targetRef") == "EndEvent_success"]
+    end_in = [
+        f.get("sourceRef")
+        for f in proc.findall("bpmn:sequenceFlow", NS)
+        if f.get("targetRef") == "EndEvent_success"
+    ]
     assert any(s.startswith("Activity_submit_") for s in end_in)
 
 
@@ -304,12 +487,16 @@ def test_governance_annotations_present():
 # Backward compatibility with existing example blueprints
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("name", [
-    "incident_reporting_blueprint.json",
-    "purchase_order_blueprint.json",
-    "rag_workflow_blueprint.json",
-    "document_extraction_blueprint.json",
-])
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "incident_reporting_blueprint.json",
+        "purchase_order_blueprint.json",
+        "rag_workflow_blueprint.json",
+        "document_extraction_blueprint.json",
+    ],
+)
 def test_example_blueprints_generate_valid_bpmn(name):
     path = EXAMPLES_DIR / name
     if not path.exists():
@@ -332,24 +519,56 @@ def _pdf_blueprint(has_pdf: bool) -> Blueprint:
         "blueprint_version": "1.0",
         "use_case": {"id": "pdf_uc", "name": "PDF Use Case", "description": "x", "domain": "test"},
         "technical_spec": {
-            "input_types": ["audio"], "language": "en",
+            "input_types": ["audio"],
+            "language": "en",
             "output_types": ["structured_json", "pdf"] if has_pdf else ["structured_json"],
         },
         "target_output_spec": {"required_fields": ["a"]},
-        "components": {"selected_modules": [], "selected_building_blocks": ["Transcriber", "DataExtractor"], "custom_components": []},
+        "components": {
+            "selected_modules": [],
+            "selected_building_blocks": ["Transcriber", "DataExtractor"],
+            "custom_components": [],
+        },
         "artifacts": {
             "src": {"type": "audio", "source": "user_upload", "optional": False},
-            "out": {"type": "structured_json", "source": "generated", "optional": False,
-                    "final_output": True, "produced_by": "extract"},
+            "out": {
+                "type": "structured_json",
+                "source": "generated",
+                "optional": False,
+                "final_output": True,
+                "produced_by": "extract",
+            },
         },
-        "workflow": {"steps": [
-            {"id": "transcribe", "name": "Transcribe", "type": "automated_task", "component": "Transcriber",
-             "inputs": ["src"], "outputs": [], "depends_on": []},
-            {"id": "extract", "name": "Extract", "type": "automated_task", "component": "DataExtractor",
-             "inputs": [], "outputs": ["out"], "depends_on": ["transcribe"]},
-            {"id": "review", "name": "Review", "type": "human_review",
-             "inputs": ["out"], "outputs": [], "depends_on": ["extract"]},
-        ]},
+        "workflow": {
+            "steps": [
+                {
+                    "id": "transcribe",
+                    "name": "Transcribe",
+                    "type": "automated_task",
+                    "component": "Transcriber",
+                    "inputs": ["src"],
+                    "outputs": [],
+                    "depends_on": [],
+                },
+                {
+                    "id": "extract",
+                    "name": "Extract",
+                    "type": "automated_task",
+                    "component": "DataExtractor",
+                    "inputs": [],
+                    "outputs": ["out"],
+                    "depends_on": ["transcribe"],
+                },
+                {
+                    "id": "review",
+                    "name": "Review",
+                    "type": "human_review",
+                    "inputs": ["out"],
+                    "outputs": [],
+                    "depends_on": ["extract"],
+                },
+            ]
+        },
     }
     return Blueprint.model_validate(data)
 
@@ -363,10 +582,13 @@ def test_pdf_generation_task_injected_when_output_types_includes_pdf():
     proc = root.find("bpmn:process", NS)
     service_tasks = [e for e in proc if _local(e) == "serviceTask"]
     pdf_task = next((t for t in service_tasks if "pdf" in (t.get("name") or "").lower()), None)
-    assert pdf_task is not None, "expected a 'Generate PDF report' service task when output_types includes 'pdf'"
+    assert pdf_task is not None, (
+        "expected a 'Generate PDF report' service task when output_types includes 'pdf'"
+    )
     # Full edge list (a gateway has several outgoing flows — do not collapse).
-    edges = [(f.get("sourceRef"), f.get("targetRef"))
-             for f in proc.findall("bpmn:sequenceFlow", NS)]
+    edges = [
+        (f.get("sourceRef"), f.get("targetRef")) for f in proc.findall("bpmn:sequenceFlow", NS)
+    ]
     pdf_id = pdf_task.get("id")
     # The PDF task is reached FROM the approval gateway's approved path.
     feeders = [s for s, t in edges if t == pdf_id]
@@ -387,28 +609,55 @@ def test_pdf_generation_precedes_integration_send_task():
     data = {
         "blueprint_version": "1.0",
         "use_case": {"id": "uc", "name": "U", "description": "x", "domain": "t"},
-        "technical_spec": {"input_types": ["audio"], "output_types": ["structured_json", "pdf"],
-                           "language": "en", "integration_targets": ["erp_system"]},
+        "technical_spec": {
+            "input_types": ["audio"],
+            "output_types": ["structured_json", "pdf"],
+            "language": "en",
+            "integration_targets": ["erp_system"],
+        },
         "target_output_spec": {"required_fields": ["a"]},
-        "components": {"selected_modules": [], "selected_building_blocks": ["Extractor"], "custom_components": []},
+        "components": {
+            "selected_modules": [],
+            "selected_building_blocks": ["Extractor"],
+            "custom_components": [],
+        },
         "artifacts": {
             "src": {"type": "audio", "source": "user_upload", "optional": False},
-            "out": {"type": "structured_json", "source": "generated", "optional": False,
-                    "final_output": True, "produced_by": "extract"},
+            "out": {
+                "type": "structured_json",
+                "source": "generated",
+                "optional": False,
+                "final_output": True,
+                "produced_by": "extract",
+            },
         },
-        "workflow": {"steps": [
-            {"id": "extract", "name": "Extract", "type": "automated_task", "component": "Extractor",
-             "inputs": ["src"], "outputs": ["out"], "depends_on": []},
-        ]},
+        "workflow": {
+            "steps": [
+                {
+                    "id": "extract",
+                    "name": "Extract",
+                    "type": "automated_task",
+                    "component": "Extractor",
+                    "inputs": ["src"],
+                    "outputs": ["out"],
+                    "depends_on": [],
+                },
+            ]
+        },
     }
     bp = Blueprint.model_validate(data)
     xml, root = _parse(bp)
     proc = root.find("bpmn:process", NS)
     flows = {f.get("sourceRef"): f.get("targetRef") for f in proc.findall("bpmn:sequenceFlow", NS)}
-    pdf_id = next(e.get("id") for e in proc if _local(e) == "serviceTask"
-                  and "pdf" in (e.get("name") or "").lower())
+    pdf_id = next(
+        e.get("id")
+        for e in proc
+        if _local(e) == "serviceTask" and "pdf" in (e.get("name") or "").lower()
+    )
     send_id = next(e.get("id") for e in proc if _local(e) == "sendTask")
-    assert flows.get(pdf_id) == send_id, "PDF generation must flow into the Send Task (generate, then submit)"
+    assert flows.get(pdf_id) == send_id, (
+        "PDF generation must flow into the Send Task (generate, then submit)"
+    )
 
 
 def test_pdf_generation_task_not_injected_without_pdf_in_output_types():
@@ -426,25 +675,64 @@ def _blueprint_with_loop_to_exception() -> Blueprint:
     data = {
         "blueprint_version": "1.0",
         "use_case": {"id": "rework_uc", "name": "Rework UC", "description": "x", "domain": "test"},
-        "technical_spec": {"input_types": ["audio"], "output_types": ["structured_json"], "language": "en"},
+        "technical_spec": {
+            "input_types": ["audio"],
+            "output_types": ["structured_json"],
+            "language": "en",
+        },
         "target_output_spec": {"required_fields": ["a"]},
-        "components": {"selected_modules": [], "selected_building_blocks": ["Transcriber"], "custom_components": []},
+        "components": {
+            "selected_modules": [],
+            "selected_building_blocks": ["Transcriber"],
+            "custom_components": [],
+        },
         "artifacts": {
             "src": {"type": "audio", "source": "user_upload", "optional": False},
-            "out": {"type": "structured_json", "source": "generated", "optional": False,
-                    "final_output": True, "produced_by": "extract"},
+            "out": {
+                "type": "structured_json",
+                "source": "generated",
+                "optional": False,
+                "final_output": True,
+                "produced_by": "extract",
+            },
         },
-        "workflow": {"steps": [
-            {"id": "upload", "name": "Upload", "type": "user_task", "inputs": [], "outputs": ["src"]},
-            {"id": "extract", "name": "Extract", "type": "automated_task", "component": "Transcriber",
-             "inputs": ["src"], "outputs": ["out"], "depends_on": ["upload"]},
-            {"id": "review", "name": "Review", "type": "human_review",
-             "inputs": ["out"], "outputs": [], "depends_on": ["extract"]},
-        ]},
+        "workflow": {
+            "steps": [
+                {
+                    "id": "upload",
+                    "name": "Upload",
+                    "type": "user_task",
+                    "inputs": [],
+                    "outputs": ["src"],
+                },
+                {
+                    "id": "extract",
+                    "name": "Extract",
+                    "type": "automated_task",
+                    "component": "Transcriber",
+                    "inputs": ["src"],
+                    "outputs": ["out"],
+                    "depends_on": ["upload"],
+                },
+                {
+                    "id": "review",
+                    "name": "Review",
+                    "type": "human_review",
+                    "inputs": ["out"],
+                    "outputs": [],
+                    "depends_on": ["extract"],
+                },
+            ]
+        },
         "business_process": {
             "exceptions": [
-                {"id": "rejection_rework", "name": "Employee corrects and resubmits",
-                 "attached_to": "review", "condition": "No (rework)", "outcome": "loop_to:upload"},
+                {
+                    "id": "rejection_rework",
+                    "name": "Employee corrects and resubmits",
+                    "attached_to": "review",
+                    "condition": "No (rework)",
+                    "outcome": "loop_to:upload",
+                },
             ],
         },
     }
@@ -457,9 +745,12 @@ def test_explicit_loop_to_exception_routes_to_named_step():
     bp = _blueprint_with_loop_to_exception()
     xml, root = _parse(bp)
     proc = root.find("bpmn:process", NS)
-    no_flows = [f for f in proc.findall("bpmn:sequenceFlow", NS)
-                if f.get("sourceRef", "").startswith("Gateway_approve_")
-                and "rework" in (f.get("name") or "").lower()]
+    no_flows = [
+        f
+        for f in proc.findall("bpmn:sequenceFlow", NS)
+        if f.get("sourceRef", "").startswith("Gateway_approve_")
+        and "rework" in (f.get("name") or "").lower()
+    ]
     assert no_flows, "expected a rework flow from the approval gateway"
     assert no_flows[0].get("targetRef") == "Activity_upload", (
         "rework loop should go to the 'upload' user_task, not the AI extractor"

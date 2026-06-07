@@ -34,7 +34,7 @@ TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "poc"
 # ---------------------------------------------------------------------------
 
 _EVAL_BODIES: Dict[str, str] = {
-    "extraction_eval": '''\
+    "extraction_eval": """\
     total_exact = total_semantic = total_present = 0
     n = 0
     for out_file in output_files:
@@ -57,43 +57,40 @@ _EVAL_BODIES: Dict[str, str] = {
     else:
         print("No matched output/ground-truth pairs found.")
     print("\\nFor full metrics (precision/recall/F1/semantic) run:")
-    print("  implementation_layer/eval_methods/extraction_eval/evaluate.py")''',
-
-    "RAG_eval": '''\
+    print("  implementation_layer/eval_methods/extraction_eval/evaluate.py")""",
+    "RAG_eval": """\
     print("For full RAG retrieval metrics (token recall, MRR, rank-weighted coverage) run:")
     print("  implementation_layer/eval_methods/RAG_eval/")
     for out_file in output_files:
-        print(f"  Output: {out_file.name}")''',
-
-    "transcription_eval": '''\
+        print(f"  Output: {out_file.name}")""",
+    "transcription_eval": """\
     print("For full transcription metrics (WER/CER) run:")
     print("  implementation_layer/eval_methods/transcription_eval/")
     for out_file in output_files:
-        print(f"  Output: {out_file.name}")''',
-
-    "report_writing_eval": '''\
+        print(f"  Output: {out_file.name}")""",
+    "report_writing_eval": """\
     print("For full report quality scoring (LLM-as-judge) run:")
     print("  implementation_layer/eval_methods/report_writing_eval/")
     for out_file in output_files:
-        print(f"  Output: {out_file.name}")''',
-
-    "translation_eval": '''\
+        print(f"  Output: {out_file.name}")""",
+    "translation_eval": """\
     print("For full translation metrics (BLEU/chrF/TER) run:")
     print("  implementation_layer/eval_methods/translation_eval/")
     for out_file in output_files:
-        print(f"  Output: {out_file.name}")''',
+        print(f"  Output: {out_file.name}")""",
 }
 
-_DEFAULT_EVAL_BODY = '''\
+_DEFAULT_EVAL_BODY = """\
     print("No specific evaluation framework configured.")
     print("Output files:")
     for f in output_files:
-        print(f"  {f}")'''
+        print(f"  {f}")"""
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _fill(template_text: str, variables: Dict[str, Any]) -> str:
     """Fill a template using string.Template safe_substitute."""
@@ -121,7 +118,7 @@ def _topo_order(steps: List) -> List:
     in_degree: Dict[str, int] = {s.id: 0 for s in steps}
 
     for s in steps:
-        for dep in (s.depends_on or []):
+        for dep in s.depends_on or []:
             if dep in dependents:
                 dependents[dep].append(s.id)
                 in_degree[s.id] = in_degree.get(s.id, 0) + 1
@@ -234,16 +231,22 @@ def _determine_pattern(blueprint: Blueprint) -> str:
          blueprint's pipeline shape, reuse it deterministically.
       3. _generic fallback -- agent authors the wiring.
     """
-    modules = [m.id if hasattr(m, "id") else m.get("id", "") for m in blueprint.components.selected_modules]
+    modules = [
+        m.id if hasattr(m, "id") else m.get("id", "") for m in blueprint.components.selected_modules
+    ]
     building_blocks = set(blueprint.components.selected_building_blocks)
 
     # Only use a fixed module template when exactly one module is selected.
     # Multiple selected modules mean a genuine hybrid -- no single fixed template
     # covers the full pipeline, so fall through to dynamic/generic.
     if len(modules) == 1:
-        if "audio_to_structured_data" in modules and _module_covers_all_blocks("audio_to_structured_data", building_blocks):
+        if "audio_to_structured_data" in modules and _module_covers_all_blocks(
+            "audio_to_structured_data", building_blocks
+        ):
             return "audio_to_structured"
-        if "documents_to_structured_data" in modules and _module_covers_all_blocks("documents_to_structured_data", building_blocks):
+        if "documents_to_structured_data" in modules and _module_covers_all_blocks(
+            "documents_to_structured_data", building_blocks
+        ):
             return "document_to_structured"
         if "rag_workflow" in modules and _module_covers_all_blocks("rag_workflow", building_blocks):
             return "rag"
@@ -267,6 +270,7 @@ def _build_generic_pipeline_skeleton(blueprint: Blueprint) -> str:
     one call per block rather than inventing the whole structure.
     """
     from .registry import get_reference_cards
+
     cards = get_reference_cards()
     lines: List[str] = []
 
@@ -277,12 +281,16 @@ def _build_generic_pipeline_skeleton(blueprint: Blueprint) -> str:
 
         if step.type == "user_task":
             lines.append(f"    # ----- Step: {step.id}  (user input) -----")
-            lines.append(f"    # produces: {outputs}  (loaded from sample_input/, see loaders above)")
+            lines.append(
+                f"    # produces: {outputs}  (loaded from sample_input/, see loaders above)"
+            )
             lines.append("")
             continue
 
         if step.type == "human_review" or comp == "human_review":
-            lines.append(f"    # ----- Step: {step.id}  (human review -- NOT executed in PoC) -----")
+            lines.append(
+                f"    # ----- Step: {step.id}  (human review -- NOT executed in PoC) -----"
+            )
             lines.append(f"    # In production a reviewer approves: {outputs}")
             lines.append("")
             continue
@@ -301,7 +309,9 @@ def _build_generic_pipeline_skeleton(blueprint: Blueprint) -> str:
                     lines.append(f"    #   {snip_line}")
             lines.append(f"    #   returns: {card['returns']}")
         else:
-            lines.append(f"    # (no reference card for {comp} -- read its README/example_script_path)")
+            lines.append(
+                f"    # (no reference card for {comp} -- read its README/example_script_path)"
+            )
         # Pre-declare each output variable so later steps reference real names
         for out in step.outputs:
             lines.append(f"    {out} = None  # TODO: wire {comp}; assign its result to '{out}'")
@@ -348,7 +358,7 @@ def _build_generic_judge_section(has_llm_judge: bool) -> str:
     if not has_llm_judge:
         return "    # LLMJudge is not in this blueprint's pipeline."
 
-    return '''\
+    return """\
     # -- LLMJudge hallucination detection (from blueprint) --
     # Contract: by this point your wiring MUST have assigned:
     #   extracted_fields  (dict or list[dict])  -- the structured output
@@ -384,7 +394,7 @@ def _build_generic_judge_section(has_llm_judge: bool) -> str:
         except ImportError:
             print("LLMJudge skipped: gaik[llm-judge] not installed.")
         except Exception as _judge_exc:
-            print(f"LLMJudge warning: {_judge_exc}")'''
+            print(f"LLMJudge warning: {_judge_exc}")"""
 
 
 def _wants_pdf(blueprint: Blueprint) -> bool:
@@ -414,12 +424,12 @@ def _build_pdf_report_section(blueprint: Blueprint, schema_name: str) -> str:
         "    if _pdf_source is not None:\n"
         "        try:\n"
         "            from pdf_report import write_pdf_report\n"
-        "            _pdf_path = output_dir / \"result_report.pdf\"\n"
-        f"            write_pdf_report(_pdf_source, _pdf_path, title=\"{title}\", subtitle=\"{schema_name}\",\n"
-        f"                             metadata={{\"Schema\": \"{schema_name}\"}})\n"
-        "            print(f\"PDF report written to: {_pdf_path}\")\n"
+        '            _pdf_path = output_dir / "result_report.pdf"\n'
+        f'            write_pdf_report(_pdf_source, _pdf_path, title="{title}", subtitle="{schema_name}",\n'
+        f'                             metadata={{"Schema": "{schema_name}"}})\n'
+        '            print(f"PDF report written to: {_pdf_path}")\n'
         "        except Exception as _pdf_exc:  # noqa: BLE001\n"
-        "            print(f\"WARNING: PDF report generation failed: {_pdf_exc}\")\n"
+        '            print(f"WARNING: PDF report generation failed: {_pdf_exc}")\n'
     )
 
 
@@ -429,7 +439,6 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> Dict[str, Any]:
     models = bc.models or {}
     provider = models.get("provider", "azure_openai")
     use_azure = str(provider in ("azure_openai",)).lower()  # python bool as string
-
 
     # Determine model names
     transcription_model = models.get("transcription_model", "gpt-4o-transcribe")
@@ -442,12 +451,13 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> Dict[str, Any]:
         or "OutputSchema"
     )
     fields = bc.target_output_spec.get("fields", [])
-    sample_field_lines = "\n".join(f"  - {f}" for f in fields[:5]) if fields else "  (no fields defined)"
+    sample_field_lines = (
+        "\n".join(f"  - {f}" for f in fields[:5]) if fields else "  (no fields defined)"
+    )
 
     # Workflow steps summary for _generic template
     steps_summary = "\n".join(
-        f"#   {i+1}. {s.id} ({s.type}): {s.component or 'user_task'} "
-        f"{s.inputs} -> {s.outputs}"
+        f"#   {i + 1}. {s.id} ({s.type}): {s.component or 'user_task'} {s.inputs} -> {s.outputs}"
         for i, s in enumerate(bc.workflow.steps)
     )
 
@@ -462,18 +472,21 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> Dict[str, Any]:
                 import_path = entry["import_path"]
                 import_lines.append(f"from {import_path} import {class_name}")
 
-    language = bc.technical_spec.get("language", "en") if isinstance(bc.technical_spec, dict) else getattr(bc.technical_spec, "language", "en")
+    language = (
+        bc.technical_spec.get("language", "en")
+        if isinstance(bc.technical_spec, dict)
+        else getattr(bc.technical_spec, "language", "en")
+    )
 
     # LLMJudge section: inject real code if judge is in the selected pipeline,
     # otherwise inject a skip comment so run_poc.py stays syntactically valid.
-    all_components = (
-        [m.name if hasattr(m, "name") else m.get("name", "") for m in bc.components.selected_modules]
-        + bc.components.selected_building_blocks
-    )
+    all_components = [
+        m.name if hasattr(m, "name") else m.get("name", "") for m in bc.components.selected_modules
+    ] + bc.components.selected_building_blocks
     has_llm_judge = "LLMJudge" in all_components
 
     if has_llm_judge:
-        llm_judge_section = '''\
+        llm_judge_section = """\
     # -- LLMJudge hallucination detection (from blueprint) --
     # detect_hallucinations() checks each extracted field against the grounding
     # source text and flags any value not supported by it.
@@ -534,11 +547,9 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> Dict[str, Any]:
     # -- Human review (blueprint step: supervisor_review) --
     print("\\nNOTE: Human review (supervisor approval) is not executed in the PoC.")
     print("      Gate 3 in the wizard conversation is the equivalent review step.")
-    print("      In production, the approved_ticket artifact is produced here.")'''
+    print("      In production, the approved_ticket artifact is produced here.")"""
     else:
-        llm_judge_section = (
-            "    # LLMJudge and human_review are not in this blueprint's pipeline."
-        )
+        llm_judge_section = "    # LLMJudge and human_review are not in this blueprint's pipeline."
 
     return {
         "use_case_name": bc.use_case.name,
@@ -552,7 +563,9 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> Dict[str, Any]:
         "temperature": temperature,
         "language": language,
         "llm_judge_section": llm_judge_section,
-        "eval_framework": bc.evaluation.get("eval_framework", "extraction_eval") if isinstance(bc.evaluation, dict) else "extraction_eval",
+        "eval_framework": bc.evaluation.get("eval_framework", "extraction_eval")
+        if isinstance(bc.evaluation, dict)
+        else "extraction_eval",
         "eval_framework_body": _EVAL_BODIES.get(
             bc.evaluation.get("eval_framework", "") if isinstance(bc.evaluation, dict) else "",
             _DEFAULT_EVAL_BODY,
@@ -596,7 +609,9 @@ def _input_instructions(bp: Blueprint) -> str:
 
 
 def _output_instructions(bp: Blueprint) -> str:
-    fields = bp.target_output_spec.get("fields", []) if isinstance(bp.target_output_spec, dict) else []
+    fields = (
+        bp.target_output_spec.get("fields", []) if isinstance(bp.target_output_spec, dict) else []
+    )
     input_types = (
         bp.technical_spec.get("input_types", [])
         if isinstance(bp.technical_spec, dict)
@@ -618,12 +633,13 @@ def _output_instructions(bp: Blueprint) -> str:
 # File generators
 # ---------------------------------------------------------------------------
 
+
 def _write_requirements_txt(blueprint: Blueprint, poc_dir: Path) -> None:
     registry = get_registry()
-    all_components = (
-        [m.name if hasattr(m, "name") else m.get("name", "") for m in blueprint.components.selected_modules]
-        + blueprint.components.selected_building_blocks
-    )
+    all_components = [
+        m.name if hasattr(m, "name") else m.get("name", "")
+        for m in blueprint.components.selected_modules
+    ] + blueprint.components.selected_building_blocks
     lines = registry.pip_requirements(all_components)
     lines.append("pyyaml")
     if _wants_pdf(blueprint):
@@ -678,6 +694,7 @@ def _write_readme(variables: Dict[str, Any], poc_dir: Path) -> None:
 # Main entry point
 # ---------------------------------------------------------------------------
 
+
 def scaffold_poc(
     blueprint: Blueprint,
     output_dir: Path,
@@ -724,7 +741,9 @@ def scaffold_poc(
     _schema_already_approved = _approved_schema.exists() and _approved_req.exists()
 
     has_fields = bool(
-        blueprint.target_output_spec.get("fields") if isinstance(blueprint.target_output_spec, dict) else False
+        blueprint.target_output_spec.get("fields")
+        if isinstance(blueprint.target_output_spec, dict)
+        else False
     )
     if pattern != "rag" and _schema_already_approved:
         # SchemaGenerator output exists and was approved -- use as-is
@@ -783,6 +802,7 @@ def scaffold_poc(
         try:
             from reportlab.lib.pagesizes import A4
             from reportlab.pdfgen import canvas as rl_canvas
+
             pdf_path = sample_dir / "synthetic_sample.pdf"
             c = rl_canvas.Canvas(str(pdf_path), pagesize=A4)
             c.drawString(50, 750, f"SYNTHETIC SAMPLE - {blueprint.use_case.name}")

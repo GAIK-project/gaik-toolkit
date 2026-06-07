@@ -39,6 +39,7 @@ DOC_NAMES = [
 # Formatting helpers
 # ---------------------------------------------------------------------------
 
+
 def _as_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
@@ -77,6 +78,7 @@ def _field(d: Dict[str, Any], key: str) -> str:
 # Variable extraction
 # ---------------------------------------------------------------------------
 
+
 def _components_block(blueprint: Blueprint) -> str:
     comps = blueprint.components
     lines: List[str] = []
@@ -95,8 +97,10 @@ def _workflow_table(blueprint: Blueprint) -> str:
     steps = blueprint.workflow.steps
     if not steps:
         return "_No workflow steps defined._"
-    rows = ["| Step | Type | Component | Inputs | Outputs |",
-            "|------|------|-----------|--------|---------|"]
+    rows = [
+        "| Step | Type | Component | Inputs | Outputs |",
+        "|------|------|-----------|--------|---------|",
+    ]
     for s in steps:
         comp = s.component or "—"
         params = ""
@@ -132,7 +136,9 @@ def _build_doc_variables(blueprint: Blueprint) -> Dict[str, str]:
 
     fields = tos.get("fields") or []
     runtime = tspec.get("runtime_interface") or "cli"
-    run_cmd = "python poc/run_poc.py" if "cli" in str(runtime).lower() else f"({runtime} entry point)"
+    run_cmd = (
+        "python poc/run_poc.py" if "cli" in str(runtime).lower() else f"({runtime} entry point)"
+    )
 
     return {
         # identity
@@ -140,7 +146,9 @@ def _build_doc_variables(blueprint: Blueprint) -> Dict[str, str]:
         "use_case_id": uc.id,
         "domain": uc.domain or "_not specified_",
         "description": uc.description or "_not specified_",
-        "knowledge_processes": _fmt_value([k.value if hasattr(k, "value") else k for k in uc.knowledge_processes]),
+        "knowledge_processes": _fmt_value(
+            [k.value if hasattr(k, "value") else k for k in uc.knowledge_processes]
+        ),
         # business
         "current_process": _field(bspec, "current_process"),
         "pain_points": _bullets(bspec.get("pain_points")),
@@ -190,6 +198,7 @@ def _build_doc_variables(blueprint: Blueprint) -> Dict[str, str]:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def generate_docs(blueprint: Blueprint, output_dir: str | Path) -> List[Path]:
     """Generate the five documents into ``<output_dir>/docs/``.

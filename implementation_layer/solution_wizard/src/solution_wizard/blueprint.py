@@ -19,6 +19,7 @@ from pydantic import BaseModel, field_validator, model_validator
 # Enumerations
 # ---------------------------------------------------------------------------
 
+
 class KnowledgeProcess(str, Enum):
     CAPTURE = "knowledge_capture"
     ACCESS = "knowledge_access"
@@ -48,6 +49,7 @@ class AssumptionStatus(str, Enum):
 # ---------------------------------------------------------------------------
 # Sub-models
 # ---------------------------------------------------------------------------
+
 
 class Metadata(BaseModel):
     blueprint_id: str = ""
@@ -87,13 +89,9 @@ class Artifact(BaseModel):
         # in step.outputs without the artifact having a produced_by field;
         # the two sides (step.outputs vs artifact.produced_by) are independent.
         if self.source == ArtifactSource.GENERATED and self.produced_by is None:
-            raise ValueError(
-                "Artifact with source='generated' requires 'produced_by' to be set."
-            )
+            raise ValueError("Artifact with source='generated' requires 'produced_by' to be set.")
         if self.source == ArtifactSource.USER_UPLOAD and self.produced_by is not None:
-            raise ValueError(
-                "Artifact with source='user_upload' must not have 'produced_by'."
-            )
+            raise ValueError("Artifact with source='user_upload' must not have 'produced_by'.")
         return self
 
 
@@ -191,8 +189,10 @@ class ChangeLogEntry(BaseModel):
 # only into the diagram. The BPMN is generated from here; it is never the
 # source of truth (one-directional, linked-by-derivation).
 
+
 class Participant(BaseModel):
     """A swimlane (human role) or system lane in the BPMN."""
+
     id: str
     name: str
     kind: str = "human_role"  # human_role | system
@@ -203,6 +203,7 @@ class Participant(BaseModel):
 
 class ManualStep(BaseModel):
     """A human business step the AI pipeline does not model as a workflow step."""
+
     id: str
     name: str
     performed_by: str = ""  # Participant id
@@ -214,6 +215,7 @@ class ManualStep(BaseModel):
 
 class ExternalParty(BaseModel):
     """A black-box pool outside the organisation that hands inputs in."""
+
     id: str
     name: str
     sends: List[str] = []  # artifact ids handed in via a message flow
@@ -222,6 +224,7 @@ class ExternalParty(BaseModel):
 
 class MessageFlow(BaseModel):
     """A cross-pool message (dashed line in BPMN)."""
+
     # `from`/`to` are element ids (participant id, external party id, step id,
     # or data store id). `from_` is the Python attribute (from is reserved);
     # JSON uses the natural key "from" via the alias.
@@ -242,6 +245,7 @@ class MessageFlow(BaseModel):
 
 class ExceptionFlow(BaseModel):
     """An alternative / error path attached to a step."""
+
     id: str
     name: str
     attached_to: str = ""  # step id the boundary/branch hangs off
@@ -257,6 +261,7 @@ class DecisionBranch(BaseModel):
 
 class DecisionPoint(BaseModel):
     """A business gateway beyond the implicit approve/reject one."""
+
     id: str
     name: str
     after: str = ""  # step id this gateway follows
@@ -275,6 +280,7 @@ class BusinessProcess(BaseModel):
 # ---------------------------------------------------------------------------
 # Top-level Blueprint
 # ---------------------------------------------------------------------------
+
 
 class Blueprint(BaseModel):
     blueprint_version: str = "1.0"
@@ -308,9 +314,7 @@ class Blueprint(BaseModel):
         return cls.model_validate(data)
 
     def to_file(self, path: str | Path) -> None:
-        Path(path).write_text(
-            self.model_dump_json(indent=2), encoding="utf-8"
-        )
+        Path(path).write_text(self.model_dump_json(indent=2), encoding="utf-8")
 
     @classmethod
     def export_json_schema(cls, path: str | Path) -> None:

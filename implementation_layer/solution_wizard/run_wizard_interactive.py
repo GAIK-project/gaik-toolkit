@@ -97,27 +97,28 @@ DEFAULT_MODEL = "claude-sonnet-4-6"
 
 # ── ANSI colours (suppressed on non-TTY / Windows without ANSI support) ──────
 
+
 def _supports_colour() -> bool:
     return sys.stdout.isatty() and os.name != "nt" or os.environ.get("FORCE_COLOR")
 
 
-RESET  = "\033[0m"  if _supports_colour() else ""
-BOLD   = "\033[1m"  if _supports_colour() else ""
-DIM    = "\033[2m"  if _supports_colour() else ""
-CYAN   = "\033[36m" if _supports_colour() else ""
+RESET = "\033[0m" if _supports_colour() else ""
+BOLD = "\033[1m" if _supports_colour() else ""
+DIM = "\033[2m" if _supports_colour() else ""
+CYAN = "\033[36m" if _supports_colour() else ""
 YELLOW = "\033[33m" if _supports_colour() else ""
-GREEN  = "\033[32m" if _supports_colour() else ""
-RED    = "\033[31m" if _supports_colour() else ""
+GREEN = "\033[32m" if _supports_colour() else ""
+RED = "\033[31m" if _supports_colour() else ""
 
 
 # ── Environment ───────────────────────────────────────────────────────────────
+
 
 def load_environment(env_file: Path) -> dict[str, str]:
     if env_file.exists():
         load_dotenv(env_file)
     else:
-        print(f"{DIM}(no .env at {env_file} — using current shell env){RESET}",
-              file=sys.stderr)
+        print(f"{DIM}(no .env at {env_file} — using current shell env){RESET}", file=sys.stderr)
 
     missing = [k for k in REQUIRED_ENV_VARS if not (os.getenv(k) or "").strip()]
     if missing:
@@ -134,8 +135,12 @@ def load_environment(env_file: Path) -> dict[str, str]:
 
 
 def resolve_model(env: dict[str, str], cli_model: str | None) -> str:
-    return (cli_model or env.get("ANTHROPIC_MODEL") or
-            env.get("ANTHROPIC_DEFAULT_SONNET_MODEL") or DEFAULT_MODEL).strip()
+    return (
+        cli_model
+        or env.get("ANTHROPIC_MODEL")
+        or env.get("ANTHROPIC_DEFAULT_SONNET_MODEL")
+        or DEFAULT_MODEL
+    ).strip()
 
 
 def guard_nested_session(allow_nested: bool, env: dict[str, str]) -> None:
@@ -152,6 +157,7 @@ def guard_nested_session(allow_nested: bool, env: dict[str, str]) -> None:
 
 
 # ── Output printing ───────────────────────────────────────────────────────────
+
 
 def _print_text(text: str) -> None:
     """Print wizard text in cyan so it's visually distinct from the user prompt."""
@@ -177,20 +183,23 @@ def _print_result(message: ResultMessage) -> None:
             print(message.result)
     else:
         print(f"\n{GREEN}--- Wizard session complete ---{RESET}")
-        print(f"{DIM}Turns: {message.num_turns}  |  "
-              f"Session: {message.session_id}"
-              + (f"  |  Cost: ${message.total_cost_usd:.4f}" if message.total_cost_usd else "")
-              + RESET)
+        print(
+            f"{DIM}Turns: {message.num_turns}  |  "
+            f"Session: {message.session_id}"
+            + (f"  |  Cost: ${message.total_cost_usd:.4f}" if message.total_cost_usd else "")
+            + RESET
+        )
 
 
 # ── Input ─────────────────────────────────────────────────────────────────────
+
 
 def _read_user_input() -> str | None:
     """Prompt the user and return their input, or None on EOF/Ctrl+D."""
     try:
         print(f"\n{BOLD}You:{RESET} ", end="", flush=True)
         line = sys.stdin.readline()
-        if not line:        # EOF / Ctrl+D
+        if not line:  # EOF / Ctrl+D
             return None
         return line.rstrip("\n")
     except KeyboardInterrupt:
@@ -220,7 +229,7 @@ async def _drain_response(client: ClaudeSDKClient) -> ResultMessage | None:
         elif isinstance(message, ResultMessage):
             if message.is_error:
                 _print_result(message)
-                return message   # error — caller should stop
+                return message  # error — caller should stop
             # Normal turn end: wizard is waiting for user input.
             # Return None so the conversation loop continues.
             return None
@@ -229,12 +238,17 @@ async def _drain_response(client: ClaudeSDKClient) -> ResultMessage | None:
 
 # ── Initial prompt ────────────────────────────────────────────────────────────
 
+
 def build_initial_prompt(output_dir: Path | None) -> str:
     """The first message that invokes the wizard skill and sets up the session."""
     output_hint = (
-        f"\nThe user has pre-selected this output directory: {output_dir}\n"
-        "Skip the directory question and use it directly."
-    ) if output_dir else ""
+        (
+            f"\nThe user has pre-selected this output directory: {output_dir}\n"
+            "Skip the directory question and use it directly."
+        )
+        if output_dir
+        else ""
+    )
 
     return f"""\
 /solution-wizard
@@ -252,6 +266,7 @@ conversation, one or two questions at a time.
 
 # ── Main interactive loop ─────────────────────────────────────────────────────
 
+
 async def run_interactive(
     env: dict[str, str],
     model: str,
@@ -264,7 +279,7 @@ async def run_interactive(
         model=model,
         allowed_tools=["Read", "Grep", "Glob", "Write", "Edit", "Bash"],
         permission_mode="bypassPermissions",
-        setting_sources=[],     # isolate from repo CLAUDE.md / graphify noise
+        setting_sources=[],  # isolate from repo CLAUDE.md / graphify noise
     )
 
     print(f"{BOLD}GAIK Solution Configuration Wizard{RESET}")
@@ -284,11 +299,11 @@ async def run_interactive(
         # and a ResultMessage on error. Loop until error or user exits.
         while error_result is None:
             user_input = _read_user_input()
-            if user_input is None:          # EOF or Ctrl+D
+            if user_input is None:  # EOF or Ctrl+D
                 print(f"\n{YELLOW}(session ended by user){RESET}")
                 break
             if not user_input.strip():
-                continue                    # ignore blank lines
+                continue  # ignore blank lines
 
             await client.query(user_input)
             error_result = await _drain_response(client)
@@ -302,6 +317,7 @@ async def run_interactive(
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
@@ -330,7 +346,7 @@ def parse_args() -> argparse.Namespace:
         "--allow-nested",
         action="store_true",
         help="Permit running inside a Claude Code session by dropping CLAUDECODE "
-             "for the child process (may disrupt the parent session).",
+        "for the child process (may disrupt the parent session).",
     )
     return p.parse_args()
 
@@ -344,12 +360,18 @@ def main() -> None:
 
         if args.preflight:
             from claude_agent_sdk import query, ClaudeAgentOptions
+
             print(f"Preflight: checking Foundry routing (model={model}) …\n")
+
             async def _check():
                 opts = ClaudeAgentOptions(
-                    cwd=str(WIZARD_DIR), env=env, model=model,
-                    allowed_tools=[], permission_mode="bypassPermissions",
-                    setting_sources=[], max_turns=1,
+                    cwd=str(WIZARD_DIR),
+                    env=env,
+                    model=model,
+                    allowed_tools=[],
+                    permission_mode="bypassPermissions",
+                    setting_sources=[],
+                    max_turns=1,
                 )
                 async for msg in query(prompt="Reply with the single word: READY", options=opts):
                     if isinstance(msg, __import__("claude_agent_sdk").AssistantMessage):
@@ -365,6 +387,7 @@ def main() -> None:
                         print(f"{GREEN}Preflight passed{RESET}{DIM}{cost}{RESET}")
                         return 0
                 return 0
+
             sys.exit(asyncio.run(_check()))
 
         output_dir: Path | None = None

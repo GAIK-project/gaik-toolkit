@@ -32,7 +32,11 @@ def _complete_data() -> dict:
             "evaluation_requirements": "field F1 >= 0.9",
             "security_constraints": "none",
         },
-        "target_output_spec": {"schema_name": "Out", "fields": ["a", "b"], "required_fields": ["a"]},
+        "target_output_spec": {
+            "schema_name": "Out",
+            "fields": ["a", "b"],
+            "required_fields": ["a"],
+        },
     }
 
 
@@ -91,7 +95,9 @@ def test_privacy_satisfied_by_governance():
     no explicit security_constraints field."""
     data = _complete_data()
     del data["technical_spec"]["security_constraints"]
-    data["governance"] = {"data_handling": {"contains_personal_data": "no", "output_sensitivity": "low"}}
+    data["governance"] = {
+        "data_handling": {"contains_personal_data": "no", "output_sensitivity": "low"}
+    }
     bp = Blueprint.model_validate(data)
     gaps = {g.number for g in check_completeness(bp)}
     assert 9 not in gaps

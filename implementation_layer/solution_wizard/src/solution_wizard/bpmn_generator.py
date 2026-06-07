@@ -37,21 +37,21 @@ from .blueprint import Blueprint
 
 POOL_X = 160
 POOL_Y = 90
-POOL_LABEL_W = 30          # left band of a horizontal pool (rotated name)
-LANE_LABEL_W = 30          # left band of a lane inside the pool
+POOL_LABEL_W = 30  # left band of a horizontal pool (rotated name)
+LANE_LABEL_W = 30  # left band of a lane inside the pool
 CONTENT_X0 = POOL_X + POOL_LABEL_W + LANE_LABEL_W + 30  # first node column centre-ish
-X_SPACING = 200            # horizontal distance between ranks
-COL_W = 100                # nominal column width (for column centring)
+X_SPACING = 200  # horizontal distance between ranks
+COL_W = 100  # nominal column width (for column centring)
 # Each row inside a lane is split into a data-object zone (top) and a task zone
 # (bottom), so every task carries its own data objects directly above it -- even
 # when two parallel tasks are stacked in the same column of the same lane.
-ROW_DATA_H = 95            # data-object zone height per row (gap above the task)
-ROW_TASK_H = 120           # task zone height per row
+ROW_DATA_H = 95  # data-object zone height per row (gap above the task)
+ROW_TASK_H = 120  # task zone height per row
 ROW_H = ROW_DATA_H + ROW_TASK_H
-DATA_OBJ_TOP_PAD = 8       # gap from the row top to the data object
-LANE_PAD_TOP = 12          # padding at the top of a lane
-LANE_PAD_BOTTOM = 12       # padding at the bottom of a lane
-DATA_OBJ_GAP = 70          # horizontal gap between several data objects of one task
+DATA_OBJ_TOP_PAD = 8  # gap from the row top to the data object
+LANE_PAD_TOP = 12  # padding at the top of a lane
+LANE_PAD_BOTTOM = 12  # padding at the bottom of a lane
+DATA_OBJ_GAP = 70  # horizontal gap between several data objects of one task
 BASE_LANE_H = 150
 EXT_POOL_H = 70
 EXT_POOL_GAP = 30
@@ -71,6 +71,7 @@ SIZE = {
 # ---------------------------------------------------------------------------
 # XML helpers
 # ---------------------------------------------------------------------------
+
 
 def _esc(text: str) -> str:
     """Escape text for use in XML attribute values and element text."""
@@ -92,23 +93,24 @@ def _safe(token: str) -> str:
 # Internal model objects
 # ---------------------------------------------------------------------------
 
+
 class _Node:
     """A BPMN flow node (event, task, gateway)."""
 
     def __init__(self, nid: str, tag: str, name: str, lane: str, size_key: str):
         self.id = nid
-        self.tag = tag          # e.g. "bpmn:userTask"
+        self.tag = tag  # e.g. "bpmn:userTask"
         self.name = name
-        self.lane = lane        # lane id
+        self.lane = lane  # lane id
         self.w, self.h = SIZE[size_key]
         self.rank = 0
         self.x = 0
         self.y = 0
-        self.incoming: List[str] = []   # sequence flow ids
+        self.incoming: List[str] = []  # sequence flow ids
         self.outgoing: List[str] = []
         # data associations attached to this node (tasks only)
-        self.data_in: List[Tuple[str, str, str]] = []   # (assoc_id, dataobjref_id, property_id)
-        self.data_out: List[Tuple[str, str]] = []        # (assoc_id, dataobjref_id)
+        self.data_in: List[Tuple[str, str, str]] = []  # (assoc_id, dataobjref_id, property_id)
+        self.data_out: List[Tuple[str, str]] = []  # (assoc_id, dataobjref_id)
 
     @property
     def cx(self) -> float:
@@ -133,7 +135,7 @@ class _Lane:
         self.id = lid
         self.name = name
         self.priority = priority
-        self.members: List[str] = []   # flow node ids
+        self.members: List[str] = []  # flow node ids
         self.top = 0.0
         self.height = float(BASE_LANE_H)
 
@@ -142,6 +144,7 @@ class _Lane:
 # Builder
 # ---------------------------------------------------------------------------
 
+
 class _BpmnBuilder:
     def __init__(self, blueprint: Blueprint):
         self.bp = blueprint
@@ -149,11 +152,11 @@ class _BpmnBuilder:
         self.lanes: Dict[str, _Lane] = {}
         self.flows: List[_Flow] = []
         self.msg_flows: List[Tuple[str, str, str, str]] = []  # id, src, tgt, name
-        self.ext_pools: List[Tuple[str, str]] = []            # id, name
+        self.ext_pools: List[Tuple[str, str]] = []  # id, name
         self.data_objs: List[Tuple[str, str, str, str]] = []  # refid, objid, name, artifact_id
-        self.data_stores: List[Tuple[str, str, str]] = []     # id, name, target
-        self.annotations: List[Tuple[str, str]] = []          # id, text
-        self.assocs: List[Tuple[str, str, str]] = []          # id, src(annotation), tgt(node)
+        self.data_stores: List[Tuple[str, str, str]] = []  # id, name, target
+        self.annotations: List[Tuple[str, str]] = []  # id, text
+        self.assocs: List[Tuple[str, str, str]] = []  # id, src(annotation), tgt(node)
         self.mapping: Dict[str, Dict[str, str]] = {}
         # unified geometry store: element id -> (x, y, w, h). Populated during
         # layout for every drawable element (flow nodes, data objects, data
@@ -229,11 +232,17 @@ class _BpmnBuilder:
             return lid
 
         if category == "review":
-            hit = self._participant_lane(lambda p: "human_review" in getattr(p, "default_lane_for", []))
+            hit = self._participant_lane(
+                lambda p: "human_review" in getattr(p, "default_lane_for", [])
+            )
             if hit:
                 return self._ensure_lane(hit[0], hit[1], 2)
             reviewers = spec.get("reviewers") or []
-            name = " / ".join(r.replace("_", " ").title() for r in reviewers) if reviewers else "Reviewer"
+            name = (
+                " / ".join(r.replace("_", " ").title() for r in reviewers)
+                if reviewers
+                else "Reviewer"
+            )
             lid = self._ensure_lane("Lane_reviewers", name, 2)
             if lid not in self.mapping:
                 self._map(lid, "lane", "derived:business_spec.reviewers")
@@ -317,7 +326,9 @@ class _BpmnBuilder:
                     dependents[dep].append(s.id)
 
         # manual step dependencies fold into the same graph
-        manual_node_of = {ms.id: f"Activity_{_safe(ms.id)}" for ms in self.bp.business_process.manual_steps}
+        manual_node_of = {
+            ms.id: f"Activity_{_safe(ms.id)}" for ms in self.bp.business_process.manual_steps
+        }
         all_node_of = {**node_of, **manual_node_of}
 
         # 1. raw step->step edges
@@ -351,7 +362,11 @@ class _BpmnBuilder:
             first_entry_node = node_of[entry_steps[0].id]
         elif entry_manual:
             first_entry_node = manual_node_of[entry_manual[0].id]
-        start.lane = self.nodes[first_entry_node].lane if first_entry_node else self._lane_for_category("user")
+        start.lane = (
+            self.nodes[first_entry_node].lane
+            if first_entry_node
+            else self._lane_for_category("user")
+        )
 
         for s in entry_steps:
             self._add_flow("StartEvent_1", node_of[s.id])
@@ -364,7 +379,9 @@ class _BpmnBuilder:
         for sid in list(all_node_of):
             if outdeg.get(sid, 0) >= 2:
                 pf = f"Gateway_fork_{_safe(sid)}"
-                self.nodes[pf] = _Node(pf, "bpmn:parallelGateway", "", self.nodes[all_node_of[sid]].lane, "gateway")
+                self.nodes[pf] = _Node(
+                    pf, "bpmn:parallelGateway", "", self.nodes[all_node_of[sid]].lane, "gateway"
+                )
                 self._map(pf, "parallel_fork", f"derived:fork_after:{sid}")
                 fork_of[sid] = pf
                 self._add_flow(all_node_of[sid], pf)
@@ -374,7 +391,9 @@ class _BpmnBuilder:
         for sid in list(all_node_of):
             if indeg.get(sid, 0) >= 2:
                 pj = f"Gateway_join_{_safe(sid)}"
-                self.nodes[pj] = _Node(pj, "bpmn:parallelGateway", "", self.nodes[all_node_of[sid]].lane, "gateway")
+                self.nodes[pj] = _Node(
+                    pj, "bpmn:parallelGateway", "", self.nodes[all_node_of[sid]].lane, "gateway"
+                )
                 self._map(pj, "parallel_join", f"derived:join_before:{sid}")
                 join_of[sid] = pj
                 self._add_flow(pj, all_node_of[sid])
@@ -390,7 +409,8 @@ class _BpmnBuilder:
         self._map("EndEvent_success", "end_event", "derived:end")
         terminal = [s for s in steps if not dependents[s.id]]
         terminal_manual = [
-            ms for ms in self.bp.business_process.manual_steps
+            ms
+            for ms in self.bp.business_process.manual_steps
             if ms.id not in {d for deps in dependents.values() for d in deps}
             and not any(ms.id in m.depends_on for m in self.bp.business_process.manual_steps)
         ]
@@ -414,7 +434,9 @@ class _BpmnBuilder:
         for s in review_steps:
             hid = self._step_node_id(s)
             xg = f"Gateway_approve_{_safe(s.id)}"
-            self.nodes[xg] = _Node(xg, "bpmn:exclusiveGateway", "Approved?", self.nodes[hid].lane, "gateway")
+            self.nodes[xg] = _Node(
+                xg, "bpmn:exclusiveGateway", "Approved?", self.nodes[hid].lane, "gateway"
+            )
             self._map(xg, "approval_gateway", f"derived:approval_after:{s.id}")
             self._approval_gateways.append(xg)
 
@@ -441,14 +463,20 @@ class _BpmnBuilder:
 
             # Case 1 & default case 3: discard end event.
             discard_ex = next(
-                (ex for ex in self.bp.business_process.exceptions
-                 if ex.attached_to == s.id and ex.outcome == "end"),
+                (
+                    ex
+                    for ex in self.bp.business_process.exceptions
+                    if ex.attached_to == s.id and ex.outcome == "end"
+                ),
                 None,
             )
             # Case 2: explicit loop_to rework exception.
             loop_ex = next(
-                (ex for ex in self.bp.business_process.exceptions
-                 if ex.attached_to == s.id and ex.outcome.startswith("loop_to:")),
+                (
+                    ex
+                    for ex in self.bp.business_process.exceptions
+                    if ex.attached_to == s.id and ex.outcome.startswith("loop_to:")
+                ),
                 None,
             )
 
@@ -457,7 +485,9 @@ class _BpmnBuilder:
                 target_step_id = loop_ex.outcome.split(":", 1)[1].strip()
                 target_node = self._lookup_node_for_step(target_step_id)
                 if target_node:
-                    self._add_flow(xg, target_node, name=loop_ex.condition or "No (rework)", is_loop=True)
+                    self._add_flow(
+                        xg, target_node, name=loop_ex.condition or "No (rework)", is_loop=True
+                    )
                     self._consumed_exception_ids.add(loop_ex.id)
                 else:
                     # Named step not found; fall back to a rejected end event.
@@ -466,8 +496,11 @@ class _BpmnBuilder:
                 # Explicit "end" exception (discard).
                 rej_end = f"EndEvent_{_safe(discard_ex.id)}"
                 self.nodes[rej_end] = _Node(
-                    rej_end, "bpmn:endEvent", discard_ex.name or "Rejected",
-                    self.nodes[xg].lane, "event",
+                    rej_end,
+                    "bpmn:endEvent",
+                    discard_ex.name or "Rejected",
+                    self.nodes[xg].lane,
+                    "event",
                 )
                 self._map(rej_end, "end_event", f"business_process.exceptions.{discard_ex.id}")
                 self._add_flow(xg, rej_end, name=discard_ex.condition or "No")
@@ -483,8 +516,11 @@ class _BpmnBuilder:
         rej_end = f"EndEvent_rejected_{_safe(review_step_id)}"
         if rej_end not in self.nodes:
             self.nodes[rej_end] = _Node(
-                rej_end, "bpmn:endEvent", "Rejected",
-                self.nodes[gateway_id].lane, "event",
+                rej_end,
+                "bpmn:endEvent",
+                "Rejected",
+                self.nodes[gateway_id].lane,
+                "event",
             )
             self._map(rej_end, "end_event", f"derived:rejection_after:{review_step_id}")
         self._add_flow(gateway_id, rej_end, name="No")
@@ -502,8 +538,7 @@ class _BpmnBuilder:
                     if s.id == producer and s.type == "automated_task":
                         return self._step_node_id(s)
         # fallback: last automated_task before the review in list order
-        prior_auto = [s for s in self.bp.workflow.steps
-                      if s.type == "automated_task"]
+        prior_auto = [s for s in self.bp.workflow.steps if s.type == "automated_task"]
         if prior_auto:
             return self._step_node_id(prior_auto[-1])
         return None
@@ -522,7 +557,13 @@ class _BpmnBuilder:
             self._map(ds_id, "data_store", f"technical_spec.integration_targets[{idx}]")
 
             send_id = f"Activity_submit_{_safe(target)}"
-            send_node = _Node(send_id, "bpmn:sendTask", f"Submit to {ds_name}", self._lane_for_category("ai"), "task")
+            send_node = _Node(
+                send_id,
+                "bpmn:sendTask",
+                f"Submit to {ds_name}",
+                self._lane_for_category("ai"),
+                "task",
+            )
             self.nodes[send_id] = send_node
             self._map(send_id, "send_task", f"derived:submit:{target}")
             send_node.data_out.append((self._next_assoc_id(), ds_id))
@@ -587,13 +628,21 @@ class _BpmnBuilder:
         for s in self.bp.workflow.steps:
             sid_low = s.id.lower()
             comp_low = (s.component or "").lower()
-            if "pdf" in sid_low or "pdf" in comp_low or "report_gen" in sid_low or "report_gen" in comp_low:
+            if (
+                "pdf" in sid_low
+                or "pdf" in comp_low
+                or "report_gen" in sid_low
+                or "report_gen" in comp_low
+            ):
                 return
 
         pdf_id = "Activity_generate_pdf"
         pdf_node = _Node(
-            pdf_id, "bpmn:serviceTask", "Generate PDF report",
-            self._lane_for_category("ai"), "task",
+            pdf_id,
+            "bpmn:serviceTask",
+            "Generate PDF report",
+            self._lane_for_category("ai"),
+            "task",
         )
         self.nodes[pdf_id] = pdf_node
         self._map(pdf_id, "pdf_generation", "derived:pdf_output")
@@ -604,8 +653,7 @@ class _BpmnBuilder:
         #    end event -- this is the final approval, after which the report is
         #    rendered. (With nested reviews, only the last gateway leads to end.)
         for f in self.flows:
-            if (f.src in self._approval_gateways
-                    and f.tgt == "EndEvent_success" and not f.is_loop):
+            if f.src in self._approval_gateways and f.tgt == "EndEvent_success" and not f.is_loop:
                 splice_edge = f
                 break
         # 2. Fallback: any non-loop edge into the success end event.
@@ -630,7 +678,9 @@ class _BpmnBuilder:
             if not after_node:
                 continue
             xg = f"Gateway_decision_{_safe(dp.id)}"
-            self.nodes[xg] = _Node(xg, "bpmn:exclusiveGateway", dp.name, self.nodes[after_node].lane, "gateway")
+            self.nodes[xg] = _Node(
+                xg, "bpmn:exclusiveGateway", dp.name, self.nodes[after_node].lane, "gateway"
+            )
             self._map(xg, "decision_point", f"business_process.decision_points[{i}]")
             # reroute the after_node's forward (non-loop) edges through the gateway
             outgoing = [f for f in self.flows if f.src == after_node and not f.is_loop]
@@ -638,7 +688,11 @@ class _BpmnBuilder:
                 f.src = xg
             self._add_flow(after_node, xg)
             for br in dp.branches:
-                tgt = "EndEvent_success" if br.target in ("end", "") else self._lookup_node_for_step(br.target)
+                tgt = (
+                    "EndEvent_success"
+                    if br.target in ("end", "")
+                    else self._lookup_node_for_step(br.target)
+                )
                 if tgt:
                     self._add_flow(xg, tgt, name=br.condition)
 
@@ -653,7 +707,9 @@ class _BpmnBuilder:
             if not attached:
                 continue
             xg = f"Gateway_exc_{_safe(ex.id)}"
-            self.nodes[xg] = _Node(xg, "bpmn:exclusiveGateway", ex.name, self.nodes[attached].lane, "gateway")
+            self.nodes[xg] = _Node(
+                xg, "bpmn:exclusiveGateway", ex.name, self.nodes[attached].lane, "gateway"
+            )
             self._map(xg, "exception_gateway", f"business_process.exceptions[{i}]")
             outgoing = [f for f in self.flows if f.src == attached and not f.is_loop]
             for f in outgoing:
@@ -667,7 +723,9 @@ class _BpmnBuilder:
                     self._add_flow(xg, tgt, name=ex.condition or "exception", is_loop=True)
             else:  # outcome == "end"
                 rej = f"EndEvent_{_safe(ex.id)}"
-                self.nodes[rej] = _Node(rej, "bpmn:endEvent", ex.name or "Discarded", self.nodes[attached].lane, "event")
+                self.nodes[rej] = _Node(
+                    rej, "bpmn:endEvent", ex.name or "Discarded", self.nodes[attached].lane, "event"
+                )
                 self._map(rej, "end_event", f"business_process.exceptions[{i}]")
                 self._add_flow(xg, rej, name=ex.condition or "exception")
 
@@ -796,6 +854,7 @@ class _BpmnBuilder:
                 indeg[f.tgt] += 1
         # Kahn with longest-path relaxation
         from collections import deque
+
         rank = {n: 0 for n in nodes}
         q = deque([n for n in nodes if indeg[n] == 0])
         local_indeg = dict(indeg)
@@ -819,7 +878,9 @@ class _BpmnBuilder:
         for node in self.nodes.values():
             key = (node.lane, node.rank)
             lane_rank_count[key] = lane_rank_count.get(key, 0) + 1
-            max_stack_per_lane[node.lane] = max(max_stack_per_lane.get(node.lane, 1), lane_rank_count[key])
+            max_stack_per_lane[node.lane] = max(
+                max_stack_per_lane.get(node.lane, 1), lane_rank_count[key]
+            )
 
         # lane heights & tops (ordered by priority then creation). Every row is
         # tall enough to hold a data-object zone above its task zone.
@@ -884,7 +945,12 @@ class _BpmnBuilder:
             else:
                 # no anchor: drop into the top-left content area
                 for i, ref_id in enumerate(refs):
-                    self.bounds[ref_id] = (CONTENT_X0 + i * (w_obj + DATA_OBJ_GAP), POOL_Y + 10, w_obj, h_obj)
+                    self.bounds[ref_id] = (
+                        CONTENT_X0 + i * (w_obj + DATA_OBJ_GAP),
+                        POOL_Y + 10,
+                        w_obj,
+                        h_obj,
+                    )
 
         # data stores: directly below their send task, beneath the pool
         w_ds, h_ds = SIZE["dataStore"]
@@ -953,7 +1019,7 @@ class _BpmnBuilder:
         L: List[str] = []
         L.append('<?xml version="1.0" encoding="UTF-8"?>')
         L.append(
-            '<bpmn:definitions '
+            "<bpmn:definitions "
             'xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" '
             'xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" '
             'xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" '
@@ -964,13 +1030,15 @@ class _BpmnBuilder:
         # ---- collaboration ----
         L.append('  <bpmn:collaboration id="Collaboration_1">')
         proc_name = _esc(self.bp.use_case.name)
-        L.append(f'    <bpmn:participant id="Participant_main" name="{proc_name}" processRef="Process_1" />')
+        L.append(
+            f'    <bpmn:participant id="Participant_main" name="{proc_name}" processRef="Process_1" />'
+        )
         for pid, name in self.ext_pools:
             L.append(f'    <bpmn:participant id="{pid}" name="{_esc(name)}" />')
         for mid, src, tgt, name in self.msg_flows:
             nm = f' name="{_esc(name)}"' if name else ""
             L.append(f'    <bpmn:messageFlow id="{mid}"{nm} sourceRef="{src}" targetRef="{tgt}" />')
-        L.append('  </bpmn:collaboration>')
+        L.append("  </bpmn:collaboration>")
 
         # ---- process ----
         L.append('  <bpmn:process id="Process_1" isExecutable="false">')
@@ -981,9 +1049,9 @@ class _BpmnBuilder:
         for lane in ordered_lanes:
             L.append(f'      <bpmn:lane id="{lane.id}" name="{_esc(lane.name)}">')
             for ref in lane.members:
-                L.append(f'        <bpmn:flowNodeRef>{ref}</bpmn:flowNodeRef>')
-            L.append('      </bpmn:lane>')
-        L.append('    </bpmn:laneSet>')
+                L.append(f"        <bpmn:flowNodeRef>{ref}</bpmn:flowNodeRef>")
+            L.append("      </bpmn:lane>")
+        L.append("    </bpmn:laneSet>")
 
         # flow nodes
         for node in self.nodes.values():
@@ -991,7 +1059,9 @@ class _BpmnBuilder:
 
         # data objects
         for ref_id, obj_id, name, art_id in self.data_objs:
-            L.append(f'    <bpmn:dataObjectReference id="{ref_id}" name="{_esc(name)}" dataObjectRef="{obj_id}" />')
+            L.append(
+                f'    <bpmn:dataObjectReference id="{ref_id}" name="{_esc(name)}" dataObjectRef="{obj_id}" />'
+            )
             L.append(f'    <bpmn:dataObject id="{obj_id}" />')
 
         # data stores
@@ -1000,46 +1070,52 @@ class _BpmnBuilder:
 
         # text annotations + associations
         for aid, text in self.annotations:
-            L.append(f'    <bpmn:textAnnotation id="{aid}"><bpmn:text>{_esc(text)}</bpmn:text></bpmn:textAnnotation>')
+            L.append(
+                f'    <bpmn:textAnnotation id="{aid}"><bpmn:text>{_esc(text)}</bpmn:text></bpmn:textAnnotation>'
+            )
         for assoc_id, src, tgt in self.assocs:
-            L.append(f'    <bpmn:association id="{assoc_id}" sourceRef="{tgt}" targetRef="{src}" associationDirection="None" />')
+            L.append(
+                f'    <bpmn:association id="{assoc_id}" sourceRef="{tgt}" targetRef="{src}" associationDirection="None" />'
+            )
 
         # sequence flows
         for f in self.flows:
             nm = f' name="{_esc(f.name)}"' if f.name else ""
-            L.append(f'    <bpmn:sequenceFlow id="{f.id}"{nm} sourceRef="{f.src}" targetRef="{f.tgt}" />')
+            L.append(
+                f'    <bpmn:sequenceFlow id="{f.id}"{nm} sourceRef="{f.src}" targetRef="{f.tgt}" />'
+            )
 
-        L.append('  </bpmn:process>')
+        L.append("  </bpmn:process>")
 
         # ---- diagram ----
         self._emit_di(L, pool_w, pool_h)
 
-        L.append('</bpmn:definitions>')
+        L.append("</bpmn:definitions>")
         return "\n".join(L) + "\n"
 
     def _emit_node(self, L: List[str], node: _Node) -> None:
         inner: List[str] = []
         for fid in node.incoming:
-            inner.append(f'      <bpmn:incoming>{fid}</bpmn:incoming>')
+            inner.append(f"      <bpmn:incoming>{fid}</bpmn:incoming>")
         for fid in node.outgoing:
-            inner.append(f'      <bpmn:outgoing>{fid}</bpmn:outgoing>')
+            inner.append(f"      <bpmn:outgoing>{fid}</bpmn:outgoing>")
         # data associations (tasks only)
         for assoc_id, ref_id, prop_id in node.data_in:
             inner.append(f'      <bpmn:property id="{prop_id}" name="__targetRef_placeholder" />')
             inner.append(f'      <bpmn:dataInputAssociation id="{assoc_id}">')
-            inner.append(f'        <bpmn:sourceRef>{ref_id}</bpmn:sourceRef>')
-            inner.append(f'        <bpmn:targetRef>{prop_id}</bpmn:targetRef>')
-            inner.append('      </bpmn:dataInputAssociation>')
+            inner.append(f"        <bpmn:sourceRef>{ref_id}</bpmn:sourceRef>")
+            inner.append(f"        <bpmn:targetRef>{prop_id}</bpmn:targetRef>")
+            inner.append("      </bpmn:dataInputAssociation>")
         for assoc_id, ref_id in node.data_out:
             inner.append(f'      <bpmn:dataOutputAssociation id="{assoc_id}">')
-            inner.append(f'        <bpmn:targetRef>{ref_id}</bpmn:targetRef>')
-            inner.append('      </bpmn:dataOutputAssociation>')
+            inner.append(f"        <bpmn:targetRef>{ref_id}</bpmn:targetRef>")
+            inner.append("      </bpmn:dataOutputAssociation>")
 
         name_attr = f' name="{_esc(node.name)}"' if node.name else ""
         if inner:
             L.append(f'    <{node.tag} id="{node.id}"{name_attr}>')
             L.extend(inner)
-            L.append(f'    </{node.tag}>')
+            L.append(f"    </{node.tag}>")
         else:
             L.append(f'    <{node.tag} id="{node.id}"{name_attr} />')
 
@@ -1048,61 +1124,88 @@ class _BpmnBuilder:
         L.append('    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">')
 
         # main pool
-        L.append('      <bpmndi:BPMNShape id="Participant_main_di" bpmnElement="Participant_main" isHorizontal="true">')
-        L.append(f'        <omgdc:Bounds x="{POOL_X}" y="{POOL_Y}" width="{int(pool_w)}" height="{int(pool_h)}" />')
-        L.append('      </bpmndi:BPMNShape>')
+        L.append(
+            '      <bpmndi:BPMNShape id="Participant_main_di" bpmnElement="Participant_main" isHorizontal="true">'
+        )
+        L.append(
+            f'        <omgdc:Bounds x="{POOL_X}" y="{POOL_Y}" width="{int(pool_w)}" height="{int(pool_h)}" />'
+        )
+        L.append("      </bpmndi:BPMNShape>")
 
         # lanes
         ordered_lanes = sorted(self.lanes.values(), key=lambda l: (l.priority, l.id))
         lane_x = POOL_X + POOL_LABEL_W
         lane_w = pool_w - POOL_LABEL_W
         for lane in ordered_lanes:
-            L.append(f'      <bpmndi:BPMNShape id="{lane.id}_di" bpmnElement="{lane.id}" isHorizontal="true">')
-            L.append(f'        <omgdc:Bounds x="{int(lane_x)}" y="{int(lane.top)}" width="{int(lane_w)}" height="{int(lane.height)}" />')
-            L.append('      </bpmndi:BPMNShape>')
+            L.append(
+                f'      <bpmndi:BPMNShape id="{lane.id}_di" bpmnElement="{lane.id}" isHorizontal="true">'
+            )
+            L.append(
+                f'        <omgdc:Bounds x="{int(lane_x)}" y="{int(lane.top)}" width="{int(lane_w)}" height="{int(lane.height)}" />'
+            )
+            L.append("      </bpmndi:BPMNShape>")
 
         # external pools (stacked above the main pool)
         ext_y = POOL_Y - EXT_POOL_GAP - EXT_POOL_H
         for pid, name in self.ext_pools:
             self.bounds[pid] = (float(POOL_X), float(ext_y), float(pool_w), float(EXT_POOL_H))
-            L.append(f'      <bpmndi:BPMNShape id="{pid}_di" bpmnElement="{pid}" isHorizontal="true">')
-            L.append(f'        <omgdc:Bounds x="{POOL_X}" y="{int(ext_y)}" width="{int(pool_w)}" height="{EXT_POOL_H}" />')
-            L.append('      </bpmndi:BPMNShape>')
-            ext_y -= (EXT_POOL_H + EXT_POOL_GAP)
+            L.append(
+                f'      <bpmndi:BPMNShape id="{pid}_di" bpmnElement="{pid}" isHorizontal="true">'
+            )
+            L.append(
+                f'        <omgdc:Bounds x="{POOL_X}" y="{int(ext_y)}" width="{int(pool_w)}" height="{EXT_POOL_H}" />'
+            )
+            L.append("      </bpmndi:BPMNShape>")
+            ext_y -= EXT_POOL_H + EXT_POOL_GAP
 
         # flow node shapes
         for node in self.nodes.values():
-            is_marker = node.tag in ("bpmn:startEvent", "bpmn:endEvent", "bpmn:exclusiveGateway", "bpmn:parallelGateway")
+            is_marker = node.tag in (
+                "bpmn:startEvent",
+                "bpmn:endEvent",
+                "bpmn:exclusiveGateway",
+                "bpmn:parallelGateway",
+            )
             extra = ' isMarkerVisible="true"' if node.tag == "bpmn:exclusiveGateway" else ""
             L.append(f'      <bpmndi:BPMNShape id="{node.id}_di" bpmnElement="{node.id}"{extra}>')
-            L.append(f'        <omgdc:Bounds x="{int(node.x)}" y="{int(node.y)}" width="{node.w}" height="{node.h}" />')
+            L.append(
+                f'        <omgdc:Bounds x="{int(node.x)}" y="{int(node.y)}" width="{node.w}" height="{node.h}" />'
+            )
             if node.name and is_marker:
                 # label below small shapes
-                L.append('        <bpmndi:BPMNLabel>')
-                L.append(f'          <omgdc:Bounds x="{int(node.x - 10)}" y="{int(node.y + node.h + 4)}" width="{node.w + 20}" height="20" />')
-                L.append('        </bpmndi:BPMNLabel>')
-            L.append('      </bpmndi:BPMNShape>')
+                L.append("        <bpmndi:BPMNLabel>")
+                L.append(
+                    f'          <omgdc:Bounds x="{int(node.x - 10)}" y="{int(node.y + node.h + 4)}" width="{node.w + 20}" height="20" />'
+                )
+                L.append("        </bpmndi:BPMNLabel>")
+            L.append("      </bpmndi:BPMNShape>")
 
         # data object shapes (positions precomputed into self.bounds)
         for ref_id, obj_id, name, art_id in self.data_objs:
             x, y, w, h = self.bounds[ref_id]
             L.append(f'      <bpmndi:BPMNShape id="{ref_id}_di" bpmnElement="{ref_id}">')
-            L.append(f'        <omgdc:Bounds x="{int(x)}" y="{int(y)}" width="{int(w)}" height="{int(h)}" />')
-            L.append('      </bpmndi:BPMNShape>')
+            L.append(
+                f'        <omgdc:Bounds x="{int(x)}" y="{int(y)}" width="{int(w)}" height="{int(h)}" />'
+            )
+            L.append("      </bpmndi:BPMNShape>")
 
         # data store shapes (below their send task)
         for ds_id, ds_name, target in self.data_stores:
             x, y, w, h = self.bounds[ds_id]
             L.append(f'      <bpmndi:BPMNShape id="{ds_id}_di" bpmnElement="{ds_id}">')
-            L.append(f'        <omgdc:Bounds x="{int(x)}" y="{int(y)}" width="{int(w)}" height="{int(h)}" />')
-            L.append('      </bpmndi:BPMNShape>')
+            L.append(
+                f'        <omgdc:Bounds x="{int(x)}" y="{int(y)}" width="{int(w)}" height="{int(h)}" />'
+            )
+            L.append("      </bpmndi:BPMNShape>")
 
         # annotation shapes (notes column right of the pool)
         for aid, text in self.annotations:
             x, y, w, h = self.bounds[aid]
             L.append(f'      <bpmndi:BPMNShape id="{aid}_di" bpmnElement="{aid}">')
-            L.append(f'        <omgdc:Bounds x="{int(x)}" y="{int(y)}" width="{int(w)}" height="{int(h)}" />')
-            L.append('      </bpmndi:BPMNShape>')
+            L.append(
+                f'        <omgdc:Bounds x="{int(x)}" y="{int(y)}" width="{int(w)}" height="{int(h)}" />'
+            )
+            L.append("      </bpmndi:BPMNShape>")
 
         # sequence flow edges
         for f in self.flows:
@@ -1120,8 +1223,8 @@ class _BpmnBuilder:
         for mid, src, tgt, name in self.msg_flows:
             self._emit_msg_edge(L, mid, src, tgt)
 
-        L.append('    </bpmndi:BPMNPlane>')
-        L.append('  </bpmndi:BPMNDiagram>')
+        L.append("    </bpmndi:BPMNPlane>")
+        L.append("  </bpmndi:BPMNDiagram>")
 
     def _element_center(self, element_id: str) -> Tuple[float, float]:
         b = self.bounds.get(element_id)
@@ -1153,7 +1256,7 @@ class _BpmnBuilder:
         if src is None or tgt is None:
             L.append(f'        <omgdi:waypoint x="{CONTENT_X0}" y="{POOL_Y}" />')
             L.append(f'        <omgdi:waypoint x="{CONTENT_X0 + 40}" y="{POOL_Y}" />')
-            L.append('      </bpmndi:BPMNEdge>')
+            L.append("      </bpmndi:BPMNEdge>")
             return
         if f.is_loop:
             # route below the lanes: src bottom -> down -> left -> up to tgt bottom
@@ -1176,7 +1279,7 @@ class _BpmnBuilder:
                 L.append(f'        <omgdi:waypoint x="{int(midx)}" y="{int(sy)}" />')
                 L.append(f'        <omgdi:waypoint x="{int(midx)}" y="{int(ty)}" />')
                 L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(ty)}" />')
-        L.append('      </bpmndi:BPMNEdge>')
+        L.append("      </bpmndi:BPMNEdge>")
 
     def _emit_data_edge(self, L: List[str], edge_id: str, a_id: str, b_id: str) -> None:
         """A dashed data-association edge from a_id to b_id, attached to each
@@ -1186,7 +1289,7 @@ class _BpmnBuilder:
         L.append(f'      <bpmndi:BPMNEdge id="{edge_id}_di" bpmnElement="{edge_id}">')
         L.append(f'        <omgdi:waypoint x="{int(ax)}" y="{int(ay)}" />')
         L.append(f'        <omgdi:waypoint x="{int(bx)}" y="{int(by)}" />')
-        L.append('      </bpmndi:BPMNEdge>')
+        L.append("      </bpmndi:BPMNEdge>")
 
     def _emit_msg_edge(self, L: List[str], mid: str, src: str, tgt: str) -> None:
         # attach at borders so the dashed message flow meets the pool / task cleanly
@@ -1195,12 +1298,13 @@ class _BpmnBuilder:
         L.append(f'      <bpmndi:BPMNEdge id="{mid}_di" bpmnElement="{mid}">')
         L.append(f'        <omgdi:waypoint x="{int(sx)}" y="{int(sy)}" />')
         L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(ty)}" />')
-        L.append('      </bpmndi:BPMNEdge>')
+        L.append("      </bpmndi:BPMNEdge>")
 
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def generate_bpmn(blueprint: Blueprint) -> str:
     """Generate BPMN 2.0 XML from a blueprint.
@@ -1232,7 +1336,7 @@ def write_bpmn(blueprint: Blueprint, output_dir: str | Path) -> Path:
 def _empty_bpmn() -> str:
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<bpmn:definitions '
+        "<bpmn:definitions "
         'xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" '
         'xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" '
         'xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" '
@@ -1240,13 +1344,13 @@ def _empty_bpmn() -> str:
         'id="Definitions_1" targetNamespace="http://gaik.solutionwizard/bpmn">\n'
         '  <bpmn:process id="Process_1" isExecutable="false">\n'
         '    <bpmn:startEvent id="StartEvent_1" name="No workflow steps defined" />\n'
-        '  </bpmn:process>\n'
+        "  </bpmn:process>\n"
         '  <bpmndi:BPMNDiagram id="BPMNDiagram_1">\n'
         '    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1">\n'
         '      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">\n'
         '        <omgdc:Bounds x="160" y="100" width="36" height="36" />\n'
-        '      </bpmndi:BPMNShape>\n'
-        '    </bpmndi:BPMNPlane>\n'
-        '  </bpmndi:BPMNDiagram>\n'
-        '</bpmn:definitions>\n'
+        "      </bpmndi:BPMNShape>\n"
+        "    </bpmndi:BPMNPlane>\n"
+        "  </bpmndi:BPMNDiagram>\n"
+        "</bpmn:definitions>\n"
     )

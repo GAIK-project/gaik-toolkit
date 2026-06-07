@@ -56,10 +56,16 @@ def test_get_unknown_card_returns_none():
 # Structured options (V3 component-option awareness)
 # ---------------------------------------------------------------------------
 
+
 def test_five_previously_missing_cards_present():
     cards = set(get_reference_cards().names())
-    for name in ("LLMJudgePanel", "ExtractionEvaluator", "RAGEvaluator",
-                 "BatchEvaluationRunner", "FormUnderstander"):
+    for name in (
+        "LLMJudgePanel",
+        "ExtractionEvaluator",
+        "RAGEvaluator",
+        "BatchEvaluationRunner",
+        "FormUnderstander",
+    ):
         assert name in cards, f"card '{name}' missing"
 
 
@@ -81,8 +87,10 @@ def test_transcriber_declares_enhanced_transcript_with_finnish_rule():
     card = get_reference_cards().get("Transcriber")
     opts = {o["name"]: o for o in card.get("options", [])}
     assert "enhanced_transcript" in opts
-    assert "fi" in opts["enhanced_transcript"]["infer_from"].lower() \
+    assert (
+        "fi" in opts["enhanced_transcript"]["infer_from"].lower()
         or "finnish" in opts["enhanced_transcript"]["infer_from"].lower()
+    )
     # Transcriber subsumes the standalone enhancer for audio
     assert "TranscriptEnhancer" in (card.get("subsumes") or [])
 
@@ -98,9 +106,11 @@ def test_modules_declare_subsumed_components():
 # Structural correctness via inspect (requires gaik installed; skips otherwise)
 # ---------------------------------------------------------------------------
 
+
 def _try_import(import_line: str):
     """Execute a card's import line and return the imported name, or None on failure."""
     import importlib
+
     m = re.search(r"from\s+(gaik[\w\.]*)\s+import\s+([\w,\s]+)", import_line)
     if not m:
         return None
@@ -132,6 +142,7 @@ def _extract_method_name(call_line: str) -> str | None:
 def _gaik_available() -> bool:
     try:
         import gaik  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -139,7 +150,10 @@ def _gaik_available() -> bool:
 
 import pytest
 
-@pytest.mark.skipif(not _gaik_available(), reason="gaik not installed; skipping structural card tests")
+
+@pytest.mark.skipif(
+    not _gaik_available(), reason="gaik not installed; skipping structural card tests"
+)
 def test_card_constructor_param_exists_on_class():
     """Constructor params mentioned in 'construct' must exist on the class __init__.
 
@@ -148,6 +162,7 @@ def test_card_constructor_param_exists_on_class():
     inspecting the first imported name.
     """
     import inspect
+
     cards = get_reference_cards()
     failures = []
     for name in cards.names():
@@ -173,7 +188,9 @@ def test_card_constructor_param_exists_on_class():
     assert not failures, "\n".join(failures)
 
 
-@pytest.mark.skipif(not _gaik_available(), reason="gaik not installed; skipping structural card tests")
+@pytest.mark.skipif(
+    not _gaik_available(), reason="gaik not installed; skipping structural card tests"
+)
 def test_card_call_method_exists_on_class():
     """Method names mentioned in 'call' must exist as actual methods on the class."""
     cards = get_reference_cards()

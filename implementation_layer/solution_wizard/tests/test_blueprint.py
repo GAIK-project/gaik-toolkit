@@ -22,11 +22,15 @@ EXAMPLES = Path(__file__).parent.parent / "examples"
 # Example blueprints load and validate
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("filename", [
-    "incident_reporting_blueprint.json",
-    "document_extraction_blueprint.json",
-    "rag_workflow_blueprint.json",
-])
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "incident_reporting_blueprint.json",
+        "document_extraction_blueprint.json",
+        "rag_workflow_blueprint.json",
+    ],
+)
 def test_example_blueprints_load(filename):
     path = EXAMPLES / filename
     bp = Blueprint.from_file(path)
@@ -37,6 +41,7 @@ def test_example_blueprints_load(filename):
 # ---------------------------------------------------------------------------
 # Artifact conditional rules
 # ---------------------------------------------------------------------------
+
 
 def test_generated_artifact_requires_produced_by():
     with pytest.raises(Exception):
@@ -83,6 +88,7 @@ def test_optional_field_required():
 # Round-trip serialisation
 # ---------------------------------------------------------------------------
 
+
 def test_blueprint_round_trip(tmp_path):
     path = EXAMPLES / "incident_reporting_blueprint.json"
     bp = Blueprint.from_file(path)
@@ -96,6 +102,7 @@ def test_blueprint_round_trip(tmp_path):
 # ---------------------------------------------------------------------------
 # JSON Schema export
 # ---------------------------------------------------------------------------
+
 
 def test_export_json_schema(tmp_path):
     schema_path = tmp_path / "blueprint.schema.json"

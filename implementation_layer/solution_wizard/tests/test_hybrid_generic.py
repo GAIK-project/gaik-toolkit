@@ -24,29 +24,109 @@ def _hybrid_blueprint() -> Blueprint:
     """audio + document -> combine -> extract -> judge (no single module covers this)."""
     data = {
         "blueprint_version": "1.0",
-        "use_case": {"id": "hybrid_uc", "name": "Hybrid UC", "description": "audio+doc->extract", "domain": "test"},
-        "technical_spec": {"input_types": ["audio", "pdf"], "output_types": ["structured_json"], "language": "en"},
-        "target_output_spec": {"schema_name": "HybridOut", "fields": ["field_alpha", "field_beta"], "required_fields": ["field_alpha"]},
+        "use_case": {
+            "id": "hybrid_uc",
+            "name": "Hybrid UC",
+            "description": "audio+doc->extract",
+            "domain": "test",
+        },
+        "technical_spec": {
+            "input_types": ["audio", "pdf"],
+            "output_types": ["structured_json"],
+            "language": "en",
+        },
+        "target_output_spec": {
+            "schema_name": "HybridOut",
+            "fields": ["field_alpha", "field_beta"],
+            "required_fields": ["field_alpha"],
+        },
         "components": {
             "selected_modules": [],
-            "selected_building_blocks": ["Transcriber", "MultimodalParser", "Extractor", "LLMJudge"],
+            "selected_building_blocks": [
+                "Transcriber",
+                "MultimodalParser",
+                "Extractor",
+                "LLMJudge",
+            ],
             "custom_components": [],
         },
         "artifacts": {
             "src_audio": {"type": "audio", "source": "user_upload", "optional": False},
             "src_pdf": {"type": "pdf", "source": "user_upload", "optional": False},
-            "transcript": {"type": "transcript", "source": "generated", "optional": False, "produced_by": "transcribe"},
-            "parsed_text": {"type": "parsed_text", "source": "generated", "optional": False, "produced_by": "parse"},
-            "structured_output": {"type": "structured_json", "source": "generated", "optional": False, "final_output": True, "produced_by": "extract"},
+            "transcript": {
+                "type": "transcript",
+                "source": "generated",
+                "optional": False,
+                "produced_by": "transcribe",
+            },
+            "parsed_text": {
+                "type": "parsed_text",
+                "source": "generated",
+                "optional": False,
+                "produced_by": "parse",
+            },
+            "structured_output": {
+                "type": "structured_json",
+                "source": "generated",
+                "optional": False,
+                "final_output": True,
+                "produced_by": "extract",
+            },
         },
-        "workflow": {"steps": [
-            {"id": "rec_audio", "name": "Record", "type": "user_task", "inputs": [], "outputs": ["src_audio"]},
-            {"id": "upload_pdf", "name": "Upload", "type": "user_task", "inputs": [], "outputs": ["src_pdf"]},
-            {"id": "transcribe", "name": "Transcribe", "type": "automated_task", "component": "Transcriber", "inputs": ["src_audio"], "outputs": ["transcript"], "depends_on": ["rec_audio"]},
-            {"id": "parse", "name": "Parse", "type": "automated_task", "component": "MultimodalParser", "inputs": ["src_pdf"], "outputs": ["parsed_text"], "depends_on": ["upload_pdf"]},
-            {"id": "extract", "name": "Extract", "type": "automated_task", "component": "Extractor", "inputs": ["transcript", "parsed_text"], "outputs": ["structured_output"], "depends_on": ["transcribe", "parse"]},
-            {"id": "validate", "name": "Validate", "type": "automated_task", "component": "LLMJudge", "inputs": ["structured_output"], "outputs": ["structured_output"], "depends_on": ["extract"]},
-        ]},
+        "workflow": {
+            "steps": [
+                {
+                    "id": "rec_audio",
+                    "name": "Record",
+                    "type": "user_task",
+                    "inputs": [],
+                    "outputs": ["src_audio"],
+                },
+                {
+                    "id": "upload_pdf",
+                    "name": "Upload",
+                    "type": "user_task",
+                    "inputs": [],
+                    "outputs": ["src_pdf"],
+                },
+                {
+                    "id": "transcribe",
+                    "name": "Transcribe",
+                    "type": "automated_task",
+                    "component": "Transcriber",
+                    "inputs": ["src_audio"],
+                    "outputs": ["transcript"],
+                    "depends_on": ["rec_audio"],
+                },
+                {
+                    "id": "parse",
+                    "name": "Parse",
+                    "type": "automated_task",
+                    "component": "MultimodalParser",
+                    "inputs": ["src_pdf"],
+                    "outputs": ["parsed_text"],
+                    "depends_on": ["upload_pdf"],
+                },
+                {
+                    "id": "extract",
+                    "name": "Extract",
+                    "type": "automated_task",
+                    "component": "Extractor",
+                    "inputs": ["transcript", "parsed_text"],
+                    "outputs": ["structured_output"],
+                    "depends_on": ["transcribe", "parse"],
+                },
+                {
+                    "id": "validate",
+                    "name": "Validate",
+                    "type": "automated_task",
+                    "component": "LLMJudge",
+                    "inputs": ["structured_output"],
+                    "outputs": ["structured_output"],
+                    "depends_on": ["extract"],
+                },
+            ]
+        },
     }
     return Blueprint.model_validate(data)
 
@@ -54,6 +134,7 @@ def _hybrid_blueprint() -> Blueprint:
 # ---------------------------------------------------------------------------
 # Pattern key
 # ---------------------------------------------------------------------------
+
 
 def test_hybrid_falls_to_generic():
     assert _determine_pattern(_hybrid_blueprint()) == "_generic"
@@ -84,6 +165,7 @@ def test_pattern_key_differs_for_different_topology():
 # ---------------------------------------------------------------------------
 # Generic template fills + parses
 # ---------------------------------------------------------------------------
+
 
 def test_generic_template_fills_and_parses():
     bp = _hybrid_blueprint()
@@ -142,19 +224,18 @@ def test_scaffold_hybrid_endtoend(tmp_path):
 def test_validator_accepts_reference_card_component():
     """A hybrid step using a card-only building block (MultimodalParser) must validate."""
     from solution_wizard.validator import validate
+
     bp = _hybrid_blueprint()
     result = validate(bp)
     # MultimodalParser is not in the registry but has a card -> no rule-3 error for it
-    rule3_for_parser = [
-        e for e in result.errors
-        if e.rule == 3 and "MultimodalParser" in e.message
-    ]
+    rule3_for_parser = [e for e in result.errors if e.rule == 3 and "MultimodalParser" in e.message]
     assert not rule3_for_parser
 
 
 def test_pip_requirements_includes_card_only_extra():
     """requirements.txt must include extras for card-only components like parsers."""
     from solution_wizard.registry import get_registry
+
     lines = get_registry().pip_requirements(["Transcriber", "MultimodalParser", "Extractor"])
     combined = " ".join(lines)
     assert "transcriber" in combined
@@ -178,21 +259,45 @@ def _blueprint_with_extra_block(extra: str) -> Blueprint:
     data = {
         "blueprint_version": "1.0",
         "use_case": {"id": "mixed", "name": "Mixed", "description": "x", "domain": "test"},
-        "technical_spec": {"input_types": ["audio"], "output_types": ["structured_json"], "language": "en"},
+        "technical_spec": {
+            "input_types": ["audio"],
+            "output_types": ["structured_json"],
+            "language": "en",
+        },
         "target_output_spec": {},
         "components": {
-            "selected_modules": [{"id": "audio_to_structured_data", "name": "AudioToStructuredData", "reason": "test"}],
+            "selected_modules": [
+                {
+                    "id": "audio_to_structured_data",
+                    "name": "AudioToStructuredData",
+                    "reason": "test",
+                }
+            ],
             "selected_building_blocks": [extra],
             "custom_components": [],
         },
         "artifacts": {
             "src": {"type": "audio", "source": "user_upload", "optional": False},
-            "out": {"type": "structured_json", "source": "generated", "optional": False, "final_output": True, "produced_by": "step_a"},
+            "out": {
+                "type": "structured_json",
+                "source": "generated",
+                "optional": False,
+                "final_output": True,
+                "produced_by": "step_a",
+            },
         },
-        "workflow": {"steps": [
-            {"id": "step_a", "name": "A", "type": "automated_task", "component": "AudioToStructuredData",
-             "inputs": ["src"], "outputs": ["out"]},
-        ]},
+        "workflow": {
+            "steps": [
+                {
+                    "id": "step_a",
+                    "name": "A",
+                    "type": "automated_task",
+                    "component": "AudioToStructuredData",
+                    "inputs": ["src"],
+                    "outputs": ["out"],
+                },
+            ]
+        },
     }
     return Blueprint.model_validate(data)
 
@@ -202,25 +307,50 @@ def test_multiple_selected_modules_falls_to_generic():
     data = {
         "blueprint_version": "1.0",
         "use_case": {"id": "multi_mod", "name": "Multi", "description": "x", "domain": "test"},
-        "technical_spec": {"input_types": ["audio", "pdf"], "output_types": ["structured_json"], "language": "en"},
+        "technical_spec": {
+            "input_types": ["audio", "pdf"],
+            "output_types": ["structured_json"],
+            "language": "en",
+        },
         "target_output_spec": {},
         "components": {
             "selected_modules": [
-                {"id": "audio_to_structured_data", "name": "AudioToStructuredData", "reason": "audio"},
-                {"id": "documents_to_structured_data", "name": "DocumentsToStructuredData", "reason": "doc"},
+                {
+                    "id": "audio_to_structured_data",
+                    "name": "AudioToStructuredData",
+                    "reason": "audio",
+                },
+                {
+                    "id": "documents_to_structured_data",
+                    "name": "DocumentsToStructuredData",
+                    "reason": "doc",
+                },
             ],
             "selected_building_blocks": [],
             "custom_components": [],
         },
         "artifacts": {
             "src": {"type": "audio", "source": "user_upload", "optional": False},
-            "out": {"type": "structured_json", "source": "generated", "optional": False,
-                    "final_output": True, "produced_by": "step_a"},
+            "out": {
+                "type": "structured_json",
+                "source": "generated",
+                "optional": False,
+                "final_output": True,
+                "produced_by": "step_a",
+            },
         },
-        "workflow": {"steps": [
-            {"id": "step_a", "name": "A", "type": "automated_task",
-             "component": "AudioToStructuredData", "inputs": ["src"], "outputs": ["out"]},
-        ]},
+        "workflow": {
+            "steps": [
+                {
+                    "id": "step_a",
+                    "name": "A",
+                    "type": "automated_task",
+                    "component": "AudioToStructuredData",
+                    "inputs": ["src"],
+                    "outputs": ["out"],
+                },
+            ]
+        },
     }
     bp = Blueprint.model_validate(data)
     assert _determine_pattern(bp) == "_generic"
@@ -241,6 +371,7 @@ def test_module_plus_extra_component_falls_to_generic():
 def test_dynamic_discovery_finds_promoted_template(tmp_path, monkeypatch):
     """If a template exists at templates/poc/<pattern_key>/, _determine_pattern returns it."""
     import solution_wizard.scaffolder as scaffolder_mod
+
     bp = _hybrid_blueprint()
     key = _derive_pattern_key(bp)
 

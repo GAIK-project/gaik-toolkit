@@ -12,7 +12,12 @@ from solution_wizard.docs_generator import DOC_NAMES, generate_docs
 def _blueprint() -> Blueprint:
     data = {
         "blueprint_version": "1.0",
-        "use_case": {"id": "clinic_uc", "name": "Clinical Extraction", "description": "Extract fields.", "domain": "healthcare"},
+        "use_case": {
+            "id": "clinic_uc",
+            "name": "Clinical Extraction",
+            "description": "Extract fields.",
+            "domain": "healthcare",
+        },
         "business_spec": {
             "intended_users": ["doctor"],
             "reviewers": ["supervisor"],
@@ -22,28 +27,68 @@ def _blueprint() -> Blueprint:
             "success_criteria": ["F1 >= 0.9"],
         },
         "technical_spec": {
-            "input_types": ["audio", "pdf"], "output_types": ["structured_json"],
-            "language": "en", "model_provider": "azure_openai",
-            "integration_targets": ["patient_management_system"], "human_review": True,
+            "input_types": ["audio", "pdf"],
+            "output_types": ["structured_json"],
+            "language": "en",
+            "model_provider": "azure_openai",
+            "integration_targets": ["patient_management_system"],
+            "human_review": True,
             "evaluation_requirements": "field-level F1",
         },
-        "target_output_spec": {"schema_name": "Rec", "fields": ["full_name", "allergies"], "required_fields": ["full_name"]},
+        "target_output_spec": {
+            "schema_name": "Rec",
+            "fields": ["full_name", "allergies"],
+            "required_fields": ["full_name"],
+        },
         "components": {
-            "selected_modules": [{"id": "audio_to_structured_data", "name": "AudioToStructuredData", "reason": "audio->structured"}],
+            "selected_modules": [
+                {
+                    "id": "audio_to_structured_data",
+                    "name": "AudioToStructuredData",
+                    "reason": "audio->structured",
+                }
+            ],
             "selected_building_blocks": ["LLMJudge"],
             "custom_components": [],
         },
         "artifacts": {
             "src_audio": {"type": "audio", "source": "user_upload", "optional": False},
-            "out": {"type": "structured_json", "source": "generated", "optional": False, "final_output": True, "produced_by": "extract"},
+            "out": {
+                "type": "structured_json",
+                "source": "generated",
+                "optional": False,
+                "final_output": True,
+                "produced_by": "extract",
+            },
         },
-        "workflow": {"steps": [
-            {"id": "upload", "name": "Upload", "type": "user_task", "inputs": [], "outputs": ["src_audio"]},
-            {"id": "extract", "name": "Extract", "type": "automated_task", "component": "AudioToStructuredData",
-             "inputs": ["src_audio"], "outputs": ["out"], "depends_on": ["upload"],
-             "parameters": {"enhanced_transcript": True}},
-        ]},
-        "governance": {"data_handling": {"contains_personal_data": "yes", "output_sensitivity": "high", "audit_log_required": True}},
+        "workflow": {
+            "steps": [
+                {
+                    "id": "upload",
+                    "name": "Upload",
+                    "type": "user_task",
+                    "inputs": [],
+                    "outputs": ["src_audio"],
+                },
+                {
+                    "id": "extract",
+                    "name": "Extract",
+                    "type": "automated_task",
+                    "component": "AudioToStructuredData",
+                    "inputs": ["src_audio"],
+                    "outputs": ["out"],
+                    "depends_on": ["upload"],
+                    "parameters": {"enhanced_transcript": True},
+                },
+            ]
+        },
+        "governance": {
+            "data_handling": {
+                "contains_personal_data": "yes",
+                "output_sensitivity": "high",
+                "audit_log_required": True,
+            }
+        },
     }
     return Blueprint.model_validate(data)
 

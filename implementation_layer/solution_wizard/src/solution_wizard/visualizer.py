@@ -17,11 +17,11 @@ from .blueprint import Blueprint
 
 # GAIK palette
 COLOUR = {
-    "user_task":    "#dbeafe",   # blue  -- user provides input
-    "automated_task": "#f5f3ff", # purple -- GAIK component processes
-    "human_review": "#fefce8",   # yellow -- human-in-the-loop
-    "decision":     "#fefce8",   # yellow -- gateway
-    "output":       "#dcfce7",   # green  -- final output
+    "user_task": "#dbeafe",  # blue  -- user provides input
+    "automated_task": "#f5f3ff",  # purple -- GAIK component processes
+    "human_review": "#fefce8",  # yellow -- human-in-the-loop
+    "decision": "#fefce8",  # yellow -- gateway
+    "output": "#dcfce7",  # green  -- final output
 }
 
 
@@ -37,12 +37,7 @@ def _node_label(label: str) -> str:
     likely to break a diagram are double-quote (terminates the label string)
     and brackets (interfere with node-shape syntax).
     """
-    return (
-        label
-        .replace('"', "#quot;")
-        .replace("[", "#lsqb;")
-        .replace("]", "#rsqb;")
-    )
+    return label.replace('"', "#quot;").replace("[", "#lsqb;").replace("]", "#rsqb;")
 
 
 def generate_mermaid(blueprint: Blueprint) -> str:
@@ -50,10 +45,7 @@ def generate_mermaid(blueprint: Blueprint) -> str:
     if not steps:
         return "flowchart TD\n    empty[No workflow steps defined]"
 
-    final_artifact_ids = {
-        art_id for art_id, art in blueprint.artifacts.items()
-        if art.final_output
-    }
+    final_artifact_ids = {art_id for art_id, art in blueprint.artifacts.items() if art.final_output}
 
     lines: List[str] = ["flowchart TD"]
     style_lines: List[str] = []

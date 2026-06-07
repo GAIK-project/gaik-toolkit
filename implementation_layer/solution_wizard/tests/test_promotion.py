@@ -15,19 +15,66 @@ import promote_template as promo
 def _blueprint() -> Blueprint:
     data = {
         "blueprint_version": "1.0",
-        "use_case": {"id": "facilities_fault", "name": "Facilities Fault", "description": "x", "domain": "test"},
-        "technical_spec": {"input_types": ["audio"], "output_types": ["structured_json"], "language": "fi"},
-        "target_output_spec": {"schema_name": "MaintenanceTicket", "fields": ["fault_description", "location"], "required_fields": ["fault_description"]},
-        "components": {"selected_modules": [], "selected_building_blocks": ["Transcriber", "Extractor"], "custom_components": []},
+        "use_case": {
+            "id": "facilities_fault",
+            "name": "Facilities Fault",
+            "description": "x",
+            "domain": "test",
+        },
+        "technical_spec": {
+            "input_types": ["audio"],
+            "output_types": ["structured_json"],
+            "language": "fi",
+        },
+        "target_output_spec": {
+            "schema_name": "MaintenanceTicket",
+            "fields": ["fault_description", "location"],
+            "required_fields": ["fault_description"],
+        },
+        "components": {
+            "selected_modules": [],
+            "selected_building_blocks": ["Transcriber", "Extractor"],
+            "custom_components": [],
+        },
         "artifacts": {
             "src_audio": {"type": "audio", "source": "user_upload", "optional": False},
-            "out": {"type": "structured_json", "source": "generated", "optional": False, "final_output": True, "produced_by": "extract"},
+            "out": {
+                "type": "structured_json",
+                "source": "generated",
+                "optional": False,
+                "final_output": True,
+                "produced_by": "extract",
+            },
         },
-        "workflow": {"steps": [
-            {"id": "rec", "name": "Record", "type": "user_task", "inputs": [], "outputs": ["src_audio"]},
-            {"id": "transcribe", "name": "T", "type": "automated_task", "component": "Transcriber", "inputs": ["src_audio"], "outputs": ["out"], "depends_on": ["rec"]},
-            {"id": "extract", "name": "E", "type": "automated_task", "component": "Extractor", "inputs": ["src_audio"], "outputs": ["out"], "depends_on": ["transcribe"]},
-        ]},
+        "workflow": {
+            "steps": [
+                {
+                    "id": "rec",
+                    "name": "Record",
+                    "type": "user_task",
+                    "inputs": [],
+                    "outputs": ["src_audio"],
+                },
+                {
+                    "id": "transcribe",
+                    "name": "T",
+                    "type": "automated_task",
+                    "component": "Transcriber",
+                    "inputs": ["src_audio"],
+                    "outputs": ["out"],
+                    "depends_on": ["rec"],
+                },
+                {
+                    "id": "extract",
+                    "name": "E",
+                    "type": "automated_task",
+                    "component": "Extractor",
+                    "inputs": ["src_audio"],
+                    "outputs": ["out"],
+                    "depends_on": ["transcribe"],
+                },
+            ]
+        },
     }
     return Blueprint.model_validate(data)
 
@@ -35,6 +82,7 @@ def _blueprint() -> Blueprint:
 # ---------------------------------------------------------------------------
 # Genericity scan
 # ---------------------------------------------------------------------------
+
 
 def test_genericity_rejects_leaked_field_name():
     bp = _blueprint()
@@ -73,6 +121,7 @@ def test_genericity_ignores_short_field_names():
 # Fills cleanly
 # ---------------------------------------------------------------------------
 
+
 def test_fills_cleanly_detects_unknown_placeholder():
     bp = _blueprint()
     variables = _build_variables(bp, _determine_pattern(bp))
@@ -93,6 +142,7 @@ def test_fills_cleanly_passes_for_known_variables():
 # Parses
 # ---------------------------------------------------------------------------
 
+
 def test_parses_detects_bad_python():
     bp = _blueprint()
     variables = _build_variables(bp, _determine_pattern(bp))
@@ -111,6 +161,7 @@ def test_parses_accepts_valid_python():
 # ---------------------------------------------------------------------------
 # Blueprint-specific token derivation
 # ---------------------------------------------------------------------------
+
 
 def test_specific_tokens_include_id_and_schema():
     bp = _blueprint()
@@ -139,6 +190,7 @@ def test_genericity_accepts_language_as_placeholder():
 def test_import_check_runs_by_default(tmp_path, monkeypatch):
     """--check-imports must default to ON; use --skip-import-check to disable."""
     import argparse
+
     # Simulate parsing with no flags -- import check should run
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-import-check", action="store_true")

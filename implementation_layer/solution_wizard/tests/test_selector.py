@@ -24,6 +24,7 @@ from solution_wizard.selector import (
 # Registry loads and self-validates
 # ---------------------------------------------------------------------------
 
+
 def test_registry_loads_and_validates():
     reg = get_registry()
     assert len(reg.all()) == 10
@@ -36,10 +37,18 @@ def test_registry_validation_catches_missing_keys():
 
 def test_registry_validation_catches_bad_type():
     entry = {
-        "id": "x", "name": "X", "type": "widget",
-        "input_artifact_types": [], "output_artifact_types": [],
-        "required_parameters": [], "best_for": [], "known_limitations": [],
-        "import_path": "", "source_path": "", "readme_path": "", "example_script_path": "",
+        "id": "x",
+        "name": "X",
+        "type": "widget",
+        "input_artifact_types": [],
+        "output_artifact_types": [],
+        "required_parameters": [],
+        "best_for": [],
+        "known_limitations": [],
+        "import_path": "",
+        "source_path": "",
+        "readme_path": "",
+        "example_script_path": "",
     }
     with pytest.raises(ValueError):
         _validate_entries([entry])
@@ -48,6 +57,7 @@ def test_registry_validation_catches_bad_type():
 # ---------------------------------------------------------------------------
 # Transformation chains
 # ---------------------------------------------------------------------------
+
 
 def test_chain_audio_to_structured_non_empty():
     chain = transformation_chain("audio_to_structured")
@@ -81,6 +91,7 @@ def test_all_chains_non_empty():
 # ---------------------------------------------------------------------------
 # Module-first rule
 # ---------------------------------------------------------------------------
+
 
 def test_module_for_audio_to_structured():
     entry = module_for_pattern("audio_to_structured")
@@ -117,6 +128,7 @@ def test_no_module_for_hybrid():
 # ---------------------------------------------------------------------------
 # Registry fields used for agent-driven selection
 # ---------------------------------------------------------------------------
+
 
 def test_module_entry_has_required_llm_fields():
     """The fields the agent needs to reason about selection are present."""

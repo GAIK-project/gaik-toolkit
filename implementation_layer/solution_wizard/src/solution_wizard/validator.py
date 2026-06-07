@@ -72,16 +72,14 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
     for step in steps:
         for art_id in step.inputs:
             if art_id not in artifacts:
-                errors.append(Issue(
-                    2, f"Input '{art_id}' not declared in artifacts",
-                    step_id=step.id
-                ))
+                errors.append(
+                    Issue(2, f"Input '{art_id}' not declared in artifacts", step_id=step.id)
+                )
         for art_id in step.outputs:
             if art_id not in artifacts:
-                errors.append(Issue(
-                    2, f"Output '{art_id}' not declared in artifacts",
-                    step_id=step.id
-                ))
+                errors.append(
+                    Issue(2, f"Output '{art_id}' not declared in artifacts", step_id=step.id)
+                )
 
     # ------------------------------------------------------------------
     # Rule 3: components exist in registry, OR as a reference card (wireable in
@@ -92,17 +90,20 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
     _card_names = set()
     try:
         from .registry import get_reference_cards
+
         _card_names = set(get_reference_cards().names())
     except Exception:
         pass
     for step in steps:
         if step.component and step.component not in ("custom", "human_review"):
             if not registry.exists(step.component) and step.component not in _card_names:
-                errors.append(Issue(
-                    3,
-                    f"Component '{step.component}' is not in the registry or reference cards",
-                    step_id=step.id
-                ))
+                errors.append(
+                    Issue(
+                        3,
+                        f"Component '{step.component}' is not in the registry or reference cards",
+                        step_id=step.id,
+                    )
+                )
 
     # ------------------------------------------------------------------
     # Rule 4: component artifact-type compatibility
@@ -117,21 +118,25 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
         for art_id in step.inputs:
             art = artifacts.get(art_id)
             if art and allowed_inputs and art.type not in allowed_inputs:
-                errors.append(Issue(
-                    4,
-                    f"Component '{step.component}' does not accept artifact type '{art.type}' "
-                    f"(allowed: {allowed_inputs})",
-                    step_id=step.id
-                ))
+                errors.append(
+                    Issue(
+                        4,
+                        f"Component '{step.component}' does not accept artifact type '{art.type}' "
+                        f"(allowed: {allowed_inputs})",
+                        step_id=step.id,
+                    )
+                )
         for art_id in step.outputs:
             art = artifacts.get(art_id)
             if art and allowed_outputs and art.type not in allowed_outputs:
-                errors.append(Issue(
-                    4,
-                    f"Component '{step.component}' does not produce artifact type '{art.type}' "
-                    f"(allowed: {allowed_outputs})",
-                    step_id=step.id
-                ))
+                errors.append(
+                    Issue(
+                        4,
+                        f"Component '{step.component}' does not produce artifact type '{art.type}' "
+                        f"(allowed: {allowed_outputs})",
+                        step_id=step.id,
+                    )
+                )
 
     # ------------------------------------------------------------------
     # Rule 5: required parameters present
@@ -143,11 +148,13 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
             continue
         for req_param in entry.get("required_parameters", []):
             if req_param not in step.parameters:
-                errors.append(Issue(
-                    5,
-                    f"Component '{step.component}' requires parameter '{req_param}' but it is missing",
-                    step_id=step.id
-                ))
+                errors.append(
+                    Issue(
+                        5,
+                        f"Component '{step.component}' requires parameter '{req_param}' but it is missing",
+                        step_id=step.id,
+                    )
+                )
 
     # ------------------------------------------------------------------
     # Rule 6: overwrites flagged
@@ -157,13 +164,15 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
             if art_id in produced_artifacts:
                 art = artifacts.get(art_id)
                 if art and not art.overwrite:
-                    errors.append(Issue(
-                        6,
-                        f"Artifact '{art_id}' is produced by both step "
-                        f"'{produced_artifacts[art_id]}' and step '{step.id}' "
-                        f"but is not flagged overwrite=true",
-                        artifact_id=art_id
-                    ))
+                    errors.append(
+                        Issue(
+                            6,
+                            f"Artifact '{art_id}' is produced by both step "
+                            f"'{produced_artifacts[art_id]}' and step '{step.id}' "
+                            f"but is not flagged overwrite=true",
+                            artifact_id=art_id,
+                        )
+                    )
             produced_artifacts[art_id] = step.id
 
     # ------------------------------------------------------------------
@@ -173,23 +182,27 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
     for art_id, art in artifacts.items():
         if art.source == ArtifactSource.GENERATED:
             if art.produced_by and art.produced_by not in step_ids:
-                errors.append(Issue(
-                    7,
-                    f"Artifact '{art_id}' references produced_by='{art.produced_by}' "
-                    f"which is not a valid step id",
-                    artifact_id=art_id
-                ))
+                errors.append(
+                    Issue(
+                        7,
+                        f"Artifact '{art_id}' references produced_by='{art.produced_by}' "
+                        f"which is not a valid step id",
+                        artifact_id=art_id,
+                    )
+                )
             elif art.produced_by and art.produced_by in step_outputs_map:
                 # Cross-check: the step named in produced_by must actually list this
                 # artifact in its outputs -- both sides of the relationship must agree.
                 if art_id not in step_outputs_map[art.produced_by]:
-                    errors.append(Issue(
-                        7,
-                        f"Artifact '{art_id}' claims produced_by='{art.produced_by}' "
-                        f"but that step does not list '{art_id}' in its outputs "
-                        f"(step outputs: {sorted(step_outputs_map[art.produced_by])})",
-                        artifact_id=art_id
-                    ))
+                    errors.append(
+                        Issue(
+                            7,
+                            f"Artifact '{art_id}' claims produced_by='{art.produced_by}' "
+                            f"but that step does not list '{art_id}' in its outputs "
+                            f"(step outputs: {sorted(step_outputs_map[art.produced_by])})",
+                            artifact_id=art_id,
+                        )
+                    )
 
     # Topological check: artifact must be produced before it is consumed.
     # NOTE (known limitation): uses step-list position as a proxy for execution
@@ -205,12 +218,14 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
         for art_id in step.inputs:
             if art_id in step_output_index:
                 if step_output_index[art_id] >= i:
-                    errors.append(Issue(
-                        7,
-                        f"Artifact '{art_id}' is consumed at step '{step.id}' (position {i}) "
-                        f"but not produced until position {step_output_index[art_id]}",
-                        step_id=step.id
-                    ))
+                    errors.append(
+                        Issue(
+                            7,
+                            f"Artifact '{art_id}' is consumed at step '{step.id}' (position {i}) "
+                            f"but not produced until position {step_output_index[art_id]}",
+                            step_id=step.id,
+                        )
+                    )
 
     # ------------------------------------------------------------------
     # Rule 8: acyclicity (DFS on depends_on graph)
@@ -235,12 +250,14 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
                 # Check for explicit loop declaration
                 loop_ids = {s.id for s in steps if s.loop is not None}
                 if s.id not in loop_ids:
-                    errors.append(Issue(
-                        8,
-                        f"Workflow graph contains a cycle involving step '{s.id}' "
-                        f"with no loop declaration (max_iterations/loop_condition_ref)",
-                        step_id=s.id
-                    ))
+                    errors.append(
+                        Issue(
+                            8,
+                            f"Workflow graph contains a cycle involving step '{s.id}' "
+                            f"with no loop declaration (max_iterations/loop_condition_ref)",
+                            step_id=s.id,
+                        )
+                    )
 
     # ------------------------------------------------------------------
     # Rule 9: at least one terminal step produces final_output=true
@@ -252,11 +269,13 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
     # incorrectly disqualify it. Acceptable for V1 blueprint-only output.
     has_final = any(a.final_output for a in artifacts.values())
     if steps and not has_final:
-        errors.append(Issue(
-            9,
-            "No artifact is marked final_output=true. "
-            "At least one terminal step must produce a deliverable."
-        ))
+        errors.append(
+            Issue(
+                9,
+                "No artifact is marked final_output=true. "
+                "At least one terminal step must produce a deliverable.",
+            )
+        )
 
     # ------------------------------------------------------------------
     # Rule 10: referenced prompt/schema paths -- verify naming convention and existence
@@ -275,47 +294,57 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
                 continue
             # Warn if the path doesn't follow the scaffold convention
             if param_key == "schema_ref" and val != EXPECTED_SCHEMA_REF:
-                warnings.append(Issue(
-                    10,
-                    f"Step '{step.id}': schema_ref='{val}' does not match the scaffold "
-                    f"convention '{EXPECTED_SCHEMA_REF}'. The scaffold always writes "
-                    f"'schemas/output_schema.py' regardless of schema class name. "
-                    f"Mismatched names cause load_schema() to skip the pre-generated schema.",
-                    step_id=step.id,
-                ))
+                warnings.append(
+                    Issue(
+                        10,
+                        f"Step '{step.id}': schema_ref='{val}' does not match the scaffold "
+                        f"convention '{EXPECTED_SCHEMA_REF}'. The scaffold always writes "
+                        f"'schemas/output_schema.py' regardless of schema class name. "
+                        f"Mismatched names cause load_schema() to skip the pre-generated schema.",
+                        step_id=step.id,
+                    )
+                )
             elif param_key == "requirements_ref" and val != EXPECTED_REQ_REF:
-                warnings.append(Issue(
-                    10,
-                    f"Step '{step.id}': requirements_ref='{val}' does not match the scaffold "
-                    f"convention '{EXPECTED_REQ_REF}'.",
-                    step_id=step.id,
-                ))
+                warnings.append(
+                    Issue(
+                        10,
+                        f"Step '{step.id}': requirements_ref='{val}' does not match the scaffold "
+                        f"convention '{EXPECTED_REQ_REF}'.",
+                        step_id=step.id,
+                    )
+                )
             else:
                 # Path follows convention -- only warn that it can't be checked at design time
-                warnings.append(Issue(
-                    10,
-                    f"Parameter '{param_key}' = '{val}' in step '{step.id}' "
-                    f"references a path that cannot be verified at design time. "
-                    f"Ensure this file exists at runtime or mark as 'to_be_generated'.",
-                    step_id=step.id,
-                ))
+                warnings.append(
+                    Issue(
+                        10,
+                        f"Parameter '{param_key}' = '{val}' in step '{step.id}' "
+                        f"references a path that cannot be verified at design time. "
+                        f"Ensure this file exists at runtime or mark as 'to_be_generated'.",
+                        step_id=step.id,
+                    )
+                )
 
     # ------------------------------------------------------------------
     # Rule 11: assumptions well-formed (warnings only)
     for assumption in blueprint.assumptions:
         if not assumption.id or not assumption.text:
-            warnings.append(Issue(
-                11,
-                f"Assumption is missing id or text: {assumption.model_dump()}"
-            ))
-        if (assumption.status == AssumptionStatus.UNCONFIRMED
-                and assumption.impact in ("component_selection", "security_constraint", "human_review")):
-            warnings.append(Issue(
-                11,
-                f"High-impact assumption '{assumption.id}' is still unconfirmed. "
-                f"Resolve before production packaging. "
-                f"Text: \"{assumption.text}\""
-            ))
+            warnings.append(
+                Issue(11, f"Assumption is missing id or text: {assumption.model_dump()}")
+            )
+        if assumption.status == AssumptionStatus.UNCONFIRMED and assumption.impact in (
+            "component_selection",
+            "security_constraint",
+            "human_review",
+        ):
+            warnings.append(
+                Issue(
+                    11,
+                    f"High-impact assumption '{assumption.id}' is still unconfirmed. "
+                    f"Resolve before production packaging. "
+                    f'Text: "{assumption.text}"',
+                )
+            )
 
     # ------------------------------------------------------------------
     # Rule 12: redundant sub-component already provided internally (warnings only).
@@ -334,7 +363,9 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
         entry = registry.lookup_by_name(s.component)
         if not entry:
             continue
-        provided = set(entry.get("subsumes", []) or []) | set(entry.get("uses_components", []) or [])
+        provided = set(entry.get("subsumes", []) or []) | set(
+            entry.get("uses_components", []) or []
+        )
         for inner in provided:
             other = step_by_component.get(inner)
             if other is not None and other.id != s.id:
@@ -343,12 +374,14 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
                     if s.component == "Transcriber" and inner == "TranscriptEnhancer"
                     else f"enable it via an option/parameter on '{s.component}' instead of a separate step"
                 )
-                warnings.append(Issue(
-                    12,
-                    f"Step '{other.id}' uses '{inner}', which is already provided internally by "
-                    f"'{s.component}' (step '{s.id}'). Redundant -- {hint}.",
-                    step_id=other.id,
-                ))
+                warnings.append(
+                    Issue(
+                        12,
+                        f"Step '{other.id}' uses '{inner}', which is already provided internally by "
+                        f"'{s.component}' (step '{s.id}'). Redundant -- {hint}.",
+                        step_id=other.id,
+                    )
+                )
 
     ok = len(errors) == 0
     return ValidationResult(ok=ok, errors=errors, warnings=warnings)

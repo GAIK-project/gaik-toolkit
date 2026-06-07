@@ -48,6 +48,7 @@ SPEC_MINIMAL = {
 # requirements text
 # ---------------------------------------------------------------------------
 
+
 def test_requirements_text_contains_all_fields():
     text = build_requirements_text(SPEC_FULL)
     for field in SPEC_FULL["fields"]:
@@ -75,6 +76,7 @@ def test_requirements_text_minimal():
 # ---------------------------------------------------------------------------
 # Pydantic model generation
 # ---------------------------------------------------------------------------
+
 
 def test_pydantic_model_parses():
     src = build_pydantic_model(SPEC_FULL, "MaintenanceTicket")
@@ -120,10 +122,10 @@ def test_safe_enum_member_names():
     # Must parse without error
     ast.parse(src)
     # Digit-starting values must be prefixed so identifier is valid
-    assert "V_1_OPEN" in src   # "1-open" -> "V_1_OPEN"
+    assert "V_1_OPEN" in src  # "1-open" -> "V_1_OPEN"
     assert "V_2_CLOSED" in src  # "2-closed" -> "V_2_CLOSED"
-    assert "IN_PROGRESS" in src # "in progress" -> "IN_PROGRESS"
-    assert "N_A" in src         # "N/A" -> "N_A"
+    assert "IN_PROGRESS" in src  # "in progress" -> "IN_PROGRESS"
+    assert "N_A" in src  # "N/A" -> "N_A"
 
 
 def test_pydantic_model_class_name():
@@ -155,6 +157,7 @@ def test_pydantic_model_runtime_instantiable():
 # requirements.json
 # ---------------------------------------------------------------------------
 
+
 def test_requirements_json_structure():
     data = build_requirements_json(SPEC_FULL, "test_uc", "MaintenanceTicket")
     assert data["model_name"] == "MaintenanceTicket"
@@ -176,6 +179,7 @@ def test_requirements_json_required_flag():
 # ---------------------------------------------------------------------------
 # File writing
 # ---------------------------------------------------------------------------
+
 
 def test_write_schema_files_correct_filenames(tmp_path):
     """load_schema(schema_dir, 'output_schema') expects output_schema_requirements.json."""

@@ -108,9 +108,7 @@ def _foundry_env() -> dict[str, str]:
 
 def _model() -> str:
     return (
-        os.getenv("ANTHROPIC_MODEL")
-        or os.getenv("ANTHROPIC_DEFAULT_SONNET_MODEL")
-        or DEFAULT_MODEL
+        os.getenv("ANTHROPIC_MODEL") or os.getenv("ANTHROPIC_DEFAULT_SONNET_MODEL") or DEFAULT_MODEL
     ).strip()
 
 
@@ -167,6 +165,7 @@ IMPORTANT INSTRUCTIONS FOR THIS WEB SESSION:
 # ---------------------------------------------------------------------------
 # Streaming bridge
 # ---------------------------------------------------------------------------
+
 
 def _tool_summary(block: ToolUseBlock) -> str:
     """Short human-readable activity line for a tool use."""
@@ -312,6 +311,7 @@ def _sse_headers() -> dict:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.post("/start")
 async def start_session() -> StreamingResponse:
     """Create a session and stream the wizard's opening turn.
@@ -371,9 +371,7 @@ async def list_files(session_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Session not found or expired.")
     root: Path = session["output_dir"]
     files = [
-        str(p.relative_to(root)).replace("\\", "/")
-        for p in sorted(root.rglob("*"))
-        if p.is_file()
+        str(p.relative_to(root)).replace("\\", "/") for p in sorted(root.rglob("*")) if p.is_file()
     ]
     return {"files": files}
 
@@ -430,6 +428,7 @@ async def end_session(session_id: str) -> dict:
 # ---------------------------------------------------------------------------
 # Idle-session cleanup (registered in main.py lifespan)
 # ---------------------------------------------------------------------------
+
 
 async def cleanup_idle_sessions() -> None:
     """Background loop: disconnect + drop sessions idle beyond the timeout."""

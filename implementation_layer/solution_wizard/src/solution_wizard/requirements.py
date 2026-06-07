@@ -24,6 +24,7 @@ from .blueprint import Blueprint
 @dataclass
 class Gap:
     """An unmet Section-9 checklist point."""
+
     number: int
     question: str
     satisfied_by: str  # human-readable hint: which blueprint field(s) close it
@@ -36,6 +37,7 @@ class Gap:
 # Field accessors -- specs are free-form dicts (blueprint.py keeps them as
 # Dict[str, Any]); these helpers express "answered" precisely.
 # ---------------------------------------------------------------------------
+
 
 def _as_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
@@ -67,6 +69,7 @@ def _present_key(d: Dict[str, Any], key: str) -> bool:
 # The 13 Section-9 checkpoints
 # ---------------------------------------------------------------------------
 
+
 def _check(blueprint: Blueprint) -> List[tuple]:
     bspec = _as_dict(blueprint.business_spec)
     tspec = _as_dict(blueprint.technical_spec)
@@ -74,7 +77,9 @@ def _check(blueprint: Blueprint) -> List[tuple]:
     gov = blueprint.governance.data_handling
 
     def task_supported() -> bool:
-        return bool((blueprint.use_case.description or "").strip()) or _answered(bspec, "proposed_solution")
+        return bool((blueprint.use_case.description or "").strip()) or _answered(
+            bspec, "proposed_solution"
+        )
 
     def users() -> bool:
         return _answered(bspec, "intended_users")
@@ -92,7 +97,9 @@ def _check(blueprint: Blueprint) -> List[tuple]:
             return True
         out = tspec.get("output_types") or []
         out_text = " ".join(out).lower() if isinstance(out, list) else str(out).lower()
-        return any(t in out_text for t in ("answer", "report", "classification", "transcript", "summary"))
+        return any(
+            t in out_text for t in ("answer", "report", "classification", "transcript", "summary")
+        )
 
     def language() -> bool:
         return _answered(tspec, "language")
@@ -126,19 +133,69 @@ def _check(blueprint: Blueprint) -> List[tuple]:
 
     # (number, question, predicate, satisfied_by-hint)
     return [
-        (1, "What task should the system support?", task_supported, "use_case.description / business_spec.proposed_solution"),
+        (
+            1,
+            "What task should the system support?",
+            task_supported,
+            "use_case.description / business_spec.proposed_solution",
+        ),
         (2, "Who will use the system?", users, "business_spec.intended_users"),
-        (3, "What input artifacts will the system receive?", inputs, "technical_spec.input_types / business_spec.input_artifacts"),
-        (4, "What output should the system produce?", outputs, "technical_spec.output_types / business_spec.target_outputs"),
-        (5, "Which fields, sections, or answer types are required?", required_fields, "target_output_spec.fields / required_fields (or a non-structured output_type)"),
+        (
+            3,
+            "What input artifacts will the system receive?",
+            inputs,
+            "technical_spec.input_types / business_spec.input_artifacts",
+        ),
+        (
+            4,
+            "What output should the system produce?",
+            outputs,
+            "technical_spec.output_types / business_spec.target_outputs",
+        ),
+        (
+            5,
+            "Which fields, sections, or answer types are required?",
+            required_fields,
+            "target_output_spec.fields / required_fields (or a non-structured output_type)",
+        ),
         (6, "What language is used in the input and output?", language, "technical_spec.language"),
-        (7, "Is domain-specific vocabulary needed?", domain_vocabulary, "technical_spec.domain_vocabulary (set 'none' if not)"),
+        (
+            7,
+            "Is domain-specific vocabulary needed?",
+            domain_vocabulary,
+            "technical_spec.domain_vocabulary (set 'none' if not)",
+        ),
         (8, "Does the use case require human review?", human_review, "technical_spec.human_review"),
-        (9, "Are there privacy, security, or compliance constraints?", privacy, "technical_spec.security_constraints / governance.data_handling"),
-        (10, "Should the solution use a specific model provider?", model_provider, "technical_spec.model_provider (e.g. 'configurable')"),
-        (11, "Should the output be integrated into another system?", integration, "technical_spec.integration_targets (set [] for none)"),
-        (12, "How should quality be evaluated?", evaluation, "technical_spec.evaluation_requirements / evaluation"),
-        (13, "What should the first PoC demonstrate?", poc_goal, "business_spec.poc_goal / success_criteria"),
+        (
+            9,
+            "Are there privacy, security, or compliance constraints?",
+            privacy,
+            "technical_spec.security_constraints / governance.data_handling",
+        ),
+        (
+            10,
+            "Should the solution use a specific model provider?",
+            model_provider,
+            "technical_spec.model_provider (e.g. 'configurable')",
+        ),
+        (
+            11,
+            "Should the output be integrated into another system?",
+            integration,
+            "technical_spec.integration_targets (set [] for none)",
+        ),
+        (
+            12,
+            "How should quality be evaluated?",
+            evaluation,
+            "technical_spec.evaluation_requirements / evaluation",
+        ),
+        (
+            13,
+            "What should the first PoC demonstrate?",
+            poc_goal,
+            "business_spec.poc_goal / success_criteria",
+        ),
     ]
 
 
@@ -163,7 +220,9 @@ def summary(blueprint: Blueprint) -> str:
     if not gaps:
         lines.append("Requirement completeness PASSED (13/13 checklist points answered)")
     else:
-        lines.append(f"Requirement completeness INCOMPLETE ({13 - len(gaps)}/13 answered, {len(gaps)} missing)")
+        lines.append(
+            f"Requirement completeness INCOMPLETE ({13 - len(gaps)}/13 answered, {len(gaps)} missing)"
+        )
     for number, question, _predicate, hint in _check(blueprint):
         mark = "MISSING" if number in missing else "  ok   "
         lines.append(f"  [{mark}] {number:>2}. {question}")

@@ -24,6 +24,7 @@ def _load_example(filename: str) -> Blueprint:
 # Pattern detection
 # ---------------------------------------------------------------------------
 
+
 def test_pattern_audio_to_structured():
     bp = _load_example("incident_reporting_blueprint.json")
     assert _determine_pattern(bp) == "audio_to_structured"
@@ -43,11 +44,15 @@ def test_pattern_rag():
 # Scaffold all three example blueprints
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("filename,expected_pattern", [
-    ("incident_reporting_blueprint.json", "audio_to_structured"),
-    ("document_extraction_blueprint.json", "document_to_structured"),
-    ("rag_workflow_blueprint.json", "rag"),
-])
+
+@pytest.mark.parametrize(
+    "filename,expected_pattern",
+    [
+        ("incident_reporting_blueprint.json", "audio_to_structured"),
+        ("document_extraction_blueprint.json", "document_to_structured"),
+        ("rag_workflow_blueprint.json", "rag"),
+    ],
+)
 def test_scaffold_example_blueprints(tmp_path, filename, expected_pattern):
     bp = _load_example(filename)
     result = scaffold_poc(bp, tmp_path)
@@ -82,11 +87,15 @@ def test_scaffold_no_writes_outside_output_dir(tmp_path):
 # run_poc.py syntax validation
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("filename", [
-    "incident_reporting_blueprint.json",
-    "document_extraction_blueprint.json",
-    "rag_workflow_blueprint.json",
-])
+
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "incident_reporting_blueprint.json",
+        "document_extraction_blueprint.json",
+        "rag_workflow_blueprint.json",
+    ],
+)
 def test_run_poc_is_valid_python(tmp_path, filename):
     bp = Blueprint.from_file(EXAMPLES / filename)
     result = scaffold_poc(bp, tmp_path)
@@ -97,6 +106,7 @@ def test_run_poc_is_valid_python(tmp_path, filename):
 # ---------------------------------------------------------------------------
 # requirements.txt
 # ---------------------------------------------------------------------------
+
 
 def test_requirements_txt_has_gaik_extra(tmp_path):
     bp = _load_example("incident_reporting_blueprint.json")
@@ -124,6 +134,7 @@ def test_requirements_txt_rag_module(tmp_path):
 # Schema files
 # ---------------------------------------------------------------------------
 
+
 def test_schema_files_generated_for_extraction_blueprint(tmp_path):
     bp = _load_example("incident_reporting_blueprint.json")
     scaffold_poc(bp, tmp_path)
@@ -146,7 +157,9 @@ def test_schema_requirements_payload_shape(tmp_path):
     assert "fields" in req
     allowed_types = {"str", "int", "float", "bool", "list[str]", "date", "decimal", "list[dict]"}
     for f in req["fields"]:
-        assert f["field_type"] in allowed_types, f"field_type '{f['field_type']}' not in AllowedTypes"
+        assert f["field_type"] in allowed_types, (
+            f"field_type '{f['field_type']}' not in AllowedTypes"
+        )
 
 
 def test_extraction_requirements_generated(tmp_path):
@@ -175,6 +188,7 @@ def test_rag_no_schema_files(tmp_path):
 # Synthetic mode
 # ---------------------------------------------------------------------------
 
+
 def test_synthetic_creates_sample_for_document(tmp_path):
     bp = _load_example("document_extraction_blueprint.json")
     result = scaffold_poc(bp, tmp_path, synthetic=True)
@@ -186,6 +200,7 @@ def test_synthetic_creates_sample_for_document(tmp_path):
 # ---------------------------------------------------------------------------
 # pip_requirements helper
 # ---------------------------------------------------------------------------
+
 
 def test_pip_requirements_deduplication():
     reg = get_registry()

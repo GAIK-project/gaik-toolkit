@@ -41,6 +41,7 @@ def _is_pdf(path: Path) -> bool:
 # Renderer
 # ---------------------------------------------------------------------------
 
+
 def test_template_is_valid_python():
     ast.parse(TEMPLATE.read_text(encoding="utf-8"))
 
@@ -58,7 +59,9 @@ def test_structured_dict_with_nesting(tmp_path):
         "notes": ["stable", "review in 2 weeks"],
     }
     out = tmp_path / "struct.pdf"
-    write(data, out, title="Clinical Record", subtitle="Schema", metadata={"Source file": "note.wav"})
+    write(
+        data, out, title="Clinical Record", subtitle="Schema", metadata={"Source file": "note.wav"}
+    )
     assert _is_pdf(out)
 
 
@@ -72,7 +75,9 @@ def test_list_of_records(tmp_path):
 
 def test_unstructured_text_with_headings(tmp_path):
     write = _load_renderer(tmp_path)
-    text = "# Summary\nA leak occurred.\n\n## Details\nLocation: pump room.\n\n## Action\nDispatched."
+    text = (
+        "# Summary\nA leak occurred.\n\n## Details\nLocation: pump room.\n\n## Action\nDispatched."
+    )
     out = tmp_path / "text.pdf"
     write(text, out, title="Incident Report")
     assert _is_pdf(out)
@@ -96,21 +101,47 @@ def test_creates_parent_dir(tmp_path):
 # Scaffolder opt-in wiring
 # ---------------------------------------------------------------------------
 
+
 def _blueprint(output_types) -> Blueprint:
-    return Blueprint.model_validate({
-        "blueprint_version": "1.0",
-        "use_case": {"id": "uc", "name": "My Use Case", "description": "x", "domain": "test"},
-        "technical_spec": {"input_types": ["audio"], "output_types": output_types, "language": "en"},
-        "target_output_spec": {"schema_name": "MyOut", "fields": ["a", "b"]},
-        "components": {"selected_modules": [], "selected_building_blocks": ["Transcriber", "Extractor", "LLMJudge"], "custom_components": []},
-        "artifacts": {
-            "src": {"type": "audio", "source": "user_upload", "optional": False},
-            "out": {"type": "structured_json", "source": "generated", "optional": False, "final_output": True, "produced_by": "e"},
-        },
-        "workflow": {"steps": [
-            {"id": "e", "name": "E", "type": "automated_task", "component": "Extractor", "inputs": ["src"], "outputs": ["out"]},
-        ]},
-    })
+    return Blueprint.model_validate(
+        {
+            "blueprint_version": "1.0",
+            "use_case": {"id": "uc", "name": "My Use Case", "description": "x", "domain": "test"},
+            "technical_spec": {
+                "input_types": ["audio"],
+                "output_types": output_types,
+                "language": "en",
+            },
+            "target_output_spec": {"schema_name": "MyOut", "fields": ["a", "b"]},
+            "components": {
+                "selected_modules": [],
+                "selected_building_blocks": ["Transcriber", "Extractor", "LLMJudge"],
+                "custom_components": [],
+            },
+            "artifacts": {
+                "src": {"type": "audio", "source": "user_upload", "optional": False},
+                "out": {
+                    "type": "structured_json",
+                    "source": "generated",
+                    "optional": False,
+                    "final_output": True,
+                    "produced_by": "e",
+                },
+            },
+            "workflow": {
+                "steps": [
+                    {
+                        "id": "e",
+                        "name": "E",
+                        "type": "automated_task",
+                        "component": "Extractor",
+                        "inputs": ["src"],
+                        "outputs": ["out"],
+                    },
+                ]
+            },
+        }
+    )
 
 
 def test_wants_pdf_detection():
@@ -120,7 +151,9 @@ def test_wants_pdf_detection():
     assert _wants_pdf(_blueprint([])) is False
 
 
-@pytest.mark.parametrize("pattern", ["audio_to_structured", "document_to_structured", "rag", "_generic"])
+@pytest.mark.parametrize(
+    "pattern", ["audio_to_structured", "document_to_structured", "rag", "_generic"]
+)
 def test_pdf_block_present_only_when_requested(pattern):
     for wants, output_types in [(True, ["structured_json", "pdf"]), (False, ["structured_json"])]:
         variables = _build_variables(_blueprint(output_types), pattern)
@@ -131,6 +164,7 @@ def test_pdf_block_present_only_when_requested(pattern):
 
 def test_scaffold_writes_pdf_helper_and_requirement(tmp_path):
     from solution_wizard.scaffolder import scaffold_poc
+
     info = scaffold_poc(_blueprint(["structured_json", "pdf"]), tmp_path)
     poc = info["poc_dir"]
     assert (poc / "pdf_report.py").exists()
@@ -142,6 +176,7 @@ def test_scaffold_writes_pdf_helper_and_requirement(tmp_path):
 
 def test_scaffold_no_pdf_when_not_requested(tmp_path):
     from solution_wizard.scaffolder import scaffold_poc
+
     info = scaffold_poc(_blueprint(["structured_json"]), tmp_path)
     poc = info["poc_dir"]
     assert not (poc / "pdf_report.py").exists()

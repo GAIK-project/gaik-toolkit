@@ -62,6 +62,7 @@ def test_mermaid_rag_workflow():
 def test_mermaid_label_escaping():
     """Step names with quotes and brackets must not break Mermaid syntax."""
     from solution_wizard.visualizer import _node_label
+
     assert _node_label('Record "voice" note') == "Record #quot;voice#quot; note"
     assert _node_label("Review [optional]") == "Review #lsqb;optional#rsqb;"
     assert _node_label("Normal step name") == "Normal step name"

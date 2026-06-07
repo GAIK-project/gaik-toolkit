@@ -14,9 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-REGISTRY_PATH = (
-    Path(__file__).parent.parent.parent / "registries" / "gaik_component_registry.json"
-)
+REGISTRY_PATH = Path(__file__).parent.parent.parent / "registries" / "gaik_component_registry.json"
 REFERENCE_CARDS_PATH = (
     Path(__file__).parent.parent.parent / "registries" / "component_reference_cards.json"
 )
@@ -49,9 +47,7 @@ def _validate_entries(entries: List[Dict[str, Any]]) -> None:
         label = entry.get("name") or entry.get("id") or f"entry #{i}"
         missing = [k for k in _REQUIRED_ENTRY_KEYS if k not in entry]
         if missing:
-            raise ValueError(
-                f"Registry entry '{label}' is missing required keys: {missing}"
-            )
+            raise ValueError(f"Registry entry '{label}' is missing required keys: {missing}")
         if entry["type"] not in _VALID_TYPES:
             raise ValueError(
                 f"Registry entry '{label}' has invalid type '{entry['type']}' "
@@ -64,9 +60,7 @@ def _validate_entries(entries: List[Dict[str, Any]]) -> None:
 
 class Registry:
     def __init__(self, registry_path: Path = REGISTRY_PATH) -> None:
-        self._entries: List[Dict[str, Any]] = json.loads(
-            registry_path.read_text(encoding="utf-8")
-        )
+        self._entries: List[Dict[str, Any]] = json.loads(registry_path.read_text(encoding="utf-8"))
         _validate_entries(self._entries)
         self._by_id: Dict[str, Dict[str, Any]] = {e["id"]: e for e in self._entries}
         self._by_name: Dict[str, Dict[str, Any]] = {e["name"]: e for e in self._entries}
@@ -84,16 +78,10 @@ class Registry:
         return id_or_name in self._by_id or id_or_name in self._by_name
 
     def filter_by_input_type(self, artifact_type: str) -> List[Dict[str, Any]]:
-        return [
-            e for e in self._entries
-            if artifact_type in e.get("input_artifact_types", [])
-        ]
+        return [e for e in self._entries if artifact_type in e.get("input_artifact_types", [])]
 
     def filter_by_output_type(self, artifact_type: str) -> List[Dict[str, Any]]:
-        return [
-            e for e in self._entries
-            if artifact_type in e.get("output_artifact_types", [])
-        ]
+        return [e for e in self._entries if artifact_type in e.get("output_artifact_types", [])]
 
     def modules(self) -> List[Dict[str, Any]]:
         return [e for e in self._entries if e.get("type") == "software_module"]
@@ -155,18 +143,14 @@ class ReferenceCards:
     _REQUIRED_CARD_KEYS = ("import", "construct", "call", "returns")
 
     def __init__(self, cards_path: Path = REFERENCE_CARDS_PATH) -> None:
-        self._cards: Dict[str, Dict[str, str]] = json.loads(
-            cards_path.read_text(encoding="utf-8")
-        )
+        self._cards: Dict[str, Dict[str, str]] = json.loads(cards_path.read_text(encoding="utf-8"))
         self._validate()
 
     def _validate(self) -> None:
         for name, card in self._cards.items():
             missing = [k for k in self._REQUIRED_CARD_KEYS if k not in card]
             if missing:
-                raise ValueError(
-                    f"Reference card '{name}' is missing required keys: {missing}"
-                )
+                raise ValueError(f"Reference card '{name}' is missing required keys: {missing}")
 
     def get(self, component_name: str) -> Optional[Dict[str, str]]:
         return self._cards.get(component_name)
