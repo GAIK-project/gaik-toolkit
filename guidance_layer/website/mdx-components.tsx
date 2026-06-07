@@ -1,5 +1,5 @@
 import defaultMdxComponents from 'fumadocs-ui/mdx';
-import { ImageZoom } from 'fumadocs-ui/components/image-zoom';
+import { ImageZoom } from '@/components/mdx/image-zoom-client';
 import { Mermaid } from '@/components/mdx/mermaid';
 import type { MDXComponents } from 'mdx/types';
 
