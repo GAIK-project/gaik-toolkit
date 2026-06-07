@@ -3,7 +3,7 @@
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageTransition } from "@/components/demo/page-transition";
 import { cn } from "@/lib/utils";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Sparkles, Wand2 } from "lucide-react";
 import Link from "next/link";
 
 export function Hero() {
@@ -46,6 +46,38 @@ export function Hero() {
             Explore All Demos
           </Button>
         </div>
+
+        {/* Solution Configuration Wizard — new feature callout */}
+        <Link
+          href="/solution-wizard"
+          className="group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50 to-cyan-50 px-6 py-5 shadow-sm transition-all hover:border-teal-300 hover:shadow-md"
+        >
+          {/* subtle glow */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_left,_rgba(20,184,166,0.08)_0%,_transparent_60%)]" />
+
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-600/10">
+            <Wand2 className="size-5 text-teal-600" />
+          </div>
+
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-base font-bold text-teal-700">
+                Solution Configuration Wizard
+              </span>
+              <span className="animate-pulse inline-flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                <Sparkles className="size-2.5" />
+                New
+              </span>
+            </div>
+            <p className="text-sm leading-snug text-slate-600">
+              Describe your use case — the wizard collects requirements and
+              creates a working, validated, proof of concept with documentation,
+              diagrams, and all necessary artifacts.
+            </p>
+          </div>
+
+          <ArrowRight className="ml-4 shrink-0 text-teal-400 transition-all group-hover:translate-x-1 group-hover:text-teal-600" />
+        </Link>
       </div>
     </PageTransition>
   );

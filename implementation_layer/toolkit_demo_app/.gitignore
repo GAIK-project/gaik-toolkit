@@ -49,3 +49,5 @@ rahti.md
 
 # Auto-generated extractor schemas
 api/schemas/extractor_*
+# Solution Wizard per-session workspaces
+.wizard_workspaces/

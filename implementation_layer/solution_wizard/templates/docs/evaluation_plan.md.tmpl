@@ -1,0 +1,40 @@
+# Evaluation Plan — ${use_case_name}
+
+> How the quality of this solution is measured. Generated from the blueprint.
+
+## Goal
+Demonstrate: ${poc_goal}
+
+Success criteria:
+${success_criteria}
+
+## Stated evaluation requirements
+${evaluation_requirements}
+
+<!-- AGENT: translate the requirements above into concrete metrics and thresholds. -->
+
+## Recommended metrics
+- **Output type:** ${output_types} (schema: `${schema_name}`)
+- For structured extraction, use the GAIK `extraction_eval` framework (field-level Precision / Recall / F1, hallucination rate) via `ExtractionEvaluator`.
+- For RAG / answers, use `RAG_eval` (faithfulness, answer relevance, context precision/recall) via `RAGEvaluator`.
+- For transcription, use `transcription_eval`; for translation, `translation_eval`; for report writing, `report_writing_eval`.
+
+<!-- AGENT: pick the applicable framework(s) above and remove the rest. -->
+
+## Test data
+- **Data sources:** ${data_sources}
+- Place ground-truth examples under `evals/ground_truth/` and predictions under `evals/predictions/`.
+
+<!-- AGENT: describe how many examples, where they come from, and how ground truth is established. -->
+
+## Thresholds and acceptance
+${validation_rules}
+
+<!-- AGENT: state the pass/fail thresholds per metric (e.g. F1 >= 0.9 on required fields). -->
+
+## Human review
+- **Required:** ${human_review}
+- **Reviewers:** ${reviewers}
+
+## Limitations
+<!-- AGENT: note any evaluation limitations (e.g. no ground truth yet, small sample, subjective fields). -->

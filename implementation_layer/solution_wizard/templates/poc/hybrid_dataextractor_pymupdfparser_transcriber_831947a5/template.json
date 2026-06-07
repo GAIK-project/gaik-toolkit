@@ -1,0 +1,23 @@
+{
+  "pattern_key": "hybrid_dataextractor_pymupdfparser_transcriber_831947a5",
+  "components": [
+    "Transcriber",
+    "PyMuPDFParser",
+    "DataExtractor"
+  ],
+  "topology_signature": [
+    "Transcriber(['voice_note_audio']->['raw_transcript'])",
+    "PyMuPDFParser(['referral_pdf']->['parsed_referral_text'])",
+    "DataExtractor(['combined_clinical_text']->['patient_record_json'])"
+  ],
+  "variables_used": [
+    "language",
+    "use_azure",
+    "use_case_name"
+  ],
+  "validated_by": [
+    "clinical_documentation_extraction"
+  ],
+  "status": "provisional",
+  "created_at": "2026-06-06T19:25:08.735044+00:00"
+}

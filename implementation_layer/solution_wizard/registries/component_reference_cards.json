@@ -1,0 +1,257 @@
+{
+  "Transcriber": {
+    "import": "from gaik.software_components.transcriber import Transcriber, get_openai_config",
+    "construct": "transcriber = Transcriber(api_config=get_openai_config(use_azure=use_azure), language=language, enhanced_transcript=True)",
+    "call": "tr = transcriber.transcribe(input_path)\n    text = tr.enhanced_transcript or tr.raw_transcript",
+    "returns": "TranscriptionResult(.raw_transcript, .enhanced_transcript, .job_id)",
+    "install_extra": "transcriber",
+    "subsumes": ["TranscriptEnhancer"],
+    "options": [
+      {"name": "enhanced_transcript", "type": "bool", "default": false, "effect": "Two-pass transcript enhancement; internally constructs TranscriptEnhancer (Finnish-tuned). For audio input, prefer this over adding a separate TranscriptEnhancer step.", "selection_relevant": true, "infer_from": "language == 'fi' (Finnish). For other languages enhancement needs prompt customisation; default off and flag to the user."},
+      {"name": "language", "type": "str", "default": "auto", "effect": "ISO 639-1 language code (or 'auto').", "selection_relevant": false, "infer_from": "technical_spec.language"},
+      {"name": "diarization", "type": "bool", "default": false, "effect": "Speaker diarization (who spoke when).", "selection_relevant": true, "infer_from": "requirement mentions multiple speakers / meetings / interviews"}
+    ]
+  },
+  "TranscriptEnhancer": {
+    "import": "from gaik.software_components.enhance_transcript import TranscriptEnhancer, get_openai_config",
+    "construct": "enhancer = TranscriptEnhancer(api_config=get_openai_config(use_azure=use_azure))",
+    "call": "er = enhancer.enhance_text(transcript_text)\n    text = er.enhanced_text",
+    "returns": "result(.enhanced_text, .summary)",
+    "install_extra": "enhance-transcript",
+    "options": [
+      {"name": "additional_instructions", "type": "str", "default": null, "effect": "Domain-specific correction instructions.", "selection_relevant": false, "infer_from": "domain_vocabulary"}
+    ],
+    "note": "Finnish-tuned. When the input is audio, do NOT add this as a separate step -- set Transcriber(enhanced_transcript=True) instead, which calls this internally. Use this standalone only to enhance an already-existing transcript (text input)."
+  },
+  "SchemaGenerator": {
+    "import": "from gaik.software_components.extractor import SchemaGenerator, get_openai_config",
+    "construct": "schema_gen = SchemaGenerator(config=get_openai_config(use_azure=use_azure))",
+    "call": "schema, requirements = _load_output_schema(schema_dir)\n    if schema is None:\n        schema = schema_gen.generate_schema(user_requirements=user_requirements)\n        requirements = schema_gen.item_requirements\n        schema_dir.mkdir(parents=True, exist_ok=True)\n        _save_output_schema(schema_gen, schema, requirements, schema_dir)",
+    "returns": "Pydantic model class; .item_requirements = ExtractionRequirements",
+    "install_extra": "extract",
+    "note": "Use _load_output_schema() first -- the wizard pre-generates the schema; only call generate_schema() when _load_output_schema() returns None. Schema files are always named output_schema.* regardless of the class name."
+  },
+  "DataExtractor": {
+    "import": "from gaik.software_components.extractor import DataExtractor, get_openai_config",
+    "construct": "extractor = DataExtractor(config=get_openai_config(use_azure=use_azure))",
+    "call": "extracted_fields = extractor.extract(extraction_model=schema, requirements=requirements, user_requirements=user_requirements, documents=[source_text])",
+    "returns": "list[dict] (one dict per document)",
+    "install_extra": "extract"
+  },
+  "Extractor": {
+    "import": "from gaik.software_components.extractor import SchemaGenerator, DataExtractor, get_openai_config",
+    "construct": "config = get_openai_config(use_azure=use_azure)\n    schema_gen = SchemaGenerator(config=config)\n    extractor = DataExtractor(config=config)",
+    "call": "schema, requirements = _load_output_schema(schema_dir)\n    if schema is None:\n        schema = schema_gen.generate_schema(user_requirements=user_requirements)\n        requirements = schema_gen.item_requirements\n        schema_dir.mkdir(parents=True, exist_ok=True)\n        _save_output_schema(schema_gen, schema, requirements, schema_dir)\n    extracted_fields = extractor.extract(extraction_model=schema, requirements=requirements, user_requirements=user_requirements, documents=[source_text])",
+    "returns": "list[dict]",
+    "install_extra": "extract",
+    "note": "Use _load_output_schema() first. Schema files are always named output_schema.* regardless of blueprint schema_name."
+  },
+  "VisionExtractor": {
+    "import": "from gaik.software_components.vision_extractor import VisionExtractor",
+    "construct": "extractor = VisionExtractor(model_provider='openai', use_azure=use_azure, include_verification=False)",
+    "call": "vr = extractor.extract(file_paths=[input_path], user_requirements=user_requirements)\n    extracted_fields = vr.data",
+    "returns": "VisionExtractionResult(.data dict, .model, .documents_processed)",
+    "install_extra": "vision-extract",
+    "options": [
+      {"name": "include_verification", "type": "bool", "default": false, "effect": "Per-field confidence + reasoning, useful before human review.", "selection_relevant": true, "infer_from": "human_review == yes OR target_output_spec.confidence_required"},
+      {"name": "model_provider", "type": "enum", "values": ["openai", "anthropic", "google"], "default": "openai", "effect": "Vision LLM provider.", "selection_relevant": false, "infer_from": "technical_spec.model_provider"},
+      {"name": "merge_table", "type": "bool", "default": false, "effect": "Merge table data into the extracted text.", "selection_relevant": false, "infer_from": "inputs contain tables"}
+    ]
+  },
+  "MultimodalParser": {
+    "import": "from gaik.software_components.parsers import MultimodalParser",
+    "construct": "parser = MultimodalParser(model_provider='openai', use_azure=use_azure)",
+    "call": "pr = parser.parse(str(input_path))\n    parsed_text = pr.clean_markdown",
+    "returns": "ParseResult(.raw_markdown, .clean_markdown)",
+    "install_extra": "multimodal-parser",
+    "options": [
+      {"name": "model_provider", "type": "enum", "values": ["openai", "claude", "google"], "default": "openai", "effect": "Parsing LLM provider.", "selection_relevant": false, "infer_from": "technical_spec.model_provider"},
+      {"name": "merge_table", "type": "bool", "default": false, "effect": "Merge tables into the markdown text.", "selection_relevant": false, "infer_from": "inputs contain tables"}
+    ]
+  },
+  "VisionParser": {
+    "import": "from gaik.software_components.parsers import VisionParser, get_openai_config",
+    "construct": "parser = VisionParser(openai_config=get_openai_config(use_azure=use_azure))",
+    "call": "pages = parser.convert_pdf(str(input_path), clean_output=True)\n    parsed_text = '\\n\\n'.join(pages)",
+    "returns": "list[str] (markdown pages)",
+    "install_extra": "parser"
+  },
+  "PyMuPDFParser": {
+    "import": "from gaik.software_components.parsers import PyMuPDFParser",
+    "construct": "parser = PyMuPDFParser()",
+    "call": "res = parser.parse_document(str(input_path), use_markdown=True)\n    parsed_text = res['text_content']",
+    "returns": "dict(.text_content, .word_count)",
+    "install_extra": "parser-cpu"
+  },
+  "DocxParser": {
+    "import": "from gaik.software_components.parsers import DocxParser",
+    "construct": "parser = DocxParser()",
+    "call": "res = parser.parse_document(str(input_path), use_markdown=True)\n    parsed_text = res['text_content']",
+    "returns": "dict(.text_content)",
+    "install_extra": "parser-cpu"
+  },
+  "DoclingParser": {
+    "import": "from gaik.software_components.parsers import DoclingParser",
+    "construct": "parser = DoclingParser(enable_table_structure=True)",
+    "call": "res = parser.parse_document(str(input_path), use_markdown=True)\n    parsed_text = res['text_content']",
+    "returns": "dict(.text_content, .word_count)",
+    "install_extra": "parser",
+    "options": [
+      {"name": "enable_ocr", "type": "bool", "default": true, "effect": "OCR for scanned / image-based PDFs.", "selection_relevant": true, "infer_from": "inputs are scanned or image-based PDFs"},
+      {"name": "enable_table_structure", "type": "bool", "default": true, "effect": "Extract table structure.", "selection_relevant": false, "infer_from": "inputs contain tables"}
+    ]
+  },
+  "DocumentClassifier": {
+    "import": "from gaik.software_components.doc_classifier import DocumentClassifier, get_openai_config",
+    "construct": "classifier = DocumentClassifier(config=get_openai_config(use_azure=use_azure))",
+    "call": "result = classifier.classify(file_or_dir=str(input_path), classes=categories)\n    # result: {filename: {'class':..., 'confidence':..., 'reasoning':...}}",
+    "returns": "dict[filename -> {class, confidence, reasoning}]",
+    "install_extra": "classifier"
+  },
+  "Embedder": {
+    "import": "from gaik.software_components.RAG.embedder import Embedder, get_openai_config",
+    "construct": "embedder = Embedder(config=get_openai_config(use_azure=use_azure))",
+    "call": "embeddings, documents = embedder.embed(text_chunks)",
+    "returns": "tuple(list[list[float]], list[Document])",
+    "install_extra": "embedder"
+  },
+  "PgVectorStore": {
+    "import": "from gaik.software_components.RAG.pg_vector_store import PgVectorStore",
+    "construct": "store = PgVectorStore(connection_string=connection_string, table_name='documents')",
+    "call": "with store:\n        store.setup()\n        store.add(documents, embeddings)\n        hits = store.search_hybrid(query_embedding, query_text, top_k=5)",
+    "returns": "list[tuple(Document, float)]",
+    "install_extra": "pg-vector-store"
+  },
+  "Retriever": {
+    "import": "from gaik.software_components.RAG.retriever import Retriever",
+    "construct": "retriever = Retriever(embedder=embedder, vector_store=store, hybrid_search=True, top_k=5)",
+    "call": "retrieved_chunks = retriever.search(user_query, include_scores=True)",
+    "returns": "list[Document]",
+    "install_extra": "retriever",
+    "options": [
+      {"name": "hybrid_search", "type": "bool", "default": false, "effect": "Combine semantic + keyword search.", "selection_relevant": true, "infer_from": "queries mix exact terms (codes, names, IDs) with conceptual questions"},
+      {"name": "re_rank", "type": "bool", "default": false, "effect": "Cross-encoder re-ranking of retrieved results.", "selection_relevant": true, "infer_from": "retrieval precision is critical"},
+      {"name": "top_k", "type": "int", "default": 5, "effect": "Number of chunks retrieved.", "selection_relevant": false, "infer_from": "answer breadth requirement"}
+    ]
+  },
+  "AnswerGenerator": {
+    "import": "from gaik.software_components.RAG.answer_generator import AnswerGenerator",
+    "construct": "generator = AnswerGenerator(use_azure=use_azure, citations=True, stream=False)",
+    "call": "answer = generator.generate(query=user_query, context=retrieved_chunks)",
+    "returns": "str (or iterable[str] if stream=True)",
+    "install_extra": "answer-generator",
+    "options": [
+      {"name": "citations", "type": "bool", "default": false, "effect": "Include source citations in the answer.", "selection_relevant": true, "infer_from": "traceability / citation requirement"},
+      {"name": "stream", "type": "bool", "default": true, "effect": "Stream answer tokens.", "selection_relevant": false, "infer_from": "runtime_interface (interactive demo vs. batch)"}
+    ]
+  },
+  "LLMJudge": {
+    "import": "from gaik.software_components.validators.llm_judge.llm_judge import LLMJudge",
+    "construct": "judge = LLMJudge(model_provider='openai', use_azure=use_azure)",
+    "call": "report = judge.detect_hallucinations(source_text=source_text, extracted=extracted_fields)\n    # report.flags: list of HallucinationFlag(.field, .value, .severity, .reason)",
+    "returns": "HallucinationReport(.flags)",
+    "install_extra": "llm-judge",
+    "options": [
+      {"name": "model_provider", "type": "enum", "values": ["openai", "azure", "anthropic", "google"], "default": "google", "effect": "Judge LLM provider; using a provider different from the extractor reduces shared-model bias.", "selection_relevant": false, "infer_from": "technical_spec.model_provider"}
+    ]
+  },
+  "LLMJudgePanel": {
+    "import": "from gaik.software_components.validators.llm_judge import LLMJudgePanel",
+    "construct": "panel = LLMJudgePanel(judges=[judge_a, judge_b])",
+    "call": "result = panel.validate(source_pages=pages, extracted=extracted_fields)\n    flags = result.aggregated_flags",
+    "returns": "JudgePanelResult(.aggregated_flags, .agreement_score, .per_judge)",
+    "install_extra": "llm-judge",
+    "options": [
+      {"name": "judges", "type": "list[LLMJudge]", "default": "(required, >= 2)", "effect": "Two or more judges; diverse providers give the strongest debiasing via majority vote.", "selection_relevant": true, "infer_from": "high-stakes validation that warrants more than one judge"}
+    ]
+  },
+  "TextToSpeech": {
+    "import": "from gaik.software_components.text_to_speech import TextToSpeech, get_openai_config",
+    "construct": "tts = TextToSpeech(api_config=get_openai_config(use_azure=use_azure), language=language)",
+    "call": "sr = tts.synthesize(text)\n    saved_path = sr.save(output_dir)",
+    "returns": "SpeechSynthesisResult(.audio_bytes); .save(dir) -> Path",
+    "install_extra": "text-to-speech"
+  },
+  "PostgresAgent": {
+    "import": "from gaik.software_components.postgres_agent import PostgresAgent",
+    "construct": "agent = PostgresAgent(connection_string=connection_string)",
+    "call": "with agent:\n        ar = agent.ask(user_query)\n    answer = ar.answer",
+    "returns": "AnswerResult(.answer, .generated_sql, .query_result)",
+    "install_extra": "postgres-agent",
+    "options": [
+      {"name": "table_allowlist", "type": "list[str]", "default": null, "effect": "Restrict which tables the agent may query (security).", "selection_relevant": true, "infer_from": "security_constraints / access controls"},
+      {"name": "answer_language", "type": "str", "default": "en", "effect": "Language of the natural-language answer.", "selection_relevant": false, "infer_from": "technical_spec.language"}
+    ]
+  },
+  "ExtractionEvaluator": {
+    "import": "from gaik.software_components.evaluators import ExtractionEvaluator",
+    "construct": "evaluator = ExtractionEvaluator(match_mode='exact')",
+    "call": "result = evaluator.evaluate_dataset(dataset, extracted_outputs=outputs)\n    metrics = result.aggregate",
+    "returns": "ExtractionEvaluationResult(.aggregate Precision/Recall/F1, .items)",
+    "install_extra": "evaluators",
+    "options": [
+      {"name": "match_mode", "type": "enum", "values": ["exact", "semantic"], "default": "exact", "effect": "Field comparison mode; 'semantic' needs a judge for free-text fields.", "selection_relevant": true, "infer_from": "free-text fields needing semantic (not exact) matching"}
+    ]
+  },
+  "RAGEvaluator": {
+    "import": "from gaik.software_components.evaluators import RAGEvaluator",
+    "construct": "evaluator = RAGEvaluator(judge=judge)",
+    "call": "result = evaluator.evaluate_dataset(items)\n    metrics = result.aggregate",
+    "returns": "RAGEvaluationResult(.aggregate faithfulness/relevance/context, .items)",
+    "install_extra": "evaluators",
+    "options": [
+      {"name": "skip_context_recall", "type": "bool", "default": true, "effect": "Skip the context-recall metric when no ground truth is available.", "selection_relevant": false, "infer_from": "ground-truth availability"}
+    ]
+  },
+  "BatchEvaluationRunner": {
+    "import": "from gaik.software_components.evaluators import BatchEvaluationRunner",
+    "construct": "runner = BatchEvaluationRunner(pipeline=pipeline_fn)",
+    "call": "result = runner.run(dataset)\n    outputs = result.outputs",
+    "returns": "RunnerResult(.outputs, .errors)",
+    "install_extra": "evaluators",
+    "options": [
+      {"name": "on_error", "type": "enum", "values": ["raise", "skip"], "default": "raise", "effect": "Whether to skip dataset items that raise during the pipeline run.", "selection_relevant": false, "infer_from": "dataset robustness needs"}
+    ]
+  },
+  "FormUnderstander": {
+    "import": "from gaik.software_components.form_understander import FormUnderstander",
+    "construct": "understander = FormUnderstander(config=api_config)",
+    "call": "labels = understander.clean_labels(field_ids)",
+    "returns": "mapping of cryptic form-field ids -> human-readable labels",
+    "install_extra": "form-understander"
+  },
+  "AudioToStructuredData": {
+    "import": "from gaik.software_modules.audio_to_structured_data import AudioToStructuredData",
+    "construct": "pipeline = AudioToStructuredData(use_azure=use_azure)",
+    "call": "result = pipeline.run(file_path=input_path, user_requirements=user_requirements, schema=schema, requirements=requirements)\n    extracted_fields = result.extracted_fields\n    source_text = result.transcription.enhanced_transcript or result.transcription.raw_transcript",
+    "returns": "PipelineResult(.transcription, .extracted_fields, .schema, .requirements)",
+    "install_extra": "audio-to-structured-data",
+    "subsumes": ["Transcriber", "TranscriptEnhancer", "SchemaGenerator", "DataExtractor"],
+    "note": "End-to-end module: already transcribes (with Finnish enhancement), generates the schema, and extracts. Do NOT also add Transcriber / TranscriptEnhancer / SchemaGenerator / DataExtractor as separate steps."
+  },
+  "DocumentsToStructuredData": {
+    "import": "from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData",
+    "construct": "pipeline = DocumentsToStructuredData(use_azure=use_azure)",
+    "call": "result = pipeline.run(file_path=input_path, user_requirements=user_requirements, parser_choice='vision_parser', schema=schema, requirements=requirements)\n    extracted_fields = result.extracted_fields\n    source_text = '\\n\\n'.join(result.parsed_documents)",
+    "returns": "PipelineResult(.parsed_documents, .extracted_fields, .schema, .requirements)",
+    "install_extra": "documents-to-structured-data",
+    "subsumes": ["SchemaGenerator", "DataExtractor"],
+    "options": [
+      {"name": "parser_choice", "type": "enum", "values": ["vision_parser", "docling_parser", "pymupdf_parser", "docx_parser"], "default": "vision_parser", "effect": "Which parser sub-component the module uses internally.", "selection_relevant": true, "infer_from": "input_formats: scanned/visual PDF -> vision_parser/docling_parser; text PDF -> pymupdf_parser; DOCX -> docx_parser"}
+    ],
+    "note": "End-to-end module: parses then extracts. Do NOT also add a parser / SchemaGenerator / DataExtractor as separate steps; choose the internal parser via parser_choice."
+  },
+  "RAGWorkflow": {
+    "import": "from gaik.software_modules.RAG_workflow import RAGWorkflow",
+    "construct": "workflow = RAGWorkflow(use_azure=use_azure, persist=True, persist_path=str(output_dir / 'chroma_store'), citations=True, stream=False)",
+    "call": "workflow.index_documents(document_paths)\n    rr = workflow.ask(user_query)\n    answer = rr.answer",
+    "returns": "RAGWorkflowResult(.answer, .documents)",
+    "install_extra": "rag-workflow",
+    "subsumes": ["Embedder", "PgVectorStore", "Retriever", "AnswerGenerator"],
+    "options": [
+      {"name": "citations", "type": "bool", "default": false, "effect": "Include source citations in the answer.", "selection_relevant": true, "infer_from": "traceability / citation requirement"},
+      {"name": "retriever_top_k", "type": "int", "default": 5, "effect": "Number of chunks retrieved.", "selection_relevant": false, "infer_from": "answer breadth requirement"}
+    ],
+    "note": "End-to-end module: embeds, stores, retrieves, and answers. Do NOT also add Embedder / PgVectorStore / Retriever / AnswerGenerator as separate steps."
+  }
+}

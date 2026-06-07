@@ -12,7 +12,7 @@ Two approaches for Generative AI solution implementation are supported by the to
 
 The key parts of the code-based implementation layer includes:
 
-- **Software components** – reusable utilities such as `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`, and RAG components like `rag_parser_docling`, `rag_parser_vision`, `embedder`, `vector_store`, `retriever`, `answer_generator`
+- **Software components** – reusable utilities for extraction, parsing, transcription, transcript enhancement, classification, RAG, validation/evaluation, LLM provider access, text-to-speech, PostgreSQL querying, and one-call vision extraction
 - **Software modules** – end‑to‑end pipelines combining the software components such as "audio → structured data", "documents → structured data", and "RAG workflow"
 
 ## Architecture overview
@@ -22,7 +22,7 @@ GAIK distinguishes three levels:
 | Level                  | Concept in GAIK                         | Examples                                                      |
 |------------------------|-----------------------------------------|---------------------------------------------------------------|
 | **Knowledge Service**            | Logical capability                      | `speech_to_text`, `document_parsing`, `information_extraction` |
-| **Software component** | Atomic toolkit class / function         | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser` |
+| **Software component** | Atomic toolkit class / function         | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`, `VisionExtractor`, `DocumentClassifier`, `LLMJudge`, `TextToSpeech` |
 | **Software module**    | Composed, workflow‑ready unit           | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow` |
 
 In code, that maps to:
@@ -55,14 +55,34 @@ pip install "gaik[rag-parser-docling]"
 pip install "gaik[rag-parser-vision]"
 pip install "gaik[embedder]"
 pip install "gaik[vector-store]"
+pip install "gaik[pg-vector-store]"
 pip install "gaik[retriever]"
 pip install "gaik[answer-generator]"
 
 # Audio/video transcription (Whisper + GPT enhancement)
 pip install "gaik[transcriber]"
+pip install "gaik[parallel-transcriber]"
+pip install "gaik[enhance-transcript]"
 
 # Document classification
 pip install "gaik[classifier]"
+
+# Single-call vision extraction (document/image -> structured data)
+pip install "gaik[vision-extract]"
+
+# Multi-provider multimodal parsing
+pip install "gaik[multimodal-parser]"
+
+# LLM adapters, validation, and evaluation
+pip install "gaik[llm-anthropic]"
+pip install "gaik[llm-google]"
+pip install "gaik[llm-judge]"
+pip install "gaik[evaluators]"
+pip install "gaik[rag-response-evaluator]"
+
+# Text-to-speech and database agent
+pip install "gaik[text-to-speech]"
+pip install "gaik[postgres-agent]"
 
 # Software modules (pipelines)
 pip install "gaik[audio-to-structured-data]"
@@ -90,18 +110,27 @@ Key software components:
 - `DataExtractor` – uses that model to extract structured records from one or more documents
 - Shared helpers: `get_openai_config`, `create_openai_client` for OpenAI/Azure configuration
 
-### 2. Parsers – documents → text / markdown
+### 2. Vision Extractor – document/image → structured data in one call
+
+**Goal:** combine visual document understanding and structured extraction in a single LLM call for complex layouts where parse-then-extract workflows may lose important context.
+
+Software components:
+
+- `VisionExtractor` – sends PDFs/images directly to OpenAI, Claude, or Gemini models and returns schema-validated structured data
+- Supports schema reuse, optional schema generation, provider-specific reasoning settings, verification metadata, usage, timing, and cost reporting
+
+### 3. Parsers – documents → text / markdown
 
 **Goal:** convert PDFs and other documents into clean text or markdown, ready for extraction or retrieval.
 
 Software components:
 
-- `VisionParser` – LLM/vision‑based PDF → markdown (multi‑page context, table handling, custom prompts)
+- `VisionParser` / multimodal parser – LLM/vision‑based PDF → markdown (multi‑page context, table handling, custom prompts)
 - `PyMuPDFParser` – fast, local PDF text extraction (no external binaries)
 - `DoclingParser` – OCR and multi‑format parsing (for more complex documents)
 - `VisionRAGParser` – combines Docling with vision models for RAG‑optimized parsing (chunked outputs with image descriptions)
 
-### 3. Transcriber – audio / video → transcripts
+### 4. Transcriber and Transcript Enhancement – audio / video → transcripts
 
 **Goal:** transcribe audio or video into raw and optionally GPT‑enhanced transcripts, with chunking and compression handled for you.
 
@@ -111,9 +140,20 @@ Software components:
   - chunking for long audio
   - optional audio compression (via ffmpeg)
   - context‑aware multi‑chunk transcription
+- `ParallelTranscriber` – FFmpeg-based parallel transcription for longer media and faster throughput
+- `TranscriptEnhancer` – two-pass transcript correction/enhancement, especially useful for Finnish or domain-heavy audio
 - `TranscriptionResult` – container with save/export helpers
 
-### 4. RAG Components – retrieval‑augmented generation
+### 5. Classification and Form Understanding
+
+**Goal:** classify documents and understand form-like inputs before routing them into extraction, RAG, or downstream workflows.
+
+Software components:
+
+- `DocumentClassifier` – classifies PDF/DOCX/text inputs into user-defined categories
+- `form_understander` – form-oriented understanding utilities for structured document inputs
+
+### 6. RAG Components – retrieval‑augmented generation
 
 **Goal:** build retrieval‑augmented generation pipelines that parse documents, store them as searchable vectors, retrieve relevant context, and generate accurate, cited answers.
 
@@ -123,8 +163,28 @@ Software components:
 - `rag_parser_vision` – combines Docling with vision models to add image descriptions into chunks
 - `embedder` – generates vector embeddings from text chunks using OpenAI/Azure models
 - `vector_store` – stores embeddings and metadata (in‑memory or Chroma persistent storage)
+- `pg_vector_store` – PostgreSQL/pgvector storage with hybrid vector and full-text retrieval support
 - `retriever` – retrieves relevant chunks using semantic search (supports hybrid search + reranking)
 - `answer_generator` – generates answers from retrieved context with optional citations and conversation history
+
+### 7. LLM, Validation, and Evaluation Utilities
+
+**Goal:** provide shared model-provider access and quality checks for extraction, RAG, and other GenAI workflows.
+
+Software components:
+
+- `llm` – provider adapters and shared LLM access patterns
+- `validators` – LLM-as-judge style validation utilities
+- `evaluators` – RAG and extraction evaluation helpers, including response evaluation and comparison workflows
+
+### 8. Speech Output and Database Interaction
+
+**Goal:** support additional workflow endpoints beyond extraction and retrieval.
+
+Software components:
+
+- `text_to_speech` – generates spoken audio from text
+- `postgres_agent` – turns natural-language questions into controlled PostgreSQL queries with schema introspection and safety constraints
 
 ---
 
@@ -205,7 +265,7 @@ Although the full Solution Wizard and template catalogue live outside this repo,
  - **Semantic Video Search (Semantic + keyword based search within videos)**
  `Embedder` + `vectorStore` + `HybridRetriever` + `ReRanker`
 - **Construction Site Report Generation (Multiple documents + images + audios + notes + sample report → A structured report)**
- `Transcriber` + `DocClassifier` + `VisionRAGParser` + `ReportWriter` 
+ `Transcriber` + `DocumentClassifier` + `VisionRAGParser` + `ReportWriter` 
 
 At solution level, a template or SolutionWizardSpec can express these as **services** implemented by GAIK software components and modules.
 

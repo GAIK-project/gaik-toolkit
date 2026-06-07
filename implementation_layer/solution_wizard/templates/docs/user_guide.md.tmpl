@@ -1,0 +1,41 @@
+# User Guide — ${use_case_name}
+
+> How to run the solution, provide input, inspect output, and adjust settings.
+
+## What this does
+${description}
+
+This proof of concept demonstrates: ${poc_goal}
+
+## Prerequisites
+- Python 3.11+
+- Install dependencies: `pip install -r poc/requirements.txt`
+- Copy `poc/.env.example` to `poc/.env` and fill in your model-provider credentials (provider: ${model_provider}).
+
+## Providing input
+- **Expected input:** ${input_types} (formats: ${input_formats})
+- Place your input file(s) in `poc/sample_input/`.
+
+<!-- AGENT: state the exact file name(s) and any format requirements the pipeline expects. -->
+
+## Running
+```bash
+${run_command}
+```
+
+## Inspecting the output
+- Results are written to `poc/output/`.
+- The output is ${output_types} following the `${schema_name}` schema.
+- **Human review:** ${human_review}
+
+<!-- AGENT: describe what a correct output file looks like and how the reviewer should check it. -->
+
+## Adjusting settings
+| To change... | Edit... |
+|--------------|---------|
+| What is extracted / the fields | `poc/prompts/extraction_requirements.md` then re-run (schema regenerates) |
+| Output structure | `poc/schemas/output_schema.py` |
+| Model / temperature | `poc/config.yaml` |
+
+## Privacy note
+Personal data: ${contains_personal_data} · output sensitivity: ${output_sensitivity}. Handle outputs accordingly.

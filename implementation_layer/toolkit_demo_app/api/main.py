@@ -41,6 +41,7 @@ try:
         pipeline,
         postgres_agent,
         rag,
+        solution_wizard,
         text_to_speech,
         transcriber,
         video_search,
@@ -59,6 +60,7 @@ except ImportError:
         pipeline,
         postgres_agent,
         rag,
+        solution_wizard,
         text_to_speech,
         transcriber,
         video_search,
@@ -71,9 +73,11 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("GAIK Demo API starting...")
     cleanup_task = asyncio.create_task(dental_transcription._cleanup_old_subtitles())
+    wizard_cleanup_task = asyncio.create_task(solution_wizard.cleanup_idle_sessions())
     yield
     # Shutdown
     cleanup_task.cancel()
+    wizard_cleanup_task.cancel()
     logger.info("GAIK Demo API shutting down...")
 
 
@@ -128,6 +132,7 @@ app.include_router(
 app.include_router(video_search.router, prefix="/video-search", tags=["Video Search"])
 app.include_router(luvata_order.router, tags=["Luvata Order"])
 app.include_router(llm_judge.router, prefix="/llm-judge", tags=["LLM Judge"])
+app.include_router(solution_wizard.router, prefix="/wizard", tags=["Solution Wizard"])
 
 
 @app.get("/health")

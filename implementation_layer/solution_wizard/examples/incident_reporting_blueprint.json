@@ -1,0 +1,238 @@
+{
+  "blueprint_version": "1.0",
+  "metadata": {
+    "blueprint_id": "incident_reporting_v1",
+    "created_by": "solution_configuration_wizard",
+    "created_at": "2026-06-04T09:00:00Z",
+    "last_updated_at": "2026-06-04T09:00:00Z",
+    "status": "validated"
+  },
+  "use_case": {
+    "id": "incident_reporting",
+    "name": "Incident and Safety Observation Reporting Assistant",
+    "description": "Convert spoken incident observations into structured incident reports for review and submission.",
+    "domain": "manufacturing_safety",
+    "knowledge_processes": ["knowledge_capture"]
+  },
+  "business_spec": {
+    "current_process": "Employees report incidents by accessing a computer and filling a web form.",
+    "pain_points": [
+      "Reporting may be delayed",
+      "The form is not convenient in shop-floor or outdoor contexts",
+      "Report quality varies between employees"
+    ],
+    "intended_users": ["employee_reporter"],
+    "reviewers": ["safety_manager"],
+    "expected_value": ["faster reporting", "more consistent documentation", "improved safety transparency"]
+  },
+  "technical_spec": {
+    "input_types": ["audio"],
+    "output_types": ["structured_json"],
+    "language": "fi",
+    "human_review_required": true,
+    "integration_targets": ["incident_reporting_database_optional"]
+  },
+  "target_output_spec": {
+    "schema_name": "IncidentReport",
+    "fields": ["incident_date", "location", "description", "severity", "injured_persons", "actions_taken", "reporter_name"],
+    "required_fields": ["incident_date", "location", "description", "severity"]
+  },
+  "assumptions": [
+    {
+      "id": "assumption_001",
+      "text": "Audio recordings are in Finnish and typically 1-5 minutes in length.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "ComponentSelector",
+      "recorded_at": "2026-06-04T09:00:00Z"
+    },
+    {
+      "id": "assumption_002",
+      "text": "Human review is required before the report is submitted to the safety database.",
+      "status": "confirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-06-04T09:01:00Z"
+    }
+  ],
+  "artifacts": {
+    "incident_audio": {
+      "type": "audio",
+      "source": "user_upload",
+      "optional": false
+    },
+    "incident_photo": {
+      "type": "image",
+      "source": "user_upload",
+      "optional": true
+    },
+    "raw_transcript": {
+      "type": "transcript",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "produced_by": "transcribe_audio"
+    },
+    "enhanced_transcript": {
+      "type": "enhanced_transcript",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "produced_by": "enhance_transcript"
+    },
+    "incident_report_json": {
+      "type": "structured_json",
+      "source": "generated",
+      "optional": false,
+      "final_output": true,
+      "produced_by": "extract_report_fields",
+      "schema_ref": "schemas/incident_report_schema.py"
+    },
+    "validation_report": {
+      "type": "validation_report",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "produced_by": "validate_report"
+    },
+    "approved_report": {
+      "type": "structured_json",
+      "source": "generated",
+      "optional": false,
+      "final_output": true,
+      "produced_by": "human_review"
+    }
+  },
+  "components": {
+    "selected_modules": [
+      {
+        "id": "audio_to_structured_data",
+        "name": "AudioToStructuredData",
+        "reason": "Primary input is audio; module encapsulates full transcription + extraction pipeline."
+      }
+    ],
+    "selected_building_blocks": ["Transcriber", "TranscriptEnhancer", "Extractor", "LLMJudge"],
+    "custom_components": []
+  },
+  "workflow": {
+    "steps": [
+      {
+        "id": "record_observation",
+        "name": "Record voice description and optional photo",
+        "type": "user_task",
+        "inputs": [],
+        "outputs": ["incident_audio", "incident_photo"],
+        "parameters": {},
+        "depends_on": []
+      },
+      {
+        "id": "transcribe_audio",
+        "name": "Transcribe audio recording",
+        "type": "automated_task",
+        "component": "Transcriber",
+        "inputs": ["incident_audio"],
+        "outputs": ["raw_transcript"],
+        "parameters": {"language": "fi"},
+        "depends_on": ["record_observation"]
+      },
+      {
+        "id": "enhance_transcript",
+        "name": "Enhance Finnish transcript",
+        "type": "automated_task",
+        "component": "TranscriptEnhancer",
+        "inputs": ["raw_transcript"],
+        "outputs": ["enhanced_transcript"],
+        "parameters": {},
+        "depends_on": ["transcribe_audio"]
+      },
+      {
+        "id": "extract_report_fields",
+        "name": "Extract incident report fields",
+        "type": "automated_task",
+        "component": "Extractor",
+        "inputs": ["enhanced_transcript"],
+        "outputs": ["incident_report_json"],
+        "parameters": {
+          "schema_ref": "schemas/incident_report_schema.py",
+          "requirements_ref": "to_be_generated"
+        },
+        "depends_on": ["enhance_transcript"]
+      },
+      {
+        "id": "validate_report",
+        "name": "Validate generated report",
+        "type": "automated_task",
+        "component": "LLMJudge",
+        "inputs": ["enhanced_transcript", "incident_report_json"],
+        "outputs": ["validation_report"],
+        "parameters": {"rubric_ref": "to_be_generated"},
+        "depends_on": ["extract_report_fields"]
+      },
+      {
+        "id": "human_review",
+        "name": "Safety manager reviews and approves report",
+        "type": "human_review",
+        "inputs": ["incident_report_json", "validation_report"],
+        "outputs": ["approved_report"],
+        "parameters": {},
+        "depends_on": ["validate_report"]
+      }
+    ]
+  },
+  "models": {
+    "provider": "azure_openai",
+    "transcription_model": "gpt-4o-transcribe",
+    "extraction_model": "gpt-5.4",
+    "temperature": 0.0
+  },
+  "validation": {
+    "human_review_required": true,
+    "completeness_check": true,
+    "hallucination_check": true
+  },
+  "evaluation": {
+    "metrics": ["field_exact_match", "semantic_match", "completeness", "hallucination_rate"],
+    "eval_framework": "extraction_eval",
+    "sample_data_dir": "data/samples",
+    "ground_truth_dir": "evals/ground_truth"
+  },
+  "governance": {
+    "data_handling": {
+      "external_model_api_allowed": true,
+      "local_processing_required": false,
+      "stores_input_data": false,
+      "stores_outputs": true,
+      "retention_policy": "not_specified",
+      "contains_personal_data": "yes",
+      "output_sensitivity": "high",
+      "audit_log_required": true
+    }
+  },
+  "runtime": {
+    "interface": "cli",
+    "entrypoint": "src/incident_reporting/main.py",
+    "env_file": ".env.example"
+  },
+  "package": {
+    "name": "incident_reporting_use_case",
+    "output_dir": "/path/provided/by/user",
+    "include_tests": true,
+    "include_evals": true,
+    "include_docs": true
+  },
+  "visualizations": {},
+  "traceability": [
+    {"component": "Transcriber", "required_by": "technical_spec.input_types contains audio"},
+    {"component": "TranscriptEnhancer", "required_by": "technical_spec.language=fi; ASR error correction needed"},
+    {"component": "Extractor", "required_by": "output_type=structured_json; field extraction required"},
+    {"component": "LLMJudge", "required_by": "validation.hallucination_check=true; human_review=yes"}
+  ],
+  "change_log": [
+    {
+      "version": "1.0",
+      "date": "2026-06-04",
+      "change": "Initial blueprint generated by solution_configuration_wizard V1",
+      "changed_by": "solution_configuration_wizard"
+    }
+  ]
+}

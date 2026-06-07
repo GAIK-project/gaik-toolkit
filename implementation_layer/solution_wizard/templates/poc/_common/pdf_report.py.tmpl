@@ -1,0 +1,240 @@
+"""Formatted PDF report writer for the PoC output.
+
+Renders the pipeline result as a readable PDF -- structured output (a dict or a
+list of dicts from the extractor) as key/value tables, unstructured output (free
+text) as titled sections. Each report carries a title and a small metadata block.
+
+Pure ReportLab (platypus); no GAIK or network dependencies. Input-agnostic:
+
+    from pdf_report import write_pdf_report
+    write_pdf_report(extracted_fields, output_dir / "result_report.pdf",
+                     title="My Use Case", metadata={"Source file": "input.pdf"})
+
+`data` may be a dict, a list[dict], a list of scalars, or a str.
+"""
+
+from __future__ import annotations
+
+import datetime as _dt
+from pathlib import Path
+from typing import Any
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    HRFlowable,
+    ListFlowable,
+    ListItem,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
+
+# ---------------------------------------------------------------------------
+# Styles
+# ---------------------------------------------------------------------------
+
+_STYLES = getSampleStyleSheet()
+_TITLE = ParagraphStyle("ReportTitle", parent=_STYLES["Title"], fontSize=20, spaceAfter=4)
+_SUBTITLE = ParagraphStyle("ReportSubtitle", parent=_STYLES["Normal"], fontSize=11,
+                           textColor=colors.HexColor("#555555"), spaceAfter=10)
+_H2 = ParagraphStyle("ReportH2", parent=_STYLES["Heading2"], fontSize=13,
+                     textColor=colors.HexColor("#1f3a5f"), spaceBefore=12, spaceAfter=6)
+_H3 = ParagraphStyle("ReportH3", parent=_STYLES["Heading3"], fontSize=11,
+                     textColor=colors.HexColor("#1f3a5f"), spaceBefore=8, spaceAfter=4)
+_BODY = ParagraphStyle("ReportBody", parent=_STYLES["Normal"], fontSize=10, leading=14)
+_KEY = ParagraphStyle("ReportKey", parent=_BODY, fontName="Helvetica-Bold")
+_META = ParagraphStyle("ReportMeta", parent=_BODY, fontSize=9,
+                       textColor=colors.HexColor("#555555"))
+
+_BLANK = "—"  # em dash for missing values
+
+_TABLE_STYLE = TableStyle([
+    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#d0d0d0")),
+    ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f4f6f9")),
+    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+    ("TOPPADDING", (0, 0), (-1, -1), 4),
+    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+])
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _humanize(key: str) -> str:
+    """snake_case / camelCase -> 'Title Case'."""
+    s = str(key).replace("_", " ").strip()
+    return s[:1].upper() + s[1:] if s else s
+
+
+def _esc(text: Any) -> str:
+    """Escape text for ReportLab paragraph markup."""
+    return (
+        str(text)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def _is_blank(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and value.strip() == "")
+
+
+def _render_value(value: Any) -> Any:
+    """Recursively turn a value into a flowable (or nested table)."""
+    if _is_blank(value):
+        return Paragraph(_BLANK, _BODY)
+
+    if isinstance(value, dict):
+        return _dict_table(value)
+
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return Paragraph(_BLANK, _BODY)
+        # list of dicts -> stacked sub-tables; list of scalars -> bullet list
+        if all(isinstance(v, dict) for v in value):
+            rows = [_dict_table(v) for v in value]
+            inner = Table([[r] for r in rows], colWidths=[150 * mm])
+            inner.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]))
+            return inner
+        return ListFlowable(
+            [ListItem(Paragraph(_esc(v), _BODY)) for v in value],
+            bulletType="bullet", leftIndent=12,
+        )
+
+    return Paragraph(_esc(value), _BODY)
+
+
+def _dict_table(data: dict) -> Table:
+    """A 2-column (key | value) table from a dict, values rendered recursively."""
+    rows = []
+    for key, value in data.items():
+        rows.append([Paragraph(_esc(_humanize(key)), _KEY), _render_value(value)])
+    if not rows:
+        rows = [[Paragraph(_BLANK, _BODY), Paragraph(_BLANK, _BODY)]]
+    table = Table(rows, colWidths=[50 * mm, 105 * mm])
+    table.setStyle(_TABLE_STYLE)
+    return table
+
+
+def _render_structured(data: Any) -> list:
+    """Flowables for dict / list[dict] / list[scalar] output."""
+    story: list = []
+    if isinstance(data, dict):
+        story.append(_dict_table(data))
+    elif isinstance(data, (list, tuple)):
+        if all(isinstance(v, dict) for v in data) and data:
+            for i, record in enumerate(data, 1):
+                story.append(Paragraph(f"Record {i}", _H2))
+                story.append(_dict_table(record))
+                story.append(Spacer(1, 6))
+        else:
+            story.append(_render_value(list(data)))
+    else:
+        story.append(_render_value(data))
+    return story
+
+
+def _render_unstructured(text: str) -> list:
+    """Flowables for free text. Lines starting with #/## become headings;
+    blank-line-separated blocks become paragraphs."""
+    story: list = []
+    blocks = [b.strip() for b in str(text).split("\n\n")]
+    for block in blocks:
+        if not block:
+            continue
+        stripped = block.lstrip()
+        if stripped.startswith("## "):
+            story.append(Paragraph(_esc(stripped[3:].strip()), _H3))
+        elif stripped.startswith("# "):
+            story.append(Paragraph(_esc(stripped[2:].strip()), _H2))
+        else:
+            # preserve single newlines inside a block as <br/>
+            story.append(Paragraph(_esc(block).replace("\n", "<br/>"), _BODY))
+            story.append(Spacer(1, 4))
+    if not story:
+        story.append(Paragraph(_BLANK, _BODY))
+    return story
+
+
+def _header(title: str, subtitle: str | None, metadata: dict | None) -> list:
+    story: list = [Paragraph(_esc(title), _TITLE)]
+    if subtitle:
+        story.append(Paragraph(_esc(subtitle), _SUBTITLE))
+
+    meta = {"Generated": _dt.datetime.now().strftime("%Y-%m-%d %H:%M")}
+    if metadata:
+        meta.update({k: v for k, v in metadata.items() if not _is_blank(v)})
+    meta_rows = [
+        [Paragraph(_esc(_humanize(k)), _META), Paragraph(_esc(v), _META)]
+        for k, v in meta.items()
+    ]
+    meta_table = Table(meta_rows, colWidths=[40 * mm, 115 * mm])
+    meta_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 1),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+        ("LEFTPADDING", (0, 0), (0, -1), 0),
+    ]))
+    story.append(meta_table)
+    story.append(Spacer(1, 6))
+    story.append(HRFlowable(width="100%", thickness=0.6, color=colors.HexColor("#1f3a5f")))
+    story.append(Spacer(1, 10))
+    return story
+
+
+def _page_footer(canvas, doc) -> None:
+    canvas.saveState()
+    canvas.setFont("Helvetica", 8)
+    canvas.setFillColor(colors.HexColor("#888888"))
+    canvas.drawRightString(200 * mm, 12 * mm, f"Page {doc.page}")
+    canvas.restoreState()
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def write_pdf_report(
+    data: Any,
+    output_path: str | Path,
+    *,
+    title: str,
+    subtitle: str | None = None,
+    metadata: dict | None = None,
+) -> Path:
+    """Render `data` as a formatted PDF at `output_path`.
+
+    `data` may be a dict, a list[dict], a list of scalars, or a str. Structured
+    data is rendered as key/value tables (nested objects become sub-tables);
+    string data is rendered as titled sections. Returns the written Path.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    story = _header(title, subtitle, metadata)
+    if isinstance(data, str):
+        story += _render_unstructured(data)
+    else:
+        story += _render_structured(data)
+
+    doc = SimpleDocTemplate(
+        str(output_path), pagesize=A4,
+        topMargin=18 * mm, bottomMargin=20 * mm,
+        leftMargin=18 * mm, rightMargin=18 * mm,
+        title=title,
+    )
+    doc.build(story, onFirstPage=_page_footer, onLaterPages=_page_footer)
+    return output_path

@@ -1,0 +1,105 @@
+---
+title: Solution Configuration Wizard
+description: An agentic assistant that guides users from a business problem description to a validated, deployable GenAI solution — including a JSON blueprint, BPMN workflow diagram, runnable proof of concept, and documentation suite.
+---
+
+The Solution Configuration Wizard is the Guidance Layer in action. It bridges the gap between a natural-language business problem and a fully configured, validated GenAI solution — without requiring the user to know which components, schemas, prompts, or evaluation tools are needed. The user describes the problem; the wizard handles the rest.
+
+---
+
+## What the wizard does
+
+The wizard conducts a structured conversation that walks through the complete solution design and build process:
+
+1. **Collects requirements** — business context, technical constraints, and target output specification — using the full Section 8 model in thematic rounds, with a completeness gate (13-point checklist) before proceeding.
+2. **Selects GAIK components** — applies a module-first rule (prefer a single software module when it covers the pattern end-to-end) and reasons about each component's behaviour-changing options from the collected requirements.
+3. **Generates two complementary blueprints** — the executable JSON blueprint as the source of truth, and the BPMN visual blueprint as the business-process view for stakeholder communication.
+4. **Scaffolds a runnable proof of concept** — a complete Python package with `run_poc.py`, `requirements.txt`, an extraction schema, a prompt file, and an evaluation script.
+5. **Validates the PoC with the user** (Gate 3) — classifies feedback as intent changes (applied to the JSON blueprint first) or code-only fixes, keeping the blueprint as the single source of truth throughout.
+6. **Generates a documentation suite** — five documents pre-filled from blueprint facts: GenAI product canvas, technical specification, user guide, developer guide, and evaluation plan.
+
+---
+
+## Two complementary blueprints
+
+The wizard produces two views of every solution, each serving a distinct audience:
+
+**The JSON blueprint** (`use_case.blueprint.json`) is the executable source of truth. It captures the complete technical configuration: input and output artifacts, selected GAIK components and their options, workflow steps, schemas, prompts, model settings, validation gates, and evaluation plan. Every downstream artifact — BPMN diagram, PoC files, documentation — is generated from it.
+
+**The BPMN visual blueprint** (`workflow.bpmn`) is the business-process view. It is a standards-based BPMN 2.0 model with swimlanes for each stakeholder role (employee, reviewer, AI system, external parties), typed tasks, approval gateways, data objects, and message flows. It is linked element-by-element to the JSON blueprint via a stable mapping, and is intended for business analysts, domain experts, and decision-makers to review and approve the process design before implementation proceeds.
+
+---
+
+## How to run it
+
+**Claude Code or Claude Desktop (recommended):**
+
+```
+/solution-wizard
+```
+
+**Web chat — [Live Demo](https://gaik-demo.2.rahtiapp.fi/):**
+
+Open the demo and navigate to **Solution Configuration Wizard**. The wizard streams responses live; generated files appear in the sidebar and can be downloaded individually or as a `.zip`.
+
+---
+
+## V1 — Current release
+
+V1 is a single-agent `SKILL.md` skill deployable in Claude Code, Claude Desktop, or via the Claude Agent SDK as a web interface. It covers the full workflow from requirements through PoC to documentation:
+
+| Capability | V1 |
+|---|---|
+| Full requirement collection (business, technical, target output) | ✓ |
+| Requirement completeness gate (13-point checklist) | ✓ |
+| Component selection with option-awareness | ✓ |
+| Executable JSON blueprint + validation | ✓ |
+| BPMN 2.0 visual blueprint (read-only, generated from JSON) | ✓ |
+| Mermaid workflow diagram | ✓ |
+| Extraction schema generation (one SchemaGenerator API call) | ✓ |
+| Runnable proof of concept (audio, document, RAG, custom pipelines) | ✓ |
+| PoC validation and refinement with Gate 3 | ✓ |
+| Documentation suite (5 documents generated from blueprint) | ✓ |
+| Optional PDF report output (ReportLab, when requested) | ✓ |
+
+---
+
+## V2 — Under development
+
+V2 extends the wizard with full package generation, deeper component intelligence, and a live BPMN editing environment:
+
+| Capability | V2 |
+|---|---|
+| Full installable use-case package (tests, configs, connectors) | Planned |
+| Interactive BPMN canvas with synchronized JSON editing | Planned |
+| Natural-language, real-time blueprint change requests via chat | Planned |
+
+The key addition in V2 is the **hybrid blueprint editor**: a web application with a live BPMN canvas (bpmn-js), a step configuration panel, a wizard chat, and a JSON view — all synchronized so that a change in any pane is reflected in the others.
+
+---
+
+## Workflow overview
+
+The diagram below shows the complete wizard workflow across both releases. The phases implemented in V1 are shown on the left; the interactive BPMN editing environment planned for V2 appears on the right.
+
+![GAIK Solution Configuration Wizard — full workflow (V1 current, V2 planned)](/images/solution_wizard_v2_workflow.png)
+
+---
+
+## Design principles
+
+The wizard is built on three core principles:
+
+**Artifact-driven**: the JSON blueprint is the state object at every phase. It is validated before the next phase begins and drives all code and documentation generation. Design decisions are never stored only in agent memory or in the diagram.
+
+**Agent produces meaning, Python enforces correctness**: the LLM interprets requirements, classifies patterns, selects components, and authors the blueprint. Deterministic Python scripts validate the blueprint, generate diagrams, scaffold the PoC, and build documentation. The two layers do not overlap.
+
+**Blueprint-first changes**: the BPMN and Mermaid diagrams are derived views. Changing a swimlane, a hand-off, or an exception path means editing the JSON blueprint and regenerating — never editing the diagram directly.
+
+---
+
+## Further reading
+
+- [Solution Wizard README](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/solution_wizard/README.md) — complete walkthrough, output layout, component registry, and script reference
+- [Full specification](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/solution_wizard/docs/solution_wizard.md) — detailed requirements, JSON blueprint schema, validation rules, and implementation design
+- [Implementation Layer](/toolkit/software-components) — the GAIK software components and modules the wizard selects from

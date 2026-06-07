@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GAIKComponentRegistry",
+  "description": "Catalog of GAIK software modules and components the wizard can select from.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "id",
+      "name",
+      "type",
+      "input_artifact_types",
+      "output_artifact_types",
+      "required_parameters",
+      "best_for",
+      "known_limitations",
+      "import_path",
+      "source_path",
+      "readme_path",
+      "example_script_path"
+    ],
+    "properties": {
+      "id": { "type": "string" },
+      "name": { "type": "string" },
+      "type": {
+        "type": "string",
+        "enum": ["software_module", "software_component"]
+      },
+      "input_artifact_types": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "output_artifact_types": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "knowledge_processes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": ["knowledge_capture", "knowledge_access", "knowledge_synthesis"]
+        }
+      },
+      "uses_components": {
+        "type": "array",
+        "items": { "type": "string" },
+        "description": "Internal building blocks for software_module entries; empty for components."
+      },
+      "required_parameters": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "optional_parameters": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "supported_providers": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "cost_relevant_parameters": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "quality_tradeoffs": { "type": "object" },
+      "known_limitations": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "best_for": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "example_blueprint_steps": {
+        "type": "array",
+        "items": { "type": "object" }
+      },
+      "source_path": { "type": "string" },
+      "import_path": { "type": "string" },
+      "example_script_path": { "type": "string" },
+      "readme_path": { "type": "string" },
+      "install_extra": {
+        "type": "string",
+        "description": "pip extra for gaik[extra] in generated requirements.txt"
+      }
+    }
+  }
+}

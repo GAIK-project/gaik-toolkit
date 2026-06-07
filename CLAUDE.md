@@ -1,3 +1,17 @@
+## gaik-sync (keep the Solution Wizard in step with gaik)
+
+The Solution Configuration Wizard (`implementation_layer/solution_wizard/`) holds a component registry, reference cards, and selection guidance that mirror the gaik API. When gaik changes, these drift silently and the wizard produces wrong blueprints or PoCs that fail at runtime.
+
+Rule: after any change to gaik that affects its public surface, **remind the user to run the `gaik-sync` skill** (and offer to run it). Trigger changes include:
+- adding, removing, or renaming a software component or module;
+- changing a component's constructor params, primary method name, or return shape;
+- adding/removing/renaming a behaviour-changing option;
+- changing a component's `install_extra` / pip extra, supported providers, or input/output artifact types;
+- a component now providing a capability internally (a new subsumption relationship);
+- bumping the installed gaik version.
+
+`gaik-sync` scans gaik, presents its findings for approval, and only then syncs the approved changes into the wizard and runs the tests. It edits the wizard assets only — never gaik. A quick non-mutating check is `python .claude/skills/gaik-sync/scripts/audit_registry.py`.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.

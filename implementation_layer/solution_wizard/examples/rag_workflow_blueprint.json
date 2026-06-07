@@ -1,0 +1,170 @@
+{
+  "blueprint_version": "1.0",
+  "metadata": {
+    "blueprint_id": "internal_knowledge_qa_v1",
+    "created_by": "solution_configuration_wizard",
+    "created_at": "2026-06-04T09:00:00Z",
+    "last_updated_at": "2026-06-04T09:00:00Z",
+    "status": "validated"
+  },
+  "use_case": {
+    "id": "internal_knowledge_qa",
+    "name": "Internal Knowledge Base Q&A",
+    "description": "Enable employees to ask natural-language questions over a collection of internal documents and receive cited answers.",
+    "domain": "knowledge_management",
+    "knowledge_processes": ["knowledge_access"]
+  },
+  "business_spec": {
+    "current_process": "Employees search manually through shared drives and document repositories to find relevant information.",
+    "pain_points": [
+      "Finding the right document is time-consuming",
+      "Answers require reading multiple documents",
+      "Knowledge is siloed across different folders and formats"
+    ],
+    "intended_users": ["employee"],
+    "reviewers": [],
+    "expected_value": ["faster information access", "reduced time searching", "consistent answers with citations"]
+  },
+  "technical_spec": {
+    "input_types": ["document_collection"],
+    "output_types": ["answer"],
+    "language": "en",
+    "human_review_required": false,
+    "integration_targets": []
+  },
+  "target_output_spec": {},
+  "assumptions": [
+    {
+      "id": "assumption_001",
+      "text": "Documents are primarily PDF and DOCX files in English.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "ComponentSelector",
+      "recorded_at": "2026-06-04T09:00:00Z"
+    },
+    {
+      "id": "assumption_002",
+      "text": "PostgreSQL with pgvector extension is available for the vector store.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "ComponentSelector",
+      "recorded_at": "2026-06-04T09:00:00Z"
+    }
+  ],
+  "artifacts": {
+    "document_collection": {
+      "type": "document_collection",
+      "source": "user_upload",
+      "optional": false
+    },
+    "user_query": {
+      "type": "text",
+      "source": "user_upload",
+      "optional": false
+    },
+    "answer_with_citations": {
+      "type": "answer_with_citations",
+      "source": "generated",
+      "optional": false,
+      "final_output": true,
+      "produced_by": "run_rag"
+    }
+  },
+  "components": {
+    "selected_modules": [
+      {
+        "id": "rag_workflow",
+        "name": "RAGWorkflow",
+        "reason": "Use case is document Q&A with citations -- RAGWorkflow covers the full indexing and retrieval pipeline."
+      }
+    ],
+    "selected_building_blocks": ["PgVectorStore"],
+    "custom_components": []
+  },
+  "workflow": {
+    "steps": [
+      {
+        "id": "upload_documents",
+        "name": "Upload document collection",
+        "type": "user_task",
+        "inputs": [],
+        "outputs": ["document_collection"],
+        "parameters": {},
+        "depends_on": []
+      },
+      {
+        "id": "ask_question",
+        "name": "User submits a question",
+        "type": "user_task",
+        "inputs": [],
+        "outputs": ["user_query"],
+        "parameters": {},
+        "depends_on": ["upload_documents"]
+      },
+      {
+        "id": "run_rag",
+        "name": "Index documents, retrieve context, generate cited answer",
+        "type": "automated_task",
+        "component": "RAGWorkflow",
+        "inputs": ["document_collection", "user_query"],
+        "outputs": ["answer_with_citations"],
+        "parameters": {"collection_name": "internal_knowledge"},
+        "depends_on": ["ask_question"]
+      }
+    ]
+  },
+  "models": {
+    "provider": "azure_openai",
+    "embedding_model": "text-embedding-3-large",
+    "answer_model": "gpt-5.4",
+    "temperature": 0.0
+  },
+  "validation": {
+    "human_review_required": false,
+    "completeness_check": false,
+    "hallucination_check": false
+  },
+  "evaluation": {
+    "metrics": ["token_recall", "mrr", "rank_weighted_coverage"],
+    "eval_framework": "RAG_eval",
+    "sample_data_dir": "data/samples",
+    "ground_truth_dir": "evals/ground_truth"
+  },
+  "governance": {
+    "data_handling": {
+      "external_model_api_allowed": true,
+      "local_processing_required": false,
+      "stores_input_data": true,
+      "stores_outputs": false,
+      "retention_policy": "not_specified",
+      "contains_personal_data": "unknown",
+      "output_sensitivity": "medium",
+      "audit_log_required": false
+    }
+  },
+  "runtime": {
+    "interface": "cli",
+    "entrypoint": "src/internal_knowledge_qa/main.py",
+    "env_file": ".env.example"
+  },
+  "package": {
+    "name": "internal_knowledge_qa_use_case",
+    "output_dir": "/path/provided/by/user",
+    "include_tests": true,
+    "include_evals": true,
+    "include_docs": true
+  },
+  "visualizations": {},
+  "traceability": [
+    {"component": "RAGWorkflow", "required_by": "input_type=document_collection, output_type=answer"},
+    {"component": "PgVectorStore", "required_by": "vector storage required for semantic retrieval"}
+  ],
+  "change_log": [
+    {
+      "version": "1.0",
+      "date": "2026-06-04",
+      "change": "Initial blueprint generated by solution_configuration_wizard V1",
+      "changed_by": "solution_configuration_wizard"
+    }
+  ]
+}

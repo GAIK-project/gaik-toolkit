@@ -1,0 +1,43 @@
+# Developer Guide — ${use_case_name}
+
+> Package structure, extension points, component configuration, tests, and evaluation.
+
+## Architecture
+This use case is driven by an **executable JSON blueprint** (`use_case.blueprint.json`) — the single source of truth. The PoC, the visual workflows (`workflow.mmd`, `workflow.bpmn`), and these docs are all *generated from it*. To change behaviour, edit the blueprint and regenerate; never hand-edit generated artifacts.
+
+## Pipeline
+${workflow_table}
+
+### Components and their options
+${components_block}
+
+<!-- AGENT: for each component, note the constructor/option values set and where they live in config. -->
+
+## Layout (PoC)
+```
+poc/
+  run_poc.py            <- pipeline entry point
+  config.yaml           <- model names, temperature, paths
+  requirements.txt
+  .env.example
+  schemas/              <- output_schema.py (Pydantic) + requirements + hash
+  prompts/              <- extraction_requirements.md, validation_rubric.md
+  sample_input/  output/
+  evals/                <- run_basic_eval.py
+```
+
+## Extension points
+- **Add/replace a component:** update `components` + `workflow.steps` + `artifacts` in the blueprint, re-validate, regenerate.
+- **Change the schema/fields:** edit `target_output_spec` (and `prompts/extraction_requirements.md`); the schema regenerates on the next run via the requirements hash.
+- **Tune a component option:** set it in `workflow.steps[].parameters` (e.g. `enhanced_transcript`, `include_verification`, `hybrid_search`).
+
+## Configuration
+- **Model provider:** ${model_provider}
+- **Model preferences:** ${model_preferences}
+- **Integration targets:** ${integration_targets}
+
+## Tests and evaluation
+- Evaluation requirements: ${evaluation_requirements}
+- See `evals/` for the basic evaluation script and `evaluation_plan.md` for the full plan.
+
+<!-- AGENT: note any component-specific gotchas a future developer should know. -->

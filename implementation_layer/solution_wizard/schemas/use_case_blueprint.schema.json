@@ -1,0 +1,998 @@
+{
+  "$defs": {
+    "Artifact": {
+      "properties": {
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/ArtifactSource"
+        },
+        "optional": {
+          "title": "Optional",
+          "type": "boolean"
+        },
+        "final_output": {
+          "default": false,
+          "title": "Final Output",
+          "type": "boolean"
+        },
+        "externally_visible": {
+          "default": false,
+          "title": "Externally Visible",
+          "type": "boolean"
+        },
+        "produced_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Produced By"
+        },
+        "schema_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema Ref"
+        },
+        "overwrite": {
+          "default": false,
+          "title": "Overwrite",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "source",
+        "optional"
+      ],
+      "title": "Artifact",
+      "type": "object"
+    },
+    "ArtifactSource": {
+      "enum": [
+        "user_upload",
+        "generated",
+        "external_system",
+        "static_resource"
+      ],
+      "title": "ArtifactSource",
+      "type": "string"
+    },
+    "Assumption": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/AssumptionStatus",
+          "default": "unconfirmed"
+        },
+        "impact": {
+          "default": "",
+          "title": "Impact",
+          "type": "string"
+        },
+        "recorded_by": {
+          "default": "",
+          "title": "Recorded By",
+          "type": "string"
+        },
+        "recorded_at": {
+          "default": "",
+          "title": "Recorded At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "text"
+      ],
+      "title": "Assumption",
+      "type": "object"
+    },
+    "AssumptionStatus": {
+      "enum": [
+        "unconfirmed",
+        "confirmed",
+        "overridden"
+      ],
+      "title": "AssumptionStatus",
+      "type": "string"
+    },
+    "BlueprintStatus": {
+      "enum": [
+        "draft",
+        "validated",
+        "poc",
+        "production_ready"
+      ],
+      "title": "BlueprintStatus",
+      "type": "string"
+    },
+    "BusinessProcess": {
+      "properties": {
+        "participants": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Participant"
+          },
+          "title": "Participants",
+          "type": "array"
+        },
+        "manual_steps": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ManualStep"
+          },
+          "title": "Manual Steps",
+          "type": "array"
+        },
+        "external_parties": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ExternalParty"
+          },
+          "title": "External Parties",
+          "type": "array"
+        },
+        "message_flows": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MessageFlow"
+          },
+          "title": "Message Flows",
+          "type": "array"
+        },
+        "exceptions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ExceptionFlow"
+          },
+          "title": "Exceptions",
+          "type": "array"
+        },
+        "decision_points": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/DecisionPoint"
+          },
+          "title": "Decision Points",
+          "type": "array"
+        }
+      },
+      "title": "BusinessProcess",
+      "type": "object"
+    },
+    "ChangeLogEntry": {
+      "properties": {
+        "version": {
+          "title": "Version",
+          "type": "string"
+        },
+        "date": {
+          "title": "Date",
+          "type": "string"
+        },
+        "change": {
+          "title": "Change",
+          "type": "string"
+        },
+        "changed_by": {
+          "title": "Changed By",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version",
+        "date",
+        "change",
+        "changed_by"
+      ],
+      "title": "ChangeLogEntry",
+      "type": "object"
+    },
+    "Components": {
+      "properties": {
+        "selected_modules": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SelectedModule"
+          },
+          "title": "Selected Modules",
+          "type": "array"
+        },
+        "selected_building_blocks": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Selected Building Blocks",
+          "type": "array"
+        },
+        "custom_components": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Custom Components",
+          "type": "array"
+        }
+      },
+      "title": "Components",
+      "type": "object"
+    },
+    "DataHandling": {
+      "properties": {
+        "external_model_api_allowed": {
+          "default": true,
+          "title": "External Model Api Allowed",
+          "type": "boolean"
+        },
+        "local_processing_required": {
+          "default": false,
+          "title": "Local Processing Required",
+          "type": "boolean"
+        },
+        "stores_input_data": {
+          "default": false,
+          "title": "Stores Input Data",
+          "type": "boolean"
+        },
+        "stores_outputs": {
+          "default": true,
+          "title": "Stores Outputs",
+          "type": "boolean"
+        },
+        "retention_policy": {
+          "default": "not_specified",
+          "title": "Retention Policy",
+          "type": "string"
+        },
+        "contains_personal_data": {
+          "default": "unknown",
+          "title": "Contains Personal Data",
+          "type": "string"
+        },
+        "output_sensitivity": {
+          "default": "unknown",
+          "title": "Output Sensitivity",
+          "type": "string"
+        },
+        "audit_log_required": {
+          "default": false,
+          "title": "Audit Log Required",
+          "type": "boolean"
+        }
+      },
+      "title": "DataHandling",
+      "type": "object"
+    },
+    "DecisionBranch": {
+      "properties": {
+        "condition": {
+          "default": "",
+          "title": "Condition",
+          "type": "string"
+        },
+        "target": {
+          "default": "",
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "title": "DecisionBranch",
+      "type": "object"
+    },
+    "DecisionPoint": {
+      "description": "A business gateway beyond the implicit approve/reject one.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "after": {
+          "default": "",
+          "title": "After",
+          "type": "string"
+        },
+        "branches": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/DecisionBranch"
+          },
+          "title": "Branches",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "DecisionPoint",
+      "type": "object"
+    },
+    "ExceptionFlow": {
+      "description": "An alternative / error path attached to a step.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "attached_to": {
+          "default": "",
+          "title": "Attached To",
+          "type": "string"
+        },
+        "condition": {
+          "default": "",
+          "title": "Condition",
+          "type": "string"
+        },
+        "outcome": {
+          "default": "end",
+          "title": "Outcome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "ExceptionFlow",
+      "type": "object"
+    },
+    "ExternalParty": {
+      "description": "A black-box pool outside the organisation that hands inputs in.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "sends": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Sends",
+          "type": "array"
+        },
+        "to_step": {
+          "default": "",
+          "title": "To Step",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "ExternalParty",
+      "type": "object"
+    },
+    "Governance": {
+      "properties": {
+        "data_handling": {
+          "$ref": "#/$defs/DataHandling",
+          "default": {
+            "external_model_api_allowed": true,
+            "local_processing_required": false,
+            "stores_input_data": false,
+            "stores_outputs": true,
+            "retention_policy": "not_specified",
+            "contains_personal_data": "unknown",
+            "output_sensitivity": "unknown",
+            "audit_log_required": false
+          }
+        }
+      },
+      "title": "Governance",
+      "type": "object"
+    },
+    "KnowledgeProcess": {
+      "enum": [
+        "knowledge_capture",
+        "knowledge_access",
+        "knowledge_synthesis"
+      ],
+      "title": "KnowledgeProcess",
+      "type": "string"
+    },
+    "LoopConfig": {
+      "properties": {
+        "max_iterations": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Iterations"
+        },
+        "loop_condition_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Loop Condition Ref"
+        }
+      },
+      "title": "LoopConfig",
+      "type": "object"
+    },
+    "ManualStep": {
+      "description": "A human business step the AI pipeline does not model as a workflow step.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "performed_by": {
+          "default": "",
+          "title": "Performed By",
+          "type": "string"
+        },
+        "type": {
+          "default": "user_task",
+          "title": "Type",
+          "type": "string"
+        },
+        "depends_on": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Depends On",
+          "type": "array"
+        },
+        "consumes": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Consumes",
+          "type": "array"
+        },
+        "produces": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Produces",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "ManualStep",
+      "type": "object"
+    },
+    "MessageFlow": {
+      "description": "A cross-pool message (dashed line in BPMN).",
+      "properties": {
+        "from_": {
+          "default": "",
+          "title": "From",
+          "type": "string"
+        },
+        "to": {
+          "default": "",
+          "title": "To",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "title": "MessageFlow",
+      "type": "object"
+    },
+    "Metadata": {
+      "properties": {
+        "blueprint_id": {
+          "default": "",
+          "title": "Blueprint Id",
+          "type": "string"
+        },
+        "created_by": {
+          "default": "solution_configuration_wizard",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "default": "",
+          "title": "Created At",
+          "type": "string"
+        },
+        "last_updated_at": {
+          "default": "",
+          "title": "Last Updated At",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/BlueprintStatus",
+          "default": "draft"
+        }
+      },
+      "title": "Metadata",
+      "type": "object"
+    },
+    "Package": {
+      "properties": {
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "output_dir": {
+          "default": "",
+          "title": "Output Dir",
+          "type": "string"
+        },
+        "include_tests": {
+          "default": true,
+          "title": "Include Tests",
+          "type": "boolean"
+        },
+        "include_evals": {
+          "default": true,
+          "title": "Include Evals",
+          "type": "boolean"
+        },
+        "include_docs": {
+          "default": true,
+          "title": "Include Docs",
+          "type": "boolean"
+        }
+      },
+      "title": "Package",
+      "type": "object"
+    },
+    "Participant": {
+      "description": "A swimlane (human role) or system lane in the BPMN.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "default": "human_role",
+          "title": "Kind",
+          "type": "string"
+        },
+        "default_lane_for": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Default Lane For",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Participant",
+      "type": "object"
+    },
+    "Runtime": {
+      "properties": {
+        "interface": {
+          "default": "cli",
+          "title": "Interface",
+          "type": "string"
+        },
+        "entrypoint": {
+          "default": "",
+          "title": "Entrypoint",
+          "type": "string"
+        },
+        "env_file": {
+          "default": ".env.example",
+          "title": "Env File",
+          "type": "string"
+        }
+      },
+      "title": "Runtime",
+      "type": "object"
+    },
+    "SelectedModule": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "SelectedModule",
+      "type": "object"
+    },
+    "TraceabilityEntry": {
+      "properties": {
+        "component": {
+          "title": "Component",
+          "type": "string"
+        },
+        "required_by": {
+          "title": "Required By",
+          "type": "string"
+        }
+      },
+      "required": [
+        "component",
+        "required_by"
+      ],
+      "title": "TraceabilityEntry",
+      "type": "object"
+    },
+    "UseCase": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "domain": {
+          "title": "Domain",
+          "type": "string"
+        },
+        "knowledge_processes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/KnowledgeProcess"
+          },
+          "title": "Knowledge Processes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "domain"
+      ],
+      "title": "UseCase",
+      "type": "object"
+    },
+    "Workflow": {
+      "properties": {
+        "steps": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/WorkflowStep"
+          },
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "title": "Workflow",
+      "type": "object"
+    },
+    "WorkflowStep": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "component": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Component"
+        },
+        "inputs": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Inputs",
+          "type": "array"
+        },
+        "outputs": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Outputs",
+          "type": "array"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "default": {},
+          "title": "Parameters",
+          "type": "object"
+        },
+        "depends_on": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Depends On",
+          "type": "array"
+        },
+        "loop": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LoopConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type"
+      ],
+      "title": "WorkflowStep",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "blueprint_version": {
+      "default": "1.0",
+      "title": "Blueprint Version",
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata",
+      "default": {
+        "blueprint_id": "",
+        "created_by": "solution_configuration_wizard",
+        "created_at": "",
+        "last_updated_at": "",
+        "status": "draft"
+      }
+    },
+    "use_case": {
+      "$ref": "#/$defs/UseCase"
+    },
+    "business_spec": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Business Spec",
+      "type": "object"
+    },
+    "technical_spec": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Technical Spec",
+      "type": "object"
+    },
+    "target_output_spec": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Target Output Spec",
+      "type": "object"
+    },
+    "assumptions": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Assumption"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "artifacts": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Artifact"
+      },
+      "default": {},
+      "title": "Artifacts",
+      "type": "object"
+    },
+    "inputs": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Inputs",
+      "type": "object"
+    },
+    "outputs": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Outputs",
+      "type": "object"
+    },
+    "schemas": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Schemas",
+      "type": "object"
+    },
+    "components": {
+      "$ref": "#/$defs/Components",
+      "default": {
+        "selected_modules": [],
+        "selected_building_blocks": [],
+        "custom_components": []
+      }
+    },
+    "workflow": {
+      "$ref": "#/$defs/Workflow",
+      "default": {
+        "steps": []
+      }
+    },
+    "business_process": {
+      "$ref": "#/$defs/BusinessProcess",
+      "default": {
+        "participants": [],
+        "manual_steps": [],
+        "external_parties": [],
+        "message_flows": [],
+        "exceptions": [],
+        "decision_points": []
+      }
+    },
+    "prompts": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Prompts",
+      "type": "object"
+    },
+    "models": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Models",
+      "type": "object"
+    },
+    "validation": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Validation",
+      "type": "object"
+    },
+    "evaluation": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Evaluation",
+      "type": "object"
+    },
+    "governance": {
+      "$ref": "#/$defs/Governance",
+      "default": {
+        "data_handling": {
+          "audit_log_required": false,
+          "contains_personal_data": "unknown",
+          "external_model_api_allowed": true,
+          "local_processing_required": false,
+          "output_sensitivity": "unknown",
+          "retention_policy": "not_specified",
+          "stores_input_data": false,
+          "stores_outputs": true
+        }
+      }
+    },
+    "runtime": {
+      "$ref": "#/$defs/Runtime",
+      "default": {
+        "interface": "cli",
+        "entrypoint": "",
+        "env_file": ".env.example"
+      }
+    },
+    "package": {
+      "$ref": "#/$defs/Package",
+      "default": {
+        "name": "",
+        "output_dir": "",
+        "include_tests": true,
+        "include_evals": true,
+        "include_docs": true
+      }
+    },
+    "visualizations": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Visualizations",
+      "type": "object"
+    },
+    "traceability": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/TraceabilityEntry"
+      },
+      "title": "Traceability",
+      "type": "array"
+    },
+    "change_log": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ChangeLogEntry"
+      },
+      "title": "Change Log",
+      "type": "array"
+    }
+  },
+  "required": [
+    "use_case"
+  ],
+  "title": "Blueprint",
+  "type": "object"
+}

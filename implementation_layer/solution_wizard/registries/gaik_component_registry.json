@@ -1,0 +1,782 @@
+[
+  {
+    "id": "audio_to_structured_data",
+    "name": "AudioToStructuredData",
+    "type": "software_module",
+    "input_artifact_types": [
+      "audio",
+      "video"
+    ],
+    "output_artifact_types": [
+      "structured_json"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [
+      "Transcriber",
+      "TranscriptEnhancer",
+      "SchemaGenerator",
+      "DataExtractor"
+    ],
+    "required_parameters": [
+      "schema_ref",
+      "requirements_ref"
+    ],
+    "optional_parameters": [
+      "language",
+      "transcription_model",
+      "extraction_model"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "transcription_model",
+      "extraction_model"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "2-pass enhancement adds ~60s for typical 5-min recording",
+      "cost_sensitivity": "medium -- two LLM calls per document",
+      "degrades_on": [
+        "very_noisy_audio",
+        "heavily_accented_speech_without_domain_tuning"
+      ]
+    },
+    "known_limitations": [
+      "Requires audio/video input; cannot process text-only input without bypassing Transcriber",
+      "TranscriptEnhancer is tuned for Finnish; other languages require prompt customisation"
+    ],
+    "best_for": [
+      "spoken_report_to_structured_form",
+      "voice_note_to_json",
+      "incident_audio_to_report"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "transcribe_audio",
+        "component": "Transcriber",
+        "inputs": [
+          "source_audio"
+        ],
+        "outputs": [
+          "raw_transcript"
+        ]
+      },
+      {
+        "id": "enhance_transcript",
+        "component": "TranscriptEnhancer",
+        "inputs": [
+          "raw_transcript"
+        ],
+        "outputs": [
+          "enhanced_transcript"
+        ]
+      },
+      {
+        "id": "extract_fields",
+        "component": "DataExtractor",
+        "inputs": [
+          "enhanced_transcript"
+        ],
+        "outputs": [
+          "structured_json"
+        ],
+        "parameters": {
+          "schema_ref": "schemas/output_schema.py",
+          "requirements_ref": "schemas/requirements.json"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_modules/audio_to_structured_data/",
+    "import_path": "gaik.software_modules.audio_to_structured_data",
+    "example_script_path": "implementation_layer/examples/software_modules/audio_to_structured_data/",
+    "readme_path": "implementation_layer/src/gaik/software_modules/audio_to_structured_data/README.md",
+    "install_extra": "audio-to-structured-data"
+  },
+  {
+    "id": "documents_to_structured_data",
+    "name": "DocumentsToStructuredData",
+    "type": "software_module",
+    "input_artifact_types": [
+      "pdf",
+      "docx",
+      "document"
+    ],
+    "output_artifact_types": [
+      "structured_json"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [
+      "MultimodalParser",
+      "SchemaGenerator",
+      "DataExtractor"
+    ],
+    "required_parameters": [
+      "schema_ref",
+      "requirements_ref"
+    ],
+    "optional_parameters": [
+      "parser_type",
+      "extraction_model"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "extraction_model",
+      "parser_type"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Vision parser adds latency but handles complex layouts better",
+      "cost_sensitivity": "medium -- LLM extraction call per document",
+      "degrades_on": [
+        "handwritten_documents",
+        "very_low_dpi_scans"
+      ]
+    },
+    "known_limitations": [
+      "Complex scanned documents may need VisionExtractor instead",
+      "Multi-page extraction may lose cross-page context"
+    ],
+    "best_for": [
+      "pdf_form_extraction",
+      "invoice_processing",
+      "document_to_database"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "parse_document",
+        "component": "MultimodalParser",
+        "inputs": [
+          "source_document"
+        ],
+        "outputs": [
+          "parsed_text"
+        ]
+      },
+      {
+        "id": "extract_fields",
+        "component": "DataExtractor",
+        "inputs": [
+          "parsed_text"
+        ],
+        "outputs": [
+          "structured_json"
+        ],
+        "parameters": {
+          "schema_ref": "schemas/output_schema.py",
+          "requirements_ref": "schemas/requirements.json"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_modules/documents_to_structured_data/",
+    "import_path": "gaik.software_modules.documents_to_structured_data",
+    "example_script_path": "implementation_layer/examples/software_modules/documents_to_structured_data/",
+    "readme_path": "implementation_layer/src/gaik/software_modules/documents_to_structured_data/README.md",
+    "install_extra": "documents-to-structured-data"
+  },
+  {
+    "id": "rag_workflow",
+    "name": "RAGWorkflow",
+    "type": "software_module",
+    "input_artifact_types": [
+      "document_collection",
+      "pdf",
+      "text"
+    ],
+    "output_artifact_types": [
+      "answer",
+      "answer_with_citations"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [
+      "Embedder",
+      "PgVectorStore",
+      "Retriever",
+      "AnswerGenerator"
+    ],
+    "required_parameters": [
+      "collection_name"
+    ],
+    "optional_parameters": [
+      "embedding_model",
+      "retrieval_top_k",
+      "answer_model"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "embedding_model",
+      "answer_model"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Larger top_k improves recall but increases generation cost",
+      "cost_sensitivity": "medium -- embedding + generation calls",
+      "degrades_on": [
+        "very_short_documents",
+        "highly_technical_niche_domains_without_domain_tuning"
+      ]
+    },
+    "known_limitations": [
+      "Requires PostgreSQL with pgvector extension",
+      "Initial indexing required before querying"
+    ],
+    "best_for": [
+      "document_qa",
+      "knowledge_base_search",
+      "enterprise_knowledge_access"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "ingest_documents",
+        "component": "Embedder",
+        "inputs": [
+          "document_collection"
+        ],
+        "outputs": [
+          "vector_index"
+        ]
+      },
+      {
+        "id": "retrieve_context",
+        "component": "Retriever",
+        "inputs": [
+          "user_query",
+          "vector_index"
+        ],
+        "outputs": [
+          "retrieved_chunks"
+        ]
+      },
+      {
+        "id": "generate_answer",
+        "component": "AnswerGenerator",
+        "inputs": [
+          "user_query",
+          "retrieved_chunks"
+        ],
+        "outputs": [
+          "answer_with_citations"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_modules/RAG_workflow/",
+    "import_path": "gaik.software_modules.RAG_workflow",
+    "example_script_path": "implementation_layer/examples/software_modules/RAG_workflow/",
+    "readme_path": "implementation_layer/src/gaik/software_modules/RAG_workflow/README.md",
+    "install_extra": "rag-workflow"
+  },
+  {
+    "id": "transcriber",
+    "name": "Transcriber",
+    "type": "software_component",
+    "input_artifact_types": [
+      "audio",
+      "video"
+    ],
+    "output_artifact_types": [
+      "text",
+      "transcript"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "subsumes": [
+      "TranscriptEnhancer"
+    ],
+    "required_parameters": [],
+    "optional_parameters": [
+      "transcription_model",
+      "language",
+      "word_timestamps",
+      "enhanced_transcript",
+      "diarization"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "transcription_model"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "gpt-4o-transcribe is more accurate but slower than whisper",
+      "cost_sensitivity": "low -- single transcription call",
+      "degrades_on": [
+        "very_noisy_audio",
+        "multiple_overlapping_speakers"
+      ]
+    },
+    "known_limitations": [
+      "Does not produce structured output -- use Extractor downstream",
+      "Built-in transcript enhancement (enhanced_transcript=True) is Finnish-tuned; calls TranscriptEnhancer internally. For audio input, set this option instead of adding a separate TranscriptEnhancer step. For non-Finnish audio, enhancement needs prompt customisation -- default off and flag it."
+    ],
+    "best_for": [
+      "audio_to_transcript",
+      "video_subtitles",
+      "meeting_notes"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "transcribe_audio",
+        "component": "Transcriber",
+        "inputs": [
+          "source_audio"
+        ],
+        "outputs": [
+          "raw_transcript"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/transcriber/",
+    "import_path": "gaik.software_components.transcriber",
+    "example_script_path": "implementation_layer/examples/software_components/transcriber/",
+    "readme_path": "implementation_layer/src/gaik/software_components/transcriber/README.md",
+    "install_extra": "transcriber"
+  },
+  {
+    "id": "transcript_enhancer",
+    "name": "TranscriptEnhancer",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text",
+      "transcript"
+    ],
+    "output_artifact_types": [
+      "text",
+      "enhanced_transcript"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "generate_summary",
+      "diff_chunks",
+      "additional_instructions"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Adds ~60s per 5-min recording; significantly reduces ASR errors",
+      "cost_sensitivity": "low-medium -- two LLM passes",
+      "degrades_on": [
+        "non_Finnish_languages_without_prompt_customisation"
+      ]
+    },
+    "known_limitations": [
+      "Tuned for Finnish; other languages require prompt customisation",
+      "Should not be used when transcript faithfulness is more important than correctness"
+    ],
+    "best_for": [
+      "finnish_transcript_repair",
+      "asr_error_correction",
+      "spoken_text_normalisation"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "enhance_transcript",
+        "component": "TranscriptEnhancer",
+        "inputs": [
+          "raw_transcript"
+        ],
+        "outputs": [
+          "enhanced_transcript"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/enhance_transcript/",
+    "import_path": "gaik.software_components.enhance_transcript",
+    "example_script_path": "implementation_layer/examples/software_components/enhance_transcript/",
+    "readme_path": "implementation_layer/src/gaik/software_components/enhance_transcript/README.md",
+    "install_extra": "enhance-transcript"
+  },
+  {
+    "id": "extractor",
+    "name": "Extractor",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text",
+      "transcript",
+      "enhanced_transcript",
+      "parsed_text"
+    ],
+    "output_artifact_types": [
+      "structured_json"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture",
+      "knowledge_synthesis"
+    ],
+    "uses_components": [
+      "SchemaGenerator",
+      "DataExtractor"
+    ],
+    "required_parameters": [],
+    "optional_parameters": [
+      "schema_ref",
+      "requirements_ref",
+      "extraction_model"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai",
+      "anthropic",
+      "google"
+    ],
+    "cost_relevant_parameters": [
+      "extraction_model"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Structured output via schema improves precision at cost of one schema-generation call",
+      "cost_sensitivity": "medium -- schema generation + extraction calls",
+      "degrades_on": [
+        "very_long_inputs_exceeding_context_window"
+      ]
+    },
+    "known_limitations": [
+      "Requires schema or field requirements to extract against",
+      "When provider=azure_openai: bare dict and list[dict] Pydantic field types cause a 400 error — Azure OpenAI structured output requires additionalProperties:false on every object. Replace with named sub-models using ConfigDict(extra='forbid'). E.g. define class Medication(BaseModel) with model_config=ConfigDict(extra='forbid') and use list[Medication] instead of list[dict].",
+      "ExtractionRequirements field_type enum does not include plain 'dict'. For nested objects use field_type 'str' in requirements JSON; for arrays of objects use 'list[dict]'. Never write field_type: 'dict' directly."
+    ],
+    "best_for": [
+      "form_field_extraction",
+      "structured_report_generation",
+      "data_capture_from_text"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "extract_fields",
+        "component": "Extractor",
+        "inputs": [
+          "source_text"
+        ],
+        "outputs": [
+          "structured_json"
+        ],
+        "parameters": {
+          "schema_ref": "schemas/output_schema.py"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/extractor/",
+    "import_path": "gaik.software_components.extractor",
+    "example_script_path": "implementation_layer/examples/software_components/extractor/",
+    "readme_path": "implementation_layer/src/gaik/software_components/extractor/README.md",
+    "install_extra": "extract"
+  },
+  {
+    "id": "vision_extractor",
+    "name": "VisionExtractor",
+    "type": "software_component",
+    "input_artifact_types": [
+      "pdf",
+      "image",
+      "document"
+    ],
+    "output_artifact_types": [
+      "structured_json"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "task"
+    ],
+    "optional_parameters": [
+      "schema_ref",
+      "reasoning_effort",
+      "include_verification",
+      "use_azure"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai",
+      "anthropic",
+      "google"
+    ],
+    "cost_relevant_parameters": [
+      "reasoning_effort",
+      "model_provider"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "High reasoning_effort significantly improves complex layout handling",
+      "cost_sensitivity": "high -- vision calls ~10x local parsing cost",
+      "degrades_on": [
+        "very_low_dpi_scans",
+        "pure_text_pdfs_without_tables"
+      ]
+    },
+    "known_limitations": [
+      "Max ~20MB per file",
+      "Not suitable for audio input",
+      "Expensive for large document batches -- prefer DocumentsToStructuredData for plain text PDFs"
+    ],
+    "best_for": [
+      "scanned_forms",
+      "technical_drawings",
+      "charts_and_tables",
+      "image_to_structured_data"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "extract_from_image",
+        "component": "VisionExtractor",
+        "inputs": [
+          "source_image"
+        ],
+        "outputs": [
+          "structured_json"
+        ],
+        "parameters": {
+          "task": "Extract all relevant fields",
+          "schema_ref": "schemas/output_schema.py"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/vision_extractor/",
+    "import_path": "gaik.software_components.vision_extractor",
+    "example_script_path": "implementation_layer/examples/software_components/vision_extractor/",
+    "readme_path": "implementation_layer/src/gaik/software_components/vision_extractor/README.md",
+    "install_extra": "vision-extract"
+  },
+  {
+    "id": "document_classifier",
+    "name": "DocumentClassifier",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text",
+      "pdf",
+      "document"
+    ],
+    "output_artifact_types": [
+      "classification",
+      "classification_result"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "categories"
+    ],
+    "optional_parameters": [
+      "classification_model",
+      "include_confidence"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai",
+      "anthropic"
+    ],
+    "cost_relevant_parameters": [
+      "classification_model"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Zero-shot with good category descriptions is usually sufficient",
+      "cost_sensitivity": "low -- single classification call",
+      "degrades_on": [
+        "overlapping_categories",
+        "very_short_documents"
+      ]
+    },
+    "known_limitations": [
+      "Categories must be clearly defined; ambiguous categories reduce accuracy",
+      "Does not produce structured field extraction -- combine with Extractor for full pipeline"
+    ],
+    "best_for": [
+      "document_routing",
+      "invoice_type_detection",
+      "email_triage",
+      "form_type_identification"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "classify_document",
+        "component": "DocumentClassifier",
+        "inputs": [
+          "source_document"
+        ],
+        "outputs": [
+          "classification_result"
+        ],
+        "parameters": {
+          "categories": [
+            "invoice",
+            "receipt",
+            "contract",
+            "other"
+          ]
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/doc_classifier/",
+    "import_path": "gaik.software_components.doc_classifier",
+    "example_script_path": "implementation_layer/examples/software_components/classifier/",
+    "readme_path": "implementation_layer/src/gaik/software_components/doc_classifier/README.md",
+    "install_extra": "classifier"
+  },
+  {
+    "id": "pg_vector_store",
+    "name": "PgVectorStore",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text_chunks",
+      "embeddings"
+    ],
+    "output_artifact_types": [
+      "vector_index",
+      "retrieved_chunks"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "connection_string",
+      "collection_name"
+    ],
+    "optional_parameters": [
+      "embedding_model",
+      "retrieval_top_k"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "embedding_model"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Larger top_k improves recall at cost of generation context",
+      "cost_sensitivity": "low -- embedding calls only",
+      "degrades_on": [
+        "very_large_collections_without_filtering"
+      ]
+    },
+    "known_limitations": [
+      "Requires PostgreSQL with pgvector extension (`pip install gaik[pg-vector-store]`)",
+      "Database must be set up separately before use"
+    ],
+    "best_for": [
+      "semantic_search",
+      "document_retrieval",
+      "knowledge_base_indexing"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "store_embeddings",
+        "component": "PgVectorStore",
+        "inputs": [
+          "text_chunks"
+        ],
+        "outputs": [
+          "vector_index"
+        ]
+      },
+      {
+        "id": "retrieve_chunks",
+        "component": "PgVectorStore",
+        "inputs": [
+          "user_query",
+          "vector_index"
+        ],
+        "outputs": [
+          "retrieved_chunks"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/",
+    "import_path": "gaik.software_components.RAG.pg_vector_store",
+    "example_script_path": "implementation_layer/examples/software_components/RAG/",
+    "readme_path": "implementation_layer/src/gaik/software_components/RAG/pg_vector_store/README.md",
+    "install_extra": "pg-vector-store"
+  },
+  {
+    "id": "llm_judge",
+    "name": "LLMJudge",
+    "type": "software_component",
+    "input_artifact_types": [
+      "structured_json",
+      "text",
+      "transcript",
+      "enhanced_transcript"
+    ],
+    "output_artifact_types": [
+      "validation_report",
+      "judgement",
+      "structured_json"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "rubric_ref",
+      "judge_model",
+      "panel_size"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai",
+      "anthropic"
+    ],
+    "cost_relevant_parameters": [
+      "judge_model",
+      "panel_size"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Panel of judges (LLMJudgePanel) increases reliability at higher cost",
+      "cost_sensitivity": "medium -- one or more LLM judgement calls",
+      "degrades_on": [
+        "highly_subjective_evaluation_criteria"
+      ]
+    },
+    "known_limitations": [
+      "LLM judges can be inconsistent; use LLMJudgePanel for critical decisions",
+      "Not a substitute for human review in safety-critical workflows"
+    ],
+    "best_for": [
+      "hallucination_detection",
+      "completeness_checking",
+      "output_quality_validation"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "validate_output",
+        "component": "LLMJudge",
+        "inputs": [
+          "source_text",
+          "structured_json"
+        ],
+        "outputs": [
+          "validation_report"
+        ],
+        "parameters": {
+          "rubric_ref": "prompts/validation_rubric.md"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/validators/llm_judge/",
+    "import_path": "gaik.software_components.validators.llm_judge",
+    "example_script_path": "implementation_layer/examples/software_components/validators/",
+    "readme_path": "implementation_layer/src/gaik/software_components/validators/llm_judge/README.md",
+    "install_extra": "llm-judge"
+  }
+]

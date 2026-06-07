@@ -69,6 +69,69 @@ This architecture ensures that GenAI solutions are built with proper governance,
 
 
 
+---
+
+## Solution Configuration Wizard
+
+The **GAIK Solution Configuration Wizard** is the Guidance Layer in action. It takes a plain-language description of a business problem and guides you — through a structured, multi-turn conversation — all the way to a validated, deployable GenAI solution.
+
+### What the wizard produces
+
+| Deliverable | Description |
+|---|---|
+| `use_case.blueprint.json` | Executable source of truth — components, artifacts, workflow steps, schemas, model settings |
+| `workflow.bpmn` | BPMN 2.0 visual blueprint with swimlanes, gateways, and data objects for stakeholder review |
+| `workflow.mmd` | Mermaid diagram (quick developer flow view) |
+| `poc/` | Runnable proof of concept: `run_poc.py`, `requirements.txt`, schema, prompt, eval script |
+| `docs/` | Documentation suite: GenAI product canvas, technical specification, user guide, developer guide, evaluation plan |
+
+Everything is written to a directory you choose — nothing is written into the toolkit repository.
+
+### How to run it
+
+**Option 1 — Claude Code or Claude Desktop (recommended)**
+
+```
+/solution-wizard
+```
+
+Type this in a Claude Code session or Claude Desktop chat. The wizard guides you through the full workflow conversationally.
+
+**Option 2 — Web chat (demo website)**
+
+Open the [live demo](https://gaik-demo.2.rahtiapp.fi/) and navigate to **Solution Configuration Wizard**. Token-by-token streaming, generated files appear in the sidebar, downloadable as a `.zip`.
+
+To run the demo locally:
+
+```bash
+cd implementation_layer/toolkit_demo_app
+bun dev:all   # starts Next.js frontend + FastAPI backend
+# open http://localhost:3000/solution-wizard
+```
+
+**Option 3 — Individual scripts (CLI)**
+
+The wizard's deterministic scripts can be run independently:
+
+```bash
+cd implementation_layer/solution_wizard
+
+# Validate an existing blueprint
+python scripts/validate_blueprint.py --blueprint ~/my-use-case/use_case.blueprint.json
+
+# Generate BPMN visual blueprint
+python scripts/generate_bpmn.py --blueprint ~/my-use-case/use_case.blueprint.json --output-dir ~/my-use-case
+
+# Scaffold a PoC from a validated blueprint
+python scripts/scaffold_poc.py --blueprint ~/my-use-case/use_case.blueprint.json
+```
+
+### Full documentation
+
+See [`implementation_layer/solution_wizard/README.md`](implementation_layer/solution_wizard/README.md) for the complete walkthrough, output directory layout, component registry, validation rules, and test suite.
+
+---
+
 ## License
 
 This project is licensed under the MIT License – see `LICENSE` for details.

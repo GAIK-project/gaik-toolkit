@@ -1,0 +1,234 @@
+"""Proof of Concept: ${use_case_name}
+
+Hybrid pipeline: Transcriber + PyMuPDFParser → merge → DataExtractor → LLMJudge.
+
+Inputs:
+  - One audio file (voice note / spoken report) — required
+  - One PDF document (referral letter / supporting document) — optional
+
+CONTRACT:
+  - extracted_fields  (dict or list[dict]) -- the structured output
+  - source_text       (str)                -- grounding text for LLMJudge
+
+Usage:
+    python run_poc.py
+    python run_poc.py --synthetic
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+import yaml
+from dotenv import load_dotenv
+
+load_dotenv()
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def load_config() -> dict:
+    with open(Path(__file__).parent / "config.yaml") as f:
+        return yaml.safe_load(f)
+
+
+def load_requirements() -> str:
+    req_path = Path(__file__).parent / "prompts" / "extraction_requirements.md"
+    return req_path.read_text(encoding="utf-8") if req_path.exists() else ""
+
+
+def _find_input(sample_dir: Path, exts: tuple) -> Path:
+    files = [f for f in sample_dir.iterdir() if f.suffix.lower() in exts]
+    if not files:
+        print(f"ERROR: No input file with extensions {exts} found in {sample_dir}", file=sys.stderr)
+        sys.exit(1)
+    return sorted(files)[0]
+
+
+def _find_optional_input(sample_dir: Path, exts: tuple) -> Path | None:
+    """Like _find_input but returns None instead of exiting when no file is found."""
+    files = [f for f in sample_dir.iterdir() if f.suffix.lower() in exts]
+    return sorted(files)[0] if files else None
+
+
+def _load_approved_schema(schema_dir: Path):
+    """Load the wizard-approved Pydantic class and ExtractionRequirements from disk.
+
+    Uses the pre-generated output_schema.py and output_schema_requirements.json
+    so that DataExtractor reuses the reviewed schema without calling SchemaGenerator again.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "output_schema", schema_dir / "output_schema.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    req_data = json.loads((schema_dir / "output_schema_requirements.json").read_text(encoding="utf-8"))
+    schema_class = getattr(module, req_data["model_name"])
+
+    from gaik.software_components.extractor.schema import ExtractionRequirements
+    requirements = ExtractionRequirements(**req_data["requirements"])
+
+    return schema_class, requirements
+
+
+# ---------------------------------------------------------------------------
+# Pipeline
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="${use_case_name} PoC"
+    )
+    parser.add_argument("--synthetic", action="store_true", help="Use synthetic/generated input")
+    args = parser.parse_args()
+
+    config = load_config()
+    use_azure = config.get("use_azure", ${use_azure})
+    language = config.get("language", "${language}")
+    user_requirements = load_requirements()
+
+    schema_dir = Path(__file__).parent / "schemas"
+    sample_dir = Path(__file__).parent / config.get("paths", {}).get("sample_input", "sample_input")
+    output_dir = Path(__file__).parent / config.get("paths", {}).get("output", "output")
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # ----- Load inputs -----
+    audio_input_path = _find_input(
+        sample_dir, (".wav", ".mp3", ".m4a", ".ogg", ".flac", ".webm", ".mp4")
+    )
+    print(f"audio_input: {audio_input_path}")
+
+    # document input is optional: the pipeline runs on audio alone if absent
+    document_input_path = _find_optional_input(sample_dir, (".pdf",))
+    if document_input_path:
+        print(f"document_input: {document_input_path}")
+    else:
+        print("document_input: not provided (optional — proceeding with audio only)")
+
+    # ----- Contract variables -----
+    extracted_fields = None
+    source_text = ""
+
+    # ===========================================================================
+    # PIPELINE WIRING
+    # ===========================================================================
+
+    # ----- Step: transcribe_audio (Transcriber) -----
+    print("\n[1/4] Transcribing audio input...")
+    from gaik.software_components.transcriber import Transcriber
+    from gaik.software_components.transcriber import get_openai_config as get_transcriber_config
+    transcriber = Transcriber(
+        api_config=get_transcriber_config(use_azure=use_azure),
+        language=language,
+        enhanced_transcript=True,
+    )
+    tr = transcriber.transcribe(audio_input_path)
+    raw_transcript = tr.enhanced_transcript or tr.raw_transcript
+    print(f"    Transcript: {len(raw_transcript)} chars")
+
+    # ----- Step: parse_document (PyMuPDFParser) -----
+    parsed_doc_text = ""
+    if document_input_path:
+        print("\n[2/4] Parsing document input...")
+        from gaik.software_components.parsers import PyMuPDFParser
+        pdf_parser = PyMuPDFParser()
+        pdf_result = pdf_parser.parse_document(str(document_input_path), use_markdown=True)
+        parsed_doc_text = pdf_result["text_content"]
+        print(f"    Parsed text: {len(parsed_doc_text)} chars")
+    else:
+        print("\n[2/4] Skipping document parse (no document provided)")
+
+    # ----- Step: merge_sources (custom) -----
+    print("\n[3/4] Merging sources...")
+    if parsed_doc_text:
+        merged_text = (
+            f"AUDIO TRANSCRIPT:\n{raw_transcript}"
+            f"\n\nDOCUMENT:\n{parsed_doc_text}"
+        )
+    else:
+        merged_text = f"AUDIO TRANSCRIPT:\n{raw_transcript}"
+    source_text = merged_text
+    print(f"    Combined text: {len(merged_text)} chars")
+
+    # ----- Step: extract_fields (DataExtractor) -----
+    print("\n[4/4] Extracting structured output...")
+    from gaik.software_components.extractor import DataExtractor
+    from gaik.software_components.extractor import get_openai_config as get_extractor_config
+    schema_class, requirements = _load_approved_schema(schema_dir)
+    extractor = DataExtractor(config=get_extractor_config(use_azure=use_azure))
+    results = extractor.extract(
+        extraction_model=schema_class,
+        requirements=requirements,
+        user_requirements=user_requirements,
+        documents=[merged_text],
+    )
+    extracted_fields = results[0] if results else {}
+
+    # ----- Step: human_review (human review — NOT executed in PoC) -----
+    # In production a reviewer approves the output before downstream use.
+
+    # ----- Save output -----
+    if extracted_fields is not None:
+        (output_dir / "result.json").write_text(
+            json.dumps(extracted_fields, indent=2, ensure_ascii=False, default=str),
+            encoding="utf-8",
+        )
+        print(f"\nResult written to: {output_dir / 'result.json'}")
+        print(json.dumps(extracted_fields, indent=2, ensure_ascii=False, default=str))
+    else:
+        print("\nNOTE: extracted_fields is still None — finish wiring the pipeline above.")
+
+    # -- LLMJudge hallucination detection --
+    if extracted_fields is None or not source_text:
+        print("LLMJudge skipped: pipeline not fully wired "
+              "(need both 'extracted_fields' and 'source_text').")
+    else:
+        print("\nRunning LLMJudge hallucination detection...")
+        try:
+            from gaik.software_components.validators.llm_judge.llm_judge import LLMJudge as _LLMJudge
+            judge = _LLMJudge(model_provider="openai", use_azure=use_azure)
+            extracted_for_judge = extracted_fields
+            if isinstance(extracted_for_judge, list) and len(extracted_for_judge) == 1:
+                extracted_for_judge = extracted_for_judge[0]
+            report = judge.detect_hallucinations(
+                source_text=source_text, extracted=extracted_for_judge
+            )
+            if report.flags:
+                print(f"WARNING: {len(report.flags)} hallucination flag(s) detected:")
+                for flag in report.flags:
+                    print(f"  field={flag.field}  value={flag.value}  reason={flag.reason}")
+            else:
+                print("Hallucination check passed — all fields are grounded in the source.")
+            validation_result = {
+                "hallucination_flags": [
+                    {
+                        "field": f.field,
+                        "value": f.value,
+                        "severity": str(f.severity),
+                        "reason": f.reason,
+                    }
+                    for f in report.flags
+                ],
+                "passed": len(report.flags) == 0,
+            }
+            (output_dir / "validation.json").write_text(
+                json.dumps(validation_result, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+        except ImportError:
+            print("LLMJudge skipped: gaik[llm-judge] not installed.")
+        except Exception as _judge_exc:
+            print(f"LLMJudge warning: {_judge_exc}")
+
+
+if __name__ == "__main__":
+    main()
