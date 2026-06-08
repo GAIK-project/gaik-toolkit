@@ -41,7 +41,6 @@ try:
         pipeline,
         postgres_agent,
         rag,
-        solution_wizard,
         text_to_speech,
         transcriber,
         video_search,
@@ -60,12 +59,26 @@ except ImportError:
         pipeline,
         postgres_agent,
         rag,
-        solution_wizard,
         text_to_speech,
         transcriber,
         video_search,
         vision_extractor,
     )
+
+# The Solution Wizard router makes source-tree assumptions at module load: it
+# imports the optional `claude_agent_sdk`, spawns the `claude` CLI binary, and
+# resolves REPO_ROOT via Path(__file__).parents[4] (which only exists in the
+# repo layout, not the flattened container layout, where it raises IndexError).
+# Import it defensively so any load failure disables only the wizard instead of
+# crashing the entire API (every other demo, including luvata-order).
+try:
+    try:
+        from routers import solution_wizard
+    except ImportError:
+        from api.routers import solution_wizard
+except Exception as exc:  # noqa: BLE001
+    solution_wizard = None
+    logger.warning("Solution Wizard router unavailable; disabling it (%s)", exc)
 
 
 @asynccontextmanager
@@ -73,11 +86,16 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("GAIK Demo API starting...")
     cleanup_task = asyncio.create_task(dental_transcription._cleanup_old_subtitles())
-    wizard_cleanup_task = asyncio.create_task(solution_wizard.cleanup_idle_sessions())
+    wizard_cleanup_task = (
+        asyncio.create_task(solution_wizard.cleanup_idle_sessions())
+        if solution_wizard is not None
+        else None
+    )
     yield
     # Shutdown
     cleanup_task.cancel()
-    wizard_cleanup_task.cancel()
+    if wizard_cleanup_task is not None:
+        wizard_cleanup_task.cancel()
     logger.info("GAIK Demo API shutting down...")
 
 
@@ -132,7 +150,8 @@ app.include_router(
 app.include_router(video_search.router, prefix="/video-search", tags=["Video Search"])
 app.include_router(luvata_order.router, tags=["Luvata Order"])
 app.include_router(llm_judge.router, prefix="/llm-judge", tags=["LLM Judge"])
-app.include_router(solution_wizard.router, prefix="/wizard", tags=["Solution Wizard"])
+if solution_wizard is not None:
+    app.include_router(solution_wizard.router, prefix="/wizard", tags=["Solution Wizard"])
 
 
 @app.get("/health")
