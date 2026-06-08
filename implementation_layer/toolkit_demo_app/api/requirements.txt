@@ -7,3 +7,9 @@ openpyxl>=3.1.0
 gaik[all-cpu,multimodal-parser,postgres-agent]>=0.5.14
 boto3>=1.35.0
 yt-dlp>=2024.0.0
+# Solution Configuration Wizard router imports claude_agent_sdk at module load,
+# so it must be installed or the whole API fails to start (declared in
+# pyproject.toml but previously missing here). Note: the wizard also spawns the
+# `claude` CLI binary at runtime, which is not in this image — the wizard
+# endpoints will error when used, but the API (and every other demo) starts.
+claude-agent-sdk>=0.1.48
