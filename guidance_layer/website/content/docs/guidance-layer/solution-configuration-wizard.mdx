@@ -81,7 +81,7 @@ V1 is a single-agent `SKILL.md` skill deployable in Claude Code, Claude Desktop,
 | Requirement completeness gate (13-point checklist) | ✓ |
 | Component selection with option-awareness | ✓ |
 | Executable JSON blueprint + validation | ✓ |
-| BPMN 2.0 visual blueprint (read-only, generated from JSON) | ✓ |
+| BPMN 2.0 visual blueprint (generated from JSON; updated by the wizard during PoC validation) | ✓ |
 | Mermaid workflow diagram | ✓ |
 | Extraction schema generation (one SchemaGenerator API call) | ✓ |
 | Runnable proof of concept (audio, document, RAG, custom pipelines) | ✓ |
@@ -93,16 +93,17 @@ V1 is a single-agent `SKILL.md` skill deployable in Claude Code, Claude Desktop,
 
 ## V2 — Under development
 
-V2 extends the wizard with full package generation, and a production-grade live BPMN editing environment:
+V2 adds full package generation and a production-grade Solution Wizard UI. All V1 capabilities carry over unchanged.
 
 | Capability | V2 |
 |---|---|
-| Full installable use-case package (tests, configs, connectors) | Planned |
-| Interactive BPMN canvas with synchronized JSON editing | Planned |
-| Capability to handle diverse use cases | Planned |
-| Natural-language, real-time blueprint change requests via chat | Planned |
+| Full installable use-case package | Planned |
+| BPMN directly editable via interactive canvas, with changes propagated back to the JSON | Planned |
+| Security and access control (auth, secrets management, data isolation) | Planned |
+| Gate 4: runtime validation of the full package | Planned |
+| Session recovery for the stateful BPMN editor | Planned |
 
-The key addition in V2 is the **hybrid blueprint editor**: a web application with a live BPMN canvas (bpmn-js), a step configuration panel, a wizard chat, and a JSON view — all synchronized so that a change in any pane is reflected in the others.
+The key addition in V2 is the **Solution Wizard UI**: a web application with a live BPMN canvas (bpmn-js), a step configuration panel, a wizard chat, and a JSON view — all synchronized so that a change in any pane is reflected in the others.
 
 ---
 
@@ -124,7 +125,7 @@ The wizard is built on three core principles:
 
 **Agent produces meaning, Python enforces correctness**: the LLM interprets requirements, classifies patterns, selects components, and authors the blueprint. Deterministic Python scripts validate the blueprint, generate diagrams, scaffold the PoC, and build documentation. The two layers do not overlap.
 
-**Blueprint-first changes**: the BPMN is a derived views. Changing a swimlane, a hand-off, or an exception path means editing the JSON blueprint and regenerating.
+**Blueprint-first changes**: the BPMN is a derived view. Changing a swimlane, a hand-off, or an exception path means editing the JSON blueprint and regenerating.
 
 ---
 

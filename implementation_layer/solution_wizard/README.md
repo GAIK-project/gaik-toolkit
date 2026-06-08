@@ -93,7 +93,7 @@ The diagram below shows the complete vision for the wizard across both releases.
 
 ![GAIK Solution Configuration Wizard — full workflow (V2 vision)](images/solution_wizard_v2_workflow.png)
 
-**What is implemented in V1 (current):** phases 1–12 as shown — session start and use-case intake (1), guided requirement collection (2), specification generation (3), Gate 1 specification validation (4), component selection (5), executable JSON blueprint (7), BPMN visual blueprint (8), Gate 2 workflow validation, PoC creation (10), PoC validation and refinement / Gate 3 (11), documentation suite. In V1 the BPMN is read-only (phase 8 left half only); interactive editing is not yet available.
+**What is implemented in V1 (current):** phases 1–12 as shown — session start and use-case intake (1), guided requirement collection (2), specification generation (3), Gate 1 specification validation (4), component selection (5), executable JSON blueprint (7), BPMN visual blueprint (8), Gate 2 workflow validation, PoC creation (10), PoC validation and refinement / Gate 3 (11), documentation suite. The BPMN is regenerated from the JSON blueprint and never edited directly; during PoC validation the wizard updates the JSON based on user feedback and regenerates the BPMN accordingly.
 
 **What is planned for V2:** robust BPMN generation, capability of dealing with diverse use cases, the interactive BPMN editing environment shown in phase 9 (BPMN canvas, step configuration panel, wizard chat, and synchronized JSON ↔ BPMN editing), full use-case package generation (phase 12), and within-wizard PoC running and validation.
 
@@ -448,6 +448,18 @@ solution_wizard/
 
 ## Adding a new component to the registry
 
+**Option 1 — Use the `gaik-sync` skill (recommended)**
+
+Run `/gaik-sync` in Claude Code or Claude Desktop after adding a new gaik component. In informed mode, tell it what you added — for example:
+
+```
+/gaik-sync  I just added a new component: ParallelTranscriber
+```
+
+The skill reads the component's `README.md`, constructor signature, and example script; drafts the registry entry and reference card; presents them for your review; and writes the files only after you approve. It then runs the structural tests to verify everything is consistent.
+
+**Option 2 — Edit manually**
+
 Edit `registries/gaik_component_registry.json` and add one entry. Required fields:
 
 - `id`, `name`, `type` (`software_module` or `software_component`)
@@ -460,7 +472,9 @@ Edit `registries/gaik_component_registry.json` and add one entry. Required field
 
 For modules, also include `uses_components`.
 
-That is the only change needed. Component selection is done by the agent reading these fields directly — no scoring tables to maintain. If the new component covers a use-case pattern end-to-end as a module, also add it to `_PATTERN_TO_MODULE` in `src/solution_wizard/selector.py`.
+Also add a corresponding entry to `registries/component_reference_cards.json` with the verified `import`, `construct`, `call`, and `returns` patterns (see existing entries for the format).
+
+Component selection is done by the agent reading these fields directly — no scoring tables to maintain. If the new component covers a use-case pattern end-to-end as a module, also add it to `_PATTERN_TO_MODULE` in `src/solution_wizard/selector.py`.
 
 ---
 
