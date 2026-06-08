@@ -386,6 +386,20 @@ def _extract_fee_flags_from_bom_text(text: str) -> dict[str, bool]:
     }
 
 
+def _resolve_fee_flag(scanned_flag: bool, extracted_flag: object) -> bool:
+    """Combine the deterministic text-scan flag with the LLM-extracted flag.
+
+    The text scan (`_extract_fee_flags_from_bom_text`) always yields a real
+    bool. The LLM extraction model declares these fields as ``bool | None`` and
+    returns ``None`` when the document is silent about a fee. A plain
+    ``dict.get(key, False)`` does NOT protect against that: when the key is
+    present with value ``None`` the default is ignored and ``None`` leaks
+    through, which then fails ``BOMData``'s strict ``bool`` validation. Coerce
+    here so the model only ever receives ``True``/``False``.
+    """
+    return bool(scanned_flag or extracted_flag)
+
+
 def _extract_po_address_block(text: str) -> tuple[str, str | None]:
     """Extract the buyer header block from parsed PO markdown."""
     lines = [line.strip() for line in text.splitlines() if line.strip()]
@@ -724,15 +738,22 @@ async def extract_bom_data(bom_file: UploadFile) -> BOMData:
         fee_flags = _extract_fee_flags_from_bom_text(text)
         bom = BOMData(
             material_id=bom_data.get("material_id", ""),
-            type_designation=bom_data.get("type_designation", ""),
+            type_designation=(
+                bom_data.get("type_designation")
+                or bom_data.get("product_type_designation")
+                or ""
+            ),
             dimensions=bom_data.get("dimensions", ""),
             material_grade=bom_data.get("material_grade", ""),
-            cutting_required=fee_flags["cutting_required"]
-            or bom_data.get("cutting_required", False),
-            testing_required=fee_flags["testing_required"]
-            or bom_data.get("testing_required", False),
-            certificates_required=fee_flags["certificates_required"]
-            or bom_data.get("certificates_required", False),
+            cutting_required=_resolve_fee_flag(
+                fee_flags["cutting_required"], bom_data.get("cutting_required")
+            ),
+            testing_required=_resolve_fee_flag(
+                fee_flags["testing_required"], bom_data.get("testing_required")
+            ),
+            certificates_required=_resolve_fee_flag(
+                fee_flags["certificates_required"], bom_data.get("certificates_required")
+            ),
         )
         return bom
     finally:
@@ -776,8 +797,22 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
             row_map = {name: i for i, name in enumerate(normalized) if name}
             has_generic = any(
                 k in row_map
-                for k in ("type", "typedesignation", "partdesignation", "typepartdesignation")
-            ) and any(k in row_map for k in ("unitprice", "priceperunit", "price"))
+                for k in (
+                    "type",
+                    "typedesignation",
+                    "partdesignation",
+                    "typepartdesignation",
+                    "partnumber",
+                    "partno",
+                    "itemno",
+                    "itemnumber",
+                    "materialid",
+                    "materialnumber",
+                )
+            ) and any(
+                k in row_map
+                for k in ("unitprice", "priceperunit", "price", "baseunitprice", "baseprice")
+            )
             has_abb = "type" in row_map and "conversion" in row_map and "copper" in row_map
             if has_generic or has_abb:
                 header_row_idx = idx
@@ -795,9 +830,14 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
                     return header_map[name]
             return None
 
-        item_col = first_col("itemno", "itemnumber", "materialid", "materialnumber", "id")
+        item_col = first_col(
+            "itemno", "itemnumber", "materialid", "materialnumber", "partnumber", "partno", "id"
+        )
         type_col = first_col("type", "typedesignation", "partdesignation", "typepartdesignation")
-        generic_price_col = first_col("unitprice", "priceperunit", "price")
+        desc_col = first_col("description", "productdescription", "itemdescription")
+        generic_price_col = first_col(
+            "unitprice", "priceperunit", "price", "baseunitprice", "baseprice"
+        )
         abb_price_col = first_col("kgpriceexclmachining", "kgprice", "total")
         cutting_col = first_col("cuttingfee", "cutting")
         testing_col = first_col("testingfee", "testing")
@@ -812,14 +852,26 @@ async def parse_pricing_file(pricing_file: UploadFile) -> list[PricingRow]:
         )
         pricing_rows: list[PricingRow] = []
         for row in rows[header_row_idx + 1 :]:
-            if type_col is None or type_col >= len(row):
-                continue
             material_id = (
                 str(row[item_col] or "").strip()
                 if item_col is not None and item_col < len(row)
                 else ""
             )
-            type_designation = str(row[type_col] or "").strip()
+            type_designation = (
+                str(row[type_col] or "").strip()
+                if type_col is not None and type_col < len(row)
+                else ""
+            )
+            if not type_designation:
+                # Price lists keyed only by part/material number have no type
+                # column; fall back to the description (or the id) so the row is
+                # still emitted and matchable by material_id.
+                description = (
+                    str(row[desc_col] or "").strip()
+                    if desc_col is not None and desc_col < len(row)
+                    else ""
+                )
+                type_designation = description or material_id
             if not type_designation or type_designation.lower() in {"nan", "none"}:
                 continue
             try:
