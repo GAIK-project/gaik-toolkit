@@ -2,6 +2,17 @@
 
 All Mermaid diagrams in GAIK use-case pages use the `flowchart` keyword (not `graph`), include emojis in node labels, and apply `stroke:` colors in style lines. Follow `incident-reporting.mdx` as the exact reference for diagram style.
 
+## Contents
+
+- [Keyword](#keyword)
+- [Color Palette](#color-palette)
+- [Node Emojis](#node-emojis)
+- [Orientation Rules](#orientation-rules)
+- [Node Shape Conventions](#node-shape-conventions)
+- [Diagram Skeletons](#diagram-skeletons)
+- [Syntax Rules](#syntax-rules)
+- [Common Mistakes to Avoid](#common-mistakes-to-avoid)
+
 ---
 
 ## Keyword
