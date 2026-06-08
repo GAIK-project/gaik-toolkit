@@ -739,9 +739,7 @@ async def extract_bom_data(bom_file: UploadFile) -> BOMData:
         bom = BOMData(
             material_id=bom_data.get("material_id", ""),
             type_designation=(
-                bom_data.get("type_designation")
-                or bom_data.get("product_type_designation")
-                or ""
+                bom_data.get("type_designation") or bom_data.get("product_type_designation") or ""
             ),
             dimensions=bom_data.get("dimensions", ""),
             material_grade=bom_data.get("material_grade", ""),
