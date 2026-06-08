@@ -118,6 +118,47 @@ Edit only the four wizard assets, only the approved rows:
 
 Keep edits surgical and in the existing JSON/markdown style. Do not reformat whole files.
 
+### Authoring a new entry from documentation (for approved `new` findings)
+
+When the approved finding is a **new component/module to add**, do not guess the
+fields — *source* them. Introspection gives the mechanical fields; the component's
+own docs give the semantic ones. Gather, in this order:
+
+1. **Constructor + method signatures** — `inspect.signature` on the class
+   (`__init__` and the primary method). Gives `required_parameters`,
+   `optional_parameters`, and the card's `construct`/`call` argument names.
+2. **The component's `README.md`** (under `implementation_layer/src/gaik/software_components/<component>/`)
+   — gives `best_for`, `known_limitations`, `quality_tradeoffs`, and the prose for
+   what the component is *for*. Do not invent these; quote/condense the README.
+3. **The example script** (`implementation_layer/examples/software_components/<component>/`)
+   — gives the *verified* `call` snippet, the `returns` shape, and a working
+   `construct` line. The card's `call`/`returns` must match a real example, not a
+   plausible-looking guess (this is the field most likely to break the scaffolded PoC).
+4. **`pyproject.toml` / `setup.cfg` extras** — gives `install_extra` (the `gaik[<extra>]` name).
+5. **Artifact-type mapping** — translate the Python input/output types into the
+   blueprint's artifact-type vocabulary (`audio`, `video`, `text`, `transcript`,
+   `document`, `image`, `structured_json`, `answer`, …), **not** raw Python types.
+   Reuse the exact strings already used by sibling entries.
+6. **`subsumes`** — only set this if the new component provides a capability that an
+   existing component also provides (so the wizard won't add both). This is a
+   semantic judgement — state your reasoning in the change table and confirm with
+   the user if unsure.
+
+**Registry entry required fields** (validated on load against
+`schemas/component_registry.schema.json`): `id`, `name`, `type`,
+`input_artifact_types`, `output_artifact_types`, `required_parameters`, `best_for`,
+`known_limitations`, `import_path`, `source_path`, `readme_path`,
+`example_script_path`. Match the shape of the nearest existing entry of the same
+`type` (component vs module). For modules, also populate `uses_components`.
+
+**Reference card required keys**: `import`, `construct`, `call`, `returns`
+(+ `install_extra`, and `options` for behaviour-changing flags with `infer_from`
+hints, + `subsumes` where relevant).
+
+If any field cannot be sourced from the docs (e.g. there is no example script),
+say so explicitly in your summary and mark that field as a best-effort draft for
+the user to confirm — never silently fabricate `best_for`/`known_limitations`.
+
 ## Phase 5 — Verify, then update the pin
 
 Run the wizard's own structural tests (they cross-check cards against gaik via `inspect`) plus re-scan:

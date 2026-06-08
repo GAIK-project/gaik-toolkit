@@ -5,20 +5,15 @@ The GAIK Solution Configuration Wizard guides users from a natural-language busi
 > **Full specification:** [`docs/solution_wizard.md`](docs/solution_wizard.md) — detailed requirements, design decisions, release plan, JSON blueprint schema, component registry model, validation rules, and implementation guidance for both V1 (current) and V2 (future).
 
 **What the wizard delivers (V1 — current):**
-- **Complete requirement collection** — the full Section-8 model (business, technical, target-output), collected conversationally in thematic rounds, with a **completeness gate** (`check_requirements.py`, the 13-point Section-9 checklist) that asks follow-up questions for anything missing instead of silently assuming
-- Component selection from the GAIK registry — agent-driven, no scoring tables
-- **Component-option awareness** — the wizard reasons about each component's behaviour-changing options (recorded in the reference cards) and infers them from the requirements or asks: e.g. Finnish audio → `Transcriber(enhanced_transcript=True)` instead of a separate `TranscriptEnhancer` step; `human_review` → `VisionExtractor(include_verification=True)`. It never adds a sub-component a selected option/module already provides (`validate_blueprint.py` warns on redundancy, Rule 12)
+- **Complete requirement collection** — Business, technical, and target-output requierments collected conversationally in thematic rounds, with a **completeness gate** that asks follow-up questions for anything missing instead of silently assuming
+- **Component selection:** agent driven component selection from a registry 
+- **Component-option awareness** — the wizard reasons about each component's behaviour-changing options (recorded in the reference cards) and infers them from the requirements or asks.
 - **Two complementary blueprints** generated from the validated specification:
- - **JSON blueprint** (`use_case.blueprint.json`) — the executable source of truth: components, artifacts, workflow steps, schemas, prompts, model settings, validation gates. Drives all downstream generation.
- - **BPMN visual blueprint** (`workflow.bpmn`) — a standards-based BPMN 2.0 business-process model with swimlanes for each stakeholder role, typed tasks, gateways, data objects/stores, and message flows. Linked element-by-element to the JSON via `visualizations.bpmn_mapping`; kept in sync by editing the JSON and regenerating.
-- Extraction schema generation via GAIK `SchemaGenerator` (one API call), presented to the user for review and approval
-- Runnable PoC: `run_poc.py`, `requirements.txt`, `.env.example`, `config.yaml`, schema files, extraction prompt, evaluation script
-- Schema freshness tracking: PoC reuses the approved schema; regenerates automatically when the extraction prompt changes
-- LLMJudge hallucination detection when `LLMJudge` is in the blueprint pipeline
-- Gate 3 refinement loop: user runs PoC, shares output, wizard classifies the change (intent vs. implementation fix), updates the blueprint first for intent changes and re-validates before regenerating PoC files, or patches the PoC directly for code-only fixes
-- **Documentation suite** — `generate_docs.py` writes five documents (GenAI product canvas, technical specification, user guide, developer guide, evaluation plan) into `<output_dir>/docs/`, pre-filled with blueprint facts; the agent fills the narrative markers
-- **Formatted PDF report** (optional) — when `technical_spec.output_types` includes `"pdf"`, the scaffolder wires a ReportLab renderer (`poc/pdf_report.py`) that produces a titled, paginated PDF alongside the JSON output: structured data as key/value tables (nested objects as sub-tables), free text as titled sections
-- All outputs saved to a user-chosen directory outside this repository
+ - **JSON blueprint** the executable source of truth: components, artifacts, workflow steps, schemas, prompts, model settings, validation gates. Drives all downstream generation.
+ - **BPMN visual blueprint** a standards-based BPMN 2.0 business-process model with swimlanes for each stakeholder role, typed tasks, gateways, data objects/stores, and message flows. Linked element-by-element to the JSON via; kept in sync by editing the JSON and regenerating.
+- **Runnable PoC:** with schema files, extraction prompt, evaluation script
+- **Refinement loop:** user runs PoC, shares output, wizard classifies the change (intent vs. implementation fix), updates the blueprint first for intent changes and re-validates before regenerating PoC files, or patches the PoC directly for code-only fixes
+- **Documentation suite** — GenAI product canvas, technical specification, user guide, developer guide, evaluation plan
 
 ---
 
@@ -49,83 +44,7 @@ Type `/solution-wizard` in a Claude Code session or Claude Desktop chat.
 
 The wizard asks for an output directory and guides you through the full workflow. All generated files are saved to your chosen directory.
 
-### Option 2 — Validate an existing blueprint
-
-```bash
-cd implementation_layer/solution_wizard
-
-python scripts/validate_blueprint.py --blueprint ~/my-use-case/use_case.blueprint.json
-```
-
-### Option 3 — Generate extraction schema (calls GAIK SchemaGenerator once)
-
-Run this during the Schema Design phase of the wizard conversation. The agent writes `extraction_requirements.md` first, then calls this script. The generated schema is presented to the user for review before scaffolding.
-
-```bash
-python scripts/generate_schema.py \
- --requirements ~/my-use-case/poc/prompts/extraction_requirements.md \
- --schema-name MaintenanceTicket \
- --output-dir ~/my-use-case/poc
-```
-
-### Option 4 — Scaffold PoC from a validated blueprint
-
-```bash
-python scripts/scaffold_poc.py --blueprint ~/my-use-case/use_case.blueprint.json
-
-# With synthetic sample data (document/RAG patterns only):
-python scripts/scaffold_poc.py --blueprint ~/my-use-case/use_case.blueprint.json --synthetic
-```
-
-### Option 5 — Generate visual diagrams
-
-`run_wizard.py` generates both views automatically. To regenerate just one after an edit:
-
-```bash
-# Mermaid (quick flow view)
-python scripts/generate_mermaid.py \
- --blueprint ~/my-use-case/use_case.blueprint.json \
- --output-dir ~/my-use-case
-
-# BPMN 2.0 visual blueprint (opens in bpmn-js / Camunda Modeler / draw.io)
-python scripts/generate_bpmn.py \
- --blueprint ~/my-use-case/use_case.blueprint.json \
- --output-dir ~/my-use-case
-```
-
-The **JSON blueprint** is the executable source of truth; the **BPMN visual blueprint** is the standards-based business-process view for stakeholder communication and review. Both are derived from the same blueprint and are never hand-edited. The BPMN is linked element-by-element to the JSON via `visualizations.bpmn_mapping`; to change either diagram, edit the JSON (`workflow`, `artifacts`, and the optional `business_process` section) and regenerate.
-
-### Option 6 — Check requirement completeness 
-
-```bash
-python scripts/check_requirements.py --blueprint ~/my-use-case/use_case.blueprint.json
-```
-
-Reports which of the 13 Section-9 checklist points are answered vs. still missing (exit 0 when complete). The wizard runs this before component selection and asks follow-up questions for any gap.
-
-### Option 7 — Generate the documentation suite 
-
-```bash
-python scripts/generate_docs.py \
- --blueprint ~/my-use-case/use_case.blueprint.json \
- --output-dir ~/my-use-case
-```
-
-Writes `genai_product_canvas.md`, `technical_specification.md`, `user_guide.md`, `developer_guide.md`, and `evaluation_plan.md` into `<output-dir>/docs/`, pre-filled with blueprint facts and `<!-- AGENT: ... -->` narrative markers.
-
-### Option 8 — Print registry summary (for component selection)
-
-```bash
-python scripts/run_wizard.py --show-registry
-```
-
-### Option 9 — Re-export JSON Schema from Pydantic models
-
-```bash
-python scripts/run_wizard.py --export-schema
-```
-
-### Option 10 — Interactive wizard session via the Claude Agent SDK (CLI)
+### Option 2 — Interactive wizard session via the Claude Agent SDK (CLI)
 
 `run_wizard_interactive.py` starts a persistent, multi-turn conversation with the wizard
 driven by the Claude Agent SDK (`ClaudeSDKClient`) on Azure Foundry. The wizard streams
@@ -149,10 +68,7 @@ current shell environment. See `.env.example` for the required variables
 `ANTHROPIC_DEFAULT_SONNET_MODEL`). Run `python run_wizard_interactive.py --preflight` to
 confirm routing before a full session.
 
-`run_wizard_sdk.py` is a headless smoke-test runner (one fixed use case, fully automated,
-no user interaction) useful for CI or regression testing.
-
-### Option 11 — Wizard as a web chat (demo website)
+### Option 3 — Wizard as a web chat (demo website)
 
 The wizard is also integrated as a streaming chat page in the demo website at
 `implementation_layer/toolkit_demo_app`. The backend (`api/routers/solution_wizard.py`)
@@ -189,39 +105,6 @@ The **agent** (the LLM following `SKILL.md`) is the brain of the wizard. Everyth
 
 > **The agent produces meaning** (interpretation, classification, component selection, authoring the blueprint). **The Python scripts enforce correctness** (Pydantic type rules + the validator rules) and **render the derived views** (BPMN visual blueprint, PoC files, documentation). The wizard produces two complementary blueprints: the **JSON blueprint** (executable source of truth, drives all generation) and the **BPMN visual blueprint** (standards-based business-process view for stakeholder communication and review).
 
-### The cast — function, input, output
-
-| File | Role | Input | Output |
-|------|------|-------|--------|
-| `SKILL.md` | Orchestration — the conversation the agent follows | User messages | Questions, decisions, script calls |
-| `registries/gaik_component_registry.json` | Catalog of 10 GAIK components/modules | — | Read by agent + `registry.py` |
-| `registries/component_reference_cards.json` | Verified call patterns (import/constructor/method/return) **+ structured `options`** (behaviour-changing flags with `infer_from` hints) **+ `subsumes`** notes for every component/module | — | Injected into the `_generic` skeleton; read in Phase 5 for option reasoning |
-| `schemas/component_registry.schema.json` | Contract the registry must obey | — | Validated on load |
-| `schemas/use_case_blueprint.schema.json` | JSON Schema exported from Pydantic (reference) | — | External validation |
-| `templates/blueprint_template.json` | Blueprint skeleton with `<placeholders>` | — | Starting structure the agent fills in |
-| `templates/poc/` | Per-pattern PoC templates (audio, document, RAG, generic) | Template variables | Filled `run_poc.py` and boilerplate |
-| `templates/docs/` | Five §18 document skeletons (`*.md.tmpl`) | Blueprint-derived variables | Filled `docs/*.md` |
-| `examples/*.json` | Three worked, valid blueprints | — | Reference patterns the agent copies from |
-| `src/blueprint.py` | Pydantic models — authoritative blueprint definition | dict / JSON | Validated `Blueprint`; serialized JSON |
-| `src/registry.py` | Loads + self-validates registry; lookup + `as_llm_context()` | registry JSON | `Registry` object; readable summary |
-| `src/selector.py` | Reference data: transformation chains + module-first map | pattern name | ordered chain; module entry |
-| `src/validator.py` | Runs the validation rules (incl. Rule 12: redundant subsumed sub-component, warning) | `Blueprint` object | `ValidationResult(ok, errors, warnings)` |
-| `src/requirements.py` | Section-9 completeness checklist | `Blueprint` object | list of unmet checklist points |
-| `src/visualizer.py` | Builds Mermaid from the workflow | `Blueprint` object | `workflow.mmd` |
-| `src/bpmn_generator.py` | Builds the BPMN 2.0 visual blueprint (semantic model → enrichment → auto-layout → XML + DI) | `Blueprint` object | `workflow.bpmn` + `visualizations.bpmn_mapping` |
-| `src/docs_generator.py` | Fills the §18 document skeletons with blueprint facts | `Blueprint` object | `docs/*.md` |
-| `src/schema_designer.py` | Fallback schema generation from `target_output_spec` (no API call) | spec dict | `output_schema.py`, `output_schema_requirements.json` |
-| `src/scaffolder.py` | Deterministic PoC file generation | `Blueprint` object | complete `poc/` folder |
-| `scripts/run_wizard.py` | CLI entry: validate + save + both diagrams; `--show-registry`; `--export-schema` | blueprint path / flags | saved blueprint + `workflow.mmd` + `workflow.bpmn` |
-| `scripts/check_requirements.py` | Section-9 completeness gate | blueprint path | satisfied/missing report, exit 0/1 |
-| `scripts/validate_blueprint.py` | Standalone validator | blueprint path | pass/fail report, exit 0/1 |
-| `scripts/generate_mermaid.py` | Standalone Mermaid generator (validates first) | blueprint path + output dir | `workflow.mmd` |
-| `scripts/generate_bpmn.py` | Standalone BPMN generator (validates first) | blueprint path + output dir | `workflow.bpmn` |
-| `scripts/generate_docs.py` | Documentation suite generator (validates first) | blueprint path + output dir | `docs/*.md` (5 files) |
-| `scripts/generate_schema.py` | Calls GAIK SchemaGenerator once; saves schema + hash | requirements.md path | `output_schema.py`, `output_schema_requirements.json`, `output_schema.hash` |
-| `scripts/scaffold_poc.py` | Scaffolds complete `poc/` from a validated blueprint | blueprint path | `poc/` folder (+ prints `pattern_key`/`template_save_path`) |
-| `scripts/promote_template.py` | Generalize-then-save a validated hybrid PoC to the template library | blueprint + agent-generalised `.tmpl` | `templates/poc/<pattern_key>/` + manifest, or rejection |
-
 ### Worked example
 
 **The user's description:**
@@ -230,16 +113,7 @@ The **agent** (the LLM following `SKILL.md`) is the brain of the wizard. Everyth
 
 ---
 
-**Phase 1 — Session start.** The agent asks for the output directory (`~/projects/maintenance-tickets`) and the use-case description, then classifies the pattern: audio input + structured JSON output → `audio_to_structured`. Consults `selector.py` as reference data:
-
-```
-transformation_chain("audio_to_structured")
- → ["audio_input", "raw_transcript", "enhanced_transcript",
- "structured_json", "validated_output", "final_output"]
-
-module_for_pattern("audio_to_structured")
- → AudioToStructuredData (single module covers the pattern end-to-end)
-```
+**Phase 1 — Session start.** The agent asks for the output directory (`~/projects/maintenance-tickets`) and the use-case description, then classifies the pattern: audio input + structured JSON output → `audio_to_structured`. Consults `selector.py` as reference data.
 
 **Phase 2 — Complete requirement collection .** The agent collects the full Section-8 model in thematic rounds (business, technical, target output). Key answers: audio input, **Finnish** language, structured JSON output, human review required, technician names are personal data, integration target = the maintenance system, evaluation = field-level accuracy. The agent (not a script) maps "Finnish voice messages" to `input_type=audio, language=fi`.
 
@@ -248,14 +122,7 @@ module_for_pattern("audio_to_structured")
 **Phase 4 — Schema design.** For extraction use cases:
 
 1. Agent writes `poc/prompts/extraction_requirements.md` with domain-specific field definitions, Finnish urgency cues, allowed values, and output policy.
-2. Agent calls SchemaGenerator once:
-
-```bash
-python scripts/generate_schema.py \
- --requirements poc/prompts/extraction_requirements.md \
- --schema-name MaintenanceTicket \
- --output-dir poc/
-```
+2. Agent calls GAIK's SchemaGenerator once.
 
 SchemaGenerator generates `output_schema.py` (Pydantic model), `output_schema_requirements.json` (payload for `load_schema()`), and `output_schema.hash` (SHA-256 of the requirements file for freshness tracking). The agent presents `output_schema.py` to the user for review. The user approves or requests changes — the agent applies changes directly; SchemaGenerator is never called again.
 
@@ -263,32 +130,17 @@ SchemaGenerator generates `output_schema.py` (Pydantic model), `output_schema_re
 
 **Phase 6 — Blueprint assembly + validation.** Agent reads `templates/blueprint_template.json` and the closest example blueprint, fills in the blueprint. Schema paths are always `"schemas/output_schema.py"` and `"schemas/output_schema_requirements.json"`. Validates:
 
-```bash
-python scripts/validate_blueprint.py --blueprint ~/projects/maintenance-tickets/use_case.blueprint.json
-```
-
 Validation PASSED (or proposes fixes, re-validates).
 
-**Phase 8 + Gate 2 — Visual workflow.** Agent runs:
+**Phase 8 + Gate 2 — Visual workflow.**
 
-```bash
-python scripts/run_wizard.py \
- --blueprint ~/projects/maintenance-tickets/use_case.blueprint.json \
- --output-dir ~/projects/maintenance-tickets
-```
-
-Saves the blueprint and writes **both** `workflow.mmd` (Mermaid) and `workflow.bpmn` (the BPMN visual blueprint, with `visualizations.bpmn_mapping` persisted into the JSON). Agent shows the Mermaid diagram and points the user to the BPMN; user confirms or requests edits — including business-level changes to lanes, hand-offs, or exception paths — which are applied to the JSON first (`workflow`/`artifacts`/`business_process`) and both diagrams regenerated. The diagrams are never hand-edited.
+The agent `scripts/run_wizard.py` and saves the blueprint and writes **both** `workflow.mmd` (Mermaid) and `workflow.bpmn` (the BPMN visual blueprint, with `visualizations.bpmn_mapping` persisted into the JSON). Agent shows the Mermaid diagram and points the user to the BPMN; user confirms or requests edits — including business-level changes to lanes, hand-offs, or exception paths — which are applied to the JSON first (`workflow`/`artifacts`/`business_process`) and both diagrams regenerated. The diagrams are never hand-edited.
 
 Optionally, **Phase 3.5** elicits a `business_process` section (roles/lanes, external parties, manual steps, exceptions, business decisions) so the BPMN becomes a genuine Level-2 business-process model rather than just the pipeline. If skipped, the BPMN is still rich via enrichment conventions (approval gateway + rework loop from `human_review`; parallel fork/join from multi-dependency steps; data store + send task from `integration_targets`; governance annotations).
 
-**Phase 10 — PoC scaffolding.** Agent runs:
+**Phase 10 — PoC scaffolding.**
 
-```bash
-python scripts/scaffold_poc.py \
- --blueprint ~/projects/maintenance-tickets/use_case.blueprint.json
-```
-
-Since `generate_schema.py` already ran and wrote the approved schema files, `scaffold_poc.py` uses them as-is without overwriting. `run_poc.py` is fully wired from the `audio_to_structured` template. The agent prints use-case-specific run instructions and asks the user to run the PoC.
+The agent runs `scripts/scaffold_poc.py`. Since `generate_schema.py` already ran and wrote the approved schema files, `scaffold_poc.py` uses them as-is without overwriting. `run_poc.py` is fully wired from the `audio_to_structured` template. The agent prints use-case-specific run instructions and asks the user to run the PoC.
 
 **Phase 11 + Gate 3 — PoC validation and refinement.** User runs the PoC and shares the output. The agent first classifies each piece of feedback as either an **intent change** (workflow, components, schema, prompt, model, evaluation) or an **implementation fix** (path, logging, wiring bug). For intent changes the blueprint is updated first, re-validated, and then the affected PoC files are regenerated from the updated blueprint — keeping `use_case.blueprint.json` as the single source of truth. For code-only fixes the PoC is patched directly without touching the blueprint. All intent changes are recorded in `change_log`.
 

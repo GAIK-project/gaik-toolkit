@@ -4,7 +4,7 @@
 
 Version 1.0 -- June 2026
 
-Two-release plan: **V1** (current) complete requirements + PoC scaffolding + BPMN + documentation · **V2** (future) full package + reference cards/Graphify + interactive BPMN editing
+Two-release plan: **V1** (current) complete requirements + PoC scaffolding + BPMN + documentation · **V2** (future) full package + interactive BPMN editing
 
 > **Design note**: Component selection is **agent-driven** -- the agent reads registry fields (`input/output_artifact_types`, `best_for`, `known_limitations`) and reasons from them, constrained only by the module-first rule and the validator. What scales by release is **information-retrieval depth**, robust BPMN generation, capability of addressing diverse use cases, and **orchestration** (single `SKILL.md` agent in V1 → optional staged sub-agents in V2), not the selection logic itself.
 
@@ -60,7 +60,7 @@ The wizard is delivered in **two releases**:
 Complete requirement collection (full business / technical / target-output specifications with a completeness gate), component-option awareness, PoC scaffolding with BPMN visual blueprint and documentation suite. Runs as a single-agent `SKILL.md` with no sub-agents.
 
 **V2 -- Future Release**
-All V1 capabilities, plus full use-case package generation, reference card auto-generation + Graphify integration for component intelligence, and a web-based hybrid editor with a live BPMN canvas.
+All V1 capabilities, plus full use-case package generation and a web-based hybrid editor with a live BPMN canvas.
 
 | Capability | V1 (current) | V2 (future) |
 |---|---|---|
@@ -74,7 +74,6 @@ All V1 capabilities, plus full use-case package generation, reference card auto-
 | PoC validation and refinement (Gate 3) within the wizard's web interface | ✓ | ✓ |
 | Documentation suite (5 docs generated from blueprint) | ✓ | ✓ |
 | Full installable use-case package (Section 17) | — | ✓ |
-| Reference card auto-generation + Graphify integration | — | ✓ |
 | Interactive BPMN and JSON editing (canvas / panel / chat) | — | ✓ |
 
 ---
@@ -137,7 +136,7 @@ Two deterministic rules constrain that reasoning:
 1. **Module-first**: when a single GAIK software module already covers the needed workflow end-to-end (its input/output artifact types match the use case), the agent selects that module first. Lower-level building blocks are selected when the use case needs a custom pipeline, additional validation, special parsing, or non-standard orchestration.
 2. **Validator as safety net**: every selection is checked by `BlueprintValidator` (component exists, artifact-type compatibility, required parameters present). A wrong selection is caught there, not by a scoring heuristic.
 
-Adding a new component is therefore a one-file change: add its registry entry. What grows across releases is not the selection logic but the depth of **information retrieval** used once a component is selected (e.g., registry-as-index in V1-V1; reference cards + Graphify in V2 -- see Section 13.4).
+Adding a new component is therefore a one-file change: add its registry entry (plus its reference card). What grows across releases is not the selection logic but the surrounding capabilities -- full use-case package generation and interactive BPMN/JSON editing in V2.
 
 ### 3.5 Traceability
 
@@ -284,7 +283,7 @@ The BPMN-JSON element mapping links each visual workflow element to its correspo
 - Requirement **completeness gate** (Section 9 checklist, 13 points) before component selection; the wizard asks follow-up questions for missing items instead of silently recording assumptions
 - Pattern classification (audio-to-structured, document-to-structured, RAG, classification, hybrid)
 - **Component-option awareness**: the wizard reasons about the behaviour-changing options each component/module class exposes and either infers them from the collected requirements or clarifies them with the user (e.g. Finnish audio → `Transcriber(enhanced_transcript=True)` instead of a separate `TranscriptEnhancer` step; `human_review=yes` → `VisionExtractor(include_verification=True)`)
-- **Reference-card completeness**: every component/module in the registry has a reference card with structured `options` (behaviour-/selection-relevant options with `infer_from` hints). Card auto-generation and Graphify integration are V2.
+- **Reference-card completeness**: every component/module in the registry has a reference card with structured `options` (behaviour-/selection-relevant options with `infer_from` hints).
 - JSON blueprint generation with ArtifactRegistry enforcement
 - BlueprintValidator: artifact existence, component compatibility, required parameters, acyclicity, terminal step, redundancy warnings
 - **BPMN 2.0 visual blueprint** (`workflow.bpmn`): a standards-based business-process model with swimlanes for each stakeholder role, typed tasks (user tasks, automated AI steps, human-review tasks, send tasks), parallel and exclusive gateways, data objects, data stores, and message flows. Linked element-by-element to the JSON blueprint via `visualizations.bpmn_mapping`. In V1, changes to the process are made in the JSON blueprint and the BPMN is regenerated; in V2 the BPMN canvas becomes directly editable.
@@ -305,17 +304,14 @@ The registry is the index; files are the content. Each agent reads only what it 
 | `PoCScaffolder` | `readme_path` + `example_script_path` + reference cards |
 | `PackageBuilder` | `readme_path` + `example_script_path` + reference cards |
 
-Card auto-generation and Graphify queries are V2.
-
 ---
 
 ### Release V2 -- Future Release
 
-**Target**: Full use-case package generation, reference-card auto-generation + Graphify integration, and a web application with embedded BPMN canvas and full synchronized BPMN-JSON editing.
+**Target**: Full use-case package generation and a web application with embedded BPMN canvas and full synchronized BPMN-JSON editing.
 
 **Capabilities** (all V1 capabilities, plus):
 - **Full use-case package generation** (see Section 17): the standard installable Python package layout, configs, tests, and scripts
-- **Reference card generation**: a script that derives one structured card per component from its source, README, and example (class name, import path, constructor params, main method signature, return type, minimal importable example -- see Section 13.4), plus **Graphify integration** (cards added as nodes in the knowledge graph, queried for both API contracts and relationships) and a graph-freshness check
 - Hybrid blueprint editor with four connected areas:
   1. **BPMN canvas** -- visual process editing (bpmn-js or Camunda-compatible)
   2. **Step configuration panel** -- linked JSON technical settings per selected task
@@ -331,11 +327,6 @@ Card auto-generation and Graphify queries are V2.
 
 **Synchronization cycle**: generate BPMN from JSON → user edits via canvas / panel / chat → convert to JSON change operation → validate updated JSON → regenerate BPMN → user approves
 
-**Graphify use in V2**: the unified Graphify graph (with embedded reference card nodes) is used heavily throughout V2 for interactive editing support:
-- When the user clicks a BPMN task, the step configuration panel queries the graph for the component's card to populate constructor params, supported providers, and quality tradeoffs
-- When the user requests a change in natural language (e.g. "use a cheaper model for this step"), the wizard queries the graph to identify compatible alternatives
-- Impact analysis: when a step is modified, the graph identifies all downstream artifacts and steps that may be affected, enabling targeted re-validation
-
 ---
 
 ## Wizard Workflow Overview
@@ -346,7 +337,7 @@ The diagram below shows the complete vision for the wizard across both releases.
 
 **What is implemented in V1 (current):** phases 1–12 as shown — session start and use-case intake (1), guided requirement collection (2), specification generation (3), Gate 1 specification validation (4), component selection (5), executable JSON blueprint (7), BPMN visual blueprint (8), Gate 2 workflow validation, PoC creation (10), PoC validation and refinement / Gate 3 (11), documentation suite. In V1 the BPMN is read-only (phase 8 left half only); interactive editing is not yet available.
 
-**What is planned for V2:** the interactive BPMN editing environment shown in phase 9 (BPMN canvas, step configuration panel, wizard chat, and synchronized JSON ↔ BPMN editing), full use-case package generation (phase 12), and reference-card auto-generation + Graphify integration for component intelligence.
+**What is planned for V2:** the interactive BPMN editing environment shown in phase 9 (BPMN canvas, step configuration panel, wizard chat, and synchronized JSON ↔ BPMN editing) and full use-case package generation (phase 12).
 
 ---
 
@@ -1311,76 +1302,26 @@ Software component entries do not have a `uses_components` field -- they are lea
 
 ### 13.4 Component Information Retrieval Model
 
-The wizard's information needs grow across releases. Three mechanisms cover the full range, applied at different layers:
+The wizard's information needs are covered by two mechanisms applied at different layers:
 
-| Mechanism | What it answers | Used from |
-|-----------|----------------|-----------|
-| **Registry JSON** | What does this component do? What are its input/output types, params, `best_for`, and `known_limitations`? | V1+ |
-| **Reference cards** | How do I call this component? What is its import path, constructor signature, return type, and behaviour-changing options? | V1+ (hand-maintained, made complete + option-aware in V1) |
-| **Graphify graph (cards embedded)** | What relates to this component? Which modules use it? Which examples reference it? Queried as a unified graph. | V2 |
+| Mechanism | What it answers |
+|-----------|----------------|
+| **Registry JSON** | What does this component do? What are its input/output types, params, `best_for`, and `known_limitations`? |
+| **Reference cards** | How do I call this component? What is its import path, constructor signature, return type, and behaviour-changing options? |
 
-#### V1: Registry as Index, Files as Content
+#### Registry as Index, Files as Content
 
-The registry provides selection-time information. When PoCScaffolder or PackageBuilder need implementation details, they read the files referenced by the selected components' `readme_path`, `example_script_path`, and `source_path`. The `import_path` field provides the Python import without requiring a file read. No additional infrastructure is needed.
+The registry provides selection-time information. When PoCScaffolder or PackageBuilder need implementation details, they read the files referenced by the selected components' `readme_path`, `example_script_path`, and `source_path`. The `import_path` field provides the Python import without requiring a file read. The reference cards supply the verified call pattern (import, constructor, main method, return shape, behaviour-changing options) that is injected into the generic PoC skeleton so the agent does not guess API signatures. No additional infrastructure is needed.
 
-#### V2: Reference Cards Embedded in the Graphify Graph
+**Retrieval model by agent:**
 
-Reference cards are generated first from the component source code, READMEs, and example scripts. They capture the stable API contract for each component:
-
-```json
-{
-  "id": "vision_extractor",
-  "class_name": "VisionExtractor",
-  "import_path": "gaik.software_components.vision_extractor",
-  "constructor_params": {
-    "model_provider": "openai | claude | google",
-    "reasoning_effort": "low | medium | high",
-    "use_azure": "bool"
-  },
-  "main_method": "extract",
-  "method_params": {
-    "file_paths": "list[str]",
-    "task": "str",
-    "schema_dir": "str | None",
-    "include_verification": "bool"
-  },
-  "returns": "VisionExtractionResult",
-  "minimal_example": "from gaik.software_components.vision_extractor import VisionExtractor\nextractor = VisionExtractor(model_provider='openai', use_azure=True)\nresult = extractor.extract(file_paths=['doc.pdf'], task='Extract invoice fields')\nprint(result.data)"
-}
-```
-
-Once generated, reference cards are **included as nodes in the Graphify knowledge graph**. This means the wizard queries a single unified graph rather than two separate systems. A query such as `graphify query "how do I call VisionExtractor"` returns both the card data (import path, constructor, return type) and the relationship data (which modules use it, which examples reference it, which artifact types it produces) in a single pass.
-
-**Information flow for V2:**
-
-```
-Source code + READMEs + examples
-    --> [card generation step]
-    --> reference_cards/*.json
-
-reference_cards/*.json + source graph
-    --> [graphify update]
-    --> graphify-out/graph.json  (unified graph with card nodes)
-
-Wizard agents:
-    ComponentSelector   --> graphify query (relationships + card summaries)
-    SchemaDesigner      --> graphify query (component schema requirements)
-    BlueprintBuilder    --> graphify query (card API contracts)
-    PoCScaffolder       --> graphify query (card) + raw example file (full code)
-    PackageBuilder      --> graphify query (card) + raw example file (full code)
-```
-
-**Why PoCScaffolder and PackageBuilder still read raw files:** the card stores a `minimal_example` (a short importable snippet). For full PoC and package generation, the scaffolder needs the complete example script with configuration, error handling, and sample data paths. The graph node contains the file path; the scaffolder reads the file. The graph gives the pointer; the file gives the content.
-
-**Layered retrieval model across all releases:**
-
-| Agent | V1-V1 | V2 |
-|-------|--------|--------|
-| `ComponentSelector` | Registry fields (types, `best_for`, `known_limitations`) + reference-card options (V1) | Registry fields + Graphify queries (relationships) |
-| `SchemaDesigner` | Registry | Graphify (schema requirements per component) |
-| `BlueprintBuilder` | Registry + `example_blueprint_steps` + reference cards | Registry + Graphify (card API contracts) |
-| `PoCScaffolder` | `readme_path` + `example_script_path` + reference cards | Graphify card + raw example file |
-| `PackageBuilder` | `readme_path` + `example_script_path` | Graphify card + raw example file |
+| Agent | Information source |
+|-------|--------------------|
+| `ComponentSelector` | Registry fields (types, `best_for`, `known_limitations`) + reference-card `options` |
+| `SchemaDesigner` | Registry + `target_output_spec` |
+| `BlueprintBuilder` | Registry + `example_blueprint_steps` + reference cards |
+| `PoCScaffolder` | `readme_path` + `example_script_path` + reference cards |
+| `PackageBuilder` | `readme_path` + `example_script_path` + reference cards |
 
 ---
 
@@ -1732,7 +1673,6 @@ implementation_layer/
             generate_bpmn.py                <- V1+
             scaffold_poc.py                 <- V1+
             scaffold_package.py             <- V1+
-            generate_reference_cards.py     <- V1+
             apply_blueprint_patch.py        <- V2
             sync_bpmn_json.py               <- V2
             validate_blueprint_change.py    <- V2
@@ -1745,7 +1685,9 @@ implementation_layer/
                 validator.py                <- blueprint validation rules
                 visualizer.py               <- Mermaid / BPMN generation
                 scaffolder.py               <- PoC and package scaffolding
-        reference_cards/                    <- generated at V1+; card nodes fed to Graphify
+        registries/
+            gaik_component_registry.json    <- component/module catalog
+            component_reference_cards.json  <- hand-maintained call-pattern cards
         examples/
             incident_reporting_blueprint.json
             document_extraction_blueprint.json
@@ -1832,9 +1774,6 @@ All work lives under `implementation_layer/solution_wizard/`. The following is a
 ### Phase 2: V2 -- Future
 
 - Generate the standard Python package (`scaffold_package.py`, Section 17)
-- **Implement reference card generation**: a script (`generate_reference_cards.py`) that reads each component's `source_path`, `readme_path`, and `example_script_path` and produces a structured `reference_cards/<component_id>.json` per entry (class name, import path, constructor params, main method, return type, minimal importable example)
-- **Integrate reference cards into the Graphify graph**: extend the graphify update step to ingest `reference_cards/*.json` as nodes and link them to the corresponding source, example, and module nodes
-- **Add graph freshness validation** (`validate_graph_freshness.py`): compare card `source_path` modification times against card generation timestamps and warn when source files are newer
 - Implement BPMN canvas (bpmn-js or Camunda-compatible), step configuration panel with JSON preview, `apply_blueprint_patch.py`, `validate_blueprint_change.py`, `sync_bpmn_json.py` (BPMN ↔ JSON synchronization), and wizard chat for natural-language change requests
 
 ---
@@ -1878,7 +1817,7 @@ The GAIK Solution Configuration Wizard is a structured agent that turns a busine
 The two-release plan delivers usable value now and preserves a clear path for future extension:
 
 - **V1 (current)** delivers full requirement collection (with a completeness gate), component-option awareness, reference-card completeness, read-only BPMN visual blueprint, PoC scaffolding, and the use-case documentation suite — all in a single-agent `SKILL.md` with no sub-agents required.
-- **V2 (future)** adds full package generation, reference-card auto-generation + Graphify integration for component intelligence, and interactive BPMN editing with synchronized BPMN-JSON validation.
+- **V2 (future)** adds full package generation and interactive BPMN editing with synchronized BPMN-JSON validation.
 
 The solution is built on two complementary blueprints. The **JSON blueprint** is the executable source of truth: machine-readable, version-controlled, and the artifact that drives every downstream generation step. The **BPMN visual blueprint** is the business-process view: a standards-based model that makes the solution legible to stakeholders, supports process review and governance, and — in V2 — becomes directly editable with changes propagated back to the JSON. Neither blueprint diminishes the other; they serve different audiences and different purposes in the same solution lifecycle.
 
