@@ -7,6 +7,24 @@ The Solution Configuration Wizard is the Guidance Layer in action. It bridges th
 
 ---
 
+## Scope
+
+The wizard focuses on GenAI use cases that can be implemented using GAIK's existing software components or software modules. It supports at least the following use-case families:
+
+- Audio to structured data
+- Document to structured data
+- Complex document parsing and extraction
+- Vision-based extraction from images, scanned documents, charts, or technical drawings
+- Retrieval-augmented generation over document collections
+- Conversational access to internal knowledge
+- Report, summary, or proposal generation
+- Validation and evaluation of generated or extracted outputs
+- Enhanced speech-to-text, semantic and hybrid search across multiple data formats
+
+The wizard also supports hybrid use cases — for example, audio transcription followed by structured extraction and report generation, or document parsing followed by RAG-based question answering.
+
+---
+
 ## What the wizard does
 
 The wizard conducts a structured conversation that walks through the complete solution design and build process:
@@ -93,17 +111,17 @@ V1 is a single-agent `SKILL.md` skill deployable in Claude Code, Claude Desktop,
 
 ## V2 — Under development
 
-V2 adds full package generation and a production-grade Solution Wizard UI. All V1 capabilities carry over unchanged.
+V2 is aimed at making the wizard production-grade and accessible through a dedicated web UI. All V1 capabilities carry over unchanged.
 
 | Capability | V2 |
 |---|---|
+| Dedicated Solution Wizard web UI — structured multi-pane workspace for the full workflow | Planned |
+| Interactive BPMN editing — canvas editable with changes propagated back to the JSON | Planned |
 | Full installable use-case package | Planned |
-| BPMN directly editable via interactive canvas, with changes propagated back to the JSON | Planned |
-| Security and access control (auth, secrets management, data isolation) | Planned |
 | Gate 4: runtime validation of the full package | Planned |
-| Session recovery for the stateful BPMN editor | Planned |
+| Error handling and guardrails | Planned |
 
-The key addition in V2 is the **Solution Wizard UI**: a web application with a live BPMN canvas (bpmn-js), a step configuration panel, a wizard chat, and a JSON view — all synchronized so that a change in any pane is reflected in the others.
+The centrepiece of V2 is a **dedicated Solution Wizard web UI**: a purpose-built web application that hosts the entire wizard workflow — from requirement collection through blueprint design to PoC validation and package generation — replacing the current dependency on Claude Code/Desktop. Within the UI, the BPMN canvas becomes directly editable with all changes synchronized back to the JSON blueprint. V2 also adds production-grade error handling and wizard guardrails that scope generation to GAIK toolkit use cases, enforce safety constraints, and protect blueprint state across sessions.
 
 ---
 

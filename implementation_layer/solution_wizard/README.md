@@ -95,7 +95,7 @@ The diagram below shows the complete vision for the wizard across both releases.
 
 **What is implemented in V1 (current):** phases 1–12 as shown — session start and use-case intake (1), guided requirement collection (2), specification generation (3), Gate 1 specification validation (4), component selection (5), executable JSON blueprint (7), BPMN visual blueprint (8), Gate 2 workflow validation, PoC creation (10), PoC validation and refinement / Gate 3 (11), documentation suite. The BPMN is regenerated from the JSON blueprint and never edited directly; during PoC validation the wizard updates the JSON based on user feedback and regenerates the BPMN accordingly.
 
-**What is planned for V2:** robust BPMN generation, capability of dealing with diverse use cases, the interactive BPMN editing environment shown in phase 9 (BPMN canvas, step configuration panel, wizard chat, and synchronized JSON ↔ BPMN editing), full use-case package generation (phase 12), and within-wizard PoC running and validation.
+**What is planned for V2:** a dedicated Solution Wizard web UI that hosts the full wizard workflow as a structured multi-pane workspace; interactive BPMN editing within that UI (live canvas, step configuration panel, wizard chat, synchronized JSON ↔ BPMN); full use-case package generation; Gate 4 runtime validation of the full package; and production-grade error handling and guardrails (scoped to GAIK toolkit use cases, safety constraints, graceful recovery, and session state safety).
 
 ---
 

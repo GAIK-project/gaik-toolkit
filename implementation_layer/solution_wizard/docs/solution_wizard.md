@@ -778,22 +778,27 @@ V2 implementation is planned as described in §24.
 
 ## 23. V2 — What's Planned
 
-V2 builds on V1 without changing the pipeline shape or the V1 workflow. All V1 capabilities carry over unchanged. The following new capabilities are planned:
+V2 is aimed at making the wizard production-grade and accessible to a wider audience through a dedicated web UI. All V1 capabilities carry over unchanged. The following new capabilities are planned:
+
+**Dedicated Solution Wizard web UI**
+A purpose-built web application that hosts the entire wizard workflow — from requirement collection through blueprint design to PoC validation and package generation — in a structured multi-pane workspace. This replaces the current dependency on Claude Code/Desktop or a raw chat interface. The UI is intended to be self-contained and usable by domain experts without a developer tool installed.
+
+**Interactive BPMN editing**
+Within the Solution Wizard UI, the BPMN canvas becomes directly editable. Changes made through the canvas, a step configuration panel, or natural-language chat are converted to structured JSON change operations, validated by `BlueprintValidator`, and reflected back in the JSON blueprint. The BPMN is regenerated from the updated JSON — the JSON remains the source of truth. All changes are logged and reversible.
 
 **Full use-case package generation**
-Generates the standard installable Python package (see Section 15 for the layout): `src/`, `configs/`, `schemas/`, `prompts/`, `evals/`, `tests/`, `scripts/`. The package is executable from the command line and production-grade.
-
-**Solution Wizard UI — BPMN canvas + real-time JSON sync**
-A web application with four connected views: live BPMN canvas (bpmn-js or Camunda-compatible), step configuration panel, JSON preview, and wizard chat. All editing channels (visual canvas, step panel, natural-language chat) are converted to structured JSON change operations, validated by `BlueprintValidator`, and the BPMN is regenerated from the updated JSON. Changes are logged and reversible.
-
-**Security and access control**
-Authentication, authorization, secrets management, and data isolation between users and projects. Required before the wizard handles production-grade blueprints containing connection strings, API keys, and sensitive schemas.
+Generates a standard installable Python project (beyond the PoC): `src/`, `configs/`, `schemas/`, `prompts/`, `evals/`, `tests/`, `scripts/`. The package is executable from the command line and production-grade.
 
 **Gate 4: runtime validation of the full package**
-Runs the generated test suite (`tests/`) and evaluation scripts (`evals/`) against the full package inside the wizard UI. Gate 3 covers the PoC only; Gate 4 validates the production package before delivery.
+Runs the generated test suite (`tests/`) and evaluation scripts (`evals/`) against the full package inside the wizard UI before the package is declared production-ready. Gate 3 covers the PoC only; Gate 4 validates the full deliverable.
 
-**Session recovery**
-Auto-save and crash/resume for the stateful BPMN editor. An interrupted session can be resumed from the last consistent blueprint state without data loss.
+**Error handling and guardrails**
+Robust error handling and configurable guardrails for safe, production-grade use of the wizard:
+
+- **Error handling** — standard production-grade error handling across all wizard operations: meaningful error messages with actionable guidance, retry logic for transient API failures, input validation at system boundaries (file formats, blueprint structure, registry constraints), and structured logging for diagnostics and audit.
+- **Wizard guardrails** — scoping and safety constraints to keep the wizard within its intended boundaries: generation is limited to use cases supported by the GAIK toolkit (the wizard declines out-of-scope requests); constraints on what can be generated or modified (e.g. approved schemas are protected from overwrite); human review is enforced for safety-critical, legal, or high-impact outputs; cost and token usage are bounded to prevent runaway sessions; and generated packages cannot write to paths outside the user-specified output directory.
+- **Graceful error recovery** — clear error messages mapped to actionable guidance; failed steps (API calls, script runs, file writes) surface the root cause and suggest a fix rather than silently failing.
+- **Session and state safety** — auto-save of blueprint state so an interrupted session can be resumed without data loss; protection against partial writes that could leave the blueprint in an inconsistent state.
 
 **Staged sub-agents (optional)**
 If package generation and interactive BPMN editing grow the conversation state beyond a single context window, individual pipeline stages may be split into independent agents each receiving `use_case.blueprint.json` and returning a validated diff. The pipeline shape (§3.8) is unchanged; this is a realization choice, not a design change.
@@ -815,10 +820,10 @@ If package generation and interactive BPMN editing grow the conversation state b
 | Documentation suite (5 docs from blueprint) | ✓ | ✓ |
 | Single-agent `SKILL.md` (no sub-agents required) | ✓ | ✓ |
 | Full installable use-case package | — | ✓ |
-| BPMN directly editable via interactive canvas, with changes propagated back to the JSON | — | ✓ |
-| Security and access control | — | ✓ |
+| Dedicated Solution Wizard web UI (structured workspace for the full wizard workflow) | — | ✓ |
+| Interactive BPMN editing (canvas editable; changes propagated back to the JSON) | — | ✓ |
 | Gate 4: runtime validation of the full package | — | ✓ |
-| Session recovery for the stateful BPMN editor | — | ✓ |
+| Error handling and guardrails | — | ✓ |
 | Staged sub-agents (optional, if context size warrants) | — | ✓ |
 
 
