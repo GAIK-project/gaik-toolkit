@@ -780,6 +780,12 @@ V2 implementation is planned as described in §24.
 
 V2 is aimed at making the wizard production-grade and accessible to a wider audience through a dedicated web UI. All V1 capabilities carry over unchanged. The following new capabilities are planned:
 
+**Improved BPMN generation**
+More robust and accurate BPMN generation covering a wider range of pipeline patterns — including complex multi-role workflows, parallel branches, exception paths, and hybrid use cases. Enrichment conventions are extended to handle diverse real-world scenarios reliably.
+
+**Diverse use-case coverage (at least 10 tested)**
+V2 validates the wizard against at least 10 distinct use cases spanning all supported pattern families (audio-to-structured, document-to-structured, RAG, classification, vision, hybrid, etc.). Each tested use case produces a valid blueprint, correct BPMN, and a runnable PoC, establishing a verified baseline for production readiness.
+
 **Dedicated Solution Wizard web UI**
 A purpose-built web application that hosts the entire wizard workflow — from requirement collection through blueprint design to PoC validation and package generation — in a structured multi-pane workspace. This replaces the current dependency on Claude Code/Desktop or a raw chat interface. The UI is intended to be self-contained and usable by domain experts without a developer tool installed.
 
@@ -819,6 +825,8 @@ If package generation and interactive BPMN editing grow the conversation state b
 | Gate 3: PoC validation and refinement | ✓ | ✓ |
 | Documentation suite (5 docs from blueprint) | ✓ | ✓ |
 | Single-agent `SKILL.md` (no sub-agents required) | ✓ | ✓ |
+| Improved BPMN generation (complex workflows, parallel branches, exception paths) | — | ✓ |
+| Diverse use-case coverage (at least 10 tested) | — | ✓ |
 | Full installable use-case package | — | ✓ |
 | Dedicated Solution Wizard web UI (structured workspace for the full wizard workflow) | — | ✓ |
 | Interactive BPMN editing (canvas editable; changes propagated back to the JSON) | — | ✓ |
