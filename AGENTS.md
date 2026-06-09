@@ -15,17 +15,34 @@ Rule: after any change to gaik that affects its public surface, **remind the use
 
 `gaik-sync` scans gaik, presents its findings for approval, and only then syncs the approved changes into the wizard and runs the tests. It edits the wizard assets only — never gaik. A quick non-mutating check is `python .claude/skills/gaik-sync/scripts/audit_registry.py`.
 
-## graphify
+## graphify (optional — only when the tooling is present)
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+This repo has a committed knowledge graph in graphify-out/ (god nodes, community
+structure, cross-file relationships). The `graphify` CLI and skill are **not part
+of the toolkit's required setup** — some developers have them installed, others
+don't. Treat graphify as a best-effort accelerator, never a hard dependency.
 
-When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"` before doing anything else.
+**Availability gate — check before using, and degrade silently if absent:**
 
-Rules:
+- If the user types `/graphify` and a `graphify` skill is actually listed as
+  available, invoke it. If no such skill exists, do **not** attempt to invoke it —
+  just answer the request with normal search.
+- If the `graphify` CLI is installed, prefer it for codebase questions:
+  `graphify query "<question>"`, `graphify path "<A>" "<B>"`,
+  `graphify explain "<concept>"`. These return a scoped subgraph, usually much
+  smaller than GRAPH_REPORT.md or raw grep.
+- If the CLI is **not** installed and no skill is available, skip graphify entirely
+  and use the normal tools (Grep/Glob/Read). Do not announce graphify or report it
+  as missing — silently fall back. The committed graphify-out/ artifacts
+  (graph.json, GRAPH_REPORT.md, wiki/) may be read directly as an optional
+  fallback, but reading them is never required.
 
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- If the `graphify` CLI is not installed, read the committed graphify-out/ artifacts directly (graph.json, GRAPH_REPORT.md, wiki/) instead of running the commands.
-- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+When graphify *is* in use:
+
+- Dirty graphify-out/ files after hooks or incremental updates are expected and not
+  a reason to skip it. Only skip if the task is about stale/incorrect graph output,
+  or the user says not to use it.
+- Prefer graphify-out/wiki/index.md for broad navigation, GRAPH_REPORT.md only for
+  broad architecture review or when query/path/explain don't surface enough.
+- After modifying code, `graphify update .` keeps the graph current (AST-only, no
+  API cost) — only if the CLI is installed.
