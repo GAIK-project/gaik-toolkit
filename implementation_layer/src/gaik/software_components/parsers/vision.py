@@ -18,6 +18,7 @@ import logging
 import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 try:  # Optional dependency, documented via extra: gaik[vision]
@@ -173,6 +174,27 @@ class VisionParser:
         if clean_output and len(markdown_pages) > 1:
             return [self._clean_markdown(markdown_pages)]
         return markdown_pages
+
+    def convert_image(self, image_path: str | Path) -> str:
+        """Convert a single image file to Markdown.
+
+        Unlike :meth:`convert_pdf` (which renders PDF pages to images first),
+        this reads an existing image file (``.png``, ``.jpg``, ``.jpeg``,
+        ``.webp``, ``.tiff`` …) and sends it straight to the vision model.
+
+        Parameters
+        ----------
+        image_path:
+            Path to the image file.
+
+        Returns
+        -------
+        str
+            Markdown extracted from the image.
+        """
+
+        image_bytes = Path(image_path).read_bytes()
+        return self._parse_image(image_bytes, page=1, previous_context=None)
 
     def save_markdown(
         self,

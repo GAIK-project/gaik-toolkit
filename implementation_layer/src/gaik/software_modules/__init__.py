@@ -4,4 +4,5 @@ __all__ = [
     "audio_to_structured_data",
     "documents_to_structured_data",
     "RAG_workflow",
+    "multi_source_report_generator",
 ]

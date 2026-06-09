@@ -41,7 +41,8 @@ def main() -> None:
     transcriber = Transcriber(
         api_config=config,
         output_dir=args.output_dir,
-        enhanced_transcript=True,
+        enhanced_transcript=False,
+        compress_audio=True
     )
 
     result = transcriber.transcribe(

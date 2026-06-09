@@ -238,6 +238,7 @@ all = [
     "gaik[rag-workflow]",
     "gaik[audio-to-structured-data]",
     "gaik[documents-to-structured-data]",
+    "gaik[multi-source-report-generator]",
     "gaik[llm-judge]",
     "gaik[finnish-rag]",
     "gaik[evaluators]",
@@ -253,6 +254,13 @@ audio-to-structured-data = [
 documents-to-structured-data = [
     "gaik[parser]",
     "gaik[extract]",
+]
+
+multi-source-report-generator = [
+    "gaik[parser]",
+    "gaik[transcriber]",
+    "gaik[extract]",
+    "openpyxl>=3.1",
 ]
 
 # CPU-only variants (no GPU/torch/docling dependencies)

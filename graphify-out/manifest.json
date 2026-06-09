@@ -10,7 +10,7 @@
     "semantic_hash": "b911e9da8bdcbd5b989cc943827b3beb"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\guidance_layer\\website\\mdx-components.tsx": {
-    "mtime": 1767285396.1233137,
+    "mtime": 1780873500.3709805,
     "ast_hash": "171846b2e2bcc5cfee9a2b31316c42bb",
     "semantic_hash": "171846b2e2bcc5cfee9a2b31316c42bb"
   },
@@ -70,7 +70,7 @@
     "semantic_hash": "871bb49a2c73eb42107b38a73ab07e66"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\guidance_layer\\website\\content\\docs\\meta.json": {
-    "mtime": 1771002598.5914066,
+    "mtime": 1780873908.2490935,
     "ast_hash": "2f93018185e7794c62ecf80b55995164",
     "semantic_hash": "2f93018185e7794c62ecf80b55995164"
   },
@@ -180,14 +180,14 @@
     "semantic_hash": "c6724a2fd178d77483778ba049315162"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\api\\utils\\diary_pdf.py": {
-    "mtime": 1769782141.589244,
-    "ast_hash": "e5788643e09deacb6503fd73d258f7d5",
-    "semantic_hash": "e5788643e09deacb6503fd73d258f7d5"
+    "mtime": 1780869897.9560661,
+    "ast_hash": "57a088524f7f739c88250da4ce3ef340",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\api\\utils\\pdf_generator.py": {
-    "mtime": 1769782141.589244,
-    "ast_hash": "694d689c7d5e31df94851dccee8883a7",
-    "semantic_hash": "694d689c7d5e31df94851dccee8883a7"
+    "mtime": 1780869897.9575753,
+    "ast_hash": "43ccbc0f740602b1fa9e06325c1bf806",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\api\\utils\\__init__.py": {
     "mtime": 1773307853.2966952,
@@ -200,19 +200,19 @@
     "semantic_hash": "4d3fb04232aef7f325cc57cea48f46fa"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\eval_methods\\transcription_eval\\enhance_transcript.py": {
-    "mtime": 1777200700.1750662,
-    "ast_hash": "edc81370286328c2fd6fa81aec8dff60",
-    "semantic_hash": "edc81370286328c2fd6fa81aec8dff60"
+    "mtime": 1780869897.960588,
+    "ast_hash": "27cc0bd6690b87de6f3713ff7dcac55f",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\eval_methods\\transcription_eval\\eval_enhanced.py": {
-    "mtime": 1768938964.5803754,
-    "ast_hash": "3abfa19453e19e14e6aadc2eaf52d0ed",
-    "semantic_hash": "3abfa19453e19e14e6aadc2eaf52d0ed"
+    "mtime": 1780869897.960588,
+    "ast_hash": "27c0751a70b183fdfa144002637c8bf2",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\eval_methods\\transcription_eval\\side_by_side_compare.py": {
-    "mtime": 1768940633.933997,
-    "ast_hash": "2f4dbaa265c7cb441233eda1985bff81",
-    "semantic_hash": "2f4dbaa265c7cb441233eda1985bff81"
+    "mtime": 1780869897.9615884,
+    "ast_hash": "1e03bf3e7634c4f82da978ef1a4dcfa1",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\classifier\\classification_example.py": {
     "mtime": 1769701772.4930353,
@@ -225,14 +225,14 @@
     "semantic_hash": "d10b2ea4cda034a6d73e13d746ea6460"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\evaluators\\extraction_evaluator_example.py": {
-    "mtime": 1777847871.4199615,
-    "ast_hash": "718f17e0b853b7efe6763a9a59dd8058",
-    "semantic_hash": "718f17e0b853b7efe6763a9a59dd8058"
+    "mtime": 1780869897.9665875,
+    "ast_hash": "7d879690b38d8d970162f733e165ceec",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\evaluators\\rag_evaluator_example.py": {
-    "mtime": 1777847871.4199615,
-    "ast_hash": "24a1fee0d4b08882d293a6992dbab212",
-    "semantic_hash": "24a1fee0d4b08882d293a6992dbab212"
+    "mtime": 1780869897.9675858,
+    "ast_hash": "e13906aff69ea18fdb55450ba0eec1df",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\evaluators\\rag_response_evaluator_example.py": {
     "mtime": 1779041509.0029926,
@@ -265,9 +265,9 @@
     "semantic_hash": "07a121e13532bdc3b1156c8953bcb63d"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\llm\\example_multi_provider_extractor.py": {
-    "mtime": 1777291144.5782106,
-    "ast_hash": "77071e261b7b2fbae1a8e2092a0c6efc",
-    "semantic_hash": "77071e261b7b2fbae1a8e2092a0c6efc"
+    "mtime": 1780869897.9675858,
+    "ast_hash": "848dab2882df3346409fca45bb512786",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\llm\\example_provider_client_basics.py": {
     "mtime": 1777291144.579209,
@@ -275,14 +275,14 @@
     "semantic_hash": "ef3c3065e1392f9f0531526fc886fb86"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\parsers\\demo_docling.py": {
-    "mtime": 1773174065.7365255,
-    "ast_hash": "4898287951ea072b88e61466d4134aa4",
-    "semantic_hash": "4898287951ea072b88e61466d4134aa4"
+    "mtime": 1780869897.9685876,
+    "ast_hash": "ec6c109042e96ace11112c8d88da0c99",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\parsers\\demo_docling_api_client.py": {
-    "mtime": 1773176067.5410516,
-    "ast_hash": "b010d0c51a53b286150633a1a80949fc",
-    "semantic_hash": "b010d0c51a53b286150633a1a80949fc"
+    "mtime": 1780869897.9695864,
+    "ast_hash": "e294ee3143f2780323a77dc16a765193",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\parsers\\demo_multimodal_parser.py": {
     "mtime": 1777200700.1827958,
@@ -295,9 +295,9 @@
     "semantic_hash": "d72cc26c192a45df3d72aec1a7e4051e"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\parsers\\demo_visionPlus.py": {
-    "mtime": 1773174582.8218143,
-    "ast_hash": "6a33d315bb8a4f16cda47a5e9cfe2e91",
-    "semantic_hash": "6a33d315bb8a4f16cda47a5e9cfe2e91"
+    "mtime": 1780869897.9705877,
+    "ast_hash": "bf8d9d93271a0330ace60bbe59c6ba7b",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\parsers\\demo_vision_simple.py": {
     "mtime": 1772633681.2021084,
@@ -325,14 +325,14 @@
     "semantic_hash": "5015c52975e935708f13c6272491f63b"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\RAG\\rag_parser_docling_example.py": {
-    "mtime": 1777200700.177111,
-    "ast_hash": "7f8ea943310dc9d085cc507307ee9697",
-    "semantic_hash": "7f8ea943310dc9d085cc507307ee9697"
+    "mtime": 1780869897.964589,
+    "ast_hash": "9a5d1bf2b280177b0061faa896243648",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\RAG\\rag_parser_vision_example.py": {
-    "mtime": 1777200700.177111,
-    "ast_hash": "86effda1f4043c5b6caac37236690745",
-    "semantic_hash": "86effda1f4043c5b6caac37236690745"
+    "mtime": 1780869897.964589,
+    "ast_hash": "d0dedc05eb00b06e340097fc340372e9",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\RAG\\retriever_example.py": {
     "mtime": 1777200700.1783612,
@@ -345,14 +345,14 @@
     "semantic_hash": "6a2372a82f85f766854c2552dcce68cc"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\RAG\\video_search_example.py": {
-    "mtime": 1777200700.180409,
-    "ast_hash": "d59786f3eaa40d2309da9f8313c0c149",
-    "semantic_hash": "d59786f3eaa40d2309da9f8313c0c149"
+    "mtime": 1780869897.965588,
+    "ast_hash": "b2bd79afad0077ac67c7ce021eb67875",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\schema-generator\\schema_generation_example.py": {
-    "mtime": 1779103212.9440856,
-    "ast_hash": "aa18cb84cd85c506c56f8e45bc5d2113",
-    "semantic_hash": "aa18cb84cd85c506c56f8e45bc5d2113"
+    "mtime": 1780869897.9715877,
+    "ast_hash": "a288842d6d4681b2b0e58a148cba5b2d",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\schema-generator\\schema_generated_single_doc\\requirements.json": {
     "mtime": 1779103228.0301774,
@@ -360,9 +360,9 @@
     "semantic_hash": "a12dff720f2e1e607921bb2b3be5ac77"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\schema-generator\\schema_generated_single_doc\\schema.py": {
-    "mtime": 1779103228.0291786,
-    "ast_hash": "d25b6c747be78785b14cdabba32fdaf9",
-    "semantic_hash": "d25b6c747be78785b14cdabba32fdaf9"
+    "mtime": 1780869897.9715877,
+    "ast_hash": "fa4361b7db7baba16f57b1049cbd7e00",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\schema-generator\\schema_generated_single_doc\\schema_info.json": {
     "mtime": 1779103228.0301774,
@@ -370,14 +370,14 @@
     "semantic_hash": "dd97487520702a6507df7a119e5193d0"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\text_to_speech\\text_to_speech_example.py": {
-    "mtime": 1773602073.375815,
-    "ast_hash": "fa29ef5581d0288dffbe0c41d4fa2b85",
-    "semantic_hash": "fa29ef5581d0288dffbe0c41d4fa2b85"
+    "mtime": 1780869897.9727888,
+    "ast_hash": "2a620ebda65f098b2fce6ad0ae7f9545",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\transcriber\\local_whisper_subtitles_example.py": {
-    "mtime": 1773174065.6355498,
-    "ast_hash": "91d46239760a84c561007cce10ffbfea",
-    "semantic_hash": "91d46239760a84c561007cce10ffbfea"
+    "mtime": 1780869897.9737935,
+    "ast_hash": "049eb9dde088b67202dd5dde74f878f5",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\transcriber\\transcriber_example.py": {
     "mtime": 1774482021.5382752,
@@ -385,9 +385,9 @@
     "semantic_hash": "d62bbac6e49ca7752c4230923ce37f50"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\transcriber\\transcriber_exmaple_local_model.py": {
-    "mtime": 1777200700.1838179,
-    "ast_hash": "afc7809ebb8f9ba6a7cd6487e8b86c07",
-    "semantic_hash": "afc7809ebb8f9ba6a7cd6487e8b86c07"
+    "mtime": 1780869897.9737935,
+    "ast_hash": "1cec6e5af140af4464413b246ca2a888",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\validators\\demo_calibration.py": {
     "mtime": 1777847871.4209614,
@@ -395,19 +395,19 @@
     "semantic_hash": "16dcc9e016efa187fdfa85e5cac9695c"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\validators\\demo_detect_hallucinations.py": {
-    "mtime": 1777847871.4209614,
-    "ast_hash": "3935eecd3619409fa85eaa9370946391",
-    "semantic_hash": "3935eecd3619409fa85eaa9370946391"
+    "mtime": 1780869897.9748027,
+    "ast_hash": "2f14ef31c58289fa859d035f8234f00d",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\validators\\demo_judgebench_comparison.py": {
-    "mtime": 1780330655.5952973,
-    "ast_hash": "43051589a8864bd2d5bb96f3a652e4dc",
+    "mtime": 1780869897.9748027,
+    "ast_hash": "526361d5c6d142d108996e8ebb60cd6d",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\validators\\demo_likert_scoring.py": {
-    "mtime": 1777847871.4229681,
-    "ast_hash": "bb4d4968276a6380c5b20d1defa4462f",
-    "semantic_hash": "bb4d4968276a6380c5b20d1defa4462f"
+    "mtime": 1780869897.975801,
+    "ast_hash": "5883badb4bbe2d2b83debf9d674a0df9",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\validators\\demo_llm_judge.py": {
     "mtime": 1777847871.4239802,
@@ -415,9 +415,9 @@
     "semantic_hash": "a10e485c6c770a30657221747da11ca4"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\validators\\demo_llm_judge_text_pair.py": {
-    "mtime": 1777847871.4239802,
-    "ast_hash": "fc6ee2713d77a663a67fd69421012130",
-    "semantic_hash": "fc6ee2713d77a663a67fd69421012130"
+    "mtime": 1780869897.9768012,
+    "ast_hash": "3e69f22026863b3ee9a50b5a32668d94",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\validators\\demo_pairwise.py": {
     "mtime": 1777847871.4249802,
@@ -425,9 +425,9 @@
     "semantic_hash": "036f70f54ec57b98f3e1c4871974aa73"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\validators\\demo_panel_jury.py": {
-    "mtime": 1777847871.4249802,
-    "ast_hash": "08f66ab3a8d43ba4de7ce8e882f33072",
-    "semantic_hash": "08f66ab3a8d43ba4de7ce8e882f33072"
+    "mtime": 1780869897.9768012,
+    "ast_hash": "6cba2cdd24e8d4a6b6278a6baefcb825",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\vision_extractor\\blueprint.json": {
     "mtime": 1779172193.2640731,
@@ -440,14 +440,14 @@
     "semantic_hash": "45cbfbb0e85e770d6ce6eb6469f80c6c"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\vision_extractor\\vision_extractor_example.py": {
-    "mtime": 1779170057.3619719,
-    "ast_hash": "04d7e9e77c95bc156aec989155addc11",
-    "semantic_hash": "04d7e9e77c95bc156aec989155addc11"
+    "mtime": 1780869897.9781704,
+    "ast_hash": "12c0206d5ee9b3c28144c9fed914a816",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\vision_extractor\\vision_extractor_example_minimal.py": {
-    "mtime": 1779172300.531981,
-    "ast_hash": "12d38d2de7f4cefb807cc3da262882eb",
-    "semantic_hash": "12d38d2de7f4cefb807cc3da262882eb"
+    "mtime": 1780869897.9791782,
+    "ast_hash": "476647d2aaa728366eff9a37b92ee5db",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\vision_extractor\\PO_schema\\requirements.json": {
     "mtime": 1779109567.3315725,
@@ -455,9 +455,9 @@
     "semantic_hash": "a5bdf45758441be3dae13cada754fe14"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\vision_extractor\\PO_schema\\schema.py": {
-    "mtime": 1779109567.3320816,
-    "ast_hash": "4fd662079a017651cdfcce9d72a538dc",
-    "semantic_hash": "4fd662079a017651cdfcce9d72a538dc"
+    "mtime": 1780869897.9781704,
+    "ast_hash": "3f8880923df64ac2200baf4fd1eef317",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\audio_to_structured_data\\pipeline_example.py": {
     "mtime": 1774482021.5392766,
@@ -465,19 +465,19 @@
     "semantic_hash": "c1a5d08b2e5f5ec4c328b288689cf015"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\audio_to_structured_data\\diary_workflow\\diary_creation_workflow.py": {
-    "mtime": 1777200700.185849,
-    "ast_hash": "741b4342e780d53f8e2a0f53765b7bdb",
-    "semantic_hash": "741b4342e780d53f8e2a0f53765b7bdb"
+    "mtime": 1780869897.9801762,
+    "ast_hash": "87650f9a88ca50b3c751da6086ae39f5",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\audio_to_structured_data\\diary_workflow\\pdf_generator.py": {
-    "mtime": 1777200700.1868613,
-    "ast_hash": "2e9a6f15490eea041c215bb1a36b141f",
-    "semantic_hash": "2e9a6f15490eea041c215bb1a36b141f"
+    "mtime": 1780869897.9801762,
+    "ast_hash": "c6c3a31d586741337fa9fefeda83ce62",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\audio_to_structured_data\\diary_workflow\\schema\\schema.py": {
-    "mtime": 1777200700.1879835,
-    "ast_hash": "f2e03448309ef4e08c716c996fafb673",
-    "semantic_hash": "f2e03448309ef4e08c716c996fafb673"
+    "mtime": 1780869897.981177,
+    "ast_hash": "9a85370e2d1a999eb9e319ce5943e6cc",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\audio_to_structured_data\\diary_workflow\\schema\\schema_requirements.json": {
     "mtime": 1767285396.1945798,
@@ -485,9 +485,9 @@
     "semantic_hash": "0885776298427a4a4208830d7e82be24"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\audio_to_structured_data\\schema\\schema.py": {
-    "mtime": 1777200700.189,
-    "ast_hash": "46527358aa7d8e140cf6536d22231736",
-    "semantic_hash": "46527358aa7d8e140cf6536d22231736"
+    "mtime": 1780869897.981177,
+    "ast_hash": "df93402d208e3472e6e3c0d589dcaa1b",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\audio_to_structured_data\\schema\\schema_requirements.json": {
     "mtime": 1774482021.5402768,
@@ -505,19 +505,19 @@
     "semantic_hash": "6092878d57bc2deb1bb03481f2a618d1"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\no-code-assets\\agent-skills\\construction-diary-creation\\transcription-MCP\\server.py": {
-    "mtime": 1777200700.19002,
-    "ast_hash": "bf6e982db97d7e3a101cda4300e32671",
-    "semantic_hash": "bf6e982db97d7e3a101cda4300e32671"
+    "mtime": 1780869897.9821768,
+    "ast_hash": "f82b7ccdc78ed9cf312e5ba5fb56ce6e",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\no-code-assets\\agent-skills\\incident-report-writing\\transcription-MCP\\server.py": {
-    "mtime": 1777200700.192055,
-    "ast_hash": "bf6e982db97d7e3a101cda4300e32671",
-    "semantic_hash": "bf6e982db97d7e3a101cda4300e32671"
+    "mtime": 1780869897.9821768,
+    "ast_hash": "f82b7ccdc78ed9cf312e5ba5fb56ce6e",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\no-code-assets\\agent-skills\\report-writing-skill\\transcription-MCP\\server.py": {
-    "mtime": 1777200700.1930673,
-    "ast_hash": "bf6e982db97d7e3a101cda4300e32671",
-    "semantic_hash": "bf6e982db97d7e3a101cda4300e32671"
+    "mtime": 1780869897.9821768,
+    "ast_hash": "f82b7ccdc78ed9cf312e5ba5fb56ce6e",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\__init__.py": {
     "mtime": 1773847669.3234494,
@@ -570,9 +570,9 @@
     "semantic_hash": "9914ab64ad54156355e36f4e5930b249"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\enhance_transcript\\enhance_transcript.py": {
-    "mtime": 1779041509.0059977,
-    "ast_hash": "459c72203e2cfb260e8f4cd5b105535a",
-    "semantic_hash": "459c72203e2cfb260e8f4cd5b105535a"
+    "mtime": 1780869897.985176,
+    "ast_hash": "a808a6174f6c50add09fe4a1bd401d60",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\enhance_transcript\\__init__.py": {
     "mtime": 1774482021.541277,
@@ -580,44 +580,44 @@
     "semantic_hash": "783116451dd21ab94beee6fd7b67fba1"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\evaluators\\dataset.py": {
-    "mtime": 1777847871.4299748,
-    "ast_hash": "b3da08ec87598786f6d79d5aaa72b62f",
-    "semantic_hash": "b3da08ec87598786f6d79d5aaa72b62f"
+    "mtime": 1780869897.9861777,
+    "ast_hash": "8ae59b5a7c658e977a63e1ab7c4f4424",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\evaluators\\extraction_evaluator.py": {
-    "mtime": 1777847871.4299748,
-    "ast_hash": "0f6916a04c2640bba70b2ccec727c1d5",
-    "semantic_hash": "0f6916a04c2640bba70b2ccec727c1d5"
+    "mtime": 1780869897.9871764,
+    "ast_hash": "361bb92e2f22f1e6ca3c0b0513512da3",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\evaluators\\rag_evaluator.py": {
-    "mtime": 1777847871.4309747,
-    "ast_hash": "8e606a6ee01528a3f492c63ce88c297c",
-    "semantic_hash": "8e606a6ee01528a3f492c63ce88c297c"
+    "mtime": 1780869897.9871764,
+    "ast_hash": "7d7b54dde241afafb7c623678ad381a9",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\evaluators\\rag_response_evaluator.py": {
-    "mtime": 1779041509.006997,
-    "ast_hash": "a92a833beba5496649183f5f30a2aa6b",
-    "semantic_hash": "a92a833beba5496649183f5f30a2aa6b"
+    "mtime": 1780869897.9881778,
+    "ast_hash": "e6886c92582f116ffa6fe8bf8e5ee0f7",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\evaluators\\runner.py": {
-    "mtime": 1777847871.4309747,
-    "ast_hash": "f8a72d0f488a70e678b03ece00df977e",
-    "semantic_hash": "f8a72d0f488a70e678b03ece00df977e"
+    "mtime": 1780869897.9891758,
+    "ast_hash": "db653edebff89970fb56fa258454b8a3",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\evaluators\\__init__.py": {
-    "mtime": 1779041509.006997,
-    "ast_hash": "7d4ac7223af732af5138dbdb1e522b4d",
-    "semantic_hash": "7d4ac7223af732af5138dbdb1e522b4d"
+    "mtime": 1780869897.985176,
+    "ast_hash": "8de51275a1899091d76ae5ab24a4e7ad",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\extractor\\extractor.py": {
-    "mtime": 1777848059.834049,
-    "ast_hash": "1f3587dc776d71d6e6d441ff30398c85",
-    "semantic_hash": "1f3587dc776d71d6e6d441ff30398c85"
+    "mtime": 1780869897.9901774,
+    "ast_hash": "8537b8e9d2133bdea3ee03f6bdb10e31",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\extractor\\schema.py": {
-    "mtime": 1779101547.4999106,
-    "ast_hash": "37a37cf322d6a1aaf3bdfa66868c544f",
-    "semantic_hash": "37a37cf322d6a1aaf3bdfa66868c544f"
+    "mtime": 1780869897.992175,
+    "ast_hash": "f301ebfa584d9d603edfb5d25a69c9c5",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\extractor\\__init__.py": {
     "mtime": 1779101590.646113,
@@ -635,39 +635,39 @@
     "semantic_hash": "6556ef1bcbbf9aae62976376fb44af7d"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\llm\\anthropic_provider.py": {
-    "mtime": 1777291144.584716,
-    "ast_hash": "b5c8f4395cda59ae34e19e43ae1cb7a6",
-    "semantic_hash": "b5c8f4395cda59ae34e19e43ae1cb7a6"
+    "mtime": 1780869897.992175,
+    "ast_hash": "531472e55935105f5647394eb2f9c432",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\llm\\base.py": {
-    "mtime": 1777291144.584716,
-    "ast_hash": "db761eaa5fd58c08293e8f3f5e7b06cf",
-    "semantic_hash": "db761eaa5fd58c08293e8f3f5e7b06cf"
+    "mtime": 1780869897.993176,
+    "ast_hash": "04a672b77ec11ac95a7e6fbfdda1fd47",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\llm\\config.py": {
-    "mtime": 1777291144.584716,
-    "ast_hash": "1bd865b75ed5ed2c35bac13a75fc500c",
-    "semantic_hash": "1bd865b75ed5ed2c35bac13a75fc500c"
+    "mtime": 1780869897.9941761,
+    "ast_hash": "dad1ea5479771b29dc31ea366f10a323",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\llm\\factory.py": {
-    "mtime": 1777291144.584716,
-    "ast_hash": "61e078e75220c90c74df1fcaa986bfee",
-    "semantic_hash": "61e078e75220c90c74df1fcaa986bfee"
+    "mtime": 1780869897.9941761,
+    "ast_hash": "3ff59649b537961ef860b866cd6fd176",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\llm\\google_provider.py": {
-    "mtime": 1777291144.5857258,
-    "ast_hash": "2f339747292443446e6361039e9ed25a",
-    "semantic_hash": "2f339747292443446e6361039e9ed25a"
+    "mtime": 1780869897.9951756,
+    "ast_hash": "d6742122948235a74c3fc5d5ceaab859",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\llm\\openai_provider.py": {
-    "mtime": 1777291144.5867243,
-    "ast_hash": "f3ed520208de6befca9589c7836729c7",
-    "semantic_hash": "f3ed520208de6befca9589c7836729c7"
+    "mtime": 1780869897.9951756,
+    "ast_hash": "80bd29b537fbc42440bcc4ab086d573e",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\llm\\providers.py": {
-    "mtime": 1777291144.5867243,
-    "ast_hash": "25bd1e0fbbc2de422ed0024ecae24bd3",
-    "semantic_hash": "25bd1e0fbbc2de422ed0024ecae24bd3"
+    "mtime": 1780869897.996178,
+    "ast_hash": "44b8b3fe86a83aa9dd6f94dc22c8cdc1",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\llm\\__init__.py": {
     "mtime": 1777291144.5832088,
@@ -690,9 +690,9 @@
     "semantic_hash": "707eebb7c95677ea7cf3c328e971049f"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\parallel_transcriber\\pipeline.py": {
-    "mtime": 1778617247.1628144,
-    "ast_hash": "3dcc1d07247be4943810a0d05c3c3a70",
-    "semantic_hash": "3dcc1d07247be4943810a0d05c3c3a70"
+    "mtime": 1780869897.9971776,
+    "ast_hash": "ea164847067a9c50b5e2018e8cd9416f",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\parallel_transcriber\\srt.py": {
     "mtime": 1770995620.8994832,
@@ -730,9 +730,9 @@
     "semantic_hash": "e744a82bf58332c1f2b42b1af0b81523"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\parsers\\vision.py": {
-    "mtime": 1777291144.5887225,
-    "ast_hash": "def61979c4ab21cefb7c8e2bbf3ca2a9",
-    "semantic_hash": "def61979c4ab21cefb7c8e2bbf3ca2a9"
+    "mtime": 1780936301.3295233,
+    "ast_hash": "a743e5a983700ab5ba48353b97497989",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\parsers\\visionPlus.py": {
     "mtime": 1773847669.3294618,
@@ -745,14 +745,14 @@
     "semantic_hash": "cd6418b18be345c4ca2dbf726190626e"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\parsers\\multimodal_parser\\config.py": {
-    "mtime": 1776626774.4182763,
-    "ast_hash": "511cd076c5745fde028afbeb8fac766d",
-    "semantic_hash": "511cd076c5745fde028afbeb8fac766d"
+    "mtime": 1780869897.9971776,
+    "ast_hash": "f73ac890321d2cf7d5da7075cc965982",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\parsers\\multimodal_parser\\multimodal_parser.py": {
-    "mtime": 1778617247.2145433,
-    "ast_hash": "d1122154f474a32e1e8a87fb36299e24",
-    "semantic_hash": "d1122154f474a32e1e8a87fb36299e24"
+    "mtime": 1780869897.9981756,
+    "ast_hash": "08226f2d48bea5eb31f486f6efea33f3",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\parsers\\multimodal_parser\\pricing.py": {
     "mtime": 1777847871.4339747,
@@ -780,9 +780,9 @@
     "semantic_hash": "1ae1347a20cfcefaf31af516444687d8"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\RAG\\answer_generator\\generator.py": {
-    "mtime": 1777291144.579209,
-    "ast_hash": "66b79fcfd584a740ed5f0d8cb65af380",
-    "semantic_hash": "66b79fcfd584a740ed5f0d8cb65af380"
+    "mtime": 1780869897.9831772,
+    "ast_hash": "ea3a4aa53efca58ccd5307d30fb7b415",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\RAG\\answer_generator\\__init__.py": {
     "mtime": 1769701611.5383112,
@@ -800,9 +800,9 @@
     "semantic_hash": "cb96fc73f604ee57a7d3c477eb7ebe5e"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\RAG\\finnish_text_processor\\backends.py": {
-    "mtime": 1777847871.427974,
-    "ast_hash": "a2d6f136a7e77435d6d0e0e6327ef68a",
-    "semantic_hash": "a2d6f136a7e77435d6d0e0e6327ef68a"
+    "mtime": 1780869897.9841776,
+    "ast_hash": "b5baf6c9037131595c5403b839dc3cae",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\RAG\\finnish_text_processor\\normalize.py": {
     "mtime": 1777847871.427974,
@@ -810,9 +810,9 @@
     "semantic_hash": "113570f1096af93e6f540a7e1585a5a1"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\RAG\\finnish_text_processor\\processor.py": {
-    "mtime": 1777847871.4289749,
-    "ast_hash": "d46dc3330dd3c2acaeae95d5305be5b6",
-    "semantic_hash": "d46dc3330dd3c2acaeae95d5305be5b6"
+    "mtime": 1780869897.9841776,
+    "ast_hash": "bf905634b55e4b167b437781858be578",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\RAG\\finnish_text_processor\\__init__.py": {
     "mtime": 1777847871.427974,
@@ -920,9 +920,9 @@
     "semantic_hash": "6cf574ef186e7ff4d895174c2c8469be"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\transcriber\\transcriber.py": {
-    "mtime": 1777847871.4349747,
-    "ast_hash": "c1a114956f29be83bec6e8e2ebac7bb6",
-    "semantic_hash": "c1a114956f29be83bec6e8e2ebac7bb6"
+    "mtime": 1780950584.1999705,
+    "ast_hash": "70ffaaa0331cc38c5f74096618d11a1a",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\transcriber\\whisper_local.py": {
     "mtime": 1773847669.3324502,
@@ -940,14 +940,14 @@
     "semantic_hash": "56f25352e62b08782ef14d29b75dc303"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\validators\\llm_judge\\calibration.py": {
-    "mtime": 1777847871.435975,
-    "ast_hash": "ee15de8ffa2c4d81f87f63c59895e8a0",
-    "semantic_hash": "ee15de8ffa2c4d81f87f63c59895e8a0"
+    "mtime": 1780869898.0011773,
+    "ast_hash": "abe77cf5059a180c7327710c4e1cee38",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\validators\\llm_judge\\llm_judge.py": {
-    "mtime": 1777847871.435975,
-    "ast_hash": "d8bf87c8321edbd4eee8ade725bb6e98",
-    "semantic_hash": "d8bf87c8321edbd4eee8ade725bb6e98"
+    "mtime": 1780869898.0011773,
+    "ast_hash": "d3565ed71bf53e090e3cbd266a6592b6",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\validators\\llm_judge\\pairwise.py": {
     "mtime": 1777847871.4369743,
@@ -960,8 +960,8 @@
     "semantic_hash": "05c4feda43213c6c21b567ecdc4961f3"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\validators\\llm_judge\\pricing.py": {
-    "mtime": 1780330655.6003692,
-    "ast_hash": "312a52a2d11f2fffb46e3d390c2cc0b7",
+    "mtime": 1780869898.002178,
+    "ast_hash": "b4c56cc693aa2fe2893e786a3cb3e1a8",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\validators\\llm_judge\\prompts.py": {
@@ -970,9 +970,9 @@
     "semantic_hash": "460bbdb9762f0763f7ee45a8f1c8ba66"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\validators\\llm_judge\\schema.py": {
-    "mtime": 1777847871.4379747,
-    "ast_hash": "d4e402ae2c18dd383c2b875f013bd152",
-    "semantic_hash": "d4e402ae2c18dd383c2b875f013bd152"
+    "mtime": 1780869898.002178,
+    "ast_hash": "546e6085887528d7f6e021d55233ded2",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\validators\\llm_judge\\__init__.py": {
     "mtime": 1777847871.435975,
@@ -985,19 +985,19 @@
     "semantic_hash": "ba2e304c87418c0d927885e4dfa11d6a"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\vision_extractor\\vision_extractor.py": {
-    "mtime": 1779101609.7631624,
-    "ast_hash": "d69ce38a56c3a7db2969cad703ab374b",
-    "semantic_hash": "d69ce38a56c3a7db2969cad703ab374b"
+    "mtime": 1780869898.0071774,
+    "ast_hash": "c1b33c8ea8e8c0a326dfd14db96a448a",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\vision_extractor\\__init__.py": {
-    "mtime": 1778617247.2145433,
-    "ast_hash": "36aba6bad5dff1cbcbcb1b736cc7c58f",
-    "semantic_hash": "36aba6bad5dff1cbcbcb1b736cc7c58f"
+    "mtime": 1780869898.0051765,
+    "ast_hash": "47b6f6b3476b3c8d05a7a258115a0fee",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_modules\\__init__.py": {
-    "mtime": 1769701612.4738247,
-    "ast_hash": "9237297631ea8328e2fe1298257c6257",
-    "semantic_hash": "9237297631ea8328e2fe1298257c6257"
+    "mtime": 1780936495.8014991,
+    "ast_hash": "c5665aa9b2d31a0cfde37fb056fe212c",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_modules\\audio_to_structured_data\\pipeline.py": {
     "mtime": 1774480810.1717265,
@@ -1055,7 +1055,7 @@
     "semantic_hash": "37713aa319546649816ae109ba4a2c1b"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\package.json": {
-    "mtime": 1780818804.8885195,
+    "mtime": 1780869898.4089713,
     "ast_hash": "8db9ad2d992ff34720ea9e2e52e223a7",
     "semantic_hash": ""
   },
@@ -1075,8 +1075,8 @@
     "semantic_hash": "ab575e944f15d39a5486cf9fca385c5e"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\main.py": {
-    "mtime": 1780817866.981542,
-    "ast_hash": "0abd01bc0a7fd6ad6423040798e38f47",
+    "mtime": 1780923571.6130822,
+    "ast_hash": "254464d0993a37ac5c5b0684229d555b",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\routers\\classifier.py": {
@@ -1100,9 +1100,9 @@
     "semantic_hash": "08c7992028e531a1ed737db7a66ec268"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\routers\\luvata_order.py": {
-    "mtime": 1773579002.981804,
-    "ast_hash": "133687643e7116e95e3f6f8c9f13e828",
-    "semantic_hash": "133687643e7116e95e3f6f8c9f13e828"
+    "mtime": 1780916504.8150153,
+    "ast_hash": "e67551cca3e4c90ea42eed433795aede",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\routers\\parser.py": {
     "mtime": 1777200700.216427,
@@ -1125,8 +1125,8 @@
     "semantic_hash": "57fbd77809ff7ebc05da48e9a2b4590b"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\routers\\transcriber.py": {
-    "mtime": 1780330655.6029658,
-    "ast_hash": "5ea6dae7efa3979e3f64c3b5dc941201",
+    "mtime": 1780869898.0105824,
+    "ast_hash": "6acc24cdb8b2facd6562fe8f44fd998f",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\routers\\video_search.py": {
@@ -1415,7 +1415,7 @@
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\app\\(home)\\components\\hero.tsx": {
-    "mtime": 1780833647.652304,
+    "mtime": 1780869898.4079638,
     "ast_hash": "0a17ddfa63733a8560ac72f9d5ced6e4",
     "semantic_hash": ""
   },
@@ -1900,9 +1900,9 @@
     "semantic_hash": "96c26a740bf2cfcd897ef100f81d720c"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_apply_field_policies.py": {
-    "mtime": 1778617247.215707,
-    "ast_hash": "49880e010b591c5c17e277ee496bc6d5",
-    "semantic_hash": "49880e010b591c5c17e277ee496bc6d5"
+    "mtime": 1780869898.0145817,
+    "ast_hash": "c2175964389a39b24cc8a99012a9d386",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_audio_to_structured_data.py": {
     "mtime": 1769701562.0310304,
@@ -1930,9 +1930,9 @@
     "semantic_hash": "b34c58d79c4a4df70cbb4b0dfb6c9fe8"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_ffmpeg_chunking.py": {
-    "mtime": 1777200700.2316835,
-    "ast_hash": "285e582280a577e5e224aee4941f5c43",
-    "semantic_hash": "285e582280a577e5e224aee4941f5c43"
+    "mtime": 1780869898.0155804,
+    "ast_hash": "85dd1e335f2fe5d855bd85793d93ad6d",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_imports.py": {
     "mtime": 1780330655.608978,
@@ -1940,19 +1940,19 @@
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_judge_text_pair.py": {
-    "mtime": 1777847871.4494855,
-    "ast_hash": "1f33b494144f8d05249464c1ece8ec40",
-    "semantic_hash": "1f33b494144f8d05249464c1ece8ec40"
+    "mtime": 1780869898.0165815,
+    "ast_hash": "a0bbdcb993f7cb03f75be1ad7f30a642",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_parallel_transcriber_whisper_local.py": {
-    "mtime": 1778617247.1652956,
-    "ast_hash": "5dc1a964356b45053d15f07809acdda7",
-    "semantic_hash": "5dc1a964356b45053d15f07809acdda7"
+    "mtime": 1780869898.0175908,
+    "ast_hash": "c631323c3bd76f10284ae5457da49798",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_parent_with_nested_list_schema.py": {
-    "mtime": 1779101658.311478,
-    "ast_hash": "6b7a68a288952e031d70f268009ed2f7",
-    "semantic_hash": "6b7a68a288952e031d70f268009ed2f7"
+    "mtime": 1780869898.0175908,
+    "ast_hash": "0612f2ce7b5a697d98a68779c7b3cc03",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_schema_extraction.py": {
     "mtime": 1777847871.5119739,
@@ -1960,14 +1960,14 @@
     "semantic_hash": "ab908950f05299a1637107b4d1568344"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_schema_nested.py": {
-    "mtime": 1779101706.5059695,
-    "ast_hash": "cea5510979b3084cb7da32669cc34bd5",
-    "semantic_hash": "cea5510979b3084cb7da32669cc34bd5"
+    "mtime": 1780869898.0205817,
+    "ast_hash": "a37fa588f3bdef505a6f25d2ce210740",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_schema_policy_llm.py": {
-    "mtime": 1777847871.5129716,
-    "ast_hash": "c674bef94239b0cb00cb25c0a749b71f",
-    "semantic_hash": "c674bef94239b0cb00cb25c0a749b71f"
+    "mtime": 1780869898.0205817,
+    "ast_hash": "1f9458e523d49b61b23d436d4d72752e",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\__init__.py": {
     "mtime": 1769701562.120436,
@@ -1995,9 +1995,9 @@
     "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\README.md": {
-    "mtime": 1770313789.0022564,
-    "ast_hash": "1fa78e505bc5aca441be21afa8d6297d",
-    "semantic_hash": "1fa78e505bc5aca441be21afa8d6297d"
+    "mtime": 1780869898.1379182,
+    "ast_hash": "6aca9719f73af3027599a65bc44a88d5",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\.claude\\skills\\build-software-component\\SKILL.md": {
     "mtime": 1780330655.558178,
@@ -2085,9 +2085,9 @@
     "semantic_hash": "88072adcecbe8d8923542d81b05c166d"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\.github\\workflows\\test.yml": {
-    "mtime": 1778617247.1588147,
-    "ast_hash": "396d6f6bd26377d9cbdb91c11d004cce",
-    "semantic_hash": "396d6f6bd26377d9cbdb91c11d004cce"
+    "mtime": 1780869897.9079084,
+    "ast_hash": "32adf29adb1fefb2d81daa58d5dcf296",
+    "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\business_layer\\README.md": {
     "mtime": 1770396991.886416,
@@ -2244,11 +2244,6 @@
     "ast_hash": "f1f557997072a717eab8b50c10959c87",
     "semantic_hash": ""
   },
-  "C:\\Users\\h02317\\gaik-toolkit\\guidance_layer\\website\\content\\docs\\guidance-layer.mdx": {
-    "mtime": 1770919727.3199546,
-    "ast_hash": "fa0b39bb5b5d8a8f25fefe9997679c69",
-    "semantic_hash": "fa0b39bb5b5d8a8f25fefe9997679c69"
-  },
   "C:\\Users\\h02317\\gaik-toolkit\\guidance_layer\\website\\content\\docs\\index.mdx": {
     "mtime": 1771004870.949952,
     "ast_hash": "2bd572d0525e3d8647c50842f0c95c78",
@@ -2360,8 +2355,8 @@
     "semantic_hash": "9a70c6de236991d40649918321284fee"
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\README.md": {
-    "mtime": 1780817685.9354815,
-    "ast_hash": "1503017c4db3e44ab65ab58a8358508c",
+    "mtime": 1780869898.3578136,
+    "ast_hash": "2f3b96d845a0e232b0458711f754dfdf",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\api\\README.md": {
@@ -3675,8 +3670,8 @@
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\eval_methods\\extraction_eval\\evaluate.py": {
-    "mtime": 1780330655.8303778,
-    "ast_hash": "97a59b18b6cfa2f6c20f935f90c7330b",
+    "mtime": 1780869897.959587,
+    "ast_hash": "16302239e25428cf248abe19d07c61fd",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\eval_methods\\extraction_eval\\data\\ground truth\\Sample1.json": {
@@ -3690,33 +3685,33 @@
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\eval_methods\\RAG_eval\\evaluate_standalone.py": {
-    "mtime": 1780402383.7484279,
-    "ast_hash": "25117ec07b2d7dd881b1e08da6cab6c9",
+    "mtime": 1780869897.958581,
+    "ast_hash": "7d99e687aaa282c7f430fbe280ef1244",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\eval_methods\\RAG_eval\\rag_eval.py": {
-    "mtime": 1780402015.7005258,
-    "ast_hash": "e082b1f3df4b5390a3b8793391e3d5c8",
+    "mtime": 1780869897.959587,
+    "ast_hash": "a2ea40c08fa1b5bfc9185c70f0dd51fb",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\eval_methods\\translation_eval\\src\\evaluate_standalone.py": {
-    "mtime": 1780405840.4059787,
-    "ast_hash": "55cc7d37ce3217bd54943cb0559070ba",
+    "mtime": 1780869897.962587,
+    "ast_hash": "44b63c2f0b3cbca01cb73085552e8f6b",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\eval_methods\\translation_eval\\src\\generate_metrics_plot.py": {
-    "mtime": 1780405378.017284,
-    "ast_hash": "3513d53e86c5492cdc9ecdd9e222671f",
+    "mtime": 1780869897.963587,
+    "ast_hash": "90c8d0e6f78e785cbaf10cbbbd8a11bd",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\eval_methods\\translation_eval\\src\\TermsGenerate.py": {
-    "mtime": 1780404101.3774054,
-    "ast_hash": "cfed7c9ecf0f055745bccd1a7c1658bf",
+    "mtime": 1780869897.962587,
+    "ast_hash": "c6491526776445a62e266ddc9560e5f6",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\eval_methods\\translation_eval\\src\\translation_evaluation.py": {
-    "mtime": 1780406197.7333386,
-    "ast_hash": "59c1397f1ba3d33e13e672221ef9c833",
+    "mtime": 1780869897.963587,
+    "ast_hash": "9d5cd3e8c95f8dd41d3b03510e705b04",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_components\\postgres_agent\\postgres_agent_example.py": {
@@ -3740,188 +3735,188 @@
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\examples\\document_extraction_blueprint.json": {
-    "mtime": 1780580007.6679626,
-    "ast_hash": "4fe3414651eab26a193b83152920f3ec",
+    "mtime": 1780869898.3628125,
+    "ast_hash": "c054e13a550cf6c200b797e25714ee8a",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\examples\\incident_reporting_blueprint.json": {
-    "mtime": 1780579982.470665,
-    "ast_hash": "844d5eda1ca5461cebbce6bee022e314",
+    "mtime": 1780869898.3628125,
+    "ast_hash": "4ca2d45b7de7dd46f6ed4ea4cfd0a139",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\examples\\rag_workflow_blueprint.json": {
-    "mtime": 1780580033.004836,
-    "ast_hash": "bdd692311eab66c072bc5f40d9ba4a58",
+    "mtime": 1780869898.3638153,
+    "ast_hash": "87c3ac8516f701f181cb29225946651e",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\registries\\component_reference_cards.json": {
-    "mtime": 1780815783.7133243,
-    "ast_hash": "43509f16108883ccad47a86dcbe04648",
+    "mtime": 1780869898.3713224,
+    "ast_hash": "97ca212c7be9d0b86c63571f2a593458",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\registries\\gaik_component_registry.json": {
-    "mtime": 1780787074.7136414,
+    "mtime": 1780869898.3713224,
     "ast_hash": "742388581f6e71275200613cf3272f89",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\schemas\\component_registry.schema.json": {
-    "mtime": 1780603256.753104,
-    "ast_hash": "ed68b2a3e4069837b587da348e12ba5f",
+    "mtime": 1780869898.3723261,
+    "ast_hash": "e2b770b980fadb3a15abc8f28759cbd1",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\schemas\\use_case_blueprint.schema.json": {
-    "mtime": 1780776748.3980196,
+    "mtime": 1780869898.3733215,
     "ast_hash": "782a009d0de24d44368665bc0475288f",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\scripts\\generate_bpmn.py": {
-    "mtime": 1780781751.6958435,
-    "ast_hash": "579aaf3a97f49bb7ac0ea14de584aca7",
+    "mtime": 1780869898.3743196,
+    "ast_hash": "3ecc77a10cf21c9bef5a70ead5ec951a",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\scripts\\generate_mermaid.py": {
-    "mtime": 1780601051.201928,
-    "ast_hash": "120b4d0ae500b629020c0c4bcea6ef25",
+    "mtime": 1780869898.3753223,
+    "ast_hash": "0603ff6ff852576d9cbf5e9d29a94b9b",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\scripts\\generate_schema.py": {
-    "mtime": 1780815758.7870617,
-    "ast_hash": "2f127758beae36c0e71939a39392dc76",
+    "mtime": 1780869898.3763225,
+    "ast_hash": "2489a538e61fe5e8a76016ff3e29cca3",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\scripts\\promote_template.py": {
-    "mtime": 1780769340.0799508,
-    "ast_hash": "4a3d53a3e4c1bcc48439ce23afbabd41",
+    "mtime": 1780869898.3763225,
+    "ast_hash": "c30fd2a31909da599d9c4156b8e5ed33",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\scripts\\run_wizard.py": {
-    "mtime": 1780776740.4647026,
-    "ast_hash": "49e1b44c52c004c90e53a3a7ef955ad2",
+    "mtime": 1780869898.377321,
+    "ast_hash": "76346f9ae0dded579f37cdf328f2692b",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\scripts\\scaffold_poc.py": {
-    "mtime": 1780741990.2835183,
-    "ast_hash": "662cb0868d9581540e49c5ee30c51391",
+    "mtime": 1780869898.377321,
+    "ast_hash": "91e19ffe2ff628eeeb818478f838cfff",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\scripts\\validate_blueprint.py": {
-    "mtime": 1780579317.4972117,
-    "ast_hash": "021fc12163d326bb702d770afd027159",
+    "mtime": 1780869898.3783207,
+    "ast_hash": "1a785697f1feca3df838181fcb407de9",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\src\\solution_wizard\\blueprint.py": {
-    "mtime": 1780776123.3690329,
-    "ast_hash": "5262bcfd4bae010085c33a9ad760a2d1",
+    "mtime": 1780870865.0617325,
+    "ast_hash": "edcecf2c8b2b634e110dd36b83484b5a",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\src\\solution_wizard\\bpmn_generator.py": {
-    "mtime": 1780859428.725819,
-    "ast_hash": "6948e4c2fd44224576cc61daa9b88a95",
+    "mtime": 1780870865.065734,
+    "ast_hash": "4d956001052ddafcd8cb29cb34374300",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\src\\solution_wizard\\registry.py": {
-    "mtime": 1780742457.0002308,
-    "ast_hash": "f4240a2cb5ed8496122ce31d2ef2b290",
+    "mtime": 1780870865.065734,
+    "ast_hash": "6c2e51e994fcda5d1694ee3006fde56e",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\src\\solution_wizard\\scaffolder.py": {
-    "mtime": 1780832443.5448413,
-    "ast_hash": "f76b21d8a4ef4983f0b0f4cf761943c2",
+    "mtime": 1780870865.064734,
+    "ast_hash": "1f60d7d9e2854585a981cc724d9ae178",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\src\\solution_wizard\\schema_designer.py": {
-    "mtime": 1780773539.3830354,
-    "ast_hash": "35af4a61440608685614a85dcbe82bbe",
+    "mtime": 1780870865.064734,
+    "ast_hash": "f36dbaa6bf341668f53f44c0c745688e",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\src\\solution_wizard\\selector.py": {
-    "mtime": 1780596888.1050956,
-    "ast_hash": "334eb44b4585e855b841ee6b716a374a",
+    "mtime": 1780869898.3833227,
+    "ast_hash": "0d8158c130214de12d85a01cfc3e45b6",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\src\\solution_wizard\\validator.py": {
-    "mtime": 1780787137.9021003,
-    "ast_hash": "cc1f394caaed9b55ddb42c79d7c41ae0",
+    "mtime": 1780870865.068733,
+    "ast_hash": "16ca18c4fb48dcdf8d4e78ae41b67539",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\src\\solution_wizard\\visualizer.py": {
-    "mtime": 1780601072.9647937,
-    "ast_hash": "f314e0b04faa4df4d452db2954f42ce0",
+    "mtime": 1780870865.065734,
+    "ast_hash": "81b473d1770ce5ca944df4cc5c2781c3",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\src\\solution_wizard\\__init__.py": {
-    "mtime": 1780578963.8795624,
-    "ast_hash": "70099dcc94cf302235cdb0de20deaebb",
+    "mtime": 1780869898.3783207,
+    "ast_hash": "5e392f8bfb59365e4ee8fa0afee5c6ea",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\templates\\blueprint_template.json": {
-    "mtime": 1780597226.5257404,
-    "ast_hash": "c1ad1955eaed0376ab106c3021a87e80",
+    "mtime": 1780869898.3853216,
+    "ast_hash": "6eabb0c3bf8ef540654260ec4fe3d257",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\templates\\poc\\hybrid_dataextractor_pymupdfparser_transcriber_831947a5\\template.json": {
-    "mtime": 1780773908.735044,
+    "mtime": 1780869898.3942235,
     "ast_hash": "9f770a064951e135dc8f5cc7bef23645",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_blueprint.py": {
-    "mtime": 1780579815.7702239,
-    "ast_hash": "585c6b29c24462ebdf04d2b720344e46",
+    "mtime": 1780870865.063735,
+    "ast_hash": "af97e3f20f83ead0492b5ec24e362580",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_bpmn.py": {
-    "mtime": 1780859640.495628,
-    "ast_hash": "ce60d40a5a57d5bfd34cb6a807245867",
+    "mtime": 1780870865.065734,
+    "ast_hash": "94bc3aae4ee727a3499919f4adefef29",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_hybrid_generic.py": {
-    "mtime": 1780770547.5258908,
-    "ast_hash": "9f95499e0f2a1478bf56805c9db3f699",
+    "mtime": 1780870865.063735,
+    "ast_hash": "de304e51907a7c16f2cb2be2279a9fee",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_mermaid.py": {
-    "mtime": 1780601171.630392,
-    "ast_hash": "e54122f16ae3d1b8eb4208c274c7b03e",
+    "mtime": 1780870865.0627344,
+    "ast_hash": "3b747f2750530ed49a41076084c546ef",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_promotion.py": {
-    "mtime": 1780769406.0107615,
-    "ast_hash": "fe87ece3b9d24f3c0cf47ca1de6619c7",
+    "mtime": 1780870865.0607336,
+    "ast_hash": "3bfe388c5f8531a14da9b7f9c44993f0",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_reference_cards.py": {
-    "mtime": 1780787467.1832275,
-    "ast_hash": "3666f4b1946400b69c213df787e031c3",
+    "mtime": 1780870865.063735,
+    "ast_hash": "e18f125ef678261b34b9cc25e1cb646c",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_scaffolder.py": {
-    "mtime": 1780777381.2738903,
-    "ast_hash": "a39b19b58382ffbe7b88553bfb35b37e",
+    "mtime": 1780870865.0617325,
+    "ast_hash": "62d68398c766d9ee149369fdaa5f64a3",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_schema_designer.py": {
-    "mtime": 1780606640.8648863,
-    "ast_hash": "3e605bd1b57656b96b415eec571c8166",
+    "mtime": 1780870865.0627344,
+    "ast_hash": "dcdb24359fb3fee7e56f7e2f6d833646",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_selector.py": {
-    "mtime": 1780597437.9271472,
-    "ast_hash": "f43050d74fd44e918c1f1ae7498e3af9",
+    "mtime": 1780870865.064734,
+    "ast_hash": "1f97019f7f91a196c84ea5b39cfece61",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_validator.py": {
-    "mtime": 1780787572.4963405,
-    "ast_hash": "2c9eb4a0778d494429e692d61d9bad1b",
+    "mtime": 1780870865.064734,
+    "ast_hash": "c3f2f209636e636ebf9481b694b847c3",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\postgres_agent\\agent.py": {
-    "mtime": 1780330655.5993874,
-    "ast_hash": "d08c631c28697a1369d069fd9253fc07",
+    "mtime": 1780869897.9991763,
+    "ast_hash": "6d3b48858d3a7082543d5701ba2d7606",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\postgres_agent\\introspection.py": {
-    "mtime": 1780330655.5993874,
-    "ast_hash": "72b494f21fd2f7219c03f740e5ee7d9a",
+    "mtime": 1780869897.9991763,
+    "ast_hash": "17169dc41431589bdffac04e29c85473",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\postgres_agent\\models.py": {
@@ -3930,8 +3925,8 @@
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\postgres_agent\\sql_safety.py": {
-    "mtime": 1780330655.5993874,
-    "ast_hash": "9b10fee3d3e6982a765538a680514d2b",
+    "mtime": 1780869898.0001764,
+    "ast_hash": "db2cfc549f542789cee7f4a5c983cb40",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\postgres_agent\\__init__.py": {
@@ -3940,8 +3935,8 @@
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\routers\\llm_judge.py": {
-    "mtime": 1780330655.6019785,
-    "ast_hash": "8cf180196ab31450015d99350cdce40c",
+    "mtime": 1780869898.009576,
+    "ast_hash": "2a674a500607d19f2f4ae1ed73ac71d6",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\routers\\postgres_agent.py": {
@@ -3960,33 +3955,33 @@
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_postgres_agent_extra_instructions.py": {
-    "mtime": 1780330655.608978,
-    "ast_hash": "5fc9ab089c31d17e9a98bc82c2bc23ca",
+    "mtime": 1780869898.018583,
+    "ast_hash": "c1c9682abadcb4f744cbc40b2280cc65",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_postgres_agent_query_timeout.py": {
-    "mtime": 1780330655.6104848,
-    "ast_hash": "edb4d108d6edeebad2e5a1635425f4ad",
+    "mtime": 1780869898.018583,
+    "ast_hash": "e46b101878dd8f63d2008dfa3dff6a61",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_postgres_agent_sql_safety.py": {
-    "mtime": 1780330655.6104848,
-    "ast_hash": "540c087b2f874d52e25271d0a4fbf51e",
+    "mtime": 1780869898.0195825,
+    "ast_hash": "6f619bf9e31ac09e4575bda8b6ead3f3",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\_pg_agent_fake_client.py": {
-    "mtime": 1780330655.608978,
-    "ast_hash": "36f0d7115adf0a84b8eb1050bffabb04",
+    "mtime": 1780869898.0135813,
+    "ast_hash": "0b077c5337c68f5231940d9af857da07",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\AGENTS.md": {
-    "mtime": 1780330655.6703887,
-    "ast_hash": "752aa83aa64361ac32860f882dcff932",
+    "mtime": 1780916354.561105,
+    "ast_hash": "0091d651aa5c58774aca584ddc25e905",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\CLAUDE.md": {
-    "mtime": 1780330655.6703887,
-    "ast_hash": "8a6643a420fdad6bfb583523bc6cef16",
+    "mtime": 1780916354.561105,
+    "ast_hash": "771faa62feb60b7de901a397aebb29b0",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\.claude\\skills\\create-evaluations\\SKILL.md": {
@@ -4015,13 +4010,13 @@
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\.claude\\skills\\create-usecase-description\\references\\mermaid-guide.md": {
-    "mtime": 1780408165.4788322,
-    "ast_hash": "90634b6934547d67a5a5901065ad698d",
+    "mtime": 1780916354.560111,
+    "ast_hash": "4d80f2581caa62f463081c8560c965a5",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\.claude\\skills\\solution-wizard\\SKILL.md": {
-    "mtime": 1780790390.129221,
-    "ast_hash": "e8fcc689711d64c50b469f55fc7131c3",
+    "mtime": 1780869898.1359165,
+    "ast_hash": "dd10f4c7e7e9985b30c962fc82d9a7c9",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\guidance_layer\\website\\content\\docs\\use-cases\\safety-observation-reporting.mdx": {
@@ -4380,18 +4375,18 @@
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\CLAUDE.md": {
-    "mtime": 1780773700.6761625,
-    "ast_hash": "fe8b1f6a02316c8900cb0d4128926316",
+    "mtime": 1780869898.358814,
+    "ast_hash": "dfe88735329c0f52f65e09eca6d3bdb5",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\README.md": {
-    "mtime": 1780833129.7089956,
-    "ast_hash": "a8120987b0e3d482e2d5d34327cf644d",
+    "mtime": 1780923571.6525953,
+    "ast_hash": "2b59d0661577d1e996ef613fc538feb3",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\SKILL.md": {
-    "mtime": 1780859743.2091334,
-    "ast_hash": "db576f858b04340be889da95dfb8e9fe",
+    "mtime": 1780869898.3598135,
+    "ast_hash": "18ab83ea1f32f419d5060cf68aa93fe3",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_components\\postgres_agent\\README.md": {
@@ -4560,68 +4555,168 @@
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\scripts\\check_requirements.py": {
-    "mtime": 1780786580.814922,
-    "ast_hash": "72999faffdbfcc278b540bcaef7958fa",
+    "mtime": 1780869898.3743196,
+    "ast_hash": "66ffab42e0a54b8b86fe4c235e507cd7",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\scripts\\generate_docs.py": {
-    "mtime": 1780787353.9000828,
-    "ast_hash": "0879acea52fa327fded536c283c08cdc",
+    "mtime": 1780869898.3753223,
+    "ast_hash": "c1b84045f9c8aee2eb56c9586b21d3c5",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\src\\solution_wizard\\docs_generator.py": {
-    "mtime": 1780787273.3825138,
-    "ast_hash": "da8bb475d04c5511c6d81c625e8c9189",
+    "mtime": 1780870865.064734,
+    "ast_hash": "2dea5f20104e9685d33b76c706e0866e",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\src\\solution_wizard\\requirements.py": {
-    "mtime": 1780786561.5174398,
-    "ast_hash": "f349c7b484931d4a26411cfc0c526a7a",
+    "mtime": 1780870865.065734,
+    "ast_hash": "c507e5df8767211cec39d64dc80bc388",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_docs.py": {
-    "mtime": 1780787452.8972974,
-    "ast_hash": "914c58e57ca0825605e1a074cb45453d",
+    "mtime": 1780870865.0627344,
+    "ast_hash": "23a2a0d616e363ef805fea971647b9d4",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_requirements.py": {
-    "mtime": 1780787432.8092282,
-    "ast_hash": "b64c40cc8ba365a7ecbc9b1ff712f2a2",
+    "mtime": 1780870865.0607336,
+    "ast_hash": "586e8e099c9a6787cb0d0b03f518bd2f",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\run_wizard_interactive.py": {
-    "mtime": 1780829486.506058,
-    "ast_hash": "3ea09b1f6ea2b30b1b40cd825103169d",
+    "mtime": 1780870865.0617325,
+    "ast_hash": "769755297aa9ef0bf132c6b1920a8430",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\tests\\test_pdf_report.py": {
-    "mtime": 1780832660.8595188,
-    "ast_hash": "70c40d93f28f787ec4fccf747c23671b",
+    "mtime": 1780870865.0627344,
+    "ast_hash": "0950494e7ed1951c37217b4ad39cfff1",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\routers\\solution_wizard.py": {
-    "mtime": 1780821474.4041903,
-    "ast_hash": "7171f9661dc71a2d82690c7bba273555",
+    "mtime": 1780870865.0627344,
+    "ast_hash": "af2ca9565b8265e5c7fd7d7f725d8471",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\app\\(demos)\\solution-wizard\\page.tsx": {
-    "mtime": 1780822612.5283282,
-    "ast_hash": "7d6606520756f39b4a814d8b847a5082",
+    "mtime": 1780869898.4065752,
+    "ast_hash": "597d29a97e26026263f22f0d12402867",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\components\\demo\\wizard-file-browser.tsx": {
-    "mtime": 1780820612.6025991,
-    "ast_hash": "fd12faebfe0f65f17ba702c3d552e62b",
+    "mtime": 1780869898.4079638,
+    "ast_hash": "55b8904f40bb9a320ca18ca32b108a6e",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\docs\\solution_wizard.md": {
-    "mtime": 1780831070.8048773,
-    "ast_hash": "4304fbd434b6932644b1016d3b192066",
+    "mtime": 1780929754.3462102,
+    "ast_hash": "c51ecaecab2921f43a0c1cec63712b34",
     "semantic_hash": ""
   },
   "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\solution_wizard\\images\\solution_wizard_v2_workflow.png": {
-    "mtime": 1780830807.748707,
+    "mtime": 1780869898.370323,
     "ast_hash": "fbdeae7c3f23bc6a37067865ad6dcae8",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\.claude\\skills\\gaik-sync\\scripts\\audit_registry.py": {
+    "mtime": 1780869898.1349165,
+    "ast_hash": "a1f1653f2353f08ba435a4d7b2136b79",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\guidance_layer\\website\\content\\docs\\guidance-layer\\meta.json": {
+    "mtime": 1780873893.3311393,
+    "ast_hash": "0b96ea6251288d0b0f8963ce6a240878",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\report_generation_example.py": {
+    "mtime": 1780948119.8235428,
+    "ast_hash": "249eb1001ac7e23ac716e4f3a7c893a2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_modules\\multi_source_report_generator\\pipeline.py": {
+    "mtime": 1780949625.4438083,
+    "ast_hash": "a8cb507fa464a514562be8383b2a1df2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_modules\\multi_source_report_generator\\__init__.py": {
+    "mtime": 1780936488.3810909,
+    "ast_hash": "9acab95da5c68b689495d9caf8c8e4f1",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\tests\\test_luvata_fee_flags.py": {
+    "mtime": 1780916354.5651052,
+    "ast_hash": "5d54b86327a0d9c4efb36f82d802b0f2",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_multi_source_report_generator.py": {
+    "mtime": 1780949613.7461402,
+    "ast_hash": "b82cdf9d94eae8506ac5cb45d1a781a6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_vision_suggest_requirements.py": {
+    "mtime": 1780869898.0205817,
+    "ast_hash": "99c08690c9082d9ab3a46036a3caff7a",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\.claude\\skills\\gaik-sync\\SKILL.md": {
+    "mtime": 1780908838.8977828,
+    "ast_hash": "2570787eb22fffa25650487bbab937c4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\guidance_layer\\website\\content\\docs\\guidance-layer\\index.mdx": {
+    "mtime": 1780873886.8147137,
+    "ast_hash": "a12c77320f2e6f58581e11ba369c49e6",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\guidance_layer\\website\\content\\docs\\guidance-layer\\solution-configuration-wizard.mdx": {
+    "mtime": 1780929823.3869739,
+    "ast_hash": "406dfc70f6ede0e93b49212f3bb399a1",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\README.md": {
+    "mtime": 1780947350.743745,
+    "ast_hash": "bdd998020679802d9215632621c32fa8",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\src\\gaik\\software_modules\\multi_source_report_generator\\README.md": {
+    "mtime": 1780949246.8530025,
+    "ast_hash": "4c2c598c6af640878597e9bed2fd6c4c",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\openshift\\supabase-keepalive.yaml": {
+    "mtime": 1780869898.0115817,
+    "ast_hash": "71fb475825816b295e89264a16998468",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\guidance_layer\\website\\public\\images\\solution_wizard_v2_workflow.png": {
+    "mtime": 1780869898.356814,
+    "ast_hash": "fbdeae7c3f23bc6a37067865ad6dcae8",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\guidance_layer\\website\\public\\images\\wizard_screenshot.png": {
+    "mtime": 1780873292.6255054,
+    "ast_hash": "7ca443812b5ac0abbe12bd9f0618f8a3",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_report.md": {
+    "mtime": 1780947265.9880598,
+    "ast_hash": "e59812fb04530febcb54dde5897c4e73",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_report\\README.md": {
+    "mtime": 1780948048.1077397,
+    "ast_hash": "9d63c2d0934ad7edbd5b459f83b5c2b4",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\unit_tests\\test_transcriber_chunking.py": {
+    "mtime": 1780950627.1123857,
+    "ast_hash": "725503193aef3593c7f88609fdf35076",
+    "semantic_hash": ""
+  },
+  "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\bionordica.mp3": {
+    "mtime": 1780950064.0125206,
+    "ast_hash": "16ddd6e3b57cc5e8d2379fc88e94fd56",
     "semantic_hash": ""
   }
 }

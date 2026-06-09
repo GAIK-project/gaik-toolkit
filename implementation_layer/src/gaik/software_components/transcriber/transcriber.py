@@ -295,12 +295,13 @@ class Transcriber:
         self, input_path: Path, prompt: str, transcription_model: str
     ) -> str:
         """
-        If input <= max_size_mb: single-pass transcription using the original file
-        (audio OR video container supported by the API).
-        Else: chunk with PyDub and transcribe sequentially.
+        If input is within configured size and duration limits: single-pass
+        transcription using the original file (audio OR video container
+        supported by the API). Otherwise, chunk with PyDub and transcribe
+        sequentially. Chunking is model-independent; every remote transcription
+        model goes through the same size/duration guard.
         """
-        chunkable_models = {"whisper", "whisper-1"}
-        if transcription_model in chunkable_models and self._needs_chunking(input_path):
+        if self._needs_chunking(input_path):
             print("Chunking input for transcription...")
             audio = AudioSegment.from_file(
                 input_path
@@ -320,7 +321,16 @@ class Transcriber:
 
     def _needs_chunking(self, file_path: Path) -> bool:
         size_mb = file_path.stat().st_size / (1024 * 1024)
-        return size_mb > self.max_size_mb
+        if size_mb > self.max_size_mb:
+            return True
+
+        try:
+            duration_seconds = len(AudioSegment.from_file(file_path)) / 1000
+        except Exception as exc:
+            print(f"Could not read audio duration for chunking check: {exc}")
+            return False
+
+        return duration_seconds > self.max_duration_seconds
 
     def _single_pass_transcription(
         self, file_path: Path, prompt: str, transcription_model: str
