@@ -42,7 +42,7 @@ def main() -> None:
         api_config=config,
         output_dir=args.output_dir,
         enhanced_transcript=False,
-        compress_audio=True
+        compress_audio=True,
     )
 
     result = transcriber.transcribe(

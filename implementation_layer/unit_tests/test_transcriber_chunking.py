@@ -47,9 +47,7 @@ def test_gpt_transcription_chunks_when_duration_exceeds_limit(tmp_path: Path):
             side_effect=AssertionError("single-pass should not run"),
         ),
     ):
-        result = transcriber._transcribe_input_remote(
-            audio, "prompt", "gpt-4o-transcribe"
-        )
+        result = transcriber._transcribe_input_remote(audio, "prompt", "gpt-4o-transcribe")
 
     assert result == "chunked transcript"
     split.assert_called_once()
@@ -76,10 +74,7 @@ def test_gpt_transcription_single_pass_when_within_size_and_duration(tmp_path: P
             return_value="single-pass transcript",
         ) as single,
     ):
-        result = transcriber._transcribe_input_remote(
-            audio, "prompt", "gpt-4o-transcribe"
-        )
+        result = transcriber._transcribe_input_remote(audio, "prompt", "gpt-4o-transcribe")
 
     assert result == "single-pass transcript"
     single.assert_called_once_with(audio, "prompt", "gpt-4o-transcribe")
-
