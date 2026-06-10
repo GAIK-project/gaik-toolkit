@@ -26,9 +26,29 @@ from gaik.software_modules.multi_source_report_generator import (  # noqa: E402
     MultiSourceReportGenerator,
 )
 
+# V2 agentic workflow toggle. The single switch below controls everything:
+#   True  -> each section is drafted independently and then mandatorily
+#            fact-checked/repaired by a diff-editor reviewer, with live CLI
+#            progress. Requires: pip install "gaik[multi-source-report-generator-agentic]"
+#   False -> the report is written in a single LLM call (the default).
+USE_AGENTIC = True
+
+# Sample report toggle. When True, sample_report.md is used as a format/style
+# reference (layout, list style, length). The writer and reviewer both enforce
+# that format. Content always comes from the evidence only.
+# When False (or the file is absent), the report uses a generic professional format.
+USE_SAMPLE_REPORT = True
+
 # The report structure is entirely user-defined: a title plus a list of
 # sections, each with instructions describing what the section should contain.
 REPORT_TITLE = "AI Consultancy Report"
+
+# Optional high-level description of the report's purpose. Passed to the writer,
+# reviewer, curator, and polish pass as shared context. Set to None to omit.
+REPORT_DESCRIPTION = (
+    "An AI advisory report summarizing a client meeting to assess the company's "
+    "AI readiness, current development stage, and practical next steps."
+)
 
 SECTIONS = [
     {
@@ -51,11 +71,12 @@ def main() -> None:
     output_dir = Path(__file__).parent / "output"
     transcripts_dir = output_dir / "transcripts"
 
-    # Optional example report. The writer strictly follows its FORMAT and STYLE
-    # (.txt/.md/.pdf/.docx) — all content still comes only from the evidence.
-    # Set to None to generate without a template.
+    # Sample report — used as a format/style reference only when USE_SAMPLE_REPORT=True
+    # and the file exists. Set USE_SAMPLE_REPORT=False to use a generic format instead.
     sample_report = Path(__file__).parent / "sample_report.md"
-    sample_report_path = sample_report if sample_report.exists() else None
+    sample_report_path = (
+        (sample_report if sample_report.exists() else None) if USE_SAMPLE_REPORT else None
+    )
 
     if not sample_dir.exists() or not any(sample_dir.iterdir()):
         print(
@@ -65,11 +86,12 @@ def main() -> None:
 
     generator = MultiSourceReportGenerator(use_azure=True)
 
-    print("Writing report...")
+    print(f"Writing report... ({'agentic V2' if USE_AGENTIC else 'single-call'})")
     result = generator.run(
         # A folder is expanded recursively; only supported file types are used.
         input_paths=[sample_dir],
         report_title=REPORT_TITLE,
+        report_description=REPORT_DESCRIPTION,
         sections=SECTIONS,
         report_language="English",
         # The report follows this example's structure/style (content from evidence only).
@@ -86,11 +108,20 @@ def main() -> None:
         #                          (TranscriptionResult.save() writes {job_id}_raw_transcript.txt)
         transcriber_options={
             "ctor": {
-                "compress_audio": True,
                 "output_dir": str(transcripts_dir),
             },
         },
         writer_options={"model": "gpt-5.4"},
+        # ── Agentic (V2) workflow ─────────────────────────────────────────────
+        # These are honored only when agentic=True (ignored by the single-call path).
+        agentic=USE_AGENTIC,  # opt into independent per-section drafting + review
+        verbose=USE_AGENTIC,  # print phase/section/reviewer handovers to the CLI
+        curate_evidence=True,  # True → per-section evidence brief before drafting
+        polish=True,  # True → final style/proofreading pass
+        strict_review=True,  # True → raise (before writing) if an edit can't apply
+        # review_options={"model": "gpt-5.4"},  # optional separate reviewer model
+        # include_source_references is True by default; citations are suppressed
+        # automatically by run() when there is only one input source.
     )
 
     print(f"Format template: {sample_report_path or '(none)'}")
@@ -110,6 +141,11 @@ def main() -> None:
             print(f"  Transcript saved: {txt_path}")
 
     print(f"Sections written: {[s.title for s in result.sections]}")
+    # In agentic mode, sections may carry non-fatal warnings (e.g. a reviewer edit
+    # that could not be applied, or no matching sample section).
+    for section in result.sections:
+        for warning in section.revision_warnings:
+            print(f"  [warning] {section.title}: {warning}")
     print(f"Report written to: {result.markdown_path}")
     if result.usage:
         print(f"Token usage: {result.usage}")

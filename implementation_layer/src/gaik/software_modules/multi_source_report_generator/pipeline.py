@@ -23,9 +23,17 @@ from __future__ import annotations
 import csv
 import json
 import logging
-from dataclasses import dataclass, field
+import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+from .models import (
+    EvidenceItem,
+    GeneratedSection,
+    ReportGenerationResult,
+    ReportSectionSpec,
+)
 
 # LLM path (monkeypatchable in tests). Imported defensively so the module can be
 # imported even in environments without the openai SDK present.
@@ -66,47 +74,6 @@ SUPPORTED_EXTENSIONS = frozenset(_EXT_TO_TYPE)
 
 
 # ---------------------------------------------------------------------------
-# Data models
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class ReportSectionSpec:
-    """A user-defined report section."""
-
-    title: str
-    instructions: str
-    required: bool = True
-
-
-@dataclass
-class EvidenceItem:
-    """One normalized source, ready to feed the report writer."""
-
-    source_path: str
-    source_type: str
-    content_markdown: str
-    metadata: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class GeneratedSection:
-    title: str
-    content_markdown: str
-    usage: dict[str, Any] | None = None
-
-
-@dataclass
-class ReportGenerationResult:
-    title: str
-    evidence_items: list[EvidenceItem]
-    sections: list[GeneratedSection]
-    markdown: str
-    markdown_path: Path | None
-    usage: dict[str, Any]
-
-
-# ---------------------------------------------------------------------------
 # Prompt templates (generic — no domain-specific wording)
 # ---------------------------------------------------------------------------
 
@@ -118,6 +85,9 @@ VERY IMPORTANT:
 - Do not make up anything. Generate content only from the given evidence. If the \
 evidence does not contain information for a section, state this clearly within \
 that section rather than inventing or inferring content.
+- The EVIDENCE is your ONLY source of content. A FORMAT REFERENCE (if given) is a \
+layout example, usually about a completely DIFFERENT subject — copy its shape, \
+never its content. Never reuse its facts, topic, names, numbers, examples, or wording.
 - Use simple, direct language without fluff, filler phrases, or em dashes (—).
 - Maintain a neutral and professional tone throughout.
 
@@ -129,19 +99,24 @@ heading (`## <section title>`) using the exact titles provided. Do not add, drop
 merge, or reorder sections.
 - Follow each section's content instructions. If the evidence lacks information \
 for a section, say so explicitly within that section.
-- FORMAT: If a FORMAT REFERENCE is provided, it is the HIGHEST PRIORITY instruction \
-and overrides everything else about format. Analyse the reference carefully and \
-reproduce its formatting choices exactly: how each section is structured \
+- FORMAT: If a FORMAT REFERENCE is provided, it governs BOTH structure AND length. \
+Reproduce its formatting choices exactly — how each section is structured \
 internally, whether it uses prose paragraphs, bullet lists, or numbered lists, \
-the length and style of each item, any bold lead-in patterns, and the citation \
-style. Achieve comprehensive coverage by writing more items at the same brevity \
-the reference demonstrates, not by making individual items longer. If NO \
-reference is provided, write in a clean, professional report format of your \
-choice.
+the approximate number of paragraphs or bullet points per section, the approximate \
+length of each paragraph or item, bold lead-in patterns, and citation style — but \
+take ZERO content from it. The reference is about a different topic; if you find \
+yourself repeating any fact, name, number, or sentence from it, stop and write from \
+the evidence instead. Length rule: each section should be approximately the same \
+total length and density as the corresponding reference section — not shorter and \
+not longer. Do not pad to seem thorough. If NO reference is provided, write in a \
+clean, professional report format of your choice.
 
 Content guidelines:
-- Make the most of all relevant information provided in the evidence.
-- Cover each section fully without omitting important details.
+- When a FORMAT REFERENCE is provided, match its level of brevity and detail. Do \
+not write more than the reference demonstrates — "comprehensive coverage" means \
+matching the reference's density, not exhausting all available evidence.
+- When NO FORMAT REFERENCE is provided: make the most of all relevant information \
+and cover each section fully without omitting important details.
 - Use direct language that precisely communicates facts and insights.
 - Vary sentence structures naturally to maintain reader engagement.
 - Use domain-specific terminology where appropriate, but prefer simpler terms \
@@ -296,6 +271,81 @@ def _split_into_sections(markdown: str, specs: list[ReportSectionSpec]) -> list[
 
 
 # ---------------------------------------------------------------------------
+# Sample-report section matching (used by the agentic path only)
+# ---------------------------------------------------------------------------
+
+
+def _normalize_heading(text: str) -> str:
+    """Normalize a heading for tolerant matching.
+
+    Lowercase; strip leading markdown markers and section numbering; drop
+    punctuation; collapse whitespace.
+    """
+    t = text.strip()
+    t = re.sub(r"^#+\s*", "", t)  # markdown heading markers
+    t = re.sub(r"^\d+([.)]\d*)*[.)]?\s+", "", t)  # leading numbering e.g. "1." / "1.2)"
+    t = t.lower()
+    t = re.sub(r"[^\w\s]", " ", t)  # punctuation -> space
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def _split_sample_sections(sample_markdown: str) -> dict[str, tuple[str, str]]:
+    """Split a sample report at its top-level report-section headings.
+
+    Sample reports must use ``##`` Markdown headings for their main sections.
+    Detects the shallowest heading level *below* a single document title
+    (typically ``##``) and splits only on that level, so each returned block
+    keeps its own ``###``/``####`` subsections intact. Returns
+    ``{normalized_heading: (original_heading, section_markdown)}`` where the
+    section markdown includes the heading line itself.
+    """
+    if not sample_markdown:
+        return {}
+    lines = sample_markdown.splitlines()
+    headings: list[tuple[int, int, str]] = []  # (line_index, level, text)
+    for i, line in enumerate(lines):
+        m = re.match(r"^(#{1,6})\s+(.*\S)\s*$", line)
+        if m:
+            headings.append((i, len(m.group(1)), m.group(2).strip()))
+    if not headings:
+        return {}
+
+    levels = sorted({lvl for _, lvl, _ in headings})
+    top_level = levels[0]
+    top_count = sum(1 for _, lvl, _ in headings if lvl == top_level)
+    # A single top-level heading is the document title -> sections live one level down.
+    if top_count == 1 and len(levels) > 1:
+        section_level = levels[1]
+    else:
+        section_level = top_level
+
+    section_heads = [(i, text) for (i, lvl, text) in headings if lvl == section_level]
+    out: dict[str, tuple[str, str]] = {}
+    for k, (idx, text) in enumerate(section_heads):
+        end = section_heads[k + 1][0] if k + 1 < len(section_heads) else len(lines)
+        body = "\n".join(lines[idx:end]).strip()
+        norm = _normalize_heading(text)
+        if norm and norm not in out:
+            out[norm] = (text, body)
+    return out
+
+
+def _match_sample_section(title: str, sample_sections: dict[str, tuple[str, str]]) -> str | None:
+    """Match a requested section title to one sample section block, or None.
+
+    Tries an exact heading match first, then a normalized match.
+    """
+    if not sample_sections:
+        return None
+    for _norm, (orig, body) in sample_sections.items():
+        if orig.strip() == title.strip():
+            return body
+    match = sample_sections.get(_normalize_heading(title))
+    return match[1] if match else None
+
+
+# ---------------------------------------------------------------------------
 # Main module
 # ---------------------------------------------------------------------------
 
@@ -330,6 +380,7 @@ class MultiSourceReportGenerator:
         input_paths: list[str | Path],
         sections: list[ReportSectionSpec | dict[str, Any]],
         report_title: str = "Generated Report",
+        report_description: str | None = None,
         report_language: str | None = None,
         sample_report_path: str | Path | None = None,
         output_dir: str | Path | None = None,
@@ -342,81 +393,94 @@ class MultiSourceReportGenerator:
         transcriber_options: dict | None = None,
         image_options: dict | None = None,
         writer_options: dict | None = None,
+        agentic: bool = False,
+        review_options: dict | None = None,
+        polish: bool = False,
+        strict_review: bool = False,
+        curate_evidence: bool = False,
+        verbose: bool = False,
+        progress_callback: Callable[[str], None] | None = None,
     ) -> ReportGenerationResult:
-        """Build evidence from ``input_paths`` and write each requested section."""
+        """Build evidence from ``input_paths`` and write each requested section.
+
+        By default the whole report is written in a single LLM call. Set
+        ``agentic=True`` to use the opt-in agentic workflow (independent
+        per-section drafting + mandatory diff-editor review); it requires the
+        ``multi-source-report-generator-agentic`` extra (``langgraph``).
+        """
         specs = _normalize_sections(sections)
-        files = _collect_input_files(input_paths)
-        if not files:
-            raise ValueError(
-                "No supported source files found in `input_paths`. "
-                f"Supported extensions: {sorted(SUPPORTED_EXTENSIONS)}"
-            )
 
         parser_options = parser_options or {}
         transcriber_options = transcriber_options or {}
         image_options = image_options or {}
         writer_options = writer_options or {}
 
-        # 1. Build evidence
-        evidence_items: list[EvidenceItem] = []
-        for index, path in enumerate(files, start=1):
-            item = self._build_evidence_item(
-                path,
-                index=index,
-                parser_choice=parser_choice,
-                parser_options=parser_options,
-                transcriber_options=transcriber_options,
-                image_options=image_options,
+        # 1. Build evidence (shared by both paths).
+        evidence_items, evidence_pack, sample_markdown = self._build_evidence(
+            input_paths=input_paths,
+            parser_choice=parser_choice,
+            parser_options=parser_options,
+            transcriber_options=transcriber_options,
+            image_options=image_options,
+            sample_report_path=sample_report_path,
+            max_evidence_chars=max_evidence_chars,
+        )
+
+        # Suppress inline citations when there is only one source — nothing
+        # to distinguish between sources, so citations add noise.
+        if len(evidence_items) <= 1:
+            include_source_references = False
+
+        # 2. Write the report — either the agentic path or the single LLM call.
+        if agentic:
+            markdown, generated, usage_total = self._run_agentic(
+                specs=specs,
+                evidence_items=evidence_items,
+                evidence_pack=evidence_pack,
+                sample_markdown=sample_markdown,
+                output_dir=output_dir,
+                report_title=report_title,
+                report_description=report_description,
+                report_language=report_language,
+                include_source_references=include_source_references,
+                writer_options=writer_options,
+                review_options=review_options,
+                polish=polish,
+                strict_review=strict_review,
+                curate_evidence=curate_evidence,
+                verbose=verbose,
+                progress_callback=progress_callback,
             )
-            evidence_items.append(item)
+        else:
+            # Write the whole report in a single LLM call (so a sample report's
+            # format applies to the report as a whole, not per section).
+            client = self._build_llm_client(writer_options)
+            chat_kwargs = {
+                k: v
+                for k, v in writer_options.items()
+                if k not in ("model", "provider") and v is not None
+            }
 
-        evidence_pack = self._assemble_evidence_pack(
-            evidence_items, max_evidence_chars=max_evidence_chars
-        )
-
-        # Optional format template the writer must strictly follow.
-        sample_markdown: str | None = None
-        if sample_report_path is not None:
-            sample_markdown = self._extract_sample_report(
-                sample_report_path,
-                parser_choice=parser_choice,
-                parser_options=parser_options,
+            response = self._write_report(
+                client,
+                specs=specs,
+                evidence_pack=evidence_pack,
+                report_title=report_title,
+                report_description=report_description,
+                report_language=report_language,
+                include_source_references=include_source_references,
+                sample_markdown=sample_markdown,
+                chat_kwargs=chat_kwargs,
             )
-            if max_evidence_chars is not None and len(sample_markdown) > max_evidence_chars:
-                sample_markdown = (
-                    sample_markdown[:max_evidence_chars] + "\n\n[... sample report truncated ...]"
-                )
+            markdown = _normalize_report_markdown(response.text, report_title)
+            usage_total = (
+                {k: v for k, v in response.usage.items() if isinstance(v, int)}
+                if getattr(response, "usage", None)
+                else {}
+            )
+            generated = _split_into_sections(markdown, specs)
 
-        # 2. Write the whole report in a single LLM call (so a sample report's
-        #    format applies to the report as a whole, not per section).
-        client = self._build_llm_client(writer_options)
-        chat_kwargs = {
-            k: v
-            for k, v in writer_options.items()
-            if k not in ("model", "provider") and v is not None
-        }
-
-        response = self._write_report(
-            client,
-            specs=specs,
-            evidence_pack=evidence_pack,
-            report_title=report_title,
-            report_language=report_language,
-            include_source_references=include_source_references,
-            sample_markdown=sample_markdown,
-            chat_kwargs=chat_kwargs,
-        )
-
-        # 3. Normalize the report markdown and derive per-section breakdown.
-        markdown = _normalize_report_markdown(response.text, report_title)
-        usage_total: dict[str, int] = (
-            {k: v for k, v in response.usage.items() if isinstance(v, int)}
-            if getattr(response, "usage", None)
-            else {}
-        )
-        generated = _split_into_sections(markdown, specs)
-
-        # 4. Write outputs
+        # 3. Write outputs
         markdown_path: Path | None = None
         if output_dir is not None:
             markdown_path = self._write_outputs(
@@ -438,6 +502,136 @@ class MultiSourceReportGenerator:
             markdown_path=markdown_path,
             usage=usage_total,
         )
+
+    # -- shared evidence building -----------------------------------------
+
+    def _build_evidence(
+        self,
+        *,
+        input_paths: list[str | Path],
+        parser_choice: str,
+        parser_options: dict,
+        transcriber_options: dict,
+        image_options: dict,
+        sample_report_path: str | Path | None,
+        max_evidence_chars: int | None,
+    ) -> tuple[list[EvidenceItem], str, str | None]:
+        """Normalize all inputs to an evidence pack (+ optional sample markdown).
+
+        Shared by the single-call and agentic paths.
+        """
+        files = _collect_input_files(input_paths)
+        if not files:
+            raise ValueError(
+                "No supported source files found in `input_paths`. "
+                f"Supported extensions: {sorted(SUPPORTED_EXTENSIONS)}"
+            )
+
+        evidence_items: list[EvidenceItem] = []
+        for index, path in enumerate(files, start=1):
+            evidence_items.append(
+                self._build_evidence_item(
+                    path,
+                    index=index,
+                    parser_choice=parser_choice,
+                    parser_options=parser_options,
+                    transcriber_options=transcriber_options,
+                    image_options=image_options,
+                )
+            )
+
+        evidence_pack = self._assemble_evidence_pack(
+            evidence_items, max_evidence_chars=max_evidence_chars
+        )
+
+        sample_markdown: str | None = None
+        if sample_report_path is not None:
+            sample_markdown = self._extract_sample_report(
+                sample_report_path,
+                parser_choice=parser_choice,
+                parser_options=parser_options,
+            )
+            if max_evidence_chars is not None and len(sample_markdown) > max_evidence_chars:
+                sample_markdown = (
+                    sample_markdown[:max_evidence_chars] + "\n\n[... sample report truncated ...]"
+                )
+
+        return evidence_items, evidence_pack, sample_markdown
+
+    # -- agentic path -----------------------------------------------------
+
+    def _run_agentic(
+        self,
+        *,
+        specs: list[ReportSectionSpec],
+        evidence_items: list[EvidenceItem],
+        evidence_pack: str,
+        sample_markdown: str | None,
+        output_dir: str | Path | None,
+        report_title: str,
+        report_description: str | None,
+        report_language: str | None,
+        include_source_references: bool,
+        writer_options: dict,
+        review_options: dict | None,
+        polish: bool,
+        strict_review: bool,
+        curate_evidence: bool,
+        verbose: bool,
+        progress_callback: Callable[[str], None] | None,
+    ) -> tuple[str, list[GeneratedSection], dict]:
+        from .agentic import run_agentic_report
+        from .progress import ProgressReporter
+
+        reporter = ProgressReporter(verbose=verbose, callback=progress_callback)
+
+        writer_client = self._build_llm_client(writer_options)
+        writer_kwargs = {
+            k: v
+            for k, v in writer_options.items()
+            if k not in ("model", "provider") and v is not None
+        }
+
+        # Reviewer client: a separate model via review_options, else reuse the writer.
+        if review_options:
+            reviewer_client = self._build_llm_client(review_options)
+            reviewer_kwargs = {
+                k: v
+                for k, v in review_options.items()
+                if k not in ("model", "provider") and v is not None
+            }
+        else:
+            reviewer_client = writer_client
+            reviewer_kwargs = writer_kwargs
+
+        # Split the sample by heading and resolve a matched block per section
+        # here (so the agentic package never imports pipeline internals).
+        sample_sections = _split_sample_sections(sample_markdown) if sample_markdown else {}
+        matched_samples = {
+            spec.title: _match_sample_section(spec.title, sample_sections) for spec in specs
+        }
+
+        markdown, generated, usage_total = run_agentic_report(
+            specs=specs,
+            evidence_items=evidence_items,
+            evidence_pack=evidence_pack,
+            matched_samples=matched_samples,
+            report_description=report_description,
+            sample_report_provided=sample_markdown is not None,
+            output_dir=output_dir,
+            report_title=report_title,
+            report_language=report_language,
+            include_source_references=include_source_references,
+            writer_client=writer_client,
+            writer_kwargs=writer_kwargs,
+            reviewer_client=reviewer_client,
+            reviewer_kwargs=reviewer_kwargs,
+            curate_evidence=curate_evidence,
+            polish=polish,
+            strict_review=strict_review,
+            reporter=reporter,
+        )
+        return _normalize_report_markdown(markdown, report_title), generated, usage_total
 
     # -- evidence building ------------------------------------------------
 
@@ -640,6 +834,7 @@ class MultiSourceReportGenerator:
         specs: list[ReportSectionSpec],
         evidence_pack: str,
         report_title: str,
+        report_description: str | None,
         report_language: str | None,
         include_source_references: bool,
         sample_markdown: str | None,
@@ -647,30 +842,34 @@ class MultiSourceReportGenerator:
     ):
         """Write the entire report in one LLM call and return the raw response."""
         parts = [f"Report title: {report_title}"]
+        if report_description:
+            parts.append(f"Report context and purpose: {report_description}")
         if report_language:
             parts.append(f"Write the report in: {report_language}")
         if include_source_references:
             parts.append(
                 "Where useful, reference the source (e.g. by filename) that supports a claim."
             )
+        else:
+            parts.append("Do not add inline source citations or filename references in the text.")
 
         # Present the sample BEFORE the section instructions so the model internalises
         # the expected tone/structure/format (layout, list style, brevity) before
         # reading what content to put in each section.
         if sample_markdown:
             parts.append(
-                "FORMAT REFERENCE — HIGHEST PRIORITY. Analyse this example and reproduce "
-                "its formatting exactly across the whole report:\n"
-                "  • Identify how each section is structured internally and replicate it.\n"
-                "  • Match the list type (prose, bullets, numbered) and item length used "
-                "in the example. If items are short, keep yours short; if they are longer "
-                "prose, match that length.\n"
-                "  • Replicate any bold lead-in patterns, indentation, or citation style.\n"
-                "  • When content instructions ask for comprehensive coverage, achieve "
-                "completeness by writing more items at the same brevity the reference "
-                "shows, not by making individual items longer.\n"
-                "  • Section titles come from the required list below. Facts and wording "
-                "come from the evidence. Only the FORMAT comes from this reference.\n\n"
+                "FORMAT REFERENCE — governs both structure AND length for every section. "
+                "This example is most likely about a DIFFERENT subject. "
+                "Mirror it exactly:\n"
+                "  • Structure: how each section is laid out internally, list style "
+                "(prose/bullets/numbered), bold lead-ins, citation style.\n"
+                "  • Length: each section you write should be approximately the same "
+                "total length and density as the corresponding section in this reference "
+                "— same number of paragraphs or bullet points, similar per-item length. "
+                "Do not add extra content to be thorough; do not pad.\n"
+                "  • Content: take NONE of its facts, names, numbers, or wording. Every "
+                "fact must come from the EVIDENCE below. Section titles come from the "
+                "required list.\n\n"
                 f"{sample_markdown}"
             )
 
@@ -682,17 +881,24 @@ class MultiSourceReportGenerator:
             section_lines.append(f"   Content to cover: {spec.instructions}")
         parts.append("\n".join(section_lines))
 
-        parts.append(f"Evidence (all available source material):\n{evidence_pack}")
+        parts.append(
+            "Evidence — this is the ONLY source of facts and content for the report:\n"
+            f"{evidence_pack}"
+        )
 
         closing = [
             f"Now write the complete report. Start with `# {report_title}`, then write "
             "every required section in order using `## <exact heading title>`."
         ]
         if sample_markdown:
-            closing.append("Strictly adhere to the FORMAT REFERENCE's tone, style, and structure.")
+            closing.append(
+                "Follow the FORMAT REFERENCE's layout, style, AND length — each section "
+                "should be approximately as long as the corresponding reference section. "
+                "Ignore its subject matter entirely; all facts come from the evidence."
+            )
         else:
             closing.append("Write in a clean, professional report format.")
-        closing.append("Use only the evidence.")
+        closing.append("Use only the evidence for content.")
         parts.append(" ".join(closing))
         user_prompt = "\n\n".join(parts)
 

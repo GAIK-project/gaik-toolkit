@@ -239,6 +239,7 @@ all = [
     "gaik[audio-to-structured-data]",
     "gaik[documents-to-structured-data]",
     "gaik[multi-source-report-generator]",
+    "gaik[multi-source-report-generator-agentic]",
     "gaik[llm-judge]",
     "gaik[finnish-rag]",
     "gaik[evaluators]",
@@ -261,6 +262,13 @@ multi-source-report-generator = [
     "gaik[transcriber]",
     "gaik[extract]",
     "openpyxl>=3.1",
+]
+
+# Opt-in agentic workflow (V2) for the multi-source report generator.
+# Adds LangGraph for the per-section orchestrator + diff-editor review loop.
+multi-source-report-generator-agentic = [
+    "gaik[multi-source-report-generator]",
+    "langgraph>=0.2",
 ]
 
 # CPU-only variants (no GPU/torch/docling dependencies)
