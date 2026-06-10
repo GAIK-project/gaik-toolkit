@@ -300,7 +300,7 @@ dev = [
     "pytest>=8.0",
 ]
 
-# Solution Configuration Wizard runner (run_wizard_interactive.py / run_wizard_sdk.py)
+# Solution Configuration Wizard runner (run_wizard_interactive.py / scripts/run_wizard.py)
 wizard = [
     "claude-agent-sdk>=0.1.48",
     "python-dotenv>=1.0.0",

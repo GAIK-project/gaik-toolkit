@@ -200,8 +200,9 @@ Composed pipelines in `gaik.software_modules.*`. For full API, see [Software Com
 | AudioToStructuredData | Audio → Transcript → Schema → JSON | `from gaik.software_modules.audio_to_structured_data import AudioToStructuredData` |
 | DocumentsToStructuredData | PDF/DOCX → Parse → Schema → JSON | `from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData` |
 | RAGWorkflow | PDF → Parse → Embed → Store → Retrieve → Answer | `from gaik.software_modules.RAG_workflow import RAGWorkflow` |
+| MultiSourceReportGenerator | Mixed files (PDF/DOCX/Excel/audio/images) → Normalize → Sectioned Markdown report | `from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator` |
 
-All pipelines follow: `pipeline = Pipeline(use_azure=True)` → `result = pipeline.run(file_path, user_requirements, ...)`.
+The first three pipelines follow: `pipeline = Pipeline(use_azure=True)` → `result = pipeline.run(file_path, user_requirements, ...)`. `MultiSourceReportGenerator` instead takes a set of source files plus a report structure (section titles + per-section instructions) and returns the assembled Markdown report with a per-section breakdown.
 
 ## Architecture Overview
 
@@ -209,7 +210,7 @@ All pipelines follow: `pipeline = Pipeline(use_azure=True)` → `result = pipeli
 |-------|---------|----------|
 | **Service** | Logical capability | `speech_to_text`, `document_parsing`, `information_extraction`, `rag` |
 | **Building block** | Atomic toolkit class/function | `Transcriber`, `ParallelTranscriber`, `TranscriptEnhancer`, `TextToSpeech`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `Embedder`, `VectorStore`, `PgVectorStore`, `Retriever`, `AnswerGenerator` |
-| **Software component** | Composed, workflow-ready unit | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow` |
+| **Software component** | Composed, workflow-ready unit | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow`, `MultiSourceReportGenerator` |
 
 ## Observability
 

@@ -11,7 +11,8 @@ description: >-
   RAG, classifier, TTS, enhance_transcript, validators (LLMJudge / panel /
   pairwise / calibration), evaluators (ExtractionEvaluator, RAGEvaluator,
   BatchEvaluationRunner), form_understander, observability) and software_modules
-  (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow). Not for creating a brand-new component
+  (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow,
+  MultiSourceReportGenerator). Not for creating a brand-new component
   package — use build-software-component for that.
 argument-hint: "[component name or feature to demonstrate]"
 ---
@@ -30,7 +31,7 @@ installable `pip install "gaik[...]"` flow).
 Examples live in `implementation_layer/examples/` split into two categories:
 
 - `software_components/` — individual building blocks (extractor, parsers, transcriber, RAG, classifier, TTS, etc.)
-- `software_modules/` — end-to-end pipelines (audio_to_structured_data, documents_to_structured_data, RAG_workflow)
+- `software_modules/` — end-to-end pipelines (audio_to_structured_data, documents_to_structured_data, RAG_workflow, multi_source_report_generator)
 
 ## Steps
 
@@ -155,11 +156,11 @@ Default: **yes** for interactive, user-facing features (parsers, transcribers,
 extractors, RAG, TTS, classifiers); **no** for internal utilities.
 
 If yes:
-- Add/extend a FastAPI router under `toolkit_demo_app/api/routers/` (e.g. `parser.py`, `extractor.py`, `rag.py`)
-- Add schema(s) under `toolkit_demo_app/api/schemas/`
-- Add or update a Next.js page/route under `toolkit_demo_app/app/`
+- Add/extend a FastAPI router under `implementation_layer/toolkit_demo_app/api/routers/` (e.g. `parser.py`, `extractor.py`, `rag.py`)
+- Add schema(s) under `implementation_layer/toolkit_demo_app/api/schemas/`
+- Add or update a Next.js page/route under `implementation_layer/toolkit_demo_app/app/`
 - Handle missing optional dependencies gracefully (the extra may not be installed by default)
-- Dev preview: `bun run dev:all` from `toolkit_demo_app/`
+- Dev preview: `bun run dev:all` from `implementation_layer/toolkit_demo_app/`
 
 ### 6d. Tag a PyPI release
 

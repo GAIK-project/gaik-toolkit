@@ -1,4 +1,4 @@
-﻿# GAIK Toolkit Implementation layer description
+# GAIK Toolkit Implementation layer description
 [![PyPI version](https://img.shields.io/pypi/v/gaik.svg)](https://pypi.org/project/gaik/)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
@@ -13,7 +13,7 @@ Two approaches for Generative AI solution implementation are supported by the to
 The key parts of the code-based implementation layer includes:
 
 - **Software components** – reusable utilities for extraction, parsing, transcription, transcript enhancement, classification, RAG, validation/evaluation, LLM provider access, text-to-speech, PostgreSQL querying, and one-call vision extraction
-- **Software modules** – end‑to‑end pipelines combining the software components such as "audio → structured data", "documents → structured data", and "RAG workflow"
+- **Software modules** – end‑to‑end pipelines combining the software components such as "audio → structured data", "documents → structured data", "RAG workflow", and "multi‑source report generation"
 
 ## Architecture overview
 
@@ -23,7 +23,7 @@ GAIK distinguishes three levels:
 |------------------------|-----------------------------------------|---------------------------------------------------------------|
 | **Knowledge Service**            | Logical capability                      | `speech_to_text`, `document_parsing`, `information_extraction` |
 | **Software component** | Atomic toolkit class / function         | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`, `VisionExtractor`, `DocumentClassifier`, `LLMJudge`, `TextToSpeech` |
-| **Software module**    | Composed, workflow‑ready unit           | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow` |
+| **Software module**    | Composed, workflow‑ready unit           | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow`, `MultiSourceReportGenerator` |
 
 In code, that maps to:
 
@@ -88,6 +88,7 @@ pip install "gaik[postgres-agent]"
 pip install "gaik[audio-to-structured-data]"
 pip install "gaik[documents-to-structured-data]"
 pip install "gaik[rag-workflow]"
+pip install "gaik[multi-source-report-generator]"
 
 # Everything
 pip install "gaik[all]"
@@ -128,7 +129,7 @@ Software components:
 - `VisionParser` / multimodal parser – LLM/vision‑based PDF → markdown (multi‑page context, table handling, custom prompts)
 - `PyMuPDFParser` – fast, local PDF text extraction (no external binaries)
 - `DoclingParser` – OCR and multi‑format parsing (for more complex documents)
-- `VisionRAGParser` – combines Docling with vision models for RAG‑optimized parsing (chunked outputs with image descriptions)
+- `VisionRagParser` – combines Docling with vision models for RAG‑optimized parsing (chunked outputs with image descriptions)
 
 ### 4. Transcriber and Transcript Enhancement – audio / video → transcripts
 
@@ -233,6 +234,18 @@ A retrieval‑augmented pipeline that:
 3. Retrieves top‑k relevant chunks for a query
 4. Produces a cited answer from retrieved context
 
+### Multi‑Source Report Generator
+
+`MultiSourceReportGenerator` turns a set of mixed source files into one user‑defined, long‑form Markdown report:
+
+1. Normalises every file (PDF, DOCX, Excel/CSV, text, Markdown, audio/video, images) into Markdown evidence using the appropriate GAIK parser, transcriber, or extractor
+2. Writes each section with an LLM from your section titles + per‑section instructions (optionally matching a sample report's format)
+3. Returns the assembled Markdown plus a per‑section breakdown of the evidence used
+
+```python
+from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator
+```
+
 ---
 
 ## Configuration & environment variables
@@ -265,7 +278,7 @@ Although the full Solution Wizard and template catalogue live outside this repo,
  - **Semantic Video Search (Semantic + keyword based search within videos)**
  `Embedder` + `vectorStore` + `HybridRetriever` + `ReRanker`
 - **Construction Site Report Generation (Multiple documents + images + audios + notes + sample report → A structured report)**
- `Transcriber` + `DocumentClassifier` + `VisionRAGParser` + `ReportWriter` 
+ `Transcriber` + `DocumentClassifier` + `VisionRagParser` + `ReportWriter` 
 
 At solution level, a template or SolutionWizardSpec can express these as **services** implemented by GAIK software components and modules.
 

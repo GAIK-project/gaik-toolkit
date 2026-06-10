@@ -27,7 +27,11 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 - **Construction Diary** - Voice notes to construction diary
 - **Dental Transcription** - Audio/video to SRT/VTT subtitles
 - **Semantic Video Search** - Vector search across indexed video transcripts (pgvector)
-- **Purchase Order Processing** - PO + BOMs + price list → line-item prices and order draft
+- **Purchase Order Processing** - PO + BOMs + price list → line-item prices and order draft (`luvata-order` route)
+
+### Solution Wizard
+
+- **Solution Configuration Wizard** - Natural-language use case → validated blueprint, BPMN diagram, Mermaid flow, and runnable PoC (optional; requires the `claude` CLI in the runtime)
 
 ## Quick Start
 
@@ -121,6 +125,8 @@ toolkit_demo_app/
 | `/diary` | Construction diary workflow |
 | `/dental-transcribe` | Dental transcription with SRT/VTT |
 | `/video-search` | Semantic dental video search |
+| `/luvata-order` | Purchase order processing with BOM matching and line-item pricing |
+| `/wizard` | Solution Configuration Wizard (optional; requires the `claude` CLI in the runtime) |
 
 API docs: <http://localhost:8000/docs> (Swagger UI)
 

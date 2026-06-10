@@ -18,10 +18,10 @@ GAIK provides four different parsers, each optimized for different use cases:
 
 | Parser | Use Case | Speed | Requirements |
 |--------|----------|-------|--------------|
-| [VisionParser](vision.md) | High-quality PDF/image parsing with table extraction | Slow | OpenAI/Azure API |
-| [PyMuPDFParser](pymupdf.md) | Fast PDF text extraction | Fast | None (local) |
-| [DocxParser](docx.md) | Word document parsing | Fast | None (local) |
-| [DoclingParser](docling.md) | Advanced OCR with multi-format support | Medium | Optional GPU |
+| `VisionParser` | High-quality PDF/image parsing with table extraction | Slow | OpenAI/Azure API |
+| `PyMuPDFParser` | Fast PDF text extraction | Fast | None (local) |
+| `DocxParser` | Word document parsing | Fast | None (local) |
+| `DoclingParser` | Advanced OCR with multi-format support | Medium | Optional GPU |
 
 ### Quick Comparison
 

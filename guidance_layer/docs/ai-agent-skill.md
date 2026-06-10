@@ -48,9 +48,9 @@ python .claude/skills/gaik-toolkit/scripts/fetch_pypi_readme.py --version  # Ver
 
 If you're using a different AI coding assistant, you can reference the skill files directly:
 
-- **Main documentation**: [.claude/skills/gaik-toolkit/SKILL.md](../.claude/skills/gaik-toolkit/SKILL.md)
-- **API reference**: [.claude/skills/gaik-toolkit/references/building-blocks.md](../.claude/skills/gaik-toolkit/references/building-blocks.md)
-- **Examples**: [.claude/skills/gaik-toolkit/references/examples.md](../.claude/skills/gaik-toolkit/references/examples.md)
+- **Main documentation**: [.claude/skills/gaik-toolkit/SKILL.md](../../.claude/skills/gaik-toolkit/SKILL.md)
+- **API reference**: [.claude/skills/gaik-toolkit/references/building-blocks.md](../../.claude/skills/gaik-toolkit/references/building-blocks.md)
+- **Examples**: [.claude/skills/gaik-toolkit/references/examples.md](../../.claude/skills/gaik-toolkit/references/examples.md)
 
 ## Maintaining the Skill
 

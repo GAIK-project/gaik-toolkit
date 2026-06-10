@@ -1,4 +1,4 @@
-﻿# Transcriber
+# Transcriber
 
 Transcribe audio and video files using OpenAI Whisper with optional GPT enhancement for improved formatting.
 
@@ -163,7 +163,7 @@ See [implementation_layer/examples/software_components/transcriber/](../implemen
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
 - **Examples**: [implementation_layer/examples/software_components/](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components)
-- **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
+- **Contributing**: [CONTRIBUTING.md](../../CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License

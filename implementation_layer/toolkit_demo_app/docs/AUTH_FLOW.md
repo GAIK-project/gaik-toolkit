@@ -32,7 +32,7 @@ This ensures only authorized users can access the demo features.
 1. User visits `/sign-in` and enters credentials
 
 2. On successful authentication:
-   - If access status is `approved`: redirect to `/classifier` (default demo)
+   - If access status is `approved`: redirect to `/` (home)
    - If access status is `pending`: redirect to `/access-pending`
    - If access status is `rejected`: sign out and show error
 

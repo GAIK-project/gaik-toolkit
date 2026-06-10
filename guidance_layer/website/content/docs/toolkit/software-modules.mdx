@@ -20,6 +20,7 @@ Use software modules when you want a complete, working pipeline with minimal int
 | Audio-to-Structured-Data | Audio / Video | Transcribe → Extract | Structured fields from spoken content |
 | Document-to-Structured-Data | PDF / DOCX | Parse → Extract | Structured fields from document content |
 | RAG-Workflow | PDF files + User query | Parse → Embed → Store → Retrieve → Generate | Contextual answers with citations |
+| Multi-Source-Report-Generator | Mixed files (PDF, DOCX, Excel/CSV, audio/video, images) + report structure | Normalize → Write sections → Assemble | User-defined long-form Markdown report |
 
 ---
 
@@ -237,3 +238,51 @@ flowchart TD
 
 - **Implementation code**: [software_modules/RAG_workflow](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/RAG_workflow)
 - **Usage examples**: [examples/RAG_workflow](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/RAG_workflow)
+
+---
+
+### Multi-Source-Report-Generator
+
+This module turns a set of mixed source files into a single user-defined, long-form Markdown report. You provide the files (PDF, Word, Excel/CSV, text, Markdown, audio/video, images) and a report structure (section titles plus per-section instructions). The module normalises every file into Markdown evidence using the appropriate GAIK parser, transcriber, or extractor, then writes each section with an LLM — optionally matching the format of a sample report — and returns the assembled Markdown together with a per-section breakdown. It orchestrates existing GAIK components (`PyMuPDFParser`, `VisionParser`, `MultimodalParser`, `DoclingParser`, `DocxParser`, `Transcriber`, `VisionExtractor`) rather than introducing new parsing logic.
+
+<Mermaid chart={`
+flowchart TD
+    IN1("📁 Mixed Source Files") --> MOD
+    IN2("🧱 Report Structure") --> MOD
+
+    subgraph MOD["Multi-Source-Report-Generator"]
+        direction TB
+        N["Step 1 · Normalize<br/>parsers / transcriber / extractor"] --> W["Step 2 · Write Sections<br/>LLM per section"] --> A["Step 3 · Assemble Report"]
+    end
+
+    MOD --> O1("📄 Markdown Report")
+    MOD --> O2("🧩 Per-Section Breakdown")
+
+    style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style IN2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O2 fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style MOD fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+`} />
+
+**What the module returns:**
+
+| Output | Description |
+| --- | --- |
+| Markdown Report | Assembled long-form report following your section structure |
+| Per-Section Breakdown | Each generated section with the evidence it drew from |
+
+**Key features:**
+- Handles many source types in one pipeline (documents, spreadsheets, audio/video, images)
+- User-defined report structure: section titles plus per-section instructions
+- Optional sample report to match an existing format and tone
+- Reuses GAIK parsers, transcriber, and extractor — no new parsing logic
+
+**Potential applications:**
+- Project and progress reports compiled from mixed deliverables
+- Sales proposals and marketing materials from briefs and assets
+- Research and literature summaries across documents and recordings
+- Due-diligence and audit reports from heterogeneous evidence
+
+- **Implementation code**: [software_modules/multi_source_report_generator](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/multi_source_report_generator)
+- **Usage examples**: [examples/multi_source_report_generator](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/multi_source_report_generator)

@@ -253,5 +253,95 @@
       {"name": "retriever_top_k", "type": "int", "default": 5, "effect": "Number of chunks retrieved.", "selection_relevant": false, "infer_from": "answer breadth requirement"}
     ],
     "note": "End-to-end module: embeds, stores, retrieves, and answers. Do NOT also add Embedder / PgVectorStore / Retriever / AnswerGenerator as separate steps."
+  },
+  "ParallelTranscriber": {
+    "import": "from gaik.software_components.parallel_transcriber import ParallelTranscriber, TranscriptionConfig\n    from gaik.software_components.config import get_openai_config",
+    "construct": "transcriber = ParallelTranscriber(api_config=get_openai_config(use_azure=use_azure), config=TranscriptionConfig(response_format=response_format))",
+    "call": "result = transcriber.transcribe(input_path)\n    text = result.plain_text",
+    "returns": "TranscriptionResult(.content, .plain_text, .format, .language, .model_used, .total_chunks, .total_duration_seconds); .save(out_dir) writes .srt/.txt/.vtt",
+    "install_extra": "parallel-transcriber",
+    "options": [
+      {
+        "name": "response_format",
+        "type": "enum",
+        "values": [
+          "srt",
+          "vtt",
+          "text",
+          "json"
+        ],
+        "default": "srt",
+        "effect": "Output format; 'srt'/'vtt' give timestamped subtitles, 'text' plain transcript.",
+        "selection_relevant": true,
+        "infer_from": "output_types: subtitles/captions -> srt or vtt; plain transcript -> text"
+      },
+      {
+        "name": "transcription_model",
+        "type": "str",
+        "default": "whisper",
+        "effect": "whisper (faster) or gpt-4o-transcribe / diarize backend.",
+        "selection_relevant": false,
+        "infer_from": "technical_spec.model; diarization need -> gpt-4o diarize"
+      },
+      {
+        "name": "chunk_duration_minutes",
+        "type": "int",
+        "default": 20,
+        "effect": "Nominal chunk length for parallel splitting.",
+        "selection_relevant": false,
+        "infer_from": "leave default unless the user tunes throughput"
+      }
+    ],
+    "note": "FFmpeg + ffprobe must be on PATH. Use this instead of Transcriber for long media or when fast parallel throughput matters; it does not do Finnish enhancement (no enhanced_transcript option)."
+  },
+  "MultiSourceReportGenerator": {
+    "import": "from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator",
+    "construct": "generator = MultiSourceReportGenerator(use_azure=use_azure)",
+    "call": "result = generator.run(input_paths=input_paths, sections=sections, report_title=report_title, report_language=report_language, parser_choice='auto')\n    report_markdown = result.markdown\n    written_sections = [s.title for s in result.sections]",
+    "returns": "ReportGenerationResult(.markdown, .markdown_path, .sections, .evidence_items, .title, .usage)",
+    "install_extra": "multi-source-report-generator",
+    "subsumes": [
+      "PyMuPDFParser",
+      "VisionParser",
+      "MultimodalParser",
+      "DoclingParser",
+      "DocxParser",
+      "Transcriber",
+      "VisionExtractor"
+    ],
+    "options": [
+      {
+        "name": "parser_choice",
+        "type": "enum",
+        "values": [
+          "auto",
+          "pymupdf",
+          "vision",
+          "multimodal",
+          "docling"
+        ],
+        "default": "auto",
+        "effect": "Which PDF parser the module uses internally to normalize documents.",
+        "selection_relevant": true,
+        "infer_from": "input_formats: text PDF -> auto/pymupdf; scanned/visual PDF -> vision/docling"
+      },
+      {
+        "name": "sample_report_path",
+        "type": "str",
+        "default": null,
+        "effect": "Path to a sample report whose structure/style the output should follow (content still drawn only from evidence).",
+        "selection_relevant": true,
+        "infer_from": "user supplies an example/target report format"
+      },
+      {
+        "name": "report_language",
+        "type": "str",
+        "default": null,
+        "effect": "Language to write the report in (e.g. 'English', 'Finnish').",
+        "selection_relevant": false,
+        "infer_from": "technical_spec.language"
+      }
+    ],
+    "note": "End-to-end synthesis module: it parses/transcribes/extracts every source file itself and writes the report. Do NOT also add parsers, Transcriber, or VisionExtractor as separate steps. You provide input_paths + sections (title + per-section instructions)."
   }
 }

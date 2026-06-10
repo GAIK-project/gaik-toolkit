@@ -305,6 +305,7 @@ pytest tests/ -v
 solution_wizard/
 ├── SKILL.md                          # orchestration layer (agent instructions)
 ├── README.md                         # this file
+├── run_wizard_interactive.py         # interactive CLI session (Claude Agent SDK, Azure Foundry)
 ├── schemas/
 │   ├── use_case_blueprint.schema.json  # exported from Pydantic (do not hand-edit)
 │   └── component_registry.schema.json  # registry structure (validated on load)
@@ -330,10 +331,7 @@ solution_wizard/
 │   ├── generate_docs.py                # documentation-suite generator (validates first)
 │   ├── generate_schema.py              # calls SchemaGenerator once; saves schema + hash
 │   ├── scaffold_poc.py                 # scaffolds poc/ from a validated blueprint
-│   ├── promote_template.py             # generalize-then-save a validated hybrid PoC
-│   ├── run_wizard_interactive.py       # interactive CLI session (Claude Agent SDK, Azure Foundry)
-│   ├── run_wizard_sdk.py               # headless smoke-test runner (automated, no interaction)
-│   └── .env.example                    # Foundry credential template for the two runners above
+│   └── promote_template.py             # generalize-then-save a validated hybrid PoC
 ├── src/
 │   └── solution_wizard/
 │       ├── blueprint.py                # Pydantic models (authoritative schema)
@@ -493,3 +491,4 @@ The validator (`src/solution_wizard/validator.py`) checks:
 9. At least one terminal step yields `final_output=true`
 10. `schema_ref`/`requirements_ref` follow the `schemas/output_schema.*` naming convention (warning if not)
 11. Assumptions well-formed; high-impact unconfirmed assumptions surfaced as warnings
+12. Redundant sub-component already provided internally — a step whose component is `subsumes`-ed or `uses_components`-ed by another step in the workflow is surfaced as a warning (e.g. a separate `TranscriptEnhancer` step when the `Transcriber` already produces an enhanced transcript)

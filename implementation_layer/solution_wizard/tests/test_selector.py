@@ -27,7 +27,7 @@ from solution_wizard.selector import (
 
 def test_registry_loads_and_validates():
     reg = get_registry()
-    assert len(reg.all()) == 10
+    assert len(reg.all()) == 12
 
 
 def test_registry_validation_catches_missing_keys():

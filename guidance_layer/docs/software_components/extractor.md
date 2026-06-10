@@ -1,4 +1,4 @@
-﻿# Extractor
+# Extractor
 
 Extract structured data from documents using natural language requirements with automatic Pydantic schema generation.
 
@@ -132,7 +132,7 @@ See [implementation_layer/examples/software_components/extractor/](../implementa
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
 - **Examples**: [implementation_layer/examples/software_components/](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components)
-- **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
+- **Contributing**: [CONTRIBUTING.md](../../CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License

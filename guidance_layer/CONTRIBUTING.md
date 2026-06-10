@@ -10,21 +10,20 @@ Quick guide for developers.
 
 ```text
 implementation_layer/src/gaik/
-├── extractor/        # Schema generation & structured extraction (+ tests)
-├── parsers/          # Vision, PDF, and other parsers (+ tests)
-├── transcriber/      # Audio/video transcription (+ tests)
-└── [your-feature]/   # New standalone modules
+├── software_components/   # Building blocks (extractor, parsers, transcriber, RAG, …) (+ tests)
+├── software_modules/      # End-to-end pipelines (audio_to_structured_data, …)
+└── observability/         # Tracing/metrics helpers
 ```
 
 ### Extend Existing Module
 
-Add new functionality to existing modules (e.g., `extractor/`, `parsers/`, `transcriber/`).
+Add new functionality to existing components (e.g., `software_components/extractor/`, `software_components/parsers/`, `software_components/transcriber/`).
 
-#### Example: Add a new parser to `parsers/`
+#### Example: Add a new parser to `software_components/parsers/`
 
-1. **Create parser file** → `implementation_layer/src/gaik/parsers/your_parser.py`
+1. **Create parser file** → `implementation_layer/src/gaik/software_components/parsers/your_parser.py`
 
-2. **Export in module** → [implementation_layer/src/gaik/parsers/\_\_init\_\_.py](implementation_layer/src/gaik/parsers/__init__.py)
+2. **Export in module** → [implementation_layer/src/gaik/software_components/parsers/\_\_init\_\_.py](implementation_layer/src/gaik/software_components/parsers/__init__.py)
 
    ```python
    from .your_parser import YourParser
@@ -38,15 +37,15 @@ Add new functionality to existing modules (e.g., `extractor/`, `parsers/`, `tran
    ```toml
    [project.optional-dependencies]
    parser = [
-       "openai>=2.7",
-       "PyMuPDF>=1.23.0",
+       "PyMuPDF>=1.26.0",
+       "python-docx>=1.2.0",
        "your-new-dependency>=1.0.0",  # Add here
    ]
    ```
 
-4. **Add tests** _(recommended)_ → `implementation_layer/src/gaik/parsers/tests/test_your_parser.py`
+4. **Add tests** _(recommended)_ → `implementation_layer/src/gaik/software_components/parsers/tests/test_your_parser.py`
 
-5. **Add example** _(recommended)_ → `examples/parsers/demo_your_parser.py`
+5. **Add example** _(recommended)_ → `implementation_layer/examples/software_components/parsers/demo_your_parser.py`
 
 ### Add New Standalone Feature
 
@@ -54,10 +53,10 @@ Create entirely new module for capabilities that don't fit existing modules.
 
 #### Example: New analysis module
 
-1. **Create module** → `implementation_layer/src/gaik/analysis/`
+1. **Create module** → `implementation_layer/src/gaik/software_components/analysis/`
 
    ```text
-   implementation_layer/src/gaik/analysis/
+   implementation_layer/src/gaik/software_components/analysis/
    ├── __init__.py
    ├── analyzer.py
    └── utils.py
@@ -73,10 +72,10 @@ Create entirely new module for capabilities that don't fit existing modules.
        "numpy>=1.24.0",
        "pandas>=2.0.0",
    ]
-   all = ["gaik[extractor,parser,transcriber,analysis]"]  # Update all group
+   all = ["gaik[extract,parser,transcriber,analysis]"]  # Update all group
    ```
 
-3. **Export public API** → [implementation_layer/src/gaik/\_\_init\_\_.py](implementation_layer/src/gaik/__init__.py)
+3. **Export public API** → [implementation_layer/src/gaik/software_components/\_\_init\_\_.py](implementation_layer/src/gaik/software_components/__init__.py)
 
    ```python
    from . import analysis
@@ -85,19 +84,19 @@ Create entirely new module for capabilities that don't fit existing modules.
        "extractor",
        "parsers",
        "transcriber",
-       "analysis",  # Add new module
+       "analysis",  # Add new component
    ]
    ```
 
-4. **Add tests** _(recommended)_ → `implementation_layer/src/gaik/analysis/tests/`
+4. **Add tests** _(recommended)_ → `implementation_layer/src/gaik/software_components/analysis/tests/`
 
-5. **Add examples** _(recommended)_ → `examples/analysis/` with README
+5. **Add examples** _(recommended)_ → `implementation_layer/examples/software_components/analysis/` with README
 
 ## Testing (Optional, but Recommended)
 
 Tests are automatically run by GitHub Actions on every push. Local testing and linting are optional but help catch issues early.
 
-**Tests go in:** `implementation_layer/src/gaik/<module>/tests/`
+**Tests go in:** `implementation_layer/src/gaik/software_components/<module>/tests/` (or the shared suite at `implementation_layer/unit_tests/`)
 
 ```bash
 # Option 1: Using activated venv
@@ -150,11 +149,13 @@ git push origin v0.3.0
 
 ```text
 gaik-toolkit/
-├── implementation_layer/src/gaik/                       # Package source
-│   ├── extractor/                  # Schema generation & extraction + tests
-│   ├── parsers/                    # PDF/vision parsers + tests
-│   └── transcriber/                # Audio/video transcription + tests
-├── examples/                       # Usage examples
+├── implementation_layer/
+│   ├── src/gaik/                       # Package source
+│   │   ├── software_components/         # Building blocks (extractor, parsers, transcriber, RAG, …)
+│   │   ├── software_modules/            # End-to-end pipelines
+│   │   └── observability/               # Tracing/metrics helpers
+│   ├── examples/                        # Usage examples
+│   └── unit_tests/                      # Shared test suite
 ├── scripts/                        # CI/build scripts
 └── .github/workflows/              # CI/CD
 ```

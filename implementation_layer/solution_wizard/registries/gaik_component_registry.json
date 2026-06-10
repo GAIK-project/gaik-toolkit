@@ -778,5 +778,167 @@
     "example_script_path": "implementation_layer/examples/software_components/validators/",
     "readme_path": "implementation_layer/src/gaik/software_components/validators/llm_judge/README.md",
     "install_extra": "llm-judge"
+  },
+  {
+    "id": "parallel_transcriber",
+    "name": "ParallelTranscriber",
+    "type": "software_component",
+    "input_artifact_types": [
+      "audio",
+      "video"
+    ],
+    "output_artifact_types": [
+      "text",
+      "transcript"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "transcription_model",
+      "response_format",
+      "chunk_duration_minutes",
+      "transcription_workers"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "transcription_model",
+      "transcription_workers"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Parallel FFmpeg chunking transcribes long media far faster than the sequential Transcriber; gpt-4o-transcribe is more accurate but slower than whisper",
+      "cost_sensitivity": "low -- one transcription call per chunk",
+      "degrades_on": [
+        "very_noisy_audio",
+        "multiple_overlapping_speakers"
+      ]
+    },
+    "known_limitations": [
+      "Requires FFmpeg + ffprobe on PATH (system dependency); no pure-Python fallback",
+      "Does not produce structured output -- use Extractor downstream",
+      "Overlap deduplication is SRT-based; use response_format='srt' for the cleanest chunk merging"
+    ],
+    "best_for": [
+      "long_audio_transcription",
+      "video_subtitles",
+      "fast_bulk_transcription"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "transcribe_audio",
+        "component": "ParallelTranscriber",
+        "inputs": [
+          "source_audio"
+        ],
+        "outputs": [
+          "raw_transcript"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/parallel_transcriber/",
+    "import_path": "gaik.software_components.parallel_transcriber",
+    "example_script_path": "implementation_layer/src/gaik/software_components/parallel_transcriber/README.md",
+    "readme_path": "implementation_layer/src/gaik/software_components/parallel_transcriber/README.md",
+    "install_extra": "parallel-transcriber"
+  },
+  {
+    "id": "multi_source_report_generator",
+    "name": "MultiSourceReportGenerator",
+    "type": "software_module",
+    "input_artifact_types": [
+      "pdf",
+      "docx",
+      "document",
+      "audio",
+      "video",
+      "image",
+      "text"
+    ],
+    "output_artifact_types": [
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [
+      "PyMuPDFParser",
+      "VisionParser",
+      "MultimodalParser",
+      "DoclingParser",
+      "DocxParser",
+      "Transcriber",
+      "VisionExtractor"
+    ],
+    "required_parameters": [
+      "sections"
+    ],
+    "optional_parameters": [
+      "report_title",
+      "report_language",
+      "sample_report_path",
+      "parser_choice",
+      "image_options"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "parser_choice",
+      "section_context_mode"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "One LLM write call per section plus one normalization call per source file; vision/multimodal parsers add latency but handle complex layouts",
+      "cost_sensitivity": "high -- scales with number of source files and number of report sections",
+      "degrades_on": [
+        "very_large_source_sets",
+        "handwritten_or_low_dpi_scans"
+      ]
+    },
+    "known_limitations": [
+      "Orchestrates existing GAIK parsers/transcriber/extractor; no new parsing logic -- inherits each sub-component's limits",
+      "Long-form synthesis cost grows with sources x sections",
+      "Report content is drawn only from supplied evidence; it does not browse or fetch external sources"
+    ],
+    "best_for": [
+      "multi_source_report_writing",
+      "sales_proposal_generation",
+      "project_and_progress_reports"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "normalize_sources",
+        "component": "MultiSourceReportGenerator",
+        "inputs": [
+          "source_files"
+        ],
+        "outputs": [
+          "markdown_evidence"
+        ]
+      },
+      {
+        "id": "write_report",
+        "component": "MultiSourceReportGenerator",
+        "inputs": [
+          "markdown_evidence"
+        ],
+        "outputs": [
+          "markdown_report"
+        ],
+        "parameters": {
+          "sections": "section specs (title + instructions)"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_modules/multi_source_report_generator/",
+    "import_path": "gaik.software_modules.multi_source_report_generator",
+    "example_script_path": "implementation_layer/examples/software_modules/multi_source_report_generator/",
+    "readme_path": "implementation_layer/src/gaik/software_modules/multi_source_report_generator/README.md",
+    "install_extra": "multi-source-report-generator"
   }
 ]

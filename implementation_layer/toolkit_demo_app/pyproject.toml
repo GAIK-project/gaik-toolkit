@@ -10,6 +10,9 @@ dependencies = [
     "python-multipart>=0.0.21",
     "python-dotenv>=1.2.1",
     "fpdf2>=2.8.5",
+    "openpyxl>=3.1.0",            # Excel/CSV parsing for the luvata-order demo
+    "boto3>=1.35.0",              # S3 presigned URLs for the video-search demo
+    "yt-dlp>=2024.0.0",           # video download in api/scripts/seed_dental_demo.py
     "gaik[all-cpu,multimodal-parser,postgres-agent]>=0.5.14",
     # Solution Configuration Wizard (drives the wizard skill via Claude Agent SDK).
     # NOTE: claude-agent-sdk spawns the `claude` Code CLI binary, which must be
