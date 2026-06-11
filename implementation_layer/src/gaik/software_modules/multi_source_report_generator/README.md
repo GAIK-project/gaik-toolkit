@@ -165,7 +165,7 @@ flowchart TD
     end
 
     c4 --> ASM["Assemble in user's original section order"]
-    ASM --> OUT[/"report.md · sections/ · evidence/"/]:::io
+    ASM --> OUT[/"report.md · report.docx · sections/ · evidence/"/]:::io
 ```
 
 > **Curate** — optional (`curate_evidence=True`): one LLM call per section extracts a focused evidence brief before drafting.  
