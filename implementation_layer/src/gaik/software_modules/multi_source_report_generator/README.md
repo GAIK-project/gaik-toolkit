@@ -183,18 +183,6 @@ Assembly order is always the user's original section order, not layer order. Wit
 - Reports with a logical section hierarchy where later sections (summary, conclusions, recommendations) should build on earlier ones
 - Any report where you want per-section format enforcement via a sample report
 
-**Trade-offs:**  
-Higher cost and latency: minimum `N draft + N reviewer` API calls for N sections, more with curation, polish, or reviewer retries. In exchange: every section is independently fact-checked, sections can receive context from earlier sections, and the reviewer enforces format adherence per section.
-
-| | Single-Call | Agentic |
-|---|---|---|
-| Report-writing API calls | 1 | N draft + N reviewer (minimum) |
-| Per-section fact-checking | No | Yes (mandatory diff-editor reviewer) |
-| Sections build on each other | No | Yes (via `depends_on`) |
-| Per-section format reference | No | Yes (matched sample section) |
-| Hallucination risk | Higher | Lower |
-| Speed / cost | Faster / cheaper | Slower / more expensive |
-
 ---
 
 ## Constructor
