@@ -53,17 +53,20 @@ The report writer uses the following GAIK components for input normalizations. I
 
 ## Installation
 
+**Single-call workflow only** — lighter install, no `langgraph`:
+
 ```bash
 pip install "gaik[multi-source-report-generator]"
 ```
 
-For the optional agentic workflow:
+**Agentic workflow** — includes everything above plus `langgraph`. Installing
+this is enough for both single-call and agentic:
 
 ```bash
 pip install "gaik[multi-source-report-generator-agentic]"
 ```
 
-For optional Word document (DOCX) export — also requires the
+**Optional Word document (DOCX) export** — also requires the
 [Pandoc](https://pandoc.org/installing.html) system binary:
 
 ```bash
@@ -118,11 +121,6 @@ Fastest and cheapest. No per-section fact-checking; the model relies entirely on
 ---
 
 ### Option 2 — Agentic (`agentic=True`)
-
-```bash
-pip install "gaik[multi-source-report-generator-agentic]"
-```
-
 Each section is an independent LLM call. Sections are grouped into **dependency layers** and written in order; within a layer, sections run in parallel. Every section is then fact-checked and repaired by a diff-editor reviewer before the report is assembled.
 
 ```mermaid
