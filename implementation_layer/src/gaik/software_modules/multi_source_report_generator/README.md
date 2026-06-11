@@ -2,7 +2,7 @@
 
 Generate a fully user-defined report from any mix of source files — PDF, Word, Excel, audio/video, images, and plain text.
 
-The module is built around a **use-case definition**: you tell it what report you want, and it writes it from your evidence. There are no hardcoded templates, no
+The report generator uses an agentic workflow and is built around a **use-case definition**: you tell it what report you want, and it writes it from your evidence. There are no hardcoded templates, no
 fixed sections, and no domain-specific logic.
 
 **Define your use case by providing:**
@@ -96,7 +96,7 @@ OPENAI_API_KEY
 
 The module offers two writing modes. Choose based on report criticality, cost tolerance, and whether sections need to build on each other.
 
-### Option 1 — Single-Call (default, `agentic=False`)
+### Option 1 (simple, non-agentic) — Single-Call (default, `agentic=False`)
 
 ```text
 input files
