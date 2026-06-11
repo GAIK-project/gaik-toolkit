@@ -671,31 +671,70 @@ export default function ReportWriterPage() {
             )}
           </div>
 
-          <HowItWorksCard description="How the Report Writer works">
+          <HowItWorksCard description="How to create your report use case">
             <p>
-              <strong>1. Define your use case.</strong> Set the report title,
-              description, and the sections you want with per-section
-              instructions.
+              <strong>1. Set the report title and description.</strong> The title
+              becomes the H1 heading of your report. The description is optional
+              but recommended — it is passed to the writer, reviewer, and polish
+              pass as shared context, helping the model stay on topic throughout.
+              Example: <em>"A structured summary of the Q2 product planning meeting,
+              documenting decisions, action items, and open questions."</em>
             </p>
             <p>
-              <strong>2. Upload evidence files.</strong> Any mix of PDF, Word,
-              audio, images, spreadsheets, or plain text is supported.
+              <strong>2. Define your sections.</strong> Each section needs a{" "}
+              <strong>title</strong> (the heading that appears in the report) and{" "}
+              <strong>instructions</strong> (what the section should contain). Write
+              instructions as a clear prompt to the writer — the more specific, the
+              better. For example:
+            </p>
+            <ul className="list-disc pl-5 space-y-1 text-sm">
+              <li>
+                <em>Title:</em> <strong>Action Items</strong> ·{" "}
+                <em>Instructions:</em> "List all action items from the meeting in a
+                table with columns: Action Item, Owner, Due Date, and Priority. Use
+                only items explicitly stated in the evidence."
+              </li>
+              <li>
+                <em>Title:</em> <strong>Executive Summary</strong> ·{" "}
+                <em>Instructions:</em> "Summarize the purpose, key decisions, and
+                outcome of the meeting in two concise paragraphs."
+              </li>
+            </ul>
+            <p>
+              <strong>3. Use section dependencies for hierarchical reports.</strong>{" "}
+              Open the <em>Advanced</em> panel on any section to see the dependency
+              chips. Click a chip to mark that section as a dependency — it turns
+              solid to show it is selected. A section with dependencies is written{" "}
+              <em>after</em> its dependencies are finalized and receives their
+              content as additional context. Use this when a section needs to
+              synthesize or summarize earlier sections — for example, an{" "}
+              <em>Executive Summary</em> that should reflect the already-written{" "}
+              <em>Findings</em> and <em>Decisions Made</em>, or a{" "}
+              <em>Recommendations</em> section that builds on a{" "}
+              <em>Risk Assessment</em>. Sections without dependencies all run in
+              parallel, which is faster.
             </p>
             <p>
-              <strong>3. Choose the workflow.</strong> Single-call writes the
-              whole report in one LLM call. Agentic mode drafts each section
-              independently, then fact-checks and repairs each draft with a
-              diff-editor reviewer.
+              <strong>4. Upload evidence files.</strong> Any mix of PDF, Word,
+              audio/video, images, spreadsheets, or plain text is accepted. The
+              module normalizes every file to Markdown evidence before writing.
+              Audio files are transcribed automatically.
             </p>
             <p>
-              <strong>4. Use depends_on for hierarchical reports.</strong> A
-              Summary or Recommendations section can be written after earlier
-              sections and receive their finalized content as context.
+              <strong>5. Choose the workflow.</strong> Agentic mode drafts each
+              section independently and then fact-checks and repairs it with a
+              diff-editor reviewer before assembling the report. It is slower but
+              produces more accurate, grounded output. Single-call writes the
+              entire report in one LLM call — faster and cheaper, but without
+              per-section review.
             </p>
             <p>
-              <strong>5. Save your configuration.</strong> Download the JSON
-              config to reuse or share this use case. Upload it next time to
-              restore all settings instantly.
+              <strong>6. Save and reuse your configuration.</strong> Click{" "}
+              <em>Download Config</em> to save all your settings — title,
+              description, sections, options — as a JSON file. Next time, click{" "}
+              <em>Upload Config</em> to restore everything instantly, or share the
+              file with a colleague so they can run the same report on different
+              evidence.
             </p>
           </HowItWorksCard>
         </div>

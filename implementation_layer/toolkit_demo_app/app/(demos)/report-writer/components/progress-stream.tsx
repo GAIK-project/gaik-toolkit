@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { CheckCircle, Circle, Clock, Loader2 } from "lucide-react";
+import { CheckCircle, Clock, Loader2 } from "lucide-react";
 
 interface ProgressStreamProps {
   messages: string[];
@@ -32,10 +32,11 @@ export function ProgressStream({
   isRunning,
   className,
 }: ProgressStreamProps) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length]);
 
   // Derive per-section status for the summary chips
@@ -95,7 +96,7 @@ export function ProgressStream({
       )}
 
       {/* Log */}
-      <div className="max-h-80 overflow-y-auto p-3 space-y-0.5">
+      <div ref={scrollRef} className="max-h-80 overflow-y-auto p-3 space-y-0.5">
         {messages.length === 0 && isRunning && (
           <p className="text-zinc-500 flex items-center gap-2">
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -136,7 +137,6 @@ export function ProgressStream({
           </p>
         )}
 
-        <div ref={bottomRef} />
       </div>
     </div>
   );
