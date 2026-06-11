@@ -130,9 +130,9 @@ input files
   -> for each dependency layer (in order):
        for each section in the layer (in parallel):
          -> curate section-specific evidence brief
-         -> draft section                          [LLM call]
-         -> reviewer repairs factual errors        [LLM call]
-         -> style polish                [LLM call]
+         -> draft section                          
+         -> reviewer repairs factual errors        
+         -> style polish                
   -> assemble report in the user's original section order
   -> write output files
 ```
