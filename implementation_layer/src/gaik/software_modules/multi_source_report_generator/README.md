@@ -137,51 +137,7 @@ input files
   -> write output files
 ```
 
-```mermaid
-flowchart TD
-    classDef opt  fill:#f3f4f6,stroke:#9ca3af,stroke-dasharray:5 5,color:#6b7280
-    classDef api  fill:#dbeafe,stroke:#3b82f6,color:#1e40af
-    classDef io   fill:#dcfce7,stroke:#22c55e,color:#166534
-    classDef bar  fill:#fef9c3,stroke:#eab308,color:#92400e
-
-    IN[/"Input Files\nPDF · DOCX · Audio · Video · Images · CSV · Markdown"/]:::io
-    IN --> NORM["Normalize in a common input to create an evidence pack"]
-    IN --> SQ{sample_report_path?}
-    SQ -- provided --> SS["Split sections from the sample"]
-    SQ -- not provided --> GF["generic format\nfor all sections"]
-
-    NORM --> L0
-    SS -. format ref .-> L0
-    GF -. format ref .-> L0
-
-    subgraph L0 ["Layer 0 — sections with no dependencies · run in parallel "]
-      direction LR
-      subgraph SA [" Section A "]
-        a1(["Curate"]):::opt --> a2["Draft"]:::api --> a3["Review & Repair"]:::api --> a4(["Polish"]):::opt
-      end
-      subgraph SB [" Section B "]
-        b1(["Curate"]):::opt --> b2["Draft"]:::api --> b3["Review & Repair"]:::api --> b4(["Polish"]):::opt
-      end
-    end
-
-    a4 --> BAR
-    b4 --> BAR
-    BAR{{"All parallel sections\nfinished & reviewed"}}:::bar
-
-    BAR --> L1
-
-    subgraph L1 ["Layer 1 — sections that depend on Layer 0 · run in parallel "]
-      subgraph SC [" Section C · depends_on: A, B "]
-        c0["dep context\nfinalized A + B"] --> c1(["Curate"]):::opt --> c2["Draft"]:::api --> c3["Review & Repair"]:::api --> c4(["Polish"]):::opt
-      end
-    end
-
-    c4 --> ASM["Assemble in user's original section order"]
-    ASM --> OUT[/"report.md · report.docx · sections/ · evidence/"/]:::io
-```
-
-> **Curate** — optional (`curate_evidence=True`): one LLM call per section extracts a focused evidence brief before drafting.  
-> **Polish** — optional (`polish=True`): a final style/proofreading pass after mandatory review repair.
+![Agentic Report Writing Workflow](assets/report-writer.png)
 
 **Dependency layers** — how it works:
 
