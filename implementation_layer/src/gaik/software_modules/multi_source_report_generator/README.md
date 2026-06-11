@@ -1,20 +1,44 @@
 # Multi-Source Report Generator
 
-Generate a user-defined report from mixed source files.
+Generate a fully user-defined report from any mix of source files — PDF, Word, Excel, audio/video, images, and plain text.
 
-You provide:
+The module is built around a **use-case definition**: you tell it what report you want, and it writes it from your evidence. There are no hardcoded templates, no
+fixed sections, and no domain-specific logic.
 
-- input files or folders
-- a report title
-- section titles and instructions
-- optional sample report for style/format
+**Define your use case by providing:**
 
-The module normalizes all input files into Markdown evidence, then writes a report using one of the two options selected by user:
+- **Report title** — the heading of the assembled report.
+- **Report description** — a short description for the report's purpose and
+  audience. Passed to the writer, reviewer, and polish pass as shared context to
+  keep tone and focus consistent across all sections.
+- **Report sections** — as many as you need, each with a title and a plain-language
+  description of what the section should contain and what to extract from the
+  evidence. Examples:
+  - *"List all action items in a table with Owner, Due Date, and Priority columns.
+    Use only items explicitly stated in the evidence."*
+  - *"Summarize the company's current AI maturity level and classify it as Low,
+    Moderate, or High based on development stage, data availability, and AI roadmap."*
+  - *"Describe the key technical risks identified during the discussion, with a
+    brief explanation of each risk and its potential impact."*
+- **Input files** — any mix of supported types in any folder. The module
+  normalizes every file to Markdown evidence automatically (transcribing audio,
+  parsing PDFs, extracting spreadsheet tables, etc.) before writing begins.
 
-- a default single-call workflow
-- an agentic workflow, where each section is drafted, reviewed, repaired, and optionally polished
+**Key settings you can tune:**
 
-## Components Used
+The report writer allows the user to select several options related to parsing, transcription, extraction, writing, and agentic workflows. See the list of complete options in the next sections.
+
+**Output:**
+
+- **Mandatory Markdown** (`report.md`) — the assembled report, always produced.
+- **Optional Word document** (`report.docx`) — set `output_docx=True`; requires
+  the Pandoc system binary.
+
+The module also supports saving the full use-case configuration to a JSON file
+(`save_report_config`) and reloading it later (`load_report_config`), so a
+use case defined once can be reused on new evidence without reconfiguring.
+
+## GAIK Components Used
 The report writer uses the following GAIK components for input normalizations. Input normalization means converting all supported source files into one common Markdown-like evidence format before report writing.
 
 | Component | Used for |
@@ -109,9 +133,9 @@ flowchart TD
     classDef bar  fill:#fef9c3,stroke:#eab308,color:#92400e
 
     IN[/"Input Files\nPDF · DOCX · Audio · Video · Images · CSV · Markdown"/]:::io
-    IN --> NORM["Normalize to Evidence Pack\nparsers · transcriber · image extractor"]
+    IN --> NORM["Normalize in a common input to create an evidence pack"]
     IN --> SQ{sample_report_path?}
-    SQ -- provided --> SS["Split sample by ## headings\none format block matched per section"]
+    SQ -- provided --> SS["Split sections from the sample"]
     SQ -- not provided --> GF["generic format\nfor all sections"]
 
     NORM --> L0
@@ -130,13 +154,13 @@ flowchart TD
 
     a4 --> BAR
     b4 --> BAR
-    BAR{{"Barrier\nall Layer 0 sections fully finalized"}}:::bar
+    BAR{{"All parallel sections\nfinished & reviewed"}}:::bar
 
     BAR --> L1
 
     subgraph L1 ["Layer 1 — sections that depend on Layer 0 · run in parallel "]
       subgraph SC [" Section C · depends_on: A, B "]
-        c0["📄 dep context\nfinalized A + B"] --> c1(["🧩 Curate"]):::opt --> c2["Draft"]:::api --> c3["Review & Repair"]:::api --> c4(["Polish"]):::opt
+        c0["dep context\nfinalized A + B"] --> c1(["Curate"]):::opt --> c2["Draft"]:::api --> c3["Review & Repair"]:::api --> c4(["Polish"]):::opt
       end
     end
 
