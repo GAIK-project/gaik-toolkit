@@ -1,14 +1,62 @@
 [
   {
-    "source_path": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\framerate_transcript.txt",
-    "source_type": "text",
+    "source_path": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\deployment-freeze-policy.pdf",
+    "source_type": "pdf",
     "metadata": {
       "index": 1,
-      "filename": "framerate_transcript.txt",
+      "filename": "deployment-freeze-policy.pdf",
+      "extension": ".pdf",
+      "detected_type": "pdf",
+      "size_bytes": 4869
+    },
+    "content_chars": 2033
+  },
+  {
+    "source_path": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\meeting_recording.mp3",
+    "source_type": "audio",
+    "metadata": {
+      "index": 2,
+      "filename": "meeting_recording.mp3",
+      "extension": ".mp3",
+      "detected_type": "audio",
+      "size_bytes": 903888
+    },
+    "content_chars": 1967
+  },
+  {
+    "source_path": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\notes.txt",
+    "source_type": "text",
+    "metadata": {
+      "index": 3,
+      "filename": "notes.txt",
       "extension": ".txt",
       "detected_type": "text",
-      "size_bytes": 18173
+      "size_bytes": 1035
     },
-    "content_chars": 17863
+    "content_chars": 1004
+  },
+  {
+    "source_path": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\project-budget.xlsx",
+    "source_type": "xlsx",
+    "metadata": {
+      "index": 4,
+      "filename": "project-budget.xlsx",
+      "extension": ".xlsx",
+      "detected_type": "xlsx",
+      "size_bytes": 5469
+    },
+    "content_chars": 375
+  },
+  {
+    "source_path": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\sketch.png",
+    "source_type": "image",
+    "metadata": {
+      "index": 5,
+      "filename": "sketch.png",
+      "extension": ".png",
+      "detected_type": "image",
+      "size_bytes": 139945
+    },
+    "content_chars": 401
   }
 ]

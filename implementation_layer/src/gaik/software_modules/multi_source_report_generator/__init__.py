@@ -9,7 +9,7 @@ from .models import (
     ReportGenerationResult,
     ReportSectionSpec,
 )
-from .pipeline import MultiSourceReportGenerator
+from .pipeline import MultiSourceReportGenerator, load_report_config, save_report_config
 
 __all__ = [
     "MultiSourceReportGenerator",
@@ -17,4 +17,6 @@ __all__ = [
     "ReportSectionSpec",
     "EvidenceItem",
     "GeneratedSection",
+    "save_report_config",
+    "load_report_config",
 ]

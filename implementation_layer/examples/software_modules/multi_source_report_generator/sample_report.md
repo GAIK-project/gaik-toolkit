@@ -1,18 +1,37 @@
+Q2 Product Planning Meeting
 
-## AI Maturity Level
+# Executive Summary
 
-BioNordica is an established supplier and distributor of life science and diagnostics products in Finland. The company supports research customers by helping them find suitable products such as biochemical reagents, antibodies, DNA-related materials, and some instruments from a large supplier network. Its customers include highly educated research professionals working in areas such as cancer, Alzheimer’s, Parkinson’s, microbiome, human body research, animal-related research, and diagnostics.
-BioNordica currently uses ChatGPT and other AI tools, but its AI adoption is still at an early and exploratory stage. The company has identified several possible AI use cases, but no AI solution has yet been implemented into core workflows. There is some relevant internal data, such as supplier pricing files, quotation history, and shared folders, but the key product catalog data is mostly held by suppliers and may be restricted by supplier terms and conditions. Based on the current development stage, limited AI workflow integration, unresolved data access, and the absence of a defined AI roadmap, BioNordica’s AI maturity level is rated as low**.
+The Q2 product planning meeting focused on prioritizing feature development for the upcoming quarter. The team reviewed customer feedback from the recent survey and identified three key areas for improvement: user onboarding, performance optimization, and mobile responsiveness.
 
-## Current Solution Development Stage
-BioNordica is in the ideation and early feasibility assessment stage. The company has a clear priority use case but does not yet have a prototype or implemented AI solution. The main objective is to create a product search assistant that supports the processing of customer requests for quotations. When a customer sends a request, BioNordica staff currently search manually across large supplier catalogs to identify suitable products, compare alternatives, and collect product information. This process can take up to 1–2 hours for a single product. 
-The company is looking for a solution that can search across several supplier product catalogs, especially about 5–10 suppliers, identify suitable products for customer needs, and help prepare higher-quality quotation responses more quickly. The solution should also support product-specific checks, such as identifying antibody product characteristics, including whether they were produced in mouse, rabbit, or human sources. BioNordica also wants searches to prioritize higher-quality suppliers first. What exists today includes supplier relationships, some pricing files, quotation history, and shared folders. What still needs development is legal and practical access to supplier product data, a structured data approach, and the AI-assisted search and quotation workflow.
+After extensive discussion, the team aligned on a phased approach that balances quick wins with longer-term strategic investments. The engineering team confirmed capacity for the proposed roadmap, with some adjustments to timeline for the mobile features.
 
-## Recommendations
-•	First resolve the supplier data access issue before starting technical development of the product search assistant. The company should contact the priority suppliers and confirm whether product catalog data can be accessed through APIs, structured files, agreed data feeds, URL-based access, or another permitted method. This should include checking each supplier’s terms and conditions to avoid breaching restrictions on automated access.
-•	Get supplier permissions before using any supplier catalog data in an AI workflow. It should be clear what data may be used, how it may be accessed, whether automated processing is allowed, and any limits on storage, reuse, or redistribution. When discussing data access with suppliers, clearly explain that the data would be used only to find matching products for customer requests. It should also clarify that supplier data would not be used to train AI models, would not be retained unnecessarily, and would only support product matching and quotation preparation. This may help address supplier concerns about proprietary product information.
-•	The product search assistant should be designed as a staff-support tool rather than a fully automatic quotation system at the beginning. The tool could interpret a customer request, search permitted supplier data, return the best product matches, show relevant product details, and allow the company staff to make the final selection. This approach keeps expert judgement in the process, which is important because product suitability can depend on details such as source species, specificity, functional testing, target compatibility, and intended research use.
-•	If supplier catalog access cannot be secured immediately, the company should consider an internal-data-based first phase. Existing quotations, supplier price lists, shared folder documents, and other internal materials could be used to build a searchable knowledge base or chatbot. This would allow staff to search past quotation information, extract relevant details, and draft new responses based on available internal data while external supplier data access is being negotiated.
-•	Keep the secondary use cases available for later discussion, especially instant drafting, automation of routine tasks, time management, smarter project management, and AI search across shared folders. These may be easier to start with if they rely mainly on BioNordica’s own data rather than supplier-controlled catalog data.
-•	The next practical step for the company is to discuss data access options internally and with suppliers, then return with information on what data can be used and under what conditions. Subsequently, a proof of concept could be built under FAIR services. The technical details of the potential PoC will be discussed in the next meetings. 
+# Decisions Made
 
+- **Prioritize onboarding improvements** - The new user onboarding flow will be redesigned and launched by end of October.
+- **Defer mobile app v2** - Mobile app major update pushed to Q3 due to resource constraints.
+- **Hire additional frontend developer** - Approved headcount for one senior frontend developer to support Q2 goals.
+
+# Action Items
+
+| **Action Item**                   | **Owner** | **Due Date** | **Priority** |
+| --------------------------------- | --------- | ------------ | ------------ |
+| Create onboarding wireframes      | Maria     | Sep 20       | High         |
+| Post job listing for frontend dev | John      | Sep 15       | High         |
+| Document mobile v2 requirements   | Alex      | Oct 1        | Medium       |
+
+# Open Questions
+
+- What is the budget allocation for the new developer hire?
+- Should we consider a contractor for the mobile v2 work in Q3?
+
+# Next Steps
+
+The immediate focus is on completing the high-priority action items before the end of September and unblocking the onboarding redesign.
+
+1. Post the frontend developer job listing by Sep 15 so interviews can begin before end of September.
+2. Deliver onboarding wireframes by Sep 20 for engineering review the following week.
+3. Document mobile v2 requirements by Oct 1 to support Q3 planning.
+4. Resolve the open budget question for the developer hire before the next sync on September 24.
+
+The next team check-in is scheduled for September 24.

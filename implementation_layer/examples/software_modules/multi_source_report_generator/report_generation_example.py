@@ -24,6 +24,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_modules.multi_source_report_generator import (  # noqa: E402
     MultiSourceReportGenerator,
+    load_report_config,
+    save_report_config,
 )
 
 # V2 agentic workflow toggle. The single switch below controls everything:
@@ -33,35 +35,77 @@ from gaik.software_modules.multi_source_report_generator import (  # noqa: E402
 #   False -> the report is written in a single LLM call (the default).
 USE_AGENTIC = True
 
+# Config file toggle.
+#   True  -> load all run() options from report_config.json (if it exists) instead of
+#            the hardcoded variables below. Any option in the JSON overrides the
+#            defaults. The config is still re-saved after every run so it stays current.
+#   False -> use the hardcoded variables below. The config is saved/updated on every run
+#            so you can inspect it, share it, or flip USE_CONFIG_FILE=True next time.
+USE_CONFIG_FILE = False
+CONFIG_FILE = Path(__file__).parent / "report_config.json"
+
 # Sample report toggle. When True, sample_report.md is used as a format/style
 # reference (layout, list style, length). The writer and reviewer both enforce
 # that format. Content always comes from the evidence only.
 # When False (or the file is absent), the report uses a generic professional format.
 USE_SAMPLE_REPORT = True
 
-# The report structure is entirely user-defined: a title plus a list of
-# sections, each with instructions describing what the section should contain.
-REPORT_TITLE = "AI Consultancy Report"
+# # The report structure is entirely user-defined: a title plus a list of
+# # sections, each with instructions describing what the section should contain.
+REPORT_TITLE = "Q2 Product Planning Meeting Report"
 
 # Optional high-level description of the report's purpose. Passed to the writer,
 # reviewer, curator, and polish pass as shared context. Set to None to omit.
 REPORT_DESCRIPTION = (
-    "An AI advisory report summarizing a client meeting to assess the company's "
-    "AI readiness, current development stage, and practical next steps."
+    "A structured report of the Q2 product planning meeting held on September 10, 2024, "
+    "documenting decisions, priorities, action items, and open questions."
 )
 
+# Each section may optionally declare:
+#   "id"          - stable identifier (auto-derived from the title if omitted)
+#   "depends_on"  - list of section ids that must be written BEFORE this one; in
+#                   agentic mode their finalized content is passed in as context
+#                   (e.g. a summary/conclusions section depending on earlier ones).
+# With no depends_on, all sections are written in parallel (the default).
 SECTIONS = [
     {
-        "title": "AI Maturity Level",
-        "instructions": "Briefly describe the company's current business operations and services offered. \n- Describe their current AI maturity and classify as Low**, Moderate**, or High** (marked with double star). Base this on their development stage, data availability, technical expertise, workflow integration, and AI roadmap. If this information is explicitly present in the context, use it verbatim.",
+        "title": "Executive Summary",
+        "instructions": (
+            "Summarize the purpose and outcome of the Q2 product planning meeting. "
+            "Cover the main themes discussed, the overall direction the team aligned on, "
+            "and any high-level capacity or resource considerations mentioned."
+        ),
     },
     {
-        "title": "Current Solution Development Stage",
-        "instructions": "Explain if they are in ideation, prototyping, implementation phase, or already has an AI product with customer base.\n- Describe the current state of development, and company's AI readiness with what exists and what needs development.\n - Describe what they are currently looking for, and their aims and objectives for AI implementation.",
+        "title": "Decisions Made",
+        "instructions": (
+            "List and briefly explain the key decisions reached during the meeting. "
+            "For each decision, state what was agreed and the main reason or constraint behind it."
+        ),
     },
     {
-        "title": "Recommendations",
-        "instructions": "Provide a blend of comprehensive discussions, reflections, suggestions, observations, and actionable points.\n- The tone should not be purely commanding or advisory but rather a mix of thoughtful analysis and practical guidance\n- Include relevant technical and business perspectives\n- Use a conversational yet professional tone\n- Make recommendations specific, insightful, and tailored to the company's unique situation\n- Make sure the recommendations are comprehensive and cover everything AI experts recommended in the transcript and the meeting notes. \n- Make sure that no opinion, suggestion, or recommendation present in the overall context is left out.",
+        "title": "Action Items",
+        "instructions": (
+            "List all action items from the meeting in a table with columns: "
+            "Action Item, Owner, Due Date, and Priority. "
+            "Use only items explicitly stated in the evidence."
+        ),
+    },
+    {
+        "title": "Open Questions",
+        "instructions": (
+            "List the unresolved questions or topics that require follow-up after the meeting. "
+            "Present them as a bulleted list."
+        ),
+    },
+    {
+        "id": "next_steps",
+        "title": "Next Steps",
+        "instructions": (
+            "Summarize the immediate next steps and follow-up actions the team should take. "
+            "Include any scheduled follow-up meetings or deadlines mentioned."
+        ),
+        "depends_on": ["decisions_made", "action_items", "open_questions"],
     },
 ]
 
@@ -84,45 +128,54 @@ def main() -> None:
         )
         return
 
-    generator = MultiSourceReportGenerator(use_azure=True)
-
-    print(f"Writing report... ({'agentic V2' if USE_AGENTIC else 'single-call'})")
-    result = generator.run(
-        # A folder is expanded recursively; only supported file types are used.
-        input_paths=[sample_dir],
-        report_title=REPORT_TITLE,
-        report_description=REPORT_DESCRIPTION,
-        sections=SECTIONS,
-        report_language="English",
-        # The report follows this example's structure/style (content from evidence only).
-        sample_report_path=sample_report_path,
-        output_dir=output_dir,
-        # PDF parser strategy: auto (pymupdf) | pymupdf | vision | multimodal | docling
-        parser_choice="auto",
-        # For images: {"mode": "parse"} (default, general parsing to markdown) or
-        # {"mode": "structured", "user_requirements": "..."} for structured extraction.
-        image_options={"mode": "parse"},
-        # Transcriber options:
-        #   compress_audio=True  — compress audio before sending (reduces upload size)
-        #   output_dir           — Transcriber saves raw transcript files here
-        #                          (TranscriptionResult.save() writes {job_id}_raw_transcript.txt)
-        transcriber_options={
-            "ctor": {
-                "output_dir": str(transcripts_dir),
+    # ── Run options ───────────────────────────────────────────────────────────
+    # Build the run() kwargs from either the config file or the hardcoded vars.
+    if USE_CONFIG_FILE and CONFIG_FILE.exists():
+        print(f"Config: loading existing config → {CONFIG_FILE}")
+        run_kwargs = load_report_config(CONFIG_FILE)
+    else:
+        if USE_CONFIG_FILE:
+            print(
+                f"Config: USE_CONFIG_FILE=True but {CONFIG_FILE.name} not found — using hardcoded defaults."
+            )
+        else:
+            print("Config: using hardcoded variables (USE_CONFIG_FILE=False).")
+        run_kwargs = {
+            "input_paths": [sample_dir],
+            "report_title": REPORT_TITLE,
+            "report_description": REPORT_DESCRIPTION,
+            "sections": SECTIONS,
+            "report_language": "English",
+            "sample_report_path": sample_report_path,
+            "output_dir": output_dir,
+            # Optional DOCX export. Requires:
+            #   pip install "gaik[multi-source-report-generator-docx]"
+            #   + Pandoc system binary: https://pandoc.org/installing.html
+            "output_docx": True,
+            "parser_choice": "auto",
+            "image_options": {"mode": "parse"},
+            "transcriber_options": {
+                "ctor": {
+                    "output_dir": str(transcripts_dir),
+                },
             },
-        },
-        writer_options={"model": "gpt-5.4"},
-        # ── Agentic (V2) workflow ─────────────────────────────────────────────
-        # These are honored only when agentic=True (ignored by the single-call path).
-        agentic=USE_AGENTIC,  # opt into independent per-section drafting + review
-        verbose=USE_AGENTIC,  # print phase/section/reviewer handovers to the CLI
-        curate_evidence=True,  # True → per-section evidence brief before drafting
-        polish=True,  # True → final style/proofreading pass
-        strict_review=True,  # True → raise (before writing) if an edit can't apply
-        # review_options={"model": "gpt-5.4"},  # optional separate reviewer model
-        # include_source_references is True by default; citations are suppressed
-        # automatically by run() when there is only one input source.
-    )
+            "writer_options": {"model": "gpt-5.4"},
+            "agentic": USE_AGENTIC,
+            "curate_evidence": True,
+            "polish": True,
+            "strict_review": True,
+        }
+
+    # Always save/update the config so it stays current with any code changes.
+    config_existed = CONFIG_FILE.exists()
+    save_report_config(CONFIG_FILE, **run_kwargs)
+    print(f"Config: {'updated' if config_existed else 'created'} → {CONFIG_FILE}")
+
+    generator = MultiSourceReportGenerator(use_azure=True)
+    print(f"Writing report... ({'agentic V2' if run_kwargs.get('agentic') else 'single-call'})")
+
+    # verbose is a runtime display preference — not stored in the config.
+    result = generator.run(**run_kwargs, verbose=run_kwargs.get("agentic", False))
 
     print(f"Format template: {sample_report_path or '(none)'}")
     print(f"Evidence sources used: {len(result.evidence_items)}")
@@ -147,6 +200,8 @@ def main() -> None:
         for warning in section.revision_warnings:
             print(f"  [warning] {section.title}: {warning}")
     print(f"Report written to: {result.markdown_path}")
+    if result.docx_path:
+        print(f"DOCX written to:  {result.docx_path}")
     if result.usage:
         print(f"Token usage: {result.usage}")
 

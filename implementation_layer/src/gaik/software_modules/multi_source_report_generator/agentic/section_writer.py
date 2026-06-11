@@ -68,6 +68,10 @@ def create_section_writer_graph(
                 f"No matching sample section found for '{title}'; using generic format."
             )
             reporter.emit(f"[{title}] no matching sample section -> generic format")
+        deps_ctx = state.get("dependencies_context", "")
+        if deps_ctx:
+            dep_count = sum(1 for line in deps_ctx.splitlines() if line.startswith("## "))
+            reporter.emit(f"[{title}] context: {dep_count} dependency section(s)")
         reporter.emit(
             f"[{title}] evidence loaded -> {'curation' if curate_evidence else 'drafting'}"
         )
@@ -92,7 +96,8 @@ def create_section_writer_graph(
         if out_dir and brief:
             curated_dir = Path(out_dir) / "evidence" / "curated_sections"
             curated_dir.mkdir(parents=True, exist_ok=True)
-            (curated_dir / f"{_slug(title)}.md").write_text(brief, encoding="utf-8")
+            name = state.get("section_id") or _slug(title)
+            (curated_dir / f"{name}.md").write_text(brief, encoding="utf-8")
 
         reporter.emit(f"[{title}] curated evidence -> drafting")
         return {
@@ -111,8 +116,10 @@ def create_section_writer_graph(
             sample_section=state.get("sample_section", ""),
             has_sample=bool(state.get("has_sample")),
             report_description=state.get("report_description"),
+            source_filenames=list(state.get("source_filenames") or []),
             report_language=state.get("report_language"),
             include_source_references=bool(state.get("include_source_references", True)),
+            dependencies_context=state.get("dependencies_context", ""),
         )
         response = writer_client.chat(
             [
@@ -138,6 +145,7 @@ def create_section_writer_graph(
             has_sample=bool(state.get("has_sample")),
             include_source_references=bool(state.get("include_source_references", True)),
             report_description=state.get("report_description"),
+            dependencies_context=state.get("dependencies_context", ""),
             client=reviewer_client,
             chat_kwargs=reviewer_kwargs,
             polish=polish,

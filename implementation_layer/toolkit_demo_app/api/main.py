@@ -41,6 +41,7 @@ try:
         pipeline,
         postgres_agent,
         rag,
+        report_writer,
         text_to_speech,
         transcriber,
         video_search,
@@ -59,6 +60,7 @@ except ImportError:
         pipeline,
         postgres_agent,
         rag,
+        report_writer,
         text_to_speech,
         transcriber,
         video_search,
@@ -150,6 +152,7 @@ app.include_router(
 app.include_router(video_search.router, prefix="/video-search", tags=["Video Search"])
 app.include_router(luvata_order.router, tags=["Luvata Order"])
 app.include_router(llm_judge.router, prefix="/llm-judge", tags=["LLM Judge"])
+app.include_router(report_writer.router, prefix="/report-writer", tags=["Report Writer"])
 if solution_wizard is not None:
     app.include_router(solution_wizard.router, prefix="/wizard", tags=["Solution Wizard"])
 

@@ -1,6 +1,6 @@
 # Multi-Source Report Generator
 
-Generate a user-defined Markdown report from mixed source files.
+Generate a user-defined report from mixed source files.
 
 You provide:
 
@@ -9,14 +9,13 @@ You provide:
 - section titles and instructions
 - optional sample report for style/format
 
-The module normalizes all input files into Markdown evidence, then writes a report using either:
+The module normalizes all input files into Markdown evidence, then writes a report using one of the two options selected by user:
 
-- the default single-call workflow
-- the optional agentic workflow, where each section is drafted, reviewed, repaired, and optionally polished
-
-The module is generic. It does not classify documents, select files, add report sections, or use domain-specific templates. Every report section comes from the `sections` argument.
+- a default single-call workflow
+- an agentic workflow, where each section is drafted, reviewed, repaired, and optionally polished
 
 ## Components Used
+The report writer uses the following GAIK components for input normalizations. Input normalization means converting all supported source files into one common Markdown-like evidence format before report writing.
 
 | Component | Used for |
 |---|---|
@@ -40,6 +39,13 @@ For the optional agentic workflow:
 pip install "gaik[multi-source-report-generator-agentic]"
 ```
 
+For optional Word document (DOCX) export — also requires the
+[Pandoc](https://pandoc.org/installing.html) system binary:
+
+```bash
+pip install "gaik[multi-source-report-generator-docx]"
+```
+
 ## Environment
 
 Uses the same API configuration as other GAIK components.
@@ -59,6 +65,114 @@ For standard OpenAI:
 OPENAI_API_KEY
 ```
 
+## Workflow Options
+
+The module offers two writing modes. Choose based on report criticality, cost tolerance, and whether sections need to build on each other.
+
+### Option 1 — Single-Call (default, `agentic=False`)
+
+```text
+input files
+  -> normalize all sources to Markdown evidence
+  -> (optional) normalize sample report for format reference
+  -> ONE LLM call writes the complete report
+  -> split output into section objects
+  -> (optional) write output files
+```
+
+The whole report — all sections — is written in a single prompt. The model sees the entire evidence pack and all section instructions at once and produces the full report in one response.
+
+**When to use:**
+- Simple or internal reports where occasional imprecision is acceptable
+- Cost- or speed-sensitive scenarios (1 report-writing API call regardless of section count)
+- Smaller evidence sets where the full pack fits comfortably in context
+- Rapid prototyping or draft generation
+
+**Trade-offs:**  
+Fastest and cheapest. No per-section fact-checking; the model relies entirely on the prompt instructions to stay grounded. Hallucination risk is higher than agentic mode, especially with large evidence packs or complex multi-section reports.
+
+---
+
+### Option 2 — Agentic (`agentic=True`)
+
+```bash
+pip install "gaik[multi-source-report-generator-agentic]"
+```
+
+Each section is an independent LLM call. Sections are grouped into **dependency layers** and written in order; within a layer, sections run in parallel. Every section is then fact-checked and repaired by a diff-editor reviewer before the report is assembled.
+
+```mermaid
+flowchart TD
+    classDef opt  fill:#f3f4f6,stroke:#9ca3af,stroke-dasharray:5 5,color:#6b7280
+    classDef api  fill:#dbeafe,stroke:#3b82f6,color:#1e40af
+    classDef io   fill:#dcfce7,stroke:#22c55e,color:#166534
+    classDef bar  fill:#fef9c3,stroke:#eab308,color:#92400e
+
+    IN[/"Input Files\nPDF · DOCX · Audio · Video · Images · CSV · Markdown"/]:::io
+    IN --> NORM["Normalize to Evidence Pack\nparsers · transcriber · image extractor"]
+    IN --> SQ{sample_report_path?}
+    SQ -- provided --> SS["Split sample by ## headings\none format block matched per section"]
+    SQ -- not provided --> GF["generic format\nfor all sections"]
+
+    NORM --> L0
+    SS -. format ref .-> L0
+    GF -. format ref .-> L0
+
+    subgraph L0 ["Layer 0 — sections with no dependencies · run in parallel "]
+      direction LR
+      subgraph SA [" Section A "]
+        a1(["Curate"]):::opt --> a2["Draft"]:::api --> a3["Review & Repair"]:::api --> a4(["Polish"]):::opt
+      end
+      subgraph SB [" Section B "]
+        b1(["Curate"]):::opt --> b2["Draft"]:::api --> b3["Review & Repair"]:::api --> b4(["Polish"]):::opt
+      end
+    end
+
+    a4 --> BAR
+    b4 --> BAR
+    BAR{{"Barrier\nall Layer 0 sections fully finalized"}}:::bar
+
+    BAR --> L1
+
+    subgraph L1 ["Layer 1 — sections that depend on Layer 0 · run in parallel "]
+      subgraph SC [" Section C · depends_on: A, B "]
+        c0["📄 dep context\nfinalized A + B"] --> c1(["🧩 Curate"]):::opt --> c2["Draft"]:::api --> c3["Review & Repair"]:::api --> c4(["Polish"]):::opt
+      end
+    end
+
+    c4 --> ASM["Assemble in user's original section order"]
+    ASM --> OUT[/"report.md · sections/ · evidence/"/]:::io
+```
+
+> **Curate** — optional (`curate_evidence=True`): one LLM call per section extracts a focused evidence brief before drafting.  
+> **Polish** — optional (`polish=True`): a final style/proofreading pass after mandatory review repair.
+
+**Dependency layers** — how it works:
+
+Sections with no `depends_on` form Layer 0 and run in parallel. Once all Layer 0 sections are fully finalized (reviewed + polished), a barrier releases Layer 1 — sections whose dependencies are now complete. Each dependent section receives the **finalized content** of its declared dependencies as context alongside the evidence, so a summary or recommendations section can synthesize from what was already written rather than re-deriving everything from the raw evidence.
+
+Assembly order is always the user's original section order, not layer order. With no `depends_on` anywhere, all sections form a single layer and the workflow collapses to the simple parallel case.
+
+**When to use:**
+- Reports where accuracy and factual grounding matter (client-facing, formal, legal, technical)
+- Large or complex evidence packs where a single monolithic call risks drift or omission
+- Reports with a logical section hierarchy where later sections (summary, conclusions, recommendations) should build on earlier ones
+- Any report where you want per-section format enforcement via a sample report
+
+**Trade-offs:**  
+Higher cost and latency: minimum `N draft + N reviewer` API calls for N sections, more with curation, polish, or reviewer retries. In exchange: every section is independently fact-checked, sections can receive context from earlier sections, and the reviewer enforces format adherence per section.
+
+| | Single-Call | Agentic |
+|---|---|---|
+| Report-writing API calls | 1 | N draft + N reviewer (minimum) |
+| Per-section fact-checking | No | Yes (mandatory diff-editor reviewer) |
+| Sections build on each other | No | Yes (via `depends_on`) |
+| Per-section format reference | No | Yes (matched sample section) |
+| Hallucination risk | Higher | Lower |
+| Speed / cost | Faster / cheaper | Slower / more expensive |
+
+---
+
 ## Constructor
 
 ```python
@@ -71,6 +185,44 @@ MultiSourceReportGenerator(*, api_config: dict | None = None, use_azure: bool = 
 | `use_azure` | `True` | Used only when `api_config=None`. `True` loads Azure OpenAI settings; `False` loads standard OpenAI settings. |
 
 Provider/model choices normally belong in `writer_options`, `review_options`, parser options, or transcriber options, not in the constructor.
+
+## Quick Start
+
+Minimal example — only the required inputs; everything else uses its default.
+
+```python
+from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator
+
+generator = MultiSourceReportGenerator(use_azure=True)
+
+result = generator.run(
+    input_paths=["materials/"],          # folder or list of files; all supported types picked up
+    report_title="Project Assessment",
+    report_description=(
+        "Assess the current project state and identify practical next steps for the client."
+    ),
+    sections=[
+        {
+            "title": "Background",
+            "instructions": "Summarize the project context and the company's current situation.",
+        },
+        {
+            "title": "Findings",
+            "instructions": "Describe the key findings drawn from the provided evidence.",
+        },
+        {
+            "title": "Recommendations",
+            "instructions": "Give practical, evidence-based recommendations for next steps.",
+        },
+    ],
+    output_dir="output/report",
+)
+
+print(result.markdown_path)   # output/report/report.md
+print(result.usage)
+```
+
+This runs the default single-call mode. Pass `agentic=True` (and install the extra) to use per-section drafting and review — see [Workflow Options](#workflow-options).
 
 ## Complete Usage
 
@@ -112,6 +264,9 @@ result = generator.run(
         {
             "title": "Recommendations",
             "instructions": "Give practical recommendations based only on the evidence.",
+            # If the Recommendation section uses the following two sections as context and should be written only after these sections have been written
+            "depends_on": ["ai_maturity_level", "current_solution_development_stage"],
+
         },
     ],
     report_language="English",
@@ -131,17 +286,27 @@ result = generator.run(
     # PDF parser selection.
     parser_choice="auto",  # auto, pymupdf, vision, multimodal, docling
     parser_options={
-        "ctor": {},
-        # "openai_config": custom_config,
+        "ctor": {
+            # "use_markdown": True,  # PyMuPDFParser: Markdown-formatted output (default True)
+            # "use_ocr": True,       # DoclingParser: enable OCR for scanned pages
+        },
+        # "openai_config": custom_config,  # override API config for VisionParser / MultimodalParser
     },
 
     # Audio/video transcription options.
     transcriber_options={
         "ctor": {
-            "compress_audio": True,
-            "output_dir": "output/transcripts",
+            "output_dir": "output/transcripts",     # save raw transcript files to disk
+            "transcription_model": "gpt-4o-transcribe",  # or "whisper-1", "whisper_local"
+            "enhanced_transcript": True,          # second LLM pass to fix transcription errors
+            "language": "en",                     # force language; default is auto-detect
+            "diarization": True,                  # label individual speakers
+            "initial_prompt": "Meeting about AI advisory services.",
+            # see other options in GAIK transcriber software component
         },
-        "call": {},
+        "call": {
+            # "custom_context": "Technical interview.",  # extra context hint for transcription
+        },
     },
 
     # Image handling.
@@ -155,7 +320,6 @@ result = generator.run(
     # Main report writer LLM options.
     writer_options={
         "model": "gpt-5.4",
-        "temperature": 0,
         "reasoning_effort": "medium",
     },
 
@@ -181,14 +345,14 @@ for section in result.sections:
 | Option | Default | Purpose |
 |---|---:|---|
 | `input_paths` | required | Files or folders. Folders are expanded recursively and unsupported extensions are ignored. |
-| `sections` | required | List of `ReportSectionSpec` or dicts with `title`, `instructions`, and optional `required`. |
+| `sections` | required | List of `ReportSectionSpec` or dicts with `title`, `instructions`, optional `required`, and (agentic) optional `id` + `depends_on` (see Dependency-Ordered Sections). |
 | `report_title` | `"Generated Report"` | H1 title of the assembled report. |
 | `report_description` | `None` | Optional overall purpose/context for the report. Used by the writer, and in agentic mode also by curation, review, and polish prompts. |
 | `report_language` | `None` | Optional language instruction, for example `"Finnish"` or `"English"`. |
 | `sample_report_path` | `None` | Optional sample report used only as a style/format reference. |
 | `output_dir` | `None` | If set, writes `report.md`, section files, evidence files, and metadata JSON. |
 | `include_evidence_index` | `True` | Writes `evidence_index.json` when `output_dir` is set. |
-| `include_source_references` | `True` | Asks the writer to reference source filenames where useful. |
+| `include_source_references` | `True` | Asks the writer to reference source filenames where useful. Automatically overridden to `False` when there is only one input source (nothing to distinguish between sources). |
 | `max_evidence_chars` | `None` | Truncates the normalized evidence pack before report writing. |
 | `section_context_mode` | `"all_evidence"` | Reserved for future retrieval/section-context modes. Current behavior uses all evidence. |
 | `parser_choice` | `"auto"` | PDF parser choice: `auto`, `pymupdf`, `vision`, `multimodal`, or `docling`. |
@@ -203,6 +367,7 @@ for section in result.sections:
 | `curate_evidence` | `False` | Agentic only. Creates one section-specific evidence brief before drafting each section. |
 | `verbose` | `False` | Agentic only. Prints workflow progress events. |
 | `progress_callback` | `None` | Agentic only. Callable receiving progress strings. Overrides default printing behavior. |
+| `output_docx` | `False` | Also write `report.docx` alongside `report.md` when `output_dir` is set. Requires the `multi-source-report-generator-docx` extra and the Pandoc system binary. |
 
 ## Supported Input Types
 
@@ -218,70 +383,58 @@ for section in result.sections:
 | Video | `.mp4`, `.mov`, `.mkv`, `.avi`, `.webm` | Transcribed by `Transcriber` |
 | Images | `.png`, `.jpg`, `.jpeg`, `.webp`, `.tiff`, `.tif`, `.bmp`, `.gif` | Parsed by `VisionParser` or extracted by `VisionExtractor` |
 
-## Workflow: Default Single-Call Mode
+## Agentic Mode Details
 
-This is the default when `agentic=False`.
+See [Workflow Options](#workflow-options) above for a comparison of single-call vs. agentic and guidance on when to use each.
 
-```text
-input files
--> normalize every source to Markdown evidence
--> optionally normalize sample report
--> assemble one global evidence pack
--> one LLM call writes the complete report
--> split the generated report into section objects
--> optionally write output files
-```
+### Dependency-Ordered Sections
 
-In this mode, the entire sample report is used as the format reference. This works because the model writes the whole report in one call.
+The user may define an  `id` for each section (auto-derived from the title when omitted).
 
-Minimum report-writing API calls:
-
-```text
-1
-```
-
-Additional API calls may happen during parsing, transcription, image parsing, or sample-report parsing, depending on file types and parser choices.
-
-## Workflow: Agentic Mode
-
-Enable with:
+Sections are topologically sorted into **layers**. Sections with no `depends_on`
+form layer 0 and run in parallel. Each subsequent layer starts only after all
+sections in the previous layer are fully finalized (reviewed + polished). Finalized
+dependency content is passed into the dependent section's writer and reviewer as
+additional context, so a summary or recommendations section can synthesize from
+what was already written rather than re-deriving it from the raw evidence.
 
 ```python
-agentic=True
+sections=[
+    # Layer 0 — no dependencies, run in parallel
+    {"id": "technical", "title": "Technical Analysis", "instructions": "Analyze the evidence."},
+    {"id": "risks",     "title": "Risks",              "instructions": "Identify risks."},
+    # Layer 1 — written after layer 0 finishes; receives finalized content of both deps
+    {
+        "id": "summary",
+        "title": "Executive Summary",
+        "instructions": "Summarize the key conclusions.",
+        "depends_on": ["technical", "risks"],
+    },
+]
 ```
 
-Install the extra first:
+**What a dependent section receives:**
+- Its own curated evidence brief (when `curate_evidence=True`) — focused on the
+  section's own topic from the raw evidence.
+- The finalized content of its declared dependencies — assembled as markdown
+  sections and injected alongside the evidence.
 
-```bash
-pip install "gaik[multi-source-report-generator-agentic]"
-```
+Both inputs are available to the writer and reviewer. The reviewer treats dependency
+sections as a **valid source** alongside the evidence, so legitimate synthesis is
+not flagged as hallucination.
 
-Agentic mode writes sections independently and in parallel:
+**Assembly order is always the user's original section order**, not dependency or
+layer order. A section written in layer 0 can still appear last in the final report.
+Sections without `depends_on` write independently from the evidence; they do not
+receive content from sections that happen to run in the same layer.
 
-```text
-input files
--> normalize every source to Markdown evidence
--> optionally normalize and split sample report by headings
--> for each section:
-     -> optional section-specific knowledge curation
-     -> draft section
-     -> mandatory reviewer / diff-editor repair
-     -> optional style polish
--> assemble final report in the user's original section order
--> optionally write output files
-```
+With no `depends_on` anywhere, all sections form a single layer and run fully in
+parallel — identical to the current default behavior.
 
-### Agentic API Calls
-
-For `N` sections:
-
-| Mode | Minimum report-writing API calls |
-|---|---:|
-| No curation, no polish | `N draft + N reviewer` |
-| With curation | `N curator + N draft + N reviewer` |
-| With curation and polish | `N curator + N draft + N reviewer + N polish` |
-
-Reviewer retries add more `chat_parsed(...)` calls when proposed edits cannot be applied.
+Dependency ordering applies to agentic mode only. In single-call mode the whole
+report is written at once and `depends_on` is silently ignored. The dependency graph
+is validated up front: unknown ids, self-dependencies, duplicate ids, and cycles all
+raise a clear error before any LLM calls are made.
 
 ### Agentic Review Behavior
 
@@ -342,18 +495,44 @@ If no matching sample section is found:
 
 Main sample sections should normally use Markdown `##` headings. Lower-level headings such as `###` remain inside their parent section.
 
+**When to use a sample report:**
+
+The more distinctive the sample's format — unusual list structure, specific prose/bullet mix, custom heading depth, unique bold lead-in style — the more value it adds. Use it when you have a real previous report that should serve as a style template.
+
+If the sample is about a completely different subject, the format/content separation is handled by the prompts, but there is inherent tension. If the format is generic enough that the model would produce it naturally anyway (two paragraphs + bullet list), omitting the sample often gives equally good results with less risk of content drift.
+
+Keep a same-topic sample when you want strong style fidelity; omit it or use a generic-format sample when the subject is unrelated and the format is simple.
+
 ### Agentic Progress
 
-Use `verbose=True` for CLI messages:
+Use `verbose=True` for CLI messages.
+
+With no dependencies (all sections in one parallel layer):
 
 ```text
 Writing 3 section(s) in parallel: Background, Findings, Recommendations
-[Findings] evidence loaded -> curation
-[Findings] curated evidence -> drafting
+[Findings] evidence loaded -> drafting
 [Findings] draft written (240 words) -> reviewer
 [Findings] reviewer: 2 correction(s) proposed, 2 applied
-[Findings] style polish applied
 [Findings] done
+Assembling report in requested order -> report.md
+```
+
+With dependencies (multiple layers):
+
+```text
+Phase 1/2 — writing 2 section(s) in parallel: Technical Analysis, Risks
+[Technical Analysis] evidence loaded -> drafting
+[Technical Analysis] draft written (310 words) -> reviewer
+[Technical Analysis] reviewer: 0 correction(s) proposed, 0 applied
+[Technical Analysis] done
+Phase 1/2 complete -> Phase 2
+Phase 2/2 — writing 1 section(s) in parallel: Executive Summary
+[Executive Summary] context: 2 dependency section(s)
+[Executive Summary] evidence loaded -> drafting
+[Executive Summary] draft written (180 words) -> reviewer
+[Executive Summary] reviewer: 1 correction(s) proposed, 1 applied
+[Executive Summary] done
 Assembling report in requested order -> report.md
 ```
 
@@ -369,32 +548,54 @@ result = generator.run(
 )
 ```
 
-## Option Dictionaries
-
 ### `parser_options`
 
 ```python
 parser_options={
     "ctor": {
-        # forwarded to parser constructor when supported
+        # keyword arguments forwarded to the parser constructor
+        # e.g. "use_markdown": False  for PyMuPDFParser
     },
-    "openai_config": custom_config,  # used by VisionParser paths
+    "openai_config": custom_config,  # override API config for VisionParser / MultimodalParser
 }
 ```
 
 ### `transcriber_options`
 
+All keys under `"ctor"` are forwarded to the `Transcriber` constructor. Commonly useful ones:
+
 ```python
 transcriber_options={
     "ctor": {
-        "compress_audio": True,
-        "output_dir": "output/transcripts",
+        # --- Output ---
+        "output_dir": "output/transcripts",    # save raw transcript files to disk
+
+        # --- Model ---
+        # "transcription_model": "gpt-4o-transcribe",  # or "whisper-1", "whisper_local"
+        # Default: resolved from api_config (gpt-4o-transcribe for Azure, whisper-1 for OpenAI)
+
+        # --- Transcript enhancement ---
+        # "enhanced_transcript": True,          # second LLM pass to fix transcription errors
+        # "enhanced_transcript_instructions": "Keep all technical terms as-is.",
+
+        # --- Language ---
+        # "language": "en",                     # force a language; default is auto-detect
+        # "initial_prompt": "Meeting about AI advisory services.",  # context hint for accuracy
+
+        # --- Speaker diarization ---
+        # "diarization": True,                  # identify and label individual speakers
+        # "speaker_count": 3,                   # exact number of speakers (optional)
+        # "min_speakers": 2,                    # lower bound when count is unknown
+        # "max_speakers": 5,                    # upper bound when count is unknown
     },
     "call": {
         # forwarded to Transcriber.transcribe(...)
+        # "custom_context": "Technical interview about AI systems.",
     },
 }
 ```
+
+When `enhanced_transcript=True` is set, the transcriber runs a second LLM call to clean up errors (hesitations, mis-hearings, punctuation). The module uses `result.enhanced_transcript` when available, falling back to `result.raw_transcript` otherwise.
 
 ### `image_options`
 
@@ -447,6 +648,7 @@ When `output_dir` is set:
 ```text
 output_dir/
     report.md
+    report.docx             # only when output_docx=True (requires Pandoc)
     evidence_index.json
     usage.json
     sections/
@@ -455,7 +657,7 @@ output_dir/
     evidence/
         normalized_sources.md
         curated_sections/       # only agentic=True and curate_evidence=True
-            background.md
+            background.md       # filename = section id (auto-derived from title if not set)
             findings.md
 ```
 
@@ -468,6 +670,7 @@ The returned `ReportGenerationResult` contains:
 | `sections` | Generated section objects |
 | `markdown` | Full assembled Markdown report |
 | `markdown_path` | Path to `report.md`, or `None` |
+| `docx_path` | Path to `report.docx` when `output_docx=True`, otherwise `None` |
 | `usage` | Best-effort token usage from calls that expose usage |
 
 Each `GeneratedSection` contains:
@@ -480,6 +683,49 @@ Each `GeneratedSection` contains:
 | `revision_warnings` | Non-fatal warnings from agentic generation |
 
 Note: reviewer calls use `chat_parsed(...)`; provider clients may not expose usage for parsed calls. Agentic `usage` can therefore undercount total cost until parsed-call usage is surfaced by the shared LLM interface.
+
+## Saving and Loading Configurations
+
+All `run()` parameters can be persisted to a JSON file and reloaded for repeat
+runs or to share a use-case configuration.
+
+```python
+from gaik.software_modules.multi_source_report_generator import (
+    MultiSourceReportGenerator,
+    save_report_config,
+    load_report_config,
+)
+
+# Save the current use-case configuration to a file.
+# Paths (input_paths, output_dir, sample_report_path) are stored relative to
+# the config file so it is portable. All option dicts are stored as-is.
+save_report_config(
+    "my_report_config.json",
+    input_paths=["materials/"],
+    report_title="Q2 Planning Report",
+    report_description="Summary of the Q2 product planning meeting.",
+    sections=[
+        {"title": "Decisions", "instructions": "List the key decisions."},
+        {"title": "Action Items", "instructions": "List action items as a table."},
+    ],
+    output_dir="output/report",
+    agentic=True,
+    curate_evidence=True,
+    polish=True,
+    transcriber_options={"ctor": {"transcription_model": "gpt-4o-transcribe"}},
+    writer_options={"model": "gpt-5.4"},
+)
+
+# Reload on the next run — returns a dict ready to unpack into run().
+config = load_report_config("my_report_config.json")
+gen = MultiSourceReportGenerator(use_azure=True)
+result = gen.run(**config)
+```
+
+`save_report_config` accepts the same keyword arguments as `run()`, minus
+`verbose`, `progress_callback`, and `section_context_mode` (runtime preferences
+that are not part of the use-case definition). These can still be passed
+directly to `run()`.
 
 ## Example
 

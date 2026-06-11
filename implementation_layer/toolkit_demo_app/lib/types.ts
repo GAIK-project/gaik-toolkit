@@ -20,7 +20,8 @@ export type DemoType =
   | "video-search"
   | "luvata-order"
   | "text-to-speech"
-  | "postgres-agent";
+  | "postgres-agent"
+  | "report-writer";
 
 /**
  * User feedback stored in the database

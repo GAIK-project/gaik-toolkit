@@ -67,7 +67,9 @@ class _FakeClient:
 
     def chat_parsed(self, messages, response_format, **kwargs):
         user = messages[-1]["content"]
-        self.parsed_calls.append(user)
+        # Capture the whole reviewer prompt (instruction + text) so tests can
+        # assert what context the reviewer received.
+        self.parsed_calls.append("\n".join(m["content"] for m in messages))
         is_retry = "could not be applied" in user
         if is_retry:
             return CorrectionList(corrections=[], explanation="no more")
@@ -86,6 +88,13 @@ class _FakeClient:
                 ]
             )
         return CorrectionList(corrections=[], explanation="ok")
+
+
+def _draft_index(client: _FakeClient, title: str) -> int:
+    for i, prompt in enumerate(client.draft_calls):
+        if _title_of(prompt) == title:
+            return i
+    raise AssertionError(f"no draft call for {title!r}")
 
 
 def _gen() -> MultiSourceReportGenerator:
@@ -350,6 +359,165 @@ def test_agentic_progress_callback_receives_handovers(tmp_path, patch_llm):
     assert "[Findings] evidence loaded" in joined
     assert "[Findings] draft written" in joined
     assert "Assembling report in requested order" in joined
+
+
+# ---------------------------------------------------------------------------
+# Dependency-ordered section writing
+# ---------------------------------------------------------------------------
+
+from gaik.software_modules.multi_source_report_generator.agentic.orchestrator import (  # noqa: E402
+    build_phases,
+)
+
+
+def test_id_and_depends_on_normalization():
+    specs = msrg._normalize_sections(
+        [
+            {"title": "Technical Analysis", "instructions": "a"},
+            {
+                "id": "sum",
+                "title": "Summary",
+                "instructions": "b",
+                "depends_on": ["technical_analysis"],
+            },
+        ]
+    )
+    # auto-id derived from title; explicit id preserved
+    assert specs[0].id == "technical_analysis"
+    assert specs[1].id == "sum"
+    assert specs[1].depends_on == ["technical_analysis"]
+
+
+def test_normalize_rejects_bad_dependencies():
+    with pytest.raises(ValueError):  # unknown dependency id
+        msrg._normalize_sections([{"title": "A", "instructions": "a", "depends_on": ["nope"]}])
+    with pytest.raises(ValueError):  # self dependency
+        msrg._normalize_sections(
+            [{"id": "a", "title": "A", "instructions": "a", "depends_on": ["a"]}]
+        )
+    with pytest.raises(ValueError):  # duplicate ids
+        msrg._normalize_sections(
+            [
+                {"id": "x", "title": "A", "instructions": "a"},
+                {"id": "x", "title": "B", "instructions": "b"},
+            ]
+        )
+
+
+def test_build_phases_levels_and_cycle():
+    specs = msrg._normalize_sections(
+        [
+            {"id": "a", "title": "A", "instructions": "a"},
+            {"id": "b", "title": "B", "instructions": "b"},
+            {"id": "c", "title": "C", "instructions": "c", "depends_on": ["a", "b"]},
+        ]
+    )
+    phases = build_phases(specs)
+    assert [sorted(s.id for s in layer) for layer in phases] == [["a", "b"], ["c"]]
+
+    # cycle detection (build a spec list with a cycle, bypassing _normalize validation
+    # which only catches unknown/self deps, not cycles)
+    from gaik.software_modules.multi_source_report_generator import ReportSectionSpec
+
+    cyclic = [
+        ReportSectionSpec(title="A", instructions="a", id="a", depends_on=["b"]),
+        ReportSectionSpec(title="B", instructions="b", id="b", depends_on=["a"]),
+    ]
+    with pytest.raises(ValueError):
+        build_phases(cyclic)
+
+
+def test_no_deps_prompt_has_no_dependency_block(tmp_path, patch_llm):
+    client = patch_llm(_FakeClient(review_mode="none"))
+    (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
+
+    _gen().run(
+        input_paths=[tmp_path / "src.txt"],
+        sections=SECTIONS,  # no depends_on
+        agentic=True,
+    )
+    # backward-compat: no dependency context injected anywhere
+    assert client.draft_calls
+    assert not any("ALREADY-WRITTEN REPORT SECTIONS" in p for p in client.draft_calls)
+
+
+def test_dependent_section_receives_finalized_context(tmp_path, patch_llm):
+    client = patch_llm(_FakeClient(review_mode="none"))
+    (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
+
+    result = _gen().run(
+        input_paths=[tmp_path / "src.txt"],
+        sections=[
+            {"id": "tech", "title": "Technical Analysis", "instructions": "Analyze."},
+            {
+                "id": "summary",
+                "title": "Summary",
+                "instructions": "Summarize.",
+                "depends_on": ["tech"],
+            },
+        ],
+        agentic=True,
+    )
+    tech_prompt = client.draft_calls[_draft_index(client, "Technical Analysis")]
+    summary_prompt = client.draft_calls[_draft_index(client, "Summary")]
+
+    # dependency section gets no dependency block; dependent one does
+    assert "ALREADY-WRITTEN REPORT SECTIONS" not in tech_prompt
+    assert "ALREADY-WRITTEN REPORT SECTIONS" in summary_prompt
+    # the dependent section receives the dependency's finalized content
+    assert "Draft body for Technical Analysis" in summary_prompt
+    # the dependency is drafted before the dependent (layer ordering)
+    assert _draft_index(client, "Technical Analysis") < _draft_index(client, "Summary")
+    # assembly stays in user order
+    assert [s.title for s in result.sections] == ["Technical Analysis", "Summary"]
+
+
+def test_reviewer_of_dependent_section_gets_dependency_grounding(tmp_path, patch_llm):
+    client = patch_llm(_FakeClient(review_mode="none"))
+    (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
+
+    _gen().run(
+        input_paths=[tmp_path / "src.txt"],
+        sections=[
+            {"id": "tech", "title": "Technical Analysis", "instructions": "Analyze."},
+            {
+                "id": "summary",
+                "title": "Summary",
+                "instructions": "Summarize.",
+                "depends_on": ["tech"],
+            },
+        ],
+        agentic=True,
+    )
+    # the reviewer prompt for the dependent section names the dependency content as a valid source
+    dep_reviews = [
+        p
+        for p in client.parsed_calls
+        if "ALREADY-WRITTEN REPORT SECTIONS" in p and "valid source" in p
+    ]
+    assert dep_reviews
+    assert any("Draft body for Technical Analysis" in p for p in dep_reviews)
+
+
+def test_curated_brief_filename_uses_id(tmp_path, patch_llm):
+    patch_llm(_FakeClient(review_mode="none"))
+    (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
+    out = tmp_path / "out"
+
+    # two distinct ids but near-identical titles must not collide
+    _gen().run(
+        input_paths=[tmp_path / "src.txt"],
+        sections=[
+            {"id": "risk_tech", "title": "Risks", "instructions": "Technical risks."},
+            {"id": "risk_biz", "title": "Risks ", "instructions": "Business risks."},
+        ],
+        output_dir=out,
+        agentic=True,
+        curate_evidence=True,
+    )
+    curated = out / "evidence" / "curated_sections"
+    assert (curated / "risk_tech.md").exists()
+    assert (curated / "risk_biz.md").exists()
 
 
 def test_langgraph_missing_raises_or_skip():

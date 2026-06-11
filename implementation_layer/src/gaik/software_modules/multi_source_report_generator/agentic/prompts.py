@@ -63,16 +63,30 @@ def build_section_user_prompt(
     sample_section: str,
     has_sample: bool,
     report_description: str | None,
+    source_filenames: list[str],
     report_language: str | None,
     include_source_references: bool,
+    dependencies_context: str = "",
 ) -> str:
     parts = [f"Report section to write: {title}"]
     if report_description:
         parts.append(f"Report context: {report_description}")
+    if dependencies_context:
+        parts.append(
+            "ALREADY-WRITTEN REPORT SECTIONS (context for this section):\n"
+            f"{dependencies_context}\n\n"
+            "Use these completed sections as the basis for this section (e.g. to summarize "
+            "or build on them). You may also use the evidence below. Do not contradict the "
+            "completed sections."
+        )
     if report_language:
         parts.append(f"Write the section in: {report_language}")
     if include_source_references:
-        parts.append("Where useful, reference the source (e.g. by filename) that supports a claim.")
+        parts.append(
+            "Where useful, cite the source that supports a claim using its exact filename "
+            "in parentheses, e.g. (notes.txt) or (meeting_recording.mp3). "
+            f"Available sources: {', '.join(source_filenames)}."
+        )
     else:
         parts.append("Do not add inline source citations or filename references in the text.")
 
@@ -128,11 +142,15 @@ def build_reviewer_instruction(
     has_sample: bool,
     include_source_references: bool,
     report_description: str | None,
+    dependencies_context: str = "",
 ) -> str:
     intro = f"You are reviewing a drafted report section titled '{title}'"
     if report_description:
         intro += f" (report context: {report_description})"
-    intro += ". Check its content against the provided evidence and fix problems with targeted search/replace edits."
+    intro += (
+        ". Check its content against the provided evidence and fix problems with "
+        "targeted search/replace edits."
+    )
     parts = [
         intro,
         "",
@@ -145,6 +163,14 @@ def build_reviewer_instruction(
         "- Make only necessary factual/coverage corrections. Preserve the section's "
         "structure and headings; do not make stylistic changes that do not affect facts.",
     ]
+    if dependencies_context:
+        parts.append(
+            "- This section may legitimately summarize or build on the ALREADY-WRITTEN "
+            "REPORT SECTIONS shown below. Treat those sections as a valid source in "
+            "addition to the evidence — do NOT flag or delete statements that are "
+            "supported by them. Still remove anything supported by neither the evidence "
+            "nor those sections."
+        )
     if has_sample and sample_section:
         parts.append(
             "- FORMAT REFERENCE enforcement: check that the draft matches the FORMAT "
@@ -178,14 +204,19 @@ def build_reviewer_instruction(
     parts.append(f"Section instructions:\n{instructions}")
     if has_sample and sample_section:
         parts.append(f"FORMAT REFERENCE:\n{sample_section}")
-    parts.append(f"Evidence (the only allowed source of facts):\n{evidence}")
+    if dependencies_context:
+        parts.append(f"ALREADY-WRITTEN REPORT SECTIONS (a valid source):\n{dependencies_context}")
+        parts.append(f"Evidence (also a valid source of facts):\n{evidence}")
+    else:
+        parts.append(f"Evidence (the only allowed source of facts):\n{evidence}")
     return "\n".join(parts)
 
 
 def build_polish_instruction(*, report_description: str | None = None) -> str:
     context = f" The report is about: {report_description}." if report_description else ""
     return (
-        f"Proofread and polish the text for language, flow, grammar, and consistency ONLY.{context} "
+        "Proofread and polish the text for language, flow, grammar, and consistency "
+        f"ONLY.{context} "
         "Make targeted edits. Do NOT introduce new facts, claims, figures, or "
         "sections, and do not remove supported content. Preserve all factual content "
         "and the existing structure."

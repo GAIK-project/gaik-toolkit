@@ -210,6 +210,7 @@ def review_and_polish(
     has_sample: bool,
     include_source_references: bool,
     report_description: str | None,
+    dependencies_context: str,
     client,
     chat_kwargs: dict,
     polish: bool,
@@ -225,6 +226,7 @@ def review_and_polish(
         has_sample=has_sample,
         include_source_references=include_source_references,
         report_description=report_description,
+        dependencies_context=dependencies_context,
     )
     text, applied, warnings, num_proposed = diff_editor_run(
         text=draft, instruction=instruction, client=client, chat_kwargs=chat_kwargs

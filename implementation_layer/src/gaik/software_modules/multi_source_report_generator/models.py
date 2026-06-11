@@ -15,11 +15,19 @@ from typing import Any
 
 @dataclass
 class ReportSectionSpec:
-    """A user-defined report section."""
+    """A user-defined report section.
+
+    ``id`` is a stable identifier used to reference the section in ``depends_on``
+    (and for output filenames). When omitted it is derived from ``title``.
+    ``depends_on`` lists the ids of sections that must be written *before* this
+    one; in the agentic workflow their finalized content is passed in as context.
+    """
 
     title: str
     instructions: str
     required: bool = True
+    id: str | None = None
+    depends_on: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -50,3 +58,4 @@ class ReportGenerationResult:
     markdown: str
     markdown_path: Path | None
     usage: dict[str, Any]
+    docx_path: Path | None = None

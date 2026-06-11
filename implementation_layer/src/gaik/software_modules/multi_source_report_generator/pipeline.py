@@ -145,7 +145,14 @@ def _normalize_sections(
     out: list[ReportSectionSpec] = []
     for i, s in enumerate(sections):
         if isinstance(s, ReportSectionSpec):
-            spec = s
+            # Copy so we can fill in a derived id without mutating the caller's object.
+            spec = ReportSectionSpec(
+                title=s.title,
+                instructions=s.instructions,
+                required=s.required,
+                id=s.id,
+                depends_on=list(s.depends_on),
+            )
         elif isinstance(s, dict):
             if not s.get("title"):
                 raise ValueError(f"Section {i} is missing a 'title'.")
@@ -153,12 +160,36 @@ def _normalize_sections(
                 title=str(s["title"]),
                 instructions=str(s.get("instructions", "")),
                 required=bool(s.get("required", True)),
+                id=str(s["id"]) if s.get("id") else None,
+                depends_on=[str(d) for d in (s.get("depends_on") or [])],
             )
         else:
             raise TypeError(
                 f"Section {i} must be a ReportSectionSpec or dict, got {type(s).__name__}."
             )
+        # Derive a stable id from the title when not given.
+        if not spec.id:
+            spec.id = _slug(spec.title)
         out.append(spec)
+
+    # Validate ids and dependencies.
+    seen_ids: set[str] = set()
+    for spec in out:
+        if spec.id in seen_ids:
+            raise ValueError(
+                f"Duplicate section id '{spec.id}' (derived from title '{spec.title}'). "
+                "Give the colliding sections explicit, unique `id` values."
+            )
+        seen_ids.add(spec.id)
+    for spec in out:
+        for dep in spec.depends_on:
+            if dep == spec.id:
+                raise ValueError(f"Section '{spec.id}' cannot depend on itself.")
+            if dep not in seen_ids:
+                raise ValueError(
+                    f"Section '{spec.id}' depends on unknown section id '{dep}'. "
+                    f"Known ids: {sorted(seen_ids)}."
+                )
     return out
 
 
@@ -400,6 +431,7 @@ class MultiSourceReportGenerator:
         curate_evidence: bool = False,
         verbose: bool = False,
         progress_callback: Callable[[str], None] | None = None,
+        output_docx: bool = False,
     ) -> ReportGenerationResult:
         """Build evidence from ``input_paths`` and write each requested section.
 
@@ -424,12 +456,15 @@ class MultiSourceReportGenerator:
             image_options=image_options,
             sample_report_path=sample_report_path,
             max_evidence_chars=max_evidence_chars,
+            progress_callback=progress_callback,
         )
 
         # Suppress inline citations when there is only one source — nothing
         # to distinguish between sources, so citations add noise.
         if len(evidence_items) <= 1:
             include_source_references = False
+
+        source_filenames = [item.metadata.get("filename", "") for item in evidence_items]
 
         # 2. Write the report — either the agentic path or the single LLM call.
         if agentic:
@@ -443,6 +478,7 @@ class MultiSourceReportGenerator:
                 report_description=report_description,
                 report_language=report_language,
                 include_source_references=include_source_references,
+                source_filenames=source_filenames,
                 writer_options=writer_options,
                 review_options=review_options,
                 polish=polish,
@@ -469,6 +505,7 @@ class MultiSourceReportGenerator:
                 report_description=report_description,
                 report_language=report_language,
                 include_source_references=include_source_references,
+                source_filenames=source_filenames,
                 sample_markdown=sample_markdown,
                 chat_kwargs=chat_kwargs,
             )
@@ -482,6 +519,7 @@ class MultiSourceReportGenerator:
 
         # 3. Write outputs
         markdown_path: Path | None = None
+        docx_path: Path | None = None
         if output_dir is not None:
             markdown_path = self._write_outputs(
                 output_dir,
@@ -493,6 +531,8 @@ class MultiSourceReportGenerator:
                 usage=usage_total,
                 include_evidence_index=include_evidence_index,
             )
+            if output_docx and markdown_path is not None:
+                docx_path = self._write_docx(markdown_path)
 
         return ReportGenerationResult(
             title=report_title,
@@ -501,6 +541,7 @@ class MultiSourceReportGenerator:
             markdown=markdown,
             markdown_path=markdown_path,
             usage=usage_total,
+            docx_path=docx_path,
         )
 
     # -- shared evidence building -----------------------------------------
@@ -515,11 +556,16 @@ class MultiSourceReportGenerator:
         image_options: dict,
         sample_report_path: str | Path | None,
         max_evidence_chars: int | None,
+        progress_callback: Callable[[str], None] | None = None,
     ) -> tuple[list[EvidenceItem], str, str | None]:
         """Normalize all inputs to an evidence pack (+ optional sample markdown).
 
-        Shared by the single-call and agentic paths.
+        Shared by the single-call and agentic paths. When ``progress_callback``
+        is provided, normalization progress is routed through it instead of
+        ``print`` so callers (e.g. the demo SSE backend) receive the messages.
         """
+        _emit = progress_callback or print
+
         files = _collect_input_files(input_paths)
         if not files:
             raise ValueError(
@@ -527,8 +573,11 @@ class MultiSourceReportGenerator:
                 f"Supported extensions: {sorted(SUPPORTED_EXTENSIONS)}"
             )
 
+        total = len(files)
         evidence_items: list[EvidenceItem] = []
         for index, path in enumerate(files, start=1):
+            source_type = _EXT_TO_TYPE[path.suffix.lower()]
+            _emit(f"Normalizing [{index}/{total}]: {path.name} ({source_type})")
             evidence_items.append(
                 self._build_evidence_item(
                     path,
@@ -543,6 +592,7 @@ class MultiSourceReportGenerator:
         evidence_pack = self._assemble_evidence_pack(
             evidence_items, max_evidence_chars=max_evidence_chars
         )
+        _emit(f"Evidence pack assembled: {total} source(s), {len(evidence_pack):,} chars")
 
         sample_markdown: str | None = None
         if sample_report_path is not None:
@@ -572,6 +622,7 @@ class MultiSourceReportGenerator:
         report_description: str | None,
         report_language: str | None,
         include_source_references: bool,
+        source_filenames: list[str],
         writer_options: dict,
         review_options: dict | None,
         polish: bool,
@@ -622,6 +673,7 @@ class MultiSourceReportGenerator:
             report_title=report_title,
             report_language=report_language,
             include_source_references=include_source_references,
+            source_filenames=source_filenames,
             writer_client=writer_client,
             writer_kwargs=writer_kwargs,
             reviewer_client=reviewer_client,
@@ -837,6 +889,7 @@ class MultiSourceReportGenerator:
         report_description: str | None,
         report_language: str | None,
         include_source_references: bool,
+        source_filenames: list[str],
         sample_markdown: str | None,
         chat_kwargs: dict,
     ):
@@ -848,7 +901,9 @@ class MultiSourceReportGenerator:
             parts.append(f"Write the report in: {report_language}")
         if include_source_references:
             parts.append(
-                "Where useful, reference the source (e.g. by filename) that supports a claim."
+                "Where useful, cite the source that supports a claim using its exact filename "
+                "in parentheses, e.g. (notes.txt) or (meeting_recording.mp3). "
+                f"Available sources: {', '.join(source_filenames)}."
             )
         else:
             parts.append("Do not add inline source citations or filename references in the text.")
@@ -960,6 +1015,168 @@ class MultiSourceReportGenerator:
             )
 
         return report_path
+
+    def _write_docx(self, md_path: Path) -> Path:
+        """Convert a Markdown file to DOCX using Pandoc via pypandoc.
+
+        Requires the ``multi-source-report-generator-docx`` extra and the
+        Pandoc system binary (https://pandoc.org/installing.html).
+        """
+        try:
+            import pypandoc
+        except ImportError as exc:
+            raise ImportError(
+                "DOCX export requires 'pypandoc' and the Pandoc system binary. "
+                "Install the Python wrapper with:\n"
+                '    pip install "gaik[multi-source-report-generator-docx]"\n'
+                "Then install Pandoc from https://pandoc.org/installing.html "
+                "(or: winget install JohnMacFarlane.Pandoc / brew install pandoc / "
+                "apt install pandoc)."
+            ) from exc
+        docx_path = md_path.with_suffix(".docx")
+        pypandoc.convert_file(str(md_path), "docx", outputfile=str(docx_path))
+        return docx_path
+
+
+# ---------------------------------------------------------------------------
+# Config save / load
+# ---------------------------------------------------------------------------
+
+
+def save_report_config(
+    path: str | Path,
+    *,
+    input_paths: list[str | Path],
+    sections: list[ReportSectionSpec | dict[str, Any]],
+    report_title: str = "Generated Report",
+    report_description: str | None = None,
+    report_language: str | None = None,
+    sample_report_path: str | Path | None = None,
+    output_dir: str | Path | None = None,
+    output_docx: bool = False,
+    include_evidence_index: bool = True,
+    include_source_references: bool = True,
+    max_evidence_chars: int | None = None,
+    parser_choice: str = "auto",
+    parser_options: dict | None = None,
+    transcriber_options: dict | None = None,
+    image_options: dict | None = None,
+    writer_options: dict | None = None,
+    agentic: bool = False,
+    review_options: dict | None = None,
+    polish: bool = False,
+    strict_review: bool = False,
+    curate_evidence: bool = False,
+) -> Path:
+    """Persist all ``run()`` parameters to a JSON config file for later reuse.
+
+    Paths (``input_paths``, ``output_dir``, ``sample_report_path``) are stored
+    relative to the config file's directory so the config is portable. All keys
+    inside option dicts (``transcriber_options``, ``parser_options``, etc.) are
+    stored as-is — any option supported by ``run()`` is preserved.
+
+    Not persisted: ``verbose``, ``progress_callback`` (runtime display), and
+    ``section_context_mode`` (reserved/unused). Pass them directly to ``run()``
+    as needed.
+    """
+    config_path = Path(path)
+    base = config_path.parent
+
+    def _to_rel(p: str | Path | None) -> str | None:
+        if p is None:
+            return None
+        try:
+            return str(Path(p).relative_to(base.resolve()))
+        except ValueError:
+            return str(p)  # already absolute or on a different drive
+
+    # Normalise sections: dataclasses → plain dicts, preserve all fields.
+    section_dicts: list[dict[str, Any]] = []
+    for s in sections:
+        if isinstance(s, ReportSectionSpec):
+            section_dicts.append(
+                {
+                    "id": s.id,
+                    "title": s.title,
+                    "instructions": s.instructions,
+                    "required": s.required,
+                    "depends_on": list(s.depends_on),
+                }
+            )
+        else:
+            section_dicts.append(dict(s))
+
+    config: dict[str, Any] = {
+        "version": "1",
+        "report_title": report_title,
+        "report_description": report_description,
+        "report_language": report_language,
+        "sections": section_dicts,
+        "input_paths": [_to_rel(p) for p in input_paths],
+        "sample_report_path": _to_rel(sample_report_path),
+        "output_dir": _to_rel(output_dir),
+        "output_docx": output_docx,
+        "include_evidence_index": include_evidence_index,
+        "include_source_references": include_source_references,
+        "max_evidence_chars": max_evidence_chars,
+        "parser_choice": parser_choice,
+        "parser_options": parser_options or {},
+        "transcriber_options": transcriber_options or {},
+        "image_options": image_options or {},
+        "writer_options": writer_options or {},
+        "agentic": agentic,
+        "review_options": review_options,
+        "polish": polish,
+        "strict_review": strict_review,
+        "curate_evidence": curate_evidence,
+    }
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
+    return config_path
+
+
+def load_report_config(path: str | Path) -> dict[str, Any]:
+    """Load a config file saved by ``save_report_config`` and return a dict
+    that can be unpacked directly into ``MultiSourceReportGenerator.run()``.
+
+    Relative paths stored in the config are resolved relative to the config
+    file's directory. ``None`` is returned for any key that was not present.
+    """
+    config_path = Path(path)
+    base = config_path.parent
+
+    raw: dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
+
+    def _to_abs(p: str | None) -> Path | None:
+        if p is None:
+            return None
+        resolved = Path(p)
+        return resolved if resolved.is_absolute() else (base / resolved).resolve()
+
+    return {
+        "input_paths": [_to_abs(p) for p in raw.get("input_paths") or []],
+        "sections": raw.get("sections", []),
+        "report_title": raw.get("report_title", "Generated Report"),
+        "report_description": raw.get("report_description"),
+        "report_language": raw.get("report_language"),
+        "sample_report_path": _to_abs(raw.get("sample_report_path")),
+        "output_dir": _to_abs(raw.get("output_dir")),
+        "output_docx": raw.get("output_docx", False),
+        "include_evidence_index": raw.get("include_evidence_index", True),
+        "include_source_references": raw.get("include_source_references", True),
+        "max_evidence_chars": raw.get("max_evidence_chars"),
+        "parser_choice": raw.get("parser_choice", "auto"),
+        "parser_options": raw.get("parser_options"),
+        "transcriber_options": raw.get("transcriber_options"),
+        "image_options": raw.get("image_options"),
+        "writer_options": raw.get("writer_options"),
+        "agentic": raw.get("agentic", False),
+        "review_options": raw.get("review_options"),
+        "polish": raw.get("polish", False),
+        "strict_review": raw.get("strict_review", False),
+        "curate_evidence": raw.get("curate_evidence", False),
+    }
 
 
 # ---------------------------------------------------------------------------

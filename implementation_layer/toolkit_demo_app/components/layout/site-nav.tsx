@@ -106,12 +106,6 @@ const navGroups: NavGroup[] = [
         comingSoon: true,
       },
       {
-        label: "Report Writing",
-        href: "#",
-        icon: FileText,
-        comingSoon: true,
-      },
-      {
         label: "Sales Proposal Generation",
         href: "#",
         icon: FileBarChart,
@@ -161,6 +155,7 @@ const navGroups: NavGroup[] = [
         icon: FileOutput,
       },
       { label: "RAG Builder", href: "/rag", icon: Bot },
+      { label: "Report Writer", href: "/report-writer", icon: FileText },
     ],
   },
   {

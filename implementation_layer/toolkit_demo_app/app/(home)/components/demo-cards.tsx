@@ -271,12 +271,24 @@ const newUseCases: Demo[] = [
     href: "/luvata-order",
     icon: FileBarChart,
   },
+  {
+    title: "Report Writer",
+    description:
+      "Generate structured reports from any mix of documents, audio, images, and spreadsheets — with agentic per-section review and reusable JSON configs",
+    href: "/report-writer",
+    icon: FileText,
+    featureList: [
+      { label: "Mixed inputs", icon: FileUp },
+      { label: "Agentic review", icon: Sparkles },
+      { label: "Section dependencies", icon: Database },
+      { label: "Config import/export", icon: Download },
+    ],
+  },
 ];
 
 // Coming Soon items
 const comingSoonUseCases = [
   { title: "Customer onboarding and sales assistant", icon: Headset },
-  { title: "Report Writing", icon: FileText },
   { title: "Sales Proposal Generation", icon: FileBarChart },
   { title: "Learning plans & recommendations", icon: GraduationCap },
 ];

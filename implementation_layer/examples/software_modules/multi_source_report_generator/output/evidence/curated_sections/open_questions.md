@@ -1,0 +1,4 @@
+- Source 3 (notes.txt) lists “Questions I Still Have,” which identifies unresolved follow-up topics from the meeting:
+  - “What’s the budget for AWS load testing?”
+  - “Who’s covering for Lisa during holiday break?”
+  - “Do we need stakeholder approval for the API phasing?”

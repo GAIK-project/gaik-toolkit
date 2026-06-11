@@ -240,6 +240,7 @@ all = [
     "gaik[documents-to-structured-data]",
     "gaik[multi-source-report-generator]",
     "gaik[multi-source-report-generator-agentic]",
+    "gaik[multi-source-report-generator-docx]",
     "gaik[llm-judge]",
     "gaik[finnish-rag]",
     "gaik[evaluators]",
@@ -269,6 +270,13 @@ multi-source-report-generator = [
 multi-source-report-generator-agentic = [
     "gaik[multi-source-report-generator]",
     "langgraph>=0.2",
+]
+
+# Optional DOCX export for the multi-source report generator.
+# Requires the Pandoc system binary (https://pandoc.org/installing.html).
+multi-source-report-generator-docx = [
+    "gaik[multi-source-report-generator]",
+    "pypandoc>=1.13",
 ]
 
 # CPU-only variants (no GPU/torch/docling dependencies)
