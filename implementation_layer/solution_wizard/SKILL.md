@@ -284,6 +284,18 @@ python scripts/run_wizard.py --show-registry
 
 This prints each component's name, type, input/output artifact types, `best_for`, and `known_limitations` — the exact fields you need for the steps below.
 
+**Accuracy override (check BEFORE Step 1)**
+
+Before applying the module-first rule, check whether the user has described any of the following about their documents:
+
+- Scanned or image-based pages (not digital/native text)
+- Complex or multi-column layouts
+- Difficult, nested, or merged tables
+- Mixed image and text content
+- Accuracy is critical / extraction errors are not acceptable
+
+If **any** of the above apply, prefer `VisionExtractor` over `DocumentsToStructuredData`, regardless of the module-first rule. VisionExtractor sends the full visual context directly to a vision LLM in a single pass, which delivers higher fidelity on visually complex documents. Flag the cost trade-off to the user: *"VisionExtractor could be more expensive, but delivers higher fidelity on visually complex documents."* Ask whether the higher accuracy is worth the potential added cost before confirming the choice. If the user says cost is a concern, offer `DocumentsToStructuredData` with `parser_choice="vision_parser"` as a cheaper alternative and note that accuracy may be lower on complex layouts.
+
 **Step 1 -- Module-first rule**
 
 Check whether a single GAIK software module covers the use case end-to-end:
@@ -291,7 +303,7 @@ Check whether a single GAIK software module covers the use case end-to-end:
 | Pattern | Module to try first |
 |---------|-------------------|
 | Audio/video → structured JSON | `AudioToStructuredData` |
-| PDF/DOCX → structured JSON | `DocumentsToStructuredData` |
+| PDF/DOCX → structured JSON | `DocumentsToStructuredData` (subject to accuracy override above) |
 | Document collection → answer | `RAGWorkflow` |
 
 If the module's `input_artifact_types` and `output_artifact_types` match the use case, select it and note the components it contains (from `uses_components`). Stop here unless the user needs custom control over individual steps.
@@ -302,7 +314,7 @@ If no module covers the full chain, or the user needs to skip/add/reorder steps,
 
 - Input is audio → `Transcriber` produces the transcript. **Finnish audio → set `Transcriber(enhanced_transcript=True)` (Finnish-tuned two-pass enhancement, run internally) — do NOT add a separate `TranscriptEnhancer` step.** For non-Finnish audio, leave it off and flag that enhancement would need prompt customisation. Use a standalone `TranscriptEnhancer` only to enhance an existing text transcript (no audio step).
 - Text/transcript → structured JSON → `Extractor`
-- Image or visually complex PDF → `VisionExtractor` (note: expensive; flag cost tradeoff)
+- Image or visually complex PDF → `VisionExtractor` (note: could be more expensive; flag cost tradeoff — see accuracy override above)
 - Document type detection needed → `DocumentClassifier`
 - Output validation required → `LLMJudge`
 

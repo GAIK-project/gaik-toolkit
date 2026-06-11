@@ -136,11 +136,13 @@
       "cost_sensitivity": "medium -- LLM extraction call per document",
       "degrades_on": [
         "handwritten_documents",
-        "very_low_dpi_scans"
+        "very_low_dpi_scans",
+        "complex_layouts_when_accuracy_is_critical",
+        "deeply_nested_tables_requiring_high_fidelity"
       ]
     },
     "known_limitations": [
-      "Complex scanned documents may need VisionExtractor instead",
+      "Complex scanned documents or accuracy-critical complex layouts should use VisionExtractor instead",
       "Multi-page extraction may lose cross-page context"
     ],
     "best_for": [
@@ -525,13 +527,17 @@
     "known_limitations": [
       "Max ~20MB per file",
       "Not suitable for audio input",
-      "Expensive for large document batches -- prefer DocumentsToStructuredData for plain text PDFs"
+      "Could be more expensive for large document batches -- prefer DocumentsToStructuredData for plain text PDFs"
     ],
     "best_for": [
       "scanned_forms",
       "technical_drawings",
       "charts_and_tables",
-      "image_to_structured_data"
+      "image_to_structured_data",
+      "complex_multi_column_layouts",
+      "difficult_nested_tables",
+      "accuracy_critical_extraction",
+      "mixed_image_text_documents"
     ],
     "example_blueprint_steps": [
       {

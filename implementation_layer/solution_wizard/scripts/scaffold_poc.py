@@ -27,9 +27,14 @@ _REPO_ROOT = _WIZARD_ROOT.parent.parent.resolve()
 
 
 def _check_output_dir(output_dir: Path) -> None:
-    """Refuse to write inside the GAIK repo (implementation_layer/ or above)."""
+    """Refuse to write inside the GAIK repo (implementation_layer/ or above).
+    Exception: .wizard_workspaces paths are managed by the demo app server."""
+    resolved = output_dir.resolve()
+    # Allow server-managed wizard workspace directories
+    if ".wizard_workspaces" in resolved.parts:
+        return
     try:
-        output_dir.resolve().relative_to(_REPO_ROOT)
+        resolved.relative_to(_REPO_ROOT)
         print(
             f"ERROR: output-dir '{output_dir}' is inside the GAIK repository "
             f"({_REPO_ROOT}).\n"
