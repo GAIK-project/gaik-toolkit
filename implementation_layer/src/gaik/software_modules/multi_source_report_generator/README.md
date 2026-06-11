@@ -123,6 +123,20 @@ Fastest and cheapest. No per-section fact-checking; the model relies entirely on
 ### Option 2 — Agentic (`agentic=True`)
 Each section is an independent LLM call. Sections are grouped into **dependency layers** and written in order; within a layer, sections run in parallel. Every section is then fact-checked and repaired by a diff-editor reviewer before the report is assembled.
 
+```text
+input files
+  -> normalize all sources to Markdown evidence
+  -> (optional) split sample report into per-section format references
+  -> for each dependency layer (in order):
+       for each section in the layer (in parallel):
+         -> curate section-specific evidence brief
+         -> draft section                          [LLM call]
+         -> reviewer repairs factual errors        [LLM call]
+         -> style polish                [LLM call]
+  -> assemble report in the user's original section order
+  -> write output files
+```
+
 ```mermaid
 flowchart TD
     classDef opt  fill:#f3f4f6,stroke:#9ca3af,stroke-dasharray:5 5,color:#6b7280
