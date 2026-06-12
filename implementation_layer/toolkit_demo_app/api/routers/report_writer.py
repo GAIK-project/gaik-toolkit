@@ -23,6 +23,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
 # Locate the multi_source_report_generator example assets.
 #
 # In the repo they live under <repo>/implementation_layer/examples/...; in the
