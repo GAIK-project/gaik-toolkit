@@ -249,46 +249,34 @@ Sections can declare dependencies on other sections using `depends_on`. Sections
 
 <Mermaid chart={`
 flowchart TD
-    IN1("📁 Mixed Source Files<br/>PDF · DOCX · Audio · Images · Excel") --> NRM
-    IN2("🧱 Use-Case Definition<br/>title · description · sections") --> ORC
-    IN3("📋 Sample Report<br/>optional format reference") --> NRM
+    IN1("📁 Mixed Source Files") --> NRM
+    IN2("🧱 Use-Case Definition") --> ORC
+    IN3("📋 Sample Report · optional") --> NRM
 
     NRM["🔄 Normalize to Evidence Pack<br/>parsers · transcriber · image extractor"]
-
     NRM --> ORC
 
-    subgraph ORC["Agentic Orchestrator — layered parallel execution"]
+    subgraph ORC["Agentic Orchestrator · layered parallel execution"]
         direction TB
 
-        subgraph L0["Layer 0 · sections with no dependencies · parallel"]
+        subgraph L0["Layer 0 · no dependencies · parallel"]
             direction LR
-            subgraph S1["Section A"]
-                direction TB
-                C1["Curate"] --> D1["Draft"] --> R1["Review & Repair"] --> P1["Polish"]
-            end
-            subgraph S2["Section B"]
-                direction TB
-                C2["Curate"] --> D2["Draft"] --> R2["Review & Repair"] --> P2["Polish"]
-            end
+            SA["Section A<br/>Curate → Draft → Review → Polish"]
+            SB["Section B<br/>Curate → Draft → Review → Polish"]
         end
 
-        BAR["⏸ Barrier · all Layer 0 sections finalized"]
+        BAR{{"⏸ Barrier · Layer 0 fully finalized"}}
 
-        subgraph L1["Layer 1 · sections with dependencies · parallel"]
+        subgraph L1["Layer 1 · depends on Layer 0 · parallel"]
             direction LR
-            subgraph S3["Section C · depends on A, B"]
-                direction TB
-                CTX["dep context<br/>from A + B"] --> C3["Curate"] --> D3["Draft"] --> R3["Review & Repair"] --> P3["Polish"]
-            end
+            SC["Section C · dep context from A + B<br/>Curate → Draft → Review → Polish"]
         end
 
         L0 --> BAR --> L1
     end
 
     ORC --> ASM["📋 Assemble in user's original section order"]
-    ASM --> O1("📄 report.md")
-    ASM --> O2("📝 report.docx<br/>optional")
-    ASM --> O3("🧩 Per-Section Breakdown<br/>+ revision warnings")
+    ASM --> O1("📄 report.md") & O2("📝 report.docx · optional") & O3("🧩 Per-Section Breakdown")
 
     style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style IN2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -297,9 +285,9 @@ flowchart TD
     style ORC fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
     style L0 fill:#f8fafc,stroke:#94a3b8,color:#334155
     style L1 fill:#f8fafc,stroke:#94a3b8,color:#334155
-    style S1 fill:#faf5ff,stroke:#9333ea,color:#2e1065
-    style S2 fill:#faf5ff,stroke:#9333ea,color:#2e1065
-    style S3 fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style SA fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style SB fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style SC fill:#faf5ff,stroke:#9333ea,color:#2e1065
     style BAR fill:#fef9c3,stroke:#eab308,color:#713f12
     style ASM fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
     style O1 fill:#dcfce7,stroke:#16a34a,color:#14532d
