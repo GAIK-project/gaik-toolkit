@@ -51,6 +51,9 @@ venv/
 .claude/*
 !.claude/skills/
 
+# Codex (local config / hooks, not shared)
+.codex/
+
 # Skill scratch files
 **/.claude/skills/**/last_plan.md
 .mcp.json
