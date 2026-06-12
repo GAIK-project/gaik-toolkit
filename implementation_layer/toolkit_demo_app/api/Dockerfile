@@ -12,10 +12,12 @@ LABEL version="1.0.0"
 WORKDIR /app
 
 # Install system dependencies
+# pandoc: Report Writer DOCX export (pypandoc shells out to the binary)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     tesseract-ocr \
     tesseract-ocr-fin \
+    pandoc \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies with uv (faster)
