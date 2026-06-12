@@ -3,7 +3,7 @@
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageTransition } from "@/components/demo/page-transition";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Sparkles, Wand2 } from "lucide-react";
+import { ArrowRight, Wand2 } from "lucide-react";
 import Link from "next/link";
 
 export function Hero() {
@@ -12,9 +12,7 @@ export function Hero() {
   }
 
   return (
-    <PageTransition
-      className="bg-card relative overflow-hidden rounded-3xl border p-8 shadow-sm md:p-12"
-    >
+    <PageTransition className="bg-card relative overflow-hidden rounded-3xl border p-8 shadow-sm md:p-12">
       <div className="space-y-6">
         <div className="space-y-3">
           <h1 className="max-w-3xl font-serif text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl">

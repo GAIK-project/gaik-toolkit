@@ -39,18 +39,15 @@ oc apply -f route.yaml
 
 ## Build & Push Images
 
-```bash
-# Backend API (runs from demo directory)
-cd implementation_layer/toolkit_demo_app
-docker build -t gaik-demo-api -f api/Dockerfile .
-docker tag gaik-demo-api image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo-api:latest
-docker push image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo-api:latest
+Use `deploy.sh` — it builds with a `docker-container` buildx builder and pushes
+single-arch Docker schema2 manifests (Rahti's registry rejects Docker 29's
+default OCI/manifest-list output). The API image builds from the **repository
+root** (it installs gaik from source and bundles the Solution Wizard assets):
 
-# Frontend (runs from demo directory)
-docker build -t gaik-demo .
-docker tag gaik-demo image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo:latest
-docker push image-registry.apps.2.rahti.csc.fi/gaik/gaik-demo:latest
-cd ../..
+```bash
+cd implementation_layer/toolkit_demo_app/openshift
+./deploy.sh api       # build + push + rollout API
+./deploy.sh frontend  # build + push + rollout frontend
 ```
 
 ## Restore and Verify Video Search
@@ -82,6 +79,7 @@ Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Secret: `gaik-demo-supabase`           |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key    | Secret: `gaik-demo-supabase`           |
 | `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |
+| `WIZARD_ACCESS_SECRET`                 | Unlocks the gated Solution Wizard (`/solution-wizard?key=<secret>`) | Secret: `gaik-demo-admin` |
 
 ### Backend (gaik-demo-api)
 
@@ -92,6 +90,10 @@ Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
 | `AZURE_API_VERSION`         | Azure API version        | Secret: `gaik-demo-api-keys` |
 | `DOCLING_API_BASE`          | Docling parser API URL   | Secret: `gaik-demo-api-keys` |
 | `DOCLING_API_PASSWORD`      | Docling parser API key   | Secret: `gaik-demo-api-keys` |
+| `CLAUDE_CODE_USE_FOUNDRY`   | Solution Wizard: route Claude Agent SDK via Azure Foundry (`1`) | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_FOUNDRY_API_KEY` | Solution Wizard: Azure Foundry API key | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_FOUNDRY_RESOURCE`| Solution Wizard: Azure Foundry resource name | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | Solution Wizard: model id (e.g. `claude-sonnet-4-6`) | Secret: `gaik-demo-api-keys` |
 
 ## Route Annotations
 
