@@ -23,14 +23,30 @@ except ImportError:
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# Path to the example folder in the GAIK repo
-_EXAMPLE_DIR = (
-    Path(__file__).parents[4]
-    / "implementation_layer"
-    / "examples"
-    / "software_modules"
-    / "multi_source_report_generator"
-)
+# Locate the multi_source_report_generator example assets.
+#
+# In the repo they live under <repo>/implementation_layer/examples/...; in the
+# flattened container image that tree is absent, so the assets are bundled at
+# /app/report_examples via the Dockerfile. Resolve safely so a missing tree
+# never raises at import (a bare ``parents[4]`` raised IndexError in the
+# container and crashed the entire API).
+def _find_example_dir() -> Path:
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = (
+            parent
+            / "implementation_layer"
+            / "examples"
+            / "software_modules"
+            / "multi_source_report_generator"
+        )
+        if candidate.exists():
+            return candidate
+    # Container layout: bundled copy next to the app root (/app/report_examples).
+    return here.parent.parent / "report_examples"
+
+
+_EXAMPLE_DIR = _find_example_dir()
 _EXAMPLE_INPUTS = _EXAMPLE_DIR / "sample_inputs"
 _EXAMPLE_CONFIG = _EXAMPLE_DIR / "report_config.json"
 _EXAMPLE_SAMPLE = _EXAMPLE_DIR / "sample_report.md"

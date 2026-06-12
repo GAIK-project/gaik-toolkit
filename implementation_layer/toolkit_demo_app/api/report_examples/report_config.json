@@ -1,0 +1,61 @@
+{
+  "version": "1",
+  "report_title": "Q2 Product Planning Meeting Report",
+  "report_description": "A structured report of the Q2 product planning meeting held on September 10, 2024, documenting decisions, priorities, action items, and open questions.",
+  "report_language": "English",
+  "sections": [
+    {
+      "title": "Executive Summary",
+      "instructions": "Summarize the purpose and outcome of the Q2 product planning meeting. Cover the main themes discussed, the overall direction the team aligned on, and any high-level capacity or resource considerations mentioned."
+    },
+    {
+      "title": "Decisions Made",
+      "instructions": "List and briefly explain the key decisions reached during the meeting. For each decision, state what was agreed and the main reason or constraint behind it."
+    },
+    {
+      "title": "Action Items",
+      "instructions": "List all action items from the meeting in a table with columns: Action Item, Owner, Due Date, and Priority. Use only items explicitly stated in the evidence."
+    },
+    {
+      "title": "Open Questions",
+      "instructions": "List the unresolved questions or topics that require follow-up after the meeting. Present them as a bulleted list."
+    },
+    {
+      "id": "next_steps",
+      "title": "Next Steps",
+      "instructions": "Summarize the immediate next steps and follow-up actions the team should take. Include any scheduled follow-up meetings or deadlines mentioned.",
+      "depends_on": [
+        "decisions_made",
+        "action_items",
+        "open_questions"
+      ]
+    }
+  ],
+  "input_paths": [
+    "sample_inputs"
+  ],
+  "sample_report_path": "sample_report.md",
+  "output_dir": "output",
+  "output_docx": true,
+  "include_evidence_index": true,
+  "include_source_references": true,
+  "max_evidence_chars": null,
+  "parser_choice": "auto",
+  "parser_options": {},
+  "transcriber_options": {
+    "ctor": {
+      "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\output\\transcripts"
+    }
+  },
+  "image_options": {
+    "mode": "parse"
+  },
+  "writer_options": {
+    "model": "gpt-5.4"
+  },
+  "agentic": true,
+  "review_options": null,
+  "polish": true,
+  "strict_review": true,
+  "curate_evidence": true
+}

@@ -1,0 +1,31 @@
+Q3 ROADMAP MEETING - MY NOTES
+Dec 15, 2024
+
+Key Takeaways:
+--------------
+* Mobile app at 85% - on track for Jan 15 beta!
+* Dashboard has 8 critical bugs (data viz issues) - need fix by Wed
+* API migration being phased - GraphQL read-only in Q3, write ops pushed to Q4
+
+Action Items I Caught:
+----------------------
+- Mike: Assign 2 devs to simplify onboarding (5 steps -> 3 steps)
+- Lisa: App screenshots due Dec 18 (marketing needs by Dec 20)
+- David + Mike: Set up AWS load testing env - meeting tomorrow
+- Dev team: Fix remaining 3 critical bugs by Wednesday
+
+Decisions Made:
+---------------
+1. APPROVED: Phase API migration (read-only first)
+2. APPROVED: Use AWS for load testing (not on-prem)
+3. APPROVED: Simplify onboarding flow
+
+Questions I Still Have:
+-----------------------
+- What's the budget for AWS load testing?
+- Who's covering for Lisa during holiday break?
+- Do we need stakeholder approval for the API phasing?
+
+Holiday Freeze: Dec 23 - Jan 2 (NO DEPLOYMENTS!)
+
+Next meeting: Jan 3rd
