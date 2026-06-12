@@ -15,6 +15,45 @@ function hasBody(method: string): boolean {
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Solution Wizard is gated behind a shared secret while it is "coming
+  // soon". Default-deny: with no WIZARD_ACCESS_SECRET set, the wizard is
+  // fully closed. Team access: /solution-wizard?key=<secret> sets a cookie.
+  if (
+    pathname.startsWith("/solution-wizard") ||
+    pathname.startsWith("/api/wizard")
+  ) {
+    const secret = process.env.WIZARD_ACCESS_SECRET;
+    const cookieKey = request.cookies.get("wizard_access")?.value;
+    const queryKey = request.nextUrl.searchParams.get("key");
+    const allowed = !!secret && (cookieKey === secret || queryKey === secret);
+
+    if (!allowed) {
+      if (pathname.startsWith("/api/wizard")) {
+        return NextResponse.json(
+          { error: "Solution Wizard is not publicly available yet." },
+          { status: 403 },
+        );
+      }
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+
+    if (queryKey === secret && cookieKey !== secret) {
+      // First visit with ?key= — set the access cookie and drop the key
+      // from the URL.
+      const cleanUrl = request.nextUrl.clone();
+      cleanUrl.searchParams.delete("key");
+      const response = NextResponse.redirect(cleanUrl);
+      response.cookies.set("wizard_access", secret, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+      });
+      return response;
+    }
+  }
+
   // Proxy API requests to backend (except Next.js API routes)
   const isNextApiRoute =
     pathname.startsWith("/api/auth") || pathname.startsWith("/api/admin");

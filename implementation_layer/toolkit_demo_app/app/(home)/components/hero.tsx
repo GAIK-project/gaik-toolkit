@@ -47,11 +47,8 @@ export function Hero() {
           </Button>
         </div>
 
-        {/* Solution Configuration Wizard — new feature callout */}
-        <Link
-          href="/solution-wizard"
-          className="group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50 to-cyan-50 px-6 py-5 shadow-sm transition-all hover:border-teal-300 hover:shadow-md"
-        >
+        {/* Solution Configuration Wizard — coming soon (gated, not public yet) */}
+        <div className="relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border border-teal-200/70 bg-gradient-to-r from-teal-50/70 to-cyan-50/70 px-6 py-5 opacity-80">
           {/* subtle glow */}
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_left,_rgba(20,184,166,0.08)_0%,_transparent_60%)]" />
 
@@ -64,9 +61,9 @@ export function Hero() {
               <span className="text-base font-bold text-teal-700">
                 Solution Configuration Wizard
               </span>
-              <span className="animate-pulse inline-flex items-center gap-1 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
                 <Sparkles className="size-2.5" />
-                New
+                Coming soon
               </span>
             </div>
             <p className="text-sm leading-snug text-slate-600">
@@ -75,9 +72,7 @@ export function Hero() {
               diagrams, and all necessary artifacts.
             </p>
           </div>
-
-          <ArrowRight className="ml-4 shrink-0 text-teal-400 transition-all group-hover:translate-x-1 group-hover:text-teal-600" />
-        </Link>
+        </div>
       </div>
     </PageTransition>
   );

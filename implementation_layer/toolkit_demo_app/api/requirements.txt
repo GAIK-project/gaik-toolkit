@@ -5,5 +5,9 @@ python-dotenv>=1.2.1
 fpdf2>=2.8.5
 openpyxl>=3.1.0
 gaik[all-cpu,multimodal-parser,postgres-agent]>=0.5.14
+# Solution Wizard (routers/solution_wizard.py): Claude Agent SDK session per user.
+# Also requires CLAUDE_CODE_USE_FOUNDRY, ANTHROPIC_FOUNDRY_API_KEY and
+# ANTHROPIC_FOUNDRY_RESOURCE in .env.local (or the deployment secret).
+claude-agent-sdk>=0.2.97
 boto3>=1.35.0
 yt-dlp>=2024.0.0
