@@ -17,6 +17,7 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
+import { Reasoning } from "@/components/ai-elements/reasoning";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PageTransition } from "@/components/demo/page-transition";
 import { WizardFileBrowser } from "@/components/demo/wizard-file-browser";
@@ -62,6 +63,7 @@ function friendlyActivity(name: string, summary: string): string {
 export default function SolutionWizardPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingText, setStreamingText] = useState("");
+  const [thinkingText, setThinkingText] = useState("");
   const [activity, setActivity] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -69,6 +71,7 @@ export default function SolutionWizardPage() {
 
   const sessionRef = useRef<string | null>(null);
   const streamRef = useRef("");
+  const thinkingRef = useRef("");
   const startedRef = useRef(false);
   // Incremented on every restart so stale consumeTurn callbacks from the
   // previous session become no-ops and cannot pollute the new session's state.
@@ -97,7 +100,9 @@ export default function SolutionWizardPage() {
   const consumeTurn = useCallback(
     async (response: Response, gen: number) => {
       streamRef.current = "";
+      thinkingRef.current = "";
       setStreamingText("");
+      setThinkingText("");
       setActivity("");
 
       await processSSEStream(response, {
@@ -115,10 +120,21 @@ export default function SolutionWizardPage() {
             streamRef.current += (event.data.text as string) ?? "";
             setStreamingText(streamRef.current);
             setActivity("");
+          } else if (event.type === "thinking_delta") {
+            thinkingRef.current += (event.data.text as string) ?? "";
+            setThinkingText(thinkingRef.current);
           } else if (event.type === "tool_use") {
             const name = event.data.name as string;
             const summary = (event.data.summary as string) ?? "";
             setActivity(friendlyActivity(name, summary));
+            // Generated files appear mid-turn; refresh the browser as the
+            // wizard writes them instead of waiting for the turn to finish.
+            if (
+              (name === "Write" || name === "Edit" || name === "Bash") &&
+              sessionRef.current
+            ) {
+              void refreshFiles(sessionRef.current);
+            }
           } else if (event.type === "done") {
             const text = streamRef.current.trim();
             if (text) {
@@ -245,6 +261,10 @@ export default function SolutionWizardPage() {
 
   return (
     <PageTransition>
+      {/* Break out of the layout's max-w-6xl: the chat + file browser benefit
+          from extra width on large screens. Centered on the viewport (the
+          parent container is itself centered), capped at 1400px. */}
+      <div className="relative left-1/2 w-[min(100vw-3rem,87.5rem)] -translate-x-1/2">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
@@ -275,9 +295,11 @@ export default function SolutionWizardPage() {
             setMessages([]);
             setFiles([]);
             setStreamingText("");
+            setThinkingText("");
             setActivity("");
             setBusy(false);
             streamRef.current = "";
+            thinkingRef.current = "";
             // 4. Start a new session (startSession reads genRef.current internally).
             startedRef.current = false;
             void startSession().then(() => { startedRef.current = true; });
@@ -289,7 +311,7 @@ export default function SolutionWizardPage() {
         </Button>
       </div>
 
-      <div className="grid h-[calc(100dvh-220px)] min-h-[420px] gap-4 lg:grid-cols-[1fr_300px]">
+      <div className="grid h-[calc(100dvh-220px)] min-h-[420px] gap-4 lg:grid-cols-[1fr_320px]">
         {/* Chat column (bounded height so the conversation scrolls internally).
             min-w-0 is essential: without it this grid item's automatic minimum
             width equals its widest content (a long code line in a <pre>), which
@@ -306,6 +328,15 @@ export default function SolutionWizardPage() {
                   </MessageContent>
                 </Message>
               ))}
+
+              {/* Extended-thinking trace (collapsible, opt-in to read) */}
+              {thinkingText.length > 0 && (
+                <Reasoning
+                  isStreaming={busy && streamingText.length === 0}
+                >
+                  {thinkingText}
+                </Reasoning>
+              )}
 
               {/* Live streaming assistant message */}
               {streamingText.length > 0 && (
@@ -370,6 +401,7 @@ export default function SolutionWizardPage() {
         <aside className="min-h-0 overflow-hidden rounded-xl border bg-white p-4">
           <WizardFileBrowser files={files} sessionId={sessionId} />
         </aside>
+      </div>
       </div>
     </PageTransition>
   );

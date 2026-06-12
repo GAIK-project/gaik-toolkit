@@ -62,11 +62,30 @@ router = APIRouter()
 # Paths & config
 # ---------------------------------------------------------------------------
 
-# api/routers/solution_wizard.py -> repo root is parents[4]:
-#   .../implementation_layer/toolkit_demo_app/api/routers/solution_wizard.py
-REPO_ROOT = Path(__file__).resolve().parents[4]
-WIZARD_DIR = REPO_ROOT / "implementation_layer" / "solution_wizard"
-WORKSPACES_DIR = Path(__file__).resolve().parents[2] / ".wizard_workspaces"
+# Wizard assets live at <repo>/implementation_layer/solution_wizard. In the
+# source tree that is parents[4] of this file; in the container image the api/
+# directory is flattened to /app and the wizard assets are copied to
+# /app/implementation_layer/solution_wizard (parents[1]). Resolve defensively —
+# an unguarded parents[4] raises IndexError in the container and would disable
+# the whole router at import time.
+_HERE = Path(__file__).resolve()
+
+
+def _resolve_wizard_dir() -> Path | None:
+    env_dir = os.getenv("WIZARD_DIR", "").strip()
+    if env_dir:
+        return Path(env_dir)
+    candidates = [
+        parent / "implementation_layer" / "solution_wizard"
+        for parent in (list(_HERE.parents[4:5]) + [_HERE.parents[1]])
+    ]
+    return next((c for c in candidates if c.is_dir()), None)
+
+
+WIZARD_DIR = _resolve_wizard_dir()
+WORKSPACES_DIR = Path(
+    os.getenv("WIZARD_WORKSPACES_DIR", "").strip() or _HERE.parents[1] / ".wizard_workspaces"
+)
 
 REQUIRED_FOUNDRY_VARS = [
     "CLAUDE_CODE_USE_FOUNDRY",
@@ -242,6 +261,10 @@ async def _stream_turn(session: dict, *, _silent_retries: int = 0) -> AsyncGener
                 if delta:
                     had_text = True
                     yield sse_event("text_delta", {"text": delta})
+                else:
+                    thinking = _extract_stream_thinking(message)
+                    if thinking:
+                        yield sse_event("thinking_delta", {"text": thinking})
                 continue
 
             if isinstance(message, AssistantMessage):
@@ -299,6 +322,19 @@ def _extract_stream_text(event) -> str:
     return ""
 
 
+def _extract_stream_thinking(event) -> str:
+    """Pull incremental extended-thinking text from a StreamEvent, when the
+    model emits thinking blocks. Surfaced to the UI as a collapsible
+    "Reasoning" section the user can expand."""
+    ev = getattr(event, "event", None)
+    if not isinstance(ev, dict) or ev.get("type") != "content_block_delta":
+        return ""
+    delta = ev.get("delta") or {}
+    if isinstance(delta, dict) and delta.get("type") == "thinking_delta":
+        return delta.get("thinking", "") or ""
+    return ""
+
+
 def _sse_headers() -> dict:
     return {
         "Cache-Control": "no-cache",
@@ -318,6 +354,14 @@ async def start_session() -> StreamingResponse:
 
     The first SSE event is `session {session_id}` so the client can store it.
     """
+    if WIZARD_DIR is None or not (WIZARD_DIR / "SKILL.md").is_file():
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Solution Wizard is not configured: wizard assets not found. "
+                "Set WIZARD_DIR to the solution_wizard directory (must contain SKILL.md)."
+            ),
+        )
     _foundry_env()  # validate creds before creating anything
 
     session_id = uuid.uuid4().hex[:12]

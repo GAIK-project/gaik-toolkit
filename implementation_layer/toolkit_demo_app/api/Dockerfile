@@ -39,6 +39,12 @@ COPY implementation_layer/src ./implementation_layer/src
 RUN uv pip install --system --no-cache \
     ".[all-cpu,multimodal-parser,postgres-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]"
 
+# Solution Wizard assets (SKILL.md, scripts, registries, templates). The wizard
+# session runs the bundled claude CLI (shipped inside the claude-agent-sdk
+# wheel) with cwd=WIZARD_DIR. Foundry credentials come from deployment env.
+COPY implementation_layer/solution_wizard ./implementation_layer/solution_wizard
+ENV WIZARD_DIR=/app/implementation_layer/solution_wizard
+
 # Copy API application code
 COPY implementation_layer/toolkit_demo_app/api/ .
 

@@ -51,6 +51,31 @@ spec:
                   name: gaik-demo-api-keys
                   key: DOCLING_API_PASSWORD
                   optional: true
+            # Solution Wizard (Claude Agent SDK routed via Azure Foundry)
+            - name: CLAUDE_CODE_USE_FOUNDRY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: CLAUDE_CODE_USE_FOUNDRY
+                  optional: true
+            - name: ANTHROPIC_FOUNDRY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: ANTHROPIC_FOUNDRY_API_KEY
+                  optional: true
+            - name: ANTHROPIC_FOUNDRY_RESOURCE
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: ANTHROPIC_FOUNDRY_RESOURCE
+                  optional: true
+            - name: ANTHROPIC_DEFAULT_SONNET_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: ANTHROPIC_DEFAULT_SONNET_MODEL
+                  optional: true
           resources:
             requests:
               cpu: 1000m

@@ -21,6 +21,9 @@ website/
 *.md
 !README.md
 !implementation_layer/api/README.md
+# The Solution Wizard agent reads its instructions from SKILL.md at runtime
+!implementation_layer/solution_wizard/SKILL.md
+!implementation_layer/solution_wizard/CLAUDE.md
 
 # Node/build outputs when a sub-application is built from the repository root
 node_modules/

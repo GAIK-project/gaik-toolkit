@@ -125,7 +125,7 @@ export function FileUpload({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="border-success/30 bg-success/10 flex min-h-[176px] items-center gap-3 rounded-lg border p-4"
+            className="border-success/30 bg-success/10 flex items-center gap-3 rounded-lg border px-4 py-3"
           >
             <CheckCircle className="text-success h-5 w-5" />
             <File className="text-muted-foreground h-5 w-5" />
