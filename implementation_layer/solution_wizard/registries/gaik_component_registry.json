@@ -866,7 +866,8 @@
       "text"
     ],
     "output_artifact_types": [
-      "text"
+      "text",
+      "word_document"
     ],
     "knowledge_processes": [
       "knowledge_synthesis"
@@ -885,10 +886,17 @@
     ],
     "optional_parameters": [
       "report_title",
+      "report_description",
       "report_language",
       "sample_report_path",
       "parser_choice",
-      "image_options"
+      "image_options",
+      "agentic",
+      "output_docx",
+      "writer_options",
+      "transcriber_options",
+      "curate_evidence",
+      "polish"
     ],
     "supported_providers": [
       "openai",
@@ -896,11 +904,12 @@
     ],
     "cost_relevant_parameters": [
       "parser_choice",
+      "agentic",
       "section_context_mode"
     ],
     "quality_tradeoffs": {
-      "speed_vs_accuracy": "One LLM write call per section plus one normalization call per source file; vision/multimodal parsers add latency but handle complex layouts",
-      "cost_sensitivity": "high -- scales with number of source files and number of report sections",
+      "speed_vs_accuracy": "Single-call mode: one LLM call writes the whole report — fast and cheap, higher hallucination risk. Agentic mode (agentic=True): each section is drafted independently and fact-checked by a diff-editor reviewer — higher accuracy, more API calls (N draft + N reviewer per section). Vision/multimodal parsers add latency but handle complex layouts.",
+      "cost_sensitivity": "high -- scales with number of source files and number of report sections; agentic mode multiplies LLM calls by section count",
       "degrades_on": [
         "very_large_source_sets",
         "handwritten_or_low_dpi_scans"
@@ -908,11 +917,15 @@
     },
     "known_limitations": [
       "Orchestrates existing GAIK parsers/transcriber/extractor; no new parsing logic -- inherits each sub-component's limits",
-      "Long-form synthesis cost grows with sources x sections",
-      "Report content is drawn only from supplied evidence; it does not browse or fetch external sources"
+      "Long-form synthesis cost grows with sources x sections; agentic mode is significantly more expensive than single-call",
+      "Report content is drawn only from supplied evidence; it does not browse or fetch external sources",
+      "Agentic mode requires the multi-source-report-generator-agentic extra (langgraph); DOCX export requires multi-source-report-generator-docx extra and Pandoc system binary"
     ],
     "best_for": [
       "multi_source_report_writing",
+      "meeting_report_writing",
+      "advisory_reports",
+      "client_facing_reports",
       "sales_proposal_generation",
       "project_and_progress_reports"
     ],

@@ -295,11 +295,13 @@
     "note": "FFmpeg + ffprobe must be on PATH. Use this instead of Transcriber for long media or when fast parallel throughput matters; it does not do Finnish enhancement (no enhanced_transcript option)."
   },
   "MultiSourceReportGenerator": {
-    "import": "from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator",
+    "import": "from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator, save_report_config, load_report_config",
     "construct": "generator = MultiSourceReportGenerator(use_azure=use_azure)",
-    "call": "result = generator.run(input_paths=input_paths, sections=sections, report_title=report_title, report_language=report_language, parser_choice='auto')\n    report_markdown = result.markdown\n    written_sections = [s.title for s in result.sections]",
-    "returns": "ReportGenerationResult(.markdown, .markdown_path, .sections, .evidence_items, .title, .usage)",
+    "call": "result = generator.run(\n    input_paths=input_paths,\n    sections=[\n        {\"id\": \"findings\", \"title\": \"Findings\", \"instructions\": \"Describe key findings from the evidence.\"},\n        {\"id\": \"recommendations\", \"title\": \"Recommendations\", \"instructions\": \"Give recommendations.\", \"depends_on\": [\"findings\"]}\n    ],\n    report_title=report_title,\n    report_description=report_description,\n    report_language=report_language,\n    sample_report_path=sample_report_path,\n    output_dir=output_dir,\n    output_docx=False,\n    agentic=True,\n    curate_evidence=False,\n    polish=False,\n    writer_options={\"model\": \"gpt-5.4\"}\n)\n    report_markdown = result.markdown\n    written_sections = [s.title for s in result.sections]\n    docx_path = result.docx_path",
+    "returns": "ReportGenerationResult(.markdown, .markdown_path, .docx_path, .sections, .evidence_items, .title, .usage)",
     "install_extra": "multi-source-report-generator",
+    "install_extra_agentic": "multi-source-report-generator-agentic",
+    "install_extra_docx": "multi-source-report-generator-docx",
     "subsumes": [
       "PyMuPDFParser",
       "VisionParser",
@@ -310,6 +312,22 @@
       "VisionExtractor"
     ],
     "options": [
+      {
+        "name": "agentic",
+        "type": "bool",
+        "default": false,
+        "effect": "When true, each section is drafted independently, fact-checked, and repaired by a diff-editor reviewer before the report is assembled. Higher accuracy; more API calls. Requires the multi-source-report-generator-agentic extra (langgraph).",
+        "selection_relevant": true,
+        "infer_from": "accuracy_critical == yes OR multi_section_hierarchical_report OR formal_client_facing_report"
+      },
+      {
+        "name": "report_description",
+        "type": "str",
+        "default": null,
+        "effect": "Short description of the report's purpose and audience; passed as shared context to the writer, reviewer, and polish pass to keep tone and focus consistent.",
+        "selection_relevant": false,
+        "infer_from": "report purpose or audience is known from requirements"
+      },
       {
         "name": "parser_choice",
         "type": "enum",
@@ -329,9 +347,9 @@
         "name": "sample_report_path",
         "type": "str",
         "default": null,
-        "effect": "Path to a sample report whose structure/style the output should follow (content still drawn only from evidence).",
+        "effect": "Path to a sample report whose structure, style, and tone the output should follow. Content is still drawn only from the evidence. In agentic mode the sample is split by ## headings and matched per section.",
         "selection_relevant": true,
-        "infer_from": "user supplies an example/target report format"
+        "infer_from": "user supplies an example or target report format"
       },
       {
         "name": "report_language",
@@ -340,8 +358,32 @@
         "effect": "Language to write the report in (e.g. 'English', 'Finnish').",
         "selection_relevant": false,
         "infer_from": "technical_spec.language"
+      },
+      {
+        "name": "curate_evidence",
+        "type": "bool",
+        "default": false,
+        "effect": "Agentic mode only. When true, a per-section LLM call extracts a focused evidence brief before drafting, improving relevance for reports with large evidence packs.",
+        "selection_relevant": true,
+        "infer_from": "agentic == true AND (large_evidence_pack OR many_sections)"
+      },
+      {
+        "name": "polish",
+        "type": "bool",
+        "default": false,
+        "effect": "Agentic mode only. Runs a final style and proofreading pass after the mandatory reviewer repair.",
+        "selection_relevant": true,
+        "infer_from": "agentic == true AND high_quality_output_required"
+      },
+      {
+        "name": "output_docx",
+        "type": "bool",
+        "default": false,
+        "effect": "Also write report.docx alongside report.md. Requires the multi-source-report-generator-docx extra and the Pandoc system binary.",
+        "selection_relevant": true,
+        "infer_from": "output_format == word OR user requests .docx"
       }
     ],
-    "note": "End-to-end synthesis module: it parses/transcribes/extracts every source file itself and writes the report. Do NOT also add parsers, Transcriber, or VisionExtractor as separate steps. You provide input_paths + sections (title + per-section instructions)."
+    "note": "End-to-end report synthesis module: parses/transcribes/extracts every source file itself and writes the full report. Do NOT add parsers, Transcriber, or VisionExtractor as separate steps. Provide input_paths + sections (each with title, instructions, optional id and depends_on). Sections with depends_on are written after their dependencies in agentic mode, receiving finalized dependency content as context. Use save_report_config/load_report_config to persist and reuse use-case configurations. Install multi-source-report-generator-agentic for agentic mode; multi-source-report-generator-docx for DOCX export."
   }
 }

@@ -20,7 +20,7 @@ Use software modules when you want a complete, working pipeline with minimal int
 | Audio-to-Structured-Data | Audio / Video | Transcribe → Extract | Structured fields from spoken content |
 | Document-to-Structured-Data | PDF / DOCX | Parse → Extract | Structured fields from document content |
 | RAG-Workflow | PDF files + User query | Parse → Embed → Store → Retrieve → Generate | Contextual answers with citations |
-| Multi-Source-Report-Generator | Mixed files (PDF, DOCX, Excel/CSV, audio/video, images) + report structure | Normalize → Write sections → Assemble | User-defined long-form Markdown report |
+| Multi-Source-Report-Generator | Mixed files (PDF, DOCX, Excel/CSV, audio/video, images) + use-case definition (title, description, sections) | Normalize → Curate → Draft → Review & Repair → Assemble | User-defined long-form report (Markdown + optional DOCX) |
 
 ---
 
@@ -243,46 +243,98 @@ flowchart TD
 
 ### Multi-Source-Report-Generator
 
-This module turns a set of mixed source files into a single user-defined, long-form Markdown report. You provide the files (PDF, Word, Excel/CSV, text, Markdown, audio/video, images) and a report structure (section titles plus per-section instructions). The module normalises every file into Markdown evidence using the appropriate GAIK parser, transcriber, or extractor, then writes each section with an LLM — optionally matching the format of a sample report — and returns the assembled Markdown together with a per-section breakdown. It orchestrates existing GAIK components (`PyMuPDFParser`, `VisionParser`, `MultimodalParser`, `DoclingParser`, `DocxParser`, `Transcriber`, `VisionExtractor`) rather than introducing new parsing logic.
+This module generates a fully user-defined long-form report from any mix of source files. You define the use case: report title, a description of the report's purpose, and as many sections as needed — each with a plain-language instruction describing what to extract from the evidence and what the section should contain. The module normalises every input file (PDF, Word, Excel/CSV, audio/video, images, text) into a common Markdown evidence pack, then runs an **agentic workflow** that drafts each section independently, fact-checks and repairs it with a diff-editor reviewer, and assembles the final report in your original section order.
+
+Sections can declare dependencies on other sections using `depends_on`. Sections with no dependencies run in parallel; dependent sections wait for their dependencies to be finalized and receive their content as context — enabling a Summary or Recommendations section to synthesize from what earlier sections already established. The complete use-case configuration can be saved to a JSON file and reloaded for repeat runs on new evidence.
 
 <Mermaid chart={`
 flowchart TD
-    IN1("📁 Mixed Source Files") --> MOD
-    IN2("🧱 Report Structure") --> MOD
+    IN1("📁 Mixed Source Files<br/>PDF · DOCX · Audio · Images · Excel") --> NRM
+    IN2("🧱 Use-Case Definition<br/>title · description · sections") --> ORC
+    IN3("📋 Sample Report<br/>optional format reference") --> NRM
 
-    subgraph MOD["Multi-Source-Report-Generator"]
+    NRM["🔄 Normalize to Evidence Pack<br/>parsers · transcriber · image extractor"]
+
+    NRM --> ORC
+
+    subgraph ORC["Agentic Orchestrator — layered parallel execution"]
         direction TB
-        N["Step 1 · Normalize<br/>parsers / transcriber / extractor"] --> W["Step 2 · Write Sections<br/>LLM per section"] --> A["Step 3 · Assemble Report"]
+
+        subgraph L0["Layer 0 · sections with no dependencies · parallel"]
+            direction LR
+            subgraph S1["Section A"]
+                direction TB
+                C1["Curate"] --> D1["Draft"] --> R1["Review & Repair"] --> P1["Polish"]
+            end
+            subgraph S2["Section B"]
+                direction TB
+                C2["Curate"] --> D2["Draft"] --> R2["Review & Repair"] --> P2["Polish"]
+            end
+        end
+
+        BAR["⏸ Barrier · all Layer 0 sections finalized"]
+
+        subgraph L1["Layer 1 · sections with dependencies · parallel"]
+            direction LR
+            subgraph S3["Section C · depends on A, B"]
+                direction TB
+                CTX["dep context<br/>from A + B"] --> C3["Curate"] --> D3["Draft"] --> R3["Review & Repair"] --> P3["Polish"]
+            end
+        end
+
+        L0 --> BAR --> L1
     end
 
-    MOD --> O1("📄 Markdown Report")
-    MOD --> O2("🧩 Per-Section Breakdown")
+    ORC --> ASM["📋 Assemble in user's original section order"]
+    ASM --> O1("📄 report.md")
+    ASM --> O2("📝 report.docx<br/>optional")
+    ASM --> O3("🧩 Per-Section Breakdown<br/>+ revision warnings")
 
     style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style IN2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style IN3 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style NRM fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style ORC fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+    style L0 fill:#f8fafc,stroke:#94a3b8,color:#334155
+    style L1 fill:#f8fafc,stroke:#94a3b8,color:#334155
+    style S1 fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style S2 fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style S3 fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style BAR fill:#fef9c3,stroke:#eab308,color:#713f12
+    style ASM fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
     style O1 fill:#dcfce7,stroke:#16a34a,color:#14532d
-    style O2 fill:#fefce8,stroke:#ca8a04,color:#713f12
-    style MOD fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O3 fill:#fefce8,stroke:#ca8a04,color:#713f12
 `} />
+
+> **Example:** A consultant uploads a meeting recording (MP3), a project budget (Excel), and a policy PDF. They define three sections — *AI Maturity Level*, *Current Development Stage*, and *Recommendations* (which depends on the first two). The module transcribes the audio, parses the documents, drafts and fact-checks each section in parallel, then writes Recommendations last using the finalized earlier sections as context. The output is a formatted Markdown report with a matching Word document.
 
 **What the module returns:**
 
 | Output | Description |
 | --- | --- |
-| Markdown Report | Assembled long-form report following your section structure |
-| Per-Section Breakdown | Each generated section with the evidence it drew from |
+| Markdown Report (`report.md`) | Assembled long-form report in your section order — always produced |
+| Word Document (`report.docx`) | Optional DOCX export; requires `output_docx=True` and Pandoc |
+| Per-Section Breakdown | Each section's content, usage tokens, and any reviewer warnings |
+| Evidence Index | Source files with metadata and normalized content |
 
 **Key features:**
-- Handles many source types in one pipeline (documents, spreadsheets, audio/video, images)
-- User-defined report structure: section titles plus per-section instructions
-- Optional sample report to match an existing format and tone
-- Reuses GAIK parsers, transcriber, and extractor — no new parsing logic
+- **Fully user-defined use case** — report title, description, and any number of sections each with a plain-language instruction specifying what to extract and how to write it
+- **Agentic per-section workflow** — independent drafting, mandatory diff-editor reviewer repair, optional style polish per section
+- **Dependency-ordered sections** — `depends_on` lets summary or recommendation sections synthesize from finalized earlier sections rather than re-deriving from raw evidence
+- **Mixed input normalization** — PDF, Word, Excel/CSV, audio/video, images, and plain text all processed in a single pipeline
+- **Optional sample report** — provide an existing report to enforce a specific format, tone, and length; the writer mirrors its structure without copying content
+- **Config persistence** — save the full use-case definition (sections, options, paths) to JSON with `save_report_config`; reload with `load_report_config` for repeat runs on new evidence
+- **Dual output** — Markdown always produced; Word document optional
 
 **Potential applications:**
-- Project and progress reports compiled from mixed deliverables
-- Sales proposals and marketing materials from briefs and assets
+- Meeting reports and advisory summaries from transcripts and supporting documents
+- Client-facing project and progress reports from mixed deliverables
+- AI readiness and consultancy assessments from interview recordings and documents
+- Due-diligence and audit reports from heterogeneous evidence sources
 - Research and literature summaries across documents and recordings
-- Due-diligence and audit reports from heterogeneous evidence
+- Sales proposals and marketing materials from briefs and assets
 
+- **Interactive demo**: [Report Writer demo](/report-writer)
 - **Implementation code**: [software_modules/multi_source_report_generator](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/multi_source_report_generator)
 - **Usage examples**: [examples/multi_source_report_generator](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/multi_source_report_generator)
