@@ -31,7 +31,7 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 
 ### Solution Wizard
 
-- **Solution Configuration Wizard** - Natural-language use case → validated blueprint, BPMN diagram, Mermaid flow, and runnable PoC (optional; requires the `claude` CLI in the runtime)
+- **Solution Configuration Wizard** - Natural-language use case → validated blueprint, BPMN diagram, Mermaid flow, and runnable PoC (optional; requires the `claude` CLI in the runtime). Not public yet ("Coming soon" on the front page): `/solution-wizard` and `/api/wizard` stay closed unless `WIZARD_ACCESS_SECRET` is set and supplied once via `/solution-wizard?key=<secret>` (sets an access cookie).
 
 ## Quick Start
 
