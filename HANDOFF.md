@@ -33,6 +33,8 @@ This doc captures the current state and the deploy gotchas so they aren't re-dis
 - API image builds from the **repository root** context (installs gaik from source, copies
   `implementation_layer/solution_wizard`). `.dockerignore` must keep the wizard `SKILL.md` —
   it excludes `*.md` globally and has explicit negations for the wizard files.
+- The API image needs the **pandoc binary** (apt package) — Report Writer's DOCX export
+  goes through pypandoc, which shells out to it. Without it the whole run 500s at the end.
 - Foundry env vars on `gaik-demo-api` (from secret `gaik-demo-api-keys`):
   `CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE`,
   `ANTHROPIC_DEFAULT_SONNET_MODEL`. The live deployment has drifted from
@@ -42,10 +44,13 @@ This doc captures the current state and the deploy gotchas so they aren't re-dis
 ## Verified live (2026-06-12)
 
 - Wizard gate: no key → 307 to `/`; `/api/wizard/*` → 403; `?key=` → unlocks + cookie.
-- Wizard run: `/wizard/start` → 200, bundled CLI found, welcome turn + use-case
-  classification streamed over SSE in prod.
-- Report writer page + example endpoints respond; transcriber, front page OK.
-- GitHub Actions: ruff format check green after formatting `report_writer.py`.
+- Wizard run: `/wizard/start` → 200, bundled CLI found, welcome + use-case classification
+  streamed over SSE in prod; Reasoning block renders thinking; workspace at
+  `/app/.wizard_workspaces/<sid>` (container path fix confirmed).
+- Report Writer **end-to-end**: example loaded, `/report-writer/run` → 200, 5 sections /
+  ~19k tokens generated, `.md` and `.docx` downloads offered (pandoc fix verified).
+- Transcriber end-to-end: example file → Finnish transcript via `whisper_local`.
+- GitHub Actions: green through the docs commit (ruff format fixed).
 
 ## Known open issues (wizard quality, not environment)
 
