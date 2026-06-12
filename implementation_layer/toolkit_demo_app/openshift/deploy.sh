@@ -34,6 +34,7 @@ REGISTRY="image-registry.apps.2.rahti.csc.fi"
 PROJECT="gaik"
 API_DEPLOYMENT="gaik-demo-api"
 FRONTEND_DEPLOYMENT="gaik-demo"
+BUILDX_BUILDER="${BUILDX_BUILDER:-gaik-rahti}"
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 DEMO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -90,6 +91,18 @@ ensure_registry_login() {
     fi
 }
 
+ensure_buildx_builder() {
+    # Rahti's registry rejects Docker 29's default OCI manifest output. A
+    # docker-container buildx builder lets us push Docker schema2 directly.
+    if ! docker buildx inspect "$BUILDX_BUILDER" &> /dev/null; then
+        echo -e "${YELLOW}Creating docker buildx builder $BUILDX_BUILDER...${NC}"
+        docker buildx create --name "$BUILDX_BUILDER" --driver docker-container --use > /dev/null
+    else
+        docker buildx use "$BUILDX_BUILDER" > /dev/null
+    fi
+    docker buildx inspect --bootstrap > /dev/null
+}
+
 rollout_deployment() {
     local deployment="$1"
     # `:latest` images don't trigger a new rollout on their own — restart the
@@ -101,15 +114,17 @@ rollout_deployment() {
 }
 
 deploy_api() {
-    echo -e "${YELLOW}Building API...${NC}"
-    cd "$DEMO_DIR"
-    docker build -t gaik-demo-api -f api/Dockerfile .
-
     ensure_registry_login
+    ensure_buildx_builder
 
-    echo -e "${YELLOW}Tagging and pushing API...${NC}"
-    docker tag gaik-demo-api "$REGISTRY/$PROJECT/$API_DEPLOYMENT:latest"
-    docker push "$REGISTRY/$PROJECT/$API_DEPLOYMENT:latest"
+    echo -e "${YELLOW}Building and pushing API...${NC}"
+    docker buildx build \
+        --platform linux/amd64 \
+        --provenance=false \
+        --output type=registry,oci-mediatypes=false \
+        -t "$REGISTRY/$PROJECT/$API_DEPLOYMENT:latest" \
+        -f "$DEMO_DIR/api/Dockerfile" \
+        "$REPO_ROOT"
 
     rollout_deployment "$API_DEPLOYMENT"
 

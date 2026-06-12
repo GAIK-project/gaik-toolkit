@@ -16,11 +16,21 @@ __pycache__/
 
 # Documentation & examples (not needed in production)
 docs/
-implementation_layer/toolkit_demo_app/
 examples/
 website/
 *.md
+!README.md
 !implementation_layer/api/README.md
+
+# Node/build outputs when a sub-application is built from the repository root
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+**/out/
+.pnpm-store/
+**/.pnpm-store/
 
 # Build artifacts
 build/

@@ -4,7 +4,8 @@ python-multipart>=0.0.21
 python-dotenv>=1.2.1
 fpdf2>=2.8.5
 openpyxl>=3.1.0
-gaik[all-cpu,multimodal-parser,postgres-agent]>=0.5.14
+# gaik is installed from the repository source in api/Dockerfile. Do not install
+# the published wheel here: it can lag local demo modules such as Report Writer.
 # Solution Wizard (routers/solution_wizard.py): Claude Agent SDK session per user.
 # Also requires CLAUDE_CODE_USE_FOUNDRY, ANTHROPIC_FOUNDRY_API_KEY and
 # ANTHROPIC_FOUNDRY_RESOURCE in .env.local (or the deployment secret).

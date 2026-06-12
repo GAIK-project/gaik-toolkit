@@ -1,6 +1,6 @@
 # GAIK Demo API - Lightweight Production Dockerfile
 # Optimized for CSC Rahti 2 (no GPU/torch)
-# Build context: toolkit_demo_app/ (not api/)
+# Build context: repository root
 
 FROM python:3.12-slim
 
@@ -22,22 +22,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 # Copy requirements first (layer caching)
-COPY api/requirements.txt .
+COPY implementation_layer/toolkit_demo_app/api/requirements.txt .
 
 # Install PyTorch CPU-only first (prevents CUDA download ~2GB)
 RUN uv pip install --system --no-cache \
     --extra-index-url https://download.pytorch.org/whl/cpu \
     torch torchvision
 
-# Install dependencies (gaik[rag-workflow] included in requirements.txt)
+# Install API dependencies. The local gaik package is installed from repository
+# source below because the published PyPI wheel may lag new demo modules.
 RUN uv pip install --system --no-cache -r requirements.txt
 
+# Install gaik from this repository, including the Report Writer extras.
+COPY pyproject.toml README.md LICENSE ./
+COPY implementation_layer/src ./implementation_layer/src
+RUN uv pip install --system --no-cache \
+    ".[all-cpu,multimodal-parser,postgres-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]"
+
 # Copy API application code
-COPY api/ .
+COPY implementation_layer/toolkit_demo_app/api/ .
 
 # Copy example files for RAG demo
-COPY public/GAIK_Test_Document_Demo.pdf ./public/
-COPY public/example-index.json ./public/
+COPY implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf ./public/
+COPY implementation_layer/toolkit_demo_app/public/example-index.json ./public/
 
 # OpenShift arbitrary UID support
 # CSC Rahti 2 assigns random UIDs but always GID=0 (root group)
