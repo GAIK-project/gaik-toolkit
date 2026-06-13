@@ -73,10 +73,20 @@ deploy gotchas so they aren't re-discovered.
   ravelast-wizard-test/FINDINGS.md`) found 4 open gaik bugs — nested/composite schema
   codegen + runtime crashes, and registry parser-name drift vs the gaik API. A flat
   schema (as in this session's medical-dictation run) does not trigger them. **Run
-  `gaik-sync`** for the parser-name drift, then a separate fix round for the codegen.
-- ESLint can't run standalone locally (eslint 10 vs `eslint-config-next` peer mismatch),
-  but `next build` does not run ESLint, so builds/deploys are unaffected. Cosmetic;
-  align the versions in a separate dependency pass if desired.
+  `gaik-sync`** to reconcile: the non-mutating audit
+  (`python .claude/skills/gaik-sync/scripts/audit_registry.py`) reports 19 findings —
+  notably the registry's `MultiSourceReportGenerator` lists 8 options (`agentic`,
+  `output_docx`, `report_language`, `curate_evidence`, …) that aren't real constructor
+  params (actual: `api_config`, `use_azure`), plus option drift on TranscriptEnhancer /
+  DocumentsToStructuredData / ParallelTranscriber and an untracked
+  `gaik.software_components.llm` family. Then a separate fix round for the composite
+  schema codegen.
+- ESLint **now runs**: `eslint.config.mjs` uses eslint-config-next's native flat config
+  and eslint is pinned to 9 (eslint 10 isn't supported by the Next 16 eslint stack yet).
+  `bun run lint` surfaces ~36 pre-existing `react-hooks` issues in shadcn-generated
+  `components/ui/*` + `hooks/*` (e.g. `Math.random` in render, setState-in-effect) — not
+  from this work; clean up separately. The wizard files changed this session lint clean.
+  `next build` still does not run ESLint, so builds/deploys are unaffected either way.
 
 ## Next steps (optional)
 

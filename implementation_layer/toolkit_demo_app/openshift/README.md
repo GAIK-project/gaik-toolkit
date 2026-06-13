@@ -39,10 +39,12 @@ oc apply -f route.yaml
 
 ## Build & Push Images
 
-Use `deploy.sh` — it builds with a `docker-container` buildx builder and pushes
-single-arch Docker schema2 manifests (Rahti's registry rejects Docker 29's
-default OCI/manifest-list output). The API image builds from the **repository
-root** (it installs gaik from source and bundles the Solution Wizard assets):
+Use `deploy.sh` — **both** the API and frontend build with a `docker-container`
+buildx builder and push single-arch Docker schema2 manifests (Rahti's registry
+rejects Docker 29's default OCI/manifest-list output). The API image builds from
+the **repository root** so it can bundle the Solution Wizard assets
+(`implementation_layer/solution_wizard`); gaik itself comes from the published
+PyPI wheel pinned in `api/requirements.txt`:
 
 ```bash
 cd implementation_layer/toolkit_demo_app/openshift
