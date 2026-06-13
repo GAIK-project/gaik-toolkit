@@ -118,7 +118,11 @@ export default function SolutionWizardPage() {
    *  `gen` is the generation id at call time; if genRef.current has moved on
    *  (Restart was clicked) all state mutations become no-ops. */
   const consumeTurn = useCallback(
-    async (response: Response, gen: number) => {
+    async (
+      response: Response,
+      gen: number,
+      opts: { suppressReasoning?: boolean } = {},
+    ) => {
       streamRef.current = "";
       thinkingRef.current = "";
       setStreamingText("");
@@ -141,6 +145,10 @@ export default function SolutionWizardPage() {
             setStreamingText(streamRef.current);
             setActivity("");
           } else if (event.type === "thinking_delta") {
+            // The startup turn's "thinking" is internal bootstrap (the agent
+            // loading SKILL.md and reacting to the /solution-wizard prompt) —
+            // never surface it. Real conversation turns keep their reasoning.
+            if (opts.suppressReasoning) return;
             thinkingRef.current += (event.data.text as string) ?? "";
             setThinkingText(thinkingRef.current);
           } else if (event.type === "tool_use") {
@@ -203,7 +211,7 @@ export default function SolutionWizardPage() {
         toast.error(`Could not start the wizard: ${detail}`, { duration: 10000 });
         return;
       }
-      await consumeTurn(res, gen);
+      await consumeTurn(res, gen, { suppressReasoning: true });
     } catch (err) {
       if (genRef.current === gen)
         toast.error(err instanceof Error ? err.message : "Failed to start session");
