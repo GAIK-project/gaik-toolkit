@@ -1,16 +1,11 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+// Flat config for ESLint 9 + Next.js 16. eslint-config-next ships a native flat
+// config array (its "." export), so we spread it directly instead of bridging
+// the legacy eslintrc presets through FlatCompat — the compat path crashes on a
+// circular-JSON validation bug with the bundled react plugin.
+import next from "eslint-config-next";
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...next,
   {
     ignores: [
       "node_modules/**",

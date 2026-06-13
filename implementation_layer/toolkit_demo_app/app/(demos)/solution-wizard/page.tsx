@@ -96,6 +96,24 @@ export default function SolutionWizardPage() {
     }
   }, []);
 
+  // Finalize the live turn into a history message and clear the live buffers.
+  // Appends only when there is assistant text; the buffers are always reset so
+  // the next turn starts clean. (Activity is cleared by the callers.)
+  const finalizeAssistantMessage = useCallback(() => {
+    const text = streamRef.current.trim();
+    const reasoning = thinkingRef.current.trim();
+    if (text) {
+      setMessages((prev) => [
+        ...prev,
+        { id: nextId(), role: "assistant", content: text, reasoning: reasoning || undefined },
+      ]);
+    }
+    streamRef.current = "";
+    thinkingRef.current = "";
+    setStreamingText("");
+    setThinkingText("");
+  }, []);
+
   /** Consume one SSE turn: append deltas, show tool activity, finalize on done.
    *  `gen` is the generation id at call time; if genRef.current has moved on
    *  (Restart was clicked) all state mutations become no-ops. */
@@ -138,52 +156,20 @@ export default function SolutionWizardPage() {
               void refreshFiles(sessionRef.current);
             }
           } else if (event.type === "done") {
-            const text = streamRef.current.trim();
-            const reasoning = thinkingRef.current.trim();
-            if (text) {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: nextId(),
-                  role: "assistant",
-                  content: text,
-                  reasoning: reasoning || undefined,
-                },
-              ]);
-            }
-            streamRef.current = "";
-            thinkingRef.current = "";
-            setStreamingText("");
-            setThinkingText("");
+            finalizeAssistantMessage();
             setActivity("");
           }
         },
       });
 
       if (genRef.current !== gen) return; // stale after stream closed
-      // Flush partial text if stream closed without an explicit done.
-      if (streamRef.current.trim()) {
-        const text = streamRef.current.trim();
-        const reasoning = thinkingRef.current.trim();
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: nextId(),
-            role: "assistant",
-            content: text,
-            reasoning: reasoning || undefined,
-          },
-        ]);
-        streamRef.current = "";
-        thinkingRef.current = "";
-        setStreamingText("");
-        setThinkingText("");
-      }
+      // Flush partial text if the stream closed without an explicit done.
+      finalizeAssistantMessage();
       setActivity("");
       const sid = sessionRef.current;
       if (sid) void refreshFiles(sid);
     },
-    [refreshFiles],
+    [finalizeAssistantMessage, refreshFiles],
   );
 
   const startSession = useCallback(async () => {

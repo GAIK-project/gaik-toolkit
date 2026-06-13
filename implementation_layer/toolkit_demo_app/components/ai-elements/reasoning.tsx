@@ -28,14 +28,10 @@ interface ReasoningProps {
  * collapsed; click to re-read the chain of thought.
  */
 export function Reasoning({ children, isStreaming, className }: ReasoningProps) {
-  const [open, setOpen] = useState(Boolean(isStreaming));
-  const [userToggled, setUserToggled] = useState(false);
+  // null → follow the stream (open while thinking); true/false → user override.
+  const [userOpen, setUserOpen] = useState<boolean | null>(null);
+  const open = userOpen ?? Boolean(isStreaming);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Follow the stream (open while thinking) unless the user took manual control.
-  useEffect(() => {
-    if (!userToggled) setOpen(Boolean(isStreaming));
-  }, [isStreaming, userToggled]);
 
   // Keep the newest thinking in view while it streams into the capped box.
   useEffect(() => {
@@ -49,10 +45,7 @@ export function Reasoning({ children, isStreaming, className }: ReasoningProps) 
   return (
     <Collapsible
       open={open}
-      onOpenChange={(next) => {
-        setUserToggled(true);
-        setOpen(next);
-      }}
+      onOpenChange={setUserOpen}
       className={cn("not-prose text-muted-foreground mb-2 text-xs", className)}
     >
       <CollapsibleTrigger className="hover:text-foreground flex items-center gap-1.5 transition-colors">
