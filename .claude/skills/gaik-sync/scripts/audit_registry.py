@@ -27,7 +27,6 @@ import argparse
 import contextlib
 import importlib
 import inspect
-import io
 import json
 import os
 import pkgutil
@@ -47,6 +46,7 @@ def _quiet():
 # ---------------------------------------------------------------------------
 # Locate the Solution Wizard package (co-located registries live next to it)
 # ---------------------------------------------------------------------------
+
 
 def _find_wizard_dir() -> Path:
     """Walk upward from this script until we find the solution_wizard package."""
@@ -83,6 +83,7 @@ _SKIP_METHODS = {"load_schema", "save", "save_schema", "get", "model_dump"}
 # ---------------------------------------------------------------------------
 # Introspection helpers
 # ---------------------------------------------------------------------------
+
 
 def _import_primary_class(import_line: str):
     """Import a card's `import` line and return the first callable class, or None."""
@@ -176,10 +177,12 @@ def _call_method(call_line: str) -> str | None:
 def _installed_version() -> str:
     try:
         from importlib.metadata import version
+
         return version("gaik")
     except Exception:
         try:
             import gaik
+
             return getattr(gaik, "__version__", "unknown")
         except Exception:
             return "unknown"
@@ -225,6 +228,7 @@ def _gaik_subpackages() -> dict[str, str]:
 # Audit checks (each returns a list of finding dicts)
 # ---------------------------------------------------------------------------
 
+
 def _finding(category: str, component: str, detail: str, file_hint: str) -> dict:
     return {"category": category, "component": component, "detail": detail, "file_hint": file_hint}
 
@@ -243,10 +247,14 @@ def check_removed(cards) -> list[dict]:
     for name in cards.names():
         card = cards.get(name)
         if _import_primary_class(card["import"]) is None:
-            out.append(_finding(
-                "removed", name,
-                f"import does not resolve: {card['import']}", CARDS_FILE,
-            ))
+            out.append(
+                _finding(
+                    "removed",
+                    name,
+                    f"import does not resolve: {card['import']}",
+                    CARDS_FILE,
+                )
+            )
     return out
 
 
@@ -264,20 +272,26 @@ def check_api_drift(cards) -> list[dict]:
         if cls_name and "\n" not in construct:
             for kw in _top_level_kwargs(construct, cls_name):
                 if kw not in params:
-                    out.append(_finding(
-                        "api_drift", name,
-                        f"construct kwarg '{kw}' not in {cls.__name__}.__init__ "
-                        f"(actual: {sorted(params)})",
-                        CARDS_FILE,
-                    ))
+                    out.append(
+                        _finding(
+                            "api_drift",
+                            name,
+                            f"construct kwarg '{kw}' not in {cls.__name__}.__init__ "
+                            f"(actual: {sorted(params)})",
+                            CARDS_FILE,
+                        )
+                    )
 
         method = _call_method(card.get("call", ""))
         if method and method not in _SKIP_METHODS and not hasattr(cls, method):
-            out.append(_finding(
-                "api_drift", name,
-                f"call method '{method}' not found on {cls.__name__}",
-                CARDS_FILE,
-            ))
+            out.append(
+                _finding(
+                    "api_drift",
+                    name,
+                    f"call method '{method}' not found on {cls.__name__}",
+                    CARDS_FILE,
+                )
+            )
     return out
 
 
@@ -324,6 +338,7 @@ def _config_fields(card) -> set[str]:
         out |= _constructor_params(cfg)
         with contextlib.suppress(Exception):
             import dataclasses
+
             if dataclasses.is_dataclass(cfg):
                 out |= {f.name for f in dataclasses.fields(cfg)}
     return out
@@ -357,13 +372,16 @@ def check_options(cards) -> list[dict]:
         for opt in opts:
             opt_name = opt.get("name", "")
             if opt_name and opt_name not in params:
-                out.append(_finding(
-                    "options", name,
-                    f"option '{opt_name}' is not a constructor, primary-method, "
-                    f"or nested-config parameter of {cls.__name__} "
-                    f"(accepted: {sorted(params)})",
-                    CARDS_FILE,
-                ))
+                out.append(
+                    _finding(
+                        "options",
+                        name,
+                        f"option '{opt_name}' is not a constructor, primary-method, "
+                        f"or nested-config parameter of {cls.__name__} "
+                        f"(accepted: {sorted(params)})",
+                        CARDS_FILE,
+                    )
+                )
     return out
 
 
@@ -379,12 +397,15 @@ def check_new(reg, cards) -> list[dict]:
     for sub_path in sorted(_gaik_subpackages()):
         if any(ref == sub_path or ref.startswith(sub_path + ".") for ref in referenced):
             continue
-        out.append(_finding(
-            "new", sub_path.rsplit(".", 1)[-1],
-            f"gaik subpackage '{sub_path}' is not referenced by any reference card "
-            f"(new component family, or an internal helper to ignore)",
-            REGISTRY_FILE,
-        ))
+        out.append(
+            _finding(
+                "new",
+                sub_path.rsplit(".", 1)[-1],
+                f"gaik subpackage '{sub_path}' is not referenced by any reference card "
+                f"(new component family, or an internal helper to ignore)",
+                REGISTRY_FILE,
+            )
+        )
     return out
 
 
@@ -392,24 +413,31 @@ def check_version() -> list[dict]:
     installed = _installed_version()
     pinned = _pinned_version()
     if not pinned:
-        return [_finding(
-            "version", "gaik",
-            f"no validated-version pin found; installed gaik is {installed}. "
-            f"Create {PIN_FILE.name} once the registry is verified.",
-            PIN_FILE.name,
-        )]
+        return [
+            _finding(
+                "version",
+                "gaik",
+                f"no validated-version pin found; installed gaik is {installed}. "
+                f"Create {PIN_FILE.name} once the registry is verified.",
+                PIN_FILE.name,
+            )
+        ]
     if installed != pinned:
-        return [_finding(
-            "version", "gaik",
-            f"installed gaik {installed} != last-validated {pinned}",
-            PIN_FILE.name,
-        )]
+        return [
+            _finding(
+                "version",
+                "gaik",
+                f"installed gaik {installed} != last-validated {pinned}",
+                PIN_FILE.name,
+            )
+        ]
     return []
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def run_audit() -> dict:
     reg = get_registry()
