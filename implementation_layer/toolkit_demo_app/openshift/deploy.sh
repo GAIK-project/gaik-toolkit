@@ -132,15 +132,23 @@ deploy_api() {
 }
 
 deploy_frontend() {
-    echo -e "${YELLOW}Building frontend...${NC}"
-    cd "$DEMO_DIR"
-    docker build -t gaik-demo .
-
     ensure_registry_login
+    ensure_buildx_builder
 
-    echo -e "${YELLOW}Tagging and pushing frontend...${NC}"
-    docker tag gaik-demo "$REGISTRY/$PROJECT/$FRONTEND_DEPLOYMENT:latest"
-    docker push "$REGISTRY/$PROJECT/$FRONTEND_DEPLOYMENT:latest"
+    # Build + push single-arch Docker schema2 straight to the registry, same as
+    # the API. Plain `docker build` + `docker push` breaks here: with the
+    # docker-container buildx builder selected, the image never lands in the
+    # local image store, so the follow-up tag/push has nothing to push. Building
+    # with --output type=registry sidesteps that and avoids Rahti's rejection of
+    # Docker 29's default OCI manifest output.
+    echo -e "${YELLOW}Building and pushing frontend...${NC}"
+    docker buildx build \
+        --platform linux/amd64 \
+        --provenance=false \
+        --output type=registry,oci-mediatypes=false \
+        -t "$REGISTRY/$PROJECT/$FRONTEND_DEPLOYMENT:latest" \
+        -f "$DEMO_DIR/Dockerfile" \
+        "$DEMO_DIR"
 
     rollout_deployment "$FRONTEND_DEPLOYMENT"
 

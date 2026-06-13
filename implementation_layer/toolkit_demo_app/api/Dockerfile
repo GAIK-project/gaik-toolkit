@@ -31,15 +31,11 @@ RUN uv pip install --system --no-cache \
     --extra-index-url https://download.pytorch.org/whl/cpu \
     torch torchvision
 
-# Install API dependencies. The local gaik package is installed from repository
-# source below because the published PyPI wheel may lag new demo modules.
+# Install API dependencies, including gaik. gaik is pinned to a published PyPI
+# release in requirements.txt (no longer built from repository source). torch CPU
+# is pre-installed above so the gaik[all-cpu] extra resolves against it instead of
+# pulling the ~2GB CUDA build.
 RUN uv pip install --system --no-cache -r requirements.txt
-
-# Install gaik from this repository, including the Report Writer extras.
-COPY pyproject.toml README.md LICENSE ./
-COPY implementation_layer/src ./implementation_layer/src
-RUN uv pip install --system --no-cache \
-    ".[all-cpu,multimodal-parser,postgres-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]"
 
 # Solution Wizard assets (SKILL.md, scripts, registries, templates). The wizard
 # session runs the bundled claude CLI (shipped inside the claude-agent-sdk

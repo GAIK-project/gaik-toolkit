@@ -67,3 +67,9 @@ implementation_layer/src/gaik/_version.py
 # Benchmark / demo run output at repo root (committed snapshots live next
 # to their example scripts, e.g. examples/.../judgebench-comparison/)
 /results/
+
+# Playwright / browser-MCP evidence artifacts (screenshots, SSE/network dumps)
+.playwright-mcp/
+
+# Local installers pulled for Windows testing (e.g. pandoc msi) — never commit
+*.msi
