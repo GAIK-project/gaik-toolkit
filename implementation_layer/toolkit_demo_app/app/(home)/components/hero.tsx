@@ -19,7 +19,7 @@ export function Hero() {
             GAIK Toolkit Demos
           </h1>
           <p className="text-muted-foreground max-w-2xl text-lg">
-            Interactive demos of GAIK toolkit's software components, software
+            Interactive demos of GAIK toolkit&apos;s software components, software
             modules, and general use cases.
           </p>
         </div>
@@ -45,7 +45,7 @@ export function Hero() {
           </Button>
         </div>
 
-        {/* Solution Configuration Wizard — coming soon (gated, not public yet) */}
+        {/* Solution Configuration Wizard — beta (built, gated behind ?key= access) */}
         <div className="flex w-fit max-w-full items-center gap-3 rounded-full border border-teal-200/80 bg-teal-50/60 py-2 pr-4 pl-2.5">
           <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-teal-600/10">
             <Wand2 className="size-3.5 text-teal-700" />
@@ -59,8 +59,8 @@ export function Hero() {
               turns a plain-language use case into a validated proof of concept.
             </span>
           </p>
-          <span className="shrink-0 rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600 uppercase">
-            Coming soon
+          <span className="shrink-0 rounded-full bg-teal-600/15 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-teal-800 uppercase">
+            Beta
           </span>
         </div>
       </div>
