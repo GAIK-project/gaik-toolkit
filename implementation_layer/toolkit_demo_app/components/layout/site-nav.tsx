@@ -82,6 +82,12 @@ const navGroups: NavGroup[] = [
     label: "Use Cases",
     icon: Lightbulb,
     items: [
+      {
+        label: "Solution Wizard",
+        href: "/solution-wizard",
+        icon: Wand2,
+        comingSoon: true,
+      },
       { label: "Incident Report", href: "/incident-report", icon: ShieldAlert },
       { label: "Construction Diary", href: "/diary", icon: HardHat },
       {
@@ -328,6 +334,7 @@ function MobileNav({ isActive, githubPreview, isLoggedIn }: MobileNavProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time SSR mount flag, not a cascade
     setMounted(true);
   }, []);
 
@@ -446,6 +453,7 @@ export function SiteNav({
   // the server and client both render the plain <a> fallback on first render.
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time SSR mount flag, not a cascade
     setMounted(true);
   }, []);
 

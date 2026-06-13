@@ -363,17 +363,14 @@ export default function SolutionWizardPage() {
                 !activity &&
                 streamingText.length === 0 &&
                 thinkingText.length === 0 && (
-                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
-                    <Loader2 className="text-primary h-4 w-4 animate-spin" />
-                    <Shimmer
-                      color="var(--color-primary)"
-                      shimmerColor="var(--color-primary-foreground)"
-                      spread={4}
-                      className="text-sm"
-                    >
-                      Thinking…
-                    </Shimmer>
-                  </div>
+                  <Shimmer
+                    color="var(--color-primary)"
+                    shimmerColor="var(--color-primary-foreground)"
+                    spread={4}
+                    className="text-muted-foreground text-sm"
+                  >
+                    Thinking…
+                  </Shimmer>
                 )}
             </ConversationContent>
             <ConversationScrollButton />
