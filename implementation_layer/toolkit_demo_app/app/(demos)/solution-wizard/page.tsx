@@ -32,6 +32,8 @@ interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** Extended-thinking trace captured for this turn (assistant only). */
+  reasoning?: string;
 }
 
 let messageCounter = 0;
@@ -137,14 +139,22 @@ export default function SolutionWizardPage() {
             }
           } else if (event.type === "done") {
             const text = streamRef.current.trim();
+            const reasoning = thinkingRef.current.trim();
             if (text) {
               setMessages((prev) => [
                 ...prev,
-                { id: nextId(), role: "assistant", content: text },
+                {
+                  id: nextId(),
+                  role: "assistant",
+                  content: text,
+                  reasoning: reasoning || undefined,
+                },
               ]);
             }
             streamRef.current = "";
+            thinkingRef.current = "";
             setStreamingText("");
+            setThinkingText("");
             setActivity("");
           }
         },
@@ -154,12 +164,20 @@ export default function SolutionWizardPage() {
       // Flush partial text if stream closed without an explicit done.
       if (streamRef.current.trim()) {
         const text = streamRef.current.trim();
+        const reasoning = thinkingRef.current.trim();
         setMessages((prev) => [
           ...prev,
-          { id: nextId(), role: "assistant", content: text },
+          {
+            id: nextId(),
+            role: "assistant",
+            content: text,
+            reasoning: reasoning || undefined,
+          },
         ]);
         streamRef.current = "";
+        thinkingRef.current = "";
         setStreamingText("");
+        setThinkingText("");
       }
       setActivity("");
       const sid = sessionRef.current;
@@ -272,9 +290,8 @@ export default function SolutionWizardPage() {
             Solution Configuration Wizard
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Describe your use case in plain language. The wizard collects
-            requirements, selects GAIK components, and generates a validated
-            blueprint, workflow diagrams, and documentation — streamed live.
+            From a plain-language use case to a validated blueprint, workflow
+            diagrams, docs, and a runnable PoC — streamed live.
           </p>
         </div>
         <Button
@@ -324,18 +341,19 @@ export default function SolutionWizardPage() {
               {messages.map((message) => (
                 <Message key={message.id} from={message.role}>
                   <MessageContent>
+                    {message.role === "assistant" && message.reasoning && (
+                      <Reasoning>{message.reasoning}</Reasoning>
+                    )}
                     <MessageResponse>{message.content}</MessageResponse>
                   </MessageContent>
                 </Message>
               ))}
 
-              {/* Extended-thinking trace (collapsible, opt-in to read) */}
+              {/* Live extended-thinking trace: open for the whole turn (so a long
+                  wait shows progress) and capped + scrollable so it never shoves
+                  the chat around. Finalized into the message on done. */}
               {thinkingText.length > 0 && (
-                <Reasoning
-                  isStreaming={busy && streamingText.length === 0}
-                >
-                  {thinkingText}
-                </Reasoning>
+                <Reasoning isStreaming={busy}>{thinkingText}</Reasoning>
               )}
 
               {/* Live streaming assistant message */}
@@ -355,18 +373,22 @@ export default function SolutionWizardPage() {
                   <span>{activity}</span>
                 </div>
               )}
-              {busy && !activity && streamingText.length === 0 && (
-                <div className="bg-muted w-fit rounded-2xl px-4 py-3">
-                  <Shimmer
-                    color="var(--color-primary)"
-                    shimmerColor="var(--color-primary-foreground)"
-                    spread={4}
-                    className="text-sm"
-                  >
-                    Thinking…
-                  </Shimmer>
-                </div>
-              )}
+              {busy &&
+                !activity &&
+                streamingText.length === 0 &&
+                thinkingText.length === 0 && (
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Loader2 className="text-primary h-4 w-4 animate-spin" />
+                    <Shimmer
+                      color="var(--color-primary)"
+                      shimmerColor="var(--color-primary-foreground)"
+                      spread={4}
+                      className="text-sm"
+                    >
+                      Thinking…
+                    </Shimmer>
+                  </div>
+                )}
             </ConversationContent>
             <ConversationScrollButton />
           </Conversation>
@@ -379,6 +401,7 @@ export default function SolutionWizardPage() {
           >
             <PromptInputBody>
               <PromptInputTextarea
+                className="min-h-11"
                 placeholder={
                   sessionId
                     ? "Reply to the wizard…"
