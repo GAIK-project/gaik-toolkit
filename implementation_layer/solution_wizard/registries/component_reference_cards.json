@@ -276,7 +276,7 @@
         "infer_from": "output_types: subtitles/captions -> srt or vtt; plain transcript -> text"
       },
       {
-        "name": "transcription_model",
+        "name": "model",
         "type": "str",
         "default": "whisper",
         "effect": "whisper (faster) or gpt-4o-transcribe / diarize backend.",

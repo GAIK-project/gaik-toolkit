@@ -281,6 +281,68 @@ def check_api_drift(cards) -> list[dict]:
     return out
 
 
+_CONFIG_NAME_RE = re.compile(r"\b([A-Z]\w*(?:Config|Options|Settings|Params))\s*\(")
+
+
+def _import_named_class(import_line: str, target: str):
+    """Import the module of a card's `import` line and return class `target`."""
+    m = re.search(r"from\s+(gaik[\w\.]*)\s+import\s+", import_line)
+    if not m:
+        return None
+    try:
+        with _quiet():
+            mod = importlib.import_module(m.group(1))
+    except Exception:
+        return None
+    obj = getattr(mod, target, None)
+    return obj if isinstance(obj, type) else None
+
+
+def _method_params(cls, method_name: str | None) -> set[str]:
+    fn = getattr(cls, method_name, None) if method_name else None
+    if fn is None:
+        return set()
+    try:
+        return set(inspect.signature(fn).parameters) - {"self"}
+    except (ValueError, TypeError):
+        return set()
+
+
+def _config_fields(card) -> set[str]:
+    """Constructor params / dataclass fields of any *Config(...) the card builds.
+
+    Components like ParallelTranscriber take their behaviour flags via a nested
+    config object (``config=TranscriptionConfig(response_format=...)``), so those
+    flags are legitimate options even though they live on the config, not the
+    component constructor.
+    """
+    out: set[str] = set()
+    for m in _CONFIG_NAME_RE.finditer(card.get("construct", "")):
+        cfg = _import_named_class(card.get("import", ""), m.group(1))
+        if cfg is None:
+            continue
+        out |= _constructor_params(cfg)
+        with contextlib.suppress(Exception):
+            import dataclasses
+            if dataclasses.is_dataclass(cfg):
+                out |= {f.name for f in dataclasses.fields(cfg)}
+    return out
+
+
+def _accepted_option_params(cls, card) -> set[str]:
+    """Where a behaviour-changing option may legitimately live: the constructor,
+    the primary method (run/enhance_text/transcribe/...), or a nested config the
+    construct line builds. Options are inference hints for the wizard, not a
+    constructor-only contract — an option that maps to a real method/config
+    argument is correct, not drift.
+    """
+    return (
+        _constructor_params(cls)
+        | _method_params(cls, _call_method(card.get("call", "")))
+        | _config_fields(card)
+    )
+
+
 def check_options(cards) -> list[dict]:
     out = []
     for name in cards.names():
@@ -291,14 +353,15 @@ def check_options(cards) -> list[dict]:
         cls = _import_primary_class(card["import"])
         if cls is None:
             continue
-        params = _constructor_params(cls)
+        params = _accepted_option_params(cls, card)
         for opt in opts:
             opt_name = opt.get("name", "")
             if opt_name and opt_name not in params:
                 out.append(_finding(
                     "options", name,
-                    f"option '{opt_name}' is not a constructor param of "
-                    f"{cls.__name__} (actual: {sorted(params)})",
+                    f"option '{opt_name}' is not a constructor, primary-method, "
+                    f"or nested-config parameter of {cls.__name__} "
+                    f"(accepted: {sorted(params)})",
                     CARDS_FILE,
                 ))
     return out
