@@ -330,9 +330,15 @@ interface MobileNavProps {
   isActive: (href: string) => boolean;
   githubPreview?: LinkPreview | null;
   isLoggedIn?: boolean;
+  hasWizardAccess?: boolean;
 }
 
-function MobileNav({ isActive, githubPreview, isLoggedIn }: MobileNavProps) {
+function MobileNav({
+  isActive,
+  githubPreview,
+  isLoggedIn,
+  hasWizardAccess,
+}: MobileNavProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -368,8 +374,24 @@ function MobileNav({ isActive, githubPreview, isLoggedIn }: MobileNavProps) {
               </div>
               <div className="flex flex-col gap-0.5 pl-2">
                 {group.items.map((item) => {
-                  // Beta items: built but gated — a locked "Beta" row.
+                  // Beta items: clickable for beta-access holders, otherwise a
+                  // locked "Beta" row.
                   if (item.beta) {
+                    if (hasWizardAccess) {
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition"
+                        >
+                          <item.icon className="h-5 w-5" />
+                          {item.label}
+                          <span className="bg-primary/10 text-primary ml-auto rounded px-1.5 py-0.5 text-[10px]">
+                            Beta
+                          </span>
+                        </Link>
+                      );
+                    }
                     return (
                       <div
                         key={item.label}
@@ -455,12 +477,15 @@ export interface SiteNavProps {
   pathname: string;
   githubPreview?: LinkPreview | null;
   isLoggedIn?: boolean;
+  /** True when the visitor already holds wizard_access (beta) — server-read. */
+  hasWizardAccess?: boolean;
 }
 
 export function SiteNav({
   pathname: initialPathname,
   githubPreview,
   isLoggedIn,
+  hasWizardAccess,
 }: SiteNavProps) {
   // Use client pathname when available, fall back to server pathname for SSR
   const clientPathname = usePathname();
@@ -539,9 +564,37 @@ export function SiteNav({
                             const active = isActive(item.href);
 
                             // Beta items: built but gated behind beta access
-                            // (the Solution Wizard `?key=`) — a locked "Beta"
-                            // tile that signals it's real but not yet public.
+                            // (the Solution Wizard `?key=`). Clickable for
+                            // visitors who already hold the wizard_access cookie;
+                            // a locked "Beta" tile for everyone else.
                             if (item.beta) {
+                              if (hasWizardAccess) {
+                                return (
+                                  <li key={item.label}>
+                                    <NavigationMenuLink asChild>
+                                      <Link
+                                        href={item.href}
+                                        className={cn(
+                                          "hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full space-y-1 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none",
+                                          active && "bg-primary/10 text-primary",
+                                        )}
+                                      >
+                                        <div className="flex items-center gap-2 text-sm leading-none font-medium">
+                                          <ItemIcon className="h-4 w-4" />
+                                          {item.label}
+                                          <span className="bg-primary/10 text-primary ml-auto rounded px-1.5 py-0.5 text-[10px] font-normal">
+                                            Beta
+                                          </span>
+                                        </div>
+                                        <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
+                                          Configure a solution from a
+                                          plain-language use case.
+                                        </p>
+                                      </Link>
+                                    </NavigationMenuLink>
+                                  </li>
+                                );
+                              }
                               return (
                                 <li key={item.label}>
                                   <div className="block h-full cursor-not-allowed space-y-1 rounded-md p-3 leading-none opacity-60">
@@ -655,6 +708,7 @@ export function SiteNav({
             isActive={isActive}
             githubPreview={githubPreview}
             isLoggedIn={isLoggedIn}
+            hasWizardAccess={hasWizardAccess}
           />
         </div>
       </div>
