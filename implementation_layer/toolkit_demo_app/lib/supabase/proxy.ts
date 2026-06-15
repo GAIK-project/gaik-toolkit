@@ -1,14 +1,28 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Protected demo routes that require approved access
+// All demo routes require login + approval. The Solution Wizard is intentionally
+// NOT here — it has its own finer gate in proxy.ts (login + wizard_access / team
+// key), which also admits still-pending users who hold a grant.
+// IMPORTANT: when adding a new page under app/(demos)/, add its route here.
 const PROTECTED_ROUTES = [
+  "/audio-structured",
   "/classifier",
+  "/dental-transcription",
+  "/diary",
+  "/document-structured",
   "/extractor",
   "/incident-report",
+  "/llm-judge",
+  "/luvata-order",
   "/parser",
+  "/postgres-agent",
   "/rag",
+  "/report-writer",
+  "/text-to-speech",
   "/transcriber",
+  "/video-search",
+  "/vision-extractor",
 ];
 
 // Default route for authenticated users
@@ -31,25 +45,27 @@ function isAuthRoute(pathname: string): boolean {
   );
 }
 
-export interface WizardAccessState {
+export interface AccessState {
   loggedIn: boolean;
+  approved: boolean;
   wizardAccess: boolean;
 }
 
 /**
- * Read the requesting user's Solution Wizard beta access — the per-user
- * `wizard_access` flag on their `access_requests` row. Used by the proxy's
- * wizard gate for registered beta testers. Independent of the team `?key=`
- * shortcut and of the general `approved` status. `BYPASS_AUTH` opens it in dev.
+ * Read the requesting user's access state in one shot: logged in, approved
+ * (general `status`), and Solution Wizard beta grant (`wizard_access`). Used by
+ * the proxy's API auth gate and the wizard gate. Independent of the team `?key=`
+ * shortcut. `BYPASS_AUTH` opens everything in dev.
  */
-export async function getWizardAccessState(
+export async function getAccessState(
   request: NextRequest,
-): Promise<WizardAccessState> {
-  if (BYPASS_AUTH) return { loggedIn: true, wizardAccess: true };
+): Promise<AccessState> {
+  if (BYPASS_AUTH) return { loggedIn: true, approved: true, wizardAccess: true };
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!supabaseUrl || !supabaseKey) return { loggedIn: false, wizardAccess: false };
+  if (!supabaseUrl || !supabaseKey)
+    return { loggedIn: false, approved: false, wizardAccess: false };
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
@@ -65,15 +81,19 @@ export async function getWizardAccessState(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { loggedIn: false, wizardAccess: false };
+  if (!user) return { loggedIn: false, approved: false, wizardAccess: false };
 
   const { data } = await supabase
     .from("access_requests")
-    .select("wizard_access")
+    .select("status, wizard_access")
     .eq("user_id", user.id)
     .single();
 
-  return { loggedIn: true, wizardAccess: data?.wizard_access === true };
+  return {
+    loggedIn: true,
+    approved: data?.status === "approved",
+    wizardAccess: data?.wizard_access === true,
+  };
 }
 
 export async function updateSession(request: NextRequest) {

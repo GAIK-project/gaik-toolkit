@@ -1,5 +1,5 @@
 import { ratelimit } from "@/lib/rate-limit";
-import { getWizardAccessState, updateSession } from "@/lib/supabase/proxy";
+import { getAccessState, updateSession } from "@/lib/supabase/proxy";
 import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
@@ -52,7 +52,7 @@ export default async function proxy(request: NextRequest) {
       // Otherwise allowed via the team key/cookie — fall through.
     } else {
       // No team key: allow registered beta testers (logged-in + wizard_access).
-      const { loggedIn, wizardAccess } = await getWizardAccessState(request);
+      const { loggedIn, wizardAccess } = await getAccessState(request);
       if (!wizardAccess) {
         if (isApi) {
           return NextResponse.json(
@@ -72,7 +72,9 @@ export default async function proxy(request: NextRequest) {
 
   // Proxy API requests to backend (except Next.js API routes)
   const isNextApiRoute =
-    pathname.startsWith("/api/auth") || pathname.startsWith("/api/admin");
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/admin") ||
+    pathname === "/api/report-writer/run"; // owned by its route handler
   if (pathname.startsWith("/api") && !isNextApiRoute) {
     // Rate limit only POST requests (heavy processing endpoints)
     if (ratelimit && request.method === "POST") {
@@ -101,6 +103,24 @@ export default async function proxy(request: NextRequest) {
         console.warn(
           "[rate-limit] Redis unavailable, skipping rate limit:",
           error instanceof Error ? error.message : error,
+        );
+      }
+    }
+
+    // Require login + approval for heavy backend POSTs. (The wizard API is
+    // already gated above, incl. the team-key path, so skip it here.)
+    if (request.method === "POST" && !pathname.startsWith("/api/wizard")) {
+      const { loggedIn, approved } = await getAccessState(request);
+      if (!loggedIn) {
+        return NextResponse.json(
+          { error: "Sign in to use this feature." },
+          { status: 401 },
+        );
+      }
+      if (!approved) {
+        return NextResponse.json(
+          { error: "Your access is pending approval." },
+          { status: 403 },
         );
       }
     }
