@@ -97,3 +97,41 @@ export async function updateAccessStatus(
 
   return { success: true };
 }
+
+const wizardAccessSchema = z.object({
+  userId: z.string().uuid("Invalid user ID."),
+  value: z.boolean(),
+});
+
+/**
+ * Grant or revoke a single user's Solution Wizard beta access (the per-user
+ * `wizard_access` flag). Admin-only; independent of the general approval status.
+ */
+export async function setWizardAccess(
+  userId: string,
+  value: boolean,
+): Promise<AdminResult> {
+  const result = wizardAccessSchema.safeParse({ userId, value });
+  if (!result.success) {
+    return { error: result.error.issues[0].message };
+  }
+
+  const isAuthenticated = await isAdminAuthenticated();
+  if (!isAuthenticated) {
+    return { error: "Unauthorized" };
+  }
+
+  const supabase = createServiceClient();
+
+  const { error } = await supabase
+    .from("access_requests")
+    .update({ wizard_access: result.data.value })
+    .eq("user_id", result.data.userId);
+
+  if (error) {
+    console.error("Failed to update wizard access:", error);
+    return { error: "Failed to update wizard access." };
+  }
+
+  return { success: true };
+}

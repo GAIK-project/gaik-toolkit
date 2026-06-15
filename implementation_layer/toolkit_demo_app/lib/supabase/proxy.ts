@@ -31,6 +31,51 @@ function isAuthRoute(pathname: string): boolean {
   );
 }
 
+export interface WizardAccessState {
+  loggedIn: boolean;
+  wizardAccess: boolean;
+}
+
+/**
+ * Read the requesting user's Solution Wizard beta access — the per-user
+ * `wizard_access` flag on their `access_requests` row. Used by the proxy's
+ * wizard gate for registered beta testers. Independent of the team `?key=`
+ * shortcut and of the general `approved` status. `BYPASS_AUTH` opens it in dev.
+ */
+export async function getWizardAccessState(
+  request: NextRequest,
+): Promise<WizardAccessState> {
+  if (BYPASS_AUTH) return { loggedIn: true, wizardAccess: true };
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  if (!supabaseUrl || !supabaseKey) return { loggedIn: false, wizardAccess: false };
+
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll() {
+        // Read-only: token refresh is handled by updateSession on page routes.
+      },
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { loggedIn: false, wizardAccess: false };
+
+  const { data } = await supabase
+    .from("access_requests")
+    .select("wizard_access")
+    .eq("user_id", user.id)
+    .single();
+
+  return { loggedIn: true, wizardAccess: data?.wizard_access === true };
+}
+
 export async function updateSession(request: NextRequest) {
   const supabaseResponse = NextResponse.next({ request });
   const pathname = request.nextUrl.pathname;

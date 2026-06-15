@@ -1,5 +1,5 @@
 import { ratelimit } from "@/lib/rate-limit";
-import { updateSession } from "@/lib/supabase/proxy";
+import { getWizardAccessState, updateSession } from "@/lib/supabase/proxy";
 import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
@@ -15,42 +15,58 @@ function hasBody(method: string): boolean {
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Solution Wizard is gated behind a shared secret while it is "coming
-  // soon". Default-deny: with no WIZARD_ACCESS_SECRET set, the wizard is
-  // fully closed. Team access: /solution-wizard?key=<secret> sets a cookie.
+  // Solution Wizard access gate. Two independent ways in:
+  //   1. Team shortcut: /solution-wizard?key=<WIZARD_ACCESS_SECRET> sets a
+  //      30-day `wizard_access` cookie (works without login). Unset the secret
+  //      in the environment to disable this path entirely.
+  //   2. Registered beta testers: a logged-in user whose access_requests row
+  //      has wizard_access = true (granted by an admin in /admin).
+  // Dev: BYPASS_AUTH opens the wizard. Default-deny otherwise.
   if (
     pathname.startsWith("/solution-wizard") ||
     pathname.startsWith("/api/wizard")
   ) {
+    const isApi = pathname.startsWith("/api/wizard");
     const secret = process.env.WIZARD_ACCESS_SECRET;
     const cookieKey = request.cookies.get("wizard_access")?.value;
     const queryKey = request.nextUrl.searchParams.get("key");
-    const allowed = !!secret && (cookieKey === secret || queryKey === secret);
+    const teamAllowed =
+      !!secret && (cookieKey === secret || queryKey === secret);
 
-    if (!allowed) {
-      if (pathname.startsWith("/api/wizard")) {
-        return NextResponse.json(
-          { error: "Solution Wizard is not publicly available yet." },
-          { status: 403 },
+    if (teamAllowed) {
+      if (queryKey === secret && cookieKey !== secret) {
+        // First visit with ?key= — set the access cookie and drop the key
+        // from the URL.
+        const cleanUrl = request.nextUrl.clone();
+        cleanUrl.searchParams.delete("key");
+        const response = NextResponse.redirect(cleanUrl);
+        response.cookies.set("wizard_access", secret, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 60 * 60 * 24 * 30, // 30 days
+        });
+        return response;
+      }
+      // Otherwise allowed via the team key/cookie — fall through.
+    } else {
+      // No team key: allow registered beta testers (logged-in + wizard_access).
+      const { loggedIn, wizardAccess } = await getWizardAccessState(request);
+      if (!wizardAccess) {
+        if (isApi) {
+          return NextResponse.json(
+            { error: "Solution Wizard is not available yet." },
+            { status: 403 },
+          );
+        }
+        // Page: send anonymous visitors to sign-in (to register / request
+        // access); send logged-in users without the flag back to the home page.
+        return NextResponse.redirect(
+          new URL(loggedIn ? "/" : "/sign-in", request.url),
         );
       }
-      return NextResponse.redirect(new URL("/", request.url));
-    }
-
-    if (queryKey === secret && cookieKey !== secret) {
-      // First visit with ?key= — set the access cookie and drop the key
-      // from the URL.
-      const cleanUrl = request.nextUrl.clone();
-      cleanUrl.searchParams.delete("key");
-      const response = NextResponse.redirect(cleanUrl);
-      response.cookies.set("wizard_access", secret, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 30, // 30 days
-      });
-      return response;
+      // Otherwise allowed via registered beta access — fall through.
     }
   }
 

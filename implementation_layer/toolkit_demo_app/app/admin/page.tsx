@@ -1,11 +1,12 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { Loader2, Check, X, LogOut } from "lucide-react";
+import { Loader2, Check, X, LogOut, Wand2 } from "lucide-react";
 import {
   verifyAdminPassword,
   adminLogout,
   updateAccessStatus,
+  setWizardAccess,
   type AdminResult,
 } from "./actions";
 
@@ -17,6 +18,7 @@ export type AccessRequest = {
   company: string | null;
   use_case: string | null;
   status: "pending" | "approved" | "rejected";
+  wizard_access: boolean;
   created_at: string;
 };
 
@@ -115,6 +117,58 @@ function StatusBadge({ status }: { status: AccessRequest["status"] }) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
+function WizardAccessButton({
+  request,
+  onUpdate,
+}: {
+  request: AccessRequest;
+  onUpdate: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const granted = request.wizard_access;
+
+  function toggle(): void {
+    setError(null);
+    startTransition(async () => {
+      const result = await setWizardAccess(request.user_id, !granted);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        onUpdate();
+      }
+    });
+  }
+
+  return (
+    <div>
+      <Button
+        size="sm"
+        variant={granted ? "default" : "outline"}
+        onClick={toggle}
+        disabled={isPending}
+        title={
+          granted
+            ? "Revoke Solution Wizard access"
+            : "Grant Solution Wizard access"
+        }
+      >
+        {isPending ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : granted ? (
+          <>
+            <Wand2 className="h-4 w-4" />
+            Granted
+          </>
+        ) : (
+          "Grant"
+        )}
+      </Button>
+      {error && <p className="text-destructive mt-1 text-xs">{error}</p>}
+    </div>
+  );
+}
+
 function AccessRequestRow({
   request,
   onUpdate,
@@ -147,6 +201,9 @@ function AccessRequestRow({
       </td>
       <td className="px-4 py-3">
         <StatusBadge status={request.status} />
+      </td>
+      <td className="px-4 py-3">
+        <WizardAccessButton request={request} onUpdate={onUpdate} />
       </td>
       <td className="text-muted-foreground px-4 py-3 text-sm">
         {new Date(request.created_at).toLocaleDateString()}
@@ -275,6 +332,9 @@ function Dashboard() {
                       </th>
                       <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
                         Status
+                      </th>
+                      <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                        Wizard
                       </th>
                       <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
                         Created

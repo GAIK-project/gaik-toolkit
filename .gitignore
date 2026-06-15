@@ -6,8 +6,12 @@
 **/secrets.yaml
 !**/secrets.yaml.example
 
-# Internal documentation (contains internal URLs)
+# Internal documentation (not for the open-source repo; kept locally)
 implementation_layer/api/USAGE.md
+implementation_layer/toolkit_demo_app/HANDOFF.md
+
+# Superpowers design specs (local working docs, not published)
+docs/superpowers/
 # Python
 __pycache__/
 *.py[cod]
