@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
+import { getReportWriterLimits } from "@/lib/report-writer/limits";
 
 const ADMIN_COOKIE_NAME = "admin_session";
 const ADMIN_COOKIE_VALUE = "authenticated";
@@ -134,4 +135,39 @@ export async function setWizardAccess(
   }
 
   return { success: true };
+}
+
+const resetUsageSchema = z.object({
+  userId: z.string().uuid("Invalid user ID."),
+});
+
+/** Reset a single user's Report Writer counter (count + tokens). Admin-only. */
+export async function resetReportUsage(userId: string): Promise<AdminResult> {
+  const result = resetUsageSchema.safeParse({ userId });
+  if (!result.success) {
+    return { error: result.error.issues[0].message };
+  }
+
+  const isAuthenticated = await isAdminAuthenticated();
+  if (!isAuthenticated) {
+    return { error: "Unauthorized" };
+  }
+
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("access_requests")
+    .update({ reports_count: 0, report_tokens_used: 0 })
+    .eq("user_id", result.data.userId);
+
+  if (error) {
+    console.error("Failed to reset report usage:", error);
+    return { error: "Failed to reset usage." };
+  }
+
+  return { success: true };
+}
+
+/** Expose the configured per-user report cap to the (client) admin dashboard. */
+export async function getReportWriterMaxReports(): Promise<number> {
+  return getReportWriterLimits().maxReports;
 }

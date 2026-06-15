@@ -1,12 +1,14 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
-import { Loader2, Check, X, LogOut, Wand2 } from "lucide-react";
+import { Loader2, Check, X, LogOut, Wand2, RotateCcw } from "lucide-react";
 import {
   verifyAdminPassword,
   adminLogout,
   updateAccessStatus,
   setWizardAccess,
+  resetReportUsage,
+  getReportWriterMaxReports,
   type AdminResult,
 } from "./actions";
 
@@ -19,6 +21,9 @@ export type AccessRequest = {
   use_case: string | null;
   status: "pending" | "approved" | "rejected";
   wizard_access: boolean;
+  reports_count: number;
+  report_tokens_used: number;
+  last_report_at: string | null;
   created_at: string;
 };
 
@@ -46,6 +51,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const initialState: AdminResult = {};
 
@@ -245,9 +251,71 @@ function AccessRequestRow({
   );
 }
 
+function UsageRow({
+  request,
+  maxReports,
+  onUpdate,
+}: {
+  request: AccessRequest;
+  maxReports: number;
+  onUpdate: () => void;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const atLimit = request.reports_count >= maxReports;
+
+  function reset(): void {
+    setError(null);
+    startTransition(async () => {
+      const result = await resetReportUsage(request.user_id);
+      if (result.error) setError(result.error);
+      else onUpdate();
+    });
+  }
+
+  return (
+    <tr className="border-border/50 border-b">
+      <td className="px-4 py-3 text-sm">{request.email}</td>
+      <td className="px-4 py-3 text-sm">
+        <span className={atLimit ? "text-destructive font-medium" : ""}>
+          {request.reports_count} / {maxReports}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-sm">
+        {request.report_tokens_used.toLocaleString()}
+      </td>
+      <td className="text-muted-foreground px-4 py-3 text-sm">
+        {request.last_report_at
+          ? new Date(request.last_report_at).toLocaleString()
+          : "-"}
+      </td>
+      <td className="px-4 py-3">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={reset}
+          disabled={isPending || request.reports_count === 0}
+          title="Reset this user's report counter"
+        >
+          {isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <>
+              <RotateCcw className="h-4 w-4" />
+              Reset
+            </>
+          )}
+        </Button>
+        {error && <p className="text-destructive mt-1 text-xs">{error}</p>}
+      </td>
+    </tr>
+  );
+}
+
 function Dashboard() {
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [maxReports, setMaxReports] = useState(5);
   const [loggingOut, startLogout] = useTransition();
 
   async function loadRequests(): Promise<void> {
@@ -262,6 +330,10 @@ function Dashboard() {
 
   useEffect(() => {
     loadRequests();
+  }, []);
+
+  useEffect(() => {
+    getReportWriterMaxReports().then(setMaxReports);
   }, []);
 
   function handleLogout(): void {
@@ -295,7 +367,14 @@ function Dashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <Card>
+        <Tabs defaultValue="requests">
+          <TabsList className="mb-4">
+            <TabsTrigger value="requests">Access Requests</TabsTrigger>
+            <TabsTrigger value="usage">Report Writer Usage</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="requests">
+            <Card>
           <CardHeader>
             <CardTitle>Access Requests</CardTitle>
             <CardDescription>
@@ -357,7 +436,66 @@ function Dashboard() {
               </div>
             )}
           </CardContent>
-        </Card>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="usage">
+            <Card>
+              <CardHeader>
+                <CardTitle>Report Writer Usage</CardTitle>
+                <CardDescription>
+                  Per-user report counts and tokens. Reset a counter to give a
+                  user their {maxReports}-report allowance back.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+                  </div>
+                ) : requests.length === 0 ? (
+                  <p className="text-muted-foreground py-8 text-center">
+                    No users yet.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                            Email
+                          </th>
+                          <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                            Reports
+                          </th>
+                          <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                            Tokens used
+                          </th>
+                          <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                            Last report
+                          </th>
+                          <th className="text-muted-foreground px-4 py-3 text-left text-sm font-medium">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {requests.map((request) => (
+                          <UsageRow
+                            key={request.id}
+                            request={request}
+                            maxReports={maxReports}
+                            onUpdate={loadRequests}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
