@@ -441,7 +441,13 @@ export default function ReportWriterPage() {
 
       if (!response.ok) {
         const err = await response.json().catch(() => null);
-        throw new Error(err?.detail ?? "Generation failed");
+        const message = err?.error ?? err?.detail ?? "Generation failed";
+        if (response.status === 401 || response.status === 403) {
+          toast.error(message, { duration: 6000 });
+          setIsLoading(false);
+          return;
+        }
+        throw new Error(message);
       }
 
       await processSSEStream<ReportResult>(response, {
