@@ -33,16 +33,18 @@ const AUTH_ROUTES = ["/sign-in", "/sign-up"];
 
 const BYPASS_AUTH = process.env.BYPASS_AUTH === "true";
 
-function isProtectedRoute(pathname: string): boolean {
-  return PROTECTED_ROUTES.some(
+function matchesRoute(pathname: string, routes: readonly string[]): boolean {
+  return routes.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
 }
 
+function isProtectedRoute(pathname: string): boolean {
+  return matchesRoute(pathname, PROTECTED_ROUTES);
+}
+
 function isAuthRoute(pathname: string): boolean {
-  return AUTH_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`),
-  );
+  return matchesRoute(pathname, AUTH_ROUTES);
 }
 
 export interface AccessState {

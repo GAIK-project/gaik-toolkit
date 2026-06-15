@@ -435,6 +435,36 @@ function UsageRow({
 const TH =
   "text-muted-foreground px-4 py-3 text-left text-sm font-medium whitespace-nowrap";
 
+/**
+ * Shared body for an admin table card: a centered spinner while loading, an
+ * empty-state message when there are no rows, or the table itself.
+ */
+function TableSection({
+  loading,
+  isEmpty,
+  emptyText,
+  children,
+}: {
+  loading: boolean;
+  isEmpty: boolean;
+  emptyText: string;
+  children: React.ReactNode;
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+      </div>
+    );
+  }
+  if (isEmpty) {
+    return (
+      <p className="text-muted-foreground py-8 text-center">{emptyText}</p>
+    );
+  }
+  return <div className="overflow-x-auto">{children}</div>;
+}
+
 function Dashboard() {
   const [requests, setRequests] = useState<AccessRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -557,43 +587,39 @@ function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
-                  </div>
-                ) : filtered.length === 0 ? (
-                  <p className="text-muted-foreground py-8 text-center">
-                    {requests.length === 0
+                <TableSection
+                  loading={loading}
+                  isEmpty={filtered.length === 0}
+                  emptyText={
+                    requests.length === 0
                       ? "No access requests yet."
-                      : "No users match your filter."}
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className={TH}>Email</th>
-                          <th className={TH}>Name</th>
-                          <th className={TH}>Company</th>
-                          <th className={TH}>Use Case</th>
-                          <th className={TH}>Status</th>
-                          <th className={TH}>Wizard</th>
-                          <th className={TH}>Created</th>
-                          <th className={TH}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filtered.map((request) => (
-                          <AccessRequestRow
-                            key={request.id}
-                            request={request}
-                            onUpdate={loadRequests}
-                          />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                      : "No users match your filter."
+                  }
+                >
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className={TH}>Email</th>
+                        <th className={TH}>Name</th>
+                        <th className={TH}>Company</th>
+                        <th className={TH}>Use Case</th>
+                        <th className={TH}>Status</th>
+                        <th className={TH}>Wizard</th>
+                        <th className={TH}>Created</th>
+                        <th className={TH}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((request) => (
+                        <AccessRequestRow
+                          key={request.id}
+                          request={request}
+                          onUpdate={loadRequests}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </TableSection>
               </CardContent>
             </Card>
           </TabsContent>
@@ -609,42 +635,38 @@ function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
-                  </div>
-                ) : filtered.length === 0 ? (
-                  <p className="text-muted-foreground py-8 text-center">
-                    {requests.length === 0
+                <TableSection
+                  loading={loading}
+                  isEmpty={filtered.length === 0}
+                  emptyText={
+                    requests.length === 0
                       ? "No users yet."
-                      : "No users match your filter."}
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b">
-                          <th className={TH}>Email</th>
-                          <th className={TH}>Reports</th>
-                          <th className={TH}>Limit</th>
-                          <th className={TH}>Tokens used</th>
-                          <th className={TH}>Last report</th>
-                          <th className={TH}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filtered.map((request) => (
-                          <UsageRow
-                            key={request.id}
-                            request={request}
-                            maxReports={maxReports}
-                            onUpdate={loadRequests}
-                          />
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                      : "No users match your filter."
+                  }
+                >
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className={TH}>Email</th>
+                        <th className={TH}>Reports</th>
+                        <th className={TH}>Limit</th>
+                        <th className={TH}>Tokens used</th>
+                        <th className={TH}>Last report</th>
+                        <th className={TH}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((request) => (
+                        <UsageRow
+                          key={request.id}
+                          request={request}
+                          maxReports={maxReports}
+                          onUpdate={loadRequests}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </TableSection>
               </CardContent>
             </Card>
           </TabsContent>

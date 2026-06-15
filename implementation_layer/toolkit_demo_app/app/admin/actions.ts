@@ -19,6 +19,17 @@ export type AdminResult = {
   success?: boolean;
 };
 
+/**
+ * Gate a mutating admin action. Returns an error `AdminResult` when the caller
+ * is not an authenticated admin, or `null` when the action may proceed.
+ */
+async function requireAdmin(): Promise<AdminResult | null> {
+  if (!(await isAdminAuthenticated())) {
+    return { error: "Unauthorized" };
+  }
+  return null;
+}
+
 const adminPasswordSchema = z.object({
   password: z.string().min(1, "Please enter the admin password."),
 });
@@ -79,10 +90,8 @@ export async function updateAccessStatus(
     return { error: result.error.issues[0].message };
   }
 
-  const isAuthenticated = await isAdminAuthenticated();
-  if (!isAuthenticated) {
-    return { error: "Unauthorized" };
-  }
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
 
   const supabase = createServiceClient();
 
@@ -117,10 +126,8 @@ export async function setWizardAccess(
     return { error: result.error.issues[0].message };
   }
 
-  const isAuthenticated = await isAdminAuthenticated();
-  if (!isAuthenticated) {
-    return { error: "Unauthorized" };
-  }
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
 
   const supabase = createServiceClient();
 
@@ -148,10 +155,8 @@ export async function resetReportUsage(userId: string): Promise<AdminResult> {
     return { error: result.error.issues[0].message };
   }
 
-  const isAuthenticated = await isAdminAuthenticated();
-  if (!isAuthenticated) {
-    return { error: "Unauthorized" };
-  }
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
 
   const supabase = createServiceClient();
   const { error } = await supabase
@@ -193,10 +198,8 @@ export async function setReportLimitOverride(
     return { error: result.error.issues[0].message };
   }
 
-  const isAuthenticated = await isAdminAuthenticated();
-  if (!isAuthenticated) {
-    return { error: "Unauthorized" };
-  }
+  const unauthorized = await requireAdmin();
+  if (unauthorized) return unauthorized;
 
   const supabase = createServiceClient();
   const { error } = await supabase

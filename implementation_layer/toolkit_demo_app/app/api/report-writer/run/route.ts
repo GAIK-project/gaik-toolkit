@@ -138,15 +138,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Clamp the evidence ceiling so a single run stays bounded.
-  const existingEvidence =
-    typeof config.max_evidence_chars === "number"
-      ? config.max_evidence_chars
-      : null;
+  // Clamp the evidence ceiling so a single run stays bounded. A requested value
+  // is capped at the limit; an unset value defaults to it.
   config.max_evidence_chars =
-    existingEvidence == null
-      ? limits.maxEvidenceChars
-      : Math.min(existingEvidence, limits.maxEvidenceChars);
+    typeof config.max_evidence_chars === "number"
+      ? Math.min(config.max_evidence_chars, limits.maxEvidenceChars)
+      : limits.maxEvidenceChars;
 
   // 4) Rebuild FormData (buffered Files) for forwarding — avoids the standalone
   //    request-stream truncation the proxy works around.
