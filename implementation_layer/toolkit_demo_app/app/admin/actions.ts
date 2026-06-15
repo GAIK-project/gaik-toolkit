@@ -171,3 +171,43 @@ export async function resetReportUsage(userId: string): Promise<AdminResult> {
 export async function getReportWriterMaxReports(): Promise<number> {
   return getReportWriterLimits().maxReports;
 }
+
+const limitOverrideSchema = z.object({
+  userId: z.string().uuid("Invalid user ID."),
+  // null = use the global default; a number sets this user's cap.
+  // 1000000 is the UI's "Unlimited" sentinel.
+  value: z.number().int().min(0).max(1_000_000).nullable(),
+});
+
+/**
+ * Set (or clear) a single user's Report Writer cap override. `null` reverts the
+ * user to the global `REPORT_WRITER_MAX_REPORTS` default. Admin-only. Used to
+ * give demo/team accounts a high or unlimited allowance.
+ */
+export async function setReportLimitOverride(
+  userId: string,
+  value: number | null,
+): Promise<AdminResult> {
+  const result = limitOverrideSchema.safeParse({ userId, value });
+  if (!result.success) {
+    return { error: result.error.issues[0].message };
+  }
+
+  const isAuthenticated = await isAdminAuthenticated();
+  if (!isAuthenticated) {
+    return { error: "Unauthorized" };
+  }
+
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("access_requests")
+    .update({ report_limit_override: result.data.value })
+    .eq("user_id", result.data.userId);
+
+  if (error) {
+    console.error("Failed to set report limit override:", error);
+    return { error: "Failed to set limit." };
+  }
+
+  return { success: true };
+}

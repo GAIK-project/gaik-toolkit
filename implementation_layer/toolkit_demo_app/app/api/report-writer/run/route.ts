@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     const { data: row } = await supabase
       .from("access_requests")
-      .select("status, reports_count")
+      .select("status, reports_count, report_limit_override")
       .eq("user_id", user.id)
       .single();
 
@@ -48,12 +48,15 @@ export async function POST(request: NextRequest) {
     }
 
     const used = (row.reports_count as number) ?? 0;
-    if (used >= limits.maxReports) {
+    // Per-user override wins over the global default (e.g. demo/team accounts).
+    const cap =
+      (row.report_limit_override as number | null) ?? limits.maxReports;
+    if (used >= cap) {
       return NextResponse.json(
         {
-          error: `You've used all ${limits.maxReports} of your reports. Ask an admin to reset your counter.`,
+          error: `You've used all ${cap} of your reports. Ask an admin to reset your counter.`,
           used,
-          limit: limits.maxReports,
+          limit: cap,
         },
         { status: 403 },
       );
