@@ -61,6 +61,14 @@ From `implementation_layer/toolkit_demo_app/CLAUDE.md`:
 4. **Tailwind v4:** Use `globals.css` theme variables for styling
 5. **UI components:** Prefer shadcn/ui components (Accordion, Card, Button, Select, etc.)
 
+## Access model
+
+- **Public:** `(home)` (`/`, `/privacy`) and `(auth)` (`/sign-in`, `/sign-up`, `/access-pending`).
+- **All demos** (everything under `(demos)`) require **login + admin approval** — enforced by `PROTECTED_ROUTES` in `lib/supabase/proxy.ts` (pages) plus a login+approval gate on heavy `/api` POSTs in `proxy.ts`. When adding a new demo route, add it to `PROTECTED_ROUTES`.
+- **Report Writer** additionally enforces a per-user quota (`REPORT_WRITER_MAX_REPORTS`, default 5) in `app/api/report-writer/run/route.ts`. Admins manage it in the `/admin` "Report Writer Usage" tab: per-user counts/tokens, **Reset**, and a per-user **limit override** (`access_requests.report_limit_override`; e.g. demo/team accounts → Unlimited).
+- **Solution Wizard** needs a per-user `wizard_access` grant (or team `?key=`), independent of approval.
+- `BYPASS_AUTH=true` opens everything in local dev.
+
 ## Project Structure
 
 ```
@@ -177,6 +185,13 @@ DATABASE_URL=postgresql://user:pass@host:5432/db
 # Upstash Redis (rate limiting)
 UPSTASH_REDIS_REST_URL=your-url
 UPSTASH_REDIS_REST_TOKEN=your-token
+
+# Report Writer per-user abuse limits (defaults shown; unset = these values)
+REPORT_WRITER_MAX_REPORTS=5
+REPORT_WRITER_MAX_TOKENS_PER_REPORT=32000
+REPORT_WRITER_MAX_UPLOAD_MB=25
+REPORT_WRITER_MAX_SECTIONS=12
+REPORT_WRITER_MAX_EVIDENCE_CHARS=200000
 
 # PostHog (analytics, optional)
 NEXT_PUBLIC_POSTHOG_KEY=your-key
