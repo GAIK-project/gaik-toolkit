@@ -591,7 +591,7 @@ All tuneable parameters with sensible defaults.
 | `gpt4o_chunk_duration_minutes` | int | 23 | Chunk duration for GPT-4o (25 min API limit) |
 | `transcription_workers` | int | 3 | Parallel transcription threads |
 | `ffmpeg_split_workers` | int | 3 | Parallel FFmpeg split threads |
-| `api_timeout_seconds` | int | 180 | API call timeout |
+| `api_timeout_seconds` | int | 600 | API call timeout (keep ≥ ~25s × `gpt4o_chunk_duration_minutes`) |
 | `max_retries` | int | 2 | Max retry attempts |
 | `max_429_retries` | int | 4 | Max rate-limit retries |
 | `audio_bitrate` | str | `"128k"` | Audio encoding bitrate |

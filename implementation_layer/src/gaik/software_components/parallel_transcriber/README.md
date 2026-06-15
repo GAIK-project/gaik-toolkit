@@ -177,7 +177,7 @@ result = transcriber.transcribe(
 | `FFMPEG_THREADS_PER_PROCESS` | 1 | FFmpeg threads per subprocess (alias: `FFMPEG_THREADS`) |
 | `GPT4O_CHUNK_PARALLELISM` | 4 | Parallel API calls (GPT-4o Diarize) |
 | `FFMPEG_CHUNK_TIMEOUT_SECONDS` | 3600 | Timeout per FFmpeg chunk encode |
-| `API_TIMEOUT_SECONDS` | 180 | API call timeout (alias: `AZURE_OPENAI_TIMEOUT_SECONDS`) |
+| `API_TIMEOUT_SECONDS` | 600 | API call timeout, alias `AZURE_OPENAI_TIMEOUT_SECONDS` (keep ≥ ~25s × `GPT4O_CHUNK_DURATION_MINUTES`) |
 | `MAX_RETRIES` | 2 | Retries for transient errors |
 | `RETRY_BASE_DELAY_SECONDS` | 1.0 | Base delay between retries |
 | `MAX_429_RETRIES` | 4 | Extra retries for rate limits |

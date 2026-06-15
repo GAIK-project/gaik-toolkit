@@ -46,7 +46,12 @@ class TranscriptionConfig:
 
     # --- Timeouts ---
     ffmpeg_chunk_timeout_seconds: int = 3600
-    api_timeout_seconds: int = 180
+    # Per single Azure OpenAI call. Must comfortably fit a full chunk: a dense
+    # ``gpt4o_chunk_duration_minutes`` (23 min) chunk exceeds 180s, so GPT-4o diarize
+    # would time out (``RuntimeError("GPT-4o transcription timed out")``) after retries.
+    # 600 s matches the QAdental Rahti production value. Rule of thumb: keep this
+    # >= ~25 s × gpt4o_chunk_duration_minutes.
+    api_timeout_seconds: int = 600
 
     # --- Retry ---
     max_retries: int = 2
