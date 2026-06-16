@@ -1,0 +1,58 @@
+# Pages CMS configuration — a free, hosted, browser-based editor for the
+# GAIK Fumadocs documentation site.  https://pagescms.org
+#
+# What it gives you:
+#   - Edit the docs in a web UI (app.pagescms.org). No clone, no VS Code, no git.
+#   - Saving commits straight to GitHub, which triggers the existing GitHub Pages
+#     build (.github/workflows/pages.yml). Live in ~1-2 min.
+#   - No backend or server to run. Content stays versioned as MDX in this repo.
+#
+# This file ONLY enables the editor. It does not change the site itself.
+# It must exist on a branch (e.g. `main`) for Pages CMS to read it there.
+#
+# To start editing: sign in at https://app.pagescms.org with GitHub, install the
+# Pages CMS GitHub App on the GAIK-project/gaik-toolkit repo, open the repo, pick
+# the "Documentation pages" collection, edit, and Save.
+
+# Where image/asset uploads land (Fumadocs serves these from /public).
+media:
+  input: guidance_layer/website/public
+  output: /
+
+content:
+  - name: docs
+    label: Documentation pages
+    type: collection
+    path: guidance_layer/website/content/docs
+    format: yaml-frontmatter
+    subfolders: true          # browse the whole toolkit/ use-cases/ ... tree
+    filename: '{primary}.mdx'  # new pages get a slugified .mdx name from the title
+    exclude:
+      - meta.json             # nav ordering stays a code-level concern, not content
+    view:
+      primary: title
+      fields:
+        - title
+        - description
+    fields:
+      - name: title
+        label: Title
+        type: string
+        required: true
+      - name: description
+        label: Description
+        type: text
+      # The page content (everything below the frontmatter).
+      #
+      # `text` = raw MDX in a plain editor. LOSSLESS: it never reformats or breaks
+      # Fumadocs components like <Callout>, <Cards>, tables, or Mermaid blocks.
+      #
+      # Prefer a different editing experience? Swap the `type` below:
+      #   type: code        # same raw MDX, but with syntax highlighting
+      #   options: { language: markdown }
+      # ...or for a true WYSIWYG (easiest for prose, but verify a <Callout> page
+      # round-trips before trusting it on component-heavy docs):
+      #   type: rich-text
+      - name: body
+        label: Page content (MDX)
+        type: text
