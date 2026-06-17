@@ -68,8 +68,18 @@ def _load_schema_if_fresh(pipeline, schema_dir: Path, schema_name: str):
         print("No saved schema found -- will generate from extraction_requirements.md.")
         return None, None, current_hash
     except Exception as exc:
-        print(f"WARNING: Could not load saved schema ({exc}) -- will regenerate.")
-        return None, None, current_hash
+        import traceback as _tb
+        print(
+            f"\nERROR: The approved schema exists but could not be loaded.\n"
+            f"  Schema       : {schema_dir}/{schema_name}.py\n"
+            f"  Requirements : {schema_dir}/{schema_name}_requirements.json\n"
+            f"  Reason       : {type(exc).__name__}: {exc}\n\n"
+            f"{_tb.format_exc()}"
+            f"The approved schema has NOT been overwritten.\n"
+            f"To regenerate, delete the two files above and re-run.\n",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 def find_input_file(config: dict, cli_input: str | None) -> Path:
@@ -196,11 +206,14 @@ def main() -> None:
     if result.schema and result.requirements and schema is None:
         try:
             pipeline.save_schema(result.schema, result.requirements, schema_dir, schema_name)
-            hash_path = schema_dir / f"{schema_name}.hash"
-            hash_path.write_text(_current_hash)
-            print(f"Schema and hash saved to {schema_dir}/")
+            print(f"Schema saved to {schema_dir}/")
         except Exception as exc:
             print(f"WARNING: Could not save schema: {exc}")
+    hash_path = schema_dir / f"{schema_name}.hash"
+    try:
+        hash_path.write_text(_current_hash)
+    except Exception as exc:
+        print(f"WARNING: Could not write schema hash: {exc}")
 
 ${llm_judge_section}
 

@@ -17,6 +17,7 @@ The two-layer split (spec §3.6):
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import string
 from pathlib import Path
@@ -749,6 +750,15 @@ def scaffold_poc(
         # SchemaGenerator output exists and was approved -- use as-is
         files_created.append(_approved_schema)
         files_created.append(_approved_req)
+        # Write the hash file so run_poc.py can detect prompt changes from the
+        # very first run instead of always re-checking without a baseline.
+        _req_prompt = poc_dir / "prompts" / "extraction_requirements.md"
+        _hash_file = poc_dir / "schemas" / "output_schema.hash"
+        if _req_prompt.exists() and not _hash_file.exists():
+            _hash_file.write_text(
+                hashlib.sha256(_req_prompt.read_bytes()).hexdigest()
+            )
+            files_created.append(_hash_file)
     elif has_fields and pattern != "rag":
         # Fallback: no approved schema yet, generate deterministically from
         # target_output_spec.  The wizard should have called generate_schema.py
