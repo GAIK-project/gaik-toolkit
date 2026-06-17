@@ -53,7 +53,7 @@ flowchart LR
 
 <Callout type="info">
 **Wondering whether the research-backed prompt is actually worth it?**
-The [LLM-Judge Prompt Benchmark](/toolkit/evals/llm-judge-benchmark)
+The [LLM-Judge Prompt Benchmark](/evaluation-layer/llm-judge-benchmark)
 runs the naive 1-10 baseline against the prompt design described below
 on the public [JudgeBench](https://hf.co/datasets/ScalerLab/JudgeBench)
 dataset and reports the empirical delta.
@@ -324,7 +324,7 @@ evidence you need them.
 | High-stakes scoring where one judge's variance is the risk | `LLMJudgePanel` with 3 cross-provider judges | Latency / cost matter more than variance — sequential calls add up |
 | A/B-testing two prompt or model versions | `compare_pairwise(swap_and_average=True)` | You only have one version |
 | Quoting a tracked numeric KPI (e.g. dashboards) | `scoring_mode="likert_1_5"` so scores are comparable across runs | Severity-only is enough for the UI |
-| Empirical evidence that the research-backed prompt beats naive 1-10 | [Run the JudgeBench prompt-comparison script](/toolkit/evals/llm-judge-benchmark) on the public HF dataset | You trust the cited research and don't need to demo it |
+| Empirical evidence that the research-backed prompt beats naive 1-10 | [Run the JudgeBench prompt-comparison script](/evaluation-layer/llm-judge-benchmark) on the public HF dataset | You trust the cited research and don't need to demo it |
 
 The [Luvata OC Builder](https://github.com/GAIK-project/Luvata) currently
 runs only the first row — single judge call, opt-in toggle, no
@@ -344,7 +344,7 @@ validation test set (per-field severity F1 against ground truth):
 
 **Default**: Gemini 3 Flash via Vertex. **Cheap screener**: Gemini 3.1 Flash Lite.
 For a public, reproducible comparison see the
-[Prompt Benchmark page](/toolkit/evals/llm-judge-benchmark).
+[Prompt Benchmark page](/evaluation-layer/llm-judge-benchmark).
 
 ## Examples
 

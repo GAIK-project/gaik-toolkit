@@ -178,11 +178,11 @@ graph TD
 
 To evaluate retrieval quality with the provided sample data:
 
-1. Clone the GAIK repository and navigate to `implementation_layer/eval_methods/RAG_eval/`
+1. Clone the GAIK repository and navigate to `evaluation_layer/eval_methods/RAG_eval/`
 2. Inspect `data/target.txt` (the gold passage) and `data/chunks/chunk_*.txt` (the retrieved chunks in ranked order)
 3. Run `python evaluate_standalone.py` — no dependencies required beyond Python standard library
 4. Review the printed report; pay particular attention to `token_recall`, `token_f1`, `mrr`, and `4gram_iou`
 5. Replace the sample files with your own target text and retrieved chunks to evaluate your RAG pipeline
 6. To benchmark across multiple configurations (embedding models, chunk sizes, retrievers), use `rag_eval.py` with a test CSV dataset
 
-For technical details, the evaluation script, and sample data, visit the [GAIK GitHub repository](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/RAG_eval).
+For technical details, the evaluation script, and sample data, visit the [GAIK GitHub repository](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/RAG_eval).

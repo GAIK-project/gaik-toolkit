@@ -5,7 +5,6 @@
     "multi-provider-llm",
     "software-modules",
     "evaluators",
-    "evals",
     "no-code-assets"
   ]
 }

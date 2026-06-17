@@ -5,7 +5,7 @@ description: Empirical comparison of naive 1-10 scoring vs the research-backed L
 
 ## What this measures
 
-The [LLM-as-Judge Validation](/toolkit/evals/llm-judge) page argues, citing
+The [LLM-as-Judge Validation](/evaluation-layer/llm-judge) page argues, citing
 the [HuggingFace LLM Judge cookbook](https://huggingface.co/learn/cookbook/llm_judge)
 and several research papers, that an integer Likert prompt with explicit
 Chain-of-Thought ordering and anti-bias guidance produces more reliable
@@ -160,7 +160,7 @@ the research-backed defaults are worth keeping.
 - **JudgeBench is general** (knowledge / reasoning / math / coding
   tasks). If you are evaluating a domain-specific judge — e.g. for
   document extraction — pair this benchmark with a calibration run on
-  your own labelled data ([calibration utility](/toolkit/evals/llm-judge#calibration-against-human-labels)).
+  your own labelled data ([calibration utility](/evaluation-layer/llm-judge#calibration-against-human-labels)).
 - **Prompt-design effect can be model-dependent.** This run uses Gemini
   3 Flash; the same prompt pair may give different deltas on Claude or
   GPT. Add `--provider anthropic` / `--provider openai` to extend the
@@ -168,11 +168,11 @@ the research-backed defaults are worth keeping.
 
 ## Related docs
 
-- [LLM-as-Judge Validation](/toolkit/evals/llm-judge) — what the
+- [LLM-as-Judge Validation](/evaluation-layer/llm-judge) — what the
   research-backed prompt looks like, why every component is there
-- [Calibration against human labels](/toolkit/evals/llm-judge#calibration-against-human-labels)
+- [Calibration against human labels](/evaluation-layer/llm-judge#calibration-against-human-labels)
   — measure judge vs human agreement on your own data
-- [Pairwise comparison utility](/toolkit/evals/llm-judge#pairwise-ab-comparison)
+- [Pairwise comparison utility](/evaluation-layer/llm-judge#pairwise-ab-comparison)
   — vision-based pairwise judging for extraction outputs
 
 ## References

@@ -530,7 +530,7 @@ python eval_enhanced.py <reference_dir> <original_dir> <enhanced_dir>
 ### 1. Install Dependencies
 
 ```bash
-cd implementation_layer/eval_methods/transcription_eval
+cd evaluation_layer/eval_methods/transcription_eval
 pip install -r requirements.txt
 ```
 

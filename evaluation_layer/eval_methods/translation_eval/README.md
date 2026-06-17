@@ -238,7 +238,7 @@ Average scores across all 10 evaluation files:
 ### Running the standalone evaluation
 
 ```bash
-cd implementation_layer/eval_methods/translation_eval
+cd evaluation_layer/eval_methods/translation_eval
 python src/evaluate_standalone.py
 ```
 
@@ -357,7 +357,7 @@ Path("data/translation_results/lecture.txt").write_text(translation, encoding="u
 ### 1. Install Dependencies
 
 ```bash
-cd implementation_layer/eval_methods/translation_eval
+cd evaluation_layer/eval_methods/translation_eval
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 ```

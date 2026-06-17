@@ -27,7 +27,7 @@ The canvas clarifies the purpose of the solution, the main users (order handling
 
 ## Strategy layer – value evaluation and monitoring
 
-At the strategy layer, the value evaluation model for purchase order processing applies the [Value Evaluation Framework](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/README.md) to this generic use case and makes value assumptions explicit.
+At the strategy layer, the value evaluation model for purchase order processing applies the [Value Evaluation Framework](https://github.com/GAIK-project/gaik-toolkit/blob/main/evaluation_layer/value_evaluation_framework/README.md) to this generic use case and makes value assumptions explicit.
 
 Example value fragments from the model include:
 
@@ -342,13 +342,13 @@ The quality of this use case is evaluated by assessing each pipeline component i
 
 Parsing quality is benchmarked across different parsers — including the simple PyMuPDF parser, Docling, and GAIK's custom multimodal parser — on purchase order documents with varying layouts, including complex tables and non-standard column arrangements. The benchmark measures how accurately each parser recovers field values and table structures from challenging document formats.
 
-> 📊 **Parsing evaluation methods:** [`implementation_layer/eval_methods/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods)
+> 📊 **Parsing evaluation methods:** [`evaluation_layer/eval_methods/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods)
 
 ### Extractor Evaluation
 
 The quality of structured information extraction is evaluated using precision, recall, and F1 score — computed separately for exact-match fields (item numbers, dates, quantities) and semantic-match fields (descriptions, addresses). This measures how accurately the extracted fields match the expected values across a set of reference purchase orders.
 
-> 📊 **Extraction evaluation methods:** [`implementation_layer/eval_methods/extraction_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval)
+> 📊 **Extraction evaluation methods:** [`evaluation_layer/eval_methods/extraction_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/extraction_eval)
 
 ---
 

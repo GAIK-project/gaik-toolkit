@@ -1,7 +1,9 @@
 {
-  "title": "Evaluation Methods",
+  "title": "Evaluation Layer",
   "pages": [
     "index",
+    "value-evaluation-framework",
+    "---Output Evaluation Methods---",
     "transcription-eval",
     "extraction-eval",
     "llm-judge",

@@ -27,7 +27,7 @@ The canvas clarifies the purpose of the solution, the main users (content manage
 
 ## Strategy layer – value evaluation and monitoring
 
-At the strategy layer, the value evaluation model applies the [Value Evaluation Framework](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/README.md) to this generic use case and makes value assumptions explicit.
+At the strategy layer, the value evaluation model applies the [Value Evaluation Framework](https://github.com/GAIK-project/gaik-toolkit/blob/main/evaluation_layer/value_evaluation_framework/README.md) to this generic use case and makes value assumptions explicit.
 
 Example value fragments from the model include:
 
@@ -192,13 +192,13 @@ The quality of this use case is evaluated at two levels: the GAIK software compo
 
 Transcription quality is measured using **Word Error Rate (WER)** and related metrics (Character Error Rate, Spelling Error Rate, Substitution/Deletion/Insertion rates), comparing the AI-generated transcript against a verified reference. The evaluation also benchmarks the benefit of the two-pass enhancement step.
 
-> 📊 **Transcription evaluation methods:** [`implementation_layer/eval_methods/transcription_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/transcription_eval)
+> 📊 **Transcription evaluation methods:** [`evaluation_layer/eval_methods/transcription_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/transcription_eval)
 
 ### Translation Evaluation
 
 Translation quality is measured using four complementary metrics: **BLEU** (n-gram overlap), **chrF** (character n-gram F-score), **TER** (Translation Edit Rate), and **Cosine Similarity** (semantic embedding comparison). The evaluation compares AI-generated translations against human reference translations across multiple models.
 
-> 📊 **Translation evaluation methods:** [`implementation_layer/eval_methods/translation_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/translation_eval)
+> 📊 **Translation evaluation methods:** [`evaluation_layer/eval_methods/translation_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/translation_eval)
 
 ---
 
@@ -209,7 +209,7 @@ Translation quality is measured using four complementary metrics: **BLEU** (n-gr
 | Transcriber component | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/transcriber) |
 | TranscriptEnhancer component | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/enhance_transcript) |
 | Transcriber examples | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/transcriber) |
-| Transcription evaluation | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/transcription_eval) |
-| Translation evaluation | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/translation_eval) |
+| Transcription evaluation | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/transcription_eval) |
+| Translation evaluation | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/translation_eval) |
 | Audio to Structured Data module | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data) |
 | Implementation Layer overview | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer) |

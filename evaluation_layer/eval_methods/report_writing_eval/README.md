@@ -238,7 +238,7 @@ This evaluation methodology applies to the following GAIK report generation work
 ### 1. Install Dependencies
 
 ```bash
-cd implementation_layer/eval_methods/report_writing_eval
+cd evaluation_layer/eval_methods/report_writing_eval
 pip install openai pydantic python-dotenv
 ```
 

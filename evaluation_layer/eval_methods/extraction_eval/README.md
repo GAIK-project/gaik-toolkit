@@ -205,7 +205,7 @@ For a detailed discussion of the evaluation design and results in the context of
 Place matched JSON files in `data/ground truth/` and `data/predictions/` (filenames must match), then run:
 
 ```bash
-cd implementation_layer/eval_methods/extraction_eval
+cd evaluation_layer/eval_methods/extraction_eval
 python evaluate.py
 ```
 
@@ -383,7 +383,7 @@ The same script can be reused for any of these use cases by swapping the ground 
 ### 1. Install Dependencies
 
 ```bash
-cd implementation_layer/eval_methods/extraction_eval
+cd evaluation_layer/eval_methods/extraction_eval
 pip install -r requirements.txt
 ```
 

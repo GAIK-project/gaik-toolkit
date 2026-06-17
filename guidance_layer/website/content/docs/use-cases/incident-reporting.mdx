@@ -27,7 +27,7 @@ The canvas provides a shared understanding of what the GenAI solution does and w
 
 ## Strategy layer – value evaluation and monitoring
 
-At the strategy layer, the value evaluation model for incident reporting applies the [Value Evaluation Framework](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/README.md) 
+At the strategy layer, the value evaluation model for incident reporting applies the [Value Evaluation Framework](https://github.com/GAIK-project/gaik-toolkit/blob/main/evaluation_layer/value_evaluation_framework/README.md) 
 to this generic use case and makes value assumptions explicit.
 
 Example value fragments from the model include:
@@ -48,7 +48,7 @@ The same model can be used both before implementation (to evaluate expected valu
 
 ![Value evaluation model: Incident reporting](/images/value_evaluation_incident_reporting.jpg)
 
-The source version of the **Value evaluation model: Incident reporting** - [Download Raw File (Value_evaluation_model_for Incident_reporting_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/Value_evaluation_model_for%20Incident_reporting_v0.1.pptx) 
+The source version of the **Value evaluation model: Incident reporting** - [Download Raw File (Value_evaluation_model_for Incident_reporting_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/evaluation_layer/value_evaluation_framework/Value_evaluation_model_for%20Incident_reporting_v0.1.pptx) 
 “Lower admin effort”, “Accident cost avoidance”, “Productivity gains”
 
 ## Implementation layer using No-Code
@@ -310,13 +310,13 @@ The quality of this use case is evaluated by assessing each software component i
 
 Transcription quality is measured using standard metrics such as **Word Error Rate (WER)**, which quantifies the accuracy of the speech-to-text conversion. The evaluation also includes comparison of various transcription models and methods to enhance the raw transcript as a post-transcription step.
 
-> 📊 **Transcription evaluation methods:** [`implementation_layer/eval_methods/transcription_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/transcription_eval)
+> 📊 **Transcription evaluation methods:** [`evaluation_layer/eval_methods/transcription_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/transcription_eval)
 
 ### Extractor Evaluation
 
 The quality of structured information extraction is evaluated through **cosine similarity ratio**, which measures how accurately the extracted fields match the expected values. This method assesses both the semantic correctness and completeness of the extracted data.
 
-> 📊 **Extraction evaluation methods:** [`implementation_layer/eval_methods/extraction_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/extraction_eval)
+> 📊 **Extraction evaluation methods:** [`evaluation_layer/eval_methods/extraction_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/extraction_eval)
 
 ---
 

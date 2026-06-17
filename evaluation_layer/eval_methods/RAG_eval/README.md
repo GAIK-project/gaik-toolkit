@@ -261,7 +261,7 @@ _N/A — to be completed._
 ### Running the standalone evaluation
 
 ```bash
-cd implementation_layer/eval_methods/RAG_eval
+cd evaluation_layer/eval_methods/RAG_eval
 python evaluate_standalone.py
 ```
 
@@ -409,7 +409,7 @@ This evaluation applies to any GAIK RAG workflow:
 No external packages required for `evaluate_standalone.py`. Run directly:
 
 ```bash
-cd implementation_layer/eval_methods/RAG_eval
+cd evaluation_layer/eval_methods/RAG_eval
 python evaluate_standalone.py
 ```
 

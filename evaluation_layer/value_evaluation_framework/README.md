@@ -24,7 +24,7 @@ Each value dimension can be assessed independently, but real GenAI value typical
 To make the evaluation concrete, the framework assesses each value dimension across selected knowledge processes (such as knowledge capture, access, and synthesis). This is typically done using a value–knowledge process matrix, which highlights strengths, gaps, and bottlenecks.
 Color-coding (for example, green / yellow / red) supports structured discussion and helps executives quickly see where GenAI creates value and where further improvement is needed.
 
-- **Value evaluation framework** - [Download Raw File (Value_evaluation_framework_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/Value_evaluation_framework_v0.1.pptx)
+- **Value evaluation framework** - [Download Raw File (Value_evaluation_framework_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/evaluation_layer/value_evaluation_framework/Value_evaluation_framework_v0.1.pptx)
 
 
 **Reference value evaluation models for selected use cases**
@@ -33,7 +33,7 @@ For selected generic use cases, the toolkit provides reference value evaluation 
 
 Each reference model links GenAI-enabled capabilities to changes in work practices, decision-making, and user experience, making value assumptions explicit and comparable. Organizations can use these models as starting points to evaluate expected benefits, identify value drivers, and adapt the evaluation to their own context.
 
-The **Value evaluation model: Incident reporting** - [Download Raw File (Value_evaluation_model_for Incident_reporting_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/value_evaluation_framework/Value_evaluation_model_for%20Incident_reporting_v0.1.pptx) illustrates how the framework can be applied to a concrete use case.
+The **Value evaluation model: Incident reporting** - [Download Raw File (Value_evaluation_model_for Incident_reporting_v0.1.pptx)](https://github.com/GAIK-project/gaik-toolkit/blob/main/evaluation_layer/value_evaluation_framework/Value_evaluation_model_for%20Incident_reporting_v0.1.pptx) illustrates how the framework can be applied to a concrete use case.
 
 
 ## Status

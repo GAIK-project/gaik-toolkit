@@ -1,6 +1,6 @@
 # MDX Template — Website Evaluation Page
 
-This document defines the canonical structure for `guidance_layer/website/content/docs/toolkit/evals/{component}-eval.mdx`.
+This document defines the canonical structure for `guidance_layer/website/content/docs/evaluation-layer/{component}-eval.mdx`.
 
 Follow `transcription-eval.mdx` and `extraction-eval.mdx` as references. Sections below are required; mark missing content as `_N/A — to be completed._`
 
@@ -213,7 +213,7 @@ To evaluate {{component}} quality in your own context:
 4. {{Step: iterate/improve}}
 5. {{Step: monitor in production}}
 
-For technical implementation details and evaluation tools, visit the [GAIK GitHub repository](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/{{component}}_eval).
+For technical implementation details and evaluation tools, visit the [GAIK GitHub repository](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/{{component}}_eval).
 ```
 
 Keep steps 4–6; do not over-specify implementation details here (those belong in the README).
@@ -238,7 +238,7 @@ Keep steps 4–6; do not over-specify implementation details here (those belong 
 | Bold | `**term**` for lead terms in lists and considerations; `**value**` for best results in tables |
 | Italic | `*example text*` for inline examples of extracted/transcribed content |
 | Code blocks | Not used on this page except inside Getting Started steps if unavoidable |
-| Links | Relative links for internal toolkit pages: `[Title](/toolkit/evals/page)`. Absolute for GitHub. |
+| Links | Relative links for internal toolkit pages: `[Title](/evaluation-layer/page)`. Absolute for GitHub. |
 | Images | `![Alt text](/images/filename.png)` — image file must exist under `guidance_layer/website/public/images/` |
 | N/A sections | `_N/A — to be completed._` as the sole line of that section body |
 | Tone | Business-first; explain why before how; accessible to non-technical stakeholders |
@@ -254,7 +254,7 @@ When a full page is created, add this block to `index.mdx` inside the "Available
 
 {{One-sentence description — must match the MDX `description` frontmatter exactly.}}
 
-[View {{Component Display Name}} Evaluation →](/toolkit/evals/{{component}}-eval)
+[View {{Component Display Name}} Evaluation →](/evaluation-layer/{{component}}-eval)
 
 ---
 ```

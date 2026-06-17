@@ -1,13 +1,25 @@
 ---
-title: Evaluation Methods
-description: Quality assessment methods for GAIK toolkit components
+title: Evaluation Layer
+description: Value evaluation and output quality assessment for GenAI solutions
 ---
 
-Evaluation methods provide systematic approaches to assess and improve the quality of AI-powered knowledge management solutions. These methods help organizations measure performance, compare different approaches, and ensure solutions meet quality standards before deployment.
+The evaluation layer brings together two complementary perspectives on quality. The **value evaluation framework** assesses the business value GenAI creates, while the **output evaluation methods** measure the technical quality of what the solutions produce.
 
 ---
 
-## Why Evaluation Matters
+## Value Evaluation Framework
+
+The value evaluation framework assesses how GenAI changes work, decisions, and experiences—across informational, economic, operational, and experiential value dimensions—rather than focusing on technical metrics alone.
+
+[View Value Evaluation Framework →](/evaluation-layer/value-evaluation-framework)
+
+---
+
+## Output Evaluation Methods
+
+Output evaluation methods provide systematic approaches to assess and improve the quality of AI-powered knowledge management solutions. These methods help organizations measure performance, compare different approaches, and ensure solutions meet quality standards before deployment.
+
+### Why Evaluation Matters
 
 When implementing GenAI solutions for knowledge work, quality assessment is critical for:
 
@@ -19,15 +31,15 @@ When implementing GenAI solutions for knowledge work, quality assessment is crit
 
 ---
 
-## Available Evaluation Methods
+### Available Methods
 
-The GAIK toolkit provides evaluation methods for key components:
+The GAIK toolkit provides output evaluation methods for key components:
 
 ### Transcription Evaluation
 
 Assesses the accuracy of converting audio or video recordings into text, including measuring error rates and evaluating enhancement techniques.
 
-[View Transcription Evaluation →](/toolkit/evals/transcription-eval)
+[View Transcription Evaluation →](/evaluation-layer/transcription-eval)
 
 ---
 
@@ -35,7 +47,7 @@ Assesses the accuracy of converting audio or video recordings into text, includi
 
 Measures how accurately structured information is extracted from text, focusing on field-level accuracy and semantic understanding.
 
-[View Extraction Evaluation →](/toolkit/evals/extraction-eval)
+[View Extraction Evaluation →](/evaluation-layer/extraction-eval)
 
 ---
 
@@ -43,7 +55,7 @@ Measures how accurately structured information is extracted from text, focusing 
 
 Multi-provider LLM-as-judge with integer Likert scoring, panel/jury aggregation, calibration against human labels, and pairwise comparison with position-bias mitigation. Use it to validate extractor output, A/B test prompt variants, or measure regression over time.
 
-[View LLM-as-Judge →](/toolkit/evals/llm-judge)
+[View LLM-as-Judge →](/evaluation-layer/llm-judge)
 
 ---
 
@@ -51,7 +63,7 @@ Multi-provider LLM-as-judge with integer Likert scoring, panel/jury aggregation,
 
 Empirical comparison of the research-backed prompt (Likert + CoT + bias mitigation) against a naive 1-10 baseline on the public [JudgeBench](https://hf.co/datasets/ScalerLab/JudgeBench) dataset. Run it on your own pairwise data to verify the design choices are worth the complexity for your domain.
 
-[View Prompt Benchmark →](/toolkit/evals/llm-judge-benchmark)
+[View Prompt Benchmark →](/evaluation-layer/llm-judge-benchmark)
 
 ---
 
@@ -59,7 +71,7 @@ Empirical comparison of the research-backed prompt (Likert + CoT + bias mitigati
 
 Deterministic retrieval quality assessment for RAG pipelines using token coverage, rank-aware, and n-gram metrics — no LLM calls required.
 
-[View RAG Evaluation →](/toolkit/evals/rag-eval)
+[View RAG Evaluation →](/evaluation-layer/rag-eval)
 
 ---
 
@@ -67,7 +79,7 @@ Deterministic retrieval quality assessment for RAG pipelines using token coverag
 
 Assessing AI-generated report quality using an LLM-as-judge approach with issue-based scoring across factual accuracy, completeness, and clarity.
 
-[View Report Writing Evaluation →](/toolkit/evals/report-writing-eval)
+[View Report Writing Evaluation →](/evaluation-layer/report-writing-eval)
 
 ---
 
@@ -75,7 +87,7 @@ Assessing AI-generated report quality using an LLM-as-judge approach with issue-
 
 Multi-metric translation quality assessment comparing AI models against human reference translations using BLEU, chrF, TER, and Cosine Similarity.
 
-[View Translation Evaluation →](/toolkit/evals/translation-eval)
+[View Translation Evaluation →](/evaluation-layer/translation-eval)
 
 ---
 

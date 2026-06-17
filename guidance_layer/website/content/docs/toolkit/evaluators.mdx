@@ -10,7 +10,7 @@ pipelines. It ships two evaluator classes — `ExtractionEvaluator` and
 `RAGEvaluator` — plus a `BatchEvaluationRunner` that ties any callable
 pipeline to a dataset.
 
-LLM-graded metrics reuse [LLMJudge v2](/toolkit/evals/llm-judge), so they
+LLM-graded metrics reuse [LLMJudge v2](/evaluation-layer/llm-judge), so they
 share the same Likert / few-shot / panel / calibration machinery as the
 validator. No separate prompt or scoring infrastructure to maintain.
 
@@ -143,10 +143,10 @@ Only `input` is required. `expected`, `context`, and `metadata` are optional.
 
 ## Related
 
-- [LLM-as-Judge](/toolkit/evals/llm-judge) — the underlying grader. Use
+- [LLM-as-Judge](/evaluation-layer/llm-judge) — the underlying grader. Use
   `LLMJudgePanel` for cross-model averaging if you need defensible
   benchmarks.
-- [Calibration](/toolkit/evals/llm-judge#calibration-against-human-labels)
+- [Calibration](/evaluation-layer/llm-judge#calibration-against-human-labels)
   — verify your judge correlates with human raters before trusting any of
   these metrics.
 

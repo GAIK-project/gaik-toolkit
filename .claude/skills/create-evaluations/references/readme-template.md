@@ -1,6 +1,6 @@
 # README Template — Implementation Layer Evaluation
 
-This document defines the canonical structure for `implementation_layer/eval_methods/{component}_eval/README.md`.
+This document defines the canonical structure for `evaluation_layer/eval_methods/{component}_eval/README.md`.
 
 Follow `transcription_eval/README.md` as the gold-standard reference. The sections below are required; mark any section that has no user-provided content as `_N/A — to be completed._`
 
@@ -263,7 +263,7 @@ This evaluation suite supports:
 ### 1. Install Dependencies
 
 \`\`\`bash
-cd implementation_layer/eval_methods/{{component}}_eval
+cd evaluation_layer/eval_methods/{{component}}_eval
 pip install -r requirements.txt
 \`\`\`
 

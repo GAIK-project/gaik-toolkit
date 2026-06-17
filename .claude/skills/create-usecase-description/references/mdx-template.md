@@ -403,7 +403,7 @@ The quality of this use case is evaluated by assessing each software component i
 
 {1–2 sentences describing what is measured and the key metric used.}
 
-> 📊 **{Title}:** [`implementation_layer/eval_methods/{folder}/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/{folder})
+> 📊 **{Title}:** [`evaluation_layer/eval_methods/{folder}/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/{folder})
 ```
 
 Divider `---` follows.

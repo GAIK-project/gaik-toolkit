@@ -57,25 +57,25 @@ _EVAL_BODIES: Dict[str, str] = {
     else:
         print("No matched output/ground-truth pairs found.")
     print("\\nFor full metrics (precision/recall/F1/semantic) run:")
-    print("  implementation_layer/eval_methods/extraction_eval/evaluate.py")""",
+    print("  evaluation_layer/eval_methods/extraction_eval/evaluate.py")""",
     "RAG_eval": """\
     print("For full RAG retrieval metrics (token recall, MRR, rank-weighted coverage) run:")
-    print("  implementation_layer/eval_methods/RAG_eval/")
+    print("  evaluation_layer/eval_methods/RAG_eval/")
     for out_file in output_files:
         print(f"  Output: {out_file.name}")""",
     "transcription_eval": """\
     print("For full transcription metrics (WER/CER) run:")
-    print("  implementation_layer/eval_methods/transcription_eval/")
+    print("  evaluation_layer/eval_methods/transcription_eval/")
     for out_file in output_files:
         print(f"  Output: {out_file.name}")""",
     "report_writing_eval": """\
     print("For full report quality scoring (LLM-as-judge) run:")
-    print("  implementation_layer/eval_methods/report_writing_eval/")
+    print("  evaluation_layer/eval_methods/report_writing_eval/")
     for out_file in output_files:
         print(f"  Output: {out_file.name}")""",
     "translation_eval": """\
     print("For full translation metrics (BLEU/chrF/TER) run:")
-    print("  implementation_layer/eval_methods/translation_eval/")
+    print("  evaluation_layer/eval_methods/translation_eval/")
     for out_file in output_files:
         print(f"  Output: {out_file.name}")""",
 }

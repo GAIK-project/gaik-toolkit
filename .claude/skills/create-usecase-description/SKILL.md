@@ -187,7 +187,7 @@ Use Structure B when both `implementation_layer/no-code-assets/prompts/` and `im
 - Opening sentence: "The quality of this use case is evaluated by assessing each software component independently:"
 - One `###` per evaluator. Each gets:
   - 1–2 sentence description of what is measured and the key metric
-  - `> 📊 **{Title}:** [\`path/\`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/eval_methods/{folder}/)` link
+  - `> 📊 **{Title}:** [\`path/\`](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/{folder}/)` link
 - `---` divider after
 
 **Related Resources (`## Related Resources`):**

@@ -2,8 +2,8 @@
 name: create-evaluations
 description: >-
   Creates evaluation documentation for a GAIK component in both locations:
-  implementation_layer/eval_methods/{component}_eval/ (README + optional script stubs)
-  and guidance_layer/website/content/docs/toolkit/evals/{component}-eval.mdx
+  evaluation_layer/eval_methods/{component}_eval/ (README + optional script stubs)
+  and guidance_layer/website/content/docs/evaluation-layer/{component}-eval.mdx
   (full user-facing page). Also updates index.mdx and meta.json to register the new page.
 argument-hint: "[component-name] [evaluation context: metrics, results, methodology, error analysis, use cases]"
 ---
@@ -20,12 +20,12 @@ Generates evaluation documentation for a GAIK component in two mirrored location
 
 | File | Action |
 |------|--------|
-| `implementation_layer/eval_methods/{component}_eval/README.md` | Create (or promote stub to full) |
-| `implementation_layer/eval_methods/{component}_eval/requirements.txt` | Create if scripts are requested |
-| `implementation_layer/eval_methods/{component}_eval/*.py` | Create script stubs if requested |
-| `guidance_layer/website/content/docs/toolkit/evals/{component}-eval.mdx` | Create (or promote stub to full) |
-| `guidance_layer/website/content/docs/toolkit/evals/index.mdx` | Update: add new entry, remove Coming Soon stub |
-| `guidance_layer/website/content/docs/toolkit/evals/meta.json` | Update: insert page before remaining stubs |
+| `evaluation_layer/eval_methods/{component}_eval/README.md` | Create (or promote stub to full) |
+| `evaluation_layer/eval_methods/{component}_eval/requirements.txt` | Create if scripts are requested |
+| `evaluation_layer/eval_methods/{component}_eval/*.py` | Create script stubs if requested |
+| `guidance_layer/website/content/docs/evaluation-layer/{component}-eval.mdx` | Create (or promote stub to full) |
+| `guidance_layer/website/content/docs/evaluation-layer/index.mdx` | Update: add new entry, remove Coming Soon stub |
+| `guidance_layer/website/content/docs/evaluation-layer/meta.json` | Update: insert page before remaining stubs |
 
 ---
 
@@ -137,7 +137,7 @@ Locate the first `<Callout type="warn">` block in the Available Evaluation Metho
 
 {One-sentence description matching the MDX `description` frontmatter.}
 
-[View {Component Display Name} Evaluation →](/toolkit/evals/{component}-eval)
+[View {Component Display Name} Evaluation →](/evaluation-layer/{component}-eval)
 
 ---
 ```
@@ -154,18 +154,18 @@ After writing all files, print:
 
 ```
 Files created / modified:
-  ✓ implementation_layer/eval_methods/{component}_eval/README.md  (N lines)
-  ✓ guidance_layer/website/content/docs/toolkit/evals/{component}-eval.mdx  (N lines)
-  ✓ guidance_layer/website/content/docs/toolkit/evals/index.mdx  (updated)
-  ✓ guidance_layer/website/content/docs/toolkit/evals/meta.json  (updated)
+  ✓ evaluation_layer/eval_methods/{component}_eval/README.md  (N lines)
+  ✓ guidance_layer/website/content/docs/evaluation-layer/{component}-eval.mdx  (N lines)
+  ✓ guidance_layer/website/content/docs/evaluation-layer/index.mdx  (updated)
+  ✓ guidance_layer/website/content/docs/evaluation-layer/meta.json  (updated)
   [✓ script stubs if generated]
 
 Sections marked N/A: [list or "none"]
 
 To verify:
   cd guidance_layer/website && pnpm dev
-  → /toolkit/evals/{component}-eval  (confirm page renders)
-  → /toolkit/evals               (confirm index entry and sidebar position)
+  → /evaluation-layer/{component}-eval  (confirm page renders)
+  → /evaluation-layer               (confirm index entry and sidebar position)
 ```
 
 ---
@@ -188,6 +188,6 @@ To verify:
 - `references/mdx-template.md` — canonical website MDX structure with frontmatter, section order, MDX component rules, and link conventions
 
 Pattern references (read these when in doubt):
-- `implementation_layer/eval_methods/transcription_eval/README.md` — most complete README example
-- `guidance_layer/website/content/docs/toolkit/evals/transcription-eval.mdx` — most complete MDX example
-- `guidance_layer/website/content/docs/toolkit/evals/extraction-eval.mdx` — second MDX example (simpler results section)
+- `evaluation_layer/eval_methods/transcription_eval/README.md` — most complete README example
+- `guidance_layer/website/content/docs/evaluation-layer/transcription-eval.mdx` — most complete MDX example
+- `guidance_layer/website/content/docs/evaluation-layer/extraction-eval.mdx` — second MDX example (simpler results section)

@@ -78,7 +78,7 @@ guidance_layer/website/
 | `software-modules.mdx` | Software modules documentation |
 | `no-code-assets.mdx` | Prompt templates and agent skills |
 
-### Evaluation methods (`content/docs/toolkit/evals/`)
+### Evaluation methods (`content/docs/evaluation-layer/`)
 | File | Topic |
 |------|-------|
 | `index.mdx` | Quality assessment overview |
