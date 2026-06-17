@@ -247,7 +247,7 @@ Keep steps 4–6; do not over-specify implementation details here (those belong 
 
 ## index.mdx Entry Format
 
-When a full page is created, add this block to `index.mdx` inside the "Available Evaluation Methods" section, before the first `<Callout type="warn">` stub:
+When a full page is created, add this block to `index.mdx` inside the **Output Evaluation Methods → Available Methods** section, at the end of the method list (or before the first `<Callout type="warn">` stub, if any are present):
 
 ```markdown
 ### {{Component Display Name}} Evaluation

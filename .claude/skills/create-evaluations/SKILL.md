@@ -34,8 +34,8 @@ Generates evaluation documentation for a GAIK component in two mirrored location
 ### Phase 1 — Context Parsing
 
 1. Read the component source at `implementation_layer/src/gaik/software_components/{component}/` to understand what the component does, its inputs, outputs, and configuration options.
-2. If a stub README exists at `eval_methods/{component}_eval/README.md`, read it.
-3. If a stub MDX exists at `evals/{component}-eval.mdx`, read it.
+2. If a stub README exists at `evaluation_layer/eval_methods/{component}_eval/README.md`, read it.
+3. If a stub MDX exists at `evaluation-layer/{component}-eval.mdx`, read it.
 4. Map the user-provided context against the **required sections** for both output files (see `references/readme-template.md` and `references/mdx-template.md` for the full section lists).
 5. For each required section where no context was provided, ask the user:
    > "No content was provided for **[Section Name]** (e.g. benchmarking results / error taxonomy / CLI usage). Do you want to supply it now, or continue and mark it N/A?"
@@ -130,7 +130,7 @@ Follow the structure in `references/mdx-template.md`. Key rules:
 
 **4d — Update `index.mdx`**
 
-Locate the first `<Callout type="warn">` block in the Available Evaluation Methods section. Insert the new entry immediately before it (before the preceding `---`):
+In the **Output Evaluation Methods** section, under the **Available Methods** list, append the new entry after the last existing `### … Evaluation` entry. If any Coming Soon `<Callout type="warn">` stubs are present, insert the entry immediately before the first one instead (before its preceding `---`):
 
 ```markdown
 ### {Component Display Name} Evaluation
@@ -146,7 +146,7 @@ If a Coming Soon stub for this component already exists (`### {Name}` + Callout)
 
 **4e — Update `meta.json`**
 
-Insert `"{component}-eval"` in the `pages` array after the last fully-implemented page slug and before the first remaining stub slug. The page key must match the `.mdx` filename exactly (minus `.mdx`).
+Insert `"{component}-eval"` in the `pages` array within the Output Evaluation Methods group — after the `"---Output Evaluation Methods---"` separator and after the last existing method slug (before any remaining stub slug, if present). The page key must match the `.mdx` filename exactly (minus `.mdx`).
 
 ### Phase 5 — Verification Summary
 
