@@ -10,6 +10,7 @@ Business value evaluation now lives in the dedicated **evaluation layer**. The v
 To assess readiness and prepare for GenAI adoption, the toolkit includes an **AI implementation capability assessment and development tool (AICapDev)**. This tool helps organizations identify gaps in their current AI readiness across key capability areas (such as data, skills, governance, technology, and use case management) and define concrete capability development steps and roadmaps to support successful GenAI implementation.
 
 Finally, the strategy layer provides a **GenAI success canvas**, which helps organizations structure and steer the GenAI implementation process. It supports alignment between strategic goals, selected use cases, required capabilities, and expected outcomes, helping organizations move from strategic intent to coordinated and successful execution.
+[GenAI Success Canvas Page](https://github.com/GAIK-project/gaik-toolkit/blob/main/strategy_layer/genai_success_canvas/README.md)
 
 ## Status
 
