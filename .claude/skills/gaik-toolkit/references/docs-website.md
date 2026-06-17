@@ -44,10 +44,12 @@ guidance_layer/website/
 │   │   ├── meta.json
 │   │   ├── software-components.mdx
 │   │   ├── software-modules.mdx
-│   │   ├── no-code-assets.mdx
-│   │   └── evals/              # Evaluation methods
-│   │       ├── meta.json
-│   │       └── *.mdx
+│   │   └── no-code-assets.mdx
+│   ├── evaluation-layer/       # Evaluation layer docs
+│   │   ├── meta.json
+│   │   ├── index.mdx
+│   │   ├── value-evaluation-framework.mdx
+│   │   └── *-eval.mdx
 │   └── use-cases/              # Use case documentation
 │       ├── meta.json
 │       └── *.mdx
@@ -78,12 +80,15 @@ guidance_layer/website/
 | `software-modules.mdx` | Software modules documentation |
 | `no-code-assets.mdx` | Prompt templates and agent skills |
 
-### Evaluation methods (`content/docs/evaluation-layer/`)
+### Evaluation layer (`content/docs/evaluation-layer/`)
 | File | Topic |
 |------|-------|
-| `index.mdx` | Quality assessment overview |
+| `index.mdx` | Evaluation layer overview |
+| `value-evaluation-framework.mdx` | Business-value evaluation framework |
 | `transcription-eval.mdx` | Transcription accuracy evaluation |
 | `extraction-eval.mdx` | Extraction accuracy evaluation |
+| `llm-judge.mdx` | LLM-as-judge validation |
+| `llm-judge-benchmark.mdx` | LLM-judge prompt benchmark |
 | `rag-eval.mdx` | RAG evaluation |
 | `report-writing-eval.mdx` | Report quality evaluation |
 | `translation-eval.mdx` | Translation quality evaluation |
