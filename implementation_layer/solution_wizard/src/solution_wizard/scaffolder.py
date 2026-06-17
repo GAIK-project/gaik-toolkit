@@ -755,9 +755,7 @@ def scaffold_poc(
         _req_prompt = poc_dir / "prompts" / "extraction_requirements.md"
         _hash_file = poc_dir / "schemas" / "output_schema.hash"
         if _req_prompt.exists() and not _hash_file.exists():
-            _hash_file.write_text(
-                hashlib.sha256(_req_prompt.read_bytes()).hexdigest()
-            )
+            _hash_file.write_text(hashlib.sha256(_req_prompt.read_bytes()).hexdigest())
             files_created.append(_hash_file)
     elif has_fields and pattern != "rag":
         # Fallback: no approved schema yet, generate deterministically from
