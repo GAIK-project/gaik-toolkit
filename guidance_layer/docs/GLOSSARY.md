@@ -16,7 +16,7 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 ## B
 
-**Business Layer**: One of the six layers in GAIK's architecture, containing business process modeling, workflows, GenAI product canvas, workflow templates, and work systems definitions for each generic use case.
+**Business Layer**: One of the seven layers in GAIK's architecture, containing business process modeling, workflows, GenAI product canvas, workflow templates, and work systems definitions for each generic use case.
 
 ## C
 
@@ -40,7 +40,9 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 ## E
 
-**Evaluation Methods**: Techniques and scripts for assessing solution performance for each generic use case, including metrics, test cases, and LLM-as-judge approaches.
+**Evaluation Layer**: One of the seven layers in GAIK's architecture, containing the value evaluation framework (business-value assessment) and the output evaluation methods (transcription, extraction, LLM-as-judge, RAG, report writing, and translation evaluation).
+
+**Evaluation Methods**: Techniques and scripts in the evaluation layer for assessing solution performance for each generic use case, including metrics, test cases, and LLM-as-judge approaches.
 
 **Extended BPMN**: An extension of Business Process Model and Notation adapted for modeling GenAI workflows, combining visual and textual representation.
 
@@ -58,11 +60,11 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 **Generic Use Case**: A reusable, template-based solution pattern applicable across multiple organizations or scenarios, such as "invoice processing" or "incident reporting." Each has associated workflows, product canvases, test cases, and implementation assets.
 
-**Guidance Layer**: One of the six layers in GAIK's architecture, containing documentation, best practices, development guides, process guides, configuration wizard, glossary, and the project website.
+**Guidance Layer**: One of the seven layers in GAIK's architecture, containing documentation, best practices, development guides, process guides, configuration wizard, glossary, and the project website.
 
 ## I
 
-**Implementation Layer**: One of the six layers in GAIK's architecture, containing executable code (software components and modules), examples, tests, deployment packages, demos, connectors, evaluation methods, and AIOps monitoring.
+**Implementation Layer**: One of the seven layers in GAIK's architecture, containing executable code (software components and modules), examples, tests, deployment packages, demos, connectors, and AIOps monitoring.
 
 ## K
 
@@ -78,7 +80,7 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 ## L
 
-**Layer-Based Architecture**: GAIK's comprehensive six-layer framework spanning from strategic guidance (Guidance Layer, Strategy Layer, Requirements Layer) through business design (Business Layer) to implementation (Implementation Layer) and governance (Security Compliance Layer).
+**Layer-Based Architecture**: GAIK's comprehensive seven-layer framework spanning from strategic guidance (Guidance Layer, Strategy Layer, Requirements Layer) through business design (Business Layer) to implementation (Implementation Layer), evaluation (Evaluation Layer), and governance (Security Compliance Layer).
 
 ## M
 
@@ -98,13 +100,13 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 **Rahti**: CSC's Finnish container cloud platform (specifically CSC Rahti 2) used for deploying GAIK demonstration apps and production solutions in OpenShift-compatible environments.
 
-**Requirements Layer**: One of the six layers in GAIK's architecture, containing requirements templates, test cases/evals, ground truth data, and input-output pairs for each generic use case.
+**Requirements Layer**: One of the seven layers in GAIK's architecture, containing requirements templates, test cases/evals, ground truth data, and input-output pairs for each generic use case.
 
 **Roles**: Part of the security and compliance framework, defining user permissions and access levels to system functionality and data based on organizational responsibilities.
 
 ## S
 
-**Security Compliance Layer**: One of the six layers in GAIK's architecture, containing security policies, privacy frameworks, compliance guidelines, authentication, roles, secrets management, and audit logging.
+**Security Compliance Layer**: One of the seven layers in GAIK's architecture, containing security policies, privacy frameworks, compliance guidelines, authentication, roles, secrets management, and audit logging.
 
 **Software Components**: Low-level, atomic, reusable utilities that perform specific tasks with fine-grained control. Examples include schema generators, parsers, transcribers, and RAG components. Located in `gaik.software_components.*`.
 
@@ -116,7 +118,7 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 **Specific Use Case**: A customized implementation of a generic use case tailored to a particular organization's requirements, data, and processes.
 
-**Strategy Layer**: One of the six layers in GAIK's architecture, containing strategic planning documents, lists of knowledge processes and services, value evaluation frameworks and models, use case identification frameworks, maturity assessments, and success frameworks.
+**Strategy Layer**: One of the seven layers in GAIK's architecture, containing strategic planning documents, lists of knowledge processes and services, use case identification frameworks, maturity assessments, and success frameworks.
 
 ## T
 
@@ -124,7 +126,7 @@ An alphabetized reference of terms and concepts used in the GAIK Toolkit.
 
 ## V
 
-**Value Evaluation Framework**: A structured approach in the strategy layer for assessing the business value and ROI of implementing GenAI solutions, with specific models for each knowledge process and generic use case.
+**Value Evaluation Framework**: A structured approach in the evaluation layer for assessing the business value and ROI of implementing GenAI solutions, with specific models for each knowledge process and generic use case.
 
 **Value Evaluation Model**: A specific model within the value evaluation framework for quantifying the expected value, costs, and benefits of implementing a particular knowledge process or generic use case.
 
