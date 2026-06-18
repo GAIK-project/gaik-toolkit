@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { User } from "@supabase/supabase-js";
@@ -44,3 +45,16 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
     bypassAuth: false,
   };
 });
+
+/**
+ * Whether the current request can actually open the Solution Wizard — the
+ * per-user `wizard_access` grant (or BYPASS_AUTH) OR the team `?key=` cookie.
+ * Mirrors the gate in proxy.ts so the UI matches who can really get in.
+ */
+export async function getWizardAccess(): Promise<boolean> {
+  if ((await getUserAccessStatus()).wizardAccess) return true;
+  const secret = process.env.WIZARD_ACCESS_SECRET;
+  if (!secret) return false;
+  const cookieStore = await cookies();
+  return cookieStore.get("wizard_access")?.value === secret;
+}

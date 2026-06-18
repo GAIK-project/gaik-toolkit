@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Shield, UserPlus } from "lucide-react";
+import { BookOpen, Compass, Shield, UserPlus } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -12,6 +12,7 @@ import {
   GlimpseImage,
 } from "@/components/kibo-ui/glimpse";
 import { GitHubIcon } from "@/components/github-icon";
+import { useOnboarding } from "@/components/onboarding/onboarding-provider";
 import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
 import { useEffect, useState } from "react";
 
@@ -23,6 +24,7 @@ export interface FooterProps {
 
 export function Footer({ githubPreview }: FooterProps) {
   const currentYear = new Date().getFullYear();
+  const { startTour } = useOnboarding();
 
   // Suppress hydration mismatch: GlimpseTrigger (Radix HoverCard asChild) renders
   // differently on the server vs. client. Only activate the hover card after mount.
@@ -128,6 +130,15 @@ export function Footer({ githubPreview }: FooterProps) {
               <UserPlus className="h-3.5 w-3.5" />
               Request Access
             </Link>
+            <span className="text-border">|</span>
+            <button
+              type="button"
+              onClick={startTour}
+              className="hover:text-foreground flex items-center gap-1.5 transition-colors"
+            >
+              <Compass className="h-3.5 w-3.5" />
+              Take a tour
+            </button>
           </nav>
         </div>
       </div>

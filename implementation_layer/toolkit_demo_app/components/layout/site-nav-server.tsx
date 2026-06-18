@@ -1,6 +1,6 @@
 import { getGithubPreviewSafe } from "@/lib/link-previews";
-import { getUserAccessStatus } from "@/lib/queries/access";
-import { cookies, headers } from "next/headers";
+import { getUserAccessStatus, getWizardAccess } from "@/lib/queries/access";
+import { headers } from "next/headers";
 import { SiteNav } from "./site-nav";
 
 export async function SiteNavServer() {
@@ -16,22 +16,13 @@ export async function SiteNavServer() {
   //   - the team `?key=` cookie holders (httpOnly `wizard_access` cookie), or
   //   - a registered user granted the per-user `wizard_access` flag.
   // Default-deny otherwise.
-  const cookieStore = await cookies();
-  const wizardSecret = process.env.WIZARD_ACCESS_SECRET;
-  const teamCookie =
-    !!wizardSecret && cookieStore.get("wizard_access")?.value === wizardSecret;
-
   let isLoggedIn = false;
-  let dbWizardAccess = false;
   try {
-    const access = await getUserAccessStatus();
-    isLoggedIn = !!access.user;
-    dbWizardAccess = access.wizardAccess;
+    isLoggedIn = !!(await getUserAccessStatus()).user;
   } catch {
     // ignore auth errors
   }
-
-  const hasWizardAccess = teamCookie || dbWizardAccess;
+  const hasWizardAccess = await getWizardAccess();
 
   return (
     <SiteNav

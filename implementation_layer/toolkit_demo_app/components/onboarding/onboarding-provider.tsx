@@ -87,9 +87,9 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   // First-time visitors on the home page get the welcome invite, once.
   useEffect(() => {
     if (!mounted || pathname !== "/") return;
-    const denied =
-      new URLSearchParams(window.location.search).get("wizard") === "denied";
-    if (denied || hasSeenTour()) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("wizard") === "denied" || params.get("tour") === "1") return;
+    if (hasSeenTour()) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time first-visit prompt from localStorage
     setWelcomeOpen(true);
   }, [mounted, pathname]);
@@ -97,9 +97,10 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const startTour = useCallback(async () => {
     setWelcomeOpen(false);
     markTourSeen();
-    // The tour targets home-page anchors; send the user home first if needed.
+    // The tour targets home-page anchors; send the user home first if needed
+    // (it auto-starts there via the ?tour=1 effect below).
     if (window.location.pathname !== "/") {
-      window.location.assign("/");
+      window.location.assign("/?tour=1");
       return;
     }
     const { driver } = await import("driver.js");
@@ -112,6 +113,22 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       steps: TOUR_STEPS,
     }).drive();
   }, []);
+
+  // Cross-page "Take a tour": links elsewhere send the user to /?tour=1; once
+  // home has mounted, auto-start the tour and strip the param.
+  useEffect(() => {
+    if (!mounted || pathname !== "/") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tour") !== "1") return;
+    params.delete("tour");
+    const query = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      window.location.pathname + (query ? `?${query}` : ""),
+    );
+    void startTour();
+  }, [mounted, pathname, startTour]);
 
   const dismissWelcome = useCallback(() => {
     setWelcomeOpen(false);
