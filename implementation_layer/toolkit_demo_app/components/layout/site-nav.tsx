@@ -710,13 +710,14 @@ export function SiteNav({
           <GitHubLink preview={mounted ? githubPreview : null} variant="desktop" />
           {pathname === "/" && (
             <Button
-              variant="ghost"
-              size="sm"
+              variant="outline"
+              size="icon-sm"
               onClick={startTour}
-              className="text-muted-foreground hover:text-foreground hidden gap-1.5 lg:inline-flex"
+              aria-label="Take a tour"
+              title="Take a tour"
+              className="hidden shrink-0 md:inline-flex"
             >
               <Compass className="h-4 w-4" />
-              Take a tour
             </Button>
           )}
           {isLoggedIn && (
