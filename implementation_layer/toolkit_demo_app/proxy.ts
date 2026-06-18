@@ -61,9 +61,10 @@ export default async function proxy(request: NextRequest) {
           );
         }
         // Page: send anonymous visitors to sign-in (to register / request
-        // access); send logged-in users without the flag back to the home page.
+        // access); send logged-in users without the flag home with a flag so
+        // the onboarding provider can explain how to request beta access.
         return NextResponse.redirect(
-          new URL(loggedIn ? "/" : "/sign-in", request.url),
+          new URL(loggedIn ? "/?wizard=denied" : "/sign-in", request.url),
         );
       }
       // Otherwise allowed via registered beta access — fall through.

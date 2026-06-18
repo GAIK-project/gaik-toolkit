@@ -694,7 +694,11 @@ function DemoCardsContent({ isUnlocked }: DemoCardsProps) {
       )}
 
       {/* Use Cases */}
-      <motion.div variants={itemVariants} className="space-y-4">
+      <motion.div
+        variants={itemVariants}
+        className="space-y-4"
+        data-tour="use-cases"
+      >
         <h2 className="font-serif text-2xl font-semibold md:text-3xl">
           Use Cases
         </h2>
@@ -753,7 +757,11 @@ function DemoCardsContent({ isUnlocked }: DemoCardsProps) {
       </motion.div>
 
       {/* Software Components */}
-      <motion.div variants={itemVariants} className="space-y-4">
+      <motion.div
+        variants={itemVariants}
+        className="space-y-4"
+        data-tour="components"
+      >
         <h2 className="font-serif text-2xl font-semibold md:text-3xl">
           Software Components
         </h2>
@@ -799,7 +807,7 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
             </p>
           </div>
         )}
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="use-cases">
           <h2 className="font-serif text-2xl font-semibold md:text-3xl">Use Cases</h2>
           <div className="grid gap-6 md:grid-cols-2">
             {useCaseDemos.map((demo) => (
@@ -835,7 +843,7 @@ export function DemoCards({ isUnlocked }: DemoCardsProps) {
             <ComingSoonSection title="More Modules Coming" items={comingSoonModules} />
           )}
         </div>
-        <div className="space-y-4">
+        <div className="space-y-4" data-tour="components">
           <h2 className="font-serif text-2xl font-semibold md:text-3xl">Software Components</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {buildingBlocks.map((demo) => (

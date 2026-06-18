@@ -348,3 +348,83 @@
     opacity: 0.5;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Guided tour (driver.js) — themed to match the GAIK toolkit. Scoped to the
+   `gaik-tour` popoverClass so it never affects any other driver.js usage.
+--------------------------------------------------------------------------- */
+.driver-popover.gaik-tour {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: 1.1rem 1.25rem 1rem;
+  max-width: 22rem;
+}
+
+.driver-popover.gaik-tour .driver-popover-title {
+  font-family: var(--font-serif), ui-serif, serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.driver-popover.gaik-tour .driver-popover-description {
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.driver-popover.gaik-tour .driver-popover-progress-text {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+}
+
+.driver-popover.gaik-tour .driver-popover-navigation-btns button {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 0.38rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-shadow: none;
+  transition: background-color 0.15s ease;
+}
+
+.driver-popover.gaik-tour .driver-popover-navigation-btns button:hover {
+  background-color: oklch(from var(--primary) calc(l - 0.04) c h);
+}
+
+.driver-popover.gaik-tour .driver-popover-prev-btn {
+  background-color: var(--muted);
+  color: var(--foreground);
+}
+
+.driver-popover.gaik-tour .driver-popover-prev-btn:hover {
+  background-color: oklch(from var(--muted) calc(l - 0.03) c h);
+}
+
+.driver-popover.gaik-tour .driver-popover-close-btn {
+  color: var(--muted-foreground);
+}
+
+.driver-popover.gaik-tour .driver-popover-close-btn:hover {
+  color: var(--foreground);
+}
+
+/* Arrow follows the popover background so it blends in both themes. */
+.driver-popover.gaik-tour .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-left-color: var(--popover);
+}
+.driver-popover.gaik-tour .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-right-color: var(--popover);
+}
+.driver-popover.gaik-tour .driver-popover-arrow-side-top.driver-popover-arrow {
+  border-top-color: var(--popover);
+}
+.driver-popover.gaik-tour
+  .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-bottom-color: var(--popover);
+}

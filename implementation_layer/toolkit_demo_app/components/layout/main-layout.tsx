@@ -17,7 +17,10 @@ export function MainLayout({
   contentWrapper = "default",
 }: MainLayoutProps) {
   return (
-    <div className="flex min-h-screen flex-col">
+    // suppressHydrationWarning: when an onboarding modal opens, Radix sets
+    // aria-hidden on this background wrapper (a third-party DOM mutation React
+    // doesn't track). Harmless and correct for a11y; this silences the warning.
+    <div className="flex min-h-screen flex-col" suppressHydrationWarning>
       <SiteNavServer />
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 pt-8 pb-24 sm:px-8">
         {contentWrapper === "spaced" ? (

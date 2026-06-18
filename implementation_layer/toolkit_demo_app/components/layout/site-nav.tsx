@@ -9,6 +9,7 @@ import {
   GlimpseTitle,
   GlimpseTrigger,
 } from "@/components/kibo-ui/glimpse";
+import { useOnboarding } from "@/components/onboarding/onboarding-provider";
 import { Button } from "@/components/ui/button";
 import {
   NavigationMenu,
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/navigation-menu";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetHeader,
   SheetTitle,
@@ -31,6 +33,7 @@ import {
   AudioWaveform,
   Bot,
   Boxes,
+  Compass,
   Cpu,
   Database,
   ExternalLink,
@@ -339,6 +342,7 @@ function MobileNav({
   isLoggedIn,
   hasWizardAccess,
 }: MobileNavProps) {
+  const { openWizardAccess } = useOnboarding();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -393,16 +397,19 @@ function MobileNav({
                       );
                     }
                     return (
-                      <div
-                        key={item.label}
-                        className="text-muted-foreground/70 flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium"
-                      >
-                        <item.icon className="h-5 w-5" />
-                        {item.label}
-                        <span className="bg-primary/10 text-primary ml-auto rounded px-1.5 py-0.5 text-[10px]">
-                          Beta
-                        </span>
-                      </div>
+                      <SheetClose asChild key={item.label}>
+                        <button
+                          type="button"
+                          onClick={openWizardAccess}
+                          className="text-muted-foreground hover:bg-muted hover:text-foreground flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition"
+                        >
+                          <item.icon className="h-5 w-5" />
+                          {item.label}
+                          <span className="bg-primary/10 text-primary ml-auto rounded px-1.5 py-0.5 text-[10px]">
+                            Beta
+                          </span>
+                        </button>
+                      </SheetClose>
                     );
                   }
 
@@ -490,6 +497,8 @@ export function SiteNav({
   // Use client pathname when available, fall back to server pathname for SSR
   const clientPathname = usePathname();
   const pathname = clientPathname ?? initialPathname;
+
+  const { startTour, openWizardAccess } = useOnboarding();
 
   // Suppress hydration mismatch: GlimpseTrigger (Radix HoverCard asChild) renders
   // a different element on SSR vs client. Only pass the preview after mount so that
@@ -597,18 +606,24 @@ export function SiteNav({
                               }
                               return (
                                 <li key={item.label}>
-                                  <div className="block h-full cursor-not-allowed space-y-1 rounded-md p-3 leading-none opacity-60">
-                                    <div className="text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium">
-                                      <ItemIcon className="h-4 w-4" />
-                                      {item.label}
-                                      <span className="bg-primary/10 text-primary ml-auto rounded px-1.5 py-0.5 text-[10px] font-normal">
-                                        Beta
+                                  <NavigationMenuLink asChild>
+                                    <button
+                                      type="button"
+                                      onClick={openWizardAccess}
+                                      className="hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full w-full space-y-1 rounded-md p-3 text-left leading-none transition-colors outline-none select-none"
+                                    >
+                                      <span className="text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium">
+                                        <ItemIcon className="h-4 w-4" />
+                                        {item.label}
+                                        <span className="bg-primary/10 text-primary ml-auto rounded px-1.5 py-0.5 text-[10px] font-normal">
+                                          Beta
+                                        </span>
                                       </span>
-                                    </div>
-                                    <p className="text-muted-foreground/70 line-clamp-2 text-sm leading-snug">
-                                      In beta — requires access.
-                                    </p>
-                                  </div>
+                                      <span className="text-muted-foreground/70 line-clamp-2 block text-sm leading-snug">
+                                        In beta — request access.
+                                      </span>
+                                    </button>
+                                  </NavigationMenuLink>
                                 </li>
                               );
                             }
@@ -693,6 +708,17 @@ export function SiteNav({
         {/* Right: Actions */}
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
           <GitHubLink preview={mounted ? githubPreview : null} variant="desktop" />
+          {pathname === "/" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={startTour}
+              className="text-muted-foreground hover:text-foreground hidden gap-1.5 lg:inline-flex"
+            >
+              <Compass className="h-4 w-4" />
+              Take a tour
+            </Button>
+          )}
           {isLoggedIn && (
             <Button
               variant="ghost"

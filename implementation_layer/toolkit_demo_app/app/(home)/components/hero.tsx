@@ -1,5 +1,6 @@
 "use client";
 
+import { useOnboarding } from "@/components/onboarding/onboarding-provider";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageTransition } from "@/components/demo/page-transition";
 import { cn } from "@/lib/utils";
@@ -7,6 +8,8 @@ import { ArrowRight, Wand2 } from "lucide-react";
 import Link from "next/link";
 
 export function Hero() {
+  const { openWizardAccess } = useOnboarding();
+
   function scrollToDemos(): void {
     document.getElementById("demos")?.scrollIntoView({ behavior: "smooth" });
   }
@@ -14,7 +17,7 @@ export function Hero() {
   return (
     <PageTransition className="bg-card relative overflow-hidden rounded-3xl border p-8 shadow-sm md:p-12">
       <div className="space-y-6">
-        <div className="space-y-3">
+        <div className="space-y-3" data-tour="hero">
           <h1 className="max-w-3xl font-serif text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl">
             GAIK Toolkit Demos
           </h1>
@@ -45,12 +48,18 @@ export function Hero() {
           </Button>
         </div>
 
-        {/* Solution Configuration Wizard — beta (built, gated behind ?key= access) */}
-        <div className="flex w-fit max-w-full items-center gap-3 rounded-full border border-teal-200/80 bg-teal-50/60 py-2 pr-4 pl-2.5">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-teal-600/10">
+        {/* Solution Configuration Wizard — beta. Clicking explains how to
+            request access (gated behind wizard_access / ?key=). */}
+        <button
+          type="button"
+          data-tour="wizard"
+          onClick={openWizardAccess}
+          className="group flex w-fit max-w-full items-center gap-3 rounded-full border border-teal-200/80 bg-teal-50/60 py-2 pr-3 pl-2.5 text-left transition-colors hover:border-teal-300 hover:bg-teal-50"
+        >
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-teal-600/10">
             <Wand2 className="size-3.5 text-teal-700" />
-          </div>
-          <p className="min-w-0 truncate text-sm text-slate-700">
+          </span>
+          <span className="min-w-0 truncate text-sm text-slate-700">
             <span className="font-semibold text-teal-800">
               Solution Configuration Wizard
             </span>
@@ -58,11 +67,12 @@ export function Hero() {
               {" "}
               turns a plain-language use case into a validated proof of concept.
             </span>
-          </p>
+          </span>
           <span className="shrink-0 rounded-full bg-teal-600/15 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-teal-800 uppercase">
             Beta
           </span>
-        </div>
+          <ArrowRight className="size-3.5 shrink-0 text-teal-700 transition-transform group-hover:translate-x-0.5" />
+        </button>
       </div>
     </PageTransition>
   );

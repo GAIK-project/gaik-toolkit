@@ -1,3 +1,4 @@
+import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { Toaster } from "@/components/ui/toaster";
 import type { Metadata } from "next";
@@ -68,7 +69,7 @@ export default function RootLayout({
         className={`${sora.variable} ${fraunces.variable} ${jetBrainsMono.variable} antialiased`}
       >
         <PostHogProvider>
-          {children}
+          <OnboardingProvider>{children}</OnboardingProvider>
           <Toaster />
         </PostHogProvider>
         {process.env.NEXT_PUBLIC_CHAT_URL && (
