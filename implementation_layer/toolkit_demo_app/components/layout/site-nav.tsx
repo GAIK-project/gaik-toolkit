@@ -33,7 +33,6 @@ import {
   AudioWaveform,
   Bot,
   Boxes,
-  Compass,
   Cpu,
   Database,
   ExternalLink,
@@ -498,7 +497,7 @@ export function SiteNav({
   const clientPathname = usePathname();
   const pathname = clientPathname ?? initialPathname;
 
-  const { startTour, openWizardAccess } = useOnboarding();
+  const { openWizardAccess } = useOnboarding();
 
   // Suppress hydration mismatch: GlimpseTrigger (Radix HoverCard asChild) renders
   // a different element on SSR vs client. Only pass the preview after mount so that
@@ -708,18 +707,6 @@ export function SiteNav({
         {/* Right: Actions */}
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
           <GitHubLink preview={mounted ? githubPreview : null} variant="desktop" />
-          {pathname === "/" && (
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={startTour}
-              aria-label="Take a tour"
-              title="Take a tour"
-              className="hidden shrink-0 md:inline-flex"
-            >
-              <Compass className="h-4 w-4" />
-            </Button>
-          )}
           {isLoggedIn && (
             <Button
               variant="ghost"
