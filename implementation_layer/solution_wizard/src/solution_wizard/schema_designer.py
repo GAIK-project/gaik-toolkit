@@ -61,6 +61,53 @@ def _py_type(type_name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _normalize_spec(target_output_spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a copy of target_output_spec with fields normalised to List[str].
+
+    For multi_source_report use cases, `fields` is a list of section dicts
+    (id, title, instructions, depends_on).  All downstream builders expect a
+    flat List[str] of field names.  This helper extracts field ids and merges
+    section instructions into field_descriptions so the full prompt text is
+    preserved.
+    """
+    raw_fields = target_output_spec.get("fields", [])
+    if not raw_fields or not isinstance(raw_fields[0], dict):
+        return target_output_spec  # already flat; nothing to do
+
+    flat_fields: List[str] = []
+    extra_descriptions: Dict[str, str] = {}
+    for item in raw_fields:
+        fid = item.get("id") or item.get("title", "")
+        flat_fields.append(fid)
+        instr = item.get("instructions", "")
+        if instr:
+            extra_descriptions[fid] = instr
+
+    # Merge: existing field_descriptions take precedence; fill gaps with instructions
+    existing_descs = target_output_spec.get("field_descriptions", {})
+    if not isinstance(existing_descs, dict):
+        existing_descs = {}
+    merged_descriptions = dict(extra_descriptions)
+    merged_descriptions.update(existing_descs)
+
+    # Build a normalised copy
+    normalised = dict(target_output_spec)
+    normalised["fields"] = flat_fields
+    normalised["field_descriptions"] = merged_descriptions
+    # required_fields: if list contains dicts, flatten them too
+    raw_required = normalised.get("required_fields", [])
+    if raw_required and isinstance(raw_required[0], dict):
+        normalised["required_fields"] = [
+            r.get("id", r.get("title", "")) for r in raw_required
+        ]
+    return normalised
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -71,6 +118,7 @@ def build_requirements_text(target_output_spec: Dict[str, Any]) -> str:
     This is passed to AudioToStructuredData / DocumentsToStructuredData as
     user_requirements.  It mirrors the format used in the official examples.
     """
+    target_output_spec = _normalize_spec(target_output_spec)
     fields: List[str] = target_output_spec.get("fields", [])
     field_types: Dict[str, str] = target_output_spec.get("field_types", {})
     required_fields: List[str] = target_output_spec.get("required_fields", [])
@@ -110,6 +158,7 @@ def build_pydantic_model(
     schema hint; the GAIK module generates its own internal schema from the
     user_requirements string.
     """
+    target_output_spec = _normalize_spec(target_output_spec)
     fields: List[str] = target_output_spec.get("fields", [])
     field_types: Dict[str, str] = target_output_spec.get("field_types", {})
     required_fields: List[str] = target_output_spec.get("required_fields", [])
@@ -246,6 +295,7 @@ def build_requirements_json(
             }
         }
     """
+    target_output_spec = _normalize_spec(target_output_spec)
     fields: List[str] = target_output_spec.get("fields", [])
     field_types: Dict[str, str] = target_output_spec.get("field_types", {})
     required_fields: List[str] = target_output_spec.get("required_fields", [])

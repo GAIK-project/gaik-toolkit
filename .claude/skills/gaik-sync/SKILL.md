@@ -113,7 +113,7 @@ Rules for the table:
 Edit only the four wizard assets, only the approved rows:
 - `registries/gaik_component_registry.json` — add/remove/modify entries; keep `input_artifact_types`, `output_artifact_types`, `required_parameters`, `supported_providers`, `subsumes`, `install_extra` correct.
 - `registries/component_reference_cards.json` — fix `import`, `construct`, `call`, `returns`, `options`; add cards for newly-tracked components.
-- `SKILL.md` (Phase 5/6, and Phase 4 schema constraints if the extraction contract changed) — selection rules, option inference, subsumption, provider/model consistency.
+- `SKILL.md` (Phase 5/6, and Phase 4 schema constraints if the extraction contract changed) — selection rules, option inference, subsumption, provider/model consistency. For approved **new software module** findings, also check whether the Phase 5 module-first rule table (`| Pattern | Module to try first |`) needs a new row mapping the module's primary use-case pattern to its name. For approved **new software module** findings whose `output_artifact_types` is **not** `structured_json` (e.g. a report, audio, answer), also check whether Phase 2 Round 3 in `SKILL.md` has an explicit requirement-collection branch for that pattern — if not, add one describing what the wizard must ask the user about the target output (e.g. section titles, per-section instructions, and dependency relationships for a report module). For approved **new software component** findings, also check whether the Phase 5 Step 2 composition bullets (e.g. "Input is audio → Transcriber") need a new bullet for any input→output transformation the new component introduces that is not already covered.
 - `CLAUDE.md` in the wizard dir — only if a schema/`field_type` constraint changed.
 
 Keep edits surgical and in the existing JSON/markdown style. Do not reformat whole files.
@@ -127,10 +127,13 @@ own docs give the semantic ones. Gather, in this order:
 1. **Constructor + method signatures** — `inspect.signature` on the class
    (`__init__` and the primary method). Gives `required_parameters`,
    `optional_parameters`, and the card's `construct`/`call` argument names.
-2. **The component's `README.md`** (under `implementation_layer/src/gaik/software_components/<component>/`)
+   - **`required_parameters`**: parameters with no default on `__init__` or the primary method.
+   - **`optional_parameters`**: every remaining parameter from **both** `__init__` and the primary method (e.g. `run()`, `transcribe()`, `enhance_text()`), excluding internal/programmatic ones (`progress_callback`, `verbose`, `output_dir` are typically not selection-relevant). When in doubt, include rather than omit — a complete list lets the wizard reason about all knobs.
+   - **`options` card array**: for each optional parameter that affects output quality, format, cost, or workflow behaviour, add an entry with `effect`, `selection_relevant`, and `infer_from`. `selection_relevant: true` means the wizard should ask or infer it; `false` means it is documented for completeness only. Never omit a behaviour-changing flag simply because it has a sensible default.
+2. **The component's `README.md`** (under `implementation_layer/src/gaik/software_components/<component>/` for components, `implementation_layer/src/gaik/software_modules/<module>/` for modules)
    — gives `best_for`, `known_limitations`, `quality_tradeoffs`, and the prose for
    what the component is *for*. Do not invent these; quote/condense the README.
-3. **The example script** (`implementation_layer/examples/software_components/<component>/`)
+3. **The example script** (`implementation_layer/examples/software_components/<component>/` for components, `implementation_layer/examples/software_modules/<module>/` for modules)
    — gives the *verified* `call` snippet, the `returns` shape, and a working
    `construct` line. The card's `call`/`returns` must match a real example, not a
    plausible-looking guess (this is the field most likely to break the scaffolded PoC).

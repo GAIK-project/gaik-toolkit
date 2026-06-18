@@ -13,9 +13,12 @@ import {
 import {
   PromptInput,
   PromptInputBody,
+  PromptInputButton,
   PromptInputFooter,
+  PromptInputHeader,
   PromptInputSubmit,
   PromptInputTextarea,
+  usePromptInputAttachments,
 } from "@/components/ai-elements/prompt-input";
 import { Reasoning } from "@/components/ai-elements/reasoning";
 import { Shimmer } from "@/components/ai-elements/shimmer";
@@ -24,7 +27,8 @@ import { WizardFileBrowser } from "@/components/demo/wizard-file-browser";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api-client";
 import { processSSEStream, type SSEEvent } from "@/lib/sse";
-import { Loader2, RotateCcw, Wand2 } from "lucide-react";
+import type { FileUIPart } from "ai";
+import { Loader2, Paperclip, RotateCcw, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -36,8 +40,7 @@ interface ChatMessage {
   reasoning?: string;
 }
 
-let messageCounter = 0;
-const nextId = () => `m${++messageCounter}`;
+const nextId = () => crypto.randomUUID();
 
 /**
  * Translate a raw tool invocation into a friendly, user-facing progress label.
@@ -60,6 +63,45 @@ function friendlyActivity(name: string, summary: string): string {
   if (name === "Read" || name === "Grep" || name === "Glob") return "Preparing…";
   if (name === "Bash") return "Running a configuration step…";
   return "Working…";
+}
+
+function AttachButton({ disabled }: { disabled: boolean }) {
+  const { openFileDialog } = usePromptInputAttachments();
+  return (
+    <PromptInputButton
+      aria-label="Attach file"
+      disabled={disabled}
+      onClick={openFileDialog}
+      title="Attach .txt, .md, .docx or .pdf"
+    >
+      <Paperclip className="size-4" />
+    </PromptInputButton>
+  );
+}
+
+function AttachedFileChips() {
+  const { files, remove } = usePromptInputAttachments();
+  if (files.length === 0) return null;
+  return (
+    <PromptInputHeader>
+      {files.map((f) => (
+        <span
+          key={f.id}
+          className="bg-muted text-muted-foreground inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs"
+        >
+          {f.filename ?? "file"}
+          <button
+            type="button"
+            aria-label={`Remove ${f.filename}`}
+            className="hover:text-foreground ml-0.5"
+            onClick={() => remove(f.id)}
+          >
+            <X className="size-3" />
+          </button>
+        </span>
+      ))}
+    </PromptInputHeader>
+  );
 }
 
 export default function SolutionWizardPage() {
@@ -193,14 +235,17 @@ export default function SolutionWizardPage() {
         content: [
           "## Welcome to the GAIK Solution Configuration Wizard",
           "",
-          "I'll guide you from your business idea to a fully validated **GenAI solution** — including a blueprint, BPMN workflow diagram, documentation, and a runnable proof of concept.",
+          "I'll guide you from your business idea to a fully validated **GenAI Proof of Concept (PoC)** — including a blueprint, BPMN workflow diagram, documentation, and a runnable proof of concept.",
           "",
           "**To get started, describe your use case in plain language.** For example:",
           '- *"We receive voice recordings from field technicians and turn them into structured maintenance tickets."*',
           '- *"We need to extract key fields from incoming supplier PDF invoices."*',
           '- *"We want a Q&A assistant over our internal policy documents."*',
+          '- *"We need to automatically generate a multi-section analysis report from uploaded documents, transcripts, and data files."*',
           "",
           "Give as much or as little context as you like — I'll ask follow-up questions to fill in the details.",
+          "",
+          "If you are ready, let's proceed with the first question.",
         ].join("\n"),
       },
     ]);
@@ -239,20 +284,29 @@ export default function SolutionWizardPage() {
   }, []);
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, attachedFiles: FileUIPart[] = []) => {
       const sid = sessionRef.current;
       if (!sid || busy || !text.trim()) return;
       const gen = genRef.current; // capture before any await
+      const fileNames = attachedFiles.map((f) => f.filename ?? "file").join(", ");
+      const userContent = attachedFiles.length
+        ? `${text}\n\n*Attached: ${fileNames}*`
+        : text;
       setMessages((prev) => [
         ...prev,
-        { id: nextId(), role: "user", content: text },
+        { id: nextId(), role: "user", content: userContent },
       ]);
       setBusy(true);
       try {
+        const files = attachedFiles.map((f) => ({
+          name: f.filename ?? "file",
+          mime_type: f.mediaType ?? "application/octet-stream",
+          data: f.url,
+        }));
         const res = await apiFetch(`/api/wizard/message/${sid}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, files }),
         });
         if (!res.ok) {
           const detail = await res.text();
@@ -385,11 +439,14 @@ export default function SolutionWizardPage() {
           </Conversation>
 
           <PromptInput
-            onSubmit={({ text }) => {
-              if (text) void sendMessage(text);
+            accept=".txt,.md,.docx,.pdf"
+            multiple
+            onSubmit={({ text, files }) => {
+              if (text) void sendMessage(text, files);
             }}
             className="mt-2"
           >
+            <AttachedFileChips />
             <PromptInputBody>
               <PromptInputTextarea
                 className="min-h-11"
@@ -402,7 +459,7 @@ export default function SolutionWizardPage() {
               />
             </PromptInputBody>
             <PromptInputFooter>
-              <div />
+              <AttachButton disabled={!sessionId || busy} />
               <PromptInputSubmit
                 status={busy ? "streaming" : "ready"}
                 disabled={!sessionId || busy}

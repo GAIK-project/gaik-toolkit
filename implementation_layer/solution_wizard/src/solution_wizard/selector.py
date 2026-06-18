@@ -71,6 +71,13 @@ CHAINS: Dict[str, List[str]] = {
         "document_input",
         "classification_result",
     ],
+    "multi_source_report": [
+        "source_files",
+        "normalized_evidence",
+        "report_sections",
+        "markdown_report",
+        "final_output",
+    ],
     "hybrid": [
         "mixed_input",
         "intermediate_output",
@@ -84,6 +91,7 @@ _PATTERN_TO_MODULE: Dict[str, str] = {
     "audio_to_structured": "audio_to_structured_data",
     "document_to_structured": "documents_to_structured_data",
     "rag": "rag_workflow",
+    "multi_source_report": "multi_source_report_generator",
 }
 
 

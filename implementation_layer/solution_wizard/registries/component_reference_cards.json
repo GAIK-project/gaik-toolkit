@@ -5,11 +5,106 @@
     "call": "tr = transcriber.transcribe(input_path)\n    text = tr.enhanced_transcript or tr.raw_transcript",
     "returns": "TranscriptionResult(.raw_transcript, .enhanced_transcript, .job_id)",
     "install_extra": "transcriber",
-    "subsumes": ["TranscriptEnhancer"],
+    "subsumes": [
+      "TranscriptEnhancer"
+    ],
     "options": [
-      {"name": "enhanced_transcript", "type": "bool", "default": false, "effect": "Two-pass transcript enhancement; internally constructs TranscriptEnhancer (Finnish-tuned). For audio input, prefer this over adding a separate TranscriptEnhancer step.", "selection_relevant": true, "infer_from": "language == 'fi' (Finnish). For other languages enhancement needs prompt customisation; default off and flag to the user."},
-      {"name": "language", "type": "str", "default": "auto", "effect": "ISO 639-1 language code (or 'auto').", "selection_relevant": false, "infer_from": "technical_spec.language"},
-      {"name": "diarization", "type": "bool", "default": false, "effect": "Speaker diarization (who spoke when).", "selection_relevant": true, "infer_from": "requirement mentions multiple speakers / meetings / interviews"}
+      {
+        "name": "enhanced_transcript",
+        "type": "bool",
+        "default": false,
+        "effect": "Two-pass transcript enhancement; internally constructs TranscriptEnhancer (Finnish-tuned). For audio input, prefer this over adding a separate TranscriptEnhancer step.",
+        "selection_relevant": true,
+        "infer_from": "language == 'fi' (Finnish). For other languages enhancement needs prompt customisation; default off and flag to the user."
+      },
+      {
+        "name": "language",
+        "type": "str",
+        "default": "auto",
+        "effect": "ISO 639-1 language code (or 'auto').",
+        "selection_relevant": false,
+        "infer_from": "technical_spec.language"
+      },
+      {
+        "name": "diarization",
+        "type": "bool",
+        "default": false,
+        "effect": "Speaker diarization (who spoke when).",
+        "selection_relevant": true,
+        "infer_from": "requirement mentions multiple speakers / meetings / interviews"
+      },
+      {
+        "name": "speaker_count",
+        "type": "int",
+        "default": null,
+        "effect": "Exact number of speakers for diarization (passed to whisper_local).",
+        "selection_relevant": true,
+        "infer_from": "diarization == true AND speaker count is known from requirements -> ask the user for the exact number"
+      },
+      {
+        "name": "min_speakers",
+        "type": "int",
+        "default": null,
+        "effect": "Minimum speaker count hint for diarization when exact count is unknown.",
+        "selection_relevant": true,
+        "infer_from": "diarization == true AND speaker count is a range rather than a fixed number"
+      },
+      {
+        "name": "max_speakers",
+        "type": "int",
+        "default": null,
+        "effect": "Maximum speaker count hint for diarization when exact count is unknown.",
+        "selection_relevant": true,
+        "infer_from": "diarization == true AND speaker count is a range rather than a fixed number"
+      },
+      {
+        "name": "enhanced_transcript_instructions",
+        "type": "str",
+        "default": null,
+        "effect": "Extra correction instructions forwarded to the internal TranscriptEnhancer (Pass 2). Use to inject domain vocabulary, abbreviations, or proper nouns.",
+        "selection_relevant": true,
+        "infer_from": "enhanced_transcript == true AND domain_vocabulary or domain-specific terminology is present"
+      },
+      {
+        "name": "default_prompt",
+        "type": "str",
+        "default": "Detect the language and extract transcript in the same language.",
+        "effect": "Whisper transcription prompt prepended before custom_context. Override to bias the model toward domain terminology.",
+        "selection_relevant": true,
+        "infer_from": "domain_vocabulary is provided OR source language is known in advance and not auto-detected correctly"
+      },
+      {
+        "name": "initial_prompt",
+        "type": "str",
+        "default": null,
+        "effect": "Whisper initial_prompt hint (whisper_local only). Seeds the decoder with domain terminology to reduce ASR errors.",
+        "selection_relevant": true,
+        "infer_from": "transcription_model == whisper_local AND domain_vocabulary is present"
+      },
+      {
+        "name": "output_dir",
+        "type": "str",
+        "default": "transcriber_workspace",
+        "effect": "Directory where intermediate workspace files are written.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - set only when a custom workspace path is needed"
+      },
+      {
+        "name": "max_size_mb",
+        "type": "int",
+        "default": 25,
+        "effect": "File-size threshold in MB above which audio is chunked before transcription.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave default unless the API provider has a different size limit"
+      },
+      {
+        "name": "max_duration_seconds",
+        "type": "int",
+        "default": 1500,
+        "effect": "Duration threshold in seconds above which audio is chunked before transcription.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave default unless the API provider has a different duration limit"
+      }
     ]
   },
   "TranscriptEnhancer": {
@@ -19,7 +114,38 @@
     "returns": "result(.enhanced_text, .summary)",
     "install_extra": "enhance-transcript",
     "options": [
-      {"name": "additional_instructions", "type": "str", "default": null, "effect": "Domain-specific correction instructions.", "selection_relevant": false, "infer_from": "domain_vocabulary"}
+      {
+        "name": "additional_instructions",
+        "type": "str",
+        "default": null,
+        "effect": "Domain-specific correction instructions.",
+        "selection_relevant": false,
+        "infer_from": "domain_vocabulary"
+      },
+      {
+        "name": "domain_rules",
+        "type": "str",
+        "default": null,
+        "effect": "Domain-specific override rules injected into both enhancement passes (Pass 1 and Pass 2 system prompts). Takes precedence over general rules where stated. Use to enforce domain spelling, abbreviations, or proper nouns.",
+        "selection_relevant": true,
+        "infer_from": "domain_vocabulary or domain-specific terminology is present (distinct from additional_instructions which only applies to Pass 2)"
+      },
+      {
+        "name": "generate_summary",
+        "type": "bool",
+        "default": false,
+        "effect": "Appends a CorrectionSummary (total_changes, insertions, deletions, substitutions) to the result for auditing how many tokens were changed.",
+        "selection_relevant": true,
+        "infer_from": "human_review == yes OR audit trail of corrections is required"
+      },
+      {
+        "name": "diff_chunks",
+        "type": "bool",
+        "default": false,
+        "effect": "Populates result.diff_chunks with a token-level diff between the original and enhanced text; useful for review UIs.",
+        "selection_relevant": true,
+        "infer_from": "human_review == yes AND a diff view is needed in the integration target"
+      }
     ],
     "note": "Finnish-tuned. When the input is audio, do NOT add this as a separate step -- set Transcriber(enhanced_transcript=True) instead, which calls this internally. Use this standalone only to enhance an already-existing transcript (text input)."
   },
@@ -36,7 +162,17 @@
     "construct": "extractor = DataExtractor(config=get_openai_config(use_azure=use_azure))",
     "call": "extracted_fields = extractor.extract(extraction_model=schema, requirements=requirements, user_requirements=user_requirements, documents=[source_text])",
     "returns": "list[dict] (one dict per document)",
-    "install_extra": "extract"
+    "install_extra": "extract",
+    "options": [
+      {
+        "name": "save_json",
+        "type": "bool",
+        "default": false,
+        "effect": "When True, writes the list of extracted result dicts to a JSON file at json_path after extraction completes.",
+        "selection_relevant": false,
+        "infer_from": "integration_targets include file export or audit trail -> set True and configure json_path; otherwise leave False"
+      }
+    ]
   },
   "Extractor": {
     "import": "from gaik.software_components.extractor import SchemaGenerator, DataExtractor, get_openai_config",
@@ -53,9 +189,43 @@
     "returns": "VisionExtractionResult(.data dict, .model, .documents_processed)",
     "install_extra": "vision-extract",
     "options": [
-      {"name": "include_verification", "type": "bool", "default": false, "effect": "Per-field confidence + reasoning, useful before human review.", "selection_relevant": true, "infer_from": "human_review == yes OR target_output_spec.confidence_required"},
-      {"name": "model_provider", "type": "enum", "values": ["openai", "anthropic", "google"], "default": "openai", "effect": "Vision LLM provider.", "selection_relevant": false, "infer_from": "technical_spec.model_provider"},
-      {"name": "merge_table", "type": "bool", "default": false, "effect": "Merge table data into the extracted text.", "selection_relevant": false, "infer_from": "inputs contain tables"}
+      {
+        "name": "include_verification",
+        "type": "bool",
+        "default": false,
+        "effect": "Per-field confidence + reasoning, useful before human review.",
+        "selection_relevant": true,
+        "infer_from": "human_review == yes OR target_output_spec.confidence_required"
+      },
+      {
+        "name": "model_provider",
+        "type": "enum",
+        "values": [
+          "openai",
+          "anthropic",
+          "google"
+        ],
+        "default": "openai",
+        "effect": "Vision LLM provider.",
+        "selection_relevant": false,
+        "infer_from": "technical_spec.model_provider"
+      },
+      {
+        "name": "merge_table",
+        "type": "bool",
+        "default": false,
+        "effect": "Merge table data into the extracted text.",
+        "selection_relevant": false,
+        "infer_from": "inputs contain tables"
+      },
+      {
+        "name": "additional_instructions",
+        "type": "str",
+        "default": null,
+        "effect": "Extra text appended to the user extraction prompt. Use to inject domain-specific rules, field-level hints, or language directives without replacing the built-in prompt.",
+        "selection_relevant": false,
+        "infer_from": "domain_vocabulary OR special extraction rules exist -> encode as additional_instructions; leave null for standard extraction"
+      }
     ]
   },
   "MultimodalParser": {
@@ -65,8 +235,43 @@
     "returns": "ParseResult(.raw_markdown, .clean_markdown)",
     "install_extra": "multimodal-parser",
     "options": [
-      {"name": "model_provider", "type": "enum", "values": ["openai", "claude", "google"], "default": "openai", "effect": "Parsing LLM provider.", "selection_relevant": false, "infer_from": "technical_spec.model_provider"},
-      {"name": "merge_table", "type": "bool", "default": false, "effect": "Merge tables into the markdown text.", "selection_relevant": false, "infer_from": "inputs contain tables"}
+      {
+        "name": "model_provider",
+        "type": "enum",
+        "values": [
+          "openai",
+          "claude",
+          "google"
+        ],
+        "default": "openai",
+        "effect": "Parsing LLM provider.",
+        "selection_relevant": false,
+        "infer_from": "technical_spec.model_provider"
+      },
+      {
+        "name": "merge_table",
+        "type": "bool",
+        "default": false,
+        "effect": "Merge tables into the markdown text.",
+        "selection_relevant": false,
+        "infer_from": "inputs contain tables"
+      },
+      {
+        "name": "additional_instructions",
+        "type": "str",
+        "default": null,
+        "effect": "Extra text appended to the user prompt for every parse call. Use to inject domain-specific formatting rules, language hints, or field-focus instructions without replacing the built-in prompt.",
+        "selection_relevant": false,
+        "infer_from": "domain_vocabulary OR special output formatting requirements; leave null unless the user specifies extra parsing guidance"
+      },
+      {
+        "name": "create_html",
+        "type": "bool",
+        "default": false,
+        "effect": "When True, also renders the cleaned markdown into a standalone styled HTML document and exposes it as ParseResult.html.",
+        "selection_relevant": true,
+        "infer_from": "output_types include html OR integration_target is a web UI that consumes HTML"
+      }
     ]
   },
   "VisionParser": {
@@ -74,21 +279,75 @@
     "construct": "parser = VisionParser(openai_config=get_openai_config(use_azure=use_azure))",
     "call": "pages = parser.convert_pdf(str(input_path), clean_output=True)\n    parsed_text = '\\n\\n'.join(pages)",
     "returns": "list[str] (markdown pages)",
-    "install_extra": "parser"
+    "install_extra": "parser",
+    "options": [
+      {
+        "name": "custom_prompt",
+        "type": "str",
+        "default": null,
+        "effect": "Overrides the built-in page-conversion prompt. When set, the supplied text replaces the default 'Convert this document page to accurate markdown' instruction sent to the vision model.",
+        "selection_relevant": true,
+        "infer_from": "domain_vocabulary OR special formatting requirements -> ask for a custom extraction prompt"
+      },
+      {
+        "name": "use_context",
+        "type": "bool",
+        "default": true,
+        "effect": "When True, feeds the tail of the previous page's markdown to the model so that tables and sections that span page boundaries are continued seamlessly.",
+        "selection_relevant": false,
+        "infer_from": "multi-page documents with cross-page tables; leave True (default) unless a single-page document"
+      },
+      {
+        "name": "dpi",
+        "type": "int",
+        "default": 200,
+        "effect": "PDF-to-image rendering resolution passed to PyMuPDF. Higher DPI improves OCR quality on dense or small-font pages at the cost of larger images and higher token usage.",
+        "selection_relevant": true,
+        "infer_from": "inputs are low-DPI scans OR small-font dense documents -> suggest raising to 300"
+      },
+      {
+        "name": "clean_output",
+        "type": "bool",
+        "default": true,
+        "effect": "When True and the PDF has more than one page, runs a second LLM call to merge and clean the per-page markdown outputs into a single coherent document.",
+        "selection_relevant": false,
+        "infer_from": "single-page documents only -> set False to avoid the extra LLM call; otherwise leave True"
+      }
+    ]
   },
   "PyMuPDFParser": {
     "import": "from gaik.software_components.parsers import PyMuPDFParser",
     "construct": "parser = PyMuPDFParser()",
     "call": "res = parser.parse_document(str(input_path), use_markdown=True)\n    parsed_text = res['text_content']",
     "returns": "dict(.text_content, .word_count)",
-    "install_extra": "parser-cpu"
+    "install_extra": "parser-cpu",
+    "options": [
+      {
+        "name": "use_markdown",
+        "type": "bool",
+        "default": true,
+        "effect": "When True, extracts plain text concatenated page by page. When False, extracts structured text annotated with (x, y) bounding-box coordinates for each text span - useful for layout-sensitive downstream processing.",
+        "selection_relevant": false,
+        "infer_from": "downstream needs positional/layout data -> False; otherwise leave True"
+      }
+    ]
   },
   "DocxParser": {
     "import": "from gaik.software_components.parsers import DocxParser",
     "construct": "parser = DocxParser()",
     "call": "res = parser.parse_document(str(input_path), use_markdown=True)\n    parsed_text = res['text_content']",
     "returns": "dict(.text_content)",
-    "install_extra": "parser-cpu"
+    "install_extra": "parser-cpu",
+    "options": [
+      {
+        "name": "use_markdown",
+        "type": "bool",
+        "default": true,
+        "effect": "When True, extracts plain paragraph and table text. When False, emits a structured representation with paragraph-index, style-name, and table-cell markers - useful for style-aware downstream processing.",
+        "selection_relevant": false,
+        "infer_from": "downstream needs paragraph style / formatting metadata -> False; otherwise leave True"
+      }
+    ]
   },
   "DoclingParser": {
     "import": "from gaik.software_components.parsers import DoclingParser",
@@ -97,8 +356,46 @@
     "returns": "dict(.text_content, .word_count)",
     "install_extra": "parser",
     "options": [
-      {"name": "enable_ocr", "type": "bool", "default": true, "effect": "OCR for scanned / image-based PDFs.", "selection_relevant": true, "infer_from": "inputs are scanned or image-based PDFs"},
-      {"name": "enable_table_structure", "type": "bool", "default": true, "effect": "Extract table structure.", "selection_relevant": false, "infer_from": "inputs contain tables"}
+      {
+        "name": "enable_ocr",
+        "type": "bool",
+        "default": true,
+        "effect": "OCR for scanned / image-based PDFs.",
+        "selection_relevant": true,
+        "infer_from": "inputs are scanned or image-based PDFs"
+      },
+      {
+        "name": "enable_table_structure",
+        "type": "bool",
+        "default": true,
+        "effect": "Extract table structure.",
+        "selection_relevant": false,
+        "infer_from": "inputs contain tables"
+      },
+      {
+        "name": "enable_formula_enrichment",
+        "type": "bool",
+        "default": true,
+        "effect": "Runs Docling's formula/equation enrichment pipeline to detect and render mathematical notation. Adds processing time; safe to disable for documents without formulas.",
+        "selection_relevant": true,
+        "infer_from": "input documents contain mathematical formulas or scientific notation -> keep True; otherwise set False to reduce latency"
+      },
+      {
+        "name": "ocr_engine",
+        "type": "str",
+        "default": "rapidocr",
+        "effect": "Selects the OCR backend when enable_ocr=True. Options: 'rapidocr' (no system deps), 'tesseract_cli' / 'tesseract' (system Tesseract required), 'easyocr' (GPU-friendly). Affects language support, accuracy, and system dependencies.",
+        "selection_relevant": true,
+        "infer_from": "enable_ocr == true AND (non-Latin script OR language != 'en') -> prefer easyocr or tesseract; default rapidocr works for Latin-script documents with no system deps"
+      },
+      {
+        "name": "use_markdown",
+        "type": "bool",
+        "default": true,
+        "effect": "When True, exports the parsed document as markdown (including embedded images). When False, uses Docling's structured-text export which preserves more layout metadata but is less readable.",
+        "selection_relevant": false,
+        "infer_from": "downstream component expects raw markdown -> True (default); downstream needs structured positional data -> False"
+      }
     ]
   },
   "DocumentClassifier": {
@@ -106,7 +403,17 @@
     "construct": "classifier = DocumentClassifier(config=get_openai_config(use_azure=use_azure))",
     "call": "result = classifier.classify(file_or_dir=str(input_path), classes=categories)\n    # result: {filename: {'class':..., 'confidence':..., 'reasoning':...}}",
     "returns": "dict[filename -> {class, confidence, reasoning}]",
-    "install_extra": "classifier"
+    "install_extra": "classifier",
+    "options": [
+      {
+        "name": "parser",
+        "type": "enum",
+        "default": null,
+        "effect": "Force a specific parser instead of auto-detecting by file extension. Options: 'pymupdf' (text PDFs), 'docx' (Word), 'vision' (images and scanned PDFs). When None, the classifier auto-selects based on file type.",
+        "selection_relevant": true,
+        "infer_from": "input_formats: scanned or image-based PDFs require 'vision'; auto-detection is correct for mixed batches"
+      }
+    ]
   },
   "Embedder": {
     "import": "from gaik.software_components.RAG.embedder import Embedder, get_openai_config",
@@ -129,9 +436,30 @@
     "returns": "list[Document]",
     "install_extra": "retriever",
     "options": [
-      {"name": "hybrid_search", "type": "bool", "default": false, "effect": "Combine semantic + keyword search.", "selection_relevant": true, "infer_from": "queries mix exact terms (codes, names, IDs) with conceptual questions"},
-      {"name": "re_rank", "type": "bool", "default": false, "effect": "Cross-encoder re-ranking of retrieved results.", "selection_relevant": true, "infer_from": "retrieval precision is critical"},
-      {"name": "top_k", "type": "int", "default": 5, "effect": "Number of chunks retrieved.", "selection_relevant": false, "infer_from": "answer breadth requirement"}
+      {
+        "name": "hybrid_search",
+        "type": "bool",
+        "default": false,
+        "effect": "Combine semantic + keyword search.",
+        "selection_relevant": true,
+        "infer_from": "queries mix exact terms (codes, names, IDs) with conceptual questions"
+      },
+      {
+        "name": "re_rank",
+        "type": "bool",
+        "default": false,
+        "effect": "Cross-encoder re-ranking of retrieved results.",
+        "selection_relevant": true,
+        "infer_from": "retrieval precision is critical"
+      },
+      {
+        "name": "top_k",
+        "type": "int",
+        "default": 5,
+        "effect": "Number of chunks retrieved.",
+        "selection_relevant": false,
+        "infer_from": "answer breadth requirement"
+      }
     ]
   },
   "AnswerGenerator": {
@@ -141,8 +469,22 @@
     "returns": "str (or iterable[str] if stream=True)",
     "install_extra": "answer-generator",
     "options": [
-      {"name": "citations", "type": "bool", "default": false, "effect": "Include source citations in the answer.", "selection_relevant": true, "infer_from": "traceability / citation requirement"},
-      {"name": "stream", "type": "bool", "default": true, "effect": "Stream answer tokens.", "selection_relevant": false, "infer_from": "runtime_interface (interactive demo vs. batch)"}
+      {
+        "name": "citations",
+        "type": "bool",
+        "default": false,
+        "effect": "Include source citations in the answer.",
+        "selection_relevant": true,
+        "infer_from": "traceability / citation requirement"
+      },
+      {
+        "name": "stream",
+        "type": "bool",
+        "default": true,
+        "effect": "Stream answer tokens.",
+        "selection_relevant": false,
+        "infer_from": "runtime_interface (interactive demo vs. batch)"
+      }
     ]
   },
   "LLMJudge": {
@@ -152,7 +494,28 @@
     "returns": "HallucinationReport(.flags)",
     "install_extra": "llm-judge",
     "options": [
-      {"name": "model_provider", "type": "enum", "values": ["openai", "azure", "anthropic", "google"], "default": "google", "effect": "Judge LLM provider; using a provider different from the extractor reduces shared-model bias.", "selection_relevant": false, "infer_from": "technical_spec.model_provider"}
+      {
+        "name": "model_provider",
+        "type": "enum",
+        "values": [
+          "openai",
+          "azure",
+          "anthropic",
+          "google"
+        ],
+        "default": "google",
+        "effect": "Judge LLM provider; using a provider different from the extractor reduces shared-model bias.",
+        "selection_relevant": false,
+        "infer_from": "technical_spec.model_provider"
+      },
+      {
+        "name": "max_tokens",
+        "type": "int",
+        "default": 4096,
+        "effect": "Upper bound on the judge response length in tokens. Increase for rubrics with many fields; decrease to cap cost on simple binary checks.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave default unless the rubric is very large or you need to cap cost"
+      }
     ]
   },
   "LLMJudgePanel": {
@@ -162,7 +525,14 @@
     "returns": "JudgePanelResult(.aggregated_flags, .agreement_score, .per_judge)",
     "install_extra": "llm-judge",
     "options": [
-      {"name": "judges", "type": "list[LLMJudge]", "default": "(required, >= 2)", "effect": "Two or more judges; diverse providers give the strongest debiasing via majority vote.", "selection_relevant": true, "infer_from": "high-stakes validation that warrants more than one judge"}
+      {
+        "name": "judges",
+        "type": "list[LLMJudge]",
+        "default": "(required, >= 2)",
+        "effect": "Two or more judges; diverse providers give the strongest debiasing via majority vote.",
+        "selection_relevant": true,
+        "infer_from": "high-stakes validation that warrants more than one judge"
+      }
     ]
   },
   "TextToSpeech": {
@@ -170,7 +540,49 @@
     "construct": "tts = TextToSpeech(api_config=get_openai_config(use_azure=use_azure), language=language)",
     "call": "sr = tts.synthesize(text)\n    saved_path = sr.save(output_dir)",
     "returns": "SpeechSynthesisResult(.audio_bytes); .save(dir) -> Path",
-    "install_extra": "text-to-speech"
+    "install_extra": "text-to-speech",
+    "options": [
+      {
+        "name": "language",
+        "type": "enum",
+        "default": "fi",
+        "effect": "Spoken language; controls the pronunciation instruction injected into the synthesis request. Supported: 'fi' (Finnish), 'en' (English).",
+        "selection_relevant": true,
+        "infer_from": "technical_spec.language or output language requirement"
+      },
+      {
+        "name": "voice",
+        "type": "str",
+        "default": "marin",
+        "effect": "TTS voice name (provider-specific). The default 'marin' is a Finnish-optimised voice. Change when a different persona or language accent is required.",
+        "selection_relevant": true,
+        "infer_from": "persona, brand voice, or language accent requirement is stated"
+      },
+      {
+        "name": "response_format",
+        "type": "enum",
+        "default": "mp3",
+        "effect": "Audio output format. Supported: mp3, opus, aac, flac, wav, pcm. Choose based on integration target codec requirements.",
+        "selection_relevant": true,
+        "infer_from": "integration_target audio codec requirement (e.g., browser streaming -> mp3/opus; telephony -> wav/pcm)"
+      },
+      {
+        "name": "speed",
+        "type": "float",
+        "default": 1,
+        "effect": "Playback speed multiplier for the synthesized audio (e.g., 0.9 for slower, 1.2 for faster).",
+        "selection_relevant": false,
+        "infer_from": "accessibility or pacing requirement - leave default unless the user specifies a speed preference"
+      },
+      {
+        "name": "default_instructions",
+        "type": "str",
+        "default": null,
+        "effect": "Persistent speaking-style or persona instructions prepended to every synthesis call (e.g., 'Speak in a calm, professional tone.').",
+        "selection_relevant": true,
+        "infer_from": "brand voice, tone, or consistent persona is required across all synthesized audio"
+      }
+    ]
   },
   "PostgresAgent": {
     "import": "from gaik.software_components.postgres_agent import PostgresAgent",
@@ -179,8 +591,62 @@
     "returns": "AnswerResult(.answer, .generated_sql, .query_result)",
     "install_extra": "postgres-agent",
     "options": [
-      {"name": "table_allowlist", "type": "list[str]", "default": null, "effect": "Restrict which tables the agent may query (security).", "selection_relevant": true, "infer_from": "security_constraints / access controls"},
-      {"name": "answer_language", "type": "str", "default": "en", "effect": "Language of the natural-language answer.", "selection_relevant": false, "infer_from": "technical_spec.language"}
+      {
+        "name": "table_allowlist",
+        "type": "list[str]",
+        "default": null,
+        "effect": "Restrict which tables the agent may query (security).",
+        "selection_relevant": true,
+        "infer_from": "security_constraints / access controls"
+      },
+      {
+        "name": "answer_language",
+        "type": "str",
+        "default": "en",
+        "effect": "Language of the natural-language answer.",
+        "selection_relevant": false,
+        "infer_from": "technical_spec.language"
+      },
+      {
+        "name": "max_retries",
+        "type": "int",
+        "default": 3,
+        "effect": "Number of agentic-loop attempts when SQL generation or execution fails. Increase for complex queries; set to 1 for fail-fast behaviour.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave default; increase if queries are consistently complex"
+      },
+      {
+        "name": "max_rows",
+        "type": "int",
+        "default": 100,
+        "effect": "Hard cap on rows returned by run_sql. Prevents large result sets from flooding the LLM context window.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave default; reduce for token-budget-sensitive deployments"
+      },
+      {
+        "name": "statement_timeout_ms",
+        "type": "int",
+        "default": 10000,
+        "effect": "PostgreSQL per-statement timeout in milliseconds (0 disables). Guards against slow or unindexed queries.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave default; reduce for interactive apps that require fast responses"
+      },
+      {
+        "name": "schema_name",
+        "type": "str",
+        "default": "public",
+        "effect": "The PostgreSQL schema (search_path) the agent operates on. Change when tables live in a non-default schema.",
+        "selection_relevant": true,
+        "infer_from": "database has tables in a non-public schema -> ask for the schema name; otherwise leave 'public'"
+      },
+      {
+        "name": "extra_instructions",
+        "type": "str",
+        "default": null,
+        "effect": "Free-form text appended to the SQL-generation prompt. Use for a domain glossary, naming conventions, or example question-to-SQL pairs to improve query accuracy.",
+        "selection_relevant": true,
+        "infer_from": "domain has non-obvious naming conventions or abbreviations, or the user supplies example queries -> encode as extra_instructions"
+      }
     ]
   },
   "ExtractionEvaluator": {
@@ -190,7 +656,34 @@
     "returns": "ExtractionEvaluationResult(.aggregate Precision/Recall/F1, .items)",
     "install_extra": "evaluators",
     "options": [
-      {"name": "match_mode", "type": "enum", "values": ["exact", "semantic"], "default": "exact", "effect": "Field comparison mode; 'semantic' needs a judge for free-text fields.", "selection_relevant": true, "infer_from": "free-text fields needing semantic (not exact) matching"}
+      {
+        "name": "match_mode",
+        "type": "enum",
+        "values": [
+          "exact",
+          "semantic"
+        ],
+        "default": "exact",
+        "effect": "Field comparison mode; 'semantic' needs a judge for free-text fields.",
+        "selection_relevant": true,
+        "infer_from": "free-text fields needing semantic (not exact) matching"
+      },
+      {
+        "name": "case_insensitive",
+        "type": "bool",
+        "default": true,
+        "effect": "When True, exact string comparisons fold case (e.g. 'Yes' == 'yes'). Set False only when case is semantically significant in the extracted fields.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave True (default) unless case matters for the extraction domain"
+      },
+      {
+        "name": "strip_whitespace",
+        "type": "bool",
+        "default": true,
+        "effect": "When True, leading/trailing whitespace is stripped before exact comparison. Prevents spurious mismatches from OCR or model spacing artifacts.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave True (default)"
+      }
     ]
   },
   "RAGEvaluator": {
@@ -200,7 +693,14 @@
     "returns": "RAGEvaluationResult(.aggregate faithfulness/relevance/context, .items)",
     "install_extra": "evaluators",
     "options": [
-      {"name": "skip_context_recall", "type": "bool", "default": true, "effect": "Skip the context-recall metric when no ground truth is available.", "selection_relevant": false, "infer_from": "ground-truth availability"}
+      {
+        "name": "skip_context_recall",
+        "type": "bool",
+        "default": true,
+        "effect": "Skip the context-recall metric when no ground truth is available.",
+        "selection_relevant": false,
+        "infer_from": "ground-truth availability"
+      }
     ]
   },
   "BatchEvaluationRunner": {
@@ -210,7 +710,18 @@
     "returns": "RunnerResult(.outputs, .errors)",
     "install_extra": "evaluators",
     "options": [
-      {"name": "on_error", "type": "enum", "values": ["raise", "skip"], "default": "raise", "effect": "Whether to skip dataset items that raise during the pipeline run.", "selection_relevant": false, "infer_from": "dataset robustness needs"}
+      {
+        "name": "on_error",
+        "type": "enum",
+        "values": [
+          "raise",
+          "skip"
+        ],
+        "default": "raise",
+        "effect": "Whether to skip dataset items that raise during the pipeline run.",
+        "selection_relevant": false,
+        "infer_from": "dataset robustness needs"
+      }
     ]
   },
   "FormUnderstander": {
@@ -218,7 +729,17 @@
     "construct": "understander = FormUnderstander(config=api_config)",
     "call": "labels = understander.clean_labels(field_ids)",
     "returns": "mapping of cryptic form-field ids -> human-readable labels",
-    "install_extra": "form-understander"
+    "install_extra": "",
+    "options": [
+      {
+        "name": "language_hint",
+        "type": "enum",
+        "default": null,
+        "effect": "Output language for cleaned labels. 'fi' -> Finnish, 'en' -> English. When None the LLM auto-detects from the HTML snippets. Set explicitly when the form language is known to avoid misdetection.",
+        "selection_relevant": true,
+        "infer_from": "technical_spec.language - set 'fi' for Finnish forms, 'en' for English forms; omit for mixed or unknown"
+      }
+    ]
   },
   "AudioToStructuredData": {
     "import": "from gaik.software_modules.audio_to_structured_data import AudioToStructuredData",
@@ -226,8 +747,23 @@
     "call": "result = pipeline.run(file_path=input_path, user_requirements=user_requirements, schema=schema, requirements=requirements)\n    extracted_fields = result.extracted_fields\n    source_text = result.transcription.enhanced_transcript or result.transcription.raw_transcript",
     "returns": "PipelineResult(.transcription, .extracted_fields, .schema, .requirements)",
     "install_extra": "audio-to-structured-data",
-    "subsumes": ["Transcriber", "TranscriptEnhancer", "SchemaGenerator", "DataExtractor"],
-    "note": "End-to-end module: already transcribes (with Finnish enhancement), generates the schema, and extracts. Do NOT also add Transcriber / TranscriptEnhancer / SchemaGenerator / DataExtractor as separate steps."
+    "subsumes": [
+      "Transcriber",
+      "TranscriptEnhancer",
+      "SchemaGenerator",
+      "DataExtractor"
+    ],
+    "note": "End-to-end module: already transcribes (with Finnish enhancement), generates the schema, and extracts. Do NOT also add Transcriber / TranscriptEnhancer / SchemaGenerator / DataExtractor as separate steps.",
+    "options": [
+      {
+        "name": "enhanced_transcript",
+        "type": "bool",
+        "default": false,
+        "effect": "Two-pass Finnish transcript enhancement; passed as transcriber_ctor={\"enhanced_transcript\": True}. Internally constructs TranscriptEnhancer. Adds ~60s latency for a 5-min recording. Default off for non-Finnish audio.",
+        "selection_relevant": true,
+        "infer_from": "language == 'fi' (Finnish input). For other languages, enhancement needs prompt customisation; default off and flag to the user."
+      }
+    ]
   },
   "DocumentsToStructuredData": {
     "import": "from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData",
@@ -235,9 +771,25 @@
     "call": "result = pipeline.run(file_path=input_path, user_requirements=user_requirements, parser_choice='vision_parser', schema=schema, requirements=requirements)\n    extracted_fields = result.extracted_fields\n    source_text = '\\n\\n'.join(result.parsed_documents)",
     "returns": "PipelineResult(.parsed_documents, .extracted_fields, .schema, .requirements)",
     "install_extra": "documents-to-structured-data",
-    "subsumes": ["SchemaGenerator", "DataExtractor"],
+    "subsumes": [
+      "SchemaGenerator",
+      "DataExtractor"
+    ],
     "options": [
-      {"name": "parser_choice", "type": "enum", "values": ["vision_parser", "docling_parser", "pymupdf_parser", "docx_parser"], "default": "vision_parser", "effect": "Which parser sub-component the module uses internally.", "selection_relevant": true, "infer_from": "input_formats: scanned/visual PDF -> vision_parser/docling_parser; text PDF -> pymupdf_parser; DOCX -> docx_parser"}
+      {
+        "name": "parser_choice",
+        "type": "enum",
+        "values": [
+          "vision_parser",
+          "docling_parser",
+          "pymupdf_parser",
+          "docx_parser"
+        ],
+        "default": "vision_parser",
+        "effect": "Which parser sub-component the module uses internally.",
+        "selection_relevant": true,
+        "infer_from": "input_formats: scanned/visual PDF -> vision_parser/docling_parser; text PDF -> pymupdf_parser; DOCX -> docx_parser"
+      }
     ],
     "note": "End-to-end module: parses then extracts. Do NOT also add a parser / SchemaGenerator / DataExtractor as separate steps; choose the internal parser via parser_choice."
   },
@@ -247,10 +799,85 @@
     "call": "workflow.index_documents(document_paths)\n    rr = workflow.ask(user_query)\n    answer = rr.answer",
     "returns": "RAGWorkflowResult(.answer, .documents)",
     "install_extra": "rag-workflow",
-    "subsumes": ["Embedder", "PgVectorStore", "Retriever", "AnswerGenerator"],
+    "subsumes": [
+      "Embedder",
+      "PgVectorStore",
+      "Retriever",
+      "AnswerGenerator"
+    ],
     "options": [
-      {"name": "citations", "type": "bool", "default": false, "effect": "Include source citations in the answer.", "selection_relevant": true, "infer_from": "traceability / citation requirement"},
-      {"name": "retriever_top_k", "type": "int", "default": 5, "effect": "Number of chunks retrieved.", "selection_relevant": false, "infer_from": "answer breadth requirement"}
+      {
+        "name": "citations",
+        "type": "bool",
+        "default": false,
+        "effect": "Include source citations in the answer.",
+        "selection_relevant": true,
+        "infer_from": "traceability / citation requirement"
+      },
+      {
+        "name": "retriever_top_k",
+        "type": "int",
+        "default": 5,
+        "effect": "Number of chunks retrieved.",
+        "selection_relevant": false,
+        "infer_from": "answer breadth requirement"
+      },
+      {
+        "name": "retriever_hybrid",
+        "type": "bool",
+        "default": false,
+        "effect": "Enables hybrid BM25 + vector search in the Retriever. Improves recall when queries mix exact terms (codes, IDs, names) with conceptual questions.",
+        "selection_relevant": true,
+        "infer_from": "queries mix exact keyword terms (product codes, names, IDs) with conceptual or semantic questions"
+      },
+      {
+        "name": "retriever_rerank",
+        "type": "bool",
+        "default": false,
+        "effect": "Enables cross-encoder re-ranking of retrieved chunks for higher retrieval precision. Adds one extra inference pass per query.",
+        "selection_relevant": true,
+        "infer_from": "retrieval precision is critical OR accuracy_critical == yes"
+      },
+      {
+        "name": "conversation_history",
+        "type": "bool",
+        "default": true,
+        "effect": "Maintains the last `last_n` Q/A pairs as context for subsequent questions. Enables follow-up questions but increases prompt size.",
+        "selection_relevant": true,
+        "infer_from": "multi-turn chat / conversational interface required; set false for single-shot batch Q&A"
+      },
+      {
+        "name": "stream",
+        "type": "bool",
+        "default": true,
+        "effect": "Stream answer tokens from the AnswerGenerator instead of waiting for the full response.",
+        "selection_relevant": false,
+        "infer_from": "runtime_interface: interactive/chat UI -> true; batch pipeline or API -> false"
+      },
+      {
+        "name": "last_n",
+        "type": "int",
+        "default": 3,
+        "effect": "Number of Q/A pairs retained in conversation history when conversation_history=True.",
+        "selection_relevant": false,
+        "infer_from": "conversation_history == true; leave default unless the user specifies a context window budget"
+      },
+      {
+        "name": "retriever_threshold",
+        "type": "float",
+        "default": null,
+        "effect": "Minimum similarity score for a chunk to be included in results. Filters out low-relevance chunks; None means no threshold.",
+        "selection_relevant": false,
+        "infer_from": "technical tuning; leave None unless retrieval returns too many low-relevance results"
+      },
+      {
+        "name": "persist",
+        "type": "bool",
+        "default": true,
+        "effect": "When true, uses a persistent Chroma vector store at persist_path. When false, the store is in-memory only and lost after the process exits.",
+        "selection_relevant": false,
+        "infer_from": "always true for production use; set false only for ephemeral tests or demos"
+      }
     ],
     "note": "End-to-end module: embeds, stores, retrieves, and answers. Do NOT also add Embedder / PgVectorStore / Retriever / AnswerGenerator as separate steps."
   },
@@ -290,6 +917,22 @@
         "effect": "Nominal chunk length for parallel splitting.",
         "selection_relevant": false,
         "infer_from": "leave default unless the user tunes throughput"
+      },
+      {
+        "name": "language",
+        "type": "str",
+        "default": null,
+        "effect": "ISO 639-1 language code passed to Whisper (e.g., 'fi', 'en'). None means auto-detect. Setting explicitly improves accuracy when the language is known.",
+        "selection_relevant": true,
+        "infer_from": "technical_spec.language - set when source language is known and not mixed"
+      },
+      {
+        "name": "prompt",
+        "type": "str",
+        "default": null,
+        "effect": "Optional Whisper prompt to bias the decoder toward domain vocabulary or proper nouns.",
+        "selection_relevant": true,
+        "infer_from": "domain_vocabulary is present - provide key terms to reduce ASR errors"
       }
     ],
     "note": "FFmpeg + ffprobe must be on PATH. Use this instead of Transcriber for long media or when fast parallel throughput matters; it does not do Finnish enhancement (no enhanced_transcript option)."
@@ -382,6 +1025,105 @@
         "effect": "Also write report.docx alongside report.md. Requires the multi-source-report-generator-docx extra and the Pandoc system binary.",
         "selection_relevant": true,
         "infer_from": "output_format == word OR user requests .docx"
+      },
+      {
+        "name": "strict_review",
+        "type": "bool",
+        "default": false,
+        "effect": "Agentic mode only. When true, raises before writing any output if the diff-editor reviewer has unresolved edits after retries. Use when the report must never be persisted with unresolved reviewer corrections.",
+        "selection_relevant": true,
+        "infer_from": "agentic == true AND (human_review == yes OR accuracy_critical)"
+      },
+      {
+        "name": "review_options",
+        "type": "dict",
+        "default": null,
+        "effect": "Agentic mode only. LLM config dict for the reviewer pass (same shape as writer_options). When None, the reviewer reuses the writer model/config.",
+        "selection_relevant": true,
+        "infer_from": "user specifies a separate or stronger model for fact-checking"
+      },
+      {
+        "name": "include_source_references",
+        "type": "bool",
+        "default": true,
+        "effect": "When true, the writer cites source filenames inline. Automatically suppressed when only one input source is provided.",
+        "selection_relevant": true,
+        "infer_from": "citation or traceability requirement; set false when citations are undesirable in the output"
+      },
+      {
+        "name": "section_context_mode",
+        "type": "enum",
+        "values": [
+          "all_evidence"
+        ],
+        "default": "all_evidence",
+        "effect": "Controls what evidence context each section writer receives. Currently only all_evidence is supported.",
+        "selection_relevant": false,
+        "infer_from": "reserved for future use"
+      },
+      {
+        "name": "verbose",
+        "type": "bool",
+        "default": false,
+        "effect": "When true, prints per-section progress messages to the console during an agentic run: evidence loading, optional curation, drafting, reviewer corrections applied, and polish pass. Has no effect in single-call mode.",
+        "selection_relevant": false,
+        "infer_from": "agentic == true -> always set true in PoC so the user can see the per-section workflow at the CLI"
+      },
+      {
+        "name": "writer_options",
+        "type": "dict",
+        "default": null,
+        "effect": "LLM config dict for the report writer. Key: 'model' (e.g. 'gpt-5.4'). When None, the module uses its default model. Passed to every section-writing LLM call in both single-call and agentic mode.",
+        "selection_relevant": true,
+        "infer_from": "user specifies a writing/extraction model -> set writer_options={'model': '<model>'}"
+      },
+      {
+        "name": "transcriber_options",
+        "type": "dict",
+        "default": null,
+        "effect": "Options passed to the internal Transcriber when audio/video files are among the inputs. Common keys: 'model' (transcription model, e.g. 'gpt-4o-transcribe'), 'language' (ISO 639-1, e.g. 'fi'), 'enhanced_transcript' (bool, Finnish two-pass enhancement). When None, the Transcriber uses its own defaults.",
+        "selection_relevant": true,
+        "infer_from": "input contains audio/video -> always set; model: 'gpt-4o-transcribe' for standard use; language: infer from technical_spec.language; enhanced_transcript: true for Finnish audio"
+      },
+      {
+        "name": "report_title",
+        "type": "str",
+        "default": "Generated Report",
+        "effect": "Title placed at the top of the generated report and DOCX file.",
+        "selection_relevant": true,
+        "infer_from": "report type and customer name are known -> set a descriptive title (e.g. 'AI Consultancy Report')"
+      },
+      {
+        "name": "include_evidence_index",
+        "type": "bool",
+        "default": true,
+        "effect": "When true, writes an evidence_index.json alongside the report listing every source file processed. Useful for audit trails; set false to suppress.",
+        "selection_relevant": false,
+        "infer_from": "audit trail or source-traceability requirement -> leave true; suppress only if explicitly unwanted"
+      },
+      {
+        "name": "max_evidence_chars",
+        "type": "int",
+        "default": null,
+        "effect": "Hard cap on the total character length of the assembled evidence pack passed to the writer. Prevents context-window overflows for very large source sets. When None, the full evidence is used.",
+        "selection_relevant": false,
+        "infer_from": "very large source set (many files or long documents) that risks exceeding the model's context window -> set a limit (e.g. 200000)"
+      },
+      {
+        "name": "parser_options",
+        "type": "dict",
+        "default": null,
+        "effect": "Advanced options passed through to the selected PDF/document parser (e.g. DoclingParser OCR settings). Most use cases do not need this; leave null unless the chosen parser_choice requires specific configuration.",
+        "selection_relevant": false,
+        "infer_from": "parser_choice is set to a non-default value AND the parser requires additional configuration"
+      },
+      {
+        "name": "image_options",
+        "type": "dict",
+        "default": null,
+        "effect": "Options passed to the internal vision/image handler when image files are among the inputs. Key: 'model' (vision model override). When None, the module uses its default vision model.",
+        "selection_relevant": false,
+        "infer_from": "input contains standalone image files AND user specifies a preferred vision model"
       }
     ],
     "note": "End-to-end report synthesis module: parses/transcribes/extracts every source file itself and writes the full report. Do NOT add parsers, Transcriber, or VisionExtractor as separate steps. Provide input_paths + sections (each with title, instructions, optional id and depends_on). Sections with depends_on are written after their dependencies in agentic mode, receiving finalized dependency content as context. Use save_report_config/load_report_config to persist and reuse use-case configurations. Install multi-source-report-generator-agentic for agentic mode; multi-source-report-generator-docx for DOCX export."

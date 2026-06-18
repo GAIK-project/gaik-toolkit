@@ -26,7 +26,8 @@
     "optional_parameters": [
       "language",
       "transcription_model",
-      "extraction_model"
+      "extraction_model",
+      "enhanced_transcript"
     ],
     "supported_providers": [
       "openai",
@@ -210,7 +211,14 @@
     "optional_parameters": [
       "embedding_model",
       "retrieval_top_k",
-      "answer_model"
+      "answer_model",
+      "retriever_hybrid",
+      "retriever_rerank",
+      "stream",
+      "conversation_history",
+      "last_n",
+      "persist",
+      "retriever_threshold"
     ],
     "supported_providers": [
       "openai",
@@ -302,7 +310,11 @@
       "language",
       "word_timestamps",
       "enhanced_transcript",
-      "diarization"
+      "diarization",
+      "speaker_count",
+      "enhanced_transcript_instructions",
+      "default_prompt",
+      "initial_prompt"
     ],
     "supported_providers": [
       "openai",
@@ -366,7 +378,8 @@
     "optional_parameters": [
       "generate_summary",
       "diff_chunks",
-      "additional_instructions"
+      "additional_instructions",
+      "domain_rules"
     ],
     "supported_providers": [
       "openai",
@@ -452,7 +465,7 @@
     },
     "known_limitations": [
       "Requires schema or field requirements to extract against",
-      "When provider=azure_openai: bare dict and list[dict] Pydantic field types cause a 400 error — Azure OpenAI structured output requires additionalProperties:false on every object. Replace with named sub-models using ConfigDict(extra='forbid'). E.g. define class Medication(BaseModel) with model_config=ConfigDict(extra='forbid') and use list[Medication] instead of list[dict].",
+      "When provider=azure_openai: bare dict and list[dict] Pydantic field types cause a 400 error â€” Azure OpenAI structured output requires additionalProperties:false on every object. Replace with named sub-models using ConfigDict(extra='forbid'). E.g. define class Medication(BaseModel) with model_config=ConfigDict(extra='forbid') and use list[Medication] instead of list[dict].",
       "ExtractionRequirements field_type enum does not include plain 'dict'. For nested objects use field_type 'str' in requirements JSON; for arrays of objects use 'list[dict]'. Never write field_type: 'dict' directly."
     ],
     "best_for": [
@@ -504,7 +517,8 @@
       "schema_ref",
       "reasoning_effort",
       "include_verification",
-      "use_azure"
+      "use_azure",
+      "additional_instructions"
     ],
     "supported_providers": [
       "openai",
@@ -583,7 +597,8 @@
     ],
     "optional_parameters": [
       "classification_model",
-      "include_confidence"
+      "include_confidence",
+      "parser"
     ],
     "supported_providers": [
       "openai",
@@ -736,12 +751,14 @@
     "optional_parameters": [
       "rubric_ref",
       "judge_model",
-      "panel_size"
+      "panel_size",
+      "max_tokens"
     ],
     "supported_providers": [
       "openai",
       "azure_openai",
-      "anthropic"
+      "anthropic",
+      "google"
     ],
     "cost_relevant_parameters": [
       "judge_model",
@@ -806,7 +823,9 @@
       "transcription_model",
       "response_format",
       "chunk_duration_minutes",
-      "transcription_workers"
+      "transcription_workers",
+      "language",
+      "prompt"
     ],
     "supported_providers": [
       "openai",
@@ -889,14 +908,23 @@
       "report_description",
       "report_language",
       "sample_report_path",
+      "output_dir",
+      "include_source_references",
+      "include_evidence_index",
+      "max_evidence_chars",
+      "section_context_mode",
       "parser_choice",
+      "parser_options",
       "image_options",
       "agentic",
+      "review_options",
+      "strict_review",
       "output_docx",
       "writer_options",
       "transcriber_options",
       "curate_evidence",
-      "polish"
+      "polish",
+      "verbose"
     ],
     "supported_providers": [
       "openai",
@@ -908,7 +936,7 @@
       "section_context_mode"
     ],
     "quality_tradeoffs": {
-      "speed_vs_accuracy": "Single-call mode: one LLM call writes the whole report — fast and cheap, higher hallucination risk. Agentic mode (agentic=True): each section is drafted independently and fact-checked by a diff-editor reviewer — higher accuracy, more API calls (N draft + N reviewer per section). Vision/multimodal parsers add latency but handle complex layouts.",
+      "speed_vs_accuracy": "Single-call mode: one LLM call writes the whole report â€” fast and cheap, higher hallucination risk. Agentic mode (agentic=True): each section is drafted independently and fact-checked by a diff-editor reviewer â€” higher accuracy, more API calls (N draft + N reviewer per section). Vision/multimodal parsers add latency but handle complex layouts.",
       "cost_sensitivity": "high -- scales with number of source files and number of report sections; agentic mode multiplies LLM calls by section count",
       "degrades_on": [
         "very_large_source_sets",
@@ -959,5 +987,525 @@
     "example_script_path": "implementation_layer/examples/software_modules/multi_source_report_generator/",
     "readme_path": "implementation_layer/src/gaik/software_modules/multi_source_report_generator/README.md",
     "install_extra": "multi-source-report-generator"
+  },
+  {
+    "id": "llm_judge_panel",
+    "name": "LLMJudgePanel",
+    "type": "software_component",
+    "input_artifact_types": [
+      "structured_json",
+      "text"
+    ],
+    "output_artifact_types": [
+      "validation_report",
+      "judgement"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [
+      "LLMJudge"
+    ],
+    "required_parameters": [
+      "judges"
+    ],
+    "optional_parameters": [],
+    "supported_providers": [
+      "openai",
+      "azure_openai",
+      "anthropic",
+      "google"
+    ],
+    "cost_relevant_parameters": [
+      "judges"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Panel of 2+ judges with majority vote reduces single-model bias at higher latency and cost",
+      "cost_sensitivity": "high -- one LLM call per judge per item",
+      "degrades_on": [
+        "highly_subjective_evaluation_criteria"
+      ]
+    },
+    "known_limitations": [
+      "Requires at least 2 LLMJudge instances; diverse providers give strongest debiasing",
+      "Not a substitute for human review in safety-critical workflows"
+    ],
+    "best_for": [
+      "high_stakes_validation",
+      "debiased_judgement",
+      "multi_provider_consensus"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "panel_validate",
+        "component": "LLMJudgePanel",
+        "inputs": [
+          "source_pages",
+          "structured_json"
+        ],
+        "outputs": [
+          "validation_report"
+        ],
+        "parameters": {
+          "judges": "[judge_a, judge_b]"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/validators/llm_judge/",
+    "import_path": "gaik.software_components.validators.llm_judge",
+    "example_script_path": "implementation_layer/examples/software_components/validators/",
+    "readme_path": "implementation_layer/src/gaik/software_components/validators/llm_judge/README.md",
+    "install_extra": "llm-judge"
+  },
+  {
+    "id": "extraction_evaluator",
+    "name": "ExtractionEvaluator",
+    "type": "software_component",
+    "input_artifact_types": [
+      "structured_json"
+    ],
+    "output_artifact_types": [
+      "evaluation_report"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [
+      "LLMJudge"
+    ],
+    "required_parameters": [],
+    "optional_parameters": [
+      "match_mode",
+      "judge",
+      "case_insensitive",
+      "strip_whitespace"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai",
+      "anthropic",
+      "google"
+    ],
+    "cost_relevant_parameters": [
+      "match_mode"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Semantic mode uses LLMJudge for free-text fields; adds LLM cost but tolerates paraphrasing",
+      "cost_sensitivity": "low (exact) to medium (semantic)",
+      "degrades_on": [
+        "highly_ambiguous_free_text_fields"
+      ]
+    },
+    "known_limitations": [
+      "match_mode='semantic' requires a judge instance",
+      "Does not handle nested/list field comparison -- flatten before evaluating"
+    ],
+    "best_for": [
+      "extraction_quality_benchmarking",
+      "precision_recall_measurement",
+      "hallucination_rate_tracking"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "evaluate_extraction",
+        "component": "ExtractionEvaluator",
+        "inputs": [
+          "expected_outputs",
+          "extracted_outputs"
+        ],
+        "outputs": [
+          "evaluation_report"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/evaluators/",
+    "import_path": "gaik.software_components.evaluators",
+    "example_script_path": "implementation_layer/examples/software_components/evaluators/",
+    "readme_path": "implementation_layer/src/gaik/software_components/evaluators/README.md",
+    "install_extra": "evaluators"
+  },
+  {
+    "id": "rag_evaluator",
+    "name": "RAGEvaluator",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text"
+    ],
+    "output_artifact_types": [
+      "evaluation_report"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [
+      "LLMJudge"
+    ],
+    "required_parameters": [
+      "judge"
+    ],
+    "optional_parameters": [
+      "skip_context_recall"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai",
+      "anthropic",
+      "google"
+    ],
+    "cost_relevant_parameters": [
+      "judge"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "4 LLM calls per item (faithfulness, relevance, precision, recall); context_recall only when ground_truth provided",
+      "cost_sensitivity": "medium-high -- 3-4 judge calls per RAG item",
+      "degrades_on": [
+        "very_short_context_passages"
+      ]
+    },
+    "known_limitations": [
+      "context_recall requires ground_truth; skipped otherwise (skip_context_recall=True by default)",
+      "Scores are Likert 1-5 normalized to 0-1; not calibrated against human raters"
+    ],
+    "best_for": [
+      "rag_pipeline_quality_measurement",
+      "faithfulness_evaluation",
+      "retrieval_quality_assessment"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "evaluate_rag",
+        "component": "RAGEvaluator",
+        "inputs": [
+          "rag_outputs"
+        ],
+        "outputs": [
+          "evaluation_report"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/evaluators/",
+    "import_path": "gaik.software_components.evaluators",
+    "example_script_path": "implementation_layer/examples/software_components/evaluators/",
+    "readme_path": "implementation_layer/src/gaik/software_components/evaluators/README.md",
+    "install_extra": "evaluators"
+  },
+  {
+    "id": "batch_evaluation_runner",
+    "name": "BatchEvaluationRunner",
+    "type": "software_component",
+    "input_artifact_types": [
+      "structured_json"
+    ],
+    "output_artifact_types": [
+      "structured_json"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "pipeline"
+    ],
+    "optional_parameters": [
+      "on_error"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Sequential execution; on_error='skip' continues past failures at risk of incomplete results",
+      "cost_sensitivity": "determined by the pipeline callable",
+      "degrades_on": [
+        "very_large_datasets_without_parallelism"
+      ]
+    },
+    "known_limitations": [
+      "Sequential only; no parallel execution",
+      "on_error='raise' stops on first failure; 'skip' records failures in result.failures"
+    ],
+    "best_for": [
+      "evaluation_dataset_runs",
+      "batch_pipeline_execution",
+      "test_set_inference"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "batch_run",
+        "component": "BatchEvaluationRunner",
+        "inputs": [
+          "evaluation_dataset"
+        ],
+        "outputs": [
+          "pipeline_outputs"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/evaluators/",
+    "import_path": "gaik.software_components.evaluators",
+    "example_script_path": "implementation_layer/examples/software_components/evaluators/",
+    "readme_path": "implementation_layer/src/gaik/software_components/evaluators/README.md",
+    "install_extra": "evaluators"
+  },
+  {
+    "id": "schema_generator",
+    "name": "SchemaGenerator",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text"
+    ],
+    "output_artifact_types": [
+      "structured_json"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "config"
+    ],
+    "optional_parameters": [],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Two LLM calls (structure detection + field parsing); flat schemas need only one pass",
+      "cost_sensitivity": "low -- two small structured-output calls per schema generation",
+      "degrades_on": [
+        "extremely_ambiguous_requirements_text"
+      ]
+    },
+    "known_limitations": [
+      "Supports Azure OpenAI and OpenAI only; no Anthropic/Google for structured output",
+      "field_type enum is limited: str/int/float/bool/list[str]/date/decimal/list[dict] -- 'dict' is not valid",
+      "Azure OpenAI structured output rejects bare dict/list[dict] field types -- replace with named Pydantic sub-models"
+    ],
+    "best_for": [
+      "dynamic_schema_generation",
+      "natural_language_to_pydantic_model",
+      "extraction_schema_design"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "generate_schema",
+        "component": "SchemaGenerator",
+        "inputs": [
+          "user_requirements_text"
+        ],
+        "outputs": [
+          "pydantic_schema"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/extractor/",
+    "import_path": "gaik.software_components.extractor",
+    "example_script_path": "implementation_layer/examples/software_components/extractor/",
+    "readme_path": "implementation_layer/src/gaik/software_components/extractor/README.md",
+    "install_extra": "extract"
+  },
+  {
+    "id": "text_to_speech",
+    "name": "TextToSpeech",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text"
+    ],
+    "output_artifact_types": [
+      "audio"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "use_azure",
+      "model",
+      "language",
+      "voice",
+      "response_format",
+      "speed",
+      "default_instructions",
+      "instructions"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "model"
+    ],
+    "quality_tradeoffs": {
+      "cost_sensitivity": "low -- single TTS API call per synthesize() call",
+      "degrades_on": [
+        "very_long_texts_may_require_chunking"
+      ]
+    },
+    "known_limitations": [
+      "Supports only 'fi' (Finnish) and 'en' (English) language options",
+      "Voice names are provider-specific; default 'marin' is Finnish-optimised"
+    ],
+    "best_for": [
+      "text_to_audio",
+      "spoken_summaries",
+      "accessibility_narration",
+      "audio_content_generation"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "synthesize_speech",
+        "component": "TextToSpeech",
+        "inputs": [
+          "input_text"
+        ],
+        "outputs": [
+          "audio_file"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/text_to_speech/",
+    "import_path": "gaik.software_components.text_to_speech",
+    "example_script_path": "implementation_layer/examples/software_components/text_to_speech/",
+    "readme_path": "implementation_layer/src/gaik/software_components/text_to_speech/README.md",
+    "install_extra": "text-to-speech"
+  },
+  {
+    "id": "postgres_agent",
+    "name": "PostgresAgent",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text"
+    ],
+    "output_artifact_types": [
+      "answer",
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "connection_string"
+    ],
+    "optional_parameters": [
+      "config",
+      "model",
+      "max_retries",
+      "max_rows",
+      "statement_timeout_ms",
+      "table_allowlist",
+      "schema_name",
+      "extra_instructions",
+      "answer_language"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai",
+      "anthropic",
+      "google"
+    ],
+    "cost_relevant_parameters": [
+      "model"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Agentic retry loop (max_retries) improves SQL accuracy at cost of latency",
+      "cost_sensitivity": "low-medium -- one to three LLM calls per question",
+      "degrades_on": [
+        "very_large_schemas_without_table_allowlist",
+        "highly_ambiguous_questions"
+      ]
+    },
+    "known_limitations": [
+      "Read-only SELECT queries only; no writes, DDL, or data import",
+      "Full schema placed in LLM prompt; very large databases need table_allowlist",
+      "Requires a live PostgreSQL connection at runtime"
+    ],
+    "best_for": [
+      "natural_language_db_query",
+      "ad_hoc_data_exploration",
+      "nl_to_sql",
+      "database_qa"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "ask_database",
+        "component": "PostgresAgent",
+        "inputs": [
+          "user_question",
+          "connection_string"
+        ],
+        "outputs": [
+          "natural_language_answer"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/postgres_agent/",
+    "import_path": "gaik.software_components.postgres_agent",
+    "example_script_path": "implementation_layer/examples/software_components/postgres_agent/",
+    "readme_path": "implementation_layer/src/gaik/software_components/postgres_agent/README.md",
+    "install_extra": "postgres-agent"
+  },
+  {
+    "id": "form_understander",
+    "name": "FormUnderstander",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text"
+    ],
+    "output_artifact_types": [
+      "structured_json"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "config"
+    ],
+    "optional_parameters": [
+      "model",
+      "language_hint"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "model"
+    ],
+    "quality_tradeoffs": {
+      "cost_sensitivity": "low -- single structured LLM call per batch of fields",
+      "degrades_on": [
+        "highly_ambiguous_identifiers_without_parent_html_context"
+      ]
+    },
+    "known_limitations": [
+      "No README available -- sourced from module docstring and source inspection",
+      "No example script available",
+      "LLM-based labelling; ambiguous field IDs may need parent HTML snippet for context",
+      "No extra pip install needed; bundled with base gaik install"
+    ],
+    "best_for": [
+      "form_field_label_cleanup",
+      "cryptic_asp_net_id_translation",
+      "rendering_form_ui_labels"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "clean_form_labels",
+        "component": "FormUnderstander",
+        "inputs": [
+          "raw_field_list"
+        ],
+        "outputs": [
+          "human_readable_label_map"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/form_understander/",
+    "import_path": "gaik.software_components.form_understander",
+    "example_script_path": "",
+    "readme_path": "",
+    "install_extra": ""
   }
 ]

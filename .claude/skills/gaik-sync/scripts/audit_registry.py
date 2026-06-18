@@ -236,10 +236,15 @@ def _finding(category: str, component: str, detail: str, file_hint: str) -> dict
 def check_parity(reg, cards) -> list[dict]:
     reg_names = {e["name"] for e in reg.all()}
     card_names = set(cards.names())
-    return [
+    out = [
         _finding("parity", n, "registry component has no reference card", CARDS_FILE)
         for n in sorted(reg_names - card_names)
     ]
+    out += [
+        _finding("parity", n, "reference card has no registry entry", REGISTRY_FILE)
+        for n in sorted(card_names - reg_names)
+    ]
+    return out
 
 
 def check_removed(cards) -> list[dict]:

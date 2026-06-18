@@ -20,6 +20,7 @@ implementation_layer/solution_wizard/run_wizard_interactive.py):
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 import shutil
 import tempfile
@@ -103,8 +104,46 @@ SESSION_IDLE_SECONDS = 30 * 60  # reap sessions idle longer than this
 WIZARD_SESSIONS: dict[str, dict] = {}
 
 
+class FileAttachment(BaseModel):
+    name: str
+    mime_type: str
+    data: str  # base64 data URL: "data:<mime>;base64,<bytes>"
+
+
 class MessageRequest(BaseModel):
     text: str
+    files: list[FileAttachment] = []
+
+
+def _extract_text_from_attachment(attachment: FileAttachment) -> str:
+    """Extract plain text from an uploaded file using GAIK parsers for PDF/DOCX."""
+    raw = attachment.data
+    if "," in raw:
+        raw = raw.split(",", 1)[1]
+    file_bytes = base64.b64decode(raw)
+
+    ext = Path(attachment.name).suffix.lower()
+
+    if ext in (".txt", ".md"):
+        return file_bytes.decode("utf-8", errors="replace")
+
+    with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+        tmp.write(file_bytes)
+        tmp_path = tmp.name
+
+    try:
+        if ext == ".pdf":
+            from gaik.software_components.parsers.pymupdf_parser import PyMuPDFParser
+            result = PyMuPDFParser().parse_document(tmp_path)
+            return result.get("text_content", "")
+        elif ext in (".docx", ".doc"):
+            from gaik.software_components.parsers.docx_parser import DocxParser
+            result = DocxParser().parse_document(tmp_path)
+            return result.get("text_content", "")
+        else:
+            return file_bytes.decode("utf-8", errors="replace")
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
 
 
 def _foundry_env() -> dict[str, str]:
@@ -400,7 +439,19 @@ async def send_message(session_id: str, body: MessageRequest) -> StreamingRespon
 
     async def gen() -> AsyncGenerator[str, None]:
         async with session["lock"]:
-            await session["client"].query(body.text)
+            message_text = body.text
+            if body.files:
+                file_sections = []
+                for f in body.files:
+                    try:
+                        content = _extract_text_from_attachment(f)
+                    except Exception as exc:  # noqa: BLE001
+                        content = f"[Could not extract text: {exc}]"
+                    file_sections.append(
+                        f'<attached_file name="{f.name}">\n{content}\n</attached_file>'
+                    )
+                message_text = "\n\n".join(file_sections) + "\n\n" + body.text
+            await session["client"].query(message_text)
             async for chunk in _stream_turn(session):
                 yield chunk
 

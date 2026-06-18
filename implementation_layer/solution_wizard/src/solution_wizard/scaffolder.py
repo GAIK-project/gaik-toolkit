@@ -622,8 +622,13 @@ def _output_instructions(bp: Blueprint) -> str:
     # audio template writes _ticket.json; document template writes _result.json
     suffix = "_ticket.json" if "audio" in input_types or "video" in input_types else "_result.json"
     if fields:
+        # fields may be strings (extraction) or dicts (multi_source_report sections)
+        field_names = [
+            f.get("title", f.get("id", str(f))) if isinstance(f, dict) else str(f)
+            for f in fields[:6]
+        ]
         return (
-            f"A JSON file with the following fields: {', '.join(fields[:6])}"
+            f"A JSON file with the following fields: {', '.join(field_names)}"
             + (" (and more)" if len(fields) > 6 else "")
             + f".\nWritten to `output/<input_stem>{suffix}`."
         )
@@ -714,11 +719,16 @@ def scaffold_poc(
     """
     poc_dir = output_dir / "poc"
     poc_dir.mkdir(parents=True, exist_ok=True)
-    for sub in ("sample_input", "output", "schemas", "prompts", "evals", "evals/ground_truth"):
-        (poc_dir / sub).mkdir(parents=True, exist_ok=True)
 
     pattern = _determine_pattern(blueprint)
     variables = _build_variables(blueprint, pattern)
+
+    _needs_schema_dir = pattern not in ("rag", "multi_source_report")
+    _base_subdirs = ["sample_input", "output", "prompts", "evals", "evals/ground_truth"]
+    if _needs_schema_dir:
+        _base_subdirs.append("schemas")
+    for sub in _base_subdirs:
+        (poc_dir / sub).mkdir(parents=True, exist_ok=True)
 
     files_created = []
 
@@ -746,7 +756,7 @@ def scaffold_poc(
         if isinstance(blueprint.target_output_spec, dict)
         else False
     )
-    if pattern != "rag" and _schema_already_approved:
+    if _needs_schema_dir and _schema_already_approved:
         # SchemaGenerator output exists and was approved -- use as-is
         files_created.append(_approved_schema)
         files_created.append(_approved_req)
@@ -757,7 +767,7 @@ def scaffold_poc(
         if _req_prompt.exists() and not _hash_file.exists():
             _hash_file.write_text(hashlib.sha256(_req_prompt.read_bytes()).hexdigest())
             files_created.append(_hash_file)
-    elif has_fields and pattern != "rag":
+    elif has_fields and _needs_schema_dir:
         # Fallback: no approved schema yet, generate deterministically from
         # target_output_spec.  The wizard should have called generate_schema.py
         # first, but this keeps scaffolding self-contained when run standalone.
@@ -773,7 +783,7 @@ def scaffold_poc(
 
     # extraction_requirements.md -- always write from target_output_spec if absent
     _req_prompt = poc_dir / "prompts" / "extraction_requirements.md"
-    if has_fields and pattern != "rag" and not _req_prompt.exists():
+    if has_fields and _needs_schema_dir and not _req_prompt.exists():
         req_path = write_extraction_requirements(
             blueprint.target_output_spec
             if isinstance(blueprint.target_output_spec, dict)

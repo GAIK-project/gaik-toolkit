@@ -74,7 +74,8 @@ After receiving the description, classify it yourself (you own this decision -- 
 - `vision_extraction` -- images or scanned documents, structured JSON output
 - `classification` -- documents to categories
 - `transcript_only` -- audio to transcript only
-- `hybrid` -- combination of the above
+- `multi_source_report` -- any mix of audio, documents, images, or text → narrative report
+- `hybrid` -- combination of the above that does not fit any single pattern
 
 These labels are conventions, not a fixed enum -- if a use case does not fit cleanly, pick the closest one (or `hybrid`) and proceed. Each label maps to a canonical transformation chain in `src/solution_wizard/selector.py` (`CHAINS`) that you can consult as a scaffold when building the workflow, and to the module-first map (`module_for_pattern`) that tells you whether a single GAIK module covers the pattern. Treat both as hints you may override.
 
@@ -92,7 +93,18 @@ Collect the **full Section-8 requirement model** — not just a fast path. Ask c
 
 When discussing `output_types`, also ask whether the user wants a **formatted PDF report** of the result (in addition to the raw JSON/text). If yes, add `"pdf"` to `technical_spec.output_types` — the PoC will then render a titled PDF: structured output as key/value tables (nested objects as sub-tables), unstructured output as titled sections.
 
-**Round 3 — Target output (§8.3; for extraction / structured-output cases).** `schema_name`, `fields`, `field_types`, `required_fields`, `optional_fields`, `field_descriptions`, `allowed_values`, `confidence_required`, `missing_value_policy`, `validation_rules`. For RAG / classification / transcript use cases this round is light — say so and record the answer type instead.
+**Round 3 — Target output (§8.3).** The content of this round depends on the pattern identified in Phase 1:
+
+- **Extraction / structured-output cases** (`audio_to_structured`, `document_to_structured`, `vision_extraction`): collect `schema_name`, `fields`, `field_types`, `required_fields`, `optional_fields`, `field_descriptions`, `allowed_values`, `confidence_required`, `missing_value_policy`, `validation_rules`.
+
+- **Multi-source report cases** (`multi_source_report`): the "fields" are the report sections, not a JSON schema. Collect:
+  1. **Section list** — ask the user to list every section heading the report must contain, in order.
+  2. **Per-section instructions** — for each section, ask: "What should the writer focus on for the *[Section Title]* section? Any specific points to cover, tone, depth, or constraints?" Record the answer as the section's `instructions` string. Do not skip this — instructions are the primary control over what each section says; a section without instructions will receive only a generic placeholder.
+  3. **Depends-on relationships** — after collecting all section instructions, ask: "Are there any sections that should only be written *after* another section is complete? For example, a Conclusions section that draws on Findings." If yes, record the `depends_on` list for each such section. In agentic mode, a section with `depends_on` receives the finalized content of its dependencies as additional context before drafting.
+
+  Store these as `target_output_spec.fields` — each field maps to one section: `{"id": "<slug>", "title": "<heading>", "instructions": "<prompt>", "depends_on": [...]}`. `depends_on` is omitted when empty.
+
+- **RAG / classification / transcript use cases**: this round is light — say so and record only the answer or output type instead.
 
 After collecting, summarise the requirements as a structured block grouped by the three specifications, and note any item the user explicitly left unknown.
 
@@ -305,6 +317,7 @@ Check whether a single GAIK software module covers the use case end-to-end:
 | Audio/video → structured JSON | `AudioToStructuredData` |
 | PDF/DOCX → structured JSON | `DocumentsToStructuredData` (subject to accuracy override above) |
 | Document collection → answer | `RAGWorkflow` |
+| Any mix of audio, documents, images, or text → narrative report (not structured JSON) | `MultiSourceReportGenerator` |
 
 If the module's `input_artifact_types` and `output_artifact_types` match the use case, select it and note the components it contains (from `uses_components`). Stop here unless the user needs custom control over individual steps.
 
@@ -316,11 +329,13 @@ If no module covers the full chain, or the user needs to skip/add/reorder steps,
 - Text/transcript → structured JSON → `Extractor`
 - Image or visually complex PDF → `VisionExtractor` (note: could be more expensive; flag cost tradeoff — see accuracy override above)
 - Document type detection needed → `DocumentClassifier`
-- Output validation required → `LLMJudge`
+- Output validation required → `LLMJudge` (extraction patterns only — see Step 3)
 
 **Step 3 -- Add `LLMJudge` when appropriate**
 
-Add `LLMJudge` if `human_review=yes` or the user explicitly wants output quality checking. Explain why: it pre-screens outputs before human review, reducing reviewer load. Note its limitation: it is not a substitute for human review in safety-critical workflows.
+**Skip this step entirely when `pattern == multi_source_report`.** LLMJudge validates structured extraction output against a schema; it has no meaningful role when the output is a narrative report. Never include it in a report-writing pipeline.
+
+For all other patterns: add `LLMJudge` if `human_review=yes` or the user explicitly wants output quality checking. Explain why: it pre-screens outputs before human review, reducing reviewer load. Note its limitation: it is not a substitute for human review in safety-critical workflows.
 
 **Step 4 -- Configure component options (V3)**
 
@@ -334,6 +349,7 @@ Every selected component exposes behaviour-changing options. Read each selected 
   - scanned/image PDFs → `DoclingParser.enable_ocr = True`, or `DocumentsToStructuredData.parser_choice = "docling_parser"`
   - access controls on a database → `PostgresAgent.table_allowlist = [...]`
 - **Ask the user** when an option is `selection_relevant` but cannot be inferred from the requirements.
+- **Conditional options**: when an option's `infer_from` field encodes a condition (e.g. `"diarization_required → ask for speaker count"`), only surface that option — either by inferring or asking — when the condition holds. If the condition does not hold, leave the option at its default silently.
 - **Record** every chosen non-default option in the corresponding `workflow.steps[].parameters` so the PoC scaffolder and BPMN reflect it.
 
 **Avoid redundant components (subsumption rule).** A card / registry entry may list `subsumes` or `uses_components`. If a capability is already provided internally by a selected component or module, do **not** add the inner component as a separate step:
@@ -361,6 +377,8 @@ Why not a separate TranscriptEnhancer step? The Transcriber/module already enhan
 Why not VisionExtractor? Input is audio, not an image or scanned document.
 Why not RAGWorkflow? Output is structured JSON, not a free-text answer.
 ```
+
+For each non-default option in the summary, show three things: the value set, why it was set (the `infer_from` trigger), and a brief description of its effect (from the card's `effect` field). Example: `enhanced_transcript = True  (language is Finnish → two-pass enhancement improves Finnish accuracy)`
 
 Always explain why plausible alternatives were not selected when they exist, and which behaviour-changing options you set and why.
 
@@ -392,7 +410,9 @@ Then fill the template in:
 8. **Validate provider/model consistency** before writing `blueprint.models`. The rule is: each model name must be deployable through the chosen provider. Invalid combinations that must never appear in the blueprint:
    - `provider: azure_openai` + a Claude/Anthropic model name (e.g. `claude-sonnet-4-6`) -- Claude models are not available on Azure OpenAI. If the user wants Anthropic extraction, set `provider: anthropic`.
    - `provider: openai` + an Azure-specific deployment name.
-   - When in doubt, use `gpt-5.4` (or `gpt-4o-transcribe` for transcription) with `provider: azure_openai` -- these are always valid.
+   - **Default model**: if `model_preferences` does not specify an extraction/generation model, always use `gpt-5.4` for both `provider: azure_openai` and `provider: openai`. Do **not** fall back to `gpt-4o` or any other model. `gpt-5.4` is valid on both providers.
+   - **Default temperature**: if `model_preferences` does not specify a temperature, always use `0.0`. Do not guess or invent a different value.
+   - When in doubt, use `gpt-5.4` with `provider: openai` and `temperature: 0.0` -- these are always valid.
    If you detect an inconsistency, flag it to the user and ask which provider they actually want before writing the blueprint.
 
 Write the draft to a file in the user's output directory (e.g. `<output_dir>/use_case.blueprint.json`) and run the validator:
