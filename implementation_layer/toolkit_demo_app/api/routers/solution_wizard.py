@@ -134,10 +134,12 @@ def _extract_text_from_attachment(attachment: FileAttachment) -> str:
     try:
         if ext == ".pdf":
             from gaik.software_components.parsers.pymupdf_parser import PyMuPDFParser
+
             result = PyMuPDFParser().parse_document(tmp_path)
             return result.get("text_content", "")
         elif ext in (".docx", ".doc"):
             from gaik.software_components.parsers.docx_parser import DocxParser
+
             result = DocxParser().parse_document(tmp_path)
             return result.get("text_content", "")
         else:

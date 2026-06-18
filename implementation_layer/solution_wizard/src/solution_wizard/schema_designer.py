@@ -18,19 +18,15 @@ remains the *runtime* component; these files are the design-time contract.
 from __future__ import annotations
 
 import json
-import textwrap
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-
 
 # ---------------------------------------------------------------------------
 # Python type mapping from JSON-style type names
 # ---------------------------------------------------------------------------
-
 import re
+from pathlib import Path
+from typing import Any
 
-
-_TYPE_MAP: Dict[str, str] = {
+_TYPE_MAP: dict[str, str] = {
     "string": "str",
     "str": "str",
     "text": "str",
@@ -65,7 +61,7 @@ def _py_type(type_name: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _normalize_spec(target_output_spec: Dict[str, Any]) -> Dict[str, Any]:
+def _normalize_spec(target_output_spec: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of target_output_spec with fields normalised to List[str].
 
     For multi_source_report use cases, `fields` is a list of section dicts
@@ -78,8 +74,8 @@ def _normalize_spec(target_output_spec: Dict[str, Any]) -> Dict[str, Any]:
     if not raw_fields or not isinstance(raw_fields[0], dict):
         return target_output_spec  # already flat; nothing to do
 
-    flat_fields: List[str] = []
-    extra_descriptions: Dict[str, str] = {}
+    flat_fields: list[str] = []
+    extra_descriptions: dict[str, str] = {}
     for item in raw_fields:
         fid = item.get("id") or item.get("title", "")
         flat_fields.append(fid)
@@ -101,9 +97,7 @@ def _normalize_spec(target_output_spec: Dict[str, Any]) -> Dict[str, Any]:
     # required_fields: if list contains dicts, flatten them too
     raw_required = normalised.get("required_fields", [])
     if raw_required and isinstance(raw_required[0], dict):
-        normalised["required_fields"] = [
-            r.get("id", r.get("title", "")) for r in raw_required
-        ]
+        normalised["required_fields"] = [r.get("id", r.get("title", "")) for r in raw_required]
     return normalised
 
 
@@ -112,18 +106,18 @@ def _normalize_spec(target_output_spec: Dict[str, Any]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def build_requirements_text(target_output_spec: Dict[str, Any]) -> str:
+def build_requirements_text(target_output_spec: dict[str, Any]) -> str:
     """Build a plain-text user requirements string from target_output_spec.
 
     This is passed to AudioToStructuredData / DocumentsToStructuredData as
     user_requirements.  It mirrors the format used in the official examples.
     """
     target_output_spec = _normalize_spec(target_output_spec)
-    fields: List[str] = target_output_spec.get("fields", [])
-    field_types: Dict[str, str] = target_output_spec.get("field_types", {})
-    required_fields: List[str] = target_output_spec.get("required_fields", [])
-    field_descriptions: Dict[str, str] = target_output_spec.get("field_descriptions", {})
-    allowed_values: Dict[str, List[str]] = target_output_spec.get("allowed_values", {})
+    fields: list[str] = target_output_spec.get("fields", [])
+    field_types: dict[str, str] = target_output_spec.get("field_types", {})
+    required_fields: list[str] = target_output_spec.get("required_fields", [])
+    field_descriptions: dict[str, str] = target_output_spec.get("field_descriptions", {})
+    allowed_values: dict[str, list[str]] = target_output_spec.get("allowed_values", {})
     missing_value_policy: str = target_output_spec.get(
         "missing_value_policy", 'Return an empty string ("") if the value is not present.'
     )
@@ -149,9 +143,7 @@ def build_requirements_text(target_output_spec: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def build_pydantic_model(
-    target_output_spec: Dict[str, Any], schema_name: Optional[str] = None
-) -> str:
+def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | None = None) -> str:
     """Generate output_schema.py content -- a typed Pydantic model.
 
     This is a documentation/reference artefact.  The runtime uses it as a
@@ -159,11 +151,11 @@ def build_pydantic_model(
     user_requirements string.
     """
     target_output_spec = _normalize_spec(target_output_spec)
-    fields: List[str] = target_output_spec.get("fields", [])
-    field_types: Dict[str, str] = target_output_spec.get("field_types", {})
-    required_fields: List[str] = target_output_spec.get("required_fields", [])
-    field_descriptions: Dict[str, str] = target_output_spec.get("field_descriptions", {})
-    allowed_values: Dict[str, Any] = target_output_spec.get("allowed_values", {})
+    fields: list[str] = target_output_spec.get("fields", [])
+    field_types: dict[str, str] = target_output_spec.get("field_types", {})
+    required_fields: list[str] = target_output_spec.get("required_fields", [])
+    field_descriptions: dict[str, str] = target_output_spec.get("field_descriptions", {})
+    allowed_values: dict[str, Any] = target_output_spec.get("allowed_values", {})
     name = schema_name or target_output_spec.get("schema_name") or "OutputSchema"
 
     def _safe_enum_member(v: str) -> str:
@@ -217,7 +209,10 @@ def build_pydantic_model(
     body = "\n".join(field_lines) if field_lines else "    pass"
 
     parts = [
-        '"""Generated output schema.\n\nGenerated by GAIK Solution Configuration Wizard V2.\nDo not hand-edit -- regenerate via scaffold_poc.py.\n"""',
+        (
+            '"""Generated output schema.\n\nGenerated by GAIK Solution Configuration Wizard V2.'
+            '\nDo not hand-edit -- regenerate via scaffold_poc.py.\n"""'
+        ),
         "",
         "\n".join(imports),
         "",
@@ -240,7 +235,7 @@ def build_pydantic_model(
 
 # Maps our field_types vocabulary to the AllowedTypes Literal expected by
 # ExtractionRequirements / FieldSpec in gaik.software_components.extractor.schema
-_ALLOWED_TYPES_MAP: Dict[str, str] = {
+_ALLOWED_TYPES_MAP: dict[str, str] = {
     "string": "str",
     "str": "str",
     "text": "str",
@@ -266,10 +261,10 @@ def _to_allowed_type(raw_type: str) -> str:
 
 
 def build_requirements_json(
-    target_output_spec: Dict[str, Any],
+    target_output_spec: dict[str, Any],
     use_case_name: str = "",
-    schema_class_name: Optional[str] = None,
-) -> Dict[str, Any]:
+    schema_class_name: str | None = None,
+) -> dict[str, Any]:
     """Generate the requirements JSON in the format expected by load_schema().
 
     save_schema() / load_schema() contract (gaik audio_to_structured_data pipeline):
@@ -296,11 +291,11 @@ def build_requirements_json(
         }
     """
     target_output_spec = _normalize_spec(target_output_spec)
-    fields: List[str] = target_output_spec.get("fields", [])
-    field_types: Dict[str, str] = target_output_spec.get("field_types", {})
-    required_fields: List[str] = target_output_spec.get("required_fields", [])
-    field_descriptions: Dict[str, str] = target_output_spec.get("field_descriptions", {})
-    allowed_values: Dict[str, Any] = target_output_spec.get("allowed_values", {})
+    fields: list[str] = target_output_spec.get("fields", [])
+    field_types: dict[str, str] = target_output_spec.get("field_types", {})
+    required_fields: list[str] = target_output_spec.get("required_fields", [])
+    field_descriptions: dict[str, str] = target_output_spec.get("field_descriptions", {})
+    allowed_values: dict[str, Any] = target_output_spec.get("allowed_values", {})
     class_name = schema_class_name or target_output_spec.get("schema_name") or "OutputSchema"
 
     field_specs = []
@@ -335,11 +330,11 @@ def build_requirements_json(
 
 
 def write_schema_files(
-    target_output_spec: Dict[str, Any],
-    schema_name: Optional[str],
+    target_output_spec: dict[str, Any],
+    schema_name: str | None,
     output_dir: Path,
     use_case_name: str = "",
-) -> Dict[str, Path]:
+) -> dict[str, Path]:
     """Write all schema artefacts into output_dir/schemas/.
 
     File layout that load_schema(schema_dir, "output_schema") expects:
@@ -355,7 +350,7 @@ def write_schema_files(
     schemas_dir.mkdir(parents=True, exist_ok=True)
 
     class_name = schema_name or target_output_spec.get("schema_name") or "OutputSchema"
-    results: Dict[str, Path] = {}
+    results: dict[str, Path] = {}
 
     # output_schema.py -- class must be named class_name so load_schema can find it
     py_content = build_pydantic_model(target_output_spec, class_name)
@@ -365,7 +360,7 @@ def write_schema_files(
 
     # output_schema.json (human-readable JSON Schema; best-effort)
     try:
-        ns: Dict[str, Any] = {}
+        ns: dict[str, Any] = {}
         exec(compile(py_content, "<schema>", "exec"), ns)
         model_cls = ns.get(class_name)
         if model_cls and hasattr(model_cls, "model_json_schema"):
@@ -387,7 +382,7 @@ def write_schema_files(
     return results
 
 
-def write_extraction_requirements(target_output_spec: Dict[str, Any], output_dir: Path) -> Path:
+def write_extraction_requirements(target_output_spec: dict[str, Any], output_dir: Path) -> Path:
     """Write prompts/extraction_requirements.md -- passed as user_requirements at runtime."""
     prompts_dir = output_dir / "prompts"
     prompts_dir.mkdir(parents=True, exist_ok=True)
