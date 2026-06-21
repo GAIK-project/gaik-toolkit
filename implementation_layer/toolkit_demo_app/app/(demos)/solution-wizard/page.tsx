@@ -25,6 +25,11 @@ import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PageTransition } from "@/components/demo/page-transition";
 import { WizardFileBrowser } from "@/components/demo/wizard-file-browser";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { apiFetch } from "@/lib/api-client";
 import { processSSEStream, type SSEEvent } from "@/lib/sse";
 import type { FileUIPart } from "ai";
@@ -65,17 +70,44 @@ function friendlyActivity(name: string, summary: string): string {
   return "Working…";
 }
 
+const MAX_ATTACHMENTS = 5;
+
+const SUPPORTED_FORMATS = [
+  { label: "Documents", exts: ".pdf .docx .txt .md" },
+  { label: "Spreadsheets", exts: ".xlsx .xls .csv" },
+  { label: "Images", exts: ".jpg .jpeg .png .webp .tiff .gif" },
+  { label: "Audio / Video", exts: ".mp3 .mp4 .wav .m4a .ogg .webm .flac .mpeg" },
+];
+
 function AttachButton({ disabled }: { disabled: boolean }) {
-  const { openFileDialog } = usePromptInputAttachments();
+  const { openFileDialog, files } = usePromptInputAttachments();
+  const atLimit = files.length >= MAX_ATTACHMENTS;
   return (
-    <PromptInputButton
-      aria-label="Attach file"
-      disabled={disabled}
-      onClick={openFileDialog}
-      title="Attach .txt, .md, .docx or .pdf"
-    >
-      <Paperclip className="size-4" />
-    </PromptInputButton>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <PromptInputButton
+          aria-label="Attach file"
+          disabled={disabled || atLimit}
+          onClick={openFileDialog}
+        >
+          <Paperclip className="size-4" />
+        </PromptInputButton>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-56">
+        {atLimit ? (
+          <p>Maximum {MAX_ATTACHMENTS} attachments per message</p>
+        ) : (
+          <div className="space-y-1">
+            <p className="font-medium">Attach files (max {MAX_ATTACHMENTS})</p>
+            {SUPPORTED_FORMATS.map(({ label, exts }) => (
+              <p key={label}>
+                <span className="font-medium">{label}:</span> {exts}
+              </p>
+            ))}
+          </div>
+        )}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -286,11 +318,13 @@ export default function SolutionWizardPage() {
   const sendMessage = useCallback(
     async (text: string, attachedFiles: FileUIPart[] = []) => {
       const sid = sessionRef.current;
-      if (!sid || busy || !text.trim()) return;
+      if (!sid || busy || (!text.trim() && attachedFiles.length === 0)) return;
       const gen = genRef.current; // capture before any await
       const fileNames = attachedFiles.map((f) => f.filename ?? "file").join(", ");
       const userContent = attachedFiles.length
-        ? `${text}\n\n*Attached: ${fileNames}*`
+        ? text.trim()
+          ? `${text}\n\n*Attached: ${fileNames}*`
+          : `*Attached: ${fileNames}*`
         : text;
       setMessages((prev) => [
         ...prev,
@@ -439,10 +473,10 @@ export default function SolutionWizardPage() {
           </Conversation>
 
           <PromptInput
-            accept=".txt,.md,.docx,.pdf"
+            accept=".txt,.md,.docx,.pdf,.csv,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.tiff,.gif,.mp3,.mp4,.wav,.m4a,.ogg,.webm,.flac,.mpeg,.mpga"
             multiple
             onSubmit={({ text, files }) => {
-              if (text) void sendMessage(text, files);
+              if (text || files.length > 0) void sendMessage(text, files);
             }}
             className="mt-2"
           >

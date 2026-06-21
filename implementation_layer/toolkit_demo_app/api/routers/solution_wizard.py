@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import csv
 import os
 import shutil
 import tempfile
@@ -133,15 +134,69 @@ def _extract_text_from_attachment(attachment: FileAttachment) -> str:
 
     try:
         if ext == ".pdf":
-            from gaik.software_components.parsers.pymupdf_parser import PyMuPDFParser
+            from gaik.software_components.parsers import PyMuPDFParser
 
             result = PyMuPDFParser().parse_document(tmp_path)
             return result.get("text_content", "")
         elif ext in (".docx", ".doc"):
-            from gaik.software_components.parsers.docx_parser import DocxParser
+            from gaik.software_components.parsers import DocxParser
 
             result = DocxParser().parse_document(tmp_path)
             return result.get("text_content", "")
+        elif ext == ".csv":
+            with open(tmp_path, encoding="utf-8-sig", newline="") as fh:
+                rows = list(csv.reader(fh))
+            if not rows:
+                return "_(empty CSV)_"
+            header = "| " + " | ".join(str(c) for c in rows[0]) + " |"
+            sep = "| " + " | ".join("---" for _ in rows[0]) + " |"
+            body = "\n".join(
+                "| " + " | ".join(str(c) for c in row) + " |" for row in rows[1:]
+            )
+            return "\n".join([header, sep, body])
+        elif ext in (".xlsx", ".xls"):
+            from openpyxl import load_workbook
+
+            wb = load_workbook(filename=tmp_path, read_only=True, data_only=True)
+            blocks = []
+            for ws in wb.worksheets:
+                rows = [
+                    [("" if v is None else str(v)) for v in row]
+                    for row in ws.iter_rows(values_only=True)
+                ]
+                rows = [r for r in rows if any(c.strip() for c in r)]
+                if not rows:
+                    continue
+                header = "| " + " | ".join(rows[0]) + " |"
+                sep = "| " + " | ".join("---" for _ in rows[0]) + " |"
+                body = "\n".join("| " + " | ".join(r) + " |" for r in rows[1:])
+                blocks.append(f"### Sheet: {ws.title}\n\n" + "\n".join([header, sep, body]))
+            wb.close()
+            return "\n\n".join(blocks) if blocks else "_(no tabular data found)_"
+        elif ext in (".jpg", ".jpeg", ".png", ".webp", ".tiff", ".gif"):
+            from gaik.software_components.config import get_openai_config
+            from gaik.software_components.parsers import VisionParser
+
+            config = get_openai_config(use_azure=bool(os.getenv("AZURE_API_KEY")))
+            parser = VisionParser(openai_config=config)
+            return parser.convert_image(tmp_path)
+        elif ext in (".mp3", ".mp4", ".wav", ".m4a", ".ogg", ".webm", ".flac", ".mpeg", ".mpga"):
+            try:
+                from utils import get_api_config
+            except ImportError:
+                from api.utils import get_api_config
+            from gaik.software_components.transcriber import Transcriber
+
+            transcriber_workspace = tempfile.mkdtemp()
+            try:
+                transcriber = Transcriber(
+                    api_config=get_api_config(),
+                    output_dir=transcriber_workspace,
+                )
+                result = transcriber.transcribe(file_path=tmp_path)
+                return result.raw_transcript
+            finally:
+                shutil.rmtree(transcriber_workspace, ignore_errors=True)
         else:
             return file_bytes.decode("utf-8", errors="replace")
     finally:
@@ -444,7 +499,7 @@ async def send_message(session_id: str, body: MessageRequest) -> StreamingRespon
             message_text = body.text
             if body.files:
                 file_sections = []
-                for f in body.files:
+                for f in body.files[:5]:
                     try:
                         content = _extract_text_from_attachment(f)
                     except Exception as exc:  # noqa: BLE001
