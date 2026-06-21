@@ -150,9 +150,7 @@ def _extract_text_from_attachment(attachment: FileAttachment) -> str:
                 return "_(empty CSV)_"
             header = "| " + " | ".join(str(c) for c in rows[0]) + " |"
             sep = "| " + " | ".join("---" for _ in rows[0]) + " |"
-            body = "\n".join(
-                "| " + " | ".join(str(c) for c in row) + " |" for row in rows[1:]
-            )
+            body = "\n".join("| " + " | ".join(str(c) for c in row) + " |" for row in rows[1:])
             return "\n".join([header, sep, body])
         elif ext in (".xlsx", ".xls"):
             from openpyxl import load_workbook
