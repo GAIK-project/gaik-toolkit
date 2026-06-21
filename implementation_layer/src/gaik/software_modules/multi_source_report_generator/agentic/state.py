@@ -22,6 +22,7 @@ class ReportState(TypedDict, total=False):
     evidence_pack: str
     source_filenames: list
     report_description: str | None
+    additional_instructions: str | None
     # title -> matched sample-section markdown (or None when no match / no sample)
     matched_samples: dict[str, Any]
     sample_report_provided: bool
@@ -55,6 +56,7 @@ class SectionWriterState(TypedDict, total=False):
     sample_report_provided: bool
     output_dir: str | None
     report_description: str | None
+    additional_instructions: str | None
     source_filenames: list
     report_language: str | None
     include_source_references: bool

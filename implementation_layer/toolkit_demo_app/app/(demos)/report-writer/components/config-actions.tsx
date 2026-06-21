@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 
 interface ConfigActionsProps {
   onLoadExample: () => Promise<void>;
-  onUploadConfig: (config: Record<string, unknown>) => void;
+  onUploadConfig: (config: Record<string, unknown>) => boolean;
   onDownloadConfig: () => void;
   disabled?: boolean;
   isExampleLoaded?: boolean;
@@ -44,7 +44,6 @@ export function ConfigActions({
       try {
         const config = JSON.parse(ev.target!.result as string);
         onUploadConfig(config);
-        toast.success("Config loaded from file");
       } catch {
         toast.error("Invalid JSON file");
       }
@@ -77,7 +76,7 @@ export function ConfigActions({
         disabled={disabled}
       >
         <Upload className="mr-2 h-3.5 w-3.5" />
-        Upload Config
+        Upload Usecase Config
       </Button>
       <input
         ref={fileInputRef}
@@ -94,7 +93,7 @@ export function ConfigActions({
         disabled={disabled}
       >
         <Download className="mr-2 h-3.5 w-3.5" />
-        Download Config
+        Download Usecase Config
       </Button>
 
       {isExampleLoaded && (

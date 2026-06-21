@@ -63,6 +63,7 @@ def build_section_user_prompt(
     sample_section: str,
     has_sample: bool,
     report_description: str | None,
+    additional_instructions: str | None = None,
     source_filenames: list[str],
     report_language: str | None,
     include_source_references: bool,
@@ -114,6 +115,8 @@ def build_section_user_prompt(
     parts.append(
         f"Evidence — this is the ONLY source of facts and content for the section:\n{evidence}"
     )
+    if additional_instructions:
+        parts.append(f"ADDITIONAL INSTRUCTIONS:\n{additional_instructions}")
     parts.append(
         "Now write the section body using ONLY the evidence above. "
         + (
@@ -142,6 +145,7 @@ def build_reviewer_instruction(
     has_sample: bool,
     include_source_references: bool,
     report_description: str | None,
+    additional_instructions: str | None = None,
     dependencies_context: str = "",
 ) -> str:
     intro = f"You are reviewing a drafted report section titled '{title}'"
@@ -200,6 +204,11 @@ def build_reviewer_instruction(
             "references. Remove any that are present."
         )
 
+    if additional_instructions:
+        parts.append(
+            "- ADDITIONAL INSTRUCTIONS (must be respected in the reviewed output):\n"
+            f"  {additional_instructions}"
+        )
     parts.append("")
     parts.append(f"Section instructions:\n{instructions}")
     if has_sample and sample_section:

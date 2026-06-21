@@ -377,6 +377,64 @@ def _match_sample_section(title: str, sample_sections: dict[str, tuple[str, str]
 
 
 # ---------------------------------------------------------------------------
+# Heading-aware sample report extractors
+# ---------------------------------------------------------------------------
+
+
+def _extract_sample_pdf(path: Path) -> str:
+    """Extract a PDF sample report as Markdown with heading structure.
+
+    Uses pymupdf4llm when available (detects headings from font sizes), falling
+    back to plain PyMuPDF text extraction.  Proper ``##`` headings are required
+    for ``_split_sample_sections`` to find section boundaries.
+    """
+    try:
+        import pymupdf4llm
+
+        return pymupdf4llm.to_markdown(str(path))
+    except ImportError:
+        pass
+    # Fallback: plain text (section matching will not work without headings,
+    # but at least the sample content reaches the writer as a style hint).
+    import fitz
+
+    doc = fitz.open(str(path))
+    pages = [doc[i].get_text() for i in range(doc.page_count)]
+    doc.close()
+    return "\n\n".join(pages).strip()
+
+
+def _extract_sample_docx(path: Path) -> str:
+    """Extract a DOCX sample report as Markdown with heading structure.
+
+    Maps Word heading styles (Heading 1 … Heading 6) to Markdown ``#`` markers
+    so that ``_split_sample_sections`` can detect section boundaries.  Body text
+    is included as-is.
+    """
+    from docx import Document  # python-docx
+
+    doc = Document(str(path))
+    lines: list[str] = []
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if not text:
+            continue
+        style_name = para.style.name if para.style else ""
+        if style_name.startswith("Heading"):
+            # "Heading 1" → 1, "Heading 2" → 2, …
+            parts = style_name.split()
+            try:
+                level = int(parts[-1])
+            except (ValueError, IndexError):
+                level = 2
+            level = max(1, min(level, 6))
+            lines.append(f"{'#' * level} {text}")
+        else:
+            lines.append(text)
+    return "\n\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Main module
 # ---------------------------------------------------------------------------
 
@@ -412,6 +470,7 @@ class MultiSourceReportGenerator:
         sections: list[ReportSectionSpec | dict[str, Any]],
         report_title: str = "Generated Report",
         report_description: str | None = None,
+        additional_instructions: str | None = None,
         report_language: str | None = None,
         sample_report_path: str | Path | None = None,
         output_dir: str | Path | None = None,
@@ -476,6 +535,7 @@ class MultiSourceReportGenerator:
                 output_dir=output_dir,
                 report_title=report_title,
                 report_description=report_description,
+                additional_instructions=additional_instructions,
                 report_language=report_language,
                 include_source_references=include_source_references,
                 source_filenames=source_filenames,
@@ -503,6 +563,7 @@ class MultiSourceReportGenerator:
                 evidence_pack=evidence_pack,
                 report_title=report_title,
                 report_description=report_description,
+                additional_instructions=additional_instructions,
                 report_language=report_language,
                 include_source_references=include_source_references,
                 source_filenames=source_filenames,
@@ -620,6 +681,7 @@ class MultiSourceReportGenerator:
         output_dir: str | Path | None,
         report_title: str,
         report_description: str | None,
+        additional_instructions: str | None,
         report_language: str | None,
         include_source_references: bool,
         source_filenames: list[str],
@@ -668,6 +730,7 @@ class MultiSourceReportGenerator:
             evidence_pack=evidence_pack,
             matched_samples=matched_samples,
             report_description=report_description,
+            additional_instructions=additional_instructions,
             sample_report_provided=sample_markdown is not None,
             output_dir=output_dir,
             report_title=report_title,
@@ -754,6 +817,10 @@ class MultiSourceReportGenerator:
 
         Supports text, Markdown, PDF, and DOCX. The result is used as a strict
         format/style template by the writer — never as content.
+
+        PDF and DOCX files are parsed with heading-aware extraction so that
+        ``_split_sample_sections`` can detect section boundaries from Markdown
+        heading markers (``##``).  Plain text/Markdown files are read as-is.
         """
         path = Path(sample_report_path)
         if not path.exists():
@@ -765,14 +832,12 @@ class MultiSourceReportGenerator:
                 f"Unsupported sample report type '{ext}'. "
                 "Use one of: .txt, .md, .markdown, .pdf, .docx"
             )
-        return self._extract_content(
-            path,
-            source_type=source_type,
-            parser_choice=parser_choice,
-            parser_options=parser_options,
-            transcriber_options={},
-            image_options={},
-        )
+        if source_type in ("text", "markdown"):
+            return path.read_text(encoding="utf-8", errors="replace")
+        if source_type == "pdf":
+            return _extract_sample_pdf(path)
+        # docx
+        return _extract_sample_docx(path)
 
     def _parse_pdf(self, path: Path, *, parser_choice: str, parser_options: dict) -> str:
         choice = (parser_choice or "auto").lower()
@@ -887,6 +952,7 @@ class MultiSourceReportGenerator:
         evidence_pack: str,
         report_title: str,
         report_description: str | None,
+        additional_instructions: str | None,
         report_language: str | None,
         include_source_references: bool,
         source_filenames: list[str],
@@ -940,6 +1006,9 @@ class MultiSourceReportGenerator:
             "Evidence — this is the ONLY source of facts and content for the report:\n"
             f"{evidence_pack}"
         )
+
+        if additional_instructions:
+            parts.append(f"ADDITIONAL INSTRUCTIONS:\n{additional_instructions}")
 
         closing = [
             f"Now write the complete report. Start with `# {report_title}`, then write "
@@ -1050,6 +1119,7 @@ def save_report_config(
     sections: list[ReportSectionSpec | dict[str, Any]],
     report_title: str = "Generated Report",
     report_description: str | None = None,
+    additional_instructions: str | None = None,
     report_language: str | None = None,
     sample_report_path: str | Path | None = None,
     output_dir: str | Path | None = None,
@@ -1110,6 +1180,7 @@ def save_report_config(
         "version": "1",
         "report_title": report_title,
         "report_description": report_description,
+        "additional_instructions": additional_instructions,
         "report_language": report_language,
         "sections": section_dicts,
         "input_paths": [_to_rel(p) for p in input_paths],
@@ -1159,6 +1230,7 @@ def load_report_config(path: str | Path) -> dict[str, Any]:
         "sections": raw.get("sections", []),
         "report_title": raw.get("report_title", "Generated Report"),
         "report_description": raw.get("report_description"),
+        "additional_instructions": raw.get("additional_instructions"),
         "report_language": raw.get("report_language"),
         "sample_report_path": _to_abs(raw.get("sample_report_path")),
         "output_dir": _to_abs(raw.get("output_dir")),

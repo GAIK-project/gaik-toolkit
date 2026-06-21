@@ -35,6 +35,7 @@ export interface ReportOptions {
   writerModel: string;
   temperature: number;
   reasoningEffort: string;
+  additionalInstructions: string;
   // Agentic
   agentic: boolean;
   curate: boolean;
@@ -135,30 +136,34 @@ export function OptionsForm({ options, onChange, disabled }: OptionsFormProps) {
         <AccordionContent className="space-y-3 pb-3">
           <Row label="Model">
             <Select
-              value={options.transcriptionModel || "default"}
-              onValueChange={(v) =>
-                set({ transcriptionModel: v === "default" ? "" : v })
-              }
+              value={options.transcriptionModel || "gpt-4o-transcribe"}
+              onValueChange={(v) => set({ transcriptionModel: v })}
               disabled={disabled}
             >
               <SelectTrigger className="h-8 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="default">default (from config)</SelectItem>
                 <SelectItem value="gpt-4o-transcribe">gpt-4o-transcribe</SelectItem>
                 <SelectItem value="whisper-1">whisper-1</SelectItem>
               </SelectContent>
             </Select>
           </Row>
           <Row label="Language">
-            <Input
-              placeholder="auto-detect"
-              value={options.language}
-              onChange={(e) => set({ language: e.target.value })}
+            <Select
+              value={options.language || "auto"}
+              onValueChange={(v) => set({ language: v === "auto" ? "" : v })}
               disabled={disabled}
-              className="h-8 text-sm"
-            />
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">auto</SelectItem>
+                <SelectItem value="en">en</SelectItem>
+                <SelectItem value="fi">fi</SelectItem>
+              </SelectContent>
+            </Select>
           </Row>
           <SwitchRow
             label="Enhanced transcript"
@@ -167,26 +172,6 @@ export function OptionsForm({ options, onChange, disabled }: OptionsFormProps) {
             onCheckedChange={(v) => set({ enhancedTranscript: v })}
             disabled={disabled}
           />
-          <SwitchRow
-            label="Speaker diarization"
-            description="Label individual speakers"
-            checked={options.diarization}
-            onCheckedChange={(v) => set({ diarization: v })}
-            disabled={disabled}
-          />
-          {options.diarization && (
-            <Row label="Speaker count">
-              <Input
-                type="number"
-                placeholder="auto"
-                value={options.speakerCount}
-                onChange={(e) => set({ speakerCount: e.target.value })}
-                disabled={disabled}
-                className="h-8 text-sm"
-                min={1}
-              />
-            </Row>
-          )}
           <div className="space-y-1">
             <Label className="text-sm">Context hint</Label>
             <Textarea
@@ -251,22 +236,6 @@ export function OptionsForm({ options, onChange, disabled }: OptionsFormProps) {
               className="h-8 text-sm font-mono"
             />
           </Row>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <Label className="text-sm">Temperature</Label>
-              <span className="text-xs text-muted-foreground">{options.temperature}</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.1}
-              value={options.temperature}
-              onChange={(e) => set({ temperature: parseFloat(e.target.value) })}
-              disabled={disabled}
-              className="w-full accent-primary"
-            />
-          </div>
           <Row label="Reasoning effort">
             <Select
               value={options.reasoningEffort || "none"}
@@ -284,6 +253,23 @@ export function OptionsForm({ options, onChange, disabled }: OptionsFormProps) {
               </SelectContent>
             </Select>
           </Row>
+          <SwitchRow
+            label="Include source references"
+            description="Cite filenames inline (auto-off for single-source)"
+            checked={options.includeSourceRefs}
+            onCheckedChange={(v) => set({ includeSourceRefs: v })}
+            disabled={disabled}
+          />
+          <div className="space-y-1">
+            <Label className="text-sm">Additional instructions</Label>
+            <Textarea
+              placeholder="e.g. Do not use bullet points. Write in prose only."
+              value={options.additionalInstructions}
+              onChange={(e) => set({ additionalInstructions: e.target.value })}
+              disabled={disabled}
+              className="text-sm min-h-[56px] resize-none"
+            />
+          </div>
         </AccordionContent>
       </AccordionItem>
 
@@ -352,13 +338,6 @@ export function OptionsForm({ options, onChange, disabled }: OptionsFormProps) {
               className="h-8 text-sm"
             />
           </Row>
-          <SwitchRow
-            label="Include source references"
-            description="Cite filenames inline (auto-off for single-source)"
-            checked={options.includeSourceRefs}
-            onCheckedChange={(v) => set({ includeSourceRefs: v })}
-            disabled={disabled}
-          />
           <SwitchRow
             label="Generate DOCX"
             description="Requires Pandoc system binary"

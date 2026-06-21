@@ -144,6 +144,7 @@ def main() -> None:
             "input_paths": [sample_dir],
             "report_title": REPORT_TITLE,
             "report_description": REPORT_DESCRIPTION,
+            "additional_instructions": None,  # e.g. "Do not use bullet points. Write in prose only."
             "sections": SECTIONS,
             "report_language": "English",
             "sample_report_path": sample_report_path,

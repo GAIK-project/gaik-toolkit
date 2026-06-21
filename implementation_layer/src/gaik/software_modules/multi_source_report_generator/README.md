@@ -231,6 +231,7 @@ result = generator.run(
         "Assess the current project state, summarize the evidence, "
         "and identify practical next steps for the client."
     ),
+    additional_instructions=None,  # e.g. "Do not use bullet points. Write in prose only."
     sections=[
         {
             "title": "Background",
@@ -328,6 +329,7 @@ for section in result.sections:
 | `sections` | required | List of `ReportSectionSpec` or dicts with `title`, `instructions`, optional `required`, and (agentic) optional `id` + `depends_on` (see Dependency-Ordered Sections). |
 | `report_title` | `"Generated Report"` | H1 title of the assembled report. |
 | `report_description` | `None` | Optional overall purpose/context for the report. Used by the writer, and in agentic mode also by curation, review, and polish prompts. |
+| `additional_instructions` | `None` | Optional free-text instructions appended verbatim as `ADDITIONAL INSTRUCTIONS:` in both the writer and reviewer prompts for every section. Use to enforce cross-cutting rules (e.g. tone, forbidden topics, output constraints) that apply to every section. |
 | `report_language` | `None` | Optional language instruction, for example `"Finnish"` or `"English"`. |
 | `sample_report_path` | `None` | Optional sample report used only as a style/format reference. |
 | `output_dir` | `None` | If set, writes `report.md`, section files, evidence files, and metadata JSON. |

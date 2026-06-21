@@ -13,6 +13,8 @@ The report is always assembled in the user's original section order.
 
 from __future__ import annotations
 
+import re
+
 from ..models import GeneratedSection, ReportSectionSpec
 from .section_writer import _merge_usage, create_section_writer_graph
 from .state import ReportState
@@ -85,6 +87,7 @@ def _make_section_runner(spec: ReportSectionSpec, section_graph, id_to_title: di
             "sample_report_provided": bool(state.get("sample_report_provided")),
             "output_dir": state.get("output_dir"),
             "report_description": state.get("report_description"),
+            "additional_instructions": state.get("additional_instructions"),
             "source_filenames": list(state.get("source_filenames") or []),
             "report_language": state.get("report_language"),
             "include_source_references": bool(state.get("include_source_references", True)),
@@ -171,6 +174,7 @@ def run_agentic_report(
     output_dir,
     report_title: str,
     report_description: str | None,
+    additional_instructions: str | None = None,
     report_language: str | None,
     include_source_references: bool,
     source_filenames: list,
@@ -218,6 +222,7 @@ def run_agentic_report(
         "evidence_pack": evidence_pack,
         "source_filenames": source_filenames,
         "report_description": report_description,
+        "additional_instructions": additional_instructions,
         "matched_samples": matched_samples,
         "sample_report_provided": sample_report_provided,
         "report_language": report_language,
@@ -257,6 +262,9 @@ def run_agentic_report(
     total_usage: dict = {}
     for spec in specs:
         body = (section_content.get(spec.id) or "").strip()
+        # Strip any leading heading the LLM echoed despite being told not to,
+        # so the orchestrator-added "## title" below is never duplicated.
+        body = re.sub(r"^#{1,6}\s+.*\n*", "", body, count=1).strip()
         warnings = list(section_warnings.get(spec.id, []))
         usage = section_usage.get(spec.id, {})
         total_usage = _merge_usage(total_usage, usage)
