@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import csv
+import logging
 import os
 import shutil
 import tempfile
@@ -59,6 +60,7 @@ except ImportError:  # pragma: no cover
         StreamEvent = None  # type: ignore
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Paths & config
@@ -116,6 +118,56 @@ class MessageRequest(BaseModel):
     files: list[FileAttachment] = []
 
 
+def _parse_pdf_attachment(file_path: str, original_name: str) -> str:
+    """Parse a PDF attachment, including OCR-capable fallback for scanned PDFs."""
+    from gaik.software_components.parsers import PyMuPDFParser
+
+    result = PyMuPDFParser().parse_document(file_path)
+    text = (result.get("text_content") or "").strip()
+    if text:
+        logger.info(
+            "Parsed wizard attachment %s via PyMuPDF (%d chars)",
+            original_name,
+            len(text),
+        )
+        return text
+
+    api_base = os.getenv("DOCLING_API_BASE") or os.getenv("API_BASE")
+    password = os.getenv("DOCLING_API_PASSWORD") or os.getenv("PASSWORD")
+    if not api_base or not password:
+        logger.warning(
+            "PyMuPDF extracted no text from wizard attachment %s and Docling API is not configured",
+            original_name,
+        )
+        return ""
+
+    try:
+        from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
+
+        parser = DoclingApiClientParser(api_base=api_base, password=password)
+        docling_result = parser.parse_document(file_path)
+        markdown = (
+            docling_result.get("parsed_markdown")
+            or docling_result.get("text_content")
+            or ""
+        ).strip()
+        if markdown:
+            logger.info(
+                "Parsed wizard attachment %s via Docling API fallback (%d chars)",
+                original_name,
+                len(markdown),
+            )
+            return markdown
+        logger.warning("Docling API returned empty markdown for wizard attachment %s", original_name)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Docling API fallback failed for wizard attachment %s: %s",
+            original_name,
+            exc,
+        )
+    return ""
+
+
 def _extract_text_from_attachment(attachment: FileAttachment) -> str:
     """Extract plain text from an uploaded file using GAIK parsers for PDF/DOCX."""
     raw = attachment.data
@@ -134,10 +186,7 @@ def _extract_text_from_attachment(attachment: FileAttachment) -> str:
 
     try:
         if ext == ".pdf":
-            from gaik.software_components.parsers import PyMuPDFParser
-
-            result = PyMuPDFParser().parse_document(tmp_path)
-            return result.get("text_content", "")
+            return _parse_pdf_attachment(tmp_path, attachment.name)
         elif ext in (".docx", ".doc"):
             from gaik.software_components.parsers import DocxParser
 
