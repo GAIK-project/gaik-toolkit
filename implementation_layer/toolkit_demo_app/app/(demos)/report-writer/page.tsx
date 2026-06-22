@@ -748,8 +748,8 @@ export default function ReportWriterPage() {
               becomes the H1 heading of your report. The description is optional
               but recommended — it is passed to the writer, reviewer, and polish
               pass as shared context, helping the model stay on topic throughout.
-              Example: <em>"A structured summary of the Q2 product planning meeting,
-              documenting decisions, action items, and open questions."</em>
+              Example: <em>&quot;A structured summary of the Q2 product planning meeting,
+              documenting decisions, action items, and open questions.&quot;</em>
             </p>
             <p>
               <strong>2. Define your sections.</strong> Each section needs a{" "}
@@ -761,14 +761,14 @@ export default function ReportWriterPage() {
             <ul className="list-disc pl-5 space-y-1 text-sm">
               <li>
                 <em>Title:</em> <strong>Action Items</strong> ·{" "}
-                <em>Instructions:</em> "List all action items from the meeting in a
+                <em>Instructions:</em> &quot;List all action items from the meeting in a
                 table with columns: Action Item, Owner, Due Date, and Priority. Use
-                only items explicitly stated in the evidence."
+                only items explicitly stated in the evidence.&quot;
               </li>
               <li>
                 <em>Title:</em> <strong>Executive Summary</strong> ·{" "}
-                <em>Instructions:</em> "Summarize the purpose, key decisions, and
-                outcome of the meeting in two concise paragraphs."
+                <em>Instructions:</em> &quot;Summarize the purpose, key decisions, and
+                outcome of the meeting in two concise paragraphs.&quot;
               </li>
             </ul>
             <p>

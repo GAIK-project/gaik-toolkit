@@ -30,8 +30,9 @@ spec:
                 secretKeyRef:
                   name: gaik-demo-admin
                   key: ADMIN_PASSWORD
-            # Shared secret that unlocks the gated Solution Wizard
-            # (/solution-wizard?key=<secret>). Unset => wizard fully closed.
+            # Optional team shortcut for the gated Solution Wizard
+            # (/solution-wizard?key=<secret>). Registered users can also get
+            # per-user wizard_access from /admin.
             - name: WIZARD_ACCESS_SECRET
               valueFrom:
                 secretKeyRef:

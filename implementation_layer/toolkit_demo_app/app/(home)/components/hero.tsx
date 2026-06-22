@@ -7,15 +7,22 @@ import { cn } from "@/lib/utils";
 import { ArrowRight, Wand2 } from "lucide-react";
 import Link from "next/link";
 
-export function Hero({ hasWizardAccess }: { hasWizardAccess: boolean }) {
+export function Hero({
+  hasWizardAccess,
+  isAuthenticated,
+}: {
+  hasWizardAccess: boolean;
+  isAuthenticated: boolean;
+}) {
   const { openWizardAccess } = useOnboarding();
 
   function scrollToDemos(): void {
     document.getElementById("demos")?.scrollIntoView({ behavior: "smooth" });
   }
 
-  // Visitors who can already open the Wizard go straight there; everyone else
-  // gets the "how to request beta access" dialog.
+  // Access holders go straight in. Anonymous visitors follow the same sign-in
+  // path as the other demos; signed-in users without the grant get the beta
+  // access dialog.
   const pillClassName =
     "group flex w-fit max-w-full items-center gap-3 rounded-full border border-teal-200/80 bg-teal-50/60 py-2 pr-3 pl-2.5 text-left transition-colors hover:border-teal-300 hover:bg-teal-50";
   const pillContent = (
@@ -81,6 +88,10 @@ export function Hero({ hasWizardAccess }: { hasWizardAccess: boolean }) {
             data-tour="wizard"
             className={pillClassName}
           >
+            {pillContent}
+          </Link>
+        ) : !isAuthenticated ? (
+          <Link href="/sign-in" data-tour="wizard" className={pillClassName}>
             {pillContent}
           </Link>
         ) : (

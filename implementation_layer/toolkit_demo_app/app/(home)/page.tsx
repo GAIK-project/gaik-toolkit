@@ -8,12 +8,15 @@ const DemoCards = dynamic(() =>
 );
 
 export default async function HomePage() {
-  const { isUnlocked } = await getUserAccessStatus();
+  const { user, isUnlocked } = await getUserAccessStatus();
   const hasWizardAccess = await getWizardAccess();
 
   return (
     <div className="space-y-24">
-      <Hero hasWizardAccess={hasWizardAccess} />
+      <Hero
+        hasWizardAccess={hasWizardAccess}
+        isAuthenticated={Boolean(user)}
+      />
       <DemoCards isUnlocked={isUnlocked} />
       <InstallSnippet />
     </div>

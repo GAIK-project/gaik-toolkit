@@ -168,8 +168,8 @@ OPENAI_API_KEY=your-key
 
 # Supabase (auth + database)
 NEXT_PUBLIC_SUPABASE_URL=your-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-key
-SUPABASE_SERVICE_ROLE_KEY=your-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-key
+SUPABASE_SECRET_KEY=your-key
 
 # Text-to-Speech
 AZURE_TTS_MODEL=gpt-4o-mini-tts

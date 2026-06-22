@@ -28,10 +28,11 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 - **Dental Transcription** - Audio/video to SRT/VTT subtitles
 - **Semantic Video Search** - Vector search across indexed video transcripts (pgvector)
 - **Purchase Order Processing** - PO + BOMs + price list → line-item prices and order draft (`luvata-order` route)
+- **Report Writer** - Mixed-source report generation from documents, spreadsheets, images, audio/video, text, and an optional sample report/template
 
 ### Solution Wizard
 
-- **Solution Configuration Wizard** - Natural-language use case → validated blueprint, BPMN diagram, Mermaid flow, and runnable PoC (optional; the `claude` CLI ships bundled inside the `claude-agent-sdk` wheel, so only the Azure Foundry env vars are needed). Not public yet ("Coming soon" on the front page): `/solution-wizard` and `/api/wizard` stay closed unless `WIZARD_ACCESS_SECRET` is set and supplied once via `/solution-wizard?key=<secret>` (sets an access cookie).
+- **Solution Configuration Wizard** - Natural-language use case → validated blueprint, BPMN diagram, Mermaid flow, and runnable PoC. Access is gated separately from the regular demos: anonymous visitors are sent to `/sign-in`, approved users need a per-user `wizard_access` grant from `/admin`, and the optional team shortcut `/solution-wizard?key=<WIZARD_ACCESS_SECRET>` sets a temporary access cookie.
 
 ## Quick Start
 
@@ -126,6 +127,7 @@ toolkit_demo_app/
 | `/dental-transcribe` | Dental transcription with SRT/VTT |
 | `/video-search` | Semantic dental video search |
 | `/luvata-order` | Purchase order processing with BOM matching and line-item pricing |
+| `/report-writer` | Mixed-source report generation |
 | `/wizard` | Solution Configuration Wizard (optional; needs the Azure Foundry env vars) |
 
 API docs: <http://localhost:8000/docs> (Swagger UI)
