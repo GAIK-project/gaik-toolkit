@@ -10,6 +10,9 @@
 implementation_layer/api/USAGE.md
 implementation_layer/toolkit_demo_app/HANDOFF.md
 
+# Local-only sample order data (kept out of the open-source repo)
+implementation_layer/toolkit_demo_app/data/luvata-order/
+
 # Superpowers design specs (local working docs, not published)
 docs/superpowers/
 # Python
