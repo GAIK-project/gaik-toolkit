@@ -5,7 +5,7 @@
 
 This is a generative AI toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides a complete set of components and guidance for building knowledge-centric GenAI solutions, from strategic directions to deployable implementations.
 
-**Fork development:** this repository uses a `main` / `develop` GitFlow model.
+**Fork development:** this repository uses a `main` / `dev` GitFlow model.
 See [`GITFLOW.md`](GITFLOW.md) for branching rules, upstream sync, and commit conventions.
 
 # Project Documentation

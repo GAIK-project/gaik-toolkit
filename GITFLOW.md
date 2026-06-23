@@ -13,15 +13,15 @@ For coding guidelines (module structure, tests, releases), see
 
 | Branch | Purpose | Who merges here |
 |--------|---------|-----------------|
-| **`main`** | Stable, tested, deployable code only | Maintainer via PR from `develop` or `hotfix/*` |
-| **`develop`** | Integration branch for ongoing work | Contributors via PR from `feature/*` |
-| **`feature/*`** | New features or non-urgent changes | — (merge target: `develop`) |
-| **`hotfix/*`** | Urgent fixes to production-ready code | — (merge target: `main`, then back-merge to `develop`) |
+| **`main`** | Stable, tested, deployable code only | Maintainer via PR from `dev` or `hotfix/*` |
+| **`dev`** | Integration branch for ongoing work | Contributors via PR from `feature/*` |
+| **`feature/*`** | New features or non-urgent changes | — (merge target: `dev`) |
+| **`hotfix/*`** | Urgent fixes to production-ready code | — (merge target: `main`, then back-merge to `dev`) |
 
 ### Rules
 
 - **Never commit directly to `main`.** All changes reach `main` through a reviewed pull request.
-- **`develop` may be ahead of `main`.** That is expected — it is the integration branch.
+- **`dev` may be ahead of `main`.** That is expected — it is the integration branch.
 - **`main` must always build and pass CI.** Do not merge into `main` unless tests pass.
 - **Delete feature branches** after they are merged.
 
@@ -32,8 +32,8 @@ For coding guidelines (module structure, tests, releases), see
 ### Start a new change
 
 ```bash
-git checkout develop
-git pull origin develop
+git checkout dev
+git pull origin dev
 git checkout -b feature/short-description
 ```
 
@@ -47,13 +47,13 @@ git commit
 git push -u origin feature/short-description
 ```
 
-Open a **pull request into `develop`**. Wait for CI to pass before merging.
+Open a **pull request into `dev`**. Wait for CI to pass before merging.
 
 ### Promote stable code to `main`
 
-When `develop` is ready for release:
+When `dev` is ready for release:
 
-1. Open a PR: `develop` → `main`
+1. Open a PR: `dev` → `main`
 2. Confirm CI is green
 3. Merge (prefer squash or merge commit — stay consistent within the team)
 4. Tag releases on `main` only: `git tag v0.X.Y && git push origin v0.X.Y`
@@ -65,7 +65,7 @@ git checkout main
 git pull origin main
 git checkout -b hotfix/short-description
 # fix, commit, push
-# PR → main, then merge main back into develop
+# PR → main, then merge main back into dev
 ```
 
 ---
@@ -82,13 +82,13 @@ To pull upstream changes into the fork:
 
 ```bash
 git fetch upstream
-git checkout develop
-git merge upstream/main    # or: git rebase upstream/main
+git checkout dev
+git merge upstream/dev    # or: git rebase upstream/dev
 # resolve conflicts, run tests, push
-git push origin develop
+git push origin dev
 ```
 
-After upstream sync is verified, open a PR from `develop` → `main` to promote stable changes.
+After upstream sync is verified, open a PR from `dev` → `main` to promote stable changes.
 
 ---
 
@@ -172,7 +172,7 @@ Test: pytest implementation_layer/unit_tests/ -k admin
 ```
 docs: add GitFlow branching model for fork development
 
-Documents main/develop workflow, upstream sync, and commit conventions
+Documents main/dev workflow, upstream sync, and commit conventions
 so contributors follow a consistent process.
 ```
 
@@ -196,9 +196,9 @@ before upgrading.
 
 ## Pull request checklist
 
-Before merging into `develop`:
+Before merging into `dev`:
 
-- [ ] Branch is up to date with `develop`
+- [ ] Branch is up to date with `dev`
 - [ ] CI passes (tests + format check)
 - [ ] Commit messages follow the conventions above
 - [ ] PR description explains **why** and how to test
@@ -206,8 +206,8 @@ Before merging into `develop`:
 
 Before merging into `main`:
 
-- [ ] All `develop` checklist items satisfied
-- [ ] Changes have been integrated and tested on `develop`
+- [ ] All `dev` checklist items satisfied
+- [ ] Changes have been integrated and tested on `dev`
 - [ ] Version/tag plan is clear if this is a release
 
 ---
@@ -216,7 +216,7 @@ Before merging into `main`:
 
 GitHub Actions runs tests on:
 
-- Push to `main` or `develop`
-- Pull requests targeting `main` or `develop`
+- Push to `main` or `dev`
+- Pull requests targeting `main` or `dev`
 
 Publishing to PyPI is triggered only by version tags (`v*.*.*`) on `main`.

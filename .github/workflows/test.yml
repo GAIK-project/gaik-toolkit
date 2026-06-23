@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - develop
+      - dev
     paths:
       - 'src/**'
       - 'implementation_layer/**'
@@ -14,7 +14,7 @@ on:
   pull_request:
     branches:
       - main
-      - develop
+      - dev
     paths:
       - 'src/**'
       - 'implementation_layer/**'
@@ -35,7 +35,7 @@ jobs:
     strategy:
       matrix:
         # PRs: only Python 3.11 for fast feedback
-        # Push to main/develop: full matrix
+        # Push to main/dev: full matrix
         python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.11"]') || fromJSON('["3.11", "3.12"]') }}
 
     steps:
