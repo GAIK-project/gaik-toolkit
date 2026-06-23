@@ -147,9 +147,7 @@ def _parse_pdf_attachment(file_path: str, original_name: str) -> str:
         parser = DoclingApiClientParser(api_base=api_base, password=password)
         docling_result = parser.parse_document(file_path)
         markdown = (
-            docling_result.get("parsed_markdown")
-            or docling_result.get("text_content")
-            or ""
+            docling_result.get("parsed_markdown") or docling_result.get("text_content") or ""
         ).strip()
         if markdown:
             logger.info(
@@ -158,7 +156,9 @@ def _parse_pdf_attachment(file_path: str, original_name: str) -> str:
                 len(markdown),
             )
             return markdown
-        logger.warning("Docling API returned empty markdown for wizard attachment %s", original_name)
+        logger.warning(
+            "Docling API returned empty markdown for wizard attachment %s", original_name
+        )
     except Exception as exc:  # noqa: BLE001
         logger.warning(
             "Docling API fallback failed for wizard attachment %s: %s",

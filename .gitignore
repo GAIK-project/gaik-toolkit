@@ -80,3 +80,6 @@ implementation_layer/src/gaik/_version.py
 
 # Local installers pulled for Windows testing (e.g. pandoc msi) — never commit
 *.msi
+
+# Superpowers scratch (specs/plans) — local working notes, not committed
+**/docs/superpowers/
