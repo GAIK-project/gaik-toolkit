@@ -9,9 +9,7 @@ from wizard_api.db import get_db
 from wizard_api.main import app
 from wizard_api.models import Base, WizardSession
 
-requires_postgres = pytest.mark.skipif(
-    not postgres_available(), reason="Postgres not available"
-)
+requires_postgres = pytest.mark.skipif(not postgres_available(), reason="Postgres not available")
 
 
 @pytest.fixture

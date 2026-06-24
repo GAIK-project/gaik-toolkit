@@ -45,9 +45,7 @@ def test_list_sessions_for_user(client) -> None:
 
 @requires_postgres
 def test_get_missing_session_returns_404(client) -> None:
-    missing = client.get(
-        "/sessions/00000000-0000-0000-0000-000000000099"
-    )
+    missing = client.get("/sessions/00000000-0000-0000-0000-000000000099")
     assert missing.status_code == 404
 
 

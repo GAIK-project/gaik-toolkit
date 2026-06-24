@@ -15,6 +15,4 @@ def postgres_available() -> bool:
         return False
 
 
-requires_postgres = pytest.mark.skipif(
-    not postgres_available(), reason="Postgres not available"
-)
+requires_postgres = pytest.mark.skipif(not postgres_available(), reason="Postgres not available")

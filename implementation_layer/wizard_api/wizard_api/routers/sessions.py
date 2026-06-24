@@ -16,9 +16,7 @@ router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
 @router.post("", response_model=SessionResponse, status_code=201)
-def create_session(
-    payload: SessionCreate, db: Session = Depends(get_db)
-) -> SessionResponse:
+def create_session(payload: SessionCreate, db: Session = Depends(get_db)) -> SessionResponse:
     session = session_service.create_session(db, payload)
     return SessionResponse(**session_service.session_response(session))
 
@@ -30,16 +28,12 @@ def list_sessions(
 ) -> SessionListResponse:
     sessions = session_service.list_sessions(db, user_id)
     return SessionListResponse(
-        sessions=[
-            SessionResponse(**session_service.session_response(s)) for s in sessions
-        ]
+        sessions=[SessionResponse(**session_service.session_response(s)) for s in sessions]
     )
 
 
 @router.get("/{session_id}", response_model=SessionResponse)
-def get_session(
-    session_id: uuid.UUID, db: Session = Depends(get_db)
-) -> SessionResponse:
+def get_session(session_id: uuid.UUID, db: Session = Depends(get_db)) -> SessionResponse:
     session = session_service.get_session(db, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="session not found")

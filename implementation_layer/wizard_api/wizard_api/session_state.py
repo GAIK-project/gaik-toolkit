@@ -24,9 +24,7 @@ def validate_gate_statuses(gate_statuses: dict[str, str]) -> None:
         raise ValueError(f"unknown gate keys: {sorted(unknown_keys)}")
     for key, value in gate_statuses.items():
         if value not in ("pending", "approved", "rejected"):
-            raise ValueError(
-                f"{key} must be one of: pending, approved, rejected (got {value!r})"
-            )
+            raise ValueError(f"{key} must be one of: pending, approved, rejected (got {value!r})")
 
 
 def merge_gate_statuses(current: dict[str, str], patch: dict[str, str]) -> dict[str, str]:

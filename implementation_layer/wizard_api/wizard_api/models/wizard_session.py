@@ -26,9 +26,7 @@ class WizardSession(Base):
 
     __tablename__ = "wizard_sessions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     step: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     gate_statuses: Mapped[dict] = mapped_column(

@@ -25,9 +25,7 @@ def _to_response(session: WizardSession) -> dict:
 
 def create_session(db: Session, payload: SessionCreate) -> WizardSession:
     session_id = uuid.uuid4()
-    output_dir = payload.output_dir or build_session_output_dir(
-        payload.user_id, session_id
-    )
+    output_dir = payload.output_dir or build_session_output_dir(payload.user_id, session_id)
     session = WizardSession(
         id=session_id,
         user_id=payload.user_id,
@@ -53,15 +51,11 @@ def list_sessions(db: Session, user_id: str) -> list[WizardSession]:
     return list(db.scalars(stmt).all())
 
 
-def update_session(
-    db: Session, session: WizardSession, payload: SessionUpdate
-) -> WizardSession:
+def update_session(db: Session, session: WizardSession, payload: SessionUpdate) -> WizardSession:
     if payload.step is not None:
         session.step = payload.step
     if payload.gate_statuses is not None:
-        session.gate_statuses = merge_gate_statuses(
-            session.gate_statuses, payload.gate_statuses
-        )
+        session.gate_statuses = merge_gate_statuses(session.gate_statuses, payload.gate_statuses)
     if payload.metadata is not None:
         session.session_metadata = {**session.session_metadata, **payload.metadata}
     session.updated_at = datetime.now(UTC)
