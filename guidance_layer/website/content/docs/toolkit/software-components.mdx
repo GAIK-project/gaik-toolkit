@@ -555,3 +555,51 @@ flowchart LR
 
 - **Implementation code**: [software_components/RAG](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG)
 - **Usage examples**: [examples/RAG](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/RAG)
+
+---
+
+### Postgres Agent
+
+The Postgres Agent is a **text-to-SQL query agent**: connect it to a PostgreSQL database, ask a question in plain language, and get an answer backed by a validated, read-only SQL query. It introspects the schema, asks an LLM for a query, validates it, runs it, and — if the query fails — feeds the error back to the LLM and retries in a lightweight agentic loop. It is read-only by design: only `SELECT` / `WITH ... SELECT` queries are allowed, statements are parsed and rejected if they touch other schemas or attempt writes, and the real guarantee comes from connecting with a read-only database role.
+
+<Mermaid chart={`
+flowchart LR
+    Q("❓ Natural-language Question") --> B
+    DB[("🗄️ PostgreSQL")] --> SC
+
+    subgraph B["Postgres Agent"]
+        direction TB
+        SC["Schema Introspection"]
+        GEN["LLM SQL Generation"]
+        VAL["Read-only Validation"]
+        RUN["Execute (row-capped)"]
+        SC --> GEN --> VAL --> RUN
+        RUN -.->|"error → retry"| GEN
+    end
+
+    B --> A("💬 Natural-language Answer")
+    B --> S("🧾 Validated SQL + Rows")
+
+    style Q fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style DB fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style A fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style S fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- Natural language → validated, read-only SQL → natural-language answer in one `ask()` call
+- Agentic retry loop: SQL errors (including statement timeouts) are fed back to the LLM for correction
+- Defense in depth: `sqlglot` validation rejecting non-`SELECT`, multi-statement, DDL/DML, and cross-schema queries, plus a read-only transaction, `statement_timeout`, and row cap — backed by a read-only DB role
+- `table_allowlist` narrows the agent to specific tables; queries touching anything else are rejected before running
+- `extra_instructions` injects a domain glossary or example question→SQL pairs; `answer_language` localises the answer (en, fi, sv, de, fr, es, no, da)
+- Multi-provider LLM (OpenAI / Azure / Anthropic / Google); `get_schema()` and `run_sql()` work without LLM credentials, so they double as tools for an external agent framework
+
+**Potential applications:**
+- Self-service analytics — let non-technical staff query a database in plain language
+- Conversational dashboards and reporting over operational data
+- Ad-hoc data exploration without writing SQL by hand
+- A safe, read-only query tool inside a larger agent or chatbot
+
+- **Implementation code**: [software_components/postgres_agent](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/postgres_agent)
+- **Usage examples**: [examples/postgres_agent](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/postgres_agent)
