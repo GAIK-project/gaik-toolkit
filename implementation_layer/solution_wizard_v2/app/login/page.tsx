@@ -12,7 +12,10 @@ export default async function LoginPage({
   const { locale, t } = await getI18n();
 
   return (
-    <main className="relative min-h-screen flex items-center justify-center bg-app p-4">
+    <main
+      id="main-content"
+      className="relative min-h-screen flex items-center justify-center bg-app p-4"
+    >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(13,148,136,0.07),transparent)]" />
 
       <div className="relative w-full max-w-sm bg-surface rounded-xl border border-border shadow-md p-8">
@@ -34,22 +37,26 @@ export default async function LoginPage({
         )}
 
         {params.error && (
-          <p className="mb-4 text-sm text-danger-text bg-danger-bg border border-danger-border rounded-md px-3 py-2">
+          <p
+            role="alert"
+            className="mb-4 text-sm text-danger-text bg-danger-bg border border-danger-border rounded-md px-3 py-2"
+          >
             {params.error}
           </p>
         )}
         {params.message && (
-          <p className="mb-4 text-sm text-success-text bg-success-bg border border-success-border rounded-md px-3 py-2">
+          <p
+            role="status"
+            aria-live="polite"
+            className="mb-4 text-sm text-success-text bg-success-bg border border-success-border rounded-md px-3 py-2"
+          >
             {params.message}
           </p>
         )}
 
         <form className="space-y-4">
           <div>
-            <label
-              className="block text-[13px] font-medium text-text-secondary mb-1.5"
-              htmlFor="email"
-            >
+            <label className="field-label" htmlFor="email">
               {t.email}
             </label>
             <input
@@ -59,14 +66,11 @@ export default async function LoginPage({
               required
               autoComplete="email"
               defaultValue={DEV_AUTH ? DEV_CREDENTIALS.email : undefined}
-              className="w-full rounded-md bg-surface border border-border-strong px-3 py-2 text-sm text-text placeholder:text-text-muted shadow-xs transition-colors hover:border-text-muted focus:outline-none focus:border-brand"
+              className="input-field"
             />
           </div>
           <div>
-            <label
-              className="block text-[13px] font-medium text-text-secondary mb-1.5"
-              htmlFor="password"
-            >
+            <label className="field-label" htmlFor="password">
               {t.password}
             </label>
             <input
@@ -76,20 +80,14 @@ export default async function LoginPage({
               required
               autoComplete="current-password"
               defaultValue={DEV_AUTH ? DEV_CREDENTIALS.password : undefined}
-              className="w-full rounded-md bg-surface border border-border-strong px-3 py-2 text-sm text-text placeholder:text-text-muted shadow-xs transition-colors hover:border-text-muted focus:outline-none focus:border-brand"
+              className="input-field"
             />
           </div>
           <div className="flex gap-2 pt-2">
-            <button
-              formAction={login}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-xs transition-colors hover:bg-brand-hover active:bg-brand-active disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
-            >
+            <button formAction={login} type="submit" className="btn-brand flex-1">
               {t.login}
             </button>
-            <button
-              formAction={signup}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md bg-surface px-4 py-2 text-sm font-medium text-text-secondary border border-border-strong shadow-xs transition-colors hover:bg-surface-muted hover:text-text hover:border-text-muted disabled:opacity-40 disabled:cursor-not-allowed"
-            >
+            <button formAction={signup} type="submit" className="btn-secondary flex-1">
               {t.signup}
             </button>
           </div>

@@ -81,8 +81,15 @@ export type Dict = {
   phasesTitle: string;
   saved: string;
   gateWaiting: string;
+  skipToContent: string;
+  sessionNameLabel: string;
+  chatInputLabel: string;
+  hideChat: string;
+  showChat: string;
+  phaseProgressNav: string;
+  streamFailed: string;
 
-  phases: string[]; // 13 vaihetta (GAIK V1 -malli + V2 Gate 4)
+  phases: string[];
   gates: { locked: string; pending: string; approved: string; rejected: string };
 };
 
@@ -155,6 +162,13 @@ const fi: Dict = {
   phasesTitle: "Vaiheet",
   saved: "Tallennettu",
   gateWaiting: "Gate odottaa hyväksyntää",
+  skipToContent: "Siirry pääsisältöön",
+  sessionNameLabel: "Session nimi",
+  chatInputLabel: "Viesti wizardille",
+  hideChat: "Piilota keskustelu",
+  showChat: "Näytä keskustelu",
+  phaseProgressNav: "Wizard-vaiheet",
+  streamFailed: "Vastauksen striimaus epäonnistui.",
 
   phases: [
     "Session start",
@@ -247,6 +261,13 @@ const en: Dict = {
   phasesTitle: "Steps",
   saved: "Saved",
   gateWaiting: "Gate awaiting approval",
+  skipToContent: "Skip to main content",
+  sessionNameLabel: "Session name",
+  chatInputLabel: "Message to the wizard",
+  hideChat: "Hide chat",
+  showChat: "Show chat",
+  phaseProgressNav: "Wizard steps",
+  streamFailed: "Failed to stream the response.",
 
   phases: [
     "Session start",

@@ -60,7 +60,7 @@ export function RobotHex({ px = 28 }: { px?: number }) {
 // User avatar: initial in a circle.
 export function UserAvatar({ initial }: { initial: string }) {
   return (
-    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border-strong bg-surface-muted text-[11px] font-semibold text-text-muted">
+    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border-strong bg-surface-muted text-xs font-semibold text-text-muted">
       {initial}
     </span>
   );

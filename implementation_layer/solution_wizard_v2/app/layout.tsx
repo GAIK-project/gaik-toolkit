@@ -1,7 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Orbitron } from "next/font/google";
-import { getLocale } from "@/lib/i18n";
+import { getI18n } from "@/lib/i18n";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -15,7 +15,6 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-// Geometrinen/kulmikas display-fontti logon kirjaimelle.
 const orbitron = Orbitron({
   subsets: ["latin"],
   variable: "--font-display",
@@ -33,13 +32,18 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const locale = await getLocale();
+  const { locale, t } = await getI18n();
   return (
     <html
       lang={locale}
       className={`${inter.variable} ${jetbrainsMono.variable} ${orbitron.variable}`}
     >
-      <body className="antialiased bg-app text-text-secondary">{children}</body>
+      <body className="antialiased bg-app text-text-secondary">
+        <a href="#main-content" className="skip-link">
+          {t.skipToContent}
+        </a>
+        {children}
+      </body>
     </html>
   );
 }

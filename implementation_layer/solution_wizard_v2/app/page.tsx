@@ -9,15 +9,15 @@ import { listSessions, PHASE_COUNT, type WizardSession } from "@/lib/mock-sessio
 function StatusBadge({ session, t }: { session: WizardSession; t: Dict }) {
   if (session.status === "done") {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium bg-success-bg border-success-border text-success-text">
-        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      <span className="badge-success">
+        <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
         {t.done}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium bg-info-bg border-info-border text-info-text">
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+    <span className="badge-info">
+      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
       {t.step} {session.step}/{PHASE_COUNT}
     </span>
   );
@@ -38,9 +38,12 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-app">
-      <header className="h-[52px] shrink-0 px-5 flex items-center justify-between bg-surface/80 backdrop-blur-sm border-b border-border sticky top-0 z-10">
-        <span className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-text">
-          <span className="h-6 w-6 rounded-md bg-brand shadow-xs flex items-center justify-center text-white text-[11px] font-bold">
+      <header className="app-header sticky top-0 z-10">
+        <span className="flex items-center gap-2 text-base font-semibold tracking-tight text-text">
+          <span
+            className="h-6 w-6 rounded-md bg-brand shadow-xs flex items-center justify-center text-on-brand text-xs font-bold"
+            aria-hidden
+          >
             G
           </span>
           {t.appName}
@@ -48,17 +51,22 @@ export default async function Home() {
         <div className="flex items-center gap-4 text-sm text-text-secondary">
           <LocaleSwitcher locale={locale} />
           <span>{user?.email}</span>
-          <span className="h-4 w-px bg-border" />
+          <span className="h-4 w-px bg-border" aria-hidden />
           <form action={signOut}>
-            <button className="text-sm font-medium text-text-muted hover:text-danger-text transition-colors">
+            <button
+              type="submit"
+              className="text-sm font-medium text-text-muted hover:text-danger-text transition-colors"
+            >
               {t.signOut}
             </button>
           </form>
         </div>
       </header>
 
-      <main className="flex-1 max-w-3xl w-full mx-auto p-6 space-y-10">
-        {/* Uuden session aloitus */}
+      <main
+        id="main-content"
+        className="flex-1 max-w-3xl w-full mx-auto p-6 space-y-10"
+      >
         <section>
           <h1 className="text-lg font-semibold tracking-tight text-text mb-1">
             {t.sessionsTitle}
@@ -70,22 +78,22 @@ export default async function Home() {
             action={startSession}
             className="flex gap-2 bg-surface border border-border rounded-lg p-3 shadow-xs"
           >
+            <label htmlFor="session-title" className="sr-only">
+              {t.sessionNameLabel}
+            </label>
             <input
+              id="session-title"
               name="title"
               type="text"
               placeholder={t.newSessionPlaceholder}
-              className="flex-1 rounded-md bg-surface border border-border-strong px-3 py-2 text-sm text-text placeholder:text-text-muted shadow-xs transition-colors hover:border-text-muted focus:outline-none focus:border-brand"
+              className="input-field flex-1"
             />
-            <button
-              type="submit"
-              className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-medium text-white shadow-xs transition-colors hover:bg-brand-hover active:bg-brand-active"
-            >
+            <button type="submit" className="btn-brand shrink-0">
               {t.startNew}
             </button>
           </form>
         </section>
 
-        {/* Olemassa olevat sessiot */}
         <section>
           <h2 className="text-sm font-semibold text-text-strong mb-3">
             {t.previousSessions} ({sessions.length})
@@ -110,11 +118,11 @@ export default async function Home() {
                     </div>
                     <div className="mt-1.5 flex items-center gap-2 text-xs text-text-muted">
                       <span>{t.phases[s.step - 1]}</span>
-                      <span className="h-1 w-1 rounded-full bg-border-strong" />
+                      <span className="h-1 w-1 rounded-full bg-border-strong" aria-hidden />
                       <span>
                         {s.versions.length} {t.blueprintVersions}
                       </span>
-                      <span className="h-1 w-1 rounded-full bg-border-strong" />
+                      <span className="h-1 w-1 rounded-full bg-border-strong" aria-hidden />
                       <span>
                         {t.updated} {formatDate(s.updatedAt, locale)}
                       </span>

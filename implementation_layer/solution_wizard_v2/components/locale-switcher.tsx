@@ -7,7 +7,7 @@ export function LocaleSwitcher({ locale }: { locale: Locale }) {
   return (
     <form
       action={setLocale}
-      className="inline-flex items-center gap-0.5 rounded-md bg-surface-muted border border-border p-0.5 text-[11px] font-medium"
+      className="inline-flex items-center gap-0.5 rounded-md bg-surface-muted border border-border p-0.5 text-xs font-medium"
     >
       {LOCALES.map((l) => (
         <button
@@ -17,8 +17,8 @@ export function LocaleSwitcher({ locale }: { locale: Locale }) {
           aria-current={locale === l ? "true" : undefined}
           className={
             locale === l
-              ? "px-2 py-0.5 rounded-[6px] bg-surface text-text shadow-xs"
-              : "px-2 py-0.5 rounded-[6px] text-text-muted hover:text-text transition-colors"
+              ? "px-2 py-0.5 rounded-md bg-surface text-text shadow-xs"
+              : "px-2 py-0.5 rounded-md text-text-muted hover:text-text transition-colors"
           }
         >
           {l.toUpperCase()}
