@@ -10,6 +10,7 @@
     "llm-judge-benchmark",
     "rag-eval",
     "report-writing-eval",
-    "translation-eval"
+    "translation-eval",
+    "video-search-eval"
   ]
 }

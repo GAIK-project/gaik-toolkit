@@ -1,0 +1,212 @@
+---
+title: Video Search Evaluation
+description: Retrieval-quality assessment for semantic video search, measuring whether the right lecture moment surfaces near the top across Finnish, English, and Swedish queries.
+---
+
+## The Problem
+
+Semantic video search lets a user type a natural-language question and jump
+straight to the right moment in the right recording — instead of scrubbing
+through hours of lecture video. When the right moment is buried below irrelevant
+results, the feature stops feeling like search and starts feeling like luck, so
+retrieval quality has to be measured, not assumed.
+
+Key challenges include:
+
+- **Ranking position, not just coverage** — finding the right lecture *somewhere*
+  on the first page is not enough; users expect it at or near the top.
+- **Multilingual queries over a single-language corpus** — the transcripts are
+  Finnish, but users ask in Finnish, English, and Swedish, so quality must hold
+  across all three.
+- **Temporal precision** — returning the right region of a lecture is good;
+  returning a clip whose boundaries tightly hug the relevant moment is better.
+- **A trustworthy answer key** — without a reliable "what *should* come back" set,
+  every number is meaningless.
+
+<Callout type="info">
+This evaluation was developed for the QAdental semantic-video-search app over
+transcribed dental lectures. See the related use case:
+[Semantic Video Search](/use-cases/semantic-video-search).
+</Callout>
+
+---
+
+## How We Evaluate
+
+The benchmark answers one question — *"when a user types a natural-language
+question, does the right moment in the right lecture come back near the top?"* —
+repeatably, in three languages. It works in two phases: build an answer key once
+(offline, with an LLM), then score the live search API against it as often as you
+like.
+
+### Building a trustworthy answer key
+
+The golden labels are built from the lecture subtitles, never from what the search
+API happens to return. Three guardrails keep an LLM-built answer key honest:
+
+- **Two independent models** — a proposer reads each lecture's subtitles and
+  suggests realistic queries with evidence ranges; a separate judge grades every
+  (query, evidence) pair as *yes / no / borderline* with a confidence score.
+- **A high confidence bar** — only `yes` at confidence ≥ 0.80 enters the answer
+  key; everything uncertain goes to a review pile instead.
+- **A human triages** the borderline pile. The LLM proposes; the human disposes.
+
+The current set has **237 annotated queries** (plus 18 unannotated customer seed
+queries for smoke coverage) carrying **513 expected segments** across **51 lecture
+videos**, each pair judged by `gpt-5.4` and translated into English and Swedish.
+
+### Matching a result to the answer key
+
+A returned hit "covers" an expected segment only when the **video matches** (the
+production video UUID is the hard gate) **and their time ranges overlap** (widened
+by a small ±2 s tolerance to absorb chunking differences).
+
+### Understanding the metrics
+
+Each metric captures a different quality dimension:
+
+- **Hit@K** — did *anything* relevant appear in the top K? (*`Hit@1` = the very
+  first result is already right; `Hit@10` = it's anywhere on the first page*)
+- **MRR** — *how high* was the first relevant hit? (1.0 = always rank 1)
+- **NDCG@K** — is the *whole ranking* well-ordered, using graded relevance?
+- **Recall@K** — did we find *all* the relevant moments, not just one?
+- **segment-NDCG@K** — did the clip boundaries line up *tightly* with the evidence
+  (Intersection-over-Union)? The strict one, and the next thing to improve.
+
+---
+
+## Benchmarking Results
+
+Scored against the live API in `hybrid` mode (`k = 10`, ±2 s time tolerance, mean
+latency ~1.4 s) over 237 annotated queries per language.
+
+| Language | Hit@1 | Hit@5 | Hit@10 | MRR | NDCG@10 | Recall@10 | segment-NDCG@10 |
+|----------|-------|-------|--------|-----|---------|-----------|-----------------|
+| Finnish | 0.456 | 0.747 | 0.819 | 0.582 | 0.544 | 0.738 | 0.132 |
+| English | 0.466 | 0.729 | 0.805 | 0.577 | 0.517 | 0.694 | 0.129 |
+| Swedish | **0.496** | **0.788** | **0.852** | **0.619** | **0.551** | **0.745** | **0.134** |
+
+### Key Findings
+
+- **Coverage is strong; ranking position is the gap** — the right moment lands on
+  the first page ~80–85% of the time (`Hit@10`), but is the very first result only
+  ~46–50% of the time (`Hit@1`). Improving *where* on the page, not *whether*, is
+  the priority.
+- **Quality is remarkably uniform across languages** — Swedish edges ahead and
+  English trails slightly; the embedding model is strongly multilingual on its
+  own, so translating non-Finnish queries before retrieval adds little.
+- **Boundary precision is the next frontier** — `segment-NDCG@10` ≈ 0.13 means the
+  right region is reliably found but the returned clip's start/end don't tightly
+  hug the exact evidence span. That reflects coarse video chunking, not broken
+  search.
+- **Cheap tuning levers are flat** — recall-knob (`ef_search`) and fusion-weight
+  sweeps produced identical numbers on this corpus; real gains need a bigger lever.
+
+---
+
+## Error Classification
+
+### Ranking-position misses (fundamental)
+
+**Problem**: The relevant moment is retrieved but ranked below the first slot.
+
+- `Hit@10` ≈ 0.85 while `Hit@1` ≈ 0.5 — coverage is there, ordering isn't.
+- Cheap re-tuning can't close it; it needs a stronger retrieval signal.
+
+**Impact**: Users sometimes have to scan past a few irrelevant results before
+reaching the right moment, which erodes the "type and jump" experience.
+
+### Loose clip boundaries (fundamental)
+
+**Problem**: The returned window overlaps the relevant evidence but doesn't tightly
+align to it.
+
+- `segment-NDCG@10` ≈ 0.13 — the right region, loosely bounded.
+- The search backend chunks video into coarser windows than the precise evidence
+  ranges.
+
+**Impact**: The user lands near the right moment but may need to seek a few seconds
+to the exact point.
+
+### Measured non-wins (tunable, but don't help here)
+
+**Problem**: Levers that usually help retrieval do nothing on this corpus.
+
+- Raising the HNSW recall knob (`ef_search`) has zero effect — at ~2,000 vectors
+  the index already returns exact neighbours.
+- Hybrid fusion-weight sweeps are identical, because the keyword side barely fires
+  for long natural-language questions.
+
+**Impact**: None directly — but knowing these are flat prevents wasted effort and
+points to the levers that *could* help.
+
+### Regressions (do not adopt)
+
+**Problem**: An LLM reranker over the top results made every metric *worse* on the
+Finnish set (`Hit@1` −0.017, MRR −0.049, `Hit@10` −0.033).
+
+**Impact**: A reranker must not be added without A/B proof clearing a +3 pp `Hit@5`
+bar on the Finnish corpus — the obvious fix is, on this data, a regression.
+
+---
+
+## Real-World Applications
+
+Video search evaluation supports these GAIK use cases:
+
+- **Semantic Video Search** — natural-language search over transcribed dental
+  lectures, webinars, and case discussions.
+- **Meeting and webinar recall** — finding the moment a topic was discussed across
+  recorded meetings or training sessions.
+- **Lecture and course navigation** — jumping students to the exact segment that
+  answers their question.
+- **Multilingual knowledge access** — serving Finnish, English, and Swedish users
+  from a single-language video corpus.
+
+---
+
+## Quality Considerations
+
+When evaluating video search quality for your own deployment, consider:
+
+**Coverage vs. ranking position** — decide whether your bottleneck is *finding* the
+right moment at all (`Hit@10` / `Recall@10`) or *ranking* it first (`Hit@1` / MRR);
+they call for different fixes.
+
+**Answer-key trust** — an LLM-built golden set is only as good as its guardrails;
+keep a confidence bar and a human triage step, and label from the source content,
+not from search output.
+
+**Multilingual fairness** — measure each language separately; a single blended
+score can hide that non-native-language queries are being served worse.
+
+**Boundary precision vs. "good enough"** — tight clip boundaries
+(`segment-NDCG`) are a stretch goal; decide whether your users need exact
+timestamps or just the right region.
+
+**Measure before adopting** — A/B every change against the answer key and adopt
+only on a real improvement (e.g. ≥ +3 pp `Hit@5`); the "obvious" reranker fix
+regressed quality here.
+
+---
+
+## Getting Started
+
+To evaluate video search quality in your own context:
+
+1. Build an answer key from your source content — propose queries with evidence
+   ranges, judge each pair with an independent model, and have a human triage the
+   borderline cases.
+2. Translate the queries into the languages your users actually search in.
+3. Run the scorer against your live search API to produce per-language Hit@K, MRR,
+   NDCG@K, Recall@K, and segment-NDCG.
+4. Read the gap between `Hit@10` and `Hit@1` to tell a coverage problem from a
+   ranking problem.
+5. Change one lever at a time (embedding model, chunking, fusion weights) and
+   re-measure, adopting only on a real win.
+6. Re-run after every index or model change to catch regressions early.
+
+For the full harness, dataset, and run history, see the
+[gaik-evals video-search project](https://github.com/GAIK-project/gaik-evals/tree/main/projects/qadental-video-search).
+For the evaluation method's documentation, visit the
+[GAIK GitHub repository](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/video_search_eval).
