@@ -5,11 +5,10 @@ the right lecture come back near the top when a user asks a natural-language
 question? Measured repeatably in Finnish, English, and Swedish against an
 LLM-built, human-triaged answer key.
 
-> The full evaluation harness, dataset, and run history live in the separate
-> **gaik-evals** repository under
-> [`projects/qadental-video-search`](https://github.com/GAIK-project/gaik-evals/tree/main/projects/qadental-video-search).
-> This page summarises the method and the current numbers; that repo is the
-> source of truth and the place to reproduce them.
+> The full evaluation harness, dataset, and run history live in a separate,
+> internal **gaik-evals** repository (`projects/qadental-video-search`). This page
+> summarises the method and the current numbers; that repo is the source of truth
+> and the place to reproduce them.
 
 ---
 
@@ -114,8 +113,8 @@ segment_NDCG = NDCG computed with per-hit IoU as the gain
 
 ### 2.1 Python Scripts
 
-The runnable scripts live in the **gaik-evals** repo
-([`projects/qadental-video-search/scripts/`](https://github.com/GAIK-project/gaik-evals/tree/main/projects/qadental-video-search/scripts)):
+The runnable scripts live in the internal **gaik-evals** repo
+(`projects/qadental-video-search/scripts/`):
 
 - **`run_search_eval.py`**
   - Search API client + scorer. Fans out over query × language, POSTs to the live `/api/search`, matches returned hits to the answer key, and computes Hit@K / MRR / NDCG@K / Recall@K / segment-NDCG.
@@ -307,8 +306,11 @@ with the deterministic [RAG Evaluation](../RAG_eval/README.md) suite.
 
 ### 1. Install Dependencies
 
+The harness lives in the internal **gaik-evals** repository; the steps below
+assume you have access to it.
+
 ```bash
-git clone https://github.com/GAIK-project/gaik-evals
+git clone <gaik-evals-repo-url>
 cd gaik-evals
 uv sync
 ```
@@ -324,7 +326,7 @@ key skips that step rather than erroring.
 
 ## Related Resources
 
-- **Evaluation harness & dataset (gaik-evals)**: [projects/qadental-video-search](https://github.com/GAIK-project/gaik-evals/tree/main/projects/qadental-video-search)
+- **Evaluation harness & dataset**: internal **gaik-evals** repository (`projects/qadental-video-search`)
 - **Use case — Semantic Video Search**: [/use-cases/semantic-video-search](https://gaik-project.github.io/gaik-toolkit/use-cases/semantic-video-search)
 - **RAG Evaluation (chunk-level coverage)**: [../RAG_eval/README.md](../RAG_eval/README.md)
 - **Evaluation Methods Overview**: [../README.md](../README.md)
