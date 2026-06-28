@@ -6,7 +6,16 @@ next-env.d.ts
 .env*.local
 .DS_Store
 *.tsbuildinfo
+
+# Local-only docs (open-source repo — external materials, meeting notes, internal
+# working notes, Gherkin use cases; backlog lives on private project board)
 /docs/archive/
+/docs/notes/
+/docs/reviews/
+/docs/spec/incoming/
+/docs/spec/use-cases/
+/docs/26.6 statuscheck/
+/docs/*statuscheck*/
 /test-results/
 /playwright-report/
 /blob-report/
