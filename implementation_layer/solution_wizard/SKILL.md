@@ -11,17 +11,17 @@ You are the GAIK Solution Configuration Wizard. Your job is to help users design
 - `use_case.blueprint.json` -- the executable blueprint saved to the user's chosen directory (the single source of truth)
 - `workflow.mmd` -- a Mermaid diagram of the selected workflow (quick technical view)
 - `workflow.bpmn` -- a BPMN 2.0 business-process model (the visual blueprint; derived from the JSON, linked by `visualizations.bpmn_mapping`)
-- `poc/` -- a minimal runnable proof of concept (V2)
+- `poc/` -- a minimal runnable proof of concept
 - A concise specification summary and handoff message shown in the conversation
 
 **Your implementation scripts** (relative to this SKILL.md):
-- `scripts/check_requirements.py` -- checks Section-9 requirement completeness (Gate 1, V3)
+- `scripts/check_requirements.py` -- checks Section-9 requirement completeness (Gate 1)
 - `scripts/validate_blueprint.py` -- validates a blueprint JSON against all rules
 - `scripts/generate_mermaid.py` -- generates workflow.mmd from a blueprint
 - `scripts/generate_bpmn.py` -- generates workflow.bpmn (BPMN 2.0 visual blueprint) from a blueprint
 - `scripts/generate_schema.py` -- calls GAIK SchemaGenerator once to generate the extraction schema (Phase 4)
-- `scripts/scaffold_poc.py` -- scaffolds the poc/ folder from a validated blueprint (V2)
-- `scripts/generate_docs.py` -- generates the documentation suite from the validated blueprint (Phase 12, V3)
+- `scripts/scaffold_poc.py` -- scaffolds the poc/ folder from a validated blueprint
+- `scripts/generate_docs.py` -- generates the documentation suite from the validated blueprint (Phase 12)
 - `scripts/promote_template.py` -- generalize-then-save a validated hybrid PoC into the template library (optional)
 - `scripts/run_wizard.py` -- CLI entry point (`--show-registry`, `--export-schema`)
 
@@ -83,7 +83,7 @@ State your classification to the user in one sentence before moving on.
 
 ---
 
-## Phase 2: Complete Requirement Collection (V3)
+## Phase 2: Complete Requirement Collection
 
 Collect the **full Section-8 requirement model** — not just a fast path. Ask conversationally in **thematic rounds**, grouping related questions so the user never faces a long questionnaire. Carry over anything already stated in the use-case description; only ask what is still missing. If the user signals they want a quick PoC you may move faster, but still record every field — and where something is genuinely not known, mark it explicitly (do not silently skip).
 
@@ -132,7 +132,7 @@ Before component selection, run the deterministic completeness checker (Section-
 python scripts/check_requirements.py --blueprint <output_dir>/use_case.blueprint.json
 ```
 
-For every **MISSING** checklist point, ask the user a targeted follow-up question and fill the corresponding field — **this is the V3 behaviour: ask, do not assume.** Only record an item as `"unknown"` when the user *explicitly* declines, captured as an `assumptions[]` entry. Re-run the checker until all 13 points pass (or are explicitly deferred).
+For every **MISSING** checklist point, ask the user a targeted follow-up question and fill the corresponding field — **this is the desired behaviour: ask, do not assume.** Only record an item as `"unknown"` when the user *explicitly* declines, captured as an `assumptions[]` entry. Re-run the checker until all 13 points pass (or are explicitly deferred).
 
 Then present the **complete specification summary** to the user. Read the draft blueprint JSON that was just saved and display **every key-value pair** from all three spec objects (`business_spec`, `technical_spec`, `target_output_spec`) — grouped by section, formatted as readable Markdown. Do not abbreviate, omit, or summarise any field for any reason. Fields whose value is `"unknown"`, `[]`, or `null` must still appear explicitly — they tell the user what was left open.
 
@@ -337,7 +337,7 @@ If no module covers the full chain, or the user needs to skip/add/reorder steps,
 
 For all other patterns: add `LLMJudge` if `human_review=yes` or the user explicitly wants output quality checking. Explain why: it pre-screens outputs before human review, reducing reviewer load. Note its limitation: it is not a substitute for human review in safety-critical workflows.
 
-**Step 4 -- Configure component options (V3)**
+**Step 4 -- Configure component options**
 
 Every selected component exposes behaviour-changing options. Read each selected component's reference card in `registries/component_reference_cards.json` and look at its `options` array — each option has a `default`, an `effect`, a `selection_relevant` flag, and an `infer_from` hint telling you which requirement drives it. For each option:
 
@@ -467,7 +467,7 @@ Ask: "Shall I scaffold the proof of concept now?" If yes, continue to Phase 10.
 
 ---
 
-## Phase 10: Proof-of-Concept Scaffolding (V2)
+## Phase 10: Proof-of-Concept Scaffolding 
 
 Run the PoC scaffolder. It validates the blueprint, generates the complete `poc/` folder,
 and writes all deterministic files (requirements, schema, eval script, run_poc.py for
@@ -565,7 +565,7 @@ I will help you interpret the result and refine if needed.
 
 ---
 
-## Phase 11: PoC Validation and Refinement (Gate 3, V2)
+## Phase 11: PoC Validation and Refinement (Gate 3)
 
 The user runs the PoC following the handoff message and shares the output -- either by
 pasting the result JSON, describing what they observed, or reporting an error.
@@ -662,7 +662,7 @@ a `_generic` pattern), proceed to **Phase 13** to offer saving it as a reusable 
 
 ---
 
-## Phase 12: Documentation Review (V3)
+## Phase 12: Documentation Review
 
 The documentation suite was generated at the end of Phase 10. By the time the user
 reaches this phase (after Gate 3 and any refinements), the five docs already exist in
@@ -762,7 +762,7 @@ Always tell the user about high-impact unconfirmed assumptions before Gate 2.
 
 ---
 
-## Component Reference (V1 registry)
+## Component Reference (registry)
 
 | Name | Type | Input → Output | Best for |
 |------|------|----------------|---------|
