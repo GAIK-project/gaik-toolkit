@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from gaik.software_components.extractor import (
     ChildRequirements,
     CompositeExtractionRequirements,
@@ -13,9 +12,15 @@ from gaik.software_components.extractor import (
     FieldSpec,
 )
 from gaik.software_components.extractor.schema import (
+    ChildContainerSpec,
+    StructureAnalysis,
+    _build_parent_task,
     _build_parse_requirements_prompt,
+    _collection_as_list_str_field,
     _create_parent_with_nested_list_model,
     _ensure_no_list_dict_fields,
+    _reroute_leaked_collections,
+    _resolve_child_containers,
 )
 from gaik.software_components.vision_extractor.vision_extractor import (
     VisionExtractor,
@@ -338,3 +343,184 @@ def test_vision_extractor_stores_use_azure_flag():
     extractor = VisionExtractor(api_config={"model": "test-model"}, use_azure=False)
 
     assert extractor.use_azure is False
+
+
+# -----------------------------------------------------------------------------
+# Multi-collection hardening: container resolution, exclude-list prompt, and
+# strip-and-reroute recovery for repeated collections that leak into the parent.
+# -----------------------------------------------------------------------------
+
+
+def _analysis(**overrides) -> StructureAnalysis:
+    base = dict(
+        structure_type="parent_with_nested_list",
+        parent_container_name="records",
+        parent_description="Parent object",
+        item_description="One item",
+        reasoning="test",
+    )
+    base.update(overrides)
+    return StructureAnalysis(**base)
+
+
+def test_resolve_child_containers_sanitizes_and_dedupes():
+    analysis = _analysis(
+        child_containers=[
+            ChildContainerSpec(container_name="Items Purchased", container_description="Goods"),
+            ChildContainerSpec(container_name="services offered", container_description="Services"),
+            # Duplicate of the first after sanitizing -> dropped.
+            ChildContainerSpec(container_name="items_purchased", container_description="dup"),
+        ]
+    )
+
+    specs = _resolve_child_containers(analysis)
+
+    assert [c.container_name for c in specs] == ["items_purchased", "services_offered"]
+    assert specs[0].container_description == "Goods"
+
+
+def test_resolve_child_containers_legacy_single_child_fallback():
+    analysis = _analysis(
+        child_containers=[],
+        child_container_name="line_items",
+        child_container_description="Line item rows",
+    )
+
+    specs = _resolve_child_containers(analysis)
+
+    assert len(specs) == 1
+    assert specs[0].container_name == "line_items"
+    assert specs[0].container_description == "Line item rows"
+
+
+def test_resolve_child_containers_empty_defaults_to_records():
+    specs = _resolve_child_containers(_analysis(child_containers=[]))
+
+    assert len(specs) == 1
+    assert specs[0].container_name == "records"
+
+
+def test_build_parent_task_lists_excluded_collections():
+    specs = [
+        ChildContainerSpec(container_name="items_purchased", container_description="Goods"),
+        ChildContainerSpec(container_name="services_offered", container_description="Services"),
+    ]
+
+    task = _build_parent_task("Extract invoice fields.", specs)
+
+    assert "exclude these repeated collections: items purchased, services offered" in task
+    assert task.endswith("Extract invoice fields.")
+
+
+def test_build_parent_task_without_containers_has_no_exclusion_clause():
+    task = _build_parent_task("Extract fields.", [])
+
+    assert "exclude these repeated collections" not in task
+
+
+def test_reroute_leaked_collections_moves_list_dict_into_children():
+    """A parent that leaked two repeated collections is repaired into two children."""
+    parent = _requirements(
+        "invoice",
+        [
+            FieldSpec(field_name="company", field_type="str", description="Company"),
+            FieldSpec(
+                field_name="items_purchased",
+                field_type="list[dict]",
+                description="Purchased goods",
+            ),
+            FieldSpec(
+                field_name="services_offered",
+                field_type="list[dict]",
+                description="Offered services",
+            ),
+            FieldSpec(field_name="grand_total", field_type="decimal", description="Total"),
+        ],
+    )
+    container_specs: list[ChildContainerSpec] = []
+    seen: set[str] = set()
+
+    stripped, recovered = _reroute_leaked_collections(parent, container_specs, seen)
+
+    # Parent keeps only the scalar fields.
+    assert [f.field_name for f in stripped.fields] == ["company", "grand_total"]
+    # No list[dict] survives on the parent.
+    _ensure_no_list_dict_fields(stripped, context="parent")
+    # Both leaked collections became child containers.
+    assert [c.container_name for c in container_specs] == [
+        "items_purchased",
+        "services_offered",
+    ]
+    assert recovered == [
+        ("items_purchased", "items_purchased"),
+        ("services_offered", "services_offered"),
+    ]
+
+
+def test_reroute_skips_collections_already_tracked():
+    """A leaked field already covered by a detected container is not duplicated."""
+    parent = _requirements(
+        "invoice",
+        [
+            FieldSpec(field_name="company", field_type="str", description="Company"),
+            FieldSpec(
+                field_name="line_items",
+                field_type="list[dict]",
+                description="Rows",
+            ),
+        ],
+    )
+    container_specs = [
+        ChildContainerSpec(container_name="line_items", container_description="Rows")
+    ]
+    seen = {"line_items"}
+
+    stripped, recovered = _reroute_leaked_collections(parent, container_specs, seen)
+
+    # Field stripped from parent, but no new container added and nothing "recovered".
+    assert [f.field_name for f in stripped.fields] == ["company"]
+    assert [c.container_name for c in container_specs] == ["line_items"]
+    assert recovered == []
+
+
+def test_reroute_no_leak_is_noop():
+    parent = _requirements(
+        "invoice",
+        [
+            FieldSpec(field_name="company", field_type="str", description="Company"),
+            FieldSpec(field_name="grand_total", field_type="decimal", description="Total"),
+        ],
+    )
+    container_specs = [
+        ChildContainerSpec(container_name="line_items", container_description="Rows")
+    ]
+    seen = {"line_items"}
+
+    stripped, recovered = _reroute_leaked_collections(parent, container_specs, seen)
+
+    assert stripped is parent
+    assert recovered == []
+    assert [c.container_name for c in container_specs] == ["line_items"]
+
+
+def test_collection_as_list_str_field_for_underspecified_collection():
+    """A collection with no per-item fields becomes a list[str] parent field."""
+    spec = ChildContainerSpec(
+        container_name="items_purchased",
+        container_description="Purchased goods",
+    )
+
+    field = _collection_as_list_str_field(spec)
+
+    assert field.field_name == "items_purchased"
+    assert field.field_type == "list[str]"
+    assert field.description == "Purchased goods"
+
+
+def test_collection_as_list_str_field_default_description():
+    spec = ChildContainerSpec(container_name="services_offered", container_description="")
+
+    field = _collection_as_list_str_field(spec)
+
+    assert field.field_type == "list[str]"
+    assert field.description == "List of services offered"

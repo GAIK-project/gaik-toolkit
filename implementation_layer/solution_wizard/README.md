@@ -19,6 +19,12 @@ The GAIK Solution Configuration Wizard guides users from a natural-language busi
 
 ## Installation
 
+Clone the repository first:
+
+```bash
+git clone https://github.com/GAIK-project/gaik-toolkit.git
+```
+
 The wizard itself requires:
 - Python 3.11+
 - `pydantic>=2`

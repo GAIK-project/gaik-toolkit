@@ -445,124 +445,6 @@ def _create_parent_with_nested_list_model(
     )
 
 
-def _resolve_child_containers(analysis: StructureAnalysis) -> list[ChildContainerSpec]:
-    """Return the de-duplicated child collections for a parent_with_nested_list.
-
-    Uses ``analysis.child_containers`` when the detector populated it, otherwise
-    falls back to the legacy single-child fields for backward compatibility.
-    Container names are sanitized to snake_case and de-duplicated (preserving
-    order), so any number of distinct collections is supported.
-    """
-    raw_containers = list(analysis.child_containers)
-    if not raw_containers:
-        raw_containers = [
-            ChildContainerSpec(
-                container_name=analysis.child_container_name
-                or analysis.parent_container_name
-                or "records",
-                container_description=analysis.child_container_description
-                or analysis.parent_description
-                or "",
-            )
-        ]
-
-    specs: list[ChildContainerSpec] = []
-    seen: set[str] = set()
-    for spec in raw_containers:
-        cname = _sanitize_field_name(spec.container_name, fallback="records")
-        if cname in seen:
-            continue
-        seen.add(cname)
-        specs.append(
-            ChildContainerSpec(
-                container_name=cname,
-                container_description=(
-                    spec.container_description or f"Repeated {cname.replace('_', ' ')} records"
-                ),
-            )
-        )
-    return specs
-
-
-def _build_parent_task(user_description: str, container_specs: list[ChildContainerSpec]) -> str:
-    """Build the parent-field parse prompt, excluding the known child collections.
-
-    Naming the detected repeated collections explicitly steers the parser away
-    from emitting them as ``list[dict]`` fields on the parent object.
-    """
-    excluded = ", ".join(c.container_name.replace("_", " ") for c in container_specs)
-    exclusion_clause = (
-        f" In particular, exclude these repeated collections: {excluded}." if excluded else ""
-    )
-    return (
-        "From the requirements below, parse only the once-per-document "
-        "(header / summary) fields. Ignore any repeated row or item-level "
-        "fields, i.e. any field that would hold a list of repeated records."
-        + exclusion_clause
-        + "\n\n"
-        + user_description
-    )
-
-
-def _reroute_leaked_collections(
-    parent_requirements: ExtractionRequirements,
-    container_specs: list[ChildContainerSpec],
-    seen_container_names: set[str],
-) -> tuple[ExtractionRequirements, list[tuple[str, str]]]:
-    """Move any ``list[dict]`` field on the parent into its own child container.
-
-    Mutates ``container_specs`` / ``seen_container_names`` in place by appending
-    a new :class:`ChildContainerSpec` for each leaked collection that is not
-    already tracked. Returns the parent requirements with the leaked fields
-    removed, plus a list of ``(container_name, original_field_name)`` pairs for
-    logging. Generic: handles any number of leaked collections.
-    """
-    leaked = [f for f in parent_requirements.fields if f.field_type == "list[dict]"]
-    if not leaked:
-        return parent_requirements, []
-
-    kept = [f for f in parent_requirements.fields if f.field_type != "list[dict]"]
-    stripped = ExtractionRequirements(
-        use_case_name=parent_requirements.use_case_name,
-        fields=kept,
-    )
-
-    recovered: list[tuple[str, str]] = []
-    for field in leaked:
-        cname = _sanitize_field_name(field.field_name, fallback="records")
-        if cname in seen_container_names:
-            # Already covered by a detected container; the child parse for that
-            # container reads from the full requirements text, so no work lost.
-            continue
-        seen_container_names.add(cname)
-        container_specs.append(
-            ChildContainerSpec(
-                container_name=cname,
-                container_description=(
-                    field.description or f"Repeated {cname.replace('_', ' ')} records"
-                ),
-            )
-        )
-        recovered.append((cname, field.field_name))
-    return stripped, recovered
-
-
-def _collection_as_list_str_field(spec: ChildContainerSpec) -> FieldSpec:
-    """Represent an underspecified repeated collection as a ``list[str]`` field.
-
-    Used when a child collection has no per-item fields defined (e.g. the task
-    says "items purchased" or "services offered" without naming any sub-fields).
-    A list of strings is a faithful, non-degenerate representation — better than
-    a ``list`` of empty objects, which would extract nothing.
-    """
-    label = spec.container_name.replace("_", " ")
-    return FieldSpec(
-        field_name=spec.container_name,
-        field_type="list[str]",
-        description=spec.container_description or f"List of {label}",
-    )
-
-
 def parse_nested_requirements(
     user_description: str,
     *,
@@ -613,47 +495,45 @@ def parse_nested_requirements(
     if analysis.structure_type == "parent_with_nested_list":
         print("Using parent-with-nested-list structure")
         print(f"  Parent fields: {analysis.parent_fields_description}")
-
-        # Resolve the child containers the detector identified *before* parsing
-        # the parent fields, so the parent parse can be told exactly which
-        # repeated collections to exclude. Fall back to the legacy single-child
-        # fields when the detector did not populate child_containers.
-        container_specs = _resolve_child_containers(analysis)
-        seen_container_names = {c.container_name for c in container_specs}
-        print(f"  Child collections: {[c.container_name for c in container_specs]}")
+        print(f"  Child collection: {analysis.child_container_name}")
+        print(f"  Child fields: {analysis.child_fields_description}")
 
         print("\nParsing parent-level fields...")
+        _parent_task = (
+            "From the requirements below, parse only the once-per-document "
+            "(header / summary) fields. Ignore any repeated row or item-level fields.\n\n"
+            + user_description
+        )
         parent_requirements = parse_user_requirements(
-            _build_parent_task(user_description, container_specs),
+            _parent_task,
             client=client,
             model=model,
             _usage_sink=_usage_sink,
         )
 
-        # Recovery: if the parent parse still emitted any list[dict] field, a
-        # repeated collection leaked into the parent. Rather than failing, strip
-        # each leaked field out of the parent and route it through the child
-        # pipeline as its own container. This keeps the parser robust for any
-        # number of repeated collections, whether or not the structure detector
-        # enumerated them up front.
-        parent_requirements, recovered = _reroute_leaked_collections(
-            parent_requirements, container_specs, seen_container_names
-        )
-        for cname, original in recovered:
-            print(
-                f"  Recovered leaked repeated collection '{original}' "
-                f"from parent -> child container '{cname}'"
-            )
-
-        # Final safety net: after recovery the parent must be scalar-only.
         _ensure_no_list_dict_fields(
             parent_requirements,
             context="Parent requirements for parent_with_nested_list",
         )
 
+        # Resolve child containers — use child_containers list if populated,
+        # fall back to legacy single-child fields for backward compatibility.
+        raw_containers = list(analysis.child_containers)
+        if not raw_containers:
+            raw_containers = [
+                ChildContainerSpec(
+                    container_name=analysis.child_container_name
+                    or analysis.parent_container_name
+                    or "records",
+                    container_description=analysis.child_container_description
+                    or analysis.parent_description
+                    or "",
+                )
+            ]
+
         children: list[ChildRequirements] = []
-        for spec in container_specs:
-            cname = spec.container_name
+        for spec in raw_containers:
+            cname = _sanitize_field_name(spec.container_name, fallback="records")
             cdesc = spec.container_description or f"Repeated {cname} records"
             print(f"\nParsing child fields for '{cname}'...")
             _child_task = (
@@ -672,17 +552,6 @@ def parse_nested_requirements(
                 parse_mode="repeated_item",
             )
             _ensure_no_list_dict_fields(child_req, context=f"Child requirements for '{cname}'")
-
-            if not child_req.fields:
-                # Underspecified collection — no per-item fields were described.
-                # Represent it as a list[str] on the parent instead of a list of
-                # empty objects (which would extract nothing).
-                print(f"  '{cname}' has no per-item fields -> representing as list[str] on parent")
-                existing_names = {f.field_name for f in parent_requirements.fields}
-                if cname not in existing_names:
-                    parent_requirements.fields.append(_collection_as_list_str_field(spec))
-                continue
-
             print(f"  Fields: {[f.field_name for f in child_req.fields]}")
             children.append(
                 ChildRequirements(
@@ -693,13 +562,6 @@ def parse_nested_requirements(
             )
 
         print(f"Identified parent fields: {[f.field_name for f in parent_requirements.fields]}")
-
-        if not children:
-            # Every repeated collection was underspecified and promoted to a
-            # list[str] field, so the result is effectively a flat object.
-            print("No structured child collections remain -> using flat model")
-            extraction_model = create_extraction_model(parent_requirements)
-            return extraction_model, parent_requirements, analysis
 
         print("\nCreating parent-with-nested-list Pydantic model...")
         extraction_model = _create_parent_with_nested_list_model(
