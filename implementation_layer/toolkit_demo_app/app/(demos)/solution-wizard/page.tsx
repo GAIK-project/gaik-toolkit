@@ -26,6 +26,12 @@ import { PageTransition } from "@/components/demo/page-transition";
 import { WizardFileBrowser } from "@/components/demo/wizard-file-browser";
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -33,7 +39,7 @@ import {
 import { apiFetch } from "@/lib/api-client";
 import { processSSEStream, type SSEEvent } from "@/lib/sse";
 import type { FileUIPart } from "ai";
-import { Loader2, Paperclip, RotateCcw, Wand2, X } from "lucide-react";
+import { Download, Loader2, Paperclip, RotateCcw, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -359,6 +365,38 @@ export default function SolutionWizardPage() {
     [busy, consumeTurn],
   );
 
+  const downloadConversation = useCallback((format: "md" | "txt") => {
+    const date = new Date().toISOString().split("T")[0];
+    const lines: string[] = [];
+    if (format === "md") {
+      lines.push("# GAIK Solution Configuration Wizard — Conversation", `*Exported: ${date}*`, "");
+      for (const msg of messages) {
+        lines.push("---", "");
+        lines.push(`**${msg.role === "user" ? "User" : "Wizard"}**`, "");
+        if (msg.reasoning) {
+          lines.push("<details>", "<summary>Reasoning</summary>", "", msg.reasoning, "", "</details>", "");
+        }
+        lines.push(msg.content, "");
+      }
+    } else {
+      lines.push("GAIK Solution Configuration Wizard — Conversation", `Exported: ${date}`, "");
+      for (const msg of messages) {
+        lines.push("---", `${msg.role === "user" ? "User" : "Wizard"}:`, "");
+        if (msg.reasoning) {
+          lines.push("[Reasoning]", msg.reasoning, "");
+        }
+        lines.push(msg.content, "");
+      }
+    }
+    const blob = new Blob([lines.join("\n")], { type: format === "md" ? "text/markdown" : "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `wizard-conversation-${date}.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [messages]);
+
   return (
     <PageTransition>
       {/* Break out of the layout's max-w-6xl: the chat + file browser benefit
@@ -376,6 +414,27 @@ export default function SolutionWizardPage() {
             diagrams, docs, and a runnable PoC — streamed live.
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={messages.length === 0}
+            >
+              <Download className="mr-1 h-4 w-4" />
+              Download chat
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => downloadConversation("md")}>
+              Download as .md
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => downloadConversation("txt")}>
+              Download as .txt
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           variant="outline"
           size="sm"
@@ -408,6 +467,7 @@ export default function SolutionWizardPage() {
           <RotateCcw className="mr-1 h-4 w-4" />
           Restart
         </Button>
+        </div>
       </div>
 
       <div className="grid h-[calc(100dvh-220px)] min-h-[420px] gap-4 lg:grid-cols-[1fr_320px]">
