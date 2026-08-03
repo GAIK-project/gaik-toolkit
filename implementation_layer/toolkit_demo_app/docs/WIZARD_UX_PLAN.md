@@ -48,9 +48,18 @@ spacing so the structure survives rendering.
 
 ---
 
+### 5. Nothing on screen lies during loading
+The composer used to render looking fully usable while the session was coming
+up, next to skeletons telling the user to wait. Composer and example buttons
+are now absent until the session is ready. A help dialog behind a "?" carries
+the longer explanation the start screen deliberately leaves out, including the
+one thing users most need to know: a reload loses the session.
+
+---
+
 ## NEXT (highest value first)
 
-### 5. Verify the round-formatting contract against a live run
+### 6. Verify the round-formatting contract against a live run
 **Why:** items 4 is a prompt instruction. The model can ignore it, and nothing
 in CI catches that.
 **Do:** run one full wizard session on production, capture three consecutive
@@ -60,7 +69,7 @@ bootstrap prompt in `api/routers/solution_wizard.py`, which is re-sent every
 turn and therefore harder to forget.
 **Risk:** low. **Cost:** one session.
 
-### 6. Persist the session across a page reload
+### 7. Persist the session across a page reload
 **Why:** `sessionId` lives in React state only. A refresh, an accidental
 back-navigation, or a laptop sleep loses a long-running session with no way
 back, and the workspace is then reaped 30 minutes later.
@@ -80,13 +89,13 @@ a completed step rather than a transient label. The file browser already knows
 this; the chat column does not use it.
 **Risk:** low. **Cost:** half a day.
 
-### 8. Make the generated-files panel the reward it should be
-**Why:** the panel is the actual output of the run and currently reads as an
-empty grey box for the first several minutes.
-**Do:** show the five expected artifacts up front as a dimmed checklist that
-fills in as files land. This turns dead space into an explanation of what the
-user is waiting for, and reuses the same stage derivation as item 2.
-**Risk:** low. **Cost:** half a day.
+### 8. Make the generated-files panel the reward it should be — PARTLY DONE
+The empty state now lists the five artifacts a run produces instead of a
+sentence about what will eventually appear, so the wait has a shape.
+
+**Still to do:** tick each item off as its file actually lands (reuse
+`deriveWizardStage`), so the list becomes live progress rather than a static
+preview. **Risk:** low. **Cost:** an hour.
 
 ### 9. Mobile
 **Why:** the layout is `lg:grid-cols-[1fr_320px]` with a fixed
