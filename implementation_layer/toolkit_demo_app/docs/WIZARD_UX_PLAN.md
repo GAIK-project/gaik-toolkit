@@ -46,8 +46,6 @@ turn, one short lead-in, questions as a numbered list, and a horizontal rule
 before the closing instruction. `MessageResponse` gives `hr` and `ol` real
 spacing so the structure survives rendering.
 
----
-
 ### 5. Nothing on screen lies during loading
 The composer used to render looking fully usable while the session was coming
 up, next to skeletons telling the user to wait. Composer and example buttons
@@ -60,7 +58,7 @@ one thing users most need to know: a reload loses the session.
 ## NEXT (highest value first)
 
 ### 6. Verify the round-formatting contract against a live run
-**Why:** items 4 is a prompt instruction. The model can ignore it, and nothing
+**Why:** item 4 is a prompt instruction. The model can ignore it, and nothing
 in CI catches that.
 **Do:** run one full wizard session on production, capture three consecutive
 turns, and check the contract holds (≤3 questions, numbered, rule before the
@@ -80,7 +78,7 @@ conversation history is not recoverable from the backend today, so either
 `GET /wizard/history/{id}` endpoint. Prefer (a) first; it is client-only.
 **Risk:** low. **Cost:** half a day.
 
-### 7. Explain what the wizard is doing during long silences
+### 8. Explain what the wizard is doing during long silences
 **Why:** phases 5 to 11 run for minutes with only "Thinking…" or a single
 tool-activity line. Users cannot tell a working wizard from a hung one.
 **Do:** the activity line already receives tool names. Add elapsed time after
@@ -89,7 +87,7 @@ a completed step rather than a transient label. The file browser already knows
 this; the chat column does not use it.
 **Risk:** low. **Cost:** half a day.
 
-### 8. Make the generated-files panel the reward it should be — PARTLY DONE
+### 9. Make the generated-files panel the reward it should be — PARTLY DONE
 The empty state now lists the five artifacts a run produces instead of a
 sentence about what will eventually appear, so the wait has a shape.
 
@@ -97,7 +95,7 @@ sentence about what will eventually appear, so the wait has a shape.
 `deriveWizardStage`), so the list becomes live progress rather than a static
 preview. **Risk:** low. **Cost:** an hour.
 
-### 9. Mobile
+### 10. Mobile
 **Why:** the layout is `lg:grid-cols-[1fr_320px]` with a fixed
 `h-[calc(100dvh-220px)]`. On a phone the file panel drops below a chat that is
 already viewport-height, so it is effectively invisible, and the header eats a
@@ -106,7 +104,7 @@ large share of a small screen.
 that shows the file count; shrink the page header to a single line.
 **Risk:** medium (touches shared layout). **Cost:** one day.
 
-### 10. An end-of-run summary
+### 11. An end-of-run summary
 **Why:** a run currently just stops. There is no "here is what you got".
 **Do:** when stage reaches Documentation and the turn ends, render a summary
 card: what was built, the component chain, and a prominent "Download
@@ -117,13 +115,13 @@ everything" (`/wizard/download/{id}` already returns the zip).
 
 ## SEPARATE FROM UX, BUT OUTSTANDING
 
-### 11. Non-reproducing 404 on `/wizard/files/{id}`
+### 12. Non-reproducing 404 on `/wizard/files/{id}`
 Seen once on 2026-08-03 09:14. The endpoint behaves correctly when probed
 directly, the frontend swallows the error, and a later session on the same
 build returned 200 for the same call. Leave it; if it recurs, log the session
 id at creation and at each lookup so the two can be compared.
 
-### 12. `audit_registry.py --strict` is permanently red
+### 13. `audit_registry.py --strict` is permanently red
 Nine `parity` findings and one `new` finding are deliberate design decisions
 (module-internal building blocks; a provider layer), but there is no way to
 acknowledge them, so `--strict` always exits 1 and cannot gate anything.
@@ -131,13 +129,13 @@ acknowledge them, so `--strict` always exits 1 and cannot gate anything.
 `{category, component, reason}`, and have `--strict` ignore matching findings.
 Then wire it into CI.
 
-### 13. Pre-existing lint errors — DONE
+### 14. Pre-existing lint errors — DONE
 The 15 `react/no-unescaped-entities` errors across 8 demo pages are escaped, so
 `bun run lint` is green apart from one `<img>` LCP warning in
 `video-search/page.tsx` (a dynamic thumbnail URL; converting that to
 `next/image` is a real change, not a lint fix). Rendered output is unchanged.
 
-### 14. Dev environment installs without extras — DONE
+### 15. Dev environment installs without extras — DONE
 `AGENTS.md` now states `uv sync --all-extras` as the required setup step and
 explains why: a missing extra makes a component silently absent, so the audit
 reports false `removed` drift and the wizard tests skip assertions they look
