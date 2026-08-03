@@ -69,6 +69,12 @@ Middleware in `lib/supabase/proxy.ts` enforces these protections.
 - Password-protected (simple but effective for demo/internal use)
 - No need for separate admin user accounts
 - Cookie is HTTP-only and secure in production
+- The cookie value is **HMAC-signed** (`lib/admin/session.ts`) and carries its own
+  expiry, so it cannot be forged client-side. It is signed with
+  `ADMIN_SESSION_SECRET` when set, otherwise with `ADMIN_PASSWORD`. Rotating
+  either secret invalidates all outstanding admin sessions.
+- Every admin server action and admin API route verifies the signature — the
+  panel rendering is not the gate.
 
 ## Environment Variables
 
@@ -80,6 +86,9 @@ SUPABASE_SECRET_KEY=your-service-role-key
 
 # Admin dashboard
 ADMIN_PASSWORD=your-secure-password
+# Optional: dedicated signing secret for the admin session cookie.
+# Falls back to ADMIN_PASSWORD when unset.
+ADMIN_SESSION_SECRET=a-long-random-string
 
 # Development only (bypasses all auth checks)
 BYPASS_AUTH=true

@@ -349,10 +349,51 @@ def _config_fields(card) -> set[str]:
     return out
 
 
-def _accepted_option_params(cls, card) -> set[str]:
+_PASSTHROUGH_RE = re.compile(r"^(\w+?)_(?:ctor|options)$")
+
+
+def _passthrough_params(cls, card, cards) -> set[str]:
+    """Params of the components a module forwards keyword dicts to.
+
+    Modules like AudioToStructuredData expose their sub-components' knobs as
+    passthrough dicts on the primary method — ``run(transcriber_ctor={...},
+    extract_options={...})`` — which land on ``Transcriber(**...)`` /
+    ``DataExtractor.extract(**...)``. Those flags are legitimate options even
+    though they appear nowhere in the module's own signature. Resolve each
+    ``<prefix>_ctor`` / ``<prefix>_options`` parameter against the card's
+    ``subsumes`` list and accept the subsumed component's parameters too.
+    """
+    if cards is None:
+        return set()
+    subsumed = card.get("subsumes") or []
+    if not subsumed:
+        return set()
+
+    out: set[str] = set()
+    for param in _method_params(cls, _call_method(card.get("call", ""))):
+        m = _PASSTHROUGH_RE.match(param)
+        if not m:
+            continue
+        prefix = m.group(1).replace("_", "").lower()
+        for name in subsumed:
+            if not name.lower().endswith(prefix):
+                continue
+            sub_card = cards.get(name) if name in cards.names() else None
+            if not sub_card:
+                continue
+            sub_cls = _import_primary_class(sub_card.get("import", ""))
+            if sub_cls is None:
+                continue
+            out |= _constructor_params(sub_cls)
+            out |= _method_params(sub_cls, _call_method(sub_card.get("call", "")))
+    return out
+
+
+def _accepted_option_params(cls, card, cards=None) -> set[str]:
     """Where a behaviour-changing option may legitimately live: the constructor,
-    the primary method (run/enhance_text/transcribe/...), or a nested config the
-    construct line builds. Options are inference hints for the wizard, not a
+    the primary method (run/enhance_text/transcribe/...), a nested config the
+    construct line builds, or a subsumed component the primary method forwards a
+    keyword dict to. Options are inference hints for the wizard, not a
     constructor-only contract — an option that maps to a real method/config
     argument is correct, not drift.
     """
@@ -360,6 +401,7 @@ def _accepted_option_params(cls, card) -> set[str]:
         _constructor_params(cls)
         | _method_params(cls, _call_method(card.get("call", "")))
         | _config_fields(card)
+        | _passthrough_params(cls, card, cards)
     )
 
 
@@ -373,7 +415,7 @@ def check_options(cards) -> list[dict]:
         cls = _import_primary_class(card["import"])
         if cls is None:
             continue
-        params = _accepted_option_params(cls, card)
+        params = _accepted_option_params(cls, card, cards)
         for opt in opts:
             opt_name = opt.get("name", "")
             if opt_name and opt_name not in params:
@@ -382,8 +424,8 @@ def check_options(cards) -> list[dict]:
                         "options",
                         name,
                         f"option '{opt_name}' is not a constructor, primary-method, "
-                        f"or nested-config parameter of {cls.__name__} "
-                        f"(accepted: {sorted(params)})",
+                        f"nested-config, or subsumed-passthrough parameter of "
+                        f"{cls.__name__} (accepted: {sorted(params)})",
                         CARDS_FILE,
                     )
                 )
@@ -496,7 +538,7 @@ def _print_report(result: dict) -> None:
         "removed": "REMOVED (card import failed)",
         "api_drift": "API DRIFT (constructor/method changed)",
         "options": "OPTIONS (option not a real param)",
-        "parity": "PARITY (registry entry without card)",
+        "parity": "PARITY (registry entry and reference card out of step)",
         "new": "NEW (untracked gaik class)",
     }
     by_cat: dict[str, list[dict]] = {}

@@ -78,6 +78,7 @@ Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
 | -------------------------------------- | -------------------- | -------------------------------------- |
 | `BACKEND_URL`                          | Internal API URL     | Hardcoded: `http://gaik-demo-api:8000` |
 | `ADMIN_PASSWORD`                       | Admin dashboard auth | Secret: `gaik-demo-admin`              |
+| `ADMIN_SESSION_SECRET`                 | Optional. Signs the admin session cookie; falls back to `ADMIN_PASSWORD` | Secret: `gaik-demo-admin` |
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Secret: `gaik-demo-supabase`           |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key    | Secret: `gaik-demo-supabase`           |
 | `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |

@@ -4,15 +4,12 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getReportWriterLimits } from "@/lib/report-writer/limits";
-
-const ADMIN_COOKIE_NAME = "admin_session";
-const ADMIN_COOKIE_VALUE = "authenticated";
-
-async function isAdminAuthenticated(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const adminCookie = cookieStore.get(ADMIN_COOKIE_NAME);
-  return adminCookie?.value === ADMIN_COOKIE_VALUE;
-}
+import {
+  ADMIN_COOKIE_NAME,
+  ADMIN_SESSION_MAX_AGE_SECONDS,
+  createAdminSessionValue,
+  isAdminAuthenticated,
+} from "@/lib/admin/session";
 
 export type AdminResult = {
   error?: string;
@@ -65,12 +62,17 @@ export async function verifyAdminPassword(
     return { error: "Invalid password." };
   }
 
+  const sessionValue = createAdminSessionValue();
+  if (!sessionValue) {
+    return { error: "Admin access is not configured." };
+  }
+
   const cookieStore = await cookies();
-  cookieStore.set(ADMIN_COOKIE_NAME, ADMIN_COOKIE_VALUE, {
+  cookieStore.set(ADMIN_COOKIE_NAME, sessionValue, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 60 * 60 * 8, // 8 hours
+    maxAge: ADMIN_SESSION_MAX_AGE_SECONDS,
   });
 
   return { success: true };
