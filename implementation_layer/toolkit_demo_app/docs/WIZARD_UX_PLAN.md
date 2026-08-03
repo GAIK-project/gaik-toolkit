@@ -1,8 +1,8 @@
-# Solution Wizard: UX work plan
+# Solution Wizard: open UX work
 
-Written 2026-08-03 after an audit of the deployed demo app on CSC Rahti.
-Items marked **DONE** shipped in branch `wizard-start-screen`; the rest are
-ordered by value per unit of risk.
+Started 2026-08-03 after an audit of the deployed demo app on CSC Rahti.
+**This file lists what is still open.** What already shipped is in the git log
+(`git log --oneline -- implementation_layer/toolkit_demo_app`), not repeated here.
 
 ## Context that shapes the plan
 
@@ -13,74 +13,24 @@ ordered by value per unit of risk.
 - Production is deployed from `:latest` images that are only rebuilt by
   `openshift/deploy.sh`. Pod age says nothing about what is live; check the
   ImageStream push date.
-
----
-
-## DONE
-
-### 1. The start screen is a start screen
-The welcome was injected into the chat log as a fake assistant message, so it
-was indistinguishable from the wizard talking, and the backend's own opening
-question arrived right underneath it saying much the same thing.
-
-`components/demo/wizard-start-screen.tsx` now owns the introduction and lives
-outside the conversation. The bootstrap turn's visible text is suppressed, so
-an empty chat log means "nothing has been said yet" and every bubble is real.
-Four one-click starting points replace the bulleted example list.
-
-### 2. Progress is visible
-"Round 1" buried in prose was the only signal of how far along a run was.
-`components/demo/wizard-progress.tsx` shows five user-facing stages
-(Requirements, Specification, Blueprint, Proof of concept, Documentation),
-derived from the artifacts the wizard writes rather than from parsing chat
-text, so it advances on real work and cannot be fooled by wording.
-
-### 3. Loading and failure are honest
-Loading now says "Preparing your workspace" with skeletons in the shape of
-what is coming. A failed bootstrap renders an error with a **Try again**
-button instead of leaving the user on a skeleton that never resolves.
-
-### 4. Question rounds are scannable
-`SKILL.md` Phase 2 now specifies the presentation contract: max 3 questions per
-turn, one short lead-in, questions as a numbered list, and a horizontal rule
-before the closing instruction. `MessageResponse` gives `hr` and `ol` real
-spacing so the structure survives rendering.
-
-### 5. Nothing on screen lies during loading
-The composer used to render looking fully usable while the session was coming
-up, next to skeletons telling the user to wait. Composer and example buttons
-are now absent until the session is ready. A help dialog behind a "?" carries
-the longer explanation the start screen deliberately leaves out, including the
-one thing users most need to know: a reload loses the session.
+- Two things worth not relearning:
+  - **The wizard's own instructions must live in the bootstrap prompt, not in
+    SKILL.md**, when they govern how every turn is *formatted*. A live run
+    showed the model ignoring a formatting rule buried in a 13k-token file it
+    reads once via a tool; the same rule in the prompt itself took immediately.
+  - **Caching was the wrong instinct** for the slow session start. The cost was
+    generation, not prefill, and the output was being discarded — there was
+    nothing worth caching. The fix was to delete the work, not memoize it.
 
 ---
 
 ## NEXT (highest value first)
 
-### 6. Round-formatting contract — MOVED, NEEDS RE-CHECK
-A live run showed the model **ignoring** the SKILL.md version: it asked in
-bold-led paragraphs, no numbered list, no rule. The instruction was buried in a
-13k-token file the model reads once via a tool.
-
-The contract now lives in the bootstrap prompt in
-`api/routers/solution_wizard.py`, phrased as overriding conflicting formatting
-habits. **Still to do:** one live run to confirm it takes. If it still drifts,
-the next lever is a per-turn reminder rather than a once-per-session one.
-
-### 6b. Starting a session no longer costs a model turn — DONE
-`/wizard/start` used to send the bootstrap prompt and stream a full turn (the
-model loading a ~13k-token SKILL.md) whose visible output the UI discarded.
-The prompt now rides on the user's first message instead. Measured in
-production: `/wizard/start` returns in **0.66 s**, subprocess spawn included.
-
-Caching was the wrong instinct here and is worth remembering: the cost was
-generation, not prefill, and the output was thrown away — there was nothing
-worth caching. The fix was to delete the work, not to memoize it.
-
-### 7. Persist the session across a page reload
+### 1. Persist the session across a page reload
 **Why:** `sessionId` lives in React state only. A refresh, an accidental
 back-navigation, or a laptop sleep loses a long-running session with no way
-back, and the workspace is then reaped 30 minutes later.
+back, and the workspace is then reaped 30 minutes later. This is currently the
+worst failure mode in the whole flow.
 **Do:** put `sessionId` in `sessionStorage`, and on mount try
 `GET /wizard/files/{id}` first: 200 means resume, 404 means start fresh. The
 conversation history is not recoverable from the backend today, so either
@@ -88,7 +38,7 @@ conversation history is not recoverable from the backend today, so either
 `GET /wizard/history/{id}` endpoint. Prefer (a) first; it is client-only.
 **Risk:** low. **Cost:** half a day.
 
-### 8. Explain what the wizard is doing during long silences
+### 2. Explain what the wizard is doing during long silences
 **Why:** phases 5 to 11 run for minutes with only "Thinking…" or a single
 tool-activity line. Users cannot tell a working wizard from a hung one.
 **Do:** the activity line already receives tool names. Add elapsed time after
@@ -97,30 +47,13 @@ a completed step rather than a transient label. The file browser already knows
 this; the chat column does not use it.
 **Risk:** low. **Cost:** half a day.
 
-### 9. Make the generated-files panel the reward it should be — PARTLY DONE
-The empty state now lists the five artifacts a run produces instead of a
-sentence about what will eventually appear, so the wait has a shape.
+### 3. Tick off the generated-files checklist as files land
+**Why:** the panel already lists the five artifacts a run produces, but the
+list is static — it previews the output instead of tracking it.
+**Do:** reuse `deriveWizardStage` to mark each item done as its file appears.
+**Risk:** low. **Cost:** an hour.
 
-**Still to do:** tick each item off as its file actually lands (reuse
-`deriveWizardStage`), so the list becomes live progress rather than a static
-preview. **Risk:** low. **Cost:** an hour.
-
-### 9b. Inline answers for closed-vocabulary questions
-**Why:** several Phase 2 fields are genuinely enumerable (`language`,
-`model_provider`, `human_review`, `runtime_interface`, whether the output needs
-a PDF). Free text there costs the user time and produces values the validator
-has to normalise.
-**Do NOT** do this for the open fields — current process, pain points, success
-criteria. Their value is the user's own wording; a select would flatten exactly
-the nuance Phase 2 exists to capture.
-**Do:** have the wizard append a fenced `wizard-choices` block (field + options)
-alongside the question; the frontend renders it as chips. **A chip fills the
-composer, it does not send** — so the user can pick "Finnish" and keep typing
-"…but some technicians speak Swedish". Degrades to a plain text question when
-the model omits the block.
-**Risk:** low. **Cost:** half a day.
-
-### 10. Mobile
+### 4. Mobile
 **Why:** the layout is `lg:grid-cols-[1fr_320px]` with a fixed
 `h-[calc(100dvh-220px)]`. On a phone the file panel drops below a chat that is
 already viewport-height, so it is effectively invisible, and the header eats a
@@ -129,24 +62,51 @@ large share of a small screen.
 that shows the file count; shrink the page header to a single line.
 **Risk:** medium (touches shared layout). **Cost:** one day.
 
-### 11. An end-of-run summary
+### 5. An end-of-run summary
 **Why:** a run currently just stops. There is no "here is what you got".
 **Do:** when stage reaches Documentation and the turn ends, render a summary
 card: what was built, the component chain, and a prominent "Download
 everything" (`/wizard/download/{id}` already returns the zip).
 **Risk:** low. **Cost:** half a day.
 
+### 6. Inline answers for closed-vocabulary questions — DEFERRED
+Proposed and **explicitly deferred** on 2026-08-03 to avoid changing too much
+at once. Recorded so the reasoning is not lost.
+
+**Why it would help:** several Phase 2 fields are genuinely enumerable
+(`language`, `model_provider`, `human_review`, `runtime_interface`, whether the
+output needs a PDF). Free text there costs the user time and produces values the
+validator has to normalise.
+**Why only those:** do **not** do this for current process, pain points or
+success criteria. Their value is the user's own wording; a select would flatten
+exactly the nuance Phase 2 exists to capture.
+**How:** have the wizard append a fenced `wizard-choices` block (field +
+options) alongside the question; the frontend renders it as chips. **A chip
+fills the composer, it does not send** — so the user can pick "Finnish" and keep
+typing "…but some technicians speak Swedish". Degrades to a plain text question
+when the model omits the block.
+**Risk:** low. **Cost:** half a day.
+
 ---
 
 ## SEPARATE FROM UX, BUT OUTSTANDING
 
-### 12. Non-reproducing 404 on `/wizard/files/{id}`
-Seen once on 2026-08-03 09:14. The endpoint behaves correctly when probed
-directly, the frontend swallows the error, and a later session on the same
-build returned 200 for the same call. Leave it; if it recurs, log the session
-id at creation and at each lookup so the two can be compared.
+### 7. Local dev on Windows cannot run the wizard
+`ClaudeSDKClient.connect()` spawns the bundled CLI via
+`asyncio.create_subprocess_exec`, which raises `NotImplementedError` under the
+event loop uvicorn selects on Windows. Production (Linux) is unaffected, so this
+is a developer-experience gap, not a product bug — but it means the wizard can
+only be exercised against a deployed API, which is slow and costs tokens.
+**Do:** select a Proactor-based loop for the API process on Windows (a no-op on
+Linux) and confirm `/wizard/start` succeeds locally.
 
-### 13. `audit_registry.py --strict` is permanently red
+### 8. Non-reproducing 404 on `/wizard/files/{id}`
+Seen once on 2026-08-03 09:14. The endpoint behaves correctly when probed
+directly, the frontend swallows the error, and later sessions on the same build
+returned 200 for the same call. Leave it; if it recurs, log the session id at
+creation and at each lookup so the two can be compared.
+
+### 9. `audit_registry.py --strict` is permanently red
 Nine `parity` findings and one `new` finding are deliberate design decisions
 (module-internal building blocks; a provider layer), but there is no way to
 acknowledge them, so `--strict` always exits 1 and cannot gate anything.
@@ -154,14 +114,11 @@ acknowledge them, so `--strict` always exits 1 and cannot gate anything.
 `{category, component, reason}`, and have `--strict` ignore matching findings.
 Then wire it into CI.
 
-### 14. Pre-existing lint errors — DONE
-The 15 `react/no-unescaped-entities` errors across 8 demo pages are escaped, so
-`bun run lint` is green apart from one `<img>` LCP warning in
-`video-search/page.tsx` (a dynamic thumbnail URL; converting that to
-`next/image` is a real change, not a lint fix). Rendered output is unchanged.
-
-### 15. Dev environment installs without extras — DONE
-`AGENTS.md` now states `uv sync --all-extras` as the required setup step and
-explains why: a missing extra makes a component silently absent, so the audit
-reports false `removed` drift and the wizard tests skip assertions they look
-like they are running.
+### 10. Sonnet 5 upgrade has a hidden gotcha
+The wizard runs `claude-sonnet-4-6` (set via `ANTHROPIC_DEFAULT_SONNET_MODEL` in
+the Rahti secret; Claude Agent SDK on Microsoft Foundry). Moving to
+`claude-sonnet-5` is a one-env-var change, **but** Sonnet 5 defaults
+`thinking.display` to `"omitted"` where 4.6 defaults to `"summarized"` — the
+Reasoning panel would silently go blank. Fix that in the same change, confirm
+the model is deployed in the Foundry resource, and expect ~30% more tokens per
+run from the new tokenizer at the same sticker price.

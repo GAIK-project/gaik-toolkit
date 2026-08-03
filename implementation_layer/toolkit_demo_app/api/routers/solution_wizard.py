@@ -339,6 +339,14 @@ IMPORTANT INSTRUCTIONS FOR THIS WEB SESSION:
   The rule is the visual anchor: above it is context, immediately above it is
   the list the user acts on.
 - Wait for the reply before asking more. Use Markdown.
+- LANGUAGE. Reply in the language the user writes in, and keep using it for the
+  rest of the session unless they switch. Finnish and Swedish users should be
+  able to describe their process in their own words without translating first —
+  that is where the requirement detail lives. Switch back if they switch back.
+  This applies to the conversation only: generated files (blueprint.json, the
+  schema, the PoC code and its comments) stay in English so they stay
+  consistent with the GAIK components they call. Written documentation may
+  follow the user's language if they ask for it.
 """
 
 

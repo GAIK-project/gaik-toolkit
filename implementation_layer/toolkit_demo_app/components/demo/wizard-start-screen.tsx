@@ -92,8 +92,9 @@ export function WizardStartScreen({
             What should your GenAI solution do?
           </h2>
           <p className="text-muted-foreground mt-2 max-w-md text-sm">
-            Describe the task in plain language. The wizard asks follow-up questions, then
-            builds the blueprint, diagrams, docs and a runnable proof of concept.
+            Describe the task in plain language, in English, Finnish or Swedish. The wizard
+            asks follow-up questions, then builds the blueprint, diagrams, docs and a
+            runnable proof of concept.
           </p>
         </motion.div>
 
