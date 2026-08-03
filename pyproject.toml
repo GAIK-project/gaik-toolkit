@@ -373,6 +373,13 @@ ignore = []
 [tool.pytest.ini_options]
 testpaths = ["implementation_layer/unit_tests"]
 addopts = ["-v", "--strict-markers"]
+markers = [
+    # Tests that call a real LLM. They assert on model output, so they fail when
+    # the model or the Azure deployment behind AZURE_DEPLOYMENT changes — not
+    # only when our code regresses. Excluded from the push gate (`-m "not llm"`)
+    # and run on their own schedule; see .github/workflows/test.yml.
+    "llm: requires a live LLM API key and makes real API calls",
+]
 
 
 

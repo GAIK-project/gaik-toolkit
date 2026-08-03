@@ -27,6 +27,12 @@ from gaik.software_components.extractor.schema import (
 # A1: Format DD/MM/YYYY — European slash
 # ---------------------------------------------------------------------------
 
+# Calls a real LLM: these assert on model output, so they fail when the model or
+# the Azure deployment changes, not only when our code regresses. Kept out of the
+# push gate (`-m "not llm"`); see .github/workflows/test.yml.
+pytestmark = pytest.mark.llm
+
+
 TASK_FORMAT_DD_SLASH_MM_SLASH_YYYY = """
 Extract the following fields from an incident report.
 

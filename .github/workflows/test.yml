@@ -21,6 +21,9 @@ on:
       - 'pyproject.toml'
       - '.github/workflows/test.yml'
       - '.github/workflows/publish.yml'
+  schedule:
+    # Nightly, for the live-LLM job only (see `llm-tests` below).
+    - cron: '0 3 * * *'
   workflow_dispatch:  # Allow manual trigger from GitHub UI / gh CLI
   workflow_call:  # Allow this workflow to be called by other workflows
     inputs:
@@ -64,10 +67,41 @@ jobs:
         uvx ruff@0.14.10 format --check implementation_layer/
         uvx ruff@0.14.10 check implementation_layer/src/gaik/ || echo "::warning::ruff check reported non-blocking style issues (e.g. long prompt strings)"
 
+    # Deterministic tests only. The `llm` marker covers tests that call a real
+    # model and assert on its output — those belong in the `llm-tests` job below,
+    # because a change in the model or in the Azure deployment must not turn a
+    # docs-only commit red.
     - name: Run tests
+      run: pytest -m "not llm" --strict-markers
+
+  # Tests that make real LLM calls. Kept off the push path deliberately: they
+  # are a signal about the model and the AZURE_DEPLOYMENT behind it, not a
+  # regression gate for our code. Run nightly and on demand
+  # (`gh workflow run test.yml`), so a failure here points at the deployment.
+  llm-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref || github.ref }}
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Install package
+      run: uv pip install --system ".[all,dev]"
+
+    - name: Run live LLM tests
       env:
         AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
         AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
         AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
         AZURE_DEPLOYMENT: ${{ secrets.AZURE_DEPLOYMENT }}
-      run: pytest -v --strict-markers
+      run: pytest -m llm --strict-markers

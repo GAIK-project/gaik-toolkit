@@ -13,6 +13,14 @@ from gaik.software_components.extractor.schema import (
     print_pydantic_schema,
 )
 
+import pytest
+
+# Calls a real LLM: these assert on model output, so they fail when the model or
+# the Azure deployment changes, not only when our code regresses. Kept out of the
+# push gate (`-m "not llm"`); see .github/workflows/test.yml.
+pytestmark = pytest.mark.llm
+
+
 EXTRACTION_TASK = """
 Extract the following fields from an incident report.
 
