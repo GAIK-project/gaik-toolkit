@@ -57,15 +57,25 @@ one thing users most need to know: a reload loses the session.
 
 ## NEXT (highest value first)
 
-### 6. Verify the round-formatting contract against a live run
-**Why:** item 4 is a prompt instruction. The model can ignore it, and nothing
-in CI catches that.
-**Do:** run one full wizard session on production, capture three consecutive
-turns, and check the contract holds (≤3 questions, numbered, rule before the
-closing line). If the model drifts, move the contract from prose into the
-bootstrap prompt in `api/routers/solution_wizard.py`, which is re-sent every
-turn and therefore harder to forget.
-**Risk:** low. **Cost:** one session.
+### 6. Round-formatting contract — MOVED, NEEDS RE-CHECK
+A live run showed the model **ignoring** the SKILL.md version: it asked in
+bold-led paragraphs, no numbered list, no rule. The instruction was buried in a
+13k-token file the model reads once via a tool.
+
+The contract now lives in the bootstrap prompt in
+`api/routers/solution_wizard.py`, phrased as overriding conflicting formatting
+habits. **Still to do:** one live run to confirm it takes. If it still drifts,
+the next lever is a per-turn reminder rather than a once-per-session one.
+
+### 6b. Starting a session no longer costs a model turn — DONE
+`/wizard/start` used to send the bootstrap prompt and stream a full turn (the
+model loading a ~13k-token SKILL.md) whose visible output the UI discarded.
+The prompt now rides on the user's first message instead. Measured in
+production: `/wizard/start` returns in **0.66 s**, subprocess spawn included.
+
+Caching was the wrong instinct here and is worth remembering: the cost was
+generation, not prefill, and the output was thrown away — there was nothing
+worth caching. The fix was to delete the work, not to memoize it.
 
 ### 7. Persist the session across a page reload
 **Why:** `sessionId` lives in React state only. A refresh, an accidental
@@ -94,6 +104,21 @@ sentence about what will eventually appear, so the wait has a shape.
 **Still to do:** tick each item off as its file actually lands (reuse
 `deriveWizardStage`), so the list becomes live progress rather than a static
 preview. **Risk:** low. **Cost:** an hour.
+
+### 9b. Inline answers for closed-vocabulary questions
+**Why:** several Phase 2 fields are genuinely enumerable (`language`,
+`model_provider`, `human_review`, `runtime_interface`, whether the output needs
+a PDF). Free text there costs the user time and produces values the validator
+has to normalise.
+**Do NOT** do this for the open fields — current process, pain points, success
+criteria. Their value is the user's own wording; a select would flatten exactly
+the nuance Phase 2 exists to capture.
+**Do:** have the wizard append a fenced `wizard-choices` block (field + options)
+alongside the question; the frontend renders it as chips. **A chip fills the
+composer, it does not send** — so the user can pick "Finnish" and keep typing
+"…but some technicians speak Swedish". Degrades to a plain text question when
+the model omits the block.
+**Risk:** low. **Cost:** half a day.
 
 ### 10. Mobile
 **Why:** the layout is `lg:grid-cols-[1fr_320px]` with a fixed
