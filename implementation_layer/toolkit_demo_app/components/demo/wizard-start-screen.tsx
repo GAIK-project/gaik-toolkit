@@ -2,10 +2,17 @@
 
 import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { FileAudio, FileText, MessagesSquare, RotateCcw, Table2, Wand2 } from "lucide-react";
+import {
+  FileAudio,
+  FileText,
+  Loader2,
+  MessagesSquare,
+  RotateCcw,
+  Table2,
+  Wand2,
+} from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Starting points offered on the empty screen. Clicking one sends it as the
@@ -103,15 +110,16 @@ export function WizardStartScreen({
               </AlertDescription>
             </Alert>
           ) : connecting ? (
-            <div aria-live="polite">
-              <p className="text-muted-foreground mb-3 text-center text-xs">
-                Preparing your workspace…
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {EXAMPLES.map((e) => (
-                  <Skeleton key={e.title} className="h-[62px] rounded-xl" />
-                ))}
-              </div>
+            // Deliberately no composer and no example buttons here. Showing a
+            // typable-looking input that silently rejects input is the most
+            // confusing state this screen can be in, so while the session is
+            // coming up there is exactly one thing on screen: the wait.
+            <div
+              aria-live="polite"
+              className="text-muted-foreground flex items-center justify-center gap-2 py-10 text-sm"
+            >
+              <Loader2 className="text-primary h-4 w-4 animate-spin" />
+              <span>Preparing your workspace…</span>
             </div>
           ) : (
             <>
@@ -141,9 +149,11 @@ export function WizardStartScreen({
           )}
         </motion.div>
 
-        <motion.div {...rise(0.16)} className="mt-6">
-          {composer}
-        </motion.div>
+        {!connecting && !error && (
+          <motion.div {...rise(0.16)} className="mt-6">
+            {composer}
+          </motion.div>
+        )}
       </div>
     </div>
   );

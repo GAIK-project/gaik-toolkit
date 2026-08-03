@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   ChevronRight,
+  Circle,
   Download,
   File as FileIcon,
   FileArchive,
@@ -16,6 +17,15 @@ interface WizardFileBrowserProps {
   files: string[]; // flat list of POSIX relative paths, e.g. "docs/user_guide.md"
   sessionId: string | null;
 }
+
+/** What a complete run leaves behind, in the order the wizard writes it. */
+const EXPECTED_ARTIFACTS = [
+  { label: "Blueprint", detail: "blueprint.json — the validated configuration" },
+  { label: "Workflow diagrams", detail: "Mermaid and BPMN 2.0" },
+  { label: "Schema", detail: "The extraction contract, when the use case needs one" },
+  { label: "Proof of concept", detail: "Runnable Python you can execute locally" },
+  { label: "Documentation", detail: "User and developer guides" },
+] as const;
 
 interface DirListing {
   folders: string[];
@@ -98,10 +108,29 @@ export function WizardFileBrowser({ files, sessionId }: WizardFileBrowserProps) 
       {/* Listing */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {files.length === 0 ? (
-          <p className="text-muted-foreground text-xs">
-            Files the wizard creates (blueprint, diagrams, docs, PoC) will appear
-            here. Click a folder to open it; click a file to download.
-          </p>
+          // An empty panel for the first several minutes reads as broken. The
+          // checklist says what is coming and in what order, so the wait has a
+          // shape — and it doubles as an explanation of what a run produces.
+          <div>
+            <p className="text-muted-foreground mb-3 text-xs">
+              Nothing generated yet. A full run produces:
+            </p>
+            <ul className="space-y-2">
+              {EXPECTED_ARTIFACTS.map((a) => (
+                <li key={a.label} className="flex items-start gap-2">
+                  <Circle className="text-muted-foreground/40 mt-1 h-2.5 w-2.5 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="text-foreground/70 block text-xs font-medium">
+                      {a.label}
+                    </span>
+                    <span className="text-muted-foreground block text-[11px]">
+                      {a.detail}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : isEmptyHere ? (
           <p className="text-muted-foreground text-xs">This folder is empty.</p>
         ) : (

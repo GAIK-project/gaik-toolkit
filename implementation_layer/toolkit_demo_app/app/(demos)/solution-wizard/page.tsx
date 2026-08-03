@@ -24,6 +24,7 @@ import { Reasoning } from "@/components/ai-elements/reasoning";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PageTransition } from "@/components/demo/page-transition";
 import { WizardFileBrowser } from "@/components/demo/wizard-file-browser";
+import { WizardHelpDialog } from "@/components/demo/wizard-help-dialog";
 import { WizardStartScreen } from "@/components/demo/wizard-start-screen";
 import { deriveWizardStage, WizardProgress } from "@/components/demo/wizard-progress";
 import { Button } from "@/components/ui/button";
@@ -442,6 +443,7 @@ export default function SolutionWizardPage() {
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
             <Wand2 className="h-6 w-6 text-primary" />
             Solution Configuration Wizard
+            <WizardHelpDialog />
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
             From a plain-language use case to a validated blueprint, workflow
