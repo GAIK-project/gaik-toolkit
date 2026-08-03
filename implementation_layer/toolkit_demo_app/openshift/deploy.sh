@@ -82,11 +82,15 @@ ensure_registry_login() {
     # that writes to ~/.config/containers/auth.json (podman's path). We pipe the
     # OpenShift token straight into `docker login` so the credentials land in
     # ~/.docker/config.json regardless of platform.
+    # The username is ignored by OpenShift's registry (the token authenticates),
+    # so pass a literal placeholder. Using `$(oc whoami)` breaks for service
+    # accounts, whose name contains colons ("system:serviceaccount:gaik:...")
+    # that Docker rejects as a username.
     echo -e "${YELLOW}Authenticating Docker against $REGISTRY...${NC}"
-    if ! oc whoami -t | docker login -u "$(oc whoami)" --password-stdin "$REGISTRY" &> /dev/null; then
+    if ! oc whoami -t | docker login -u unused --password-stdin "$REGISTRY" &> /dev/null; then
         echo -e "${RED}Error: failed to log Docker into the Rahti registry${NC}"
         echo "Manual recovery:"
-        echo "  oc whoami -t | docker login -u \"\$(oc whoami)\" --password-stdin $REGISTRY"
+        echo "  oc whoami -t | docker login -u unused --password-stdin $REGISTRY"
         exit 1
     fi
 }

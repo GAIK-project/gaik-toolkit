@@ -24,6 +24,8 @@ import { Reasoning } from "@/components/ai-elements/reasoning";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { PageTransition } from "@/components/demo/page-transition";
 import { WizardFileBrowser } from "@/components/demo/wizard-file-browser";
+import { WizardStartScreen } from "@/components/demo/wizard-start-screen";
+import { deriveWizardStage, WizardProgress } from "@/components/demo/wizard-progress";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -150,6 +152,9 @@ export default function SolutionWizardPage() {
   const [busy, setBusy] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [files, setFiles] = useState<string[]>([]);
+  // Surfaced on the start screen with a retry, so a failed bootstrap does not
+  // leave the user staring at a skeleton that never resolves.
+  const [startError, setStartError] = useState<string | null>(null);
 
   const sessionRef = useRef<string | null>(null);
   const streamRef = useRef("");
@@ -201,7 +206,7 @@ export default function SolutionWizardPage() {
     async (
       response: Response,
       gen: number,
-      opts: { suppressReasoning?: boolean } = {},
+      opts: { suppressReasoning?: boolean; suppressText?: boolean } = {},
     ) => {
       streamRef.current = "";
       thinkingRef.current = "";
@@ -221,6 +226,10 @@ export default function SolutionWizardPage() {
             setSessionId(sid);
             sessionRef.current = sid;
           } else if (event.type === "text_delta") {
+            // The bootstrap turn's visible text is the wizard restating its
+            // own intro. The start screen already says that, better, so it is
+            // dropped rather than duplicated as the first chat bubble.
+            if (opts.suppressText) return;
             streamRef.current += (event.data.text as string) ?? "";
             setStreamingText(streamRef.current);
             setActivity("");
@@ -264,40 +273,26 @@ export default function SolutionWizardPage() {
     const gen = genRef.current; // capture before any await
     setBusy(true);
     setFiles([]);
-    // Show a helpful welcome immediately so the user isn't staring at a blank
-    // loading state. The backend's real greeting streams in right after.
-    setMessages([
-      {
-        id: nextId(),
-        role: "assistant",
-        content: [
-          "## Welcome to the GAIK Solution Configuration Wizard",
-          "",
-          "I'll guide you from your business idea to a fully validated **GenAI Proof of Concept (PoC)** — including a blueprint, BPMN workflow diagram, documentation, and a runnable proof of concept.",
-          "",
-          "**To get started, describe your use case in plain language.** For example:",
-          '- *"We receive voice recordings from field technicians and turn them into structured maintenance tickets."*',
-          '- *"We need to extract key fields from incoming supplier PDF invoices."*',
-          '- *"We want a Q&A assistant over our internal policy documents."*',
-          '- *"We need to automatically generate a multi-section analysis report from uploaded documents, transcripts, and data files."*',
-          "",
-          "Give as much or as little context as you like — I'll ask follow-up questions to fill in the details.",
-          "",
-          "If you are ready, let's proceed with the first question.",
-        ].join("\n"),
-      },
-    ]);
+    // No injected welcome message: the start screen owns the introduction, so
+    // an empty `messages` means "no conversation yet" and nothing in the chat
+    // log is anything other than a real turn.
+    setMessages([]);
+    setStartError(null);
     try {
       const res = await apiFetch("/api/wizard/start", { method: "POST" });
       if (!res.ok) {
         const detail = await res.text();
+        if (genRef.current === gen) setStartError(detail || `Request failed (${res.status}).`);
         toast.error(`Could not start the wizard: ${detail}`, { duration: 10000 });
         return;
       }
-      await consumeTurn(res, gen, { suppressReasoning: true });
+      await consumeTurn(res, gen, { suppressReasoning: true, suppressText: true });
     } catch (err) {
-      if (genRef.current === gen)
-        toast.error(err instanceof Error ? err.message : "Failed to start session");
+      const detail = err instanceof Error ? err.message : "Failed to start session";
+      if (genRef.current === gen) {
+        setStartError(detail);
+        toast.error(detail);
+      }
     } finally {
       if (genRef.current === gen) setBusy(false);
     }
@@ -397,6 +392,45 @@ export default function SolutionWizardPage() {
     URL.revokeObjectURL(url);
   }, [messages]);
 
+  const hasConversation = messages.length > 0;
+  // Progress is read off the generated artifacts, so it advances on real work
+  // rather than on how the wizard happens to word a turn.
+  const stage = deriveWizardStage(files);
+
+  // One composer instance, rendered either centered on the start screen or
+  // pinned under the conversation.
+  const composer = (
+    <PromptInput
+      accept=".txt,.md,.docx,.pdf,.csv,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.tiff,.gif,.mp3,.mp4,.wav,.m4a,.ogg,.webm,.flac,.mpeg,.mpga"
+      multiple
+      onSubmit={({ text, files: attached }) => {
+        if (text || attached.length > 0) void sendMessage(text, attached);
+      }}
+    >
+      <AttachedFileChips />
+      <PromptInputBody>
+        <PromptInputTextarea
+          className="min-h-11"
+          placeholder={
+            !sessionId
+              ? "Connecting to the wizard…"
+              : hasConversation
+                ? "Reply to the wizard…"
+                : "Describe your use case…"
+          }
+          disabled={!sessionId || busy}
+        />
+      </PromptInputBody>
+      <PromptInputFooter>
+        <AttachButton disabled={!sessionId || busy} />
+        <PromptInputSubmit
+          status={busy ? "streaming" : "ready"}
+          disabled={!sessionId || busy}
+        />
+      </PromptInputFooter>
+    </PromptInput>
+  );
+
   return (
     <PageTransition>
       {/* Break out of the layout's max-w-6xl: the chat + file browser benefit
@@ -478,6 +512,25 @@ export default function SolutionWizardPage() {
             of the session. min-w-0 lets the track stay fixed and the code block
             scroll horizontally inside the message instead. */}
         <div className="flex min-h-0 min-w-0 flex-col">
+          {hasConversation && (
+            <WizardProgress stage={stage} className="mb-3 px-1" />
+          )}
+          {!hasConversation ? (
+            <div className="flex min-h-0 flex-1 rounded-xl border bg-white">
+              <WizardStartScreen
+                connecting={!sessionId || busy}
+                disabled={!sessionId || busy}
+                error={startError}
+                onRetry={() => {
+                  genRef.current += 1;
+                  void startSession();
+                }}
+                onPickExample={(prompt) => void sendMessage(prompt)}
+                composer={composer}
+              />
+            </div>
+          ) : (
+            <>
           <Conversation className="min-h-0 flex-1 rounded-xl border bg-white">
             <ConversationContent className="p-4">
               {messages.map((message) => (
@@ -532,34 +585,9 @@ export default function SolutionWizardPage() {
             <ConversationScrollButton />
           </Conversation>
 
-          <PromptInput
-            accept=".txt,.md,.docx,.pdf,.csv,.xlsx,.xls,.jpg,.jpeg,.png,.webp,.tiff,.gif,.mp3,.mp4,.wav,.m4a,.ogg,.webm,.flac,.mpeg,.mpga"
-            multiple
-            onSubmit={({ text, files }) => {
-              if (text || files.length > 0) void sendMessage(text, files);
-            }}
-            className="mt-2"
-          >
-            <AttachedFileChips />
-            <PromptInputBody>
-              <PromptInputTextarea
-                className="min-h-11"
-                placeholder={
-                  sessionId
-                    ? "Reply to the wizard…"
-                    : "Connecting to the wizard…"
-                }
-                disabled={!sessionId || busy}
-              />
-            </PromptInputBody>
-            <PromptInputFooter>
-              <AttachButton disabled={!sessionId || busy} />
-              <PromptInputSubmit
-                status={busy ? "streaming" : "ready"}
-                disabled={!sessionId || busy}
-              />
-            </PromptInputFooter>
-          </PromptInput>
+              <div className="mt-2">{composer}</div>
+            </>
+          )}
         </div>
 
         {/* Generated files browser */}
