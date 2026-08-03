@@ -307,6 +307,13 @@ export const MessageResponse = memo(
     <Streamdown
       className={cn(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+        // A rule is how a turn separates "here is the context" from "here is
+        // what you must answer", so it has to read as a real divider rather
+        // than collapse into the surrounding text.
+        "[&_hr]:border-border [&_hr]:my-4",
+        // Numbered question lists are the thing the user acts on: give the
+        // items room to breathe instead of running together.
+        "[&_ol]:space-y-1.5",
         className,
       )}
       // @ts-ignore shiki version mismatch between streamdown and @streamdown/code

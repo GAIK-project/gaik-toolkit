@@ -87,6 +87,15 @@ State your classification to the user in one sentence before moving on.
 
 Collect the **full Section-8 requirement model** — not just a fast path. Ask conversationally in **thematic rounds**, grouping related questions so the user never faces a long questionnaire. Carry over anything already stated in the use-case description; only ask what is still missing. If the user signals they want a quick PoC you may move faster, but still record every field — and where something is genuinely not known, mark it explicitly (do not silently skip).
 
+**How to present a round.** The user has to be able to see, at a glance, exactly what they are being asked. So:
+
+- At most **3 questions per turn**. If a round needs more, split it across turns.
+- Lead with **one short sentence** of context, not a paragraph.
+- Put the questions in a **numbered Markdown list**, one question per item, with any examples in parentheses inside the item. Do not scatter questions through prose.
+- End the turn with a horizontal rule (`---`) and a single closing line telling the user how to answer (for example: "Answer what you can, and say *skip* for anything you are unsure of.").
+
+The rule is a visual anchor: everything above it is context, everything the user must act on is the list directly above it.
+
 **Round 1 — Business context (§8.1).** Three §8.1 fields are already recorded in Phase 1: `use_case_name` → `use_case.name`, `domain` → `use_case.domain`, and `knowledge_processes` → `use_case.knowledge_processes` (set during Step 1.2 description + pattern classification). Do not re-ask them. Collect the remaining §8.1 fields here: `current_process`, `pain_points`, `proposed_solution`, `intended_users`, `reviewers`, `stakeholders`, `input_artifacts` (business-level), `target_outputs` (business-level), `success_criteria`, `expected_value`, `risks`. Also capture `poc_goal` (what the first proof of concept should demonstrate) — this is a wizard addition not in §8.1 but required for completeness checklist point 13; store it in `business_spec.poc_goal`.
 
 **Round 2 — Technical (§8.2).** `input_types`, `input_formats`, `output_types`, `language`, `domain_vocabulary` (terms / codes / controlled lists — record `"none"` if not needed), `data_sources`, `model_provider` (or `"configurable"`), `model_preferences` (model names, temperature, embedding/transcription model), `security_constraints`, `integration_targets` (record `[]` if none), `human_review` (yes / no / conditional), `evaluation_requirements` (metrics, test data, thresholds), `runtime_interface`.
