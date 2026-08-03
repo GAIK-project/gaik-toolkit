@@ -91,14 +91,18 @@ when the model omits the block.
 
 ## SEPARATE FROM UX, BUT OUTSTANDING
 
-### 7. Local dev on Windows cannot run the wizard
-`ClaudeSDKClient.connect()` spawns the bundled CLI via
-`asyncio.create_subprocess_exec`, which raises `NotImplementedError` under the
-event loop uvicorn selects on Windows. Production (Linux) is unaffected, so this
-is a developer-experience gap, not a product bug — but it means the wizard can
-only be exercised against a deployed API, which is slow and costs tokens.
-**Do:** select a Proactor-based loop for the API process on Windows (a no-op on
-Linux) and confirm `/wizard/start` succeeds locally.
+### 7. Local dev on Windows cannot run the wizard — FIXED
+Not a Windows limitation: **`--reload` was the cause.** Uvicorn picks
+`SelectorEventLoop` whenever `use_subprocess` is true (`--reload` or
+`--workers`), and on Windows that loop cannot create subprocesses at all — so
+`ClaudeSDKClient.connect()`, which spawns the bundled Claude CLI, failed with
+`NotImplementedError`. The same code worked with `--reload` removed, which is
+why it "used to work".
+
+`api/loop_factory.py` forces `ProactorEventLoop` on Windows and is wired into
+`dev:api` / `dev:all` via `--loop`. Verified locally: reload watcher fires,
+`/wizard/start` succeeds, and the wizard still works after a reload cycle.
+Production is unaffected — the Dockerfile CMD has no `--loop` and no `--reload`.
 
 ### 8. Non-reproducing 404 on `/wizard/files/{id}`
 Seen once on 2026-08-03 09:14. The endpoint behaves correctly when probed
