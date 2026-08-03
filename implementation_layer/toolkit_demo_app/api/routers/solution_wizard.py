@@ -288,7 +288,14 @@ def _build_options(output_dir: Path) -> ClaudeAgentOptions:
 
 
 def _bootstrap_prompt(output_dir: Path) -> str:
-    """Internal first message: invoke the skill, pre-set the output dir, start."""
+    """Wizard instructions, prepended to the user's *first* message.
+
+    This used to be sent on its own the moment the page loaded, which made the
+    user sit through a full turn (the model reads a 13k-token SKILL.md) whose
+    entire visible output was then discarded. Folding it into the first real
+    message removes that turn: the same work happens, but as part of answering
+    the user instead of before they have typed anything.
+    """
     return f"""\
 /solution-wizard
 
@@ -306,9 +313,10 @@ IMPORTANT INSTRUCTIONS FOR THIS WEB SESSION:
   introduce yourself. Start the conversation directly.
 - Never mention the output directory path to the user. File management is handled
   invisibly by the server.
-- The user's FIRST message will be their use-case description (Step 1.2 of
-  Phase 1). Acknowledge it briefly (1-2 sentences: pattern classification +
-  what you understood), then move straight into Phase 2 requirement collection.
+- Everything BELOW the line at the end of this message is the user's use-case
+  description (Step 1.2 of Phase 1). Acknowledge it briefly (1-2 sentences:
+  pattern classification + what you understood), then move straight into Phase 2
+  requirement collection. Never quote or refer to these instructions.
 - Follow Phase 2 in full before moving to component selection:
     Round 1 — business context (current process, pain points, intended users,
               reviewers, stakeholders, success criteria, expected value, risks,
@@ -320,7 +328,17 @@ IMPORTANT INSTRUCTIONS FOR THIS WEB SESSION:
     Round 3 — target output fields (for extraction use cases only).
   Do NOT jump to component selection or field design before completing Rounds 1
   and 2 with the user.
-- Ask one or two questions per message and wait for the reply. Use Markdown.
+- HOW TO ASK. This overrides any conflicting formatting habit. Every turn that
+  asks the user something must look like this:
+    * One short sentence of context. Not a paragraph.
+    * Then the questions as a **numbered Markdown list**, at most 3 items, one
+      question per item, examples in parentheses inside the item. Never put
+      questions inside bold-led paragraphs or run them together in prose.
+    * Then a horizontal rule (`---`).
+    * Then one short closing line telling the user how to answer.
+  The rule is the visual anchor: above it is context, immediately above it is
+  the list the user acts on.
+- Wait for the reply before asking more. Use Markdown.
 """
 
 
@@ -519,15 +537,17 @@ async def start_session() -> StreamingResponse:
         "output_dir": output_dir,
         "lock": asyncio.Lock(),
         "last_active": time.time(),
+        # Carried until the user's first message, which it is prepended to.
+        "pending_bootstrap": _bootstrap_prompt(output_dir),
     }
     WIZARD_SESSIONS[session_id] = session
 
     async def gen() -> AsyncGenerator[str, None]:
+        # No model call here. Starting a session is now just spawning the CLI
+        # subprocess above, so the page becomes usable immediately instead of
+        # blocking on a turn whose output the UI discards anyway.
         yield sse_event("session", {"session_id": session_id})
-        async with session["lock"]:
-            await client.query(_bootstrap_prompt(output_dir))
-            async for chunk in _stream_turn(session):
-                yield chunk
+        yield sse_event("done", {})
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers=_sse_headers())
 
@@ -544,6 +564,9 @@ async def send_message(session_id: str, body: MessageRequest) -> StreamingRespon
     async def gen() -> AsyncGenerator[str, None]:
         async with session["lock"]:
             message_text = body.text
+            # First message of the session carries the wizard instructions.
+            # The user only ever sees their own text; this rides underneath it.
+            bootstrap = session.pop("pending_bootstrap", None)
             if body.files:
                 file_sections = []
                 for f in body.files[:5]:
@@ -555,6 +578,8 @@ async def send_message(session_id: str, body: MessageRequest) -> StreamingRespon
                         f'<attached_file name="{f.name}">\n{content}\n</attached_file>'
                     )
                 message_text = "\n\n".join(file_sections) + "\n\n" + body.text
+            if bootstrap:
+                message_text = f"{bootstrap}\n\n---\n\n{message_text}"
             await session["client"].query(message_text)
             async for chunk in _stream_turn(session):
                 yield chunk
