@@ -13,7 +13,15 @@ Rule: after any change to gaik that affects its public surface, **remind the use
 - a component now providing a capability internally (a new subsumption relationship);
 - bumping the installed gaik version.
 
-`gaik-sync` scans gaik, presents its findings for approval, and only then syncs the approved changes into the wizard and runs the tests. It edits the wizard assets only — never gaik. A quick non-mutating check is `python .claude/skills/gaik-sync/scripts/audit_registry.py`.
+`gaik-sync` scans gaik, presents its findings for approval, and only then syncs the approved changes into the wizard and runs the tests. It edits the wizard assets only — never gaik. A quick non-mutating check is `uv run python .claude/skills/gaik-sync/scripts/audit_registry.py`.
+
+**Sync the dev environment with all extras first:**
+
+```bash
+uv sync --all-extras
+```
+
+The audit and the wizard's `tests/test_reference_cards.py` both work by importing gaik classes. Several components swallow a missing optional dependency in `__init__.py` (`try: from .x import Y / except ImportError: pass`), so an environment missing an extra makes a class silently absent. The audit then reports it as `removed` drift that is not real, and the tests skip checks they appear to be running. Missing `pydub` alone produced two false `removed` findings and hid 12 assertions on 2026-08-03. Run the audit with `uv run` so it uses the project environment rather than a system Python.
 
 ## graphify (optional — only when the tooling is present)
 

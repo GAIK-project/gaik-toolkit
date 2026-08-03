@@ -454,7 +454,7 @@ export default function TranscriberPage() {
                             Finnish Transcriber
                           </Label>
                           <p className="text-muted-foreground text-xs">
-                            Finnish fine-tuned transcriber at HH's FastAPI
+                            Finnish fine-tuned transcriber at HH&apos;s FastAPI
                             server
                           </p>
                         </div>

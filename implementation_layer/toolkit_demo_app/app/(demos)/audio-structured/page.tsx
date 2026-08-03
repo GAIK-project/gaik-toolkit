@@ -341,7 +341,7 @@ export default function AudioStructuredPage() {
             <p>
               This module extracts structured information from audios. The user
               can specify their extraction task in plain language. For instance,
-              the example ("Load Example") audio contains a patient's medical
+              the example (&quot;Load Example&quot;) audio contains a patient&apos;s medical
               examination done by a doctor. The task specified in the extraction
               requirements extracts symptoms, medical conditions, diagnosis,
               follow-up, and related details. The user can edit the extraction

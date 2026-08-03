@@ -496,7 +496,7 @@ export default function IncidentReportPage() {
                             />
                             <p className="text-muted-foreground text-xs leading-relaxed">
                               If you modify the extraction task, click
-                              "Regenerate Schema" and then run extraction. The
+                              &quot;Regenerate Schema&quot; and then run extraction. The
                               generated schema will not be persisted.
                             </p>
                           </div>

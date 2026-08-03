@@ -287,7 +287,7 @@ export default function ClassifierPage() {
             </p>
             <p>
               <strong>5. Review the result:</strong> The output shows the
-              predicted class, confidence score, and the model's reasoning.
+              predicted class, confidence score, and the model&apos;s reasoning.
             </p>
           </HowItWorksCard>
         </div>

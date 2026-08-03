@@ -312,7 +312,7 @@ export default function DocumentStructuredPage() {
                           Vision+ (Text+Image Parsing)
                         </SelectItem>
                         <SelectItem value="docling_api">
-                          HH Parser (HH's fast Docling Parser)
+                          HH Parser (HH&apos;s fast Docling Parser)
                         </SelectItem>
                         <SelectItem value="docx">
                           DOCX (Word documents)

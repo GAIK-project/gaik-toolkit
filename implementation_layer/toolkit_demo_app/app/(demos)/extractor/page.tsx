@@ -472,8 +472,8 @@ export default function ExtractorPage() {
                         </p>
                         {extractionMode === "plain-language" ? (
                           <p className="text-muted-foreground text-xs leading-relaxed">
-                            If you modify the extraction task, click "Generate
-                            Schema" and then "Extract Data" with the new schema.
+                            If you modify the extraction task, click &quot;Generate
+                            Schema&quot; and then &quot;Extract Data&quot; with the new schema.
                             Your generated schema will not be persisted.
                           </p>
                         ) : null}

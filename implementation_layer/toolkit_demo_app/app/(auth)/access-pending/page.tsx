@@ -40,7 +40,7 @@ export default async function AccessPendingPage() {
         </div>
 
         <p className="text-muted-foreground text-sm">
-          Your request will be reviewed shortly. We'll send you an email when
+          Your request will be reviewed shortly. We&apos;ll send you an email when
           your access has been approved.
         </p>
 

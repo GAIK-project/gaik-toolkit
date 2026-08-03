@@ -229,7 +229,7 @@ export default function ParserPage() {
                             Vision+ (Text+Image Parsing)
                           </SelectItem>
                           <SelectItem value="docling_api">
-                            HH Parser (HH's fast Docling Parser)
+                            HH Parser (HH&apos;s fast Docling Parser)
                           </SelectItem>
                           <SelectItem value="multimodal">
                             Multimodal (Layout-aware, PDF only)
@@ -290,7 +290,7 @@ export default function ParserPage() {
               >
                 read more
               </a>
-              ), Haaga-Helia's parser when you want a remote high-quality
+              ), Haaga-Helia&apos;s parser when you want a remote high-quality
               parsing option, and Multimodal when you want a single LLM call to
               produce layout-aware markdown (with token usage and cost
               reporting).

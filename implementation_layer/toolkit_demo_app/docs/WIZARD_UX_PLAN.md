@@ -122,13 +122,14 @@ acknowledge them, so `--strict` always exits 1 and cannot gate anything.
 `{category, component, reason}`, and have `--strict` ignore matching findings.
 Then wire it into CI.
 
-### 13. Pre-existing lint errors
-15 `react/no-unescaped-entities` errors across 8 demo pages (apostrophes in
-JSX text). Not deploy-gating, but `bun run lint` is red on `main`, which
-trains everyone to ignore it.
+### 13. Pre-existing lint errors — DONE
+The 15 `react/no-unescaped-entities` errors across 8 demo pages are escaped, so
+`bun run lint` is green apart from one `<img>` LCP warning in
+`video-search/page.tsx` (a dynamic thumbnail URL; converting that to
+`next/image` is a real change, not a lint fix). Rendered output is unchanged.
 
-### 14. Dev environment installs without extras
-`uv sync` without `--all-extras` leaves `pydub` missing, which makes
-`transcriber/__init__.py` swallow its import and turns the gaik-sync audit and
-several wizard tests into false greens. Document `uv sync --all-extras` as the
-required setup step, or add the extras to the dev dependency group.
+### 14. Dev environment installs without extras — DONE
+`AGENTS.md` now states `uv sync --all-extras` as the required setup step and
+explains why: a missing extra makes a component silently absent, so the audit
+reports false `removed` drift and the wizard tests skip assertions they look
+like they are running.
