@@ -149,6 +149,14 @@ class PostgresAgent:
             schema-agnostic; this is the hook to inject project-specific knowledge.
         answer_language: ISO 639-1 code (e.g. ``"en"``, ``"fi"``, ``"sv"``) for the
             synthesized natural-language answer. Defaults to ``"en"``.
+        temperature: Sampling temperature sent with every LLM call. Defaults to
+            ``0.0`` so the same question yields the same SQL, which is what a
+            query agent wants. Pass ``None`` to omit the parameter entirely:
+            reasoning deployments (OpenAI's o-series, gpt-5.x reasoning tiers)
+            reject an explicit temperature with *"Unsupported value:
+            'temperature' does not support 0 with this model"* and run at their
+            own fixed setting. Without this, using one of those models meant
+            catching that specific rejection downstream and retrying.
     """
 
     def __init__(
@@ -164,6 +172,7 @@ class PostgresAgent:
         schema_name: str = "public",
         extra_instructions: str | None = None,
         answer_language: str = "en",
+        temperature: float | None = 0.0,
     ) -> None:
         if not connection_string or not connection_string.strip():
             raise ValueError("connection_string must be a non-empty PostgreSQL URI.")
@@ -180,6 +189,7 @@ class PostgresAgent:
         self.table_allowlist = list(table_allowlist) if table_allowlist else None
         self.extra_instructions = extra_instructions.strip() if extra_instructions else None
         self.answer_language = (answer_language or "en").strip().lower()
+        self.temperature = temperature
 
         self._config = config
         self._model = model
@@ -234,6 +244,18 @@ class PostgresAgent:
                 self._model = config.get("model")
             self._llm_client = build_compat_client(config)
         return self._llm_client
+
+    def _temperature_kwargs(self) -> dict[str, float]:
+        """``{"temperature": x}``, or nothing at all when it is ``None``.
+
+        Splatted into every LLM call so a reasoning deployment can be used
+        without the caller catching *"Unsupported value: 'temperature'"* and
+        retrying. Note that the structured-output path via
+        :class:`ProviderClient` never sent a temperature to begin with, so SQL
+        generation already worked on those models; it was answer synthesis that
+        failed.
+        """
+        return {} if self.temperature is None else {"temperature": self.temperature}
 
     # ------------------------------------------------------------------
     # Public API
@@ -305,7 +327,7 @@ class PostgresAgent:
                     model=self._model,
                     messages=messages,
                     response_format=GeneratedSQL,
-                    temperature=0,
+                    **self._temperature_kwargs(),
                     timeout=30,
                 )
             )
@@ -450,13 +472,15 @@ class PostgresAgent:
 
         if isinstance(client, ProviderClient):
             response = _with_retries(
-                lambda: client.chat(messages=messages, model=self._model, temperature=0.0)
+                lambda: client.chat(
+                    messages=messages, model=self._model, **self._temperature_kwargs()
+                )
             )
             return (response.text or "").strip() if response else ""
 
         response = _with_retries(
             lambda: client.chat.completions.create(
-                model=self._model, messages=messages, temperature=0.0
+                model=self._model, messages=messages, **self._temperature_kwargs()
             )
         )
         if not response or not response.choices:
