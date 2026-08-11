@@ -1,0 +1,197 @@
+Run: UC01_run_01
+Attempt: 0 (original)
+EQ4 baseline: True
+Fixture: {'path': 'C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC01_audio_incident_evaluation\\fixtures\\incident_report_fi.wav', 'sha256': 'ae7a380b378f298185434c23efe8ba892389bdbbbaee925c5717c954897c4464', 'size_bytes': 981626}
+Setup command: ['C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-m', 'pip', 'install', '-r', 'requirements.txt']
+Setup exit code: 0
+--- setup stdout ---
+Requirement already satisfied: pydantic>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 1)) (2.12.5)
+Requirement already satisfied: python-dotenv in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 2)) (1.2.1)
+Requirement already satisfied: pyyaml in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 5)) (6.0.3)
+Requirement already satisfied: gaik[audio-to-structured-data] in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 3)) (0.5.16)
+Requirement already satisfied: annotated-types>=0.6.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.7.0)
+Requirement already satisfied: pydantic-core==2.41.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (2.41.5)
+Requirement already satisfied: typing-extensions>=4.14.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (4.15.0)
+Requirement already satisfied: typing-inspection>=0.4.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.4.2)
+Requirement already satisfied: openai>=2.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (2.8.1)
+Requirement already satisfied: anyio<5,>=3.5.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (4.12.0)
+Requirement already satisfied: distro<2,>=1.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (1.9.0)
+Requirement already satisfied: httpx<1,>=0.23.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (0.28.1)
+Requirement already satisfied: jiter<1,>=0.10.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (0.12.0)
+Requirement already satisfied: sniffio in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (1.3.1)
+Requirement already satisfied: tqdm>4 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (4.67.1)
+Requirement already satisfied: anthropic>=0.43.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (0.96.0)
+Requirement already satisfied: google-genai>=0.3.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (1.74.0)
+Requirement already satisfied: google-auth>=2.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (2.50.0)
+Requirement already satisfied: pydub>=0.25.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (0.25.1)
+Requirement already satisfied: requests>=2.31.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (2.32.5)
+Requirement already satisfied: docstring-parser<1,>=0.15 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (0.18.0)
+Requirement already satisfied: idna>=2.8 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anyio<5,>=3.5.0->openai>=2.7.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (3.11)
+Requirement already satisfied: pyasn1-modules>=0.2.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (0.4.2)
+Requirement already satisfied: cryptography>=38.0.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (46.0.3)
+Requirement already satisfied: tenacity<9.2.0,>=8.2.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (9.1.2)
+Requirement already satisfied: websockets<17.0,>=13.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (15.0.1)
+Requirement already satisfied: certifi in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpx<1,>=0.23.0->openai>=2.7.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (2025.11.12)
+Requirement already satisfied: httpcore==1.* in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpx<1,>=0.23.0->openai>=2.7.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (1.0.9)
+Requirement already satisfied: h11>=0.16 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpcore==1.*->httpx<1,>=0.23.0->openai>=2.7.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (0.16.0)
+Requirement already satisfied: charset_normalizer<4,>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (3.4.4)
+Requirement already satisfied: urllib3<3,>=1.21.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (2.6.2)
+Requirement already satisfied: colorama in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from tqdm>4->openai>=2.7.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (0.4.6)
+Requirement already satisfied: cffi>=2.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from cryptography>=38.0.3->google-auth>=2.0.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (2.0.0)
+Requirement already satisfied: pyasn1<0.7.0,>=0.6.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pyasn1-modules>=0.2.1->google-auth>=2.0.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (0.6.1)
+Requirement already satisfied: pycparser in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from cffi>=2.0.0->cryptography>=38.0.3->google-auth>=2.0.0->gaik[audio-to-structured-data]->-r requirements.txt (line 3)) (2.23)
+
+--- setup stderr ---
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: python.exe -m pip install --upgrade pip
+
+Run command: ['C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', 'run_poc.py', '--input', 'C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC01_audio_incident_evaluation\\fixtures\\incident_report_fi.wav']
+Run exit code: 0
+--- run stdout ---
+Loading pipeline: AudioToStructuredData (use_azure=True)
+  Transcription model : gpt-4o-transcribe
+  Extraction model    : gpt-5.4
+  Language            : fi
+Input file: C:\Users\h02317\Downloads\Wizard evaluation\UC01_audio_incident_evaluation\fixtures\incident_report_fi.wav
+Using approved schema (requirements unchanged).
+================================================================================
+Transcribing file: C:\Users\h02317\Downloads\Wizard evaluation\UC01_audio_incident_evaluation\fixtures\incident_report_fi.wav
+Use case: maintenance_fault_reporting
+================================================================================
+Transcribing prompt: Detect the language and extract transcript in the same language. The audio could be in any language, such as English, Finnish, Swedish, etc.
+Local transcription options are ignored unless transcription_model='whisper_local'.
+Transcribing in a single request (original file)...
+Fixing transcription errors with TranscriptEnhancer...
+Transcription complete. Use TranscriptionResult.save(...) to persist output.
+
+================================================================================
+EXTRACTION PHASE
+================================================================================
+
+Processing document 1/1...
+  [extraction] tokens=2434
+
+OK Completed extraction from 1 document(s)
+
+Running LLMJudge hallucination detection...
+Warning: Additional format options not available. Only PDF will be supported.
+WARNING: 1 hallucination flag(s) detected:
+  field=urgency  value=high  reason=Source says 'Kiireellisyys on korkea', not the English enum label 'high'.
+Validation report: C:\Users\h02317\Downloads\Wizard evaluation\UC01_audio_incident_evaluation\runs\run_01\generated_package\poc\output\incident_report_fi_validation.json
+
+NOTE: Human review (supervisor approval) is not executed in the PoC.
+      Gate 3 in the wizard conversation is the equivalent review step.
+      In production, the approved_ticket artifact is produced here.
+
+Extracted fields written to: C:\Users\h02317\Downloads\Wizard evaluation\UC01_audio_incident_evaluation\runs\run_01\generated_package\poc\output\incident_report_fi_ticket.json
+[
+  {
+    "reporter_name": "Matti Virtanen",
+    "asset_identifier": "Pumppu P17",
+    "location": "käyttötilahuoneessa B2",
+    "fault_description": "Pumppu P17 vuotaa käyttötilahuoneessa B2.",
+    "urgency": "high",
+    "observation_date": "2026-07-26",
+    "observation_time": "09:30",
+    "actions_taken": [
+      "Merkitsen alueen",
+      "Pysäytin pumpun"
+    ],
+    "uncertain_fields": null
+  }
+]
+Transcript saved to: C:\Users\h02317\Downloads\Wizard evaluation\UC01_audio_incident_evaluation\runs\run_01\generated_package\poc\output\incident_report_fi_transcript.txt
+
+--- run stderr ---
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4-mini/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+
+--- outputs ---
+[
+  {
+    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC01_audio_incident_evaluation\\runs\\run_01\\generated_package\\poc\\output\\incident_report_fi_ticket.json",
+    "relative_path": "output\\incident_report_fi_ticket.json",
+    "size_bytes": 423,
+    "new_or_modified": true,
+    "sha256": "b992b7e2b429a4fee0640b287f624e22d44a7057604b8b949154e56472736112",
+    "json_parsed": true,
+    "json_value": [
+      {
+        "reporter_name": "Matti Virtanen",
+        "asset_identifier": "Pumppu P17",
+        "location": "käyttötilahuoneessa B2",
+        "fault_description": "Pumppu P17 vuotaa käyttötilahuoneessa B2.",
+        "urgency": "high",
+        "observation_date": "2026-07-26",
+        "observation_time": "09:30",
+        "actions_taken": [
+          "Merkitsen alueen",
+          "Pysäytin pumpun"
+        ],
+        "uncertain_fields": null
+      }
+    ]
+  },
+  {
+    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC01_audio_incident_evaluation\\runs\\run_01\\generated_package\\poc\\output\\incident_report_fi_validation.json",
+    "relative_path": "output\\incident_report_fi_validation.json",
+    "size_bytes": 243,
+    "new_or_modified": true,
+    "sha256": "8b012829ed25264efb222a74df8a54f19d75bd45b361fa89085533805f20a3b7",
+    "json_parsed": true,
+    "json_value": {
+      "hallucination_flags": [
+        {
+          "field": "urgency",
+          "value": "high",
+          "severity": "wrong",
+          "reason": "Source says 'Kiireellisyys on korkea', not the English enum label 'high'."
+        }
+      ],
+      "passed": false
+    }
+  },
+  {
+    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC01_audio_incident_evaluation\\runs\\run_01\\generated_package\\poc\\output\\incident_report_fi_ticket.json",
+    "relative_path": "output\\incident_report_fi_ticket.json",
+    "size_bytes": 423,
+    "new_or_modified": true,
+    "sha256": "b992b7e2b429a4fee0640b287f624e22d44a7057604b8b949154e56472736112",
+    "json_parsed": true,
+    "json_value": [
+      {
+        "reporter_name": "Matti Virtanen",
+        "asset_identifier": "Pumppu P17",
+        "location": "käyttötilahuoneessa B2",
+        "fault_description": "Pumppu P17 vuotaa käyttötilahuoneessa B2.",
+        "urgency": "high",
+        "observation_date": "2026-07-26",
+        "observation_time": "09:30",
+        "actions_taken": [
+          "Merkitsen alueen",
+          "Pysäytin pumpun"
+        ],
+        "uncertain_fields": null
+      }
+    ]
+  },
+  {
+    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC01_audio_incident_evaluation\\runs\\run_01\\generated_package\\poc\\output\\incident_report_fi_validation.json",
+    "relative_path": "output\\incident_report_fi_validation.json",
+    "size_bytes": 243,
+    "new_or_modified": true,
+    "sha256": "8b012829ed25264efb222a74df8a54f19d75bd45b361fa89085533805f20a3b7",
+    "json_parsed": true,
+    "json_value": {
+      "hallucination_flags": [
+        {
+          "field": "urgency",
+          "value": "high",
+          "severity": "wrong",
+          "reason": "Source says 'Kiireellisyys on korkea', not the English enum label 'high'."
+        }
+      ],
+      "passed": false
+    }
+  }
+]

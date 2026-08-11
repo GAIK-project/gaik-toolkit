@@ -1,0 +1,570 @@
+{
+  "blueprint_version": "1.0",
+  "metadata": {
+    "blueprint_id": "purchase_order_erp_record_v1",
+    "created_by": "solution_configuration_wizard",
+    "created_at": "2026-07-31T00:00:00Z",
+    "last_updated_at": "2026-07-31T00:00:00Z",
+    "status": "draft"
+  },
+  "use_case": {
+    "id": "purchase_order_erp_record",
+    "name": "Purchase Order ERP Record Extraction",
+    "description": "Extract structured header and line-item data from customer purchase order PDFs and produce an ERP-compatible JSON record for reviewer-verified entry.",
+    "domain": "manufacturing / order processing",
+    "knowledge_processes": [
+      "knowledge_capture"
+    ]
+  },
+  "business_spec": {
+    "current_process": "Order-processing employees inspect customer purchase orders received as PDFs and manually enter header and line-item information into the ERP system. A procurement or order-processing reviewer then verifies the generated record before it is transferred.",
+    "pain_points": [
+      "Time-consuming manual data entry from diverse PO formats",
+      "Transcription errors (wrong quantities, prices, product codes, leading zeros)",
+      "Omission errors (missed fields, rows, or units)",
+      "Handling format variety across customers"
+    ],
+    "proposed_solution": "AI-powered extraction of PO header and line-item fields from PDF documents into a structured ERP-compatible JSON record, followed by reviewer verification before transfer.",
+    "intended_users": [
+      "order_processing_employees"
+    ],
+    "reviewers": [
+      "procurement_reviewer",
+      "order_processing_reviewer"
+    ],
+    "stakeholders": "not_specified",
+    "input_artifacts": [
+      "Customer purchase order PDFs (digital and scanned)"
+    ],
+    "target_outputs": [
+      "ERP-compatible JSON record (downloadable)"
+    ],
+    "success_criteria": [
+      "Faster and more consistent ERP data preparation",
+      "Fewer manual transcription and omission errors",
+      "Reviewer-verifiable record produced before any ERP transfer"
+    ],
+    "expected_value": [
+      "Faster, more consistent order entry",
+      "Fewer transcription and omission errors"
+    ],
+    "risks": [
+      "Losing table structure during extraction",
+      "Merging different line items",
+      "Missing a row continued across pages",
+      "Altering product codes or leading zeros",
+      "Dropping units",
+      "Inventing missing values (hallucination)",
+      "Transferring an unreviewed record"
+    ],
+    "poc_goal": "Given a supplied sample purchase-order PDF, extract the required header fields and all three line items into an ERP-compatible JSON record via a CLI interface. The PoC must accept the PDF, exit successfully, generate a non-empty parseable JSON record, preserve identifiers/leading zeros/article codes/dates/quantities/dimensions/units, and must not invent unsupported values for missing optional fields. Compare result semantically with fixtures/expected_erp_record.json. Out of scope: live ERP connection, PDF report, customer-specific format evaluation, numerical accuracy threshold."
+  },
+  "technical_spec": {
+    "input_types": [
+      "pdf"
+    ],
+    "input_formats": [
+      "digital_pdf",
+      "scanned_pdf"
+    ],
+    "output_types": [
+      "structured_json"
+    ],
+    "language": "en",
+    "domain_vocabulary": "Four-digit item numbers (preserve leading zeros), case-sensitive article codes, vendor numbers, material grades, standards, dimensions with units, quantities with units, dates normalized to DD/MM/YYYY. product_form restricted to: Flat, round, rectangular bar. No separate domain glossary.",
+    "data_sources": [
+      "customer_purchase_order_pdfs"
+    ],
+    "model_provider": "azure_openai",
+    "model_preferences": {
+      "extraction_model": "gpt-5.4",
+      "temperature": 0.0
+    },
+    "security_constraints": [
+      "PO content must not be retained after processing",
+      "Original remains in source document system",
+      "Approved JSON and review decision may be retained (no exact retention period specified)",
+      "Authentication, RBAC, ERP credentials, and full audit-log implementation are out of PoC scope",
+      "External model APIs allowed; local-only processing not required"
+    ],
+    "integration_targets": [],
+    "human_review": "yes",
+    "human_review_required": true,
+    "evaluation_requirements": {
+      "method": "semantic comparison with fixtures/expected_erp_record.json",
+      "metrics": [
+        "field_exact_match",
+        "semantic_match",
+        "completeness"
+      ],
+      "numerical_accuracy_threshold": "not_specified"
+    },
+    "runtime_interface": "cli"
+  },
+  "target_output_spec": {
+    "schema_name": "PurchaseOrderERPRecord",
+    "structure": "parent_with_nested_list",
+    "fields": [
+      "purchase_order_number",
+      "delivery_date",
+      "delivery_address",
+      "vendor_number",
+      "line_items",
+      "item_number",
+      "article_code",
+      "dimensions",
+      "material_grade",
+      "quantity",
+      "product_form",
+      "standard_designation",
+      "cut_length",
+      "temper_or_condition",
+      "hardness_hv",
+      "min_bend_radius",
+      "delivery_length_note",
+      "applicable_standard",
+      "special_flags"
+    ],
+    "field_types": {
+      "purchase_order_number": "str",
+      "delivery_date": "str",
+      "delivery_address": "str",
+      "vendor_number": "str",
+      "line_items": "list[dict]",
+      "item_number": "str",
+      "article_code": "str",
+      "dimensions": "str",
+      "material_grade": "str",
+      "quantity": "str",
+      "product_form": "str",
+      "standard_designation": "str",
+      "cut_length": "str",
+      "temper_or_condition": "str",
+      "hardness_hv": "float",
+      "min_bend_radius": "float",
+      "delivery_length_note": "str",
+      "applicable_standard": "str",
+      "special_flags": "str"
+    },
+    "required_fields": [
+      "purchase_order_number",
+      "delivery_date",
+      "delivery_address",
+      "vendor_number",
+      "line_items",
+      "item_number",
+      "article_code",
+      "dimensions",
+      "material_grade",
+      "quantity",
+      "product_form"
+    ],
+    "optional_fields": [
+      "standard_designation",
+      "cut_length",
+      "temper_or_condition",
+      "hardness_hv",
+      "min_bend_radius",
+      "delivery_length_note",
+      "applicable_standard",
+      "special_flags"
+    ],
+    "field_descriptions": {
+      "purchase_order_number": "Unique PO identifier as printed in the document; preserve leading zeros and punctuation.",
+      "delivery_date": "Requested delivery date, normalized to DD/MM/YYYY format.",
+      "delivery_address": "Full delivery address as stated in the PO header.",
+      "vendor_number": "Vendor/supplier identifier as printed; preserve leading zeros.",
+      "line_items": "List of line-item records, one per ordered item row.",
+      "item_number": "Four-digit line item number; preserve leading zeros.",
+      "article_code": "Case-sensitive article/product code exactly as written.",
+      "dimensions": "Dimensions string exactly as written (e.g. 12x1500x3000 mm).",
+      "material_grade": "Material grade designation exactly as written.",
+      "quantity": "Quantity including numeric value and unit exactly as written.",
+      "product_form": "Product form; must be exactly one of: Flat, round, rectangular bar.",
+      "standard_designation": "Material or product standard designation if present; null if absent.",
+      "cut_length": "Cut-to-length specification if stated; null if absent.",
+      "temper_or_condition": "Temper or delivery condition if stated; null if absent.",
+      "hardness_hv": "Hardness value in HV if stated; numeric only; null if absent.",
+      "min_bend_radius": "Minimum bend radius if stated; numeric only; null if absent.",
+      "delivery_length_note": "Any delivery length note or constraint if present; null if absent.",
+      "applicable_standard": "Applicable standard reference if present; null if absent.",
+      "special_flags": "Any special requirements or flags noted on the line item; null if absent."
+    },
+    "allowed_values": {
+      "product_form": [
+        "Flat",
+        "round",
+        "rectangular bar"
+      ]
+    },
+    "confidence_required": "not_specified",
+    "missing_value_policy": "null",
+    "validation_rules": [
+      "delivery_date must be in DD/MM/YYYY format",
+      "product_form must be one of: Flat, round, rectangular bar",
+      "item_number must preserve leading zeros as four-digit string",
+      "article_code must preserve case and punctuation exactly",
+      "vendor_number must preserve leading zeros",
+      "Optional fields must be null (not empty string) when not present in the document",
+      "Must not invent or hallucinate values for fields not present in the document"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "assumption_001",
+      "text": "Stakeholders beyond order-processing employees and reviewers were not specified by the user; recorded as 'not_specified'.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-31T00:00:00Z"
+    },
+    {
+      "id": "assumption_005",
+      "text": "Swimlane roles/participants were not specified for this evaluation; BPMN will use enrichment-only defaults.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-31T00:00:00Z"
+    },
+    {
+      "id": "assumption_006",
+      "text": "Manual steps (beyond the AI pipeline) were not specified; none added to the business process model.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-31T00:00:00Z"
+    },
+    {
+      "id": "assumption_007",
+      "text": "Business decision points beyond the approve/return-for-correction gateway were not specified; none added.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-31T00:00:00Z"
+    },
+    {
+      "id": "assumption_002",
+      "text": "No specific Azure OpenAI deployment name or model version was provided; defaulting to gpt-5.4 with temperature 0.0 per wizard defaults.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-31T00:00:00Z"
+    },
+    {
+      "id": "assumption_003",
+      "text": "Confidence scoring per field is not required for this PoC (not specified by user).",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-31T00:00:00Z"
+    },
+    {
+      "id": "assumption_004",
+      "text": "PO content (commercial information, customer/supplier identifiers) is treated as internal sensitive data. Whether it constitutes personal data is unknown pending legal assessment.",
+      "status": "unconfirmed",
+      "impact": "security_constraint",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-31T00:00:00Z"
+    }
+  ],
+  "artifacts": {
+    "source_pdf": {
+      "type": "pdf",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "erp_record_json": {
+      "type": "structured_json",
+      "source": "generated",
+      "optional": false,
+      "final_output": true,
+      "externally_visible": false,
+      "produced_by": "extract_po_fields",
+      "schema_ref": "schemas/output_schema.py",
+      "overwrite": false
+    },
+    "validation_report": {
+      "type": "validation_report",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "validate_extraction",
+      "schema_ref": null,
+      "overwrite": false
+    }
+  },
+  "inputs": {},
+  "outputs": {},
+  "schemas": {},
+  "components": {
+    "selected_modules": [],
+    "selected_building_blocks": [
+      "VisionExtractor",
+      "LLMJudge"
+    ],
+    "custom_components": []
+  },
+  "workflow": {
+    "steps": [
+      {
+        "id": "upload_po",
+        "name": "Upload purchase order PDF",
+        "type": "user_task",
+        "component": null,
+        "inputs": [],
+        "outputs": [
+          "source_pdf"
+        ],
+        "parameters": {},
+        "depends_on": [],
+        "loop": null
+      },
+      {
+        "id": "extract_po_fields",
+        "name": "Extract PO header and line items",
+        "type": "automated_task",
+        "component": "VisionExtractor",
+        "inputs": [
+          "source_pdf"
+        ],
+        "outputs": [
+          "erp_record_json"
+        ],
+        "parameters": {
+          "task": "Extract purchase order header fields (PO number, delivery date, delivery address, vendor number) and all line items from the document into an ERP-compatible structured record.",
+          "schema_ref": "schemas/output_schema.py",
+          "requirements_ref": "schemas/output_schema_requirements.json",
+          "include_verification": true,
+          "merge_table": true,
+          "model_provider": "openai",
+          "additional_instructions": "Preserve all leading zeros in item numbers, article codes, and vendor numbers exactly as printed. Article codes are case-sensitive — do not normalize case or punctuation. Normalize all dates to DD/MM/YYYY format. product_form must be exactly one of: Flat, round, rectangular bar. For absent optional fields output null, never an empty string. Merge line-item rows split across page breaks into a single entry."
+        },
+        "depends_on": [
+          "upload_po"
+        ],
+        "loop": null
+      },
+      {
+        "id": "validate_extraction",
+        "name": "Validate extracted record quality",
+        "type": "automated_task",
+        "component": "LLMJudge",
+        "inputs": [
+          "erp_record_json"
+        ],
+        "outputs": [
+          "validation_report"
+        ],
+        "parameters": {
+          "model_provider": "azure"
+        },
+        "depends_on": [
+          "extract_po_fields"
+        ],
+        "loop": null
+      },
+      {
+        "id": "notify_reviewer",
+        "name": "Send extracted record and validation report to reviewer",
+        "type": "automated_task",
+        "component": null,
+        "inputs": [
+          "erp_record_json",
+          "validation_report"
+        ],
+        "outputs": [],
+        "parameters": {},
+        "depends_on": [
+          "validate_extraction"
+        ],
+        "loop": null
+      },
+      {
+        "id": "reviewer_approves",
+        "name": "Reviewer verifies and approves ERP record",
+        "type": "human_review",
+        "component": null,
+        "inputs": [
+          "erp_record_json",
+          "validation_report"
+        ],
+        "outputs": [],
+        "parameters": {},
+        "depends_on": [
+          "notify_reviewer"
+        ],
+        "loop": null
+      }
+    ]
+  },
+  "business_process": {
+    "participants": [],
+    "manual_steps": [],
+    "external_parties": [
+      {
+        "id": "customer",
+        "name": "Customer",
+        "sends": [],
+        "to_step": ""
+      }
+    ],
+    "message_flows": [],
+    "exceptions": [
+      {
+        "id": "exception_001",
+        "name": "Record returned for correction",
+        "attached_to": "",
+        "condition": "",
+        "outcome": "loop_to:upload_po"
+      }
+    ],
+    "decision_points": []
+  },
+  "prompts": {},
+  "models": {
+    "provider": "azure_openai",
+    "extraction_model": "gpt-5.4",
+    "temperature": 0.0
+  },
+  "validation": {
+    "human_review_required": true,
+    "completeness_check": true,
+    "hallucination_check": true
+  },
+  "evaluation": {
+    "metrics": [
+      "field_exact_match",
+      "semantic_match",
+      "completeness"
+    ],
+    "eval_framework": "extraction_eval",
+    "sample_data_dir": "data/samples",
+    "ground_truth_dir": "fixtures"
+  },
+  "governance": {
+    "data_handling": {
+      "external_model_api_allowed": true,
+      "local_processing_required": false,
+      "stores_input_data": false,
+      "stores_outputs": true,
+      "retention_policy": "not_specified",
+      "contains_personal_data": "unknown",
+      "output_sensitivity": "internal",
+      "audit_log_required": false
+    }
+  },
+  "runtime": {
+    "interface": "cli",
+    "entrypoint": "poc/run_poc.py",
+    "env_file": ".env.example"
+  },
+  "package": {
+    "name": "purchase_order_erp_record_use_case",
+    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\f576bfaeea69",
+    "include_tests": true,
+    "include_evals": true,
+    "include_docs": true
+  },
+  "visualizations": {
+    "bpmn_mapping": {
+      "Lane_users": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.intended_users"
+      },
+      "Activity_upload_po": {
+        "kind": "user_task",
+        "blueprint_path": "workflow.steps[0]"
+      },
+      "Lane_gaik_ai": {
+        "kind": "lane",
+        "blueprint_path": "derived:system"
+      },
+      "Activity_extract_po_fields": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[1]"
+      },
+      "Activity_validate_extraction": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[2]"
+      },
+      "Activity_notify_reviewer": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[3]"
+      },
+      "Lane_reviewers": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.reviewers"
+      },
+      "Activity_reviewer_approves": {
+        "kind": "human_review",
+        "blueprint_path": "workflow.steps[4]"
+      },
+      "StartEvent_1": {
+        "kind": "start_event",
+        "blueprint_path": "derived:start"
+      },
+      "EndEvent_success": {
+        "kind": "end_event",
+        "blueprint_path": "derived:end"
+      },
+      "Gateway_approve_reviewer_approves": {
+        "kind": "approval_gateway",
+        "blueprint_path": "derived:approval_after:reviewer_approves"
+      },
+      "EndEvent_rejected_reviewer_approves": {
+        "kind": "end_event",
+        "blueprint_path": "derived:rejection_after:reviewer_approves"
+      },
+      "DataObjectRef_source_pdf": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.source_pdf"
+      },
+      "DataObjectRef_erp_record_json": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.erp_record_json"
+      },
+      "DataObjectRef_validation_report": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.validation_report"
+      },
+      "Participant_customer": {
+        "kind": "external_pool",
+        "blueprint_path": "business_process.external_parties[0]"
+      },
+      "TextAnnotation_1": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      }
+    }
+  },
+  "traceability": [
+    {
+      "component": "VisionExtractor",
+      "required_by": "input_type=pdf; scanned PDFs with complex multi-page tables, merged/hierarchical headers, and cross-page rows trigger accuracy override; chosen over DocumentsToStructuredData for highest extraction fidelity on visually complex documents"
+    },
+    {
+      "component": "LLMJudge",
+      "required_by": "human_review=yes; pre-screens extraction quality (hallucinations, missing required fields) before the reviewer sees the record, reducing manual review effort"
+    }
+  ],
+  "change_log": [
+    {
+      "version": "1.0",
+      "date": "2026-07-31",
+      "change": "Initial draft blueprint generated by solution_configuration_wizard V1",
+      "changed_by": "solution_configuration_wizard"
+    },
+    {
+      "version": "1.1",
+      "date": "2026-07-31",
+      "change": "Schema approved by user (Phase 4). Fixed product_form Literal (removed empty-string default) and line_items type annotation (local class reference). Schema saved to poc/schemas/output_schema.py.",
+      "changed_by": "solution_configuration_wizard"
+    }
+  ]
+}

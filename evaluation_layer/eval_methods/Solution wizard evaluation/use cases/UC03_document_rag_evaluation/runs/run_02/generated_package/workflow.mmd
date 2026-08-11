@@ -1,0 +1,10 @@
+flowchart TD
+    load_input_bundle["Load PoC input bundle"]
+    run_rag_pipeline["Index documents and process queries with role-filtered retrieval"]
+    save_results["Save RAGAnswerRecord results to output file"]
+    load_input_bundle --> run_rag_pipeline
+    run_rag_pipeline --> save_results
+
+    style load_input_bundle fill:#dbeafe
+    style run_rag_pipeline fill:#f5f3ff
+    style save_results fill:#dcfce7

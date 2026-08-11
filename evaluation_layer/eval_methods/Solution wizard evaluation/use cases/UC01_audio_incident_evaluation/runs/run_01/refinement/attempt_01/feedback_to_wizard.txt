@@ -1,0 +1,3 @@
+The original PoC did not execute successfully. Diagnose the problem using the attached execution evidence and refine the PoC. Do not change the confirmed requirements or solution intent.
+
+Paste the complete relevant contents of the preceding poc_execution.log below this line before sending the message to the wizard.

@@ -1,0 +1,200 @@
+{
+  "scenario_id": "UC01",
+  "version": "1.3.0",
+  "wizard_skill_basis": {
+    "repository": "GAIK-project/gaik-toolkit",
+    "commit": "79586c93ea3286f68acf3ad3810a370c4295fa01",
+    "path": "implementation_layer/solution_wizard/SKILL.md"
+  },
+  "instructions": [
+    "When the wizard asks for an output directory, select the run-specific generated_package folder. If the interface uses a different workspace, copy its complete, unmodified output into that folder after the run.",
+    "Send initial_prompt.txt verbatim when the wizard asks for the use-case description.",
+    "Answer a requirement question only with the answer whose trigger matches the topic.",
+    "Do not volunteer later answers before the wizard asks for them.",
+    "At every routine confirmation gate before PoC execution, answer Yes and proceed without changes.",
+    "Do not correct or refine the wizard proposal during the evaluated run.",
+    "Only if the original PoC fails to execute successfully, use the separate recovery protocol in README.md. It allows at most three refinement attempts and does not change the baseline EQ4 result.",
+    "If the wizard asks an unanticipated question, answer: Not specified for this evaluation. If a value is required, record it as an explicit assumption for user confirmation."
+  ],
+  "run_setup": {
+    "run_01_output_directory": "runs/run_01/generated_package",
+    "run_02_output_directory": "runs/run_02/generated_package",
+    "instruction": "These paths are relative to the extracted evaluation-package folder. Select the corresponding folder when the wizard asks where to write its output. If the wizard requires an absolute path, use the operating system's Copy as path action for that folder. No path needs to be entered in run_metadata.json."
+  },
+  "answers": [
+    {
+      "id": "SA01",
+      "topic": "business_context_and_stakeholders",
+      "trigger": "Who uses or reviews the solution, what is the current process, what problem should be solved, or who else is involved?",
+      "answer": "Field technicians create the voice reports and are the intended users. A maintenance supervisor reviews the generated ticket. Today the technicians type the same information manually into the maintenance management system. The proposed solution converts their voice messages into structured maintenance tickets. The main expected value is faster reporting with fewer missing details. No additional business stakeholder is required for the PoC.",
+      "supports": [
+        "EQ1-R01",
+        "EQ1-R02",
+        "EQ1-R03",
+        "EQ1-R04",
+        "EQ1-R05",
+        "EQ1-R28"
+      ]
+    },
+    {
+      "id": "SA02",
+      "topic": "audio_input_and_language",
+      "trigger": "What is the input type or format, language, recording length, data source, output language, or speaker situation?",
+      "answer": "The source is a voice message recorded or uploaded by a field technician. The input language is Finnish and the file is in a common audio format such as WAV or M4A. A typical message is under two minutes and has one speaker, so speaker diarization is not needed. Extracted free-text values remain in Finnish. The JSON field names and the canonical urgency labels use English.",
+      "supports": [
+        "EQ1-R06",
+        "EQ1-R07",
+        "EQ1-R08",
+        "EQ1-R31",
+        "EQ2-C03",
+        "EQ2-C04"
+      ]
+    },
+    {
+      "id": "SA03",
+      "topic": "ticket_schema_fields_and_types",
+      "trigger": "What schema, fields, field types, required or optional fields, formats, or allowed values should the ticket use?",
+      "answer": "Use the schema name MaintenanceTicket. It contains reporter_name (string, optional), asset_identifier (string, optional), location (string, required), fault_description (string, required), urgency (string, required, allowed values low, medium, or high), observation_date (date, optional, YYYY-MM-DD), observation_time (string, optional, HH:MM), actions_taken (list of strings, optional), and uncertain_fields (list of field names, optional). A required field may still have a null or unknown value when it was not stated, but it must be flagged for review rather than invented.",
+      "supports": [
+        "EQ1-R09",
+        "EQ1-R10",
+        "EQ1-R11",
+        "EQ1-R12",
+        "EQ1-R13",
+        "EQ1-R14",
+        "EQ1-R15",
+        "EQ1-R16",
+        "EQ1-R17",
+        "EQ1-R35",
+        "EQ1-R36",
+        "EQ1-R37",
+        "EQ1-R39",
+        "EQ2-C06"
+      ]
+    },
+    {
+      "id": "SA04",
+      "topic": "uncertainty_confidence_and_review_evidence",
+      "trigger": "How should missing, ambiguous, low-confidence, or uncertain information be represented, and what evidence should the reviewer receive?",
+      "answer": "Leave an unstated value null or explicitly unknown and include the corresponding field name in uncertain_fields. Do not infer or fabricate a value. The supervisor must receive the structured ticket, the uncertainty information, and the original transcript. A numerical confidence score is not required. If the selected component supplies confidence information, it may be included as supplementary review evidence.",
+      "supports": [
+        "EQ1-R17",
+        "EQ1-R18",
+        "EQ1-R19",
+        "EQ1-R38",
+        "EQ1-R39",
+        "EQ2-C08"
+      ]
+    },
+    {
+      "id": "SA05",
+      "topic": "review_workflow_integration_and_exceptions",
+      "trigger": "What happens after extraction, who approves, what happens after rejection, are there external parties or additional decisions, or how is the maintenance system updated?",
+      "answer": "The supervisor reviews the structured ticket, uncertainty information, and transcript. The supervisor either approves the ticket or returns it to the field technician for correction and resubmission. Only an approved ticket may be transferred to the maintenance management system. For the PoC, save the approved ticket as JSON; a live maintenance-system API integration is outside scope. The input comes from an internal field technician, not an external party. There are no branch decisions beyond approve or return for correction.",
+      "supports": [
+        "EQ1-R04",
+        "EQ1-R20",
+        "EQ1-R21",
+        "EQ1-R22",
+        "EQ1-R28",
+        "EQ1-R40",
+        "EQ2-C07",
+        "EQ2-C08",
+        "EQ2-C09"
+      ]
+    },
+    {
+      "id": "SA06",
+      "topic": "privacy_security_storage_and_audit",
+      "trigger": "What privacy, security, access, storage, retention, audit, or data-residency requirements apply?",
+      "answer": "The audio may contain an employee name and internal facility details. External model APIs are allowed, and local-only processing is not required. No provider-specific data-residency requirement is specified. The PoC must not retain the raw audio after processing. The approved structured ticket and the supervisor's approval decision may be retained, but no exact retention period is specified. Authentication, production role-based access control, and a full audit-log implementation are outside the PoC scope; retaining the approval decision is sufficient for this evaluation.",
+      "supports": [
+        "EQ1-R23",
+        "EQ1-R24",
+        "EQ1-R25",
+        "EQ1-R26",
+        "EQ1-R42"
+      ]
+    },
+    {
+      "id": "SA07",
+      "topic": "interface_outputs_and_poc_evaluation",
+      "trigger": "What interface, output formats, PoC goal, test data, metrics, threshold, or acceptance criteria are required?",
+      "answer": "A command-line PoC is sufficient. Its final machine-readable output is a JSON maintenance ticket. The transcript and uncertainty information are review evidence; no formatted PDF, HTML, or DOCX report is required. The PoC must accept the supplied Finnish audio fixture, exit successfully, produce a non-empty parseable JSON ticket, preserve the incident facts in the fixture, include the required ticket fields, and leave unsupported values null or unknown. Evaluate JSON parsing, required-field coverage, semantic fixture-fact matching, and unsupported-value introduction. No numerical accuracy threshold is specified for this single-fixture PoC.",
+      "supports": [
+        "EQ1-R27",
+        "EQ1-R29",
+        "EQ1-R34",
+        "EQ1-R41",
+        "EQ4-X01",
+        "EQ4-X02",
+        "EQ4-X03",
+        "EQ4-X04"
+      ]
+    },
+    {
+      "id": "SA08",
+      "topic": "provider_model_scale_and_budget",
+      "trigger": "Which provider, exact model, temperature, transcription model, deployment topology, SLA, throughput, volume, or budget should be used?",
+      "answer": "The provider should remain configurable. No exact provider, model, temperature, transcription model, deployment topology, SLA, throughput, volume, or budget is specified. A valid implementation default is acceptable, but it must not be presented as a user-confirmed requirement.",
+      "supports": [
+        "EQ1-R33",
+        "EQ1-D01",
+        "EQ1-D03"
+      ]
+    },
+    {
+      "id": "SA09",
+      "topic": "business_success_value_and_risks",
+      "trigger": "What does business success mean, is there a quantified value target, and what risks should be considered?",
+      "answer": "Business success means faster incident reporting with fewer missing details and a supervisor-verifiable ticket before transfer. No numerical time-saving, accuracy, or cost-saving target is specified. The main risks are Finnish transcription errors, incorrect asset, location, fault, or urgency values, unsupported values being introduced, and a ticket being transferred without supervisor approval.",
+      "supports": [
+        "EQ1-R05",
+        "EQ1-R29",
+        "EQ1-R30"
+      ]
+    },
+    {
+      "id": "SA10",
+      "topic": "domain_vocabulary_and_identifiers",
+      "trigger": "Does the audio contain domain vocabulary, abbreviations, controlled lists, proper names, facility names, room codes, or equipment identifiers?",
+      "answer": "Reports may contain Finnish facility names and alphanumeric room, asset, or equipment identifiers such as P-17 or B2. Preserve identifiers exactly as stated. No fixed domain glossary is supplied for this evaluation. The urgency controlled list is low, medium, and high.",
+      "supports": [
+        "EQ1-R32",
+        "EQ1-R37",
+        "EQ2-C03",
+        "EQ2-C04"
+      ]
+    },
+    {
+      "id": "SA11",
+      "topic": "validation_rules",
+      "trigger": "What validation rules or special extraction instructions should apply to the generated ticket?",
+      "answer": "The ticket must contain the location, fault_description, and urgency keys. Urgency must be low, medium, or high when known. observation_date uses YYYY-MM-DD and observation_time uses HH:MM when present. Values must be grounded in the voice message. Any missing or uncertain value must remain null or unknown and be identified in uncertain_fields for supervisor review.",
+      "supports": [
+        "EQ1-R12",
+        "EQ1-R13",
+        "EQ1-R14",
+        "EQ1-R17",
+        "EQ1-R37",
+        "EQ1-R39",
+        "EQ2-C06"
+      ]
+    }
+  ],
+  "confirmation_policy": {
+    "scope": "All routine wizard confirmations before the original PoC is executed.",
+    "response": "Yes. Proceed without changes.",
+    "purpose": "Prevent evaluator corrections from improving the specification, configuration, workflow, artifacts, or initial PoC before EQ1-EQ4 are measured.",
+    "recording": "The complete conversation is the evidence that the policy was followed."
+  },
+  "recovery_policy": {
+    "trigger": "The original unmodified PoC does not execute successfully.",
+    "maximum_refinement_attempts": 3,
+    "feedback": "Return the recorded execution evidence to the wizard and ask it to refine the PoC. Do not supply corrective code or new requirements.",
+    "stopping_rule": "Stop after the first successful execution or after the third unsuccessful refinement attempt.",
+    "reporting": "Record 0 for original success, 1-3 for success after that many refinements, and N/A if the PoC remains unsuccessful after three refinements.",
+    "scoring": "Refinement does not change the original EQ4 verdict."
+  },
+  "fallback_answer": "Not specified for this evaluation. If a value is required, record it as an explicit assumption for user confirmation."
+}

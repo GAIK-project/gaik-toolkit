@@ -1,0 +1,148 @@
+{
+  "$schema": "schemas/scenario_oracle.schema.json",
+  "schema_version": "1.0.0",
+  "scenario_id": "UCXX",
+  "scenario_name": "[REPLACE WITH USE-CASE NAME]",
+  "frozen_before_runs": false,
+  "requirements": [
+    {
+      "check_id": "EQ1-R01",
+      "parameter": "Users and business process",
+      "expected_value": "[Expected users, roles, and supported business process]",
+      "acceptable_equivalents": ["[Semantically equivalent representation]"],
+      "source": "initial_prompt.txt or scripted_answers.json#SA01",
+      "blueprint_paths": ["business_spec.users", "business_spec.current_process"],
+      "scored": true
+    },
+    {
+      "check_id": "EQ1-R02",
+      "parameter": "Inputs, outputs, and language",
+      "expected_value": "[Expected inputs, outputs, formats, and languages]",
+      "acceptable_equivalents": ["[Semantically equivalent representation]"],
+      "source": "initial_prompt.txt or scripted_answers.json#SA02",
+      "blueprint_paths": ["technical_spec.inputs", "technical_spec.outputs", "technical_spec.language"],
+      "scored": true
+    },
+    {
+      "check_id": "EQ1-R03",
+      "parameter": "Human review and return path",
+      "expected_value": "[Expected reviewer role and rejection or return behaviour]",
+      "acceptable_equivalents": ["[Semantically equivalent representation]"],
+      "source": "scripted_answers.json#SA03",
+      "blueprint_paths": ["business_spec.human_review", "workflow.return_path"],
+      "scored": true
+    },
+    {
+      "check_id": "EQ1-R04",
+      "parameter": "Employee interaction",
+      "expected_value": "[Expected interaction with the intended solution]",
+      "acceptable_equivalents": ["[Semantically equivalent representation]"],
+      "source": "scripted_answers.json#SA04",
+      "blueprint_paths": ["technical_spec.runtime_interface", "business_spec.employee_interaction"],
+      "scored": true
+    },
+    {
+      "check_id": "EQ1-R05",
+      "parameter": "PoC goal, interface, fixture, and acceptance",
+      "expected_value": "[Expected first-PoC demonstration and acceptance conditions]",
+      "acceptable_equivalents": ["[Semantically equivalent representation]"],
+      "source": "scripted_answers.json#SA05",
+      "blueprint_paths": ["poc.goal", "poc.interface", "poc.acceptance_criteria"],
+      "scored": true
+    }
+  ],
+  "diagnostics": [
+    {
+      "check_id": "EQ1-D01",
+      "parameter": "Unsupported provider assumption",
+      "expected_value": "No provider is presented as confirmed unless specified; a default or explicit assumption is acceptable.",
+      "source": "initial_prompt.txt; scripted_answers.json",
+      "blueprint_paths": ["assumptions", "technical_spec.provider"],
+      "scored": false
+    }
+  ],
+  "configuration_constraints": [
+    {
+      "check_id": "EQ2-C01",
+      "parameter": "Required GAIK capability",
+      "expected_value": "[Required module, component, option, or acceptable alternative]",
+      "acceptable_alternatives": ["[Alternative architecture, if applicable]"],
+      "forbidden_combinations": ["[Redundant or invalid combination, if applicable]"],
+      "blueprint_paths": ["solution.components", "solution.modules"],
+      "scored": true
+    }
+  ],
+  "package_checks": [
+    {
+      "check_id": "EQ3-P01",
+      "parameter": "Blueprint exists and parses",
+      "expected_value": "The authoritative JSON blueprint exists and is parseable JSON.",
+      "evidence_source": "generated_package/use_case.blueprint.json",
+      "scored": true
+    },
+    {
+      "check_id": "EQ3-P02",
+      "parameter": "Official blueprint validation",
+      "expected_value": "The official GAIK Solution Wizard validator returns exit code 0 with no blocking errors.",
+      "evidence_source": "validator command, exit code, and output excerpt",
+      "scored": true
+    },
+    {
+      "check_id": "EQ3-P03",
+      "parameter": "Visual workflow validity",
+      "expected_value": "BPMN and Mermaid views are present and consistent with the blueprint.",
+      "evidence_source": "workflow.bpmn; workflow.mmd; blueprint workflow mappings",
+      "scored": true
+    },
+    {
+      "check_id": "EQ3-P04",
+      "parameter": "PoC and documentation completeness",
+      "expected_value": "The generated package contains a runnable PoC, setup instructions, schemas, prompts, evaluation assets, and traceable documentation as required by the scenario.",
+      "evidence_source": "generated package inventory",
+      "scored": true
+    }
+  ],
+  "execution_checks": [
+    {
+      "check_id": "EQ4-E01",
+      "parameter": "Setup succeeds",
+      "expected_value": "Attempt 0 setup exits with code 0.",
+      "evidence_source": "poc_execution.json and poc_execution.log",
+      "scored": true
+    },
+    {
+      "check_id": "EQ4-E02",
+      "parameter": "End-to-end execution succeeds",
+      "expected_value": "Attempt 0 run command exits with code 0.",
+      "evidence_source": "poc_execution.json and poc_execution.log",
+      "scored": true
+    },
+    {
+      "check_id": "EQ4-E03",
+      "parameter": "Expected output is generated",
+      "expected_value": "Attempt 0 creates a non-empty, parseable output in the required format.",
+      "evidence_source": "poc_execution.json and generated outputs",
+      "scored": true
+    },
+    {
+      "check_id": "EQ4-E04",
+      "parameter": "Output is semantically correct",
+      "expected_value": "Attempt 0 output satisfies the scenario-specific expected facts without unsupported additions.",
+      "evidence_source": "fixtures/expected_output.json and generated outputs",
+      "scored": true
+    }
+  ],
+  "recovery_policy": {
+    "baseline_attempt": 0,
+    "maximum_refinement_attempts": 3,
+    "stop_after_first_success": true,
+    "eq4_uses_baseline_only": true,
+    "result_values": {
+      "0": "Original PoC succeeds",
+      "1": "Succeeds after one refinement",
+      "2": "Succeeds after two refinements",
+      "3": "Succeeds after three refinements",
+      "N/A": "Still unsuccessful after three refinements"
+    }
+  }
+}

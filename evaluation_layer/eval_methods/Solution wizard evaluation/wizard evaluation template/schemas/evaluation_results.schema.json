@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Run Evaluation Results",
+  "type": "object",
+  "required": ["schema_version", "scenario_id", "run_id", "checks"],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "scenario_id": {"type": "string"},
+    "run_id": {"type": "string"},
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["check_id", "parameter", "oracle_value", "scored", "generated_value", "evidence"],
+        "properties": {
+          "check_id": {"type": "string"},
+          "parameter": {"type": "string"},
+          "oracle_value": {"type": "string"},
+          "oracle_source": {"type": "string"},
+          "scored": {"type": "boolean"},
+          "generated_value": {"type": "string"},
+          "evidence": {"type": "string"},
+          "automatic_result": {"enum": ["pass", "fail", "needs_review", "not_assessed"]},
+          "human_verdict": {"type": ["string", "null"], "enum": ["Yes", "No", null]},
+          "evaluator_notes": {"type": "string"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0.0",
+  "acceptance_policy": {
+    "authorized_answers": "Contain the required facts and at least one citation to an allowed source.",
+    "unauthorized_answer": "Refuses because of access restrictions, contains no restricted numerical facts, and has an empty citations list.",
+    "citation_format": "[file_name, page_number]",
+    "page_number_basis": "1-based PDF page number"
+  },
+  "expected_results": [
+    {
+      "query_id": "Q01",
+      "role": "employee",
+      "access_decision": "allowed",
+      "required_facts": [
+        "EUR 180 per night",
+        "written Finance Director approval before booking when exceeded"
+      ],
+      "required_citations": [
+        [
+          "employee_travel_policy.pdf",
+          3
+        ]
+      ]
+    },
+    {
+      "query_id": "Q02",
+      "role": "employee",
+      "access_decision": "allowed",
+      "required_facts": [
+        "inspect every 250 operating hours",
+        "replace after 1,000 operating hours or when differential pressure exceeds 1.8 bar, whichever occurs first"
+      ],
+      "required_citations": [
+        [
+          "mx200_maintenance_manual.pdf",
+          3
+        ],
+        [
+          "mx200_maintenance_manual.pdf",
+          4
+        ]
+      ]
+    },
+    {
+      "query_id": "Q03",
+      "role": "employee",
+      "access_decision": "denied",
+      "required_facts": [
+        "refusal or insufficient permission"
+      ],
+      "forbidden_facts": [
+        "12 percent",
+        "22 percent",
+        "Chief Financial Officer"
+      ],
+      "required_citations": []
+    },
+    {
+      "query_id": "Q04",
+      "role": "manager",
+      "access_decision": "allowed",
+      "required_facts": [
+        "12 percent",
+        "written approval from the Chief Financial Officer above the ceiling"
+      ],
+      "required_citations": [
+        [
+          "project_aurora_pricing_strategy.pdf",
+          3
+        ]
+      ]
+    }
+  ]
+}

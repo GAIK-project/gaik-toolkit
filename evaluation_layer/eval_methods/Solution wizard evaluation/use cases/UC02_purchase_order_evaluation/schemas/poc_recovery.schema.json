@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UC02 PoC recovery diagnostic",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "maximum_refinement_attempts",
+    "initial_execution_successful",
+    "refinement_attempts_to_success",
+    "final_execution_successful",
+    "status",
+    "attempts",
+    "eq4_uses_baseline_only"
+  ],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "run_id": {"type": "string"},
+    "maximum_refinement_attempts": {"const": 3},
+    "initial_execution_successful": {"type": ["boolean", "null"]},
+    "refinement_attempts_to_success": {
+      "oneOf": [
+        {"type": "integer", "minimum": 0, "maximum": 3},
+        {"const": "N/A"},
+        {"type": "null"}
+      ]
+    },
+    "final_execution_successful": {"type": ["boolean", "null"]},
+    "status": {
+      "enum": [
+        "not_started",
+        "successful_original",
+        "awaiting_refinement",
+        "recovered",
+        "unsuccessful_after_maximum_refinements"
+      ]
+    },
+    "attempts": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["attempt", "successful", "feedback_file", "conversation_file", "execution_file", "generated_package"],
+        "properties": {
+          "attempt": {"type": "integer", "minimum": 1, "maximum": 3},
+          "successful": {"type": "boolean"},
+          "feedback_file": {"type": "string"},
+          "conversation_file": {"type": "string"},
+          "execution_file": {"type": "string"},
+          "generated_package": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "eq4_uses_baseline_only": {"const": true},
+    "interpretation": {"type": "string"}
+  },
+  "additionalProperties": true
+}

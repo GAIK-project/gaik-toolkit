@@ -1,0 +1,35 @@
+{
+  "hallucination_flags": [
+    {
+      "field": "line_items[0].applicable_standard",
+      "value": "null",
+      "severity": "wrong",
+      "reason": "Source gives only EN 1652 as the standard; no extra applicable standard is stated."
+    },
+    {
+      "field": "line_items[0].special_flags",
+      "value": "null",
+      "severity": "wrong",
+      "reason": "No special flags are stated for item 0010 anywhere in the source."
+    },
+    {
+      "field": "line_items[1].applicable_standard",
+      "value": "null",
+      "severity": "wrong",
+      "reason": "Source gives only ASTM A276 as the standard; no extra applicable standard is stated."
+    },
+    {
+      "field": "line_items[1].special_flags",
+      "value": "null",
+      "severity": "wrong",
+      "reason": "No special flags are stated for item 0020 anywhere in the source."
+    },
+    {
+      "field": "line_items[2].applicable_standard",
+      "value": "null",
+      "severity": "wrong",
+      "reason": "Source gives only ASTM B221 as the standard; no extra applicable standard is stated."
+    }
+  ],
+  "passed": false
+}

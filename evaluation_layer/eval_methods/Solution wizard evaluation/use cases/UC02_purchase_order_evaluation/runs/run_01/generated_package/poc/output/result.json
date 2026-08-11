@@ -1,0 +1,240 @@
+{
+  "purchase_order_number": {
+    "value": "PO-2026-0471",
+    "confidence_score": 0.99,
+    "confidence_reason": "Value appears explicitly next to the PO Number label in the document header."
+  },
+  "delivery_date": {
+    "value": "10/08/2026",
+    "confidence_score": 0.99,
+    "confidence_reason": "Value appears explicitly next to the Delivery Date label in the document header and already matches the required format."
+  },
+  "delivery_address": {
+    "value": "Northstar Manufacturing Ltd., Plant 4, 125 Industrial Way, 00180 Helsinki, Finland",
+    "confidence_score": 0.98,
+    "confidence_reason": "Full address block appears explicitly next to the Delivery Address label in the header."
+  },
+  "vendor_number": {
+    "value": "V-518834",
+    "confidence_score": 0.99,
+    "confidence_reason": "Value appears explicitly next to the Vendor Number label in the document header."
+  },
+  "line_items": [
+    {
+      "item_number": {
+        "value": "0010",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly in the Item column of the line items table."
+      },
+      "article_code": {
+        "value": "AX-7041832",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly in the Article code column for item 0010."
+      },
+      "dimensions": {
+        "value": "10x80mm",
+        "confidence_score": 0.98,
+        "confidence_reason": "Value appears explicitly in the Dimensions / form section for item 0010."
+      },
+      "material_grade": {
+        "value": "CW506L",
+        "confidence_score": 0.84,
+        "confidence_reason": "Value was extracted from the designation line within the grouped Material / designation / standard entry for item 0010."
+      },
+      "quantity": {
+        "value": "8.600 kg",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly in the Quantity column for item 0010."
+      },
+      "product_form": {
+        "value": "Flat",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly as the form for item 0010 and matches an allowed enum."
+      },
+      "standard_designation": {
+        "value": "EN 1652",
+        "confidence_score": 0.98,
+        "confidence_reason": "Value appears explicitly as the standard line within the grouped Material / designation / standard entry for item 0010."
+      },
+      "cut_length": {
+        "value": "2000mm",
+        "confidence_score": 0.98,
+        "confidence_reason": "Value appears explicitly in the Cut length / condition column for item 0010."
+      },
+      "temper_or_condition": {
+        "value": "Cold drawn",
+        "confidence_score": 0.97,
+        "confidence_reason": "Value appears explicitly as the condition entry for item 0010."
+      },
+      "hardness_hv": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No hardness value was found in or near the item 0010 row."
+      },
+      "min_bend_radius": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No minimum bend radius value was found in or near the item 0010 row."
+      },
+      "delivery_length_note": {
+        "value": null,
+        "confidence_score": 0.93,
+        "confidence_reason": "No delivery length note beyond the cut length was found for item 0010."
+      },
+      "applicable_standard": {
+        "value": null,
+        "confidence_score": 0.93,
+        "confidence_reason": "No additional standard beyond the stated standard designation was found for item 0010."
+      },
+      "special_flags": {
+        "value": null,
+        "confidence_score": 0.93,
+        "confidence_reason": "No special instruction or flag was found adjacent to item 0010."
+      }
+    },
+    {
+      "item_number": {
+        "value": "0020",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly in the Item column of the line items table."
+      },
+      "article_code": {
+        "value": "BX-7041833",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly in the Article code column for item 0020."
+      },
+      "dimensions": {
+        "value": "25x8mm",
+        "confidence_score": 0.98,
+        "confidence_reason": "Value appears explicitly in the Dimensions / form section for item 0020."
+      },
+      "material_grade": {
+        "value": "1.4401",
+        "confidence_score": 0.84,
+        "confidence_reason": "Value was extracted from the designation line within the grouped Material / designation / standard entry for item 0020."
+      },
+      "quantity": {
+        "value": "2.500 kg",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly in the Quantity column for item 0020."
+      },
+      "product_form": {
+        "value": "rectangular bar",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly as the form for item 0020 and matches an allowed enum."
+      },
+      "standard_designation": {
+        "value": "ASTM A276",
+        "confidence_score": 0.98,
+        "confidence_reason": "Value appears explicitly as the standard line within the grouped Material / designation / standard entry for item 0020."
+      },
+      "cut_length": {
+        "value": "3000mm",
+        "confidence_score": 0.98,
+        "confidence_reason": "Value appears explicitly in the Cut length / condition column for item 0020."
+      },
+      "temper_or_condition": {
+        "value": "Bright finish",
+        "confidence_score": 0.95,
+        "confidence_reason": "Value appears explicitly as the condition entry for item 0020."
+      },
+      "hardness_hv": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No hardness value was found in or near the item 0020 row."
+      },
+      "min_bend_radius": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No minimum bend radius value was found in or near the item 0020 row."
+      },
+      "delivery_length_note": {
+        "value": null,
+        "confidence_score": 0.93,
+        "confidence_reason": "No delivery length note beyond the cut length was found for item 0020."
+      },
+      "applicable_standard": {
+        "value": null,
+        "confidence_score": 0.93,
+        "confidence_reason": "No additional standard beyond the stated standard designation was found for item 0020."
+      },
+      "special_flags": {
+        "value": null,
+        "confidence_score": 0.93,
+        "confidence_reason": "No special instruction or flag was found adjacent to item 0020."
+      }
+    },
+    {
+      "item_number": {
+        "value": "0030",
+        "confidence_score": 0.99,
+        "confidence_reason": "Item number is explicit across the split row and continuation marker clearly belongs to the same line item."
+      },
+      "article_code": {
+        "value": "CX-7041834",
+        "confidence_score": 0.99,
+        "confidence_reason": "Article code appears explicitly on both pages for the continued item 0030."
+      },
+      "dimensions": {
+        "value": "20mm diameter",
+        "confidence_score": 0.98,
+        "confidence_reason": "Value appears explicitly in the Dimensions / form section for the continued item 0030."
+      },
+      "material_grade": {
+        "value": "AA6061",
+        "confidence_score": 0.84,
+        "confidence_reason": "Value was extracted from the designation line within the grouped Material / designation / standard entry for item 0030."
+      },
+      "quantity": {
+        "value": "1.200 kg",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly in the continuation row for item 0030."
+      },
+      "product_form": {
+        "value": "round",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly as the form for item 0030 and matches an allowed enum."
+      },
+      "standard_designation": {
+        "value": "ASTM B221",
+        "confidence_score": 0.98,
+        "confidence_reason": "Value appears explicitly as the standard line within the grouped Material / designation / standard entry for item 0030."
+      },
+      "cut_length": {
+        "value": "3000mm",
+        "confidence_score": 0.98,
+        "confidence_reason": "Value appears explicitly in the continuation row under Cut length / condition for item 0030."
+      },
+      "temper_or_condition": {
+        "value": "T6",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly as the condition for item 0030 on page 2."
+      },
+      "hardness_hv": {
+        "value": null,
+        "confidence_score": 0.99,
+        "confidence_reason": "The document explicitly states Hardness HV Not stated for item 0030, so the field is null."
+      },
+      "min_bend_radius": {
+        "value": null,
+        "confidence_score": 0.99,
+        "confidence_reason": "The document explicitly states Minimum bend radius Not stated for item 0030, so the field is null."
+      },
+      "delivery_length_note": {
+        "value": "in lengths of 3000mm",
+        "confidence_score": 0.98,
+        "confidence_reason": "A delivery length note appears explicitly below the continued row for item 0030."
+      },
+      "applicable_standard": {
+        "value": null,
+        "confidence_score": 0.93,
+        "confidence_reason": "No additional standard beyond the stated standard designation was found for item 0030."
+      },
+      "special_flags": {
+        "value": "chamfered edges",
+        "confidence_score": 0.98,
+        "confidence_reason": "A special flag appears explicitly below the continued row for item 0030."
+      }
+    }
+  ]
+}

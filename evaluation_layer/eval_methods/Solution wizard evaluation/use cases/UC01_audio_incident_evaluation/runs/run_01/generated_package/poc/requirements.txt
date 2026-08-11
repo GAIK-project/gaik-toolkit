@@ -1,0 +1,5 @@
+pydantic>=2
+python-dotenv
+gaik[audio-to-structured-data]
+gaik[llm-judge]
+pyyaml

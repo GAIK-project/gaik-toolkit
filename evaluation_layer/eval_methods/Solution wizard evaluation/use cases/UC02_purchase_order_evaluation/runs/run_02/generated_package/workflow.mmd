@@ -1,0 +1,16 @@
+flowchart TD
+    upload_po["Upload purchase order PDF"]
+    extract_po_fields["Extract PO header and line items"]
+    validate_extraction["Validate extracted record quality"]
+    notify_reviewer["Send extracted record and validation report to reviewer"]
+    reviewer_approves["Reviewer verifies and approves ERP record"]
+    upload_po --> extract_po_fields
+    extract_po_fields --> validate_extraction
+    validate_extraction --> notify_reviewer
+    notify_reviewer --> reviewer_approves
+
+    style upload_po fill:#dbeafe
+    style extract_po_fields fill:#dcfce7
+    style validate_extraction fill:#f5f3ff
+    style notify_reviewer fill:#f5f3ff
+    style reviewer_approves fill:#fefce8

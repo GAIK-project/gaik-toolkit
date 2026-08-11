@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GAIK wizard scenario oracle",
+  "type": "object",
+  "required": ["oracle_version", "scenario_id", "status", "protocol", "gaik_basis", "checks", "scoring", "verdict_policy"],
+  "properties": {
+    "oracle_version": {"type": "string"},
+    "scenario_id": {"const": "UC02"},
+    "status": {"const": "frozen"},
+    "protocol": {"type": "object"},
+    "gaik_basis": {"type": "object"},
+    "checks": {
+      "type": "object",
+      "required": ["EQ1", "EQ1_diagnostics", "EQ2", "EQ3", "EQ4"],
+      "properties": {
+        "EQ1": {"$ref": "#/$defs/checks"},
+        "EQ1_diagnostics": {"$ref": "#/$defs/checks"},
+        "EQ2": {"$ref": "#/$defs/checks"},
+        "EQ3": {"$ref": "#/$defs/checks"},
+        "EQ4": {"$ref": "#/$defs/checks"}
+      },
+      "additionalProperties": false
+    },
+    "scoring": {"type": "object"},
+    "verdict_policy": {"type": "object"}
+  },
+  "$defs": {
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "parameter", "oracle_value"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^EQ[1-4]-"},
+          "parameter": {"type": "string", "minLength": 1},
+          "oracle_value": {},
+          "accepted_semantics": {"type": "string"},
+          "source": {"type": "array", "items": {"type": "string"}},
+          "blueprint_hints": {"type": "array", "items": {"type": "string"}},
+          "automated_check": {"type": "string"},
+          "evidence_required": {"type": "array", "items": {"type": "string"}},
+          "scored": {"type": "boolean"}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,129 @@
+{
+  "model_name": "MaintenanceTicket_Extraction",
+  "requirements": {
+    "use_case_name": "MaintenanceTicket",
+    "fields": [
+      {
+        "field_name": "reporter_name",
+        "field_type": "str",
+        "description": "The name of the technician reporting the fault.",
+        "required_in_output": true,
+        "nullable": true,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "asset_identifier",
+        "field_type": "str",
+        "description": "The identifier or description of the faulty asset or equipment.",
+        "required_in_output": true,
+        "nullable": true,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "location",
+        "field_type": "str",
+        "description": "The physical location of the fault within the facility.",
+        "required_in_output": true,
+        "nullable": true,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "fault_description",
+        "field_type": "str",
+        "description": "A concise, faithful description of the fault or problem observed.",
+        "required_in_output": true,
+        "nullable": true,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "urgency",
+        "field_type": "str",
+        "description": "The urgency level of the fault.",
+        "required_in_output": true,
+        "nullable": true,
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "default": "",
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "observation_date",
+        "field_type": "date",
+        "description": "The date the fault was observed, if stated.",
+        "required_in_output": true,
+        "nullable": true,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": "",
+        "format": "%Y-%m-%d"
+      },
+      {
+        "field_name": "observation_time",
+        "field_type": "str",
+        "description": "The time the fault was observed, if stated.",
+        "required_in_output": true,
+        "nullable": true,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "actions_taken",
+        "field_type": "list[str]",
+        "description": "A list of immediate actions the technician has already taken before making this report.",
+        "required_in_output": true,
+        "nullable": true,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": "",
+        "format": ""
+      },
+      {
+        "field_name": "uncertain_fields",
+        "field_type": "list[str]",
+        "description": "A list of the field names that could not be confidently extracted.",
+        "required_in_output": true,
+        "nullable": true,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": "",
+        "format": ""
+      }
+    ]
+  }
+}

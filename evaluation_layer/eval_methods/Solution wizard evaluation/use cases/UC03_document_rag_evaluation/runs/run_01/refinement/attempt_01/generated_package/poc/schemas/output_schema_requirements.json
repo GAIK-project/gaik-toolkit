@@ -1,0 +1,105 @@
+{
+  "model_name": "RAGAnswerRecord",
+  "requirements": {
+    "use_case_name": "manufacturing_knowledge_rag",
+    "fields": [
+      {
+        "field_name": "query_id",
+        "field_type": "str",
+        "description": "Unique query identifier from query_set.json",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "role",
+        "field_type": "str",
+        "description": "Requestor role from trusted request metadata; must not be inferred from question content",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": [
+          "employee",
+          "manager"
+        ],
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "question",
+        "field_type": "str",
+        "description": "The natural-language question as supplied in query_set.json",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "access_decision",
+        "field_type": "str",
+        "description": "allowed if the role has access to documents that answer the query; denied otherwise",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": [
+          "allowed",
+          "denied"
+        ],
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "answer",
+        "field_type": "str",
+        "description": "Cited factual answer grounded only in retrieved content; refusal message when access_decision=denied",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "citations",
+        "field_type": "list[str]",
+        "description": "List of [file_name, page_number] pairs (1-based integer); empty list when access_decision=denied",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "refusal_reason",
+        "field_type": "str",
+        "description": "Required (non-null) when access_decision=denied; must not reveal restricted facts; null otherwise",
+        "required_in_output": false,
+        "nullable": true,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": false,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  }
+}

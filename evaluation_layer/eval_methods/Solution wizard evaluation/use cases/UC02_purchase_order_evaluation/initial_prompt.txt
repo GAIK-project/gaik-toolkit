@@ -1,0 +1,1 @@
+We are a manufacturing company that receives purchase orders from various customers in diverse formats, which usually comprise complex tables and other layouts. We want to extract structured information from the purchase orders and create ERP entries for downstream tasks.

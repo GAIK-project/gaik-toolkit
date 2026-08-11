@@ -1,0 +1,17 @@
+Synthetic UC02 purchase-order fixture facts
+
+Header:
+- PO number: PO-2026-0471
+- Order date: 15/07/2026
+- Vendor number: V-518834
+- Delivery date: 10/08/2026
+- Delivery address: Northstar Manufacturing Ltd., Plant 4, 125 Industrial Way, 00180 Helsinki, Finland
+
+Line items:
+- 0010 / AX-7041832 / C260 Brass / CW506L / EN 1652 / 10x80mm / Flat / 2000mm / Cold drawn / 8.600 kg
+- 0020 / BX-7041833 / 316 Stainless / 1.4401 / ASTM A276 / 25x8mm / rectangular bar / 3000mm / Bright finish / 2.500 kg
+- 0030 / CX-7041834 / 6061 Aluminum / AA6061 / ASTM B221 / 20mm diameter / round / 3000mm / T6 / 1.200 kg
+- Item 0030 begins on page 1 and continues on page 2.
+- Item 0030 delivery length note: in lengths of 3000mm.
+- Item 0030 special flags: chamfered edges.
+- Hardness HV and minimum bend radius are not stated.

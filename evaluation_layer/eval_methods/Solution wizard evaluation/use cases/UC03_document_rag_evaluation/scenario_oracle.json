@@ -1,0 +1,1013 @@
+{
+  "oracle_version": "1.4.0",
+  "scenario_id": "UC03",
+  "title": "Document collection to a role-aware RAG assistant",
+  "knowledge_process": "knowledge_access",
+  "status": "frozen",
+  "frozen_on": "2026-08-01",
+  "purpose": "Evaluate whether the GAIK Solution Configuration Wizard captures the fixed document-access scenario, configures a grounded role-aware RAG solution, generates a valid solution package, and produces an executable PoC.",
+  "protocol": {
+    "runs": 2,
+    "wizard_skill_file": "implementation_layer/solution_wizard/SKILL.md",
+    "wizard_skill_commit": "79586c93ea3286f68acf3ad3810a370c4295fa01",
+    "output_directory_policy": "Use the run-specific directory as the wizard workspace, read only its wizard_input folder, and write the wizard output to generated_package. No absolute path is stored in run metadata.",
+    "wizard_input_policy": "Provide only the run-specific wizard_input directory to the wizard. Do not provide scenario_oracle.json, expected_rag_results.json, scoring files, or the comparison workbook.",
+    "initial_prompt_file": "initial_prompt.txt",
+    "scripted_answers_file": "scripted_answers.json",
+    "wizard_requirement_coverage_file": "wizard_requirement_coverage.json",
+    "confirmation_policy": "At every routine confirmation before original PoC execution, answer Yes and proceed without changes.",
+    "accept_without_correction": true,
+    "unexpected_question_answer": "Not specified for this evaluation. If a value is required, record it as an explicit assumption for user confirmation.",
+    "po_c_policy": "Execute the original wizard-generated PoC without editing its source files. Supplying the fixed fixture inputs and environment credentials is allowed. EQ4 is permanently based on this original execution.",
+    "recovery_policy": {
+      "trigger": "The original PoC does not execute successfully.",
+      "maximum_refinement_attempts": 3,
+      "feedback_scope": "Return recorded execution evidence to the wizard without adding corrective code or new requirements.",
+      "stopping_rule": "Stop after the first successful execution or after the third unsuccessful refinement.",
+      "reported_values": {
+        "0": "Original PoC executed successfully.",
+        "1-3": "PoC executed successfully after the stated number of refinement attempts.",
+        "N/A": "PoC never executed successfully after three refinement attempts."
+      },
+      "headline_metric": false
+    }
+  },
+  "gaik_basis": {
+    "repository": "GAIK-project/gaik-toolkit",
+    "verified_commit": "79586c93ea3286f68acf3ad3810a370c4295fa01",
+    "blueprint_schema_path": "implementation_layer/solution_wizard/schemas/use_case_blueprint.schema.json",
+    "registry_path": "implementation_layer/solution_wizard/registries/gaik_component_registry.json",
+    "reference_cards_path": "implementation_layer/solution_wizard/registries/component_reference_cards.json",
+    "expected_component": {
+      "id": "rag_workflow",
+      "name": "RAG-Workflow",
+      "type": "software_module",
+      "required_parameters": [
+        "document_source",
+        "query"
+      ],
+      "selection_relevant_options": {
+        "citations": true,
+        "metadata_filter": "allowed_roles before retrieval",
+        "top_k": 4
+      },
+      "selection_reason": "The scenario requires retrieval-augmented question answering across a document collection with citations and access-aware retrieval."
+    }
+  },
+  "checks": {
+    "EQ1": [
+      {
+        "id": "EQ1-R01",
+        "parameter": "Primary user",
+        "oracle_value": "Employees who need answers from internal organizational documents.",
+        "accepted_semantics": "Employees are the intended question-answering users.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.intended_users",
+          "business_process.participants",
+          "use_case.description"
+        ]
+      },
+      {
+        "id": "EQ1-R02",
+        "parameter": "Current process",
+        "oracle_value": "Employees manually search policies, manuals, and management documents.",
+        "accepted_semantics": "The current process is manual document search.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.current_process",
+          "use_case.description"
+        ]
+      },
+      {
+        "id": "EQ1-R03",
+        "parameter": "Business problem",
+        "oracle_value": "Manual search is slow and may produce incomplete or unsupported answers.",
+        "accepted_semantics": "The problem includes search effort and answer reliability.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.pain_points",
+          "business_spec.expected_value"
+        ]
+      },
+      {
+        "id": "EQ1-R04",
+        "parameter": "Stakeholders and document owners",
+        "oracle_value": "Employees ask questions; managers have additional access; knowledge owners maintain source documents; no reviewer approves every answer.",
+        "accepted_semantics": "The roles and absence of per-answer review are explicit.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.stakeholders",
+          "business_spec.reviewers",
+          "business_process.participants"
+        ]
+      },
+      {
+        "id": "EQ1-R05",
+        "parameter": "Expected value",
+        "oracle_value": "Faster access to reliable internal knowledge with citations and enforced access boundaries.",
+        "accepted_semantics": "Value includes speed, reliability, traceability, and access protection.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.expected_value",
+          "business_spec.success_criteria"
+        ]
+      },
+      {
+        "id": "EQ1-R06",
+        "parameter": "Input collection",
+        "oracle_value": "Three supplied English PDF documents: travel policy, MX-200 maintenance manual, and Project Aurora pricing strategy.",
+        "accepted_semantics": "All three fixture documents and their purpose are represented.",
+        "source": [
+          "scripted_answers.json",
+          "fixtures/rag_test_bundle.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.input_artifacts",
+          "technical_spec.data_sources",
+          "artifacts"
+        ]
+      },
+      {
+        "id": "EQ1-R07",
+        "parameter": "Input format and language",
+        "oracle_value": "Text-based PDF documents in English.",
+        "accepted_semantics": "PDF and English are configured.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.input_types",
+          "technical_spec.input_formats",
+          "technical_spec.language"
+        ]
+      },
+      {
+        "id": "EQ1-R08",
+        "parameter": "Document metadata",
+        "oracle_value": "Each document and chunk preserves file_name, 1-based integer page_number, classification, and allowed roles.",
+        "accepted_semantics": "Retrieval metadata supports citations and access filtering.",
+        "source": [
+          "scripted_answers.json",
+          "fixtures/poc_input/access_manifest.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.domain_vocabulary",
+          "artifacts",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R09",
+        "parameter": "Target output",
+        "oracle_value": "RAGAnswerRecord or equivalent JSON object for each query.",
+        "accepted_semantics": "A structured JSON answer record is specified.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.target_outputs",
+          "technical_spec.output_types",
+          "target_output_spec.schema_name"
+        ]
+      },
+      {
+        "id": "EQ1-R10",
+        "parameter": "Output field: query identifier",
+        "oracle_value": "query_id; string; required and preserved from the input query.",
+        "accepted_semantics": "The result can be mapped to the test query.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.required_fields"
+        ]
+      },
+      {
+        "id": "EQ1-R11",
+        "parameter": "Output field: role",
+        "oracle_value": "role; required; allowed values employee or manager.",
+        "accepted_semantics": "The evaluated role is present with controlled values.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.allowed_values"
+        ]
+      },
+      {
+        "id": "EQ1-R12",
+        "parameter": "Output field: question",
+        "oracle_value": "question; string; required.",
+        "accepted_semantics": "The original question is retained.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.required_fields"
+        ]
+      },
+      {
+        "id": "EQ1-R13",
+        "parameter": "Output field: access decision",
+        "oracle_value": "access_decision; required; allowed or denied.",
+        "accepted_semantics": "Every result reports the access outcome.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.allowed_values",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R14",
+        "parameter": "Output field: answer",
+        "oracle_value": "answer; string; required; grounded in authorized retrieved sources.",
+        "accepted_semantics": "Every result contains a grounded answer or refusal text.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.validation_rules"
+        ]
+      },
+      {
+        "id": "EQ1-R15",
+        "parameter": "Output field: citations",
+        "oracle_value": "citations; required list; at least one for an allowed factual answer and empty for a denied answer.",
+        "accepted_semantics": "Citation cardinality depends on access decision.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.validation_rules"
+        ]
+      },
+      {
+        "id": "EQ1-R16",
+        "parameter": "Citation element: file name",
+        "oracle_value": "file_name; string; first element of every [file_name, page_number] citation pair.",
+        "accepted_semantics": "Each citation identifies the supporting PDF filename as its first element.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R17",
+        "parameter": "Citation element: page number",
+        "oracle_value": "page_number; 1-based integer; second element of every [file_name, page_number] citation pair.",
+        "accepted_semantics": "Each citation identifies the supporting PDF page as its second element.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R18",
+        "parameter": "Output field: refusal reason",
+        "oracle_value": "refusal_reason; required when access_decision is denied; otherwise optional or null.",
+        "accepted_semantics": "Denied results explain the refusal.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.optional_fields",
+          "target_output_spec.validation_rules"
+        ]
+      },
+      {
+        "id": "EQ1-R19",
+        "parameter": "Citation pair structure",
+        "oracle_value": "Every citation is exactly a two-element list ordered as [file_name, page_number].",
+        "accepted_semantics": "Citation values use the required two-element positional format without section-name metadata.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.validation_rules"
+        ]
+      },
+      {
+        "id": "EQ1-R20",
+        "parameter": "Output separation",
+        "oracle_value": "Return one distinct result for each of the four queries.",
+        "accepted_semantics": "Results are not merged across roles or questions.",
+        "source": [
+          "scripted_answers.json",
+          "fixtures/poc_input/query_set.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.validation_rules",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R21",
+        "parameter": "Grounding policy",
+        "oracle_value": "Use only retrieved content allowed for the user's role and cite every material factual claim.",
+        "accepted_semantics": "Model memory and unauthorized evidence are excluded.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.evaluation_requirements",
+          "prompts",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R22",
+        "parameter": "Unsupported question policy",
+        "oracle_value": "If authorized sources do not support an answer, say that the information was not found and do not speculate.",
+        "accepted_semantics": "The assistant abstains when evidence is absent.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.evaluation_requirements",
+          "prompts"
+        ]
+      },
+      {
+        "id": "EQ1-R23",
+        "parameter": "Conflicting-source policy",
+        "oracle_value": "Identify the conflict and cite both authorized sources rather than silently choosing one.",
+        "accepted_semantics": "Conflicting authorized evidence is disclosed.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.evaluation_requirements",
+          "prompts"
+        ]
+      },
+      {
+        "id": "EQ1-R24",
+        "parameter": "Citation integrity",
+        "oracle_value": "Do not fabricate citations or cite documents not retrieved for the authorized role.",
+        "accepted_semantics": "Citations must correspond to eligible retrieved sources.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.evaluation_requirements",
+          "prompts",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R25",
+        "parameter": "Employee interaction",
+        "oracle_value": "Employees use a web application to sign in, ask natural-language questions, and receive answers with clickable source citations.",
+        "accepted_semantics": "The final employee-facing interaction is web-based question answering with citations.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.runtime_interface",
+          "business_spec.user_interface",
+          "business_process.manual_steps",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R26",
+        "parameter": "Role-aware interaction",
+        "oracle_value": "The application uses the signed-in employee's assigned role to filter documents before retrieval.",
+        "accepted_semantics": "The employee's role drives retrieval eligibility.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.runtime_interface",
+          "technical_spec.security_constraints",
+          "business_process.decision_points",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R27",
+        "parameter": "Human review policy",
+        "oracle_value": "No routine human reviewer approves or returns each answer.",
+        "accepted_semantics": "The question-answer workflow has no per-answer human approval gate.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.human_review",
+          "business_spec.reviewers",
+          "business_process.exceptions"
+        ]
+      },
+      {
+        "id": "EQ1-R28",
+        "parameter": "Fixture data source",
+        "oracle_value": "The PoC reads the supplied local poc_input_bundle.json and resolves its documents, access manifest, and query set relative to the bundle; a live repository connector is outside PoC scope.",
+        "accepted_semantics": "The test source and integration boundary are explicit.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.data_sources",
+          "technical_spec.integration_targets"
+        ]
+      },
+      {
+        "id": "EQ1-R29",
+        "parameter": "Document sensitivity",
+        "oracle_value": "Two internal documents are available to employee and manager roles; the Project Aurora strategy is management-confidential and manager-only.",
+        "accepted_semantics": "Document classifications and allowed roles match the fixture manifest.",
+        "source": [
+          "scripted_answers.json",
+          "fixtures/poc_input/access_manifest.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.security_constraints",
+          "artifacts"
+        ]
+      },
+      {
+        "id": "EQ1-R30",
+        "parameter": "Access-control enforcement point",
+        "oracle_value": "Filter by allowed roles before retrieval so unauthorized chunks never enter the model context.",
+        "accepted_semantics": "Access control precedes similarity search and generation.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.security_constraints",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R31",
+        "parameter": "Unauthorized-response policy",
+        "oracle_value": "Refuse without exposing restricted facts or citations.",
+        "accepted_semantics": "Denied responses do not leak restricted information.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.security_constraints",
+          "prompts",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R32",
+        "parameter": "Privacy, provider, and retention boundary",
+        "oracle_value": "External model APIs are allowed; fixtures contain no personal data; no exact retention period is specified; enterprise identity and full audit service are outside PoC scope.",
+        "accepted_semantics": "Security boundaries are captured without inventing retention or identity requirements.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.security_constraints",
+          "business_spec.risks"
+        ]
+      },
+      {
+        "id": "EQ1-R33",
+        "parameter": "PoC runtime interface",
+        "oracle_value": "Command-line PoC supports python run_poc.py --input <path-to-poc_input_bundle.json>, executes the fixed query set, and writes JSON results.",
+        "accepted_semantics": "The PoC accepts the supplied input bundle explicitly and produces JSON output.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.runtime_interface",
+          "technical_spec.evaluation_requirements",
+          "poc"
+        ]
+      },
+      {
+        "id": "EQ1-R34",
+        "parameter": "Participants and external parties",
+        "oracle_value": "Employees, managers, and knowledge owners are internal participants; no external party is required for the fixture workflow.",
+        "accepted_semantics": "Internal roles are modeled and no unsupported external actor is required.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_process.participants",
+          "business_process.external_parties"
+        ]
+      },
+      {
+        "id": "EQ1-R35",
+        "parameter": "Business and technical success",
+        "oracle_value": "Faster reliable answers with citations and correct access behavior, plus successful execution over the fixture; no numerical improvement threshold.",
+        "accepted_semantics": "Success includes value, citations, access safety, and fixture execution without an invented threshold.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.success_criteria",
+          "technical_spec.evaluation_requirements"
+        ]
+      },
+      {
+        "id": "EQ1-R36",
+        "parameter": "Model configuration",
+        "oracle_value": "Azure OpenAI generation model gpt-5.4, temperature 0.0, reasoning effort medium, plus a supported Azure OpenAI embedding model.",
+        "accepted_semantics": "Provider and requested generation settings are captured; embedding deployment may remain environmental.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.model_provider",
+          "technical_spec.model_preferences",
+          "components"
+        ]
+      },
+      {
+        "id": "EQ1-R37",
+        "parameter": "Risks",
+        "oracle_value": "Hallucinated answers, wrong citations, restricted retrieval or leakage, stale documents, and answering without authorized support.",
+        "accepted_semantics": "The main RAG and access-control risks are identified.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.risks",
+          "technical_spec.security_constraints"
+        ]
+      },
+      {
+        "id": "EQ1-R38",
+        "parameter": "First PoC goal",
+        "oracle_value": "Ingest the three supplied documents and run four role-tagged queries, producing grounded cited answers for authorized cases and a non-leaking refusal for the unauthorized case.",
+        "accepted_semantics": "The first PoC goal covers RAG, citations, and access enforcement.",
+        "source": [
+          "scripted_answers.json",
+          "fixtures/rag_test_bundle.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.poc_goal",
+          "technical_spec.evaluation_requirements",
+          "poc"
+        ]
+      },
+      {
+        "id": "EQ1-R39",
+        "parameter": "Answer validation rules",
+        "oracle_value": "Required fields and controlled values are enforced; allowed answers have [file_name, page_number] citations; denied answers have refusal_reason, empty citations, and no restricted facts.",
+        "accepted_semantics": "Output validation covers schema, citations, and refusal safety.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.validation_rules",
+          "schemas",
+          "prompts"
+        ]
+      },
+      {
+        "id": "EQ1-R40",
+        "parameter": "Employee interaction and PoC separation",
+        "oracle_value": "The intended employee interaction is a web application, while the first PoC may use CLI and JSON output.",
+        "accepted_semantics": "The final interaction and PoC interface are not conflated.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.runtime_interface",
+          "business_spec.user_interface",
+          "business_spec.poc_goal"
+        ]
+      },
+      {
+        "id": "EQ1-R41",
+        "parameter": "Retrieval configuration",
+        "oracle_value": "Structure-aware chunks preserve file_name, 1-based page_number, classification, and allowed_roles metadata; role filtering occurs before semantic top-four retrieval; hybrid search or reranking is optional.",
+        "accepted_semantics": "Retrieval settings support grounded citations and role filtering.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "components",
+          "workflow.steps",
+          "technical_spec.domain_vocabulary"
+        ]
+      },
+      {
+        "id": "EQ1-R42",
+        "parameter": "Fixture acceptance conditions",
+        "oracle_value": "Q01 cites [employee_travel_policy.pdf, 3]; Q02 cites [mx200_maintenance_manual.pdf, 3] and [mx200_maintenance_manual.pdf, 4]; Q03 refuses for employee with empty citations and no 12%, 22%, or CFO leakage; Q04 answers 12% and CFO approval for manager and cites [project_aurora_pricing_strategy.pdf, 3].",
+        "accepted_semantics": "All four expected role-aware outcomes are represented.",
+        "source": [
+          "scripted_answers.json",
+          "fixtures/expected_rag_results.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.evaluation_requirements",
+          "evaluation",
+          "poc"
+        ]
+      }
+    ],
+    "EQ1_diagnostics": [
+      {
+        "id": "EQ1-D01",
+        "parameter": "Unsupported quantified targets",
+        "oracle_value": "No SLA, throughput, latency, volume, budget, accuracy, adoption, time-saving, or cost-saving number may be treated as user-confirmed.",
+        "accepted_semantics": "Such values are assumptions, not captured facts.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "assumptions",
+          "business_spec.success_criteria",
+          "technical_spec.model_preferences"
+        ],
+        "scored": false
+      },
+      {
+        "id": "EQ1-D02",
+        "parameter": "Unsupported external integration",
+        "oracle_value": "No live repository, enterprise identity, ticketing, or audit-service integration may be treated as required for the PoC.",
+        "accepted_semantics": "PoC integration scope remains local and bounded.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "assumptions",
+          "technical_spec.integration_targets"
+        ],
+        "scored": false
+      },
+      {
+        "id": "EQ1-D03",
+        "parameter": "Unsupported implementation defaults",
+        "oracle_value": "Chunk size, overlap, embedding deployment name, vector database brand, and environment details not explicitly fixed must be assumptions or defaults.",
+        "accepted_semantics": "Implementation defaults are not misrepresented as user requirements.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "assumptions",
+          "components"
+        ],
+        "scored": false
+      }
+    ],
+    "EQ2": [
+      {
+        "id": "EQ2-C01",
+        "parameter": "Knowledge-process classification",
+        "oracle_value": "Classify the use case as knowledge access through retrieval-augmented question answering.",
+        "accepted_semantics": "Knowledge access and RAG are the primary pattern.",
+        "source": [
+          "GAIK registry",
+          "scenario oracle"
+        ],
+        "blueprint_hints": [
+          "classification",
+          "use_case.knowledge_process",
+          "components"
+        ]
+      },
+      {
+        "id": "EQ2-C02",
+        "parameter": "Primary GAIK module",
+        "oracle_value": "Select the RAG-Workflow module or its registered equivalent as the primary end-to-end asset.",
+        "accepted_semantics": "The module-first rule selects the GAIK RAG workflow.",
+        "source": [
+          "GAIK registry"
+        ],
+        "blueprint_hints": [
+          "components.selected_modules",
+          "components.selection_reasoning"
+        ]
+      },
+      {
+        "id": "EQ2-C03",
+        "parameter": "Document ingestion and chunking",
+        "oracle_value": "Parse all three PDFs and create structure-aware chunks that retain file_name, 1-based integer page_number, classification, and allowed-role metadata.",
+        "accepted_semantics": "The ingestion path supports citations and access metadata.",
+        "source": [
+          "scripted_answers.json",
+          "GAIK registry"
+        ],
+        "blueprint_hints": [
+          "components",
+          "workflow.steps",
+          "artifacts"
+        ]
+      },
+      {
+        "id": "EQ2-C04",
+        "parameter": "Embeddings and vector store",
+        "oracle_value": "Create embeddings and index chunks in a vector store while preserving citation and access metadata.",
+        "accepted_semantics": "Embedding and indexing are configured once for the collection.",
+        "source": [
+          "scripted_answers.json",
+          "GAIK registry"
+        ],
+        "blueprint_hints": [
+          "components",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ2-C05",
+        "parameter": "Pre-retrieval access filtering",
+        "oracle_value": "Apply allowed_roles metadata filtering before semantic retrieval; retrieve the top four eligible chunks.",
+        "accepted_semantics": "Unauthorized chunks cannot enter retrieved context.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "components",
+          "workflow.steps",
+          "technical_spec.security_constraints"
+        ]
+      },
+      {
+        "id": "EQ2-C06",
+        "parameter": "Grounded answer generation",
+        "oracle_value": "AnswerGenerator or equivalent is instructed to use only retrieved context, cite sources, abstain without support, and refuse denied access without leakage.",
+        "accepted_semantics": "Generation instructions enforce grounding and safe refusal.",
+        "source": [
+          "scripted_answers.json",
+          "GAIK registry"
+        ],
+        "blueprint_hints": [
+          "components",
+          "prompts",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ2-C07",
+        "parameter": "Workflow order",
+        "oracle_value": "Ingest and index documents, receive query and role, filter eligible documents, retrieve evidence, generate answer, validate citations and access behavior, then return result.",
+        "accepted_semantics": "The workflow order prevents unauthorized retrieval and supports validation.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "workflow.steps",
+          "business_process"
+        ]
+      },
+      {
+        "id": "EQ2-C08",
+        "parameter": "Required output artifacts",
+        "oracle_value": "Each result includes query_id, role, question, access_decision, answer, citations as [file_name, page_number] pairs, and conditional refusal_reason in JSON.",
+        "accepted_semantics": "Output artifacts support all four acceptance cases.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec",
+          "artifacts",
+          "poc"
+        ]
+      },
+      {
+        "id": "EQ2-C09",
+        "parameter": "PoC scope",
+        "oracle_value": "CLI accepts poc_input_bundle.json through --input, resolves the supplied local documents, access manifest, and four-query set, and saves JSON; web UI, live repository, and enterprise identity are not required.",
+        "accepted_semantics": "PoC scope is executable and bounded.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "poc",
+          "technical_spec.runtime_interface",
+          "technical_spec.integration_targets"
+        ]
+      }
+    ],
+    "EQ3": [
+      {
+        "id": "EQ3-P01",
+        "parameter": "Blueprint existence and JSON parsing",
+        "oracle_value": "A non-empty use_case.blueprint.json exists and parses as JSON.",
+        "accepted_semantics": "The blueprint is present and parseable.",
+        "source": [
+          "generated package"
+        ],
+        "blueprint_hints": []
+      },
+      {
+        "id": "EQ3-P02",
+        "parameter": "Official blueprint validation",
+        "oracle_value": "The GAIK Solution Wizard validator returns exit code 0 with no blocking errors.",
+        "accepted_semantics": "Warnings are non-blocking when validation passes with exit code 0.",
+        "source": [
+          "validator command",
+          "exit code",
+          "validator output excerpt"
+        ],
+        "blueprint_hints": []
+      },
+      {
+        "id": "EQ3-P03",
+        "parameter": "Artifact-flow consistency",
+        "oracle_value": "Workflow inputs and outputs reference declared artifacts with valid producers and dependencies.",
+        "accepted_semantics": "Artifact flow is internally consistent.",
+        "source": [
+          "blueprint"
+        ],
+        "blueprint_hints": []
+      },
+      {
+        "id": "EQ3-P04",
+        "parameter": "Mermaid workflow",
+        "oracle_value": "A non-empty workflow.mmd covers every blueprint workflow step.",
+        "accepted_semantics": "Mermaid represents the workflow.",
+        "source": [
+          "workflow.mmd",
+          "blueprint workflow"
+        ],
+        "blueprint_hints": []
+      },
+      {
+        "id": "EQ3-P05",
+        "parameter": "BPMN validity and mapping",
+        "oracle_value": "workflow.bpmn parses as XML and maps every blueprint workflow step through IDs, names, or bpmn_mapping.",
+        "accepted_semantics": "BPMN is valid and traceable.",
+        "source": [
+          "workflow.bpmn",
+          "blueprint mapping"
+        ],
+        "blueprint_hints": []
+      },
+      {
+        "id": "EQ3-P06",
+        "parameter": "PoC scaffold completeness",
+        "oracle_value": "The PoC contains an entry point, dependency file, configuration, prompts, and schemas.",
+        "accepted_semantics": "All mandatory PoC categories are present.",
+        "source": [
+          "generated package/poc"
+        ],
+        "blueprint_hints": []
+      },
+      {
+        "id": "EQ3-P07",
+        "parameter": "Documentation completeness",
+        "oracle_value": "The package contains non-empty documentation plus PoC usage instructions.",
+        "accepted_semantics": "Documentation and README files are present.",
+        "source": [
+          "generated package/docs",
+          "poc README"
+        ],
+        "blueprint_hints": []
+      },
+      {
+        "id": "EQ3-P08",
+        "parameter": "Requirement-to-component traceability",
+        "oracle_value": "Traceability entries connect requirements to at least one selected GAIK module or building block.",
+        "accepted_semantics": "Selected RAG assets are traceable to requirements.",
+        "source": [
+          "blueprint traceability",
+          "selected components"
+        ],
+        "blueprint_hints": []
+      }
+    ],
+    "EQ4": [
+      {
+        "id": "EQ4-X01",
+        "parameter": "Setup succeeds",
+        "oracle_value": "The original unmodified generated PoC setup or build command exits with code 0.",
+        "accepted_semantics": "Dependencies install or setup is unnecessary and succeeds.",
+        "source": [
+          "poc_execution.json",
+          "setup log"
+        ],
+        "blueprint_hints": [],
+        "automated_check": "setup_exit_zero",
+        "evidence_required": [
+          "setup command",
+          "exit code",
+          "stderr"
+        ]
+      },
+      {
+        "id": "EQ4-X02",
+        "parameter": "End-to-end execution",
+        "oracle_value": "The original unmodified PoC processes the supplied document collection and four-query set and exits with code 0.",
+        "accepted_semantics": "The baseline RAG execution completes over the fixture.",
+        "source": [
+          "poc_execution.json",
+          "fixtures/rag_test_bundle.json"
+        ],
+        "blueprint_hints": [],
+        "automated_check": "run_exit_zero",
+        "evidence_required": [
+          "run command",
+          "exit code",
+          "fixture hash"
+        ]
+      },
+      {
+        "id": "EQ4-X03",
+        "parameter": "Parseable JSON results",
+        "oracle_value": "The original unmodified PoC generates new non-empty parseable JSON containing distinct results for the four queries.",
+        "accepted_semantics": "A machine-readable result is produced for every query.",
+        "source": [
+          "poc_execution.json",
+          "generated output"
+        ],
+        "blueprint_hints": [],
+        "automated_check": "json_output_generated",
+        "evidence_required": [
+          "output path",
+          "size",
+          "JSON parse result"
+        ]
+      },
+      {
+        "id": "EQ4-X04",
+        "parameter": "Grounded citations and access control",
+        "oracle_value": "The original output semantically matches expected_rag_results.json, including exact [file_name, page_number] citation pairs for Q01, Q02, and Q04, plus a non-leaking Q03 employee refusal with empty citations.",
+        "accepted_semantics": "The original PoC satisfies the four grounded role-aware cases without restricted leakage.",
+        "source": [
+          "fixtures/expected_rag_results.json",
+          "poc_execution.json"
+        ],
+        "blueprint_hints": [],
+        "automated_check": "fixture_semantic_match",
+        "evidence_required": [
+          "expected results",
+          "generated JSON",
+          "citation and leakage comparison"
+        ]
+      }
+    ]
+  },
+  "scoring": {
+    "EQ1": {
+      "metric": "Requirement capture recall",
+      "formula": "Yes verdicts for EQ1-R rows / total EQ1-R rows",
+      "diagnostics_excluded": [
+        "EQ1-D01",
+        "EQ1-D02",
+        "EQ1-D03"
+      ]
+    },
+    "EQ2": {
+      "metric": "Configuration constraint satisfaction",
+      "formula": "Yes verdicts for EQ2-C rows / total EQ2-C rows"
+    },
+    "EQ3": {
+      "metric": "Valid solution package rate",
+      "formula": "A run passes only if every mandatory EQ3-P check is Yes; passed runs / 2"
+    },
+    "EQ4": {
+      "metric": "PoC execution success rate",
+      "formula": "A run passes only if every mandatory EQ4-X check for the original unmodified PoC is Yes; passed runs / 2"
+    },
+    "recovery_diagnostic": {
+      "metric": "Refinement attempts to successful execution",
+      "values": "0, 1, 2, 3, or N/A",
+      "formula": "Record the first successful execution: 0 for original success, 1-3 for success after that many refinements, and N/A when all three refinements fail.",
+      "scored_under_EQ4": false,
+      "reporting": "Report initially successful runs, runs recovered within three refinements, and runs that never executed successfully."
+    },
+    "two_run_aggregation": "For EQ1 and EQ2, pool Yes verdicts across both runs and divide by the pooled number of scored checks. For EQ3 and EQ4, divide the number of passing runs by two."
+  },
+  "verdict_policy": {
+    "allowed": [
+      "Yes",
+      "No"
+    ],
+    "human_is_final_judge": true,
+    "semantic_matching": "An LLM may align semantically equivalent wording and identify evidence, but it must not enter the final verdict. The evaluator reviews the side-by-side evidence and enters Yes or No.",
+    "missing_requirement": "If an oracle requirement is absent, generated_value states NOT FOUND and the evaluator enters No. This keeps omissions in the denominator.",
+    "evidence_rule": "Every verdict must have adjacent evidence identifying a source file and concrete excerpt, path, command result, or validator result."
+  }
+}

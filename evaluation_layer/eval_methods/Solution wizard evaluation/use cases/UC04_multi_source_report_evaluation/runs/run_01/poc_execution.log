@@ -1,0 +1,297 @@
+Run: UC04_run_01
+Attempt: 0 (original)
+EQ4 baseline: True
+Fixture: {'path': 'C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input_bundle.json', 'sha256': '6218175c08fd6a69a6fd38ecee29004baf7dde5efbc58b05903a1a8e3f467cbc', 'size_bytes': 513}
+Setup command: ['C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-m', 'pip', 'install', '-r', 'requirements.txt']
+Setup exit code: 0
+--- setup stdout ---
+Requirement already satisfied: pydantic>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 1)) (2.12.5)
+Requirement already satisfied: python-dotenv in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 2)) (1.2.1)
+Requirement already satisfied: pyyaml in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 5)) (6.0.3)
+Requirement already satisfied: gaik[multi-source-report-generator] in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 3)) (0.5.16)
+Requirement already satisfied: annotated-types>=0.6.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.7.0)
+Requirement already satisfied: pydantic-core==2.41.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (2.41.5)
+Requirement already satisfied: typing-extensions>=4.14.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (4.15.0)
+Requirement already satisfied: typing-inspection>=0.4.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.4.2)
+Requirement already satisfied: openai>=2.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.8.1)
+Requirement already satisfied: openpyxl>=3.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.1.5)
+Requirement already satisfied: langgraph>=0.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (1.2.4)
+Requirement already satisfied: langchain-core<2,>=1.4.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (1.4.3)
+Requirement already satisfied: langgraph-checkpoint<5.0.0,>=4.1.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (4.1.1)
+Requirement already satisfied: langgraph-prebuilt<1.2.0,>=1.1.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (1.1.0)
+Requirement already satisfied: langgraph-sdk<0.5.0,>=0.4.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (0.4.2)
+Requirement already satisfied: xxhash>=3.5.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (3.7.0)
+Requirement already satisfied: anyio<5,>=3.5.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (4.12.0)
+Requirement already satisfied: distro<2,>=1.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.9.0)
+Requirement already satisfied: httpx<1,>=0.23.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.28.1)
+Requirement already satisfied: jiter<1,>=0.10.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.12.0)
+Requirement already satisfied: sniffio in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.3.1)
+Requirement already satisfied: tqdm>4 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (4.67.1)
+Requirement already satisfied: et-xmlfile in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openpyxl>=3.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.0.0)
+Requirement already satisfied: PyMuPDF>=1.26.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.27.2.2)
+Requirement already satisfied: python-docx>=1.2.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.2.0)
+Requirement already satisfied: docling==2.64.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.64.1)
+Requirement already satisfied: psutil in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (7.1.3)
+Requirement already satisfied: requests>=2.31.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.32.5)
+Requirement already satisfied: docling-core<3.0.0,>=2.50.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.60.2)
+Requirement already satisfied: docling-parse<5.0.0,>=4.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (4.7.3)
+Requirement already satisfied: docling-ibm-models<4,>=3.9.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.11.0)
+Requirement already satisfied: filetype<2.0.0,>=1.2.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.2.0)
+Requirement already satisfied: pypdfium2!=4.30.1,<5.0.0,>=4.30.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (4.30.0)
+Requirement already satisfied: pydantic-settings<3.0.0,>=2.3.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.12.0)
+Requirement already satisfied: huggingface_hub<1,>=0.23 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.36.0)
+Requirement already satisfied: rapidocr<4.0.0,>=3.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.4.3)
+Requirement already satisfied: certifi>=2024.7.4 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2025.11.12)
+Requirement already satisfied: rtree<2.0.0,>=1.3.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.4.1)
+Requirement already satisfied: typer<0.20.0,>=0.12.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.16.1)
+Requirement already satisfied: python-pptx<2.0.0,>=1.0.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.0.2)
+Requirement already satisfied: beautifulsoup4<5.0.0,>=4.12.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (4.14.3)
+Requirement already satisfied: pandas<3.0.0,>=2.1.4 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.3.3)
+Requirement already satisfied: marko<3.0.0,>=2.1.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.2.1)
+Requirement already satisfied: lxml<7.0.0,>=4.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (6.0.2)
+Requirement already satisfied: pillow<12.0.0,>=10.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (11.3.0)
+Requirement already satisfied: pluggy<2.0.0,>=1.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.6.0)
+Requirement already satisfied: pylatexenc<3.0,>=2.10 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.10)
+Requirement already satisfied: scipy<2.0.0,>=1.6.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.16.3)
+Requirement already satisfied: accelerate<2,>=1.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.12.0)
+Requirement already satisfied: polyfactory>=2.22.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.1.0)
+Requirement already satisfied: pydub>=0.25.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.25.1)
+Requirement already satisfied: idna>=2.8 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anyio<5,>=3.5.0->openai>=2.7.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.11)
+Requirement already satisfied: httpcore==1.* in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpx<1,>=0.23.0->openai>=2.7.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.0.9)
+Requirement already satisfied: h11>=0.16 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpcore==1.*->httpx<1,>=0.23.0->openai>=2.7.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.16.0)
+Requirement already satisfied: jsonpatch<2.0.0,>=1.33.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langchain-core<2,>=1.4.0->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (1.33)
+Requirement already satisfied: langchain-protocol>=0.0.14 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langchain-core<2,>=1.4.0->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (0.0.16)
+Requirement already satisfied: langsmith<1.0.0,>=0.3.45 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langchain-core<2,>=1.4.0->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (0.6.4)
+Requirement already satisfied: packaging>=23.2.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langchain-core<2,>=1.4.0->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (25.0)
+Requirement already satisfied: tenacity!=8.4.0,<10.0.0,>=8.1.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langchain-core<2,>=1.4.0->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (9.1.2)
+Requirement already satisfied: uuid-utils<1.0,>=0.12.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langchain-core<2,>=1.4.0->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (0.14.0)
+Requirement already satisfied: ormsgpack>=1.12.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langgraph-checkpoint<5.0.0,>=4.1.0->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (1.12.2)
+Requirement already satisfied: orjson>=3.11.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langgraph-sdk<0.5.0,>=0.4.2->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (3.11.5)
+Requirement already satisfied: websockets<16,>=14 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langgraph-sdk<0.5.0,>=0.4.2->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (15.0.1)
+Requirement already satisfied: charset_normalizer<4,>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.4.4)
+Requirement already satisfied: urllib3<3,>=1.21.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.6.2)
+Requirement already satisfied: colorama in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from tqdm>4->openai>=2.7.0->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.4.6)
+Requirement already satisfied: numpy>=1.17 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from accelerate<2,>=1.0.0->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.26.4)
+Requirement already satisfied: torch>=2.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from accelerate<2,>=1.0.0->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.9.1+cu128)
+Requirement already satisfied: safetensors>=0.4.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from accelerate<2,>=1.0.0->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.7.0)
+Requirement already satisfied: soupsieve>=1.6.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from beautifulsoup4<5.0.0,>=4.12.3->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.8)
+Requirement already satisfied: jsonschema<5.0.0,>=4.16.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core<3.0.0,>=2.50.1->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (4.25.1)
+Requirement already satisfied: jsonref<2.0.0,>=1.1.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core<3.0.0,>=2.50.1->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.1.0)
+Requirement already satisfied: tabulate<0.10.0,>=0.9.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core<3.0.0,>=2.50.1->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.9.0)
+Requirement already satisfied: latex2mathml<4.0.0,>=3.77.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core<3.0.0,>=2.50.1->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.78.1)
+Requirement already satisfied: semchunk<3.0.0,>=2.2.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.2.2)
+Requirement already satisfied: tree-sitter<0.27.0,>=0.25.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.25.2)
+Requirement already satisfied: tree-sitter-python>=0.23.6 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.25.0)
+Requirement already satisfied: tree-sitter-c>=0.23.4 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.24.1)
+Requirement already satisfied: tree-sitter-javascript>=0.23.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.25.0)
+Requirement already satisfied: tree-sitter-typescript>=0.23.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.23.2)
+Requirement already satisfied: transformers<5.0.0,>=4.34.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (4.57.6)
+Requirement already satisfied: torchvision<1,>=0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-ibm-models<4,>=3.9.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.24.1+cu128)
+Requirement already satisfied: jsonlines<5.0.0,>=3.1.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-ibm-models<4,>=3.9.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (4.0.0)
+Requirement already satisfied: pywin32>=305 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from docling-parse<5.0.0,>=4.7.0->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (311)
+Requirement already satisfied: filelock in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from huggingface_hub<1,>=0.23->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.20.0)
+Requirement already satisfied: fsspec>=2023.5.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from huggingface_hub<1,>=0.23->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2025.12.0)
+Requirement already satisfied: jsonpointer>=1.9 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from jsonpatch<2.0.0,>=1.33.0->langchain-core<2,>=1.4.0->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (3.0.0)
+Requirement already satisfied: requests-toolbelt>=1.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2,>=1.4.0->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (1.0.0)
+Requirement already satisfied: zstandard>=0.23.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2,>=1.4.0->langgraph>=0.2->gaik[multi-source-report-generator-agentic]->-r requirements.txt (line 4)) (0.25.0)
+Requirement already satisfied: python-dateutil>=2.8.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pandas<3.0.0,>=2.1.4->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.9.0.post0)
+Requirement already satisfied: pytz>=2020.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pandas<3.0.0,>=2.1.4->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2022.7.1)
+Requirement already satisfied: tzdata>=2022.7 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pandas<3.0.0,>=2.1.4->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2025.2)
+Requirement already satisfied: faker>=5.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from polyfactory>=2.22.2->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (38.2.0)
+Requirement already satisfied: XlsxWriter>=0.5.7 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from python-pptx<2.0.0,>=1.0.2->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.2.9)
+Requirement already satisfied: pyclipper>=1.2.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from rapidocr<4.0.0,>=3.3->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.4.0)
+Requirement already satisfied: opencv_python>=4.5.1.48 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from rapidocr<4.0.0,>=3.3->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (4.11.0.86)
+Requirement already satisfied: six>=1.15.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from rapidocr<4.0.0,>=3.3->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.17.0)
+Requirement already satisfied: Shapely!=2.0.4,>=1.7.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from rapidocr<4.0.0,>=3.3->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.1.2)
+Requirement already satisfied: omegaconf in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from rapidocr<4.0.0,>=3.3->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.3.0)
+Requirement already satisfied: colorlog in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from rapidocr<4.0.0,>=3.3->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (6.10.1)
+Requirement already satisfied: click>=8.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from typer<0.20.0,>=0.12.5->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (8.3.1)
+Requirement already satisfied: shellingham>=1.3.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from typer<0.20.0,>=0.12.5->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.5.4)
+Requirement already satisfied: rich>=10.11.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from typer<0.20.0,>=0.12.5->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (14.2.0)
+Requirement already satisfied: attrs>=19.2.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from jsonlines<5.0.0,>=3.1.0->docling-ibm-models<4,>=3.9.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (25.4.0)
+Requirement already satisfied: jsonschema-specifications>=2023.03.6 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from jsonschema<5.0.0,>=4.16.0->docling-core<3.0.0,>=2.50.1->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2025.9.1)
+Requirement already satisfied: referencing>=0.28.4 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from jsonschema<5.0.0,>=4.16.0->docling-core<3.0.0,>=2.50.1->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.37.0)
+Requirement already satisfied: rpds-py>=0.7.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from jsonschema<5.0.0,>=4.16.0->docling-core<3.0.0,>=2.50.1->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.30.0)
+Requirement already satisfied: markdown-it-py>=2.2.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from rich>=10.11.0->typer<0.20.0,>=0.12.5->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (4.0.0)
+Requirement already satisfied: pygments<3.0.0,>=2.13.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from rich>=10.11.0->typer<0.20.0,>=0.12.5->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.19.2)
+Requirement already satisfied: mpire[dill] in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from semchunk<3.0.0,>=2.2.0->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2.10.2)
+Requirement already satisfied: sympy>=1.13.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from torch>=2.0.0->accelerate<2,>=1.0.0->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.14.0)
+Requirement already satisfied: networkx>=2.5.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from torch>=2.0.0->accelerate<2,>=1.0.0->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.6.1)
+Requirement already satisfied: jinja2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from torch>=2.0.0->accelerate<2,>=1.0.0->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.1.6)
+Requirement already satisfied: setuptools in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from torch>=2.0.0->accelerate<2,>=1.0.0->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (80.9.0)
+Requirement already satisfied: regex!=2019.12.17 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from transformers<5.0.0,>=4.34.0->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (2025.11.3)
+Requirement already satisfied: tokenizers<=0.23.0,>=0.22.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from transformers<5.0.0,>=4.34.0->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.22.1)
+Requirement already satisfied: antlr4-python3-runtime==4.9.* in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from omegaconf->rapidocr<4.0.0,>=3.3->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (4.9.3)
+Requirement already satisfied: mdurl~=0.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from markdown-it-py>=2.2.0->rich>=10.11.0->typer<0.20.0,>=0.12.5->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.1.2)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from sympy>=1.13.3->torch>=2.0.0->accelerate<2,>=1.0.0->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (1.3.0)
+Requirement already satisfied: MarkupSafe>=2.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from jinja2->torch>=2.0.0->accelerate<2,>=1.0.0->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (3.0.3)
+Requirement already satisfied: multiprocess>=0.70.15 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from mpire[dill]->semchunk<3.0.0,>=2.2.0->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.70.18)
+Requirement already satisfied: dill>=0.4.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from multiprocess>=0.70.15->mpire[dill]->semchunk<3.0.0,>=2.2.0->docling-core[chunking]<3.0.0,>=2.50.1->docling==2.64.1->gaik[multi-source-report-generator]->-r requirements.txt (line 3)) (0.4.0)
+
+--- setup stderr ---
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: python.exe -m pip install --upgrade pip
+
+Run command: ['C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', 'run_poc.py', '--input', 'C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input_bundle.json']
+Run exit code: 0
+--- run stdout ---
+[INFO] Bundle: poc_input_bundle.json  (base dir: C:\Users\h02317\Downloads\Wizard evaluation\UC04_multi_source_report_evaluation\fixtures)
+[OK]   Source: supplier_kpis_q2_2026.xlsx
+[OK]   Source: nordic_components_quality_audit.pdf
+[OK]   Source: procurement_meeting_notes_q2_2026.md
+[OK]   Source: delivery_incidents_q2_2026.csv
+[OK]   Report spec: report_spec.json
+[OK]   Sample report: report_template.md
+[INFO] Loaded 6 sections from report spec
+[INFO]   Section: Executive Summary
+[INFO]   Section: KPI Overview
+[INFO]   Section: Supplier Findings  (after: kpi_overview)
+[INFO]   Section: Quality and Delivery Risks  (after: kpi_overview, supplier_findings)
+[INFO]   Section: Actions and Owners  (after: supplier_findings, risks)
+[INFO]   Section: Source References
+[INFO] Initialising MultiSourceReportGenerator (Azure OpenAI) ...
+[INFO] Starting agentic report synthesis (strict_review=True) ...
+[INFO] Sections will be written in dependency order.
+[INFO] Per-section progress will appear below:
+------------------------------------------------------------
+Normalizing [1/4]: supplier_kpis_q2_2026.xlsx (xlsx)
+Normalizing [2/4]: nordic_components_quality_audit.pdf (pdf)
+Warning: Additional format options not available. Only PDF will be supported.
+Normalizing [3/4]: procurement_meeting_notes_q2_2026.md (markdown)
+Normalizing [4/4]: delivery_incidents_q2_2026.csv (csv)
+Evidence pack assembled: 4 source(s), 32,069 chars
+Phase 1/4 — writing 3 section(s) in parallel: Executive Summary, KPI Overview, Source References
+[Executive Summary] evidence loaded -> drafting
+[KPI Overview] evidence loaded -> drafting
+[Source References] evidence loaded -> drafting
+[Source References] draft written (8 words) -> reviewer
+[Executive Summary] draft written (206 words) -> reviewer
+[KPI Overview] draft written (105 words) -> reviewer
+[KPI Overview] reviewer: 1 correction(s) proposed, 1 applied
+[KPI Overview] done
+[Source References] reviewer: 1 correction(s) proposed, 1 applied
+[Source References] done
+[Executive Summary] reviewer: 2 correction(s) proposed, 2 applied
+[Executive Summary] done
+Phase 1/4 complete -> Phase 2
+Phase 2/4 — writing 1 section(s) in parallel: Supplier Findings
+[Supplier Findings] context: 2 dependency section(s)
+[Supplier Findings] evidence loaded -> drafting
+[Supplier Findings] draft written (406 words) -> reviewer
+[Supplier Findings] reviewer: 4 correction(s) proposed, 4 applied
+[Supplier Findings] done
+Phase 2/4 complete -> Phase 3
+Phase 3/4 — writing 1 section(s) in parallel: Quality and Delivery Risks
+[Quality and Delivery Risks] context: 3 dependency section(s)
+[Quality and Delivery Risks] evidence loaded -> drafting
+[Quality and Delivery Risks] draft written (360 words) -> reviewer
+[Quality and Delivery Risks] reviewer: 1 correction(s) proposed, 1 applied
+[Quality and Delivery Risks] done
+Phase 3/4 complete -> Phase 4
+Phase 4/4 — writing 1 section(s) in parallel: Actions and Owners
+[Actions and Owners] context: 3 dependency section(s)
+[Actions and Owners] evidence loaded -> drafting
+[Actions and Owners] draft written (153 words) -> reviewer
+[Actions and Owners] reviewer: 1 correction(s) proposed, 1 applied
+[Actions and Owners] done
+Assembling report in requested order -> report.md
+------------------------------------------------------------
+[INFO] Removed duplicate section headings from report.
+[OK]   Report written: output/report.md (10790 bytes)
+[OK]   Evidence index written: output/evidence_index.json
+
+============================================================
+[DONE] PoC pipeline complete.
+       Report:         C:\Users\h02317\Downloads\Wizard evaluation\UC04_multi_source_report_evaluation\runs\run_01\generated_package\poc\output\report.md
+       Evidence index: C:\Users\h02317\Downloads\Wizard evaluation\UC04_multi_source_report_evaluation\runs\run_01\generated_package\poc\output\evidence_index.json
+
+[NOTE] This is a DRAFT for procurement manager review.
+       The report is NOT approved for release until the
+       manager reviews and signs off.
+============================================================
+
+--- run stderr ---
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+
+--- outputs ---
+[
+  {
+    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\runs\\run_01\\generated_package\\poc\\output\\report.md",
+    "relative_path": "output\\report.md",
+    "size_bytes": 10790,
+    "new_or_modified": true,
+    "sha256": "6a58f9ce88238ea00d48a7eaca0e51bec29376ed67a083a74d56c013434deb01",
+    "json_parsed": false,
+    "text_value": "# Q2 2026 Supplier Performance Report\n\n## Executive Summary\nQ2 supplier performance was mixed at portfolio level [supplier_kpis_q2_2026.xlsx] [procurement_meeting_notes_q2_2026.md]. Across all suppliers, the business recorded 299 deliveries, 274 of them on time, with total spend of EUR 867,000 and an overall defect rate of 2.0% [supplier_kpis_q2_2026.xlsx]. Baltic Fasteners and Alpine Sensors remained on approved status, with Baltic Fasteners identified as the preferred source for incremental fastener demand in the next quarter, while Alpine Sensors' Q2 delivery and quality performance was considered acceptable despite ongoing single-source lead-time exposure [supplier_kpis_q2_2026.xlsx] [procurement_meeting_notes_q2_2026.md].\n\nThe main concern in Q2 was Nordic Components [supplier_kpis_q2_2026.xlsx] [procurement_meeting_notes_q2_2026.md]. It remained on conditional status after recording weaker delivery and quality results than the other suppliers, including 115 on-time deliveries out of 135, 415 defective units out of 13,500 received, and Q2 spend of EUR 405,000, which is the authoritative value and overrides the approximate EUR 410,000 discussed in the meeting [supplier_kpis_q2_2026.xlsx] [procurement_meeting_notes_q2_2026.md]. The supplier also received an audit score of 72 / 100 with major findings on missing calibration records and overdue CAPA-17, and two delivery incidents caused assembly delays of 6 hours and 10 hours [nordic_components_quality_audit.pdf] [delivery_incidents_q2_2026.csv]. Management decided that Nordic Components remains active under conditional monitoring, but no order-volume increase is permitted until the corrective-action plan is accepted and the follow-up audit score is at least 85 / 100 [procurement_meeting_notes_q2_2026.md] [nordic_components_quality_audit.pdf].\n\n## KPI Overview\n\nThe table below summarizes Q2 KPI totals from the authoritative workbook. On-time delivery and defective-unit rates are calculated from the workbook totals and rounded to one decimal place [supplier_kpis_q2_2026.xlsx].\n\n| Supplier | Total deliveries | On-time delivery % | Total units | Defective units % | Spend (EUR) |\n|---|---:|---:|---:|---:|---:|\n| Nordic Components | 135 | 85.2% | 13,500 | 3.1% | 405,000 |\n| Baltic Fasteners | 97 | 96.9% | 9,700 | 1.0% | 194,000 |\n| Alpine Sensors | 67 | 97.0% | 3,350 | 0.6% | 268,000 |\n| Overall | 299 | 91.6% | 26,550 | 2.0% | 867,000 |\n\n## Supplier Findings\n\n- **Nordic Components:** Nordic Components was the weakest Q2 performer in the supplier group on both delivery and quality, with 135 deliveries, 85.2% on-time delivery, a 3.1% defective-unit rate, and EUR 405,000 spend. The workbook and meeting record both place the supplier on conditional status, and the meeting notes clarify that an approximate spend of EUR 410,000 was discussed but the authoritative workbook value is EUR 405,000. Three delivery incidents were recorded: INC-041 caused a 2-day delay with no production stoppage, INC-052 caused a 4-day delay and a 6-hour assembly delay, and INC-063 caused a 5-day delay and a 10-hour assembly delay. The 18 June audit scored 72/100 and identified two major nonconformities, missing calibration records for 4 of 10 sampled gauges and overdue CAPA-17, plus a minor packaging-label traceability issue. Management agreed that the supplier remains active but no order-volume increase is permitted until the corrective-action plan is accepted and a follow-up audit achieves at least 85/100 [supplier_kpis_q2_2026.xlsx; nordic_components_quality_audit.pdf; procurement_meeting_notes_q2_2026.md; delivery_incidents_q2_2026.csv].\n\n- **Baltic Fasteners:** Baltic Fasteners delivered stable Q2 performance, with 97 deliveries, 96.9% on-time delivery, a 1.0% defective-unit rate, and EUR 194,000 spend. The workbook shows approved status throughout the quarter, accepted-after-sampling defect disposition, and no formal Q2 corrective action in the quality review. Delivery detail shows one late machine-screw delivery event in each month, but no linked incident reference is recorded, and the meeting notes state that delivery and quality performance remained stable overall. On that basis, procurement agreed that Baltic Fasteners is the preferred source for incremental fastener demand in the next quarter, with the meeting record stating that this decision is limited to additional fastener demand rather than general supplier replacement [supplier_kpis_q2_2026.xlsx; procurement_meeting_notes_q2_2026.md].\n\n- **Alpine Sensors:** Alpine Sensors delivered acceptable Q2 results, with 67 deliveries, 97.0% on-time delivery, a 0.6% defective-unit rate, and EUR 268,000 spend. The supplier remained approved in the workbook, and the quality review and meeting notes both state that Q2 delivery and quality performance was acceptable. The only recorded delivery incident was INC-058, a 1-day weather-related delay affecting temperature probes; the incident register and meeting notes both state that it had no production impact and should be treated as a weather disruption rather than a supplier-quality failure. The main management concern is therefore not current-quarter execution but continuing single-source lead-time exposure for critical sensor items, which procurement agreed should remain under ongoing supply-continuity monitoring rather than formal corrective action or supplier-status restriction [supplier_kpis_q2_2026.xlsx; procurement_meeting_notes_q2_2026.md; delivery_incidents_q2_2026.csv].\n\n## Quality and Delivery Risks\n\n- **Nordic Components:** Nordic Components is the clearest supported Q2 quality and delivery risk in the current supplier group. It recorded 85.2% on-time delivery and a 3.1% defective-unit rate, and it remained on conditional status throughout the quarter [supplier_kpis_q2_2026.xlsx]. Delivery risk is supported by three recorded incidents, including INC-052 and INC-063, which caused a 6-hour and 10-hour assembly delay respectively, while INC-041 caused a 2-day delay without production stoppage [delivery_incidents_q2_2026.csv; procurement_meeting_notes_q2_2026.md]. Quality risk is supported by the 18 June audit score of 72/100, two major nonconformities for missing calibration records on 4 of 10 sampled gauges and overdue CAPA-17, and a minor packaging-label traceability issue [nordic_components_quality_audit.pdf]. The meeting discussion referred to spend as approximately EUR 410,000, but the authoritative workbook records exact Q2 spend of EUR 405,000 and that exact figure should be used in the report [procurement_meeting_notes_q2_2026.md; supplier_kpis_q2_2026.xlsx]. No order-volume increase is permitted until the corrective-action plan is accepted and the follow-up audit score is at least 85/100 [nordic_components_quality_audit.pdf; procurement_meeting_notes_q2_2026.md].\n\n- **Baltic Fasteners:** The available evidence supports a low current Q2 quality and delivery risk position for Baltic Fasteners. The supplier remained approved, achieved 96.9% on-time delivery, and recorded a 1.0% defective-unit rate, with no formal Q2 corrective action in the quality review [supplier_kpis_q2_2026.xlsx]. Delivery detail shows one late machine-screw delivery event in each month, but no linked incident reference is recorded, and the meeting notes describe overall delivery and quality performance as stable [supplier_kpis_q2_2026.xlsx; procurement_meeting_notes_q2_2026.md]. On the evidence provided, routine monthly monitoring is the supported response rather than escalation [supplier_kpis_q2_2026.xlsx].\n\n- **Alpine Sensors:** The supported risk for Alpine Sensors is supply continuity rather than current-quarter delivery or quality failure. Q2 performance was acceptable, with 97.0% on-time delivery, a 0.6% defective-unit rate, and approved status [supplier_kpis_q2_2026.xlsx; procurement_meeting_notes_q2_2026.md]. The only recorded incident, INC-058, was a 1-day weather-related delay affecting temperature probes with no production impact, and both the incident register and meeting notes state that it should be treated as a weather disruption rather than a supplier-quality failure [delivery_incidents_q2_2026.csv; procurement_meeting_notes_q2_2026.md]. Management’s stated concern is continued single-source lead-time exposure for critical sensor items, so the agreed response is ongoing supply-continuity monitoring rather than formal corrective action or supplier-status restriction [supplier_kpis_q2_2026.xlsx; procurement_meeting_notes_q2_2026.md].\n\n## Actions and Owners\n| Action | Owner | Due Date | Completion Condition |\n|---|---|---|---|\n| Request and track Nordic Components' corrective-action plan covering NC-01, NC-02, and the packaging-label issue [procurement_meeting_notes_q2_2026.md] | Lena Hoffmann | 15 July 2026 | Accepted corrective-action plan and supporting records |\n| Verify that the ERP supplier record prevents an automatic volume increase for Nordic Components [procurement_meeting_notes_q2_2026.md] | Marko Laine | 5 July 2026 | ERP supplier-status screenshot or control record |\n| Submit a corrective-action plan covering NC-01, NC-02, and the packaging-label issue [nordic_components_quality_audit.pdf] | Nordic Components | 15 July 2026 | Root cause, containment, actions, owners, dates, and effectiveness criteria |\n| Restore or replace missing calibration evidence and assess affected inspections [nordic_components_quality_audit.pdf] | Nordic Components | 15 July 2026 | Gauge list, valid certificates or withdrawal records, and impact assessment |\n| Complete and close CAPA-17 with effectiveness evidence [nordic_components_quality_audit.pdf] | Nordic Components | 15 July 2026 | Completed action record, closure approval, and effectiveness evidence |\n| Correct packaging-label control [nordic_components_quality_audit.pdf] | Nordic Components | 15 July 2026 | Revised label control and sample labels containing batch numbers |\n| Complete the Nordic Components follow-up supplier audit [procurement_meeting_notes_q2_2026.md; nordic_components_quality_audit.pdf] | Procurement Quality Team | 20 August 2026 | Follow-up audit report, finding status, and score; at least 85 / 100 plus verified actions is required |\n| Monitor Alpine Sensors' single-source lead-time exposure [procurement_meeting_notes_q2_2026.md] | Category owner | Ongoing | Supply-continuity review record |\n| Prepare the Q2 supplier-performance report draft with source references [procurement_meeting_notes_q2_2026.md] | Procurement analyst | Before manager review | Draft Markdown report and evidence index |\n\n## Source References\n- supplier_kpis_q2_2026.xlsx\n- nordic_components_quality_audit.pdf\n- procurement_meeting_notes_q2_2026.md\n- delivery_incidents_q2_2026.csv\n"
+  },
+  {
+    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\runs\\run_01\\generated_package\\poc\\output\\evidence_index.json",
+    "relative_path": "output\\evidence_index.json",
+    "size_bytes": 1708,
+    "new_or_modified": true,
+    "sha256": "7f5ff5e615f13b64f75086f9e1877b81c458bb117281594cb02560cbcba21140",
+    "json_parsed": true,
+    "json_value": [
+      {
+        "source_path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\supplier_kpis_q2_2026.xlsx",
+        "source_type": "xlsx",
+        "metadata": {
+          "index": 1,
+          "filename": "supplier_kpis_q2_2026.xlsx",
+          "extension": ".xlsx",
+          "detected_type": "xlsx",
+          "size_bytes": 14396
+        },
+        "content_chars": 11480
+      },
+      {
+        "source_path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\nordic_components_quality_audit.pdf",
+        "source_type": "pdf",
+        "metadata": {
+          "index": 2,
+          "filename": "nordic_components_quality_audit.pdf",
+          "extension": ".pdf",
+          "detected_type": "pdf",
+          "size_bytes": 56830
+        },
+        "content_chars": 9184
+      },
+      {
+        "source_path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\procurement_meeting_notes_q2_2026.md",
+        "source_type": "markdown",
+        "metadata": {
+          "index": 3,
+          "filename": "procurement_meeting_notes_q2_2026.md",
+          "extension": ".md",
+          "detected_type": "markdown",
+          "size_bytes": 8738
+        },
+        "content_chars": 8738
+      },
+      {
+        "source_path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\delivery_incidents_q2_2026.csv",
+        "source_type": "csv",
+        "metadata": {
+          "index": 4,
+          "filename": "delivery_incidents_q2_2026.csv",
+          "extension": ".csv",
+          "detected_type": "csv",
+          "size_bytes": 1547
+        },
+        "content_chars": 1830
+      }
+    ]
+  }
+]

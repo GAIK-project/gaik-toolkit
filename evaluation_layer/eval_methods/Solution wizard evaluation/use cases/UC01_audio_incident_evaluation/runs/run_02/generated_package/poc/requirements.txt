@@ -1,0 +1,7 @@
+pydantic>=2
+python-dotenv
+gaik[audio-to-structured-data]
+gaik[extract]
+gaik[llm-judge]
+gaik[transcriber]
+pyyaml

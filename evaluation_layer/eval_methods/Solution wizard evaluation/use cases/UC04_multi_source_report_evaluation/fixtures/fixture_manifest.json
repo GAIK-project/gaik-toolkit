@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UC04",
+  "description": "Canonical hashes for the frozen UC04 report-synthesis fixtures.",
+  "sha256": {
+    "report_test_bundle.json": "d6d900635a88170be5072514ba20bb08a0c7547be28ed7133ee795e975288c7d",
+    "report_fixture_facts.txt": "9866d181f59a11dca51e3ef696344e35a37dbe91062d1351ee2125b81a1a80a2",
+    "expected_report_results.json": "7327553abf777ec3a8e2a45cf01ad4b2e66e5cb727c70adde1b2a155105b6c53",
+    "poc_input_bundle.json": "6218175c08fd6a69a6fd38ecee29004baf7dde5efbc58b05903a1a8e3f467cbc",
+    "poc_input/report_spec.json": "e9b3054f2b4538a48d45750c4038a74ca8cb3c73363bc0f864c71b2735d5d976",
+    "poc_input/report_template.md": "2cb7394ca416af5f696a1f343eb1d4c0474fc57dda84cc8d0bb279af69969209",
+    "poc_input/sources/supplier_kpis_q2_2026.xlsx": "91deffd285ba1d7b6209275f65977af7966977352681e0b9a6b3c355afe77646",
+    "poc_input/sources/nordic_components_quality_audit.pdf": "3547b2e9cf6d11fcca1179ddc36ec0186c60f5b1706798ea94a9ed10d27ae6a8",
+    "poc_input/sources/procurement_meeting_notes_q2_2026.md": "336e6fa7ac3910d8dc62f1c098ce11a1ba1f31c5e7e662b5d754a7fd2247bda6",
+    "poc_input/sources/delivery_incidents_q2_2026.csv": "17f0a99c1b085e39654038097ede612aad1e3c2b0dccbe9d50ac3a4c864ff89b"
+  }
+}

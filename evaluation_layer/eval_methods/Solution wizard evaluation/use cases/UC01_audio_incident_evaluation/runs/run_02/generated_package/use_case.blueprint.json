@@ -1,0 +1,617 @@
+{
+  "blueprint_version": "1.0",
+  "metadata": {
+    "blueprint_id": "maintenance_ticket_v1",
+    "created_by": "solution_configuration_wizard",
+    "created_at": "2026-07-27T00:00:00Z",
+    "last_updated_at": "2026-07-27T00:00:00Z",
+    "status": "draft"
+  },
+  "use_case": {
+    "id": "maintenance_ticket",
+    "name": "Finnish Voice Fault Reporting — Maintenance Ticket Generator",
+    "description": "Convert Finnish voice messages from field technicians into structured maintenance tickets for supervisor review and system entry.",
+    "domain": "facility_maintenance",
+    "knowledge_processes": [
+      "knowledge_capture"
+    ]
+  },
+  "business_spec": {
+    "current_process": "Field technicians manually enter fault reports into the maintenance system at a computer, describing the fault, location, and urgency by hand.",
+    "pain_points": [
+      "Manual data entry is slow, especially in the field",
+      "Tickets often have missing or incomplete details",
+      "No structured review gate before system entry"
+    ],
+    "proposed_solution": "An AI workflow that accepts Finnish voice messages from technicians, transcribes and extracts structured ticket fields, and routes the ticket to a supervisor for approval before system entry.",
+    "intended_users": [
+      "field_technician"
+    ],
+    "reviewers": [
+      "supervisor"
+    ],
+    "stakeholders": [
+      "field_technician",
+      "supervisor"
+    ],
+    "input_artifacts": [
+      "Finnish voice message (MP3, M4A, or WAV) recorded on a mobile device"
+    ],
+    "target_outputs": [
+      "Structured maintenance ticket (JSON) with supervisor approval decision"
+    ],
+    "success_criteria": [
+      "Faster incident reporting compared to manual entry",
+      "Fewer missing details in submitted tickets",
+      "Every ticket is supervisor-verifiable before transfer to the maintenance system"
+    ],
+    "expected_value": [
+      "Reduced manual data-entry effort for field technicians",
+      "Higher ticket completeness and field accuracy",
+      "Structured approval gate eliminates unauthorised system transfers"
+    ],
+    "risks": [
+      "Finnish ASR transcription errors on technical vocabulary",
+      "Incorrect asset, location, fault, or urgency values extracted",
+      "Unsupported urgency values introduced instead of null",
+      "Ticket transferred to system without supervisor approval"
+    ],
+    "poc_goal": "Accept a supplied Finnish audio fixture, exit successfully, produce a non-empty parseable JSON ticket with all required fields present (may be null/unknown if not stated but flagged in uncertain_fields), preserve fixture facts, and leave unsupported values null or unknown."
+  },
+  "technical_spec": {
+    "input_types": [
+      "audio"
+    ],
+    "input_formats": [
+      "mp3",
+      "m4a",
+      "wav"
+    ],
+    "output_types": [
+      "structured_json"
+    ],
+    "language": "fi",
+    "domain_vocabulary": {
+      "urgency_values": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "notes": "Location and asset identifiers are free-form strings; no fixed controlled list was provided."
+    },
+    "data_sources": [
+      "mobile app audio recordings from field technicians"
+    ],
+    "model_provider": "azure_openai",
+    "model_preferences": {
+      "transcription_model": "gpt-4o-transcribe",
+      "extraction_model": "gpt-5.4",
+      "temperature": 0.0
+    },
+    "security_constraints": {
+      "raw_audio_retention": "must not be retained after transcription",
+      "approved_ticket_retention": "may be retained; no exact retention period specified",
+      "supervisor_approval_decision_retention": "may be retained",
+      "external_model_api_allowed": true,
+      "local_processing_required": false,
+      "data_residency_requirement": "none specified",
+      "contains_pii": "yes (employee name and internal facility details may appear in audio)",
+      "auth_rbac_audit_log": "outside PoC scope; retaining approval decision is sufficient"
+    },
+    "integration_targets": [],
+    "human_review": "yes",
+    "human_review_required": true,
+    "evaluation_requirements": {
+      "metrics": [
+        "json_parsing",
+        "required_field_coverage",
+        "semantic_fixture_fact_matching",
+        "unsupported_value_introduction"
+      ],
+      "thresholds": "none specified for single-fixture PoC",
+      "eval_framework": "extraction_eval"
+    },
+    "runtime_interface": "cli (PoC); mobile app upload (production)"
+  },
+  "target_output_spec": {
+    "schema_name": "MaintenanceTicket",
+    "fields": [
+      "reporter_name",
+      "asset_identifier",
+      "location",
+      "fault_description",
+      "urgency",
+      "observation_date",
+      "observation_time",
+      "actions_taken",
+      "uncertain_fields"
+    ],
+    "field_types": {
+      "reporter_name": "str",
+      "asset_identifier": "str",
+      "location": "str",
+      "fault_description": "str",
+      "urgency": "str",
+      "observation_date": "date",
+      "observation_time": "str",
+      "actions_taken": "list[str]",
+      "uncertain_fields": "list[str]"
+    },
+    "required_fields": [
+      "location",
+      "fault_description",
+      "urgency"
+    ],
+    "optional_fields": [
+      "reporter_name",
+      "asset_identifier",
+      "observation_date",
+      "observation_time",
+      "actions_taken",
+      "uncertain_fields"
+    ],
+    "field_descriptions": {
+      "reporter_name": "Name of the technician reporting the fault, if stated in the audio",
+      "asset_identifier": "Identifier or description of the asset or equipment involved, if stated",
+      "location": "Location of the fault within the facility (required; null + flagged if not stated)",
+      "fault_description": "Description of the fault or problem observed (required; null + flagged if not stated)",
+      "urgency": "Urgency level: must be one of low, medium, or high (required; null + flagged if not stated or value is unsupported)",
+      "observation_date": "Date the fault was observed in YYYY-MM-DD format, if stated",
+      "observation_time": "Time the fault was observed in HH:MM format, if stated",
+      "actions_taken": "List of any immediate actions already taken by the technician, if described",
+      "uncertain_fields": "List of field names where the extracted value is absent, ambiguous, or unsupported"
+    },
+    "allowed_values": {
+      "urgency": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "confidence_required": true,
+    "missing_value_policy": "Required fields may be null when not stated in the audio, but must be listed in uncertain_fields. Unsupported urgency values must be set to null and 'urgency' listed in uncertain_fields.",
+    "validation_rules": [
+      "urgency must be one of ['low', 'medium', 'high'] or null",
+      "If urgency is null, 'urgency' must appear in uncertain_fields",
+      "If location is null, 'location' must appear in uncertain_fields",
+      "If fault_description is null, 'fault_description' must appear in uncertain_fields",
+      "observation_date must match YYYY-MM-DD format if present",
+      "observation_time must match HH:MM format if present"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "assumption_001",
+      "text": "Audio recordings are short field fault reports, typically under 3 minutes.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-27T00:00:00Z"
+    },
+    {
+      "id": "assumption_002",
+      "text": "Location and asset_identifier are free-form strings extracted from audio; no fixed controlled vocabulary was provided for these fields.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-27T00:00:00Z"
+    },
+    {
+      "id": "assumption_003",
+      "text": "Integration with the downstream maintenance system is out of PoC scope; integration_targets is empty.",
+      "status": "confirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-27T00:00:00Z"
+    },
+    {
+      "id": "assumption_004",
+      "text": "Output sensitivity is treated as 'internal' — contains employee names and facility details but no explicit higher sensitivity classification was stated.",
+      "status": "unconfirmed",
+      "impact": "security_constraint",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-27T00:00:00Z"
+    }
+  ],
+  "artifacts": {
+    "fault_audio": {
+      "type": "audio",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "enhanced_transcript": {
+      "type": "transcript",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "transcribe_audio",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "ticket_json": {
+      "type": "structured_json",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "extract_ticket_fields",
+      "schema_ref": "schemas/output_schema.py",
+      "overwrite": false
+    },
+    "validation_report": {
+      "type": "validation_report",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "validate_ticket",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "supervisor_notification": {
+      "type": "notification",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "notify_supervisor",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "approved_ticket": {
+      "type": "structured_json",
+      "source": "generated",
+      "optional": false,
+      "final_output": true,
+      "externally_visible": false,
+      "produced_by": "supervisor_review",
+      "schema_ref": "schemas/output_schema.py",
+      "overwrite": false
+    }
+  },
+  "inputs": {},
+  "outputs": {},
+  "schemas": {},
+  "components": {
+    "selected_modules": [
+      {
+        "id": "audio_to_structured_data",
+        "name": "AudioToStructuredData",
+        "reason": "Primary input is Finnish audio; module encapsulates the full transcription, enhancement, and extraction pipeline."
+      }
+    ],
+    "selected_building_blocks": [
+      "Transcriber",
+      "Extractor",
+      "LLMJudge"
+    ],
+    "custom_components": []
+  },
+  "workflow": {
+    "steps": [
+      {
+        "id": "record_and_upload",
+        "name": "Record and upload voice message",
+        "type": "user_task",
+        "component": null,
+        "inputs": [],
+        "outputs": [
+          "fault_audio"
+        ],
+        "parameters": {},
+        "depends_on": [],
+        "loop": null
+      },
+      {
+        "id": "transcribe_audio",
+        "name": "Transcribe and enhance Finnish audio",
+        "type": "automated_task",
+        "component": "Transcriber",
+        "inputs": [
+          "fault_audio"
+        ],
+        "outputs": [
+          "enhanced_transcript"
+        ],
+        "parameters": {
+          "language": "fi",
+          "enhanced_transcript": true,
+          "model": "gpt-4o-transcribe"
+        },
+        "depends_on": [
+          "record_and_upload"
+        ],
+        "loop": null
+      },
+      {
+        "id": "extract_ticket_fields",
+        "name": "Extract maintenance ticket fields",
+        "type": "automated_task",
+        "component": "Extractor",
+        "inputs": [
+          "enhanced_transcript"
+        ],
+        "outputs": [
+          "ticket_json"
+        ],
+        "parameters": {
+          "schema_ref": "schemas/output_schema.py",
+          "requirements_ref": "schemas/output_schema_requirements.json"
+        },
+        "depends_on": [
+          "transcribe_audio"
+        ],
+        "loop": null
+      },
+      {
+        "id": "validate_ticket",
+        "name": "Validate ticket against schema and transcript",
+        "type": "automated_task",
+        "component": "LLMJudge",
+        "inputs": [
+          "enhanced_transcript",
+          "ticket_json"
+        ],
+        "outputs": [
+          "validation_report"
+        ],
+        "parameters": {},
+        "depends_on": [
+          "extract_ticket_fields"
+        ],
+        "loop": null
+      },
+      {
+        "id": "notify_supervisor",
+        "name": "Send ticket to supervisor for review",
+        "type": "automated_task",
+        "component": null,
+        "inputs": [
+          "ticket_json",
+          "validation_report",
+          "enhanced_transcript"
+        ],
+        "outputs": [
+          "supervisor_notification"
+        ],
+        "parameters": {},
+        "depends_on": [
+          "validate_ticket"
+        ],
+        "loop": null
+      },
+      {
+        "id": "supervisor_review",
+        "name": "Supervisor reviews and approves ticket",
+        "type": "human_review",
+        "component": null,
+        "inputs": [
+          "ticket_json",
+          "validation_report",
+          "enhanced_transcript"
+        ],
+        "outputs": [
+          "approved_ticket"
+        ],
+        "parameters": {},
+        "depends_on": [
+          "notify_supervisor"
+        ],
+        "loop": null
+      }
+    ]
+  },
+  "business_process": {
+    "participants": [
+      {
+        "id": "field_technician",
+        "name": "Field Technician",
+        "kind": "human_role",
+        "default_lane_for": [
+          "record_and_upload"
+        ]
+      },
+      {
+        "id": "gaik_ai_system",
+        "name": "GAIK AI System",
+        "kind": "human_role",
+        "default_lane_for": [
+          "transcribe_audio",
+          "extract_ticket_fields",
+          "validate_ticket",
+          "notify_supervisor"
+        ]
+      },
+      {
+        "id": "supervisor",
+        "name": "Supervisor",
+        "kind": "human_role",
+        "default_lane_for": [
+          "supervisor_review"
+        ]
+      }
+    ],
+    "manual_steps": [],
+    "external_parties": [],
+    "message_flows": [],
+    "exceptions": [
+      {
+        "id": "exception_rejection",
+        "name": "Ticket returned for correction",
+        "attached_to": "",
+        "condition": "",
+        "outcome": "loop_to:record_and_upload"
+      }
+    ],
+    "decision_points": []
+  },
+  "prompts": {},
+  "models": {
+    "provider": "azure_openai",
+    "transcription_model": "gpt-4o-transcribe",
+    "extraction_model": "gpt-5.4",
+    "temperature": 0.0
+  },
+  "validation": {
+    "human_review_required": true,
+    "completeness_check": true,
+    "hallucination_check": true
+  },
+  "evaluation": {
+    "metrics": [
+      "json_parsing",
+      "required_field_coverage",
+      "semantic_fixture_fact_matching",
+      "unsupported_value_introduction"
+    ],
+    "eval_framework": "extraction_eval",
+    "sample_data_dir": "data/samples",
+    "ground_truth_dir": "evals/ground_truth"
+  },
+  "governance": {
+    "data_handling": {
+      "external_model_api_allowed": true,
+      "local_processing_required": false,
+      "stores_input_data": false,
+      "stores_outputs": true,
+      "retention_policy": "not_specified",
+      "contains_personal_data": "yes",
+      "output_sensitivity": "internal",
+      "audit_log_required": false
+    }
+  },
+  "runtime": {
+    "interface": "cli",
+    "entrypoint": "poc/run_poc.py",
+    "env_file": ".env.example"
+  },
+  "package": {
+    "name": "maintenance_ticket_use_case",
+    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\05b0b34eb019",
+    "include_tests": true,
+    "include_evals": true,
+    "include_docs": true
+  },
+  "visualizations": {
+    "bpmn_mapping": {
+      "Lane_users": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.intended_users"
+      },
+      "Activity_record_and_upload": {
+        "kind": "user_task",
+        "blueprint_path": "workflow.steps[0]"
+      },
+      "Lane_gaik_ai": {
+        "kind": "lane",
+        "blueprint_path": "derived:system"
+      },
+      "Activity_transcribe_audio": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[1]"
+      },
+      "Activity_extract_ticket_fields": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[2]"
+      },
+      "Activity_validate_ticket": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[3]"
+      },
+      "Activity_notify_supervisor": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[4]"
+      },
+      "Lane_reviewers": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.reviewers"
+      },
+      "Activity_supervisor_review": {
+        "kind": "human_review",
+        "blueprint_path": "workflow.steps[5]"
+      },
+      "StartEvent_1": {
+        "kind": "start_event",
+        "blueprint_path": "derived:start"
+      },
+      "EndEvent_success": {
+        "kind": "end_event",
+        "blueprint_path": "derived:end"
+      },
+      "Gateway_approve_supervisor_review": {
+        "kind": "approval_gateway",
+        "blueprint_path": "derived:approval_after:supervisor_review"
+      },
+      "EndEvent_rejected_supervisor_review": {
+        "kind": "end_event",
+        "blueprint_path": "derived:rejection_after:supervisor_review"
+      },
+      "DataObjectRef_fault_audio": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.fault_audio"
+      },
+      "DataObjectRef_enhanced_transcript": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.enhanced_transcript"
+      },
+      "DataObjectRef_ticket_json": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.ticket_json"
+      },
+      "DataObjectRef_validation_report": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.validation_report"
+      },
+      "DataObjectRef_supervisor_notification": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.supervisor_notification"
+      },
+      "DataObjectRef_approved_ticket": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.approved_ticket"
+      },
+      "TextAnnotation_1": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      },
+      "TextAnnotation_2": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      }
+    }
+  },
+  "traceability": [
+    {
+      "component": "Transcriber",
+      "required_by": "technical_spec.input_types contains audio; language=fi; enhanced_transcript=True subsumes TranscriptEnhancer for Finnish audio"
+    },
+    {
+      "component": "Extractor",
+      "required_by": "technical_spec.output_types contains structured_json; field extraction from transcript required"
+    },
+    {
+      "component": "LLMJudge",
+      "required_by": "technical_spec.human_review_required=true; pre-screens ticket against schema and transcript before supervisor review"
+    }
+  ],
+  "change_log": [
+    {
+      "version": "1.0",
+      "date": "2026-07-27",
+      "change": "Initial blueprint generated by solution_configuration_wizard V1",
+      "changed_by": "solution_configuration_wizard"
+    },
+    {
+      "version": "1.1",
+      "date": "2026-07-27",
+      "change": "Schema approved by user: MaintenanceTicket_Extraction (9 fields). urgency Literal fixed (empty-string entry removed). Schema saved to poc/schemas/output_schema.py.",
+      "changed_by": "solution_configuration_wizard"
+    }
+  ]
+}

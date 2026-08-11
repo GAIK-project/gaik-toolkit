@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UC02 scripted wizard answers",
+  "type": "object",
+  "required": [
+    "scenario_id",
+    "version",
+    "wizard_skill_basis",
+    "instructions",
+    "run_setup",
+    "answers",
+    "confirmation_policy",
+    "recovery_policy",
+    "fallback_answer"
+  ],
+  "properties": {
+    "scenario_id": {"const": "UC02"},
+    "version": {"type": "string"},
+    "wizard_skill_basis": {
+      "type": "object",
+      "required": ["repository", "commit", "path"],
+      "properties": {
+        "repository": {"type": "string"},
+        "commit": {"type": "string"},
+        "path": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "instructions": {"type": "array", "items": {"type": "string"}},
+    "run_setup": {
+      "type": "object",
+      "required": ["run_01_output_directory", "run_02_output_directory", "instruction"],
+      "properties": {
+        "run_01_output_directory": {"type": "string"},
+        "run_02_output_directory": {"type": "string"},
+        "instruction": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "topic", "trigger", "answer", "supports"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^SA[0-9]+$"},
+          "topic": {"type": "string"},
+          "trigger": {"type": "string"},
+          "answer": {"type": "string"},
+          "supports": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "confirmation_policy": {
+      "type": "object",
+      "required": ["scope", "response", "purpose", "recording"],
+      "properties": {
+        "scope": {"type": "string"},
+        "response": {"const": "Yes. Proceed without changes."},
+        "purpose": {"type": "string"},
+        "recording": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "recovery_policy": {
+      "type": "object",
+      "required": ["trigger", "maximum_refinement_attempts", "feedback", "stopping_rule", "reporting", "scoring"],
+      "properties": {
+        "trigger": {"type": "string"},
+        "maximum_refinement_attempts": {"const": 3},
+        "feedback": {"type": "string"},
+        "stopping_rule": {"type": "string"},
+        "reporting": {"type": "string"},
+        "scoring": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "fallback_answer": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

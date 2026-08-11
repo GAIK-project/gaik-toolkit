@@ -1,0 +1,4 @@
+pydantic>=2
+python-dotenv
+gaik[rag-workflow]
+pyyaml

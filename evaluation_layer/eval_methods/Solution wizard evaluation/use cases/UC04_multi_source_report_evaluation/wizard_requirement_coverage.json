@@ -1,0 +1,310 @@
+{
+  "scenario_id": "UC04",
+  "coverage_version": "1.0.0",
+  "wizard_skill_basis": {
+    "repository": "GAIK-project/gaik-toolkit",
+    "commit": "79586c93ea3286f68acf3ad3810a370c4295fa01",
+    "skill_path": "implementation_layer/solution_wizard/SKILL.md",
+    "requirements_implementation_path": "implementation_layer/solution_wizard/src/solution_wizard/requirements.py"
+  },
+  "coverage_claim": "The initial prompt and scripted_answers.json cover every wizard requirement field. One fixed confirmation policy covers routine gates; adaptive questions use the fallback.",
+  "phase_1": [
+    {
+      "field": "output_directory",
+      "source": "scripted_answers.json#run_setup",
+      "status": "covered"
+    },
+    {
+      "field": "use_case_description",
+      "source": "initial_prompt.txt",
+      "status": "covered"
+    }
+  ],
+  "business_spec": [
+    {
+      "field": "current_process",
+      "source": "scripted_answers.json#SA01",
+      "status": "covered"
+    },
+    {
+      "field": "pain_points",
+      "source": "scripted_answers.json#SA01",
+      "status": "covered"
+    },
+    {
+      "field": "proposed_solution",
+      "source": "initial_prompt.txt; SA01",
+      "status": "covered"
+    },
+    {
+      "field": "intended_users",
+      "source": "scripted_answers.json#SA01",
+      "status": "covered"
+    },
+    {
+      "field": "reviewers",
+      "source": "scripted_answers.json#SA01; SA05",
+      "status": "covered"
+    },
+    {
+      "field": "stakeholders",
+      "source": "scripted_answers.json#SA01; SA05",
+      "status": "covered"
+    },
+    {
+      "field": "input_artifacts",
+      "source": "scripted_answers.json#SA02",
+      "status": "covered"
+    },
+    {
+      "field": "target_outputs",
+      "source": "scripted_answers.json#SA03; SA07",
+      "status": "covered"
+    },
+    {
+      "field": "success_criteria",
+      "source": "scripted_answers.json#SA07; SA09",
+      "status": "covered"
+    },
+    {
+      "field": "expected_value",
+      "source": "scripted_answers.json#SA01; SA09",
+      "status": "covered"
+    },
+    {
+      "field": "risks",
+      "source": "scripted_answers.json#SA09",
+      "status": "covered"
+    },
+    {
+      "field": "poc_goal",
+      "source": "scripted_answers.json#SA07",
+      "status": "covered"
+    }
+  ],
+  "technical_spec": [
+    {
+      "field": "input_types",
+      "source": "scripted_answers.json#SA02",
+      "status": "covered"
+    },
+    {
+      "field": "input_formats",
+      "source": "scripted_answers.json#SA02",
+      "status": "covered"
+    },
+    {
+      "field": "output_types",
+      "source": "scripted_answers.json#SA03; SA07",
+      "status": "covered"
+    },
+    {
+      "field": "language",
+      "source": "scripted_answers.json#SA02; SA03",
+      "status": "covered"
+    },
+    {
+      "field": "domain_vocabulary",
+      "source": "scripted_answers.json#SA04; SA07",
+      "status": "covered"
+    },
+    {
+      "field": "data_sources",
+      "source": "scripted_answers.json#SA02",
+      "status": "covered"
+    },
+    {
+      "field": "model_provider",
+      "source": "scripted_answers.json#SA08",
+      "status": "covered"
+    },
+    {
+      "field": "model_preferences",
+      "source": "scripted_answers.json#SA08; SA10",
+      "status": "covered"
+    },
+    {
+      "field": "security_constraints",
+      "source": "scripted_answers.json#SA06",
+      "status": "covered"
+    },
+    {
+      "field": "integration_targets",
+      "source": "scripted_answers.json#SA02; SA06; SA07",
+      "status": "covered"
+    },
+    {
+      "field": "human_review",
+      "source": "scripted_answers.json#SA01; SA05; SA11",
+      "status": "covered"
+    },
+    {
+      "field": "evaluation_requirements",
+      "source": "scripted_answers.json#SA07; SA11",
+      "status": "covered"
+    },
+    {
+      "field": "runtime_interface",
+      "source": "scripted_answers.json#SA05; SA07",
+      "status": "covered"
+    },
+    {
+      "field": "formatted_pdf_question",
+      "source": "scripted_answers.json#SA07",
+      "status": "covered"
+    }
+  ],
+  "target_output_spec": [
+    {
+      "field": "schema_name",
+      "source": "scripted_answers.json#SA03",
+      "status": "covered"
+    },
+    {
+      "field": "fields",
+      "source": "scripted_answers.json#SA03",
+      "status": "covered"
+    },
+    {
+      "field": "field_types",
+      "source": "scripted_answers.json#SA03",
+      "status": "covered"
+    },
+    {
+      "field": "required_fields",
+      "source": "scripted_answers.json#SA03; SA11",
+      "status": "covered"
+    },
+    {
+      "field": "optional_fields",
+      "source": "scripted_answers.json#SA03",
+      "status": "covered"
+    },
+    {
+      "field": "field_descriptions",
+      "source": "scripted_answers.json#SA03",
+      "status": "covered"
+    },
+    {
+      "field": "allowed_values",
+      "source": "scripted_answers.json#SA03; SA11",
+      "status": "covered"
+    },
+    {
+      "field": "confidence_required",
+      "source": "scripted_answers.json#SA03: no confidence field requested",
+      "status": "covered"
+    },
+    {
+      "field": "missing_value_policy",
+      "source": "scripted_answers.json#SA04",
+      "status": "covered"
+    },
+    {
+      "field": "validation_rules",
+      "source": "scripted_answers.json#SA04; SA11",
+      "status": "covered"
+    }
+  ],
+  "business_process": [
+    {
+      "field": "participants",
+      "source": "scripted_answers.json#SA01; SA05",
+      "status": "covered"
+    },
+    {
+      "field": "external_parties",
+      "source": "scripted_answers.json#SA01; SA06",
+      "status": "covered"
+    },
+    {
+      "field": "manual_steps",
+      "source": "scripted_answers.json#SA05",
+      "status": "covered"
+    },
+    {
+      "field": "exceptions",
+      "source": "scripted_answers.json#SA04; SA05",
+      "status": "covered"
+    },
+    {
+      "field": "decision_points",
+      "source": "scripted_answers.json#SA05; SA11",
+      "status": "covered"
+    }
+  ],
+  "selection_relevant_options": [
+    {
+      "field": "MultiSourceReportGenerator.agentic",
+      "source": "scripted_answers.json#SA10",
+      "expected_value": true,
+      "status": "covered"
+    },
+    {
+      "field": "MultiSourceReportGenerator.strict_review",
+      "source": "scripted_answers.json#SA10",
+      "expected_value": true,
+      "status": "covered"
+    },
+    {
+      "field": "MultiSourceReportGenerator.parser_choice",
+      "source": "scripted_answers.json#SA10",
+      "expected_value": "auto",
+      "status": "covered"
+    },
+    {
+      "field": "MultiSourceReportGenerator.sample_report_path",
+      "source": "scripted_answers.json#SA02; scripted_answers.json#SA10",
+      "expected_value": "bundle report_template.md",
+      "status": "covered"
+    },
+    {
+      "field": "MultiSourceReportGenerator.include_source_references",
+      "source": "scripted_answers.json#SA03; scripted_answers.json#SA10",
+      "expected_value": true,
+      "status": "covered"
+    },
+    {
+      "field": "MultiSourceReportGenerator.include_evidence_index",
+      "source": "scripted_answers.json#SA03; scripted_answers.json#SA10",
+      "expected_value": true,
+      "status": "covered"
+    },
+    {
+      "field": "MultiSourceReportGenerator.output_docx",
+      "source": "scripted_answers.json#SA07; scripted_answers.json#SA10",
+      "expected_value": false,
+      "status": "covered"
+    },
+    {
+      "field": "module_first_path",
+      "source": "scripted_answers.json#SA10; GAIK registry",
+      "expected_value": "Use MultiSourceReportGenerator without duplicate standalone normalization components.",
+      "status": "covered"
+    }
+  ],
+  "confirmation_policy": {
+    "status": "covered",
+    "source": "scripted_answers.json#confirmation_policy",
+    "covered_questions": [
+      "Gate 1 specification confirmation",
+      "Gate 2 component-selection confirmation",
+      "Gate 2 workflow confirmation",
+      "Schema/output confirmation",
+      "Prompt/configuration confirmation",
+      "Gate 3 PoC confirmation",
+      "Final package generation confirmation"
+    ]
+  },
+  "recovery_policy": {
+    "status": "covered",
+    "source": "scripted_answers.json#recovery_policy; README.md",
+    "maximum_refinement_attempts": 3,
+    "baseline_scoring": "EQ4 uses attempt 0 only",
+    "stopping_rule": "Stop on first success or after attempt 3"
+  },
+  "fallback_policy": {
+    "status": "covered",
+    "source": "scripted_answers.json#fallback_answer"
+  }
+}

@@ -1,0 +1,260 @@
+{
+  "model_name": "PurchaseOrderERPRecord_Extraction",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "PurchaseOrderERPRecord",
+      "fields": [
+        {
+          "field_name": "purchase_order_number",
+          "field_type": "str",
+          "description": "The customer's own purchase order reference number, copied exactly as it appears.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "delivery_date",
+          "field_type": "date",
+          "description": "The requested delivery date stated on the purchase order; output in DD/MM/YYYY.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": "%d/%m/%Y"
+        },
+        {
+          "field_name": "delivery_address",
+          "field_type": "str",
+          "description": "The full delivery address block as a single string.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "vendor_number",
+          "field_type": "str",
+          "description": "The identifier the customer uses internally to refer to the supplier/vendor, copied exactly as written.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "line_items",
+        "container_description": "Repeated line item records from the purchase order item table.",
+        "requirements": {
+          "use_case_name": "PurchaseOrderERPRecord_line_item",
+          "fields": [
+            {
+              "field_name": "item_number",
+              "field_type": "str",
+              "description": "Sequential line number or position identifier for the item within the purchase order, copied exactly as written including leading zeros.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "article_code",
+              "field_type": "str",
+              "description": "Customer article or product code for the ordered item, copied exactly as written preserving all characters and leading zeros.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "dimensions",
+              "field_type": "str",
+              "description": "Full dimension string for the ordered material, including units if present in the cell or appended from the header.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "material_grade",
+              "field_type": "str",
+              "description": "Alloy or material grade designation, copied exactly as written preserving formatting and case.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "quantity",
+              "field_type": "str",
+              "description": "Ordered quantity captured as text including the unit of measure when present or appended from the header.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "product_form",
+              "field_type": "str",
+              "description": "Physical form of the ordered material, mapped to the closest allowed value.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": [
+                "Flat",
+                "round",
+                "rectangular bar"
+              ],
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "standard_designation",
+              "field_type": "str",
+              "description": "Material or product standard designation found in the line item.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "cut_length",
+              "field_type": "str",
+              "description": "Specific cut length requested by the customer, if different from the standard mill length.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "temper_or_condition",
+              "field_type": "str",
+              "description": "Material temper, heat treatment, or delivery condition for the line item.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "hardness_hv",
+              "field_type": "float",
+              "description": "Required hardness in Vickers units, extracting only the numeric value.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "min_bend_radius",
+              "field_type": "float",
+              "description": "Minimum bend radius requirement, extracting only the numeric value.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "delivery_length_note",
+              "field_type": "str",
+              "description": "Free-text note about delivery length, cut tolerance, straightness, or packaging length constraints.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "applicable_standard",
+              "field_type": "str",
+              "description": "Additional standard or specification reference relevant to the line item beyond standard_designation.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "special_flags",
+              "field_type": "str",
+              "description": "Special instructions, quality requirements, customer-specific notes, or flags associated with the line item; concatenate multiple notes as a comma-separated string.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

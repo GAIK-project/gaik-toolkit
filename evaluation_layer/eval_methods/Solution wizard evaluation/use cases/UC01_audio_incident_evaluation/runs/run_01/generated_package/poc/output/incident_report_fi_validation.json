@@ -1,0 +1,11 @@
+{
+  "hallucination_flags": [
+    {
+      "field": "urgency",
+      "value": "high",
+      "severity": "wrong",
+      "reason": "Source says 'Kiireellisyys on korkea', not the English enum label 'high'."
+    }
+  ],
+  "passed": false
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0.0",
+  "template_name": "GAIK Solution Configuration Wizard evaluation package",
+  "scenario_id": "UCXX",
+  "number_of_independent_runs": 2,
+  "baseline_attempt": 0,
+  "maximum_refinement_attempts": 3,
+  "confirmation_policy": "Yes. Proceed without changes.",
+  "headline_metrics": ["EQ1", "EQ2", "EQ3", "EQ4"],
+  "unscored_diagnostics": ["unsupported assumptions", "PoC recovery"]
+}

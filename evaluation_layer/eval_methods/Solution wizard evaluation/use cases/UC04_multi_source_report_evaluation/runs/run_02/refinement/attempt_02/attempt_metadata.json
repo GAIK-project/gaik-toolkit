@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UC04",
+  "run_id": "UC04_run_02",
+  "attempt_number": 2,
+  "poc": {},
+  "note": "Leave poc empty unless the refined package documents a different command or output location."
+}

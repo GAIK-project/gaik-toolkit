@@ -1,0 +1,12 @@
+UC03 synthetic fixture facts
+
+- Employee Travel Policy: Helsinki hotel limit EUR 180/night; exceeding it requires written Finance Director approval before booking.
+- MX-200 manual: inspect the main process filter every 250 operating hours; replace after 1,000 hours or above 1.8 bar, whichever occurs first.
+- Project Aurora strategy: management-confidential; standard discount ceiling 12%; above it requires written CFO approval; planned gross-margin floor 22%.
+- Citation format is [file_name, page_number] with a 1-based integer PDF page number.
+- Q01 citation: [employee_travel_policy.pdf, 3].
+- Q02 citations: [mx200_maintenance_manual.pdf, 3] and [mx200_maintenance_manual.pdf, 4].
+- Q04 citation: [project_aurora_pricing_strategy.pdf, 3].
+- The employee role may access the first two documents but not the Project Aurora strategy.
+- The manager role may access all three documents.
+- Q03 must refuse without revealing 12%, 22%, or CFO details.

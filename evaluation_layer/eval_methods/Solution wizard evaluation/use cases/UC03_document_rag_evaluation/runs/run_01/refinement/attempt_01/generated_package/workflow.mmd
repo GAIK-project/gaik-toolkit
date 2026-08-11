@@ -1,0 +1,13 @@
+flowchart TD
+    load_input["Load PoC input bundle via CLI"]
+    ingest_and_index["Parse PDFs, chunk with metadata, embed, build local vector index"]
+    apply_rbac_and_retrieve["Apply RBAC pre-filter and retrieve top-4 eligible chunks per query"]
+    generate_answers["Generate cited answers and format as RAGAnswerRecord list"]
+    load_input --> ingest_and_index
+    ingest_and_index --> apply_rbac_and_retrieve
+    apply_rbac_and_retrieve --> generate_answers
+
+    style load_input fill:#dbeafe
+    style ingest_and_index fill:#f5f3ff
+    style apply_rbac_and_retrieve fill:#f5f3ff
+    style generate_answers fill:#dcfce7

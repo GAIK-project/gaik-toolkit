@@ -1,0 +1,631 @@
+{
+  "blueprint_version": "1.0",
+  "metadata": {
+    "blueprint_id": "po_erp_extraction_v1",
+    "created_by": "solution_configuration_wizard",
+    "created_at": "2026-07-31T00:00:00Z",
+    "last_updated_at": "2026-07-31T00:00:00Z",
+    "status": "draft"
+  },
+  "use_case": {
+    "id": "po_erp_extraction",
+    "name": "Purchase Order ERP Record Extraction",
+    "description": "Extract structured header and line-item data from customer purchase order PDFs and produce reviewer-verified ERP-compatible JSON records.",
+    "domain": "manufacturing / procurement",
+    "knowledge_processes": [
+      "knowledge_capture"
+    ]
+  },
+  "business_spec": {
+    "current_process": "Order-processing employees manually inspect customer purchase orders and enter header and line-item information into the ERP system.",
+    "pain_points": [
+      "Manual data entry is slow and error-prone",
+      "Complex table layouts and multi-page rows increase transcription difficulty",
+      "Product code and unit omissions cause downstream ERP errors",
+      "No systematic verification step before ERP transfer"
+    ],
+    "proposed_solution": "Automatically extract structured PO data using AI, present the result alongside confidence information and the original PDF for reviewer verification, and export an approved ERP-compatible JSON record.",
+    "intended_users": [
+      "order_processing_employees"
+    ],
+    "reviewers": [
+      "procurement_reviewer",
+      "order_processing_reviewer"
+    ],
+    "stakeholders": [
+      "order_processing_employees",
+      "procurement_reviewers",
+      "procurement_management"
+    ],
+    "input_artifacts": [
+      "customer purchase order PDFs (native and scanned)"
+    ],
+    "target_outputs": [
+      "ERP-compatible structured JSON record per purchase order"
+    ],
+    "success_criteria": [
+      "Faster and more consistent ERP data preparation",
+      "Fewer manual transcription and omission errors",
+      "Every record is reviewer-verified before ERP transfer"
+    ],
+    "expected_value": [
+      "Faster order entry",
+      "More consistent ERP records",
+      "Fewer transcription and omission errors"
+    ],
+    "risks": [
+      "Loss of complex table structure during extraction",
+      "Merging of distinct line items",
+      "Missing rows that continue across pages",
+      "Alteration of product codes or leading zeros",
+      "Dropping units of measure",
+      "Inventing (hallucinating) field values",
+      "Transferring an unreviewed record to the ERP"
+    ],
+    "poc_goal": "Extract header and line-item fields from a sample purchase order PDF, produce structured JSON ready for reviewer verification, and confirm no fields are invented or garbled."
+  },
+  "technical_spec": {
+    "input_types": [
+      "pdf"
+    ],
+    "input_formats": [
+      "native_pdf",
+      "scanned_pdf"
+    ],
+    "output_types": [
+      "structured_json"
+    ],
+    "language": "en",
+    "domain_vocabulary": [
+      "alphanumeric product identifiers",
+      "material grades",
+      "standard designations",
+      "unit of measure codes",
+      "complex multi-page tables",
+      "merged and hierarchical headers",
+      "rows split across pages"
+    ],
+    "data_sources": [
+      "customer_purchase_orders"
+    ],
+    "model_provider": "azure_openai",
+    "model_preferences": {
+      "extraction_model": "gpt-5.4",
+      "temperature": 0.0
+    },
+    "security_constraints": "POs contain internal commercial information and customer/supplier identifiers. External model APIs are permitted. Local-only processing is not required.",
+    "integration_targets": [
+      "downloadable_json_file"
+    ],
+    "human_review": "yes",
+    "human_review_required": true,
+    "evaluation_requirements": {
+      "metrics": [
+        "field_exact_match",
+        "confidence_score_distribution",
+        "required_field_coverage"
+      ],
+      "confidence_scores": true,
+      "confidence_score_range": "0.0 to 1.0",
+      "confidence_reasons": true,
+      "flag_uncertain_required_fields": true,
+      "test_data": "sample PDF available in fixture"
+    },
+    "runtime_interface": "web_application"
+  },
+  "target_output_spec": {
+    "schema_name": "PurchaseOrderERPRecord",
+    "structure": "parent_with_nested_list",
+    "fields": [
+      "purchase_order_number",
+      "delivery_date",
+      "delivery_address",
+      "vendor_number",
+      "line_items",
+      "item_number",
+      "article_code",
+      "dimensions",
+      "material_grade",
+      "quantity",
+      "product_form",
+      "standard_designation",
+      "cut_length",
+      "temper_or_condition",
+      "hardness_hv",
+      "min_bend_radius",
+      "delivery_length_note",
+      "applicable_standard",
+      "special_flags"
+    ],
+    "field_types": {
+      "purchase_order_number": "str",
+      "delivery_date": "str",
+      "delivery_address": "str",
+      "vendor_number": "str",
+      "line_items": "list[LineItem]",
+      "item_number": "str",
+      "article_code": "str",
+      "dimensions": "str",
+      "material_grade": "str",
+      "quantity": "str",
+      "product_form": "str",
+      "standard_designation": "str | None",
+      "cut_length": "str | None",
+      "temper_or_condition": "str | None",
+      "hardness_hv": "float | None",
+      "min_bend_radius": "float | None",
+      "delivery_length_note": "str | None",
+      "applicable_standard": "str | None",
+      "special_flags": "str | None"
+    },
+    "required_fields": [
+      "purchase_order_number",
+      "delivery_date",
+      "delivery_address",
+      "vendor_number",
+      "line_items",
+      "item_number",
+      "article_code",
+      "dimensions",
+      "material_grade",
+      "quantity",
+      "product_form"
+    ],
+    "optional_fields": [
+      "standard_designation",
+      "cut_length",
+      "temper_or_condition",
+      "hardness_hv",
+      "min_bend_radius",
+      "delivery_length_note",
+      "applicable_standard",
+      "special_flags"
+    ],
+    "field_descriptions": {
+      "purchase_order_number": "Customer's purchase order reference number. Preserve exactly as written, including leading zeros and alphanumeric characters.",
+      "delivery_date": "Requested delivery date in DD/MM/YYYY format.",
+      "delivery_address": "Full delivery address as written in the PO.",
+      "vendor_number": "Supplier or vendor identifier as written in the PO. Preserve leading zeros.",
+      "line_items": "List of ordered items, one entry per distinct line item.",
+      "item_number": "Line item sequence number or position identifier as written. Preserve leading zeros.",
+      "article_code": "Customer's article or product code. Preserve exactly, including leading zeros and alphanumeric format.",
+      "dimensions": "Dimensions of the ordered material (e.g. thickness x width x length) as written.",
+      "material_grade": "Material or alloy grade designation as written (e.g. EN AW-5083, S355J2).",
+      "quantity": "Ordered quantity as written, including numeric value and unit if present in the same cell.",
+      "product_form": "Physical form of the material. Must be one of: Flat, round, rectangular bar.",
+      "standard_designation": "Applicable material or product standard designation (e.g. EN 485-2). Null if absent.",
+      "cut_length": "Specific cut length requested by the customer. Null if absent.",
+      "temper_or_condition": "Material temper or delivery condition (e.g. H111, T6, annealed). Null if absent.",
+      "hardness_hv": "Required hardness in Vickers (HV). Numeric. Null if absent.",
+      "min_bend_radius": "Minimum bend radius requirement. Numeric. Null if absent.",
+      "delivery_length_note": "Free-text note about delivery length or cut tolerance. Null if absent.",
+      "applicable_standard": "Any additional applicable standard or specification reference. Null if absent.",
+      "special_flags": "Any special instructions, notes, or flags noted within the line item area. Null if absent."
+    },
+    "allowed_values": {
+      "product_form": [
+        "Flat",
+        "round",
+        "rectangular bar"
+      ]
+    },
+    "confidence_required": true,
+    "missing_value_policy": "Optional fields: set to null when absent. Required fields: flag for human review when missing or uncertain.",
+    "validation_rules": [
+      "delivery_date must match DD/MM/YYYY format",
+      "product_form must be one of: Flat, round, rectangular bar",
+      "Do not invent or infer values not present in the source document",
+      "Preserve all alphanumeric identifiers exactly, including leading zeros",
+      "Do not merge distinct line items"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "assumption_001",
+      "text": "No formatted PDF report is required as an output for this PoC. The downloadable JSON is the only output artefact.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-31T00:00:00Z"
+    },
+    {
+      "id": "assumption_002",
+      "text": "Extraction model defaults to gpt-5.4 with temperature 0.0 on Azure OpenAI, as no specific model or temperature was requested.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-31T00:00:00Z"
+    },
+    {
+      "id": "assumption_003",
+      "text": "Stakeholders beyond order-processing employees and reviewers assumed to include procurement management. No other stakeholders were specified.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-07-31T00:00:00Z"
+    }
+  ],
+  "artifacts": {
+    "source_pdf": {
+      "type": "pdf",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "extracted_po_json": {
+      "type": "structured_json",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "extract_po_fields",
+      "schema_ref": "schemas/output_schema.py",
+      "overwrite": false
+    },
+    "validation_report": {
+      "type": "validation_report",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "validate_extraction",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "approved_po_json": {
+      "type": "structured_json",
+      "source": "generated",
+      "optional": false,
+      "final_output": true,
+      "externally_visible": false,
+      "produced_by": "reviewer_review",
+      "schema_ref": "schemas/output_schema.py",
+      "overwrite": false
+    }
+  },
+  "inputs": {},
+  "outputs": {},
+  "schemas": {},
+  "components": {
+    "selected_modules": [],
+    "selected_building_blocks": [
+      "VisionExtractor",
+      "LLMJudge"
+    ],
+    "custom_components": []
+  },
+  "workflow": {
+    "steps": [
+      {
+        "id": "upload_po",
+        "name": "Upload purchase order PDF",
+        "type": "user_task",
+        "component": null,
+        "inputs": [],
+        "outputs": [
+          "source_pdf"
+        ],
+        "parameters": {},
+        "depends_on": [],
+        "loop": null
+      },
+      {
+        "id": "extract_po_fields",
+        "name": "Extract PO fields using VisionExtractor",
+        "type": "automated_task",
+        "component": "VisionExtractor",
+        "inputs": [
+          "source_pdf"
+        ],
+        "outputs": [
+          "extracted_po_json"
+        ],
+        "parameters": {
+          "task": "Extract a structured ERP purchase order record from the PDF, capturing header fields (purchase_order_number, delivery_date, delivery_address, vendor_number) and all line items (item_number, article_code, dimensions, material_grade, quantity, product_form, and optional material specification fields). Handle multi-page tables, merged headers, and rows split across pages.",
+          "schema_ref": "schemas/output_schema.py",
+          "requirements_ref": "schemas/output_schema_requirements.json",
+          "include_verification": true,
+          "merge_table": true,
+          "additional_instructions": "Preserve all alphanumeric identifiers — article codes, item numbers, vendor numbers, and product codes — exactly as written in the document, including leading zeros. Do not reformat, normalise, or truncate them. Delivery dates must be captured in DD/MM/YYYY format. The product_form field must be one of exactly: Flat, round, rectangular bar. Do not merge distinct line items. When a table row is continued on the next page, capture all continued rows as separate line items. Do not invent or infer any value not explicitly present in the source document."
+        },
+        "depends_on": [
+          "upload_po"
+        ],
+        "loop": null
+      },
+      {
+        "id": "validate_extraction",
+        "name": "Validate extraction quality",
+        "type": "automated_task",
+        "component": "LLMJudge",
+        "inputs": [
+          "extracted_po_json"
+        ],
+        "outputs": [
+          "validation_report"
+        ],
+        "parameters": {},
+        "depends_on": [
+          "extract_po_fields"
+        ],
+        "loop": null
+      },
+      {
+        "id": "notify_reviewer",
+        "name": "Send record and original PDF to reviewer",
+        "type": "automated_task",
+        "component": null,
+        "inputs": [
+          "extracted_po_json",
+          "validation_report",
+          "source_pdf"
+        ],
+        "outputs": [],
+        "parameters": {},
+        "depends_on": [
+          "validate_extraction"
+        ],
+        "loop": null
+      },
+      {
+        "id": "reviewer_review",
+        "name": "Reviewer inspects and approves or returns record",
+        "type": "human_review",
+        "component": null,
+        "inputs": [
+          "extracted_po_json",
+          "validation_report",
+          "source_pdf"
+        ],
+        "outputs": [
+          "approved_po_json"
+        ],
+        "parameters": {},
+        "depends_on": [
+          "notify_reviewer"
+        ],
+        "loop": null
+      },
+      {
+        "id": "notify_employee",
+        "name": "Notify employee of return with reviewer comments",
+        "type": "automated_task",
+        "component": null,
+        "inputs": [],
+        "outputs": [],
+        "parameters": {},
+        "depends_on": [
+          "reviewer_review"
+        ],
+        "loop": null
+      },
+      {
+        "id": "employee_correct",
+        "name": "Employee corrects extracted values or uploads corrected PO",
+        "type": "user_task",
+        "component": null,
+        "inputs": [
+          "extracted_po_json",
+          "source_pdf"
+        ],
+        "outputs": [],
+        "parameters": {},
+        "depends_on": [
+          "notify_employee"
+        ],
+        "loop": null
+      }
+    ]
+  },
+  "business_process": {
+    "participants": [
+      {
+        "id": "order_processing_employee",
+        "name": "Order-Processing Employee",
+        "kind": "human_role",
+        "default_lane_for": []
+      },
+      {
+        "id": "gaik_ai_system",
+        "name": "GAIK AI System",
+        "kind": "human_role",
+        "default_lane_for": []
+      },
+      {
+        "id": "procurement_reviewer",
+        "name": "Procurement / Order-Processing Reviewer",
+        "kind": "human_role",
+        "default_lane_for": []
+      }
+    ],
+    "manual_steps": [],
+    "external_parties": [
+      {
+        "id": "customer",
+        "name": "Customer",
+        "sends": [],
+        "to_step": ""
+      }
+    ],
+    "message_flows": [],
+    "exceptions": [
+      {
+        "id": "reviewer_rejection",
+        "name": "Reviewer returns record for correction",
+        "attached_to": "",
+        "condition": "",
+        "outcome": "loop_to:employee_correct"
+      }
+    ],
+    "decision_points": []
+  },
+  "prompts": {},
+  "models": {
+    "provider": "azure_openai",
+    "extraction_model": "gpt-5.4",
+    "temperature": 0.0
+  },
+  "validation": {
+    "human_review_required": true,
+    "completeness_check": true,
+    "hallucination_check": true
+  },
+  "evaluation": {
+    "metrics": [
+      "field_exact_match",
+      "confidence_score_distribution",
+      "required_field_coverage"
+    ],
+    "eval_framework": "extraction_eval",
+    "sample_data_dir": "data/samples",
+    "ground_truth_dir": "evals/ground_truth"
+  },
+  "governance": {
+    "data_handling": {
+      "external_model_api_allowed": true,
+      "local_processing_required": false,
+      "stores_input_data": false,
+      "stores_outputs": true,
+      "retention_policy": "not_specified",
+      "contains_personal_data": "yes",
+      "output_sensitivity": "medium",
+      "audit_log_required": false
+    }
+  },
+  "runtime": {
+    "interface": "web_application",
+    "entrypoint": "poc/run_poc.py",
+    "env_file": ".env.example"
+  },
+  "package": {
+    "name": "po_erp_extraction_use_case",
+    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\d9bd69984195",
+    "include_tests": true,
+    "include_evals": true,
+    "include_docs": true
+  },
+  "visualizations": {
+    "bpmn_mapping": {
+      "Lane_users": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.intended_users"
+      },
+      "Activity_upload_po": {
+        "kind": "user_task",
+        "blueprint_path": "workflow.steps[0]"
+      },
+      "Lane_gaik_ai": {
+        "kind": "lane",
+        "blueprint_path": "derived:system"
+      },
+      "Activity_extract_po_fields": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[1]"
+      },
+      "Activity_validate_extraction": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[2]"
+      },
+      "Activity_notify_reviewer": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[3]"
+      },
+      "Lane_reviewers": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.reviewers"
+      },
+      "Activity_reviewer_review": {
+        "kind": "human_review",
+        "blueprint_path": "workflow.steps[4]"
+      },
+      "Activity_notify_employee": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[5]"
+      },
+      "Activity_employee_correct": {
+        "kind": "user_task",
+        "blueprint_path": "workflow.steps[6]"
+      },
+      "StartEvent_1": {
+        "kind": "start_event",
+        "blueprint_path": "derived:start"
+      },
+      "EndEvent_success": {
+        "kind": "end_event",
+        "blueprint_path": "derived:end"
+      },
+      "Gateway_approve_reviewer_review": {
+        "kind": "approval_gateway",
+        "blueprint_path": "derived:approval_after:reviewer_review"
+      },
+      "EndEvent_rejected_reviewer_review": {
+        "kind": "end_event",
+        "blueprint_path": "derived:rejection_after:reviewer_review"
+      },
+      "DataStore_downloadable_json_file": {
+        "kind": "data_store",
+        "blueprint_path": "technical_spec.integration_targets[0]"
+      },
+      "Activity_submit_downloadable_json_file": {
+        "kind": "send_task",
+        "blueprint_path": "derived:submit:downloadable_json_file"
+      },
+      "DataObjectRef_source_pdf": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.source_pdf"
+      },
+      "DataObjectRef_extracted_po_json": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.extracted_po_json"
+      },
+      "DataObjectRef_validation_report": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.validation_report"
+      },
+      "DataObjectRef_approved_po_json": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.approved_po_json"
+      },
+      "Participant_customer": {
+        "kind": "external_pool",
+        "blueprint_path": "business_process.external_parties[0]"
+      },
+      "TextAnnotation_1": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      },
+      "TextAnnotation_2": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      }
+    }
+  },
+  "traceability": [
+    {
+      "component": "VisionExtractor",
+      "required_by": "input includes scanned PDFs with complex multi-page tables, merged headers, and rows split across pages; accuracy is critical"
+    },
+    {
+      "component": "LLMJudge",
+      "required_by": "human_review=yes; pre-screens extraction quality before reviewer inspection"
+    }
+  ],
+  "change_log": [
+    {
+      "version": "1.0",
+      "date": "2026-07-31",
+      "change": "Initial blueprint generated by solution_configuration_wizard V1",
+      "changed_by": "solution_configuration_wizard"
+    },
+    {
+      "version": "1.1",
+      "date": "2026-07-31",
+      "change": "Extraction schema (PurchaseOrderERPRecord) reviewed and approved by user. Fixed: line_items type annotation (module path → local class ref), product_form Literal (removed empty-string sentinel, changed to Literal | None for uncertain-flag semantics).",
+      "changed_by": "solution_configuration_wizard"
+    }
+  ]
+}

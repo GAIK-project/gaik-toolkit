@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UC01 refinement-attempt metadata",
+  "type": "object",
+  "required": ["schema_version", "run_id", "attempt_number", "poc"],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "run_id": {"type": "string"},
+    "attempt_number": {"type": "integer", "minimum": 1, "maximum": 3},
+    "poc": {
+      "type": "object",
+      "required": ["run_command", "output_globs"],
+      "properties": {
+        "setup_command": {"type": "array", "items": {"type": "string"}},
+        "run_command": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "output_globs": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+      },
+      "additionalProperties": true
+    },
+    "notes": {"type": "string"}
+  },
+  "additionalProperties": false
+}

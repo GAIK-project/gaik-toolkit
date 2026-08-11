@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UCXX",
+  "policy": {
+    "use_only_when_asked": true,
+    "unexpected_question_answer": "Not specified for this evaluation. If a value is required, record it as an explicit assumption for user confirmation.",
+    "confirmation_answer": "Yes. Proceed without changes."
+  },
+  "scripted_answers": [
+    {
+      "answer_id": "SA01",
+      "topic": "users_and_business_process",
+      "trigger": "Who uses the solution, and what process does it support?",
+      "answer": "[REPLACE WITH THE FROZEN ANSWER]",
+      "covered_oracle_checks": ["EQ1-R01"]
+    },
+    {
+      "answer_id": "SA02",
+      "topic": "inputs_outputs_and_language",
+      "trigger": "What inputs, outputs, formats, or languages are required?",
+      "answer": "[REPLACE WITH THE FROZEN ANSWER]",
+      "covered_oracle_checks": ["EQ1-R02"]
+    },
+    {
+      "answer_id": "SA03",
+      "topic": "human_review_and_return_path",
+      "trigger": "Is human review required, and what happens when a record is returned?",
+      "answer": "[REPLACE WITH THE FROZEN ANSWER OR STATE THAT THE RETURN PATH IS UNSPECIFIED]",
+      "covered_oracle_checks": ["EQ1-R03"]
+    },
+    {
+      "answer_id": "SA04",
+      "topic": "employee_interaction",
+      "trigger": "How will employees interact with the intended solution?",
+      "answer": "[REPLACE WITH THE INTENDED EMPLOYEE INTERACTION, SUCH AS WEB UPLOAD, API, WATCHED FOLDER, OR CLI]",
+      "covered_oracle_checks": ["EQ1-R04"]
+    },
+    {
+      "answer_id": "SA05",
+      "topic": "poc_goal_interface_and_evaluation",
+      "trigger": "What should the first PoC demonstrate, what interface should it use, what fixture should it process, and what acceptance criteria apply?",
+      "answer": "[REPLACE WITH A SELF-CONTAINED POC GOAL. NAME THE FIXTURES THAT WILL BE PROVIDED TO THE WIZARD, THE COMMAND INTERFACE, EXPECTED OUTPUT, AND ACCEPTANCE CONDITIONS.]",
+      "covered_oracle_checks": ["EQ1-R05", "EQ4-E01"]
+    }
+  ]
+}

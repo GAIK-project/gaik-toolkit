@@ -1,0 +1,3 @@
+[REPLACE WITH THE FROZEN PLAIN-LANGUAGE USE-CASE DESCRIPTION]
+
+Describe the business problem and desired outcome without exposing the scenario oracle, expected configuration, scoring rules, or expected output.

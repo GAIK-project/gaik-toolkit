@@ -1,0 +1,19 @@
+flowchart TD
+    record_and_upload["Record and upload voice message"]
+    transcribe_audio["Transcribe and enhance Finnish audio"]
+    extract_ticket_fields["Extract maintenance ticket fields"]
+    validate_ticket["Validate ticket against schema and transcript"]
+    notify_supervisor["Send ticket to supervisor for review"]
+    supervisor_review["Supervisor reviews and approves ticket"]
+    record_and_upload --> transcribe_audio
+    transcribe_audio --> extract_ticket_fields
+    extract_ticket_fields --> validate_ticket
+    validate_ticket --> notify_supervisor
+    notify_supervisor --> supervisor_review
+
+    style record_and_upload fill:#dbeafe
+    style transcribe_audio fill:#f5f3ff
+    style extract_ticket_fields fill:#f5f3ff
+    style validate_ticket fill:#f5f3ff
+    style notify_supervisor fill:#f5f3ff
+    style supervisor_review fill:#dcfce7

@@ -1,0 +1,680 @@
+{
+  "blueprint_version": "1.0",
+  "metadata": {
+    "blueprint_id": "uc04_supplier_performance_report_v1",
+    "created_by": "solution_configuration_wizard",
+    "created_at": "2026-08-10T00:00:00Z",
+    "last_updated_at": "2026-08-10T00:00:00Z",
+    "status": "draft"
+  },
+  "use_case": {
+    "id": "uc04_supplier_performance_report",
+    "name": "Q2 2026 Supplier Performance Report — Multi-Source Synthesis",
+    "description": "GAIK synthesises four quarterly procurement documents (KPI spreadsheet, quality-audit report, meeting notes, incident log) into a structured, cited Markdown report with evidence index; a procurement manager reviews and approves the draft before release.",
+    "domain": "manufacturing_procurement",
+    "knowledge_processes": [
+      "knowledge_synthesis",
+      "knowledge_capture",
+      "knowledge_access"
+    ]
+  },
+  "business_spec": {
+    "current_process": "A procurement analyst manually combines a KPI spreadsheet, a supplier quality-audit report, procurement meeting notes, and a delivery-incident log each quarter to produce the supplier performance report for procurement management.",
+    "pain_points": [
+      "Slow manual assembly of heterogeneous source documents",
+      "Inconsistent calculations across report versions",
+      "Inconsistent wording and terminology",
+      "Report claims are difficult to trace back to source documents"
+    ],
+    "proposed_solution": "MultiSourceReportGenerator synthesises all four sources into a structured, cited Markdown report (output/report.md) and evidence index (output/evidence_index.json). A mandatory procurement-manager review gate prevents release of unapproved drafts.",
+    "intended_users": [
+      "Procurement analyst"
+    ],
+    "reviewers": [
+      "Procurement manager"
+    ],
+    "stakeholders": [
+      "Category owners",
+      "Procurement Quality Team",
+      "Procurement management"
+    ],
+    "input_artifacts": [
+      "KPI spreadsheet (XLSX) — supplier_kpis_q2_2026.xlsx",
+      "Supplier quality-audit report (PDF, text-based) — nordic_components_quality_audit.pdf",
+      "Procurement meeting notes (Markdown) — procurement_meeting_notes_q2_2026.md",
+      "Delivery-incident log (CSV) — delivery_incidents_q2_2026.csv"
+    ],
+    "target_outputs": [
+      "Markdown report — output/report.md",
+      "Evidence index — output/evidence_index.json"
+    ],
+    "success_criteria": [
+      "Complete cited draft produced faster than manual method",
+      "All KPI calculations are correct and rounded to one decimal place",
+      "Data conflicts (e.g. EUR 410,000 vs EUR 405,000) are explicitly disclosed rather than silently resolved",
+      "Only manager-approved report is released"
+    ],
+    "expected_value": "Faster, consistent, evidence-grounded quarterly reporting with reliable calculations, inline source references, and an audit trail.",
+    "risks": [
+      "Hallucinated facts not present in any source document",
+      "Calculation errors in KPI metrics",
+      "Missing or incorrect source references",
+      "Silent resolution of data conflicts without disclosure",
+      "Omitted agreed actions or named owners",
+      "Unsupported recommendations",
+      "Premature release of an unapproved draft"
+    ],
+    "poc_goal": "Given poc_input_bundle.json (four synthetic Q2 2026 sources), running 'python run_poc.py --input <path-to-poc_input_bundle.json>' must produce non-empty output/report.md and parseable output/evidence_index.json. The report must: carry the exact title 'Q2 2026 Supplier Performance Report'; contain all six required sections (Executive Summary, KPI Overview, Supplier Findings, Quality and Delivery Risks, Actions and Owners, Source References); include a KPI table with values Overall 299/91.6%/26550/2.0%/EUR867000, Nordic 135/85.2%/13500/3.1%/EUR405000, Baltic 97/96.9%/9700/1.0%/EUR194000, Alpine 67/97.0%/3350/0.6%/EUR268000; reference all four source filenames with [source_file] citations; disclose the EUR 410,000 meeting-note approximation vs EUR 405,000 workbook figure; capture audit score 72/100, major findings, three Nordic incidents with two assembly delays, conditional status and 85/100 release threshold, named owners Lena Hoffmann and Marko Laine with due dates, Baltic preference, and Alpine single-source risk. Use Windows-safe ASCII console status text."
+  },
+  "technical_spec": {
+    "input_types": [
+      "spreadsheet",
+      "pdf",
+      "markdown",
+      "csv"
+    ],
+    "input_formats": [
+      "xlsx",
+      "pdf",
+      "md",
+      "csv"
+    ],
+    "output_types": [
+      "markdown",
+      "json"
+    ],
+    "language": "English",
+    "domain_vocabulary": [
+      "supplier performance",
+      "KPI",
+      "on-time delivery",
+      "defect rate",
+      "CAPA",
+      "corrective action plan",
+      "audit score",
+      "EUR spend",
+      "conditional status",
+      "evidence index"
+    ],
+    "data_sources": [
+      "local files resolved relative to poc_input_bundle.json"
+    ],
+    "model_provider": "azure_openai",
+    "model_preferences": {
+      "generation_model": "gpt-5.4",
+      "review_model": "gpt-5.4",
+      "temperature": 1.0,
+      "reasoning_effort": "medium"
+    },
+    "security_constraints": [
+      "Use only supplied evidence — no web browsing or external enrichment",
+      "External model API (Azure OpenAI) is permitted",
+      "Synthetic internal procurement data — no personal data",
+      "Evidence index provides the PoC audit trail"
+    ],
+    "integration_targets": [],
+    "human_review": "yes",
+    "human_review_required": true,
+    "evaluation_requirements": {
+      "test_fixture": "fixtures/expected_report_results.json",
+      "required_facts": [
+        "F01",
+        "F02",
+        "F03",
+        "F04",
+        "F05",
+        "F06",
+        "F07",
+        "F08",
+        "F09",
+        "F10"
+      ],
+      "acceptance_policy": {
+        "semantic_matching": true,
+        "numeric_values_must_be_correct": true,
+        "required_citation_format": "[source_file]",
+        "extra_unsupported_claims_are_failures": true
+      },
+      "prohibited_behavior": [
+        "Do not invent actions, owners, deadlines, suppliers, or external market facts",
+        "Do not silently use EUR 410,000 as the exact Nordic spend",
+        "Do not claim the report is manager-approved; the PoC produces a draft for review"
+      ]
+    },
+    "runtime_interface": "cli"
+  },
+  "target_output_spec": {
+    "schema_name": "SupplierPerformanceReport",
+    "fields": [
+      {
+        "id": "executive_summary",
+        "title": "Executive Summary",
+        "instructions": "Summarize overall Q2 supplier performance, identify the main concern, and state the management decision. Use only supplied evidence and cite source filenames inline."
+      },
+      {
+        "id": "kpi_overview",
+        "title": "KPI Overview",
+        "instructions": "Create a Markdown table for Nordic Components, Baltic Fasteners, Alpine Sensors, and Overall. Show total deliveries, on-time delivery percentage, total units, defective units percentage, and spend in EUR. Calculate from the KPI workbook and round percentages to one decimal place."
+      },
+      {
+        "id": "supplier_findings",
+        "title": "Supplier Findings",
+        "instructions": "Give a separate evidence-grounded finding for each supplier, combining the KPI workbook with relevant audit, incident, and meeting evidence.",
+        "depends_on": [
+          "kpi_overview"
+        ]
+      },
+      {
+        "id": "risks",
+        "title": "Quality and Delivery Risks",
+        "instructions": "Describe supported quality and delivery risks. Explicitly identify the approximate EUR 410,000 meeting-note figure versus the exact workbook spend instead of silently choosing the approximate number.",
+        "depends_on": [
+          "kpi_overview",
+          "supplier_findings"
+        ]
+      },
+      {
+        "id": "actions",
+        "title": "Actions and Owners",
+        "instructions": "Create a table with Action, Owner, Due Date, and Completion Condition. Include only actions explicitly stated in the evidence. Place source citations [filename] in the Action column only; do not add citations in the Owner, Due Date, or Completion Condition columns. If an action does not appear explicitly in a source document's action log or in meeting-note decisions, omit it entirely — do not include inferred or routine monitoring actions.",
+        "depends_on": [
+          "supplier_findings",
+          "risks"
+        ]
+      },
+      {
+        "id": "source_references",
+        "title": "Source References",
+        "instructions": "List every source file used in the report. Use exact filenames."
+      }
+    ],
+    "required_fields": [
+      "executive_summary",
+      "kpi_overview",
+      "supplier_findings",
+      "risks",
+      "actions",
+      "source_references"
+    ],
+    "optional_fields": [],
+    "field_descriptions": {},
+    "allowed_values": {},
+    "confidence_required": false,
+    "missing_value_policy": "state unavailable and omit the claim rather than speculate",
+    "validation_rules": [
+      "All KPI percentages rounded to one decimal place",
+      "EUR 405,000 (workbook) used as authoritative Nordic spend; EUR 410,000 (meeting note) disclosed as approximation",
+      "All material claims cite exact source filename in square brackets",
+      "No invented actions, owners, dates, or external facts"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "assumption_001",
+      "text": "Temperature 1.0 with reasoning_effort medium is applied to both the writer and reviewer model calls within MultiSourceReportGenerator. If the module exposes separate temperature settings per role, both are set to 1.0.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-10T00:00:00Z"
+    },
+    {
+      "id": "assumption_002",
+      "text": "No retention period, data-residency target, SLA, enterprise authentication product, or deployment topology is specified. These are not constraints for the PoC.",
+      "status": "unconfirmed",
+      "impact": "security_constraint",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-10T00:00:00Z"
+    },
+    {
+      "id": "assumption_003",
+      "text": "No numerical improvement target (time, accuracy, adoption) has been specified. PoC acceptance is determined by the fixture-based acceptance policy in evaluation_requirements.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-10T00:00:00Z"
+    },
+    {
+      "id": "assumption_004",
+      "text": "The Azure OpenAI gpt-5.4 deployment name matches the model name 'gpt-5.4'. If the tenant uses a different deployment name, the config will need updating.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-10T00:00:00Z"
+    },
+    {
+      "id": "assumption_005",
+      "text": "BPMN swimlanes: two participant lanes — 'Procurement Analyst' and 'Procurement Manager'. Category owners and Procurement Quality Team are external evidence providers and are not modelled as process participants.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-10T00:00:00Z"
+    },
+    {
+      "id": "assumption_006",
+      "text": "Manager rejection path: when the manager returns the draft, the process loops back to the analyst upload step (upload_sources) for correction and re-run, as implied by 'returns it for analyst rework and regeneration'. The rejection is not a terminal end event.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-10T00:00:00Z"
+    }
+  ],
+  "artifacts": {
+    "kpi_spreadsheet": {
+      "type": "document",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "quality_audit_pdf": {
+      "type": "pdf",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "meeting_notes_md": {
+      "type": "text",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "incident_log_csv": {
+      "type": "text",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "synthesised_report": {
+      "type": "text",
+      "source": "generated",
+      "optional": false,
+      "final_output": true,
+      "externally_visible": false,
+      "produced_by": "synthesise_report",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "evidence_index": {
+      "type": "text",
+      "source": "generated",
+      "optional": false,
+      "final_output": true,
+      "externally_visible": false,
+      "produced_by": "synthesise_report",
+      "schema_ref": null,
+      "overwrite": false
+    }
+  },
+  "inputs": {},
+  "outputs": {},
+  "schemas": {},
+  "components": {
+    "selected_modules": [
+      {
+        "id": "multi_source_report_generator",
+        "name": "MultiSourceReportGenerator",
+        "reason": "End-to-end module for mixed document inputs to narrative report. Subsumes all parsing, evidence curation, section writing, and review steps. Supports agentic mode, strict review, source references, and evidence index — all required by this use case."
+      }
+    ],
+    "selected_building_blocks": [],
+    "custom_components": []
+  },
+  "workflow": {
+    "steps": [
+      {
+        "id": "upload_sources",
+        "name": "Analyst uploads source bundle",
+        "type": "user_task",
+        "component": null,
+        "inputs": [],
+        "outputs": [
+          "kpi_spreadsheet",
+          "quality_audit_pdf",
+          "meeting_notes_md",
+          "incident_log_csv"
+        ],
+        "parameters": {
+          "bundle_format": "poc_input_bundle.json",
+          "path_resolution": "relative to bundle file"
+        },
+        "depends_on": [],
+        "loop": null
+      },
+      {
+        "id": "synthesise_report",
+        "name": "Generate supplier performance report",
+        "type": "automated_task",
+        "component": "MultiSourceReportGenerator",
+        "inputs": [
+          "kpi_spreadsheet",
+          "quality_audit_pdf",
+          "meeting_notes_md",
+          "incident_log_csv"
+        ],
+        "outputs": [
+          "synthesised_report",
+          "evidence_index"
+        ],
+        "parameters": {
+          "parser_choice": "auto",
+          "agentic": true,
+          "strict_review": true,
+          "include_source_references": true,
+          "include_evidence_index": true,
+          "sample_report_path": "report_template.md",
+          "report_language": "English",
+          "report_title": "Q2 2026 Supplier Performance Report",
+          "output_docx": false,
+          "curate_evidence": false,
+          "polish": false,
+          "verbose": true,
+          "report_description": "Internal management report for procurement leadership covering Q2 supplier delivery, quality, spend, risks, and agreed actions.",
+          "writer_options": {
+            "model": "gpt-5.4",
+            "temperature": 1.0,
+            "reasoning_effort": "medium"
+          },
+          "review_options": {
+            "model": "gpt-5.4",
+            "temperature": 1.0,
+            "reasoning_effort": "medium"
+          },
+          "report_spec": "report_spec.json",
+          "sections": [
+            {
+              "id": "executive_summary",
+              "title": "Executive Summary",
+              "instructions": "Summarize overall Q2 supplier performance, identify the main concern, and state the management decision. Use only supplied evidence and cite source filenames inline."
+            },
+            {
+              "id": "kpi_overview",
+              "title": "KPI Overview",
+              "instructions": "Create a Markdown table for Nordic Components, Baltic Fasteners, Alpine Sensors, and Overall. Show total deliveries, on-time delivery percentage, total units, defective units percentage, and spend in EUR. Calculate from the KPI workbook and round percentages to one decimal place."
+            },
+            {
+              "id": "supplier_findings",
+              "title": "Supplier Findings",
+              "instructions": "Give a separate evidence-grounded finding for each supplier, combining the KPI workbook with relevant audit, incident, and meeting evidence.",
+              "depends_on": [
+                "kpi_overview"
+              ]
+            },
+            {
+              "id": "risks",
+              "title": "Quality and Delivery Risks",
+              "instructions": "Describe supported quality and delivery risks. Explicitly identify the approximate EUR 410,000 meeting-note figure versus the exact workbook spend instead of silently choosing the approximate number.",
+              "depends_on": [
+                "kpi_overview",
+                "supplier_findings"
+              ]
+            },
+            {
+              "id": "actions",
+              "title": "Actions and Owners",
+              "instructions": "Create a table with Action, Owner, Due Date, and Completion Condition. Include only actions explicitly stated in the evidence. Place source citations [filename] in the Action column only; do not add citations in the Owner, Due Date, or Completion Condition columns. If an action does not appear explicitly in a source document's action log or in meeting-note decisions, omit it entirely — do not include inferred or routine monitoring actions.",
+              "depends_on": [
+                "supplier_findings",
+                "risks"
+              ]
+            },
+            {
+              "id": "source_references",
+              "title": "Source References",
+              "instructions": "List every source file used in the report. Use exact filenames."
+            }
+          ]
+        },
+        "depends_on": [
+          "upload_sources"
+        ],
+        "loop": null
+      },
+      {
+        "id": "notify_manager",
+        "name": "Notify procurement manager of draft",
+        "type": "automated_task",
+        "component": null,
+        "inputs": [
+          "synthesised_report"
+        ],
+        "outputs": [],
+        "parameters": {
+          "notification_method": "manual handoff (PoC scope — no system integration)"
+        },
+        "depends_on": [
+          "synthesise_report"
+        ],
+        "loop": null
+      },
+      {
+        "id": "manager_review",
+        "name": "Procurement manager reviews and approves draft",
+        "type": "human_review",
+        "component": null,
+        "inputs": [
+          "synthesised_report",
+          "evidence_index"
+        ],
+        "outputs": [],
+        "parameters": {
+          "decision": "approve or return for rework",
+          "rework_path": "analyst revises inputs and re-runs pipeline"
+        },
+        "depends_on": [
+          "notify_manager"
+        ],
+        "loop": null
+      }
+    ]
+  },
+  "business_process": {
+    "participants": [
+      {
+        "id": "analyst",
+        "name": "Procurement Analyst",
+        "kind": "human_role",
+        "default_lane_for": [
+          "upload_sources",
+          "notify_manager"
+        ]
+      },
+      {
+        "id": "manager",
+        "name": "Procurement Manager",
+        "kind": "human_role",
+        "default_lane_for": [
+          "manager_review"
+        ]
+      }
+    ],
+    "manual_steps": [],
+    "external_parties": [],
+    "message_flows": [],
+    "exceptions": [
+      {
+        "id": "manager_rejection",
+        "name": "Draft returned for rework",
+        "attached_to": "",
+        "condition": "",
+        "outcome": "loop_to:upload_sources"
+      }
+    ],
+    "decision_points": []
+  },
+  "prompts": {},
+  "models": {
+    "provider": "azure_openai",
+    "generation_model": "gpt-5.4",
+    "review_model": "gpt-5.4",
+    "temperature": 1.0,
+    "reasoning_effort": "medium"
+  },
+  "validation": {
+    "human_review_required": true,
+    "completeness_check": true,
+    "hallucination_check": true
+  },
+  "evaluation": {
+    "metrics": [
+      "required_facts_present (F01-F10)",
+      "required_sections_present",
+      "all_source_files_referenced",
+      "numeric_values_correct",
+      "citation_format_correct",
+      "no_prohibited_behavior"
+    ],
+    "eval_framework": "report_writing_eval",
+    "sample_data_dir": "fixtures/poc_input/sources",
+    "ground_truth_dir": "fixtures",
+    "test_fixture": "fixtures/expected_report_results.json"
+  },
+  "governance": {
+    "data_handling": {
+      "external_model_api_allowed": true,
+      "local_processing_required": false,
+      "stores_input_data": false,
+      "stores_outputs": true,
+      "retention_policy": "not_specified",
+      "contains_personal_data": "false",
+      "output_sensitivity": "internal",
+      "audit_log_required": true
+    }
+  },
+  "runtime": {
+    "interface": "cli",
+    "entrypoint": "poc/run_poc.py",
+    "env_file": "poc/.env.example"
+  },
+  "package": {
+    "name": "uc04_supplier_performance_report",
+    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\106758202084",
+    "include_tests": true,
+    "include_evals": true,
+    "include_docs": true
+  },
+  "visualizations": {
+    "bpmn_mapping": {
+      "Lane_users": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.intended_users"
+      },
+      "Activity_upload_sources": {
+        "kind": "user_task",
+        "blueprint_path": "workflow.steps[0]"
+      },
+      "Lane_gaik_ai": {
+        "kind": "lane",
+        "blueprint_path": "derived:system"
+      },
+      "Activity_synthesise_report": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[1]"
+      },
+      "Activity_notify_manager": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[2]"
+      },
+      "Lane_reviewers": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.reviewers"
+      },
+      "Activity_manager_review": {
+        "kind": "human_review",
+        "blueprint_path": "workflow.steps[3]"
+      },
+      "StartEvent_1": {
+        "kind": "start_event",
+        "blueprint_path": "derived:start"
+      },
+      "EndEvent_success": {
+        "kind": "end_event",
+        "blueprint_path": "derived:end"
+      },
+      "Gateway_approve_manager_review": {
+        "kind": "approval_gateway",
+        "blueprint_path": "derived:approval_after:manager_review"
+      },
+      "EndEvent_rejected_manager_review": {
+        "kind": "end_event",
+        "blueprint_path": "derived:rejection_after:manager_review"
+      },
+      "DataObjectRef_kpi_spreadsheet": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.kpi_spreadsheet"
+      },
+      "DataObjectRef_quality_audit_pdf": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.quality_audit_pdf"
+      },
+      "DataObjectRef_meeting_notes_md": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.meeting_notes_md"
+      },
+      "DataObjectRef_incident_log_csv": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.incident_log_csv"
+      },
+      "DataObjectRef_synthesised_report": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.synthesised_report"
+      },
+      "DataObjectRef_evidence_index": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.evidence_index"
+      },
+      "TextAnnotation_1": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      },
+      "TextAnnotation_2": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      },
+      "TextAnnotation_3": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      }
+    }
+  },
+  "traceability": [
+    {
+      "component": "MultiSourceReportGenerator",
+      "required_by": "multi_source_report pattern with four heterogeneous document inputs, narrative report output, agentic section writing, strict review, evidence index, and source citations"
+    }
+  ],
+  "change_log": [
+    {
+      "version": "1.0",
+      "date": "2026-08-10",
+      "change": "Initial draft blueprint generated by solution_configuration_wizard V1",
+      "changed_by": "solution_configuration_wizard"
+    },
+    {
+      "version": "1.1",
+      "date": "2026-08-10",
+      "change": "Gate 3 fix: updated 'actions' section instructions to restrict [source_file] citations to the Action column only, preventing citation text from leaking into Completion Condition cells and breaking the Markdown table.",
+      "changed_by": "solution_configuration_wizard"
+    },
+    {
+      "version": "1.2",
+      "date": "2026-08-10",
+      "change": "Gate 3 fix: extended 'actions' section instructions to prohibit inferred or routine monitoring actions not explicitly listed in a source document's action log or meeting-note decisions. Addresses invented 'Continue routine monthly monitoring for Baltic Fasteners' row.",
+      "changed_by": "solution_configuration_wizard"
+    }
+  ]
+}

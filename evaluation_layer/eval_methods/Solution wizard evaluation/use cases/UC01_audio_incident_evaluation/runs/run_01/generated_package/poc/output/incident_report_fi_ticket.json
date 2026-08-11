@@ -1,0 +1,16 @@
+[
+  {
+    "reporter_name": "Matti Virtanen",
+    "asset_identifier": "Pumppu P17",
+    "location": "käyttötilahuoneessa B2",
+    "fault_description": "Pumppu P17 vuotaa käyttötilahuoneessa B2.",
+    "urgency": "high",
+    "observation_date": "2026-07-26",
+    "observation_time": "09:30",
+    "actions_taken": [
+      "Merkitsen alueen",
+      "Pysäytin pumpun"
+    ],
+    "uncertain_fields": null
+  }
+]

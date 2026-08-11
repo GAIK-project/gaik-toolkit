@@ -1,0 +1,592 @@
+{
+  "blueprint_version": "1.0",
+  "metadata": {
+    "blueprint_id": "manufacturing_knowledge_rag_v1",
+    "created_by": "solution_configuration_wizard",
+    "created_at": "2026-08-05T00:00:00Z",
+    "last_updated_at": "2026-08-05T00:00:00Z",
+    "status": "draft"
+  },
+  "use_case": {
+    "id": "manufacturing_knowledge_rag",
+    "name": "Manufacturing Knowledge Base RAG Assistant",
+    "description": "Role-aware question-answering assistant that retrieves cited answers from internal manufacturing policies, equipment manuals, and management documents, with pre-retrieval RBAC to enforce document access boundaries.",
+    "domain": "manufacturing",
+    "knowledge_processes": [
+      "knowledge_access"
+    ]
+  },
+  "business_spec": {
+    "current_process": "Employees manually search internal policies, equipment manuals, and management documents to find answers; the process is slow and may result in incomplete or unsupported responses.",
+    "pain_points": [
+      "Manual document search is time-consuming",
+      "Employees may miss the most relevant or applicable source",
+      "No enforcement of document access controls during informal searches",
+      "Answers are not traceable to a verified source"
+    ],
+    "proposed_solution": "A RAG-based assistant that accepts natural-language questions, applies pre-retrieval RBAC based on the requestor role, retrieves semantically relevant chunks from allowed documents only, and generates cited answers in a structured RAGAnswerRecord format.",
+    "intended_users": [
+      "employee",
+      "manager",
+      "knowledge_owner"
+    ],
+    "reviewers": [],
+    "stakeholders": [
+      "knowledge_owners",
+      "managers",
+      "IT"
+    ],
+    "input_artifacts": [
+      "employee_travel_policy.pdf",
+      "mx200_maintenance_manual.pdf",
+      "project_aurora_pricing_strategy.pdf",
+      "access_manifest.json",
+      "query_set.json",
+      "poc_input_bundle.json"
+    ],
+    "target_outputs": [
+      "RAGAnswerRecord JSON list (query_id, role, question, access_decision, answer, citations, refusal_reason)"
+    ],
+    "success_criteria": [
+      "Q01 (employee, Helsinki hotel limit): answers EUR 180 per night with Finance Director approval required when exceeded, citing [employee_travel_policy.pdf, 3]",
+      "Q02 (employee, MX-200 filter): answers inspection every 250 operating hours and replacement after 1,000 operating hours or 1.8 bar, citing mx200_maintenance_manual.pdf pages 3 and 4",
+      "Q03 (employee, Project Aurora ceiling): access_decision=denied, empty citations list, no restricted facts disclosed",
+      "Q04 (manager, Project Aurora ceiling and approver): answers 12 percent ceiling with written CFO approval required above the ceiling, citing [project_aurora_pricing_strategy.pdf, 3]",
+      "All four results returned as separate non-empty parseable JSON objects in output/results.json"
+    ],
+    "expected_value": [
+      "Employees find reliable answers faster",
+      "Every factual answer is traceable to a verified source via citations",
+      "Restricted documents are never disclosed to unauthorized roles",
+      "Reduced risk of incomplete or unsupported answers"
+    ],
+    "risks": [
+      "Hallucinated or speculative answers not grounded in retrieved content",
+      "Fabricated or incorrect citations",
+      "Unauthorized chunk leakage into model context via pre-filter bypass",
+      "Restricted facts disclosed in answer text on a denied query",
+      "Stale documents producing outdated answers",
+      "Answer returned when no authorized source supports the claim"
+    ],
+    "poc_goal": "Demonstrate role-aware, citation-grounded question answering over three PDF documents using a local vector store and trusted role metadata. CLI: python run_poc.py --input <path-to-poc_input_bundle.json>. Execute all four role-tagged queries (Q01-Q04) and save non-empty parseable JSON results to output/results.json."
+  },
+  "technical_spec": {
+    "input_types": [
+      "pdf",
+      "json"
+    ],
+    "input_formats": [
+      "PDF (text-based, 1-based page numbers)",
+      "JSON (access_manifest, query_set, poc_input_bundle)"
+    ],
+    "output_types": [
+      "structured_json"
+    ],
+    "language": "en",
+    "domain_vocabulary": "none",
+    "data_sources": [
+      "local file bundle resolved relative to poc_input_bundle.json at runtime"
+    ],
+    "model_provider": "azure_openai",
+    "model_preferences": {
+      "answer_model": "gpt-5.4",
+      "temperature": 0.0,
+      "reasoning_effort": "medium",
+      "embedding_model": "from_env_AZURE_EMBEDDING_DEPLOYMENT"
+    },
+    "security_constraints": [
+      "RBAC pre-filter: role from trusted request metadata (not inferred from question); access_manifest.json maps documents to allowed_roles; unauthorized chunks must never enter model context",
+      "Cloud LLM API calls to Azure OpenAI are permitted",
+      "No personal data in synthetic PoC fixtures",
+      "No audit-log service required for PoC; enterprise identity integration is out of PoC scope"
+    ],
+    "integration_targets": [],
+    "human_review": false,
+    "human_review_required": false,
+    "evaluation_requirements": {
+      "method": "deterministic query testing",
+      "queries": [
+        "Q01",
+        "Q02",
+        "Q03",
+        "Q04"
+      ],
+      "expected_outputs": "defined in poc_input_bundle.json and query_set.json",
+      "numerical_threshold": "not_specified",
+      "eval_framework": "RAG_eval"
+    },
+    "runtime_interface": "cli",
+    "runtime_entrypoint": "python run_poc.py --input <path-to-poc_input_bundle.json>"
+  },
+  "target_output_spec": {
+    "schema_name": "RAGAnswerRecord",
+    "fields": [
+      "query_id",
+      "role",
+      "question",
+      "access_decision",
+      "answer",
+      "citations",
+      "refusal_reason"
+    ],
+    "field_types": {
+      "query_id": "str",
+      "role": "str",
+      "question": "str",
+      "access_decision": "str",
+      "answer": "str",
+      "citations": "list",
+      "refusal_reason": "str"
+    },
+    "required_fields": [
+      "query_id",
+      "role",
+      "question",
+      "access_decision",
+      "answer",
+      "citations"
+    ],
+    "optional_fields": [
+      "refusal_reason"
+    ],
+    "field_descriptions": {
+      "query_id": "Unique query identifier from query_set.json",
+      "role": "Requestor role from trusted request metadata; must not be inferred from question content",
+      "question": "The natural-language question as supplied in query_set.json",
+      "access_decision": "allowed if the role has access to documents that answer the query; denied otherwise",
+      "answer": "Cited factual answer grounded only in retrieved content; refusal message when access_decision=denied",
+      "citations": "List of [file_name, page_number] pairs (1-based integer); empty list when access_decision=denied",
+      "refusal_reason": "Required (non-null) when access_decision=denied; must not reveal restricted facts; null otherwise"
+    },
+    "allowed_values": {
+      "access_decision": [
+        "allowed",
+        "denied"
+      ],
+      "role": [
+        "employee",
+        "manager"
+      ]
+    },
+    "confidence_required": false,
+    "missing_value_policy": "If authorized sources do not support an answer, state the information was not found and do not speculate. Do not fabricate citations.",
+    "validation_rules": [
+      "access_decision must be 'allowed' or 'denied'",
+      "citations must be an empty list when access_decision=denied",
+      "refusal_reason must be non-null when access_decision=denied",
+      "each citation must be exactly [str, int] (filename, 1-based page number)",
+      "answer must not reveal restricted content when access_decision=denied",
+      "allowed factual answers must include at least one citation to a document permitted for that role",
+      "exact values must be preserved: EUR 180, 250 operating hours, 1,000 operating hours, 1.8 bar, 12 percent, 22 percent"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "assumption_001",
+      "text": "A local in-memory vector store (numpy cosine similarity or equivalent) is used for the PoC instead of PostgreSQL+pgvector, as the user explicitly requested a local vector store. The standard RAGWorkflow module is not selected.",
+      "status": "confirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-05T00:00:00Z"
+    },
+    {
+      "id": "assumption_002",
+      "text": "The knowledge_owner role is treated as having the same document access as manager (all three documents). The user specified employee and manager access tiers; knowledge_owner was described functionally but not mapped to an access tier.",
+      "status": "unconfirmed",
+      "impact": "security_constraint",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-05T00:00:00Z"
+    },
+    {
+      "id": "assumption_003",
+      "text": "Structure-aware chunking uses paragraph or section boundaries with moderate overlap (approximately 10-20% of chunk size). Exact chunk size defaults to approximately 512 tokens.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-05T00:00:00Z"
+    },
+    {
+      "id": "assumption_004",
+      "text": "The Azure OpenAI embedding deployment name is provided via environment variable AZURE_EMBEDDING_DEPLOYMENT. The specific model name is not user-confirmed.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-05T00:00:00Z"
+    },
+    {
+      "id": "assumption_005",
+      "text": "RBAC pre-filtering reads allowed_roles from access_manifest.json at index time, attaches them as chunk metadata, and filters the candidate pool to role-permitted chunks before any similarity search. The role value is taken from the query request metadata and trusted as-is.",
+      "status": "confirmed",
+      "impact": "security_constraint",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-05T00:00:00Z"
+    },
+    {
+      "id": "assumption_006",
+      "text": "BPMN swimlane structure: Requestor lane (employee or manager submits query via CLI), GAIK AI System lane (ingests, filters, retrieves, generates), Knowledge Owner shown as a collapsed pool (document maintenance, out of PoC scope). Not specified by the user.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-05T00:00:00Z"
+    },
+    {
+      "id": "assumption_007",
+      "text": "Denied-query exception path terminates with a clean 'Access Denied' end event and returns the denied RAGAnswerRecord to the caller. No additional notification, escalation, or logging step is modelled. Not specified by the user.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-05T00:00:00Z"
+    }
+  ],
+  "artifacts": {
+    "poc_input_bundle": {
+      "type": "json",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "document_collection": {
+      "type": "document_collection",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "access_manifest": {
+      "type": "json",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "query_set": {
+      "type": "json",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "chunked_documents": {
+      "type": "text_chunks",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "ingest_and_index",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "local_vector_index": {
+      "type": "vector_index",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "ingest_and_index",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "retrieved_chunks_per_query": {
+      "type": "text_chunks",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "apply_rbac_and_retrieve",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "rag_answer_records": {
+      "type": "structured_json",
+      "source": "generated",
+      "optional": false,
+      "final_output": true,
+      "externally_visible": false,
+      "produced_by": "generate_answers",
+      "schema_ref": null,
+      "overwrite": false
+    }
+  },
+  "inputs": {},
+  "outputs": {},
+  "schemas": {},
+  "components": {
+    "selected_modules": [],
+    "selected_building_blocks": [],
+    "custom_components": [
+      "RBACPreFilter",
+      "LocalVectorIndexer",
+      "CitedRAGPipeline"
+    ]
+  },
+  "workflow": {
+    "steps": [
+      {
+        "id": "load_input",
+        "name": "Load PoC input bundle via CLI",
+        "type": "user_task",
+        "component": null,
+        "inputs": [],
+        "outputs": [
+          "poc_input_bundle",
+          "document_collection",
+          "access_manifest",
+          "query_set"
+        ],
+        "parameters": {
+          "cli_arg": "--input <path-to-poc_input_bundle.json>",
+          "path_resolution": "all other files resolved relative to poc_input_bundle.json"
+        },
+        "depends_on": [],
+        "loop": null
+      },
+      {
+        "id": "ingest_and_index",
+        "name": "Parse PDFs, chunk with metadata, embed, build local vector index",
+        "type": "automated_task",
+        "component": "custom",
+        "inputs": [
+          "document_collection",
+          "access_manifest"
+        ],
+        "outputs": [
+          "chunked_documents",
+          "local_vector_index"
+        ],
+        "parameters": {
+          "chunking_strategy": "structure_aware",
+          "chunk_overlap": "moderate",
+          "metadata_fields": [
+            "file_name",
+            "page_number",
+            "classification",
+            "allowed_roles"
+          ],
+          "embedding_model": "from_env_AZURE_EMBEDDING_DEPLOYMENT",
+          "provider": "azure_openai"
+        },
+        "depends_on": [
+          "load_input"
+        ],
+        "loop": null
+      },
+      {
+        "id": "apply_rbac_and_retrieve",
+        "name": "Apply RBAC pre-filter and retrieve top-4 eligible chunks per query",
+        "type": "automated_task",
+        "component": "custom",
+        "inputs": [
+          "local_vector_index",
+          "query_set"
+        ],
+        "outputs": [
+          "retrieved_chunks_per_query"
+        ],
+        "parameters": {
+          "role_source": "trusted_request_metadata",
+          "filter_timing": "pre_retrieval",
+          "top_k": 4,
+          "similarity_metric": "cosine",
+          "denied_handling": "return_denied_record_immediately"
+        },
+        "depends_on": [
+          "ingest_and_index"
+        ],
+        "loop": null
+      },
+      {
+        "id": "generate_answers",
+        "name": "Generate cited answers and format as RAGAnswerRecord list",
+        "type": "automated_task",
+        "component": "custom",
+        "inputs": [
+          "retrieved_chunks_per_query",
+          "query_set"
+        ],
+        "outputs": [
+          "rag_answer_records"
+        ],
+        "parameters": {
+          "model": "gpt-5.4",
+          "temperature": 0.0,
+          "reasoning_effort": "medium",
+          "provider": "azure_openai",
+          "citation_format": "[file_name, page_number]",
+          "grounding_policy": "retrieved_content_only",
+          "no_support_policy": "state_not_found_do_not_speculate",
+          "output_path": "output/results.json"
+        },
+        "depends_on": [
+          "apply_rbac_and_retrieve"
+        ],
+        "loop": null
+      }
+    ]
+  },
+  "business_process": {
+    "participants": [],
+    "manual_steps": [],
+    "external_parties": [],
+    "message_flows": [],
+    "exceptions": [],
+    "decision_points": []
+  },
+  "prompts": {},
+  "models": {
+    "provider": "azure_openai",
+    "answer_model": "gpt-5.4",
+    "embedding_model": "from_env",
+    "temperature": 0.0,
+    "reasoning_effort": "medium"
+  },
+  "validation": {
+    "human_review_required": false,
+    "completeness_check": true,
+    "hallucination_check": false
+  },
+  "evaluation": {
+    "metrics": [
+      "access_control_correctness",
+      "citation_accuracy",
+      "answer_grounding"
+    ],
+    "eval_framework": "RAG_eval",
+    "sample_data_dir": "data/samples",
+    "ground_truth_dir": "evals/ground_truth"
+  },
+  "governance": {
+    "data_handling": {
+      "external_model_api_allowed": true,
+      "local_processing_required": false,
+      "stores_input_data": false,
+      "stores_outputs": true,
+      "retention_policy": "not_specified",
+      "contains_personal_data": "false",
+      "output_sensitivity": "mixed",
+      "audit_log_required": false
+    }
+  },
+  "runtime": {
+    "interface": "cli",
+    "entrypoint": "poc/run_poc.py",
+    "env_file": ".env.example"
+  },
+  "package": {
+    "name": "manufacturing_knowledge_rag_use_case",
+    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\08e611fdcc41",
+    "include_tests": true,
+    "include_evals": true,
+    "include_docs": true
+  },
+  "visualizations": {
+    "bpmn_mapping": {
+      "Lane_users": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.intended_users"
+      },
+      "Activity_load_input": {
+        "kind": "user_task",
+        "blueprint_path": "workflow.steps[0]"
+      },
+      "Lane_gaik_ai": {
+        "kind": "lane",
+        "blueprint_path": "derived:system"
+      },
+      "Activity_ingest_and_index": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[1]"
+      },
+      "Activity_apply_rbac_and_retrieve": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[2]"
+      },
+      "Activity_generate_answers": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[3]"
+      },
+      "StartEvent_1": {
+        "kind": "start_event",
+        "blueprint_path": "derived:start"
+      },
+      "EndEvent_success": {
+        "kind": "end_event",
+        "blueprint_path": "derived:end"
+      },
+      "DataObjectRef_poc_input_bundle": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.poc_input_bundle"
+      },
+      "DataObjectRef_document_collection": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.document_collection"
+      },
+      "DataObjectRef_access_manifest": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.access_manifest"
+      },
+      "DataObjectRef_query_set": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.query_set"
+      },
+      "DataObjectRef_chunked_documents": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.chunked_documents"
+      },
+      "DataObjectRef_local_vector_index": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.local_vector_index"
+      },
+      "DataObjectRef_retrieved_chunks_per_query": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.retrieved_chunks_per_query"
+      },
+      "DataObjectRef_rag_answer_records": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.rag_answer_records"
+      },
+      "TextAnnotation_1": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      },
+      "TextAnnotation_2": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      }
+    }
+  },
+  "traceability": [
+    {
+      "component": "RBACPreFilter",
+      "required_by": "security_constraints: pre-retrieval role-based access control from access_manifest.json"
+    },
+    {
+      "component": "LocalVectorIndexer",
+      "required_by": "technical_spec: local vector store required; PostgreSQL+pgvector is out of PoC scope"
+    },
+    {
+      "component": "CitedRAGPipeline",
+      "required_by": "output_types: RAGAnswerRecord with [file_name, page_number] citations; gpt-5.4 at temperature=0.0 with reasoning_effort=medium"
+    }
+  ],
+  "change_log": [
+    {
+      "version": "1.0",
+      "date": "2026-08-05",
+      "change": "Initial draft blueprint generated by solution_configuration_wizard V1",
+      "changed_by": "solution_configuration_wizard"
+    }
+  ]
+}

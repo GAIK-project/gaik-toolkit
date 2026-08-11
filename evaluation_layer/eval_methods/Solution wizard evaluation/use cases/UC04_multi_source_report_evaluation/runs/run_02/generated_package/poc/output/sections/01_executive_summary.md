@@ -1,0 +1,8 @@
+## Executive Summary
+
+## Executive Summary
+Q2 supplier performance was mixed at portfolio level. Across all suppliers, the business recorded 299 deliveries, 274 of them on time, with total Q2 spend of EUR 867,000. Baltic Fasteners and Alpine Sensors both remained on approved status with stronger delivery and quality results, while Nordic Components was the clear underperformer in the quarter [supplier_kpis_q2_2026.xlsx; procurement_meeting_notes_q2_2026.md].
+
+The main concern is Nordic Components. It closed Q2 on conditional status with 135 deliveries, 115 on time, 415 defective units, and EUR 405,000 in spend, and the Q2 audit scored the supplier at 72/100. The audit identified two major nonconformities, incomplete calibration records and overdue CAPA-17, plus a packaging-label traceability issue. Three delivery incidents were recorded for Nordic Components in Q2, and two of those incidents caused assembly delays [supplier_kpis_q2_2026.xlsx; nordic_components_quality_audit.pdf; procurement_meeting_notes_q2_2026.md; delivery_incidents_q2_2026.csv].
+
+Management decided to keep Nordic Components active under conditional monitoring and not increase its order volume until the corrective-action plan is accepted and the follow-up audit score is at least 85/100. In parallel, Baltic Fasteners was agreed as the preferred source for incremental fastener demand in the next quarter, while Alpine Sensors remains acceptable but subject to continued monitoring of single-source lead-time exposure [procurement_meeting_notes_q2_2026.md; nordic_components_quality_audit.pdf; supplier_kpis_q2_2026.xlsx].

@@ -1,0 +1,67 @@
+Run command: ['C:\Users\h02317\AppData\Local\Programs\Python\Python312\python.exe', 'run_poc.py', '--input', 'C:\Users\h02317\Downloads\Wizard evaluation\UC03_document_rag_evaluation\fixtures\poc_input_bundle.json'] Run exit code: 1 --- run stdout --- === Manufacturing Knowledge Base RAG Assistant — PoC ===
+
+Input bundle : C:\Users\h02317\Downloads\Wizard evaluation\UC03_document_rag_evaluation\fixtures\poc_input_bundle.json Chat model : gpt-5.4 (temp=0.0, reasoning=medium) Embedding : text-embedding-3-large Top-k : 4
+
+Documents found : [] Access manifest : [] Queries loaded : 0
+
+--- run stderr --- ERROR: No PDF files resolved from bundle.
+
+--- outputs --- []
+
+
+Reasoning
+The PoC ran but failed because:
+
+No PDF files were found
+Access manifest is empty ([])
+Queries loaded is 0
+This means the load_bundle function couldn't parse the poc_input_bundle.json correctly. The bundle is at a different location than I expected: C:\Users\h02317\Downloads\Wizard evaluation\UC03_document_rag_evaluation\fixtures\poc_input_bundle.json.
+
+The issue is likely that:
+
+The bundle format is different from what I expected
+The file paths in the bundle might not resolve correctly
+I need to examine the actual bundle structure along with the access_manifest.json and query_set.json files to understand what format they're in
+This is a Gate 3 diagnostic issue—the pipeline failed at input loading, so I need to identify whether it's a path resolution problem or a format mismatch before deciding on a fix.
+
+Looking at the output more carefully, access_manifest: [] is actually printing the keys of an empty dictionary, and Documents found: [] indicates the bundle doesn't have a "documents" key or the structure is different than expected. Let me load the actual bundle file from the fixtures directory to see what's really there.Now I understand the structure:
+
+poc_input_bundle.json has:
+
+documents_directory: path to PDFs directory relative to the bundle
+access_manifest: path to access_manifest.json relative to the bundle
+query_set: path to query_set.json relative to the bundle
+access_manifest.json has:
+
+documents: list of {file, title, classification, allowed_roles}
+file is relative to the access_manifest file itself (e.g., "documents/employee_travel_policy.pdf")
+query_set.json contains queries with {query_id, role, question}
+So my load_bundle function needs to read the bundle config to get the manifest and query set paths, then load the documents list from the manifest where file paths are resolved relative to the manifest's location.
+
+Looking at the directory structure, the manifest at poc_input/access_manifest.json references documents/employee_travel_policy.pdf, which should resolve relative to the manifest file's directory, so the PDFs end up in poc_input/documents/.
+
+I need to update the load_bundle function to use the correct keys: access_manifest instead of access_manifest_path, query_set for the query set path, and parse the manifest's documents list using the file field instead of filename. I'll also need to update the normalization function to handle the file key properly. Updating the code to handle the correct bundle keys and manifest structure...There's a syntax error. The issue is likely with the for ... else: construct in Python - my for key in (...): ... else: loop has elif "queries" in bundle: which is not valid. The else clause of a for loop runs when the loop completes without a break, but you can't use elif after for...else.
+
+Let me fix the query loading section. I need to restructure it to avoid the for...else...elif pattern.Now let me also verify that the bundle loading logic will work correctly by running a quick dry-run test that just loads the bundle without calling any APIs.
+
+Let me test the load_bundle function with the actual bundle file to confirm paths resolve correctly.The bundle loading now correctly resolves:
+
+3 PDFs: all exist ✓
+4 queries: Q01–Q04 ✓
+Manifest with documents ✓
+The fix is working. Now the user needs to re-run the PoC. Let me tell them to re-run with the same command.
+
+The pipeline failed at input loading — bundle format doesn't match what load_bundle expects. This is an implementation fix (no blueprint change). Let me read the actual bundle to diagnose:Three issues to fix:
+
+Bundle uses "access_manifest" / "query_set" keys (not "access_manifest_path" / "query_set_path")
+Manifest entries use "file" (a relative path) — basename extraction needed as the dict key
+PDF paths must be resolved relative to the manifest's directory, not the bundle's
+Classification: implementation fix — load_bundle and _normalise_manifest patch only; no blueprint or design intent changes.Syntax error in the query-loading loop — elif after for…else is not valid Python. Fixing:Syntax OK. Let me verify the bundle loading resolves paths correctly before asking you to re-run:All three PDFs found and exist, all four queries loaded, manifest resolved correctly. The fix works.
+
+Please re-run with the same command:
+
+bash
+
+
+python run_poc.py --input "C:\Users\h02317\Downloads\Wizard evaluation\UC03_document_rag_evaluation\fixtures\poc_input_bundle.json"
+The pipeline will now proceed past input loading and into the PDF indexing and query processing stages. Paste output/results.json here when it completes (or share the stdout if it errors again).

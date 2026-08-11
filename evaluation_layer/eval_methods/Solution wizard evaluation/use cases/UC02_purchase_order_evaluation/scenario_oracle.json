@@ -1,0 +1,1041 @@
+{
+  "oracle_version": "1.3.0",
+  "scenario_id": "UC02",
+  "title": "Complex purchase orders to ERP data",
+  "knowledge_process": "knowledge_capture",
+  "status": "frozen",
+  "frozen_on": "2026-07-30",
+  "purpose": "Evaluate whether the GAIK Solution Configuration Wizard captures the fixed purchase-order scenario, chooses and configures a valid layout-aware GAIK solution, generates a valid solution package, and produces an executable PoC.",
+  "protocol": {
+    "runs": 2,
+    "wizard_skill_file": "implementation_layer/solution_wizard/SKILL.md",
+    "wizard_skill_commit": "79586c93ea3286f68acf3ad3810a370c4295fa01",
+    "output_directory_policy": "Write the wizard output to the run-specific generated_package directory, or copy the complete unmodified output there after the run. No absolute path is stored in run metadata.",
+    "initial_prompt_file": "initial_prompt.txt",
+    "scripted_answers_file": "scripted_answers.json",
+    "wizard_requirement_coverage_file": "wizard_requirement_coverage.json",
+    "confirmation_policy": "At every routine confirmation before original PoC execution, answer Yes and proceed without changes.",
+    "accept_without_correction": true,
+    "unexpected_question_answer": "Not specified for this evaluation. If a value is required, record it as an explicit assumption for user confirmation.",
+    "po_c_policy": "Execute the original wizard-generated PoC without editing its source files. Environment variables and credentials may be supplied externally. EQ4 is permanently based on this original execution.",
+    "recovery_policy": {
+      "trigger": "The original PoC does not execute successfully.",
+      "maximum_refinement_attempts": 3,
+      "feedback_scope": "Return recorded execution evidence to the wizard without adding corrective code or new requirements.",
+      "stopping_rule": "Stop after the first successful execution or after the third unsuccessful refinement.",
+      "reported_values": {
+        "0": "Original PoC executed successfully.",
+        "1-3": "PoC executed successfully after the stated number of refinement attempts.",
+        "N/A": "PoC never executed successfully after three refinement attempts."
+      },
+      "headline_metric": false
+    }
+  },
+  "gaik_basis": {
+    "repository": "GAIK-project/gaik-toolkit",
+    "verified_commit": "79586c93ea3286f68acf3ad3810a370c4295fa01",
+    "blueprint_schema_path": "implementation_layer/solution_wizard/schemas/use_case_blueprint.schema.json",
+    "registry_path": "implementation_layer/solution_wizard/registries/gaik_component_registry.json",
+    "reference_cards_path": "implementation_layer/solution_wizard/registries/component_reference_cards.json",
+    "expected_component": {
+      "id": "vision_extractor",
+      "name": "VisionExtractor",
+      "type": "software_component",
+      "required_parameters": [
+        "task"
+      ],
+      "selection_relevant_options": {
+        "include_verification": true
+      },
+      "selection_reason": "The frozen registry directs accuracy-critical complex layouts to VisionExtractor rather than DocumentsToStructuredData."
+    }
+  },
+  "checks": {
+    "EQ1": [
+      {
+        "id": "EQ1-R01",
+        "parameter": "Primary user",
+        "oracle_value": "Order-processing employee",
+        "accepted_semantics": "An employee prepares purchase-order data for ERP entry.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.intended_users",
+          "business_process.participants",
+          "use_case.description"
+        ]
+      },
+      {
+        "id": "EQ1-R02",
+        "parameter": "Current process",
+        "oracle_value": "Employees manually inspect customer purchase orders and enter header and line-item data into ERP.",
+        "accepted_semantics": "Manual purchase-order inspection and ERP entry are described.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.current_process",
+          "use_case.description"
+        ]
+      },
+      {
+        "id": "EQ1-R03",
+        "parameter": "Business problem",
+        "oracle_value": "Manual entry is slow and can introduce transcription or omission errors.",
+        "accepted_semantics": "The generated specification identifies delay, inconsistency, or data-entry errors.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.pain_points",
+          "business_spec.expected_value"
+        ]
+      },
+      {
+        "id": "EQ1-R04",
+        "parameter": "Human reviewer",
+        "oracle_value": "Procurement or order-processing reviewer",
+        "accepted_semantics": "An internal reviewer verifies extracted order data.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.reviewers",
+          "business_process.participants",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R05",
+        "parameter": "Expected value",
+        "oracle_value": "Faster and more consistent ERP data preparation with fewer manual errors.",
+        "accepted_semantics": "The expected value includes efficiency and reduced data-entry errors.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.expected_value"
+        ]
+      },
+      {
+        "id": "EQ1-R06",
+        "parameter": "Primary input",
+        "oracle_value": "Customer purchase orders as PDF or scanned PDF email attachments.",
+        "accepted_semantics": "PDF and scanned or image-based purchase orders are supported.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.input_types",
+          "business_spec.input_artifacts",
+          "inputs",
+          "artifacts"
+        ]
+      },
+      {
+        "id": "EQ1-R07",
+        "parameter": "Document-layout complexity",
+        "oracle_value": "Complex multi-page tables, merged or hierarchical headers, notes in table areas, and rows split across pages.",
+        "accepted_semantics": "The solution preserves or reasons over complex visual layout and cross-page rows.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec",
+          "business_spec.input_artifacts",
+          "assumptions",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R08",
+        "parameter": "Document language and identifiers",
+        "oracle_value": "English document text with alphanumeric identifiers, dates, dimensions, quantities, and units that must be preserved.",
+        "accepted_semantics": "English is identified and document codes, leading zeros, and units are preserved.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.language",
+          "technical_spec.domain_vocabulary",
+          "target_output_spec.validation_rules"
+        ]
+      },
+      {
+        "id": "EQ1-R09",
+        "parameter": "Target output",
+        "oracle_value": "ERP-compatible structured purchase-order record in JSON.",
+        "accepted_semantics": "The final output is a structured JSON record suitable for downstream ERP use.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.output_types",
+          "business_spec.target_outputs",
+          "target_output_spec",
+          "outputs",
+          "artifacts"
+        ]
+      },
+      {
+        "id": "EQ1-R10",
+        "parameter": "Header field: purchase-order number",
+        "oracle_value": "purchase_order_number; string; required",
+        "accepted_semantics": "The schema contains a required purchase-order number.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.required_fields",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R11",
+        "parameter": "Header field: delivery date",
+        "oracle_value": "delivery_date; string; required; DD/MM/YYYY",
+        "accepted_semantics": "The schema contains a required normalized delivery date.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.required_fields",
+          "target_output_spec.validation_rules",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R12",
+        "parameter": "Header field: delivery address",
+        "oracle_value": "delivery_address; string; required",
+        "accepted_semantics": "The schema contains a required delivery address.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.required_fields",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R13",
+        "parameter": "Header field: vendor number",
+        "oracle_value": "vendor_number; string; required",
+        "accepted_semantics": "The schema contains a required vendor number.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.required_fields",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R14",
+        "parameter": "Line-item collection",
+        "oracle_value": "line_items; required list with one object per purchase-order item",
+        "accepted_semantics": "The schema uses a nested list and preserves the source item count.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.required_fields",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R15",
+        "parameter": "Line-item field: item number",
+        "oracle_value": "item_number; string; required; preserve leading zeros",
+        "accepted_semantics": "Each line item has a required exact item identifier.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.validation_rules",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R16",
+        "parameter": "Line-item field: article code",
+        "oracle_value": "article_code; string; required; preserve case and punctuation",
+        "accepted_semantics": "Each line item has a required exact article code.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.validation_rules",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R17",
+        "parameter": "Line-item field: dimensions",
+        "oracle_value": "dimensions; string; required; retain unit",
+        "accepted_semantics": "Each line item has required dimensions with the source unit.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.validation_rules",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R18",
+        "parameter": "Line-item field: product form",
+        "oracle_value": "product_form; required; Flat, round, or rectangular bar",
+        "accepted_semantics": "The field uses the stated controlled values.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.allowed_values",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R19",
+        "parameter": "Line-item field: material grade",
+        "oracle_value": "material_grade; string; required",
+        "accepted_semantics": "Each line item has a required material grade.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.required_fields",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R20",
+        "parameter": "Optional technical line-item fields",
+        "oracle_value": "standard_designation, cut_length, temper_or_condition, hardness_hv, min_bend_radius, delivery_length_note, applicable_standard, and special_flags",
+        "accepted_semantics": "All stated optional technical fields are represented.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.optional_fields",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R21",
+        "parameter": "Line-item field: quantity",
+        "oracle_value": "quantity; string; required; retain unit",
+        "accepted_semantics": "Each item has a required quantity that retains its unit.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.validation_rules",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R22",
+        "parameter": "Missing-value policy",
+        "oracle_value": "Leave missing optional values null; never invent a value.",
+        "accepted_semantics": "The specification prohibits fabrication and retains null for unstated optional values.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.missing_value_policy",
+          "validation",
+          "assumptions",
+          "poc/prompts"
+        ]
+      },
+      {
+        "id": "EQ1-R23",
+        "parameter": "Uncertainty handling",
+        "oracle_value": "Flag missing or uncertain required values for human review.",
+        "accepted_semantics": "Uncertain required values are visibly escalated rather than silently guessed.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec",
+          "validation",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R24",
+        "parameter": "Review evidence",
+        "oracle_value": "Reviewer receives the structured record, field-level confidence or uncertainty information, and original purchase-order PDF.",
+        "accepted_semantics": "All three review inputs are present.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "artifacts",
+          "workflow.steps.inputs",
+          "business_process.manual_steps"
+        ]
+      },
+      {
+        "id": "EQ1-R25",
+        "parameter": "Review gate",
+        "oracle_value": "Human review follows extraction and precedes ERP transfer.",
+        "accepted_semantics": "Approval is positioned after extraction and before downstream transfer.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.human_review_required",
+          "workflow.steps",
+          "validation.human_review_required"
+        ]
+      },
+      {
+        "id": "EQ1-R26",
+        "parameter": "Review outcomes",
+        "oracle_value": "The reviewer can approve the record or return it with comments. When returned, the employee corrects the extracted record or uploads a corrected purchase order and resubmits it. The extraction and review cycle repeats until approval.",
+        "accepted_semantics": "A returned record follows an employee-rework and resubmission loop rather than being automatically discarded.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_process.decision_points",
+          "business_process.exceptions",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R27",
+        "parameter": "Integration scope",
+        "oracle_value": "Production target is ERP; PoC saves approved JSON and does not implement a live ERP API or database write.",
+        "accepted_semantics": "ERP is the target while live integration remains outside PoC scope.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.integration_targets",
+          "runtime",
+          "package",
+          "assumptions"
+        ]
+      },
+      {
+        "id": "EQ1-R28",
+        "parameter": "Data classification",
+        "oracle_value": "Internal commercial purchase-order information with customer or supplier identifiers; fixture contains no personal data.",
+        "accepted_semantics": "Commercial sensitivity and absence of fixture personal data are represented.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "governance.data_handling.contains_personal_data",
+          "governance.data_handling.output_sensitivity",
+          "technical_spec.security_constraints"
+        ]
+      },
+      {
+        "id": "EQ1-R29",
+        "parameter": "External model API policy",
+        "oracle_value": "Allowed; local-only processing is not required.",
+        "accepted_semantics": "External LLM or vision APIs are allowed.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "governance.data_handling.external_model_api_allowed",
+          "governance.data_handling.local_processing_required"
+        ]
+      },
+      {
+        "id": "EQ1-R30",
+        "parameter": "Input-document retention",
+        "oracle_value": "PoC must not create a retained duplicate after processing; original remains in the source document system.",
+        "accepted_semantics": "The PoC does not retain an extra copy of the input document.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "governance.data_handling.stores_input_data",
+          "assumptions",
+          "docs"
+        ]
+      },
+      {
+        "id": "EQ1-R31",
+        "parameter": "Retained evidence",
+        "oracle_value": "Approved JSON and review decision may be retained; no exact retention period.",
+        "accepted_semantics": "The output and approval decision may be retained without inventing a duration.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "governance.data_handling.stores_outputs",
+          "governance.data_handling.retention_policy",
+          "assumptions"
+        ]
+      },
+      {
+        "id": "EQ1-R32",
+        "parameter": "PoC interface",
+        "oracle_value": "Command-line interface accepting a PDF path and saving JSON.",
+        "accepted_semantics": "A CLI processes a supplied PDF and writes JSON.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "runtime.interface",
+          "runtime.entrypoint",
+          "package"
+        ]
+      },
+      {
+        "id": "EQ1-R33",
+        "parameter": "Stakeholder and party scope",
+        "oracle_value": "Customer is the external source of the purchase order; internal order-processing employee and reviewer are the required PoC participants.",
+        "accepted_semantics": "The external sender and internal participants are distinguished.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.stakeholders",
+          "business_process.participants",
+          "business_process.external_parties"
+        ]
+      },
+      {
+        "id": "EQ1-R34",
+        "parameter": "Business and PoC success criteria",
+        "oracle_value": "Faster, less error-prone, reviewer-verifiable ERP preparation plus successful execution over the supplied fixture; no numerical improvement threshold.",
+        "accepted_semantics": "Success covers business value, reviewability, and fixture execution without an invented threshold.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.success_criteria",
+          "business_spec.poc_goal",
+          "technical_spec.evaluation_requirements",
+          "evaluation"
+        ]
+      },
+      {
+        "id": "EQ1-R35",
+        "parameter": "Principal risks",
+        "oracle_value": "Layout loss, cross-page row errors, merged items, altered codes or leading zeros, dropped units, invented values, and transfer without approval.",
+        "accepted_semantics": "The main extraction and governance risks are represented.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.risks",
+          "governance.risks",
+          "docs"
+        ]
+      },
+      {
+        "id": "EQ1-R36",
+        "parameter": "Domain vocabulary and exact identifiers",
+        "oracle_value": "Four-digit item numbers, case-sensitive article codes, vendor numbers, material grades, standards, dates, dimensions, quantities, and units; no separate glossary.",
+        "accepted_semantics": "Identifiers and units are preserved exactly and no unsupported glossary is claimed.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.domain_vocabulary",
+          "target_output_spec.validation_rules",
+          "poc/prompts"
+        ]
+      },
+      {
+        "id": "EQ1-R37",
+        "parameter": "Model and provider preference",
+        "oracle_value": "Provider and model remain configurable; no exact provider, model, temperature, or reasoning effort is user-specified.",
+        "accepted_semantics": "Specific implementation defaults may be assumptions but not user-confirmed requirements.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.model_provider",
+          "technical_spec.model_preferences",
+          "assumptions",
+          "runtime"
+        ]
+      },
+      {
+        "id": "EQ1-R38",
+        "parameter": "Required output formats",
+        "oracle_value": "Final machine-readable JSON record plus original document and confidence/uncertainty review evidence; no formatted PDF, HTML, or DOCX report.",
+        "accepted_semantics": "Only the requested JSON and review evidence are required.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.output_types",
+          "business_spec.target_outputs",
+          "artifacts",
+          "outputs",
+          "package"
+        ]
+      },
+      {
+        "id": "EQ1-R39",
+        "parameter": "Target schema structure, types, and formats",
+        "oracle_value": "PurchaseOrderERPRecord uses parent_with_nested_list; required headers and line-item strings/list are enforced; dates use DD/MM/YYYY; product_form uses its controlled values; optional numeric/text fields may be null.",
+        "accepted_semantics": "The generated schema represents the full nested structure, requiredness, formats, and controlled values.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.schema_name",
+          "target_output_spec.field_types",
+          "target_output_spec.required_fields",
+          "target_output_spec.optional_fields",
+          "target_output_spec.allowed_values",
+          "schemas"
+        ]
+      },
+      {
+        "id": "EQ1-R40",
+        "parameter": "Confidence and output validation",
+        "oracle_value": "Field-level confidence score 0-1 and short reason are required when supported; required keys and item count must match; identifiers and units are exact; values are source-grounded.",
+        "accepted_semantics": "Verification metadata and all stated validation rules are represented.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.confidence_required",
+          "target_output_spec.validation_rules",
+          "validation",
+          "schemas",
+          "poc/prompts"
+        ]
+      },
+        {
+        "id": "EQ1-R41",
+        "parameter": "Employee interaction and business-process detail",
+        "oracle_value": "Order-processing employees use a web application to upload one or more purchase-order PDFs. The system extracts a structured record for each purchase order and provides the original document, extracted values, and confidence or uncertainty information for review. The employee or reviewer can correct and approve the record. The application provides an ERP-compatible downloadable JSON file for each approved purchase order. Only approved data may proceed to ERP.",
+        "accepted_semantics": "The employee-facing workflow includes web-based upload of one or more purchase orders, extraction and review, correction and approval, and downloadable JSON output before ERP transfer.",
+        "source": [
+          "scripted_answers.json"
+        ],
+        "path_hints": [
+          "technical_spec.runtime_interface",
+          "business_spec.user_interface",
+          "business_process.manual_steps",
+          "business_process.decision_points",
+          "workflow.steps",
+          "human_review",
+          "docs"
+        ]
+      },
+      {
+        "id": "EQ1-R42",
+        "parameter": "Security, access, audit, and evaluation scope",
+        "oracle_value": "External APIs allowed; no retained input duplicate; approved JSON and decision may be retained; production authentication, RBAC, ERP credentials, and full audit logging are outside scope; fixture acceptance requires successful execution, JSON parsing, three-item preservation, and no unsupported values.",
+        "accepted_semantics": "Security boundaries and the complete PoC acceptance scope are documented.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.security_constraints",
+          "technical_spec.evaluation_requirements",
+          "governance.data_handling",
+          "evaluation",
+          "docs"
+        ]
+      }
+    ],
+    "EQ1_diagnostics": [
+      {
+        "id": "EQ1-D01",
+        "parameter": "Unsupported provider/model commitment",
+        "oracle_value": "Provider and model must remain configurable; no exact provider, model, temperature, or reasoning effort was supplied.",
+        "accepted_semantics": "Concrete implementation defaults are labelled as defaults or assumptions, not confirmed requirements.",
+        "source": [
+          "scripted_answers.json#SA08"
+        ]
+      },
+      {
+        "id": "EQ1-D02",
+        "parameter": "Unsupported retention period",
+        "oracle_value": "No exact retention period was supplied.",
+        "accepted_semantics": "The package does not invent a duration.",
+        "source": [
+          "scripted_answers.json#SA06"
+        ]
+      },
+      {
+        "id": "EQ1-D03",
+        "parameter": "Unsupported SLA, volume, budget, or deployment commitment",
+        "oracle_value": "No SLA, throughput, volume, budget, or deployment topology was supplied.",
+        "accepted_semantics": "No unsupported operational commitment is presented as confirmed.",
+        "source": [
+          "scripted_answers.json#SA08"
+        ]
+      }
+    ],
+    "EQ2": [
+      {
+        "id": "EQ2-C01",
+        "parameter": "Knowledge-process classification",
+        "oracle_value": "knowledge_capture",
+        "accepted_semantics": "Purchase-order extraction is classified as knowledge capture.",
+        "source": [
+          "GAIK registry",
+          "initial_prompt.txt"
+        ],
+        "blueprint_hints": [
+          "use_case.knowledge_processes"
+        ]
+      },
+      {
+        "id": "EQ2-C02",
+        "parameter": "Complex-layout component selection",
+        "oracle_value": "VisionExtractor (id: vision_extractor)",
+        "accepted_semantics": "The primary executable extraction asset is VisionExtractor because the purchase orders are layout-complex and accuracy-critical.",
+        "source": [
+          "GAIK registry known limitations and best_for",
+          "SA02"
+        ],
+        "blueprint_hints": [
+          "components.selected_building_blocks",
+          "components.selected_modules",
+          "workflow.steps.component"
+        ]
+      },
+      {
+        "id": "EQ2-C03",
+        "parameter": "Layout-aware PDF/image processing",
+        "oracle_value": "VisionExtractor processes the original PDF/image content directly; no text-only parser is relied on for the scored fixture.",
+        "accepted_semantics": "The PDF is passed directly to a layout-aware vision extractor that can retain cross-page context.",
+        "source": [
+          "GAIK registry",
+          "SA02"
+        ],
+        "blueprint_hints": [
+          "workflow.steps",
+          "technical_spec.input_types",
+          "poc/run_poc.py"
+        ]
+      },
+      {
+        "id": "EQ2-C04",
+        "parameter": "Verification option",
+        "oracle_value": "include_verification = true",
+        "accepted_semantics": "Field-level confidence scores and reasons are enabled for reviewer support.",
+        "source": [
+          "GAIK registry",
+          "SA04"
+        ],
+        "blueprint_hints": [
+          "workflow.steps.parameters.include_verification",
+          "technical_spec",
+          "poc/config.yaml",
+          "poc/run_poc.py"
+        ]
+      },
+      {
+        "id": "EQ2-C05",
+        "parameter": "Structured extraction task and schema",
+        "oracle_value": "VisionExtractor has a task and schema/requirements assets defining PurchaseOrderERPRecord and its nested line items.",
+        "accepted_semantics": "The required task parameter and reusable nested extraction schema are connected to the extraction step.",
+        "source": [
+          "GAIK registry required_parameters",
+          "SA03",
+          "SA11"
+        ],
+        "blueprint_hints": [
+          "target_output_spec",
+          "schemas",
+          "workflow.steps.parameters.task",
+          "workflow.steps.parameters.schema_ref",
+          "poc/schemas",
+          "poc/prompts"
+        ]
+      },
+      {
+        "id": "EQ2-C06",
+        "parameter": "No redundant executable extraction pipeline",
+        "oracle_value": "The PoC invokes VisionExtractor once and does not also execute DocumentsToStructuredData or a separate MultimodalParser-to-Extractor pipeline over the same input.",
+        "accepted_semantics": "There is one authoritative layout-aware extraction path, while references for explanation or traceability are allowed.",
+        "source": [
+          "GAIK registry",
+          "scenario design"
+        ],
+        "blueprint_hints": [
+          "components",
+          "workflow.steps",
+          "poc/run_poc.py"
+        ]
+      },
+      {
+        "id": "EQ2-C07",
+        "parameter": "Review placement",
+        "oracle_value": "Human review follows structured extraction and precedes ERP transfer.",
+        "accepted_semantics": "The workflow gates downstream ERP use on review approval.",
+        "source": [
+          "SA05"
+        ],
+        "blueprint_hints": [
+          "workflow.steps",
+          "business_process",
+          "technical_spec.integration_targets"
+        ]
+      },
+      {
+        "id": "EQ2-C08",
+        "parameter": "Review inputs",
+        "oracle_value": "Reviewer receives the structured record, field-level confidence or uncertainty information, and original purchase-order PDF.",
+        "accepted_semantics": "All required evidence is available at the review step.",
+        "source": [
+          "SA04",
+          "SA05"
+        ],
+        "blueprint_hints": [
+          "workflow.steps.inputs",
+          "artifacts",
+          "business_process.manual_steps"
+        ]
+      },
+      {
+        "id": "EQ2-C09",
+        "parameter": "PoC output behavior",
+        "oracle_value": "CLI accepts a PDF and saves JSON; live ERP API/database integration is not required.",
+        "accepted_semantics": "The executable PoC has the requested local CLI and JSON boundary.",
+        "source": [
+          "SA05",
+          "SA07"
+        ],
+        "blueprint_hints": [
+          "runtime",
+          "technical_spec.integration_targets",
+          "package",
+          "poc"
+        ]
+      }
+    ],
+    "EQ3": [
+      {
+        "id": "EQ3-P01",
+        "parameter": "Blueprint presence and JSON parsing",
+        "oracle_value": "generated_package/use_case.blueprint.json exists, is non-empty, and parses as JSON.",
+        "automated_check": "blueprint_json",
+        "evidence_required": [
+          "file path",
+          "size",
+          "JSON parser result"
+        ]
+      },
+      {
+        "id": "EQ3-P02",
+        "parameter": "Official blueprint validation",
+        "oracle_value": "The GAIK Solution Wizard validator returns exit code 0 with no blocking errors.",
+        "automated_check": "official_validator",
+        "evidence_required": [
+          "validator command",
+          "exit code",
+          "validator output excerpt"
+        ]
+      },
+      {
+        "id": "EQ3-P03",
+        "parameter": "Artifact-flow consistency",
+        "oracle_value": "Step inputs/outputs reference declared artifacts; generated artifacts have valid producers; dependencies are resolvable.",
+        "automated_check": "artifact_flow",
+        "evidence_required": [
+          "blueprint steps, artifacts, dependencies, and producer mapping"
+        ]
+      },
+      {
+        "id": "EQ3-P04",
+        "parameter": "Mermaid workflow",
+        "oracle_value": "workflow.mmd exists, is non-empty, and contains the workflow step labels or identifiers.",
+        "automated_check": "mermaid",
+        "evidence_required": [
+          "file path",
+          "size",
+          "workflow-step coverage"
+        ]
+      },
+      {
+        "id": "EQ3-P05",
+        "parameter": "BPMN workflow and traceability",
+        "oracle_value": "workflow.bpmn is well-formed XML and its mapping or element identifiers cover the blueprint workflow.",
+        "automated_check": "bpmn",
+        "evidence_required": [
+          "XML parser result",
+          "blueprint-to-BPMN mapping coverage"
+        ]
+      },
+      {
+        "id": "EQ3-P06",
+        "parameter": "PoC scaffold completeness",
+        "oracle_value": "poc/ contains an executable entrypoint, dependency declaration, configuration/example environment, document-extraction prompt, and nested output schema or schema-generation assets.",
+        "automated_check": "poc_manifest",
+        "evidence_required": [
+          "PoC file manifest by required category"
+        ]
+      },
+      {
+        "id": "EQ3-P07",
+        "parameter": "Documentation completeness",
+        "oracle_value": "docs/ contains at least one non-empty use-case-specific document and the PoC contains usage instructions.",
+        "automated_check": "documentation",
+        "evidence_required": [
+          "non-empty documentation files and PoC README"
+        ]
+      },
+      {
+        "id": "EQ3-P08",
+        "parameter": "Requirement-to-component traceability",
+        "oracle_value": "The blueprint traceability data connects the VisionExtractor decision and other selected assets to stated requirements.",
+        "automated_check": "traceability",
+        "evidence_required": [
+          "traceability entries and selected GAIK assets"
+        ]
+      }
+    ],
+    "EQ4": [
+      {
+        "id": "EQ4-X01",
+        "parameter": "PoC setup/build",
+        "oracle_value": "For the original unmodified PoC, the declared setup or import command completes with exit code 0.",
+        "automated_check": "setup_exit_code",
+        "evidence_required": [
+          "setup command",
+          "exit code",
+          "stdout/stderr"
+        ]
+      },
+      {
+        "id": "EQ4-X02",
+        "parameter": "End-to-end execution",
+        "oracle_value": "The original unmodified generated PoC processes purchase_order_complex.pdf and exits with code 0.",
+        "automated_check": "run_exit_code",
+        "evidence_required": [
+          "run command",
+          "fixture hash",
+          "exit code",
+          "stdout/stderr"
+        ]
+      },
+      {
+        "id": "EQ4-X03",
+        "parameter": "Machine-readable output",
+        "oracle_value": "The original unmodified PoC generates a new non-empty JSON ERP record that parses successfully.",
+        "automated_check": "output_json",
+        "evidence_required": [
+          "output path",
+          "size",
+          "JSON parser result"
+        ]
+      },
+      {
+        "id": "EQ4-X04",
+        "parameter": "Fixture acceptance",
+        "oracle_value": "The original unmodified PoC output preserves the expected header facts and all three line items in expected_erp_record.json, including the cross-page item, exact identifiers and units, and no unsupported values.",
+        "automated_check": "fixture_semantic_match",
+        "evidence_required": [
+          "expected ERP record",
+          "generated output",
+          "semantic field and item comparison"
+        ]
+      }
+    ]
+  },
+  "scoring": {
+    "EQ1": {
+      "metric": "Requirement capture recall",
+      "formula": "Yes verdicts for EQ1-R rows / total EQ1-R rows",
+      "diagnostics_excluded": [
+        "EQ1-D01",
+        "EQ1-D02",
+        "EQ1-D03"
+      ]
+    },
+    "EQ2": {
+      "metric": "Configuration constraint satisfaction",
+      "formula": "Yes verdicts for EQ2-C rows / total EQ2-C rows"
+    },
+    "EQ3": {
+      "metric": "Valid solution package rate",
+      "formula": "A run passes only if every mandatory EQ3-P check is Yes; passed runs / 2"
+    },
+    "EQ4": {
+      "metric": "PoC execution success rate",
+      "formula": "A run passes only if every mandatory EQ4-X check for the original unmodified PoC is Yes; passed runs / 2"
+    },
+    "recovery_diagnostic": {
+      "metric": "Refinement attempts to successful execution",
+      "values": "0, 1, 2, 3, or N/A",
+      "formula": "Record the first successful execution: 0 for original success, 1-3 for success after that many refinements, and N/A when all three refinements fail.",
+      "scored_under_EQ4": false,
+      "reporting": "Report initially successful runs, runs recovered within three refinements, and runs that never executed successfully."
+    },
+    "two_run_aggregation": "For EQ1 and EQ2, pool Yes verdicts across both runs and divide by the pooled number of scored checks. For EQ3 and EQ4, divide the number of passing runs by two."
+  },
+  "verdict_policy": {
+    "allowed": [
+      "Yes",
+      "No"
+    ],
+    "human_is_final_judge": true,
+    "semantic_matching": "The LLM may align semantically equivalent wording and identify evidence, but it must not enter the final verdict. The evaluator reviews the side-by-side evidence and enters Yes or No.",
+    "missing_requirement": "If an oracle requirement is absent, the generated-value cell states NOT FOUND, the evidence cell lists the searched sources/paths, and the evaluator enters No. This keeps omitted requirements in the denominator.",
+    "evidence_rule": "Every verdict cell must have adjacent evidence that identifies the source file and a concrete excerpt, path, command result, or parser/validator result."
+  }
+}

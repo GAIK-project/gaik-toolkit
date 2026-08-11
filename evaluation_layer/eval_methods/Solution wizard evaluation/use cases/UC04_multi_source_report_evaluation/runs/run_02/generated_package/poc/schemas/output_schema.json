@@ -1,0 +1,44 @@
+{
+  "properties": {
+    "executive_summary": {
+      "description": "Synthesise overall Q2 2026 supplier performance in 2-3 paragraphs. Cover the headline KPIs (total deliveries, on-time rate, units, defect rate, EUR spend), the key risks and findings, and any data conflicts. In particular, explicitly disclose that the meeting notes state approximately EUR 410,000 for Nordic Components while the authoritative workbook gives EUR 405,000. State clearly that this report is a draft pending procurement manager review and must not be released until approved.",
+      "title": "Executive Summary",
+      "type": "string"
+    },
+    "kpi_overview": {
+      "description": "Present a Markdown table with one row per supplier (Nordic Components, Baltic Parts, Alpine Precision) plus an Overall row. Columns: Supplier | Total Deliveries | On-Time % | Total Units | Defective % | EUR Spend. Calculate all values from supplier_kpis_q2_2026.xlsx (authoritative for spend and units). Round percentages to one decimal place. Cite the workbook [supplier_kpis_q2_2026.xlsx] for every cell value.",
+      "title": "Kpi Overview",
+      "type": "string"
+    },
+    "supplier_findings": {
+      "description": "Write a per-supplier narrative subsection for each of Nordic Components, Baltic Parts, and Alpine Precision. For each: summarise KPI performance from the workbook; cite quality audit findings including the 72/100 audit score and major findings for Nordic; highlight delivery incidents (three Nordic incidents, two being assembly delays) from the incident log; note conditional status and the 85/100 release threshold from the audit; note Baltic preference and Alpine single-source risk from meeting notes. Cite exact filenames [source_file] for every material claim.",
+      "title": "Supplier Findings",
+      "type": "string"
+    },
+    "quality_and_delivery_risks": {
+      "description": "List and explain risks derived strictly from nordic_components_quality_audit.pdf and delivery_incidents_q2_2026.csv. Include: audit major findings, three Nordic incidents including two assembly delays, the 72/100 audit score against the 85/100 release threshold, and Nordic conditional status. Do not speculate or introduce facts not present in these two source files. Cite each risk to its specific source file and, where available, page, row, or table reference.",
+      "title": "Quality And Delivery Risks",
+      "type": "string"
+    },
+    "actions_and_owners": {
+      "description": "Present a Markdown table with columns: Action | Owner | Due Date | Completion Condition. Include only actions that have named owners and due dates explicitly stated in the source documents, primarily from procurement_meeting_notes_q2_2026.md. Do not fabricate, infer, or generalise actions or owners. If a source action lacks an owner or due date, state 'not specified' in that cell and cite the source. Every row must cite [source_file].",
+      "title": "Actions And Owners",
+      "type": "string"
+    },
+    "source_references": {
+      "description": "List all four source files used in this report as a numbered list: (1) supplier_kpis_q2_2026.xlsx \u2014 KPI data and EUR spend; (2) nordic_components_quality_audit.pdf \u2014 quality audit; (3) procurement_meeting_notes_q2_2026.md \u2014 meeting decisions and actions; (4) delivery_incidents_q2_2026.csv \u2014 delivery incidents.",
+      "title": "Source References",
+      "type": "string"
+    }
+  },
+  "required": [
+    "executive_summary",
+    "kpi_overview",
+    "supplier_findings",
+    "quality_and_delivery_risks",
+    "actions_and_owners",
+    "source_references"
+  ],
+  "title": "SupplierPerformanceReport",
+  "type": "object"
+}

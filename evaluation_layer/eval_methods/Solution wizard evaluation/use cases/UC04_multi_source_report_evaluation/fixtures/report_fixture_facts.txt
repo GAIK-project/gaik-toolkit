@@ -1,0 +1,10 @@
+F01: Overall: 299 deliveries, 91.6% on time, 26,550 units, 2.0% defective, EUR 867,000 spend.
+F02: Nordic Components: 135 deliveries, 85.2% on time, 13,500 units, 3.1% defective, exact spend EUR 405,000.
+F03: Baltic Fasteners: 97 deliveries, 96.9% on time, 9,700 units, 1.0% defective, EUR 194,000 spend.
+F04: Alpine Sensors: 67 deliveries, 97.0% on time, 3,350 units, 0.6% defective, EUR 268,000 spend.
+F05: Nordic audit score 72/100; major findings are incomplete calibration records for 4/10 gauges and overdue CAPA-17 since 31 May 2026.
+F06: Nordic had three delivery incidents; two caused assembly delays of 6 and 10 hours.
+F07: Nordic remains conditional; no volume increase until the corrective-action plan is accepted and follow-up audit score is at least 85/100.
+F08: Lena Hoffmann tracks the corrective-action plan due 15 July 2026; Marko Laine verifies the ERP block by 5 July 2026; follow-up audit is due 20 August 2026.
+F09: Baltic is preferred for incremental fastener demand; Alpine performance is acceptable but single-source lead-time exposure is monitored.
+F10: The approximate EUR 410,000 meeting-note value is identified as an approximation and reconciled to the authoritative workbook amount of EUR 405,000.

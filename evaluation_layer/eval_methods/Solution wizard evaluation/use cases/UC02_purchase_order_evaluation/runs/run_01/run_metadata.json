@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.1.0",
+  "scenario_id": "UC02",
+  "run_id": "UC02_run_01",
+  "maximum_refinement_attempts": 3,
+  "poc": {
+    "setup_command": [
+      "python",
+      "-m",
+      "pip",
+      "install",
+      "-r",
+      "requirements.txt"
+    ],
+    "run_command": [
+    "python",
+    "run_poc.py"
+    ],
+    "output_globs": [
+      "output/**/*.json",
+      "output/*.json"
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UC03",
+  "documents_directory": "poc_input/documents",
+  "access_manifest": "poc_input/access_manifest.json",
+  "query_set": "poc_input/query_set.json",
+  "path_resolution": "Resolve all paths relative to this bundle file."
+}

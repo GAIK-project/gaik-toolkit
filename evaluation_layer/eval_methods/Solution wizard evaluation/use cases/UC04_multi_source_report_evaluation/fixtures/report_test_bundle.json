@@ -1,0 +1,7 @@
+{
+  "scenario_id": "UC04",
+  "input_bundle": "poc_input_bundle.json",
+  "expected_results": "expected_report_results.json",
+  "primary_output": "output/report.md",
+  "supporting_output": "output/evidence_index.json"
+}

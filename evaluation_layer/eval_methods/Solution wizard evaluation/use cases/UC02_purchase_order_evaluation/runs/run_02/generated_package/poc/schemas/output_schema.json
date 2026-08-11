@@ -1,0 +1,201 @@
+{
+  "$defs": {
+    "purchase_order_erp_record_line_item_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for purchase_order_erp_record_line_item",
+      "properties": {
+        "item_number": {
+          "description": "Sequential line number, typically in the first column; preserve leading zeros.",
+          "title": "Item Number",
+          "type": "string"
+        },
+        "article_code": {
+          "description": "Buyer's or supplier's product/material code or part number; preserve exact case and punctuation as printed.",
+          "title": "Article Code",
+          "type": "string"
+        },
+        "dimensions": {
+          "description": "Physical dimensions of the item; extract the full dimension string exactly as written.",
+          "title": "Dimensions",
+          "type": "string"
+        },
+        "material_grade": {
+          "description": "Material grade or alloy designation; preserve exactly as written.",
+          "title": "Material Grade",
+          "type": "string"
+        },
+        "quantity": {
+          "description": "Ordered quantity including the numeric value and unit of measure; preserve the unit exactly as written.",
+          "title": "Quantity",
+          "type": "string"
+        },
+        "product_form": {
+          "default": "",
+          "description": "Physical form or shape of the product.",
+          "enum": [
+            "",
+            "Flat",
+            "round",
+            "rectangular bar"
+          ],
+          "title": "Product Form",
+          "type": "string"
+        },
+        "standard_designation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Material or product standard reference.",
+          "title": "Standard Designation"
+        },
+        "cut_length": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Cut-to-length specification if ordered to a specific cut length.",
+          "title": "Cut Length"
+        },
+        "temper_or_condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Temper, heat treatment, or delivery condition stated separately from the material grade.",
+          "title": "Temper Or Condition"
+        },
+        "hardness_hv": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required hardness in Vickers (HV) as a numeric value only, without the unit.",
+          "title": "Hardness Hv"
+        },
+        "min_bend_radius": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Minimum bend radius as a numeric value only, without the unit.",
+          "title": "Min Bend Radius"
+        },
+        "delivery_length_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Any note about delivery length, cut tolerances, or length-related constraints.",
+          "title": "Delivery Length Note"
+        },
+        "applicable_standard": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional applicable standard reference beyond standard_designation if present.",
+          "title": "Applicable Standard"
+        },
+        "special_flags": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Any special requirements, quality notes, or flags on the line item.",
+          "title": "Special Flags"
+        }
+      },
+      "required": [
+        "item_number",
+        "article_code",
+        "dimensions",
+        "material_grade",
+        "quantity"
+      ],
+      "title": "purchase_order_erp_record_line_item_Extraction",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Extraction model for PurchaseOrderERPRecord with repeated line_items",
+  "properties": {
+    "purchase_order_number": {
+      "description": "The PO's unique identifier, typically labelled Purchase Order No., PO No., Order No., or similar. Extract exactly as printed and preserve leading zeros, hyphens, and alphanumeric formatting.",
+      "title": "Purchase Order Number",
+      "type": "string"
+    },
+    "delivery_date": {
+      "description": "The requested delivery or shipment date, commonly labelled Delivery Date, Required Date, Ship Date, or Due Date. Normalize to DD/MM/YYYY format; if only month and year appear, record as 01/MM/YYYY.",
+      "title": "Delivery Date",
+      "type": "string"
+    },
+    "delivery_address": {
+      "description": "The full delivery or ship-to address as stated in the document. Preserve as a single string and use commas to separate lines if needed.",
+      "title": "Delivery Address",
+      "type": "string"
+    },
+    "vendor_number": {
+      "description": "The supplier or vendor identifier assigned by the buyer, commonly labelled Vendor No., Supplier No., or Vendor ID. Preserve leading zeros and punctuation exactly.",
+      "title": "Vendor Number",
+      "type": "string"
+    },
+    "line_items": {
+      "description": "Repeated purchase order line-item entries, one per ordered item row.",
+      "items": {
+        "$ref": "#/$defs/purchase_order_erp_record_line_item_Extraction"
+      },
+      "title": "Line Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "purchase_order_number",
+    "delivery_date",
+    "delivery_address",
+    "vendor_number",
+    "line_items"
+  ],
+  "title": "PurchaseOrderERPRecord_Extraction",
+  "type": "object"
+}

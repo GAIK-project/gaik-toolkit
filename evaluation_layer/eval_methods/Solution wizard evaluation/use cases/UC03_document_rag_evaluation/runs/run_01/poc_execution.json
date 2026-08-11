@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.1.0",
+  "run_id": "UC03_run_01",
+  "attempt_number": 0,
+  "attempt_type": "original",
+  "eq4_baseline": true,
+  "generated_package": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\runs\\run_01\\generated_package",
+  "configuration": {
+    "source": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\runs\\run_01\\run_metadata.json",
+    "uses_default_values": true,
+    "resolved_setup_command": [
+      "C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "-m",
+      "pip",
+      "install",
+      "-r",
+      "requirements.txt"
+    ],
+    "resolved_run_command": [
+      "C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "run_poc.py",
+      "--input",
+      "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\fixtures\\poc_input_bundle.json"
+    ],
+    "resolved_output_globs": [
+      "output/**/*.json",
+      "output/*.json"
+    ]
+  },
+  "recorded_at": "2026-08-05T14:35:50.475509+00:00",
+  "fixture": {
+    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\fixtures\\poc_input_bundle.json",
+    "sha256": "0f39c932d5146754a0462ce9d09151c2238b8f980256ab7a201335970bc8da7e",
+    "size_bytes": 275
+  },
+  "setup": {
+    "command": [
+      "C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "-m",
+      "pip",
+      "install",
+      "-r",
+      "requirements.txt"
+    ],
+    "cwd": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\runs\\run_01\\generated_package\\poc",
+    "exit_code": 0,
+    "duration_seconds": 2.798,
+    "stdout": "Requirement already satisfied: pydantic>=2 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from -r requirements.txt (line 1)) (2.12.5)\nRequirement already satisfied: python-dotenv in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from -r requirements.txt (line 2)) (1.2.1)\nRequirement already satisfied: pyyaml in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from -r requirements.txt (line 3)) (6.0.3)\nRequirement already satisfied: openai>=1.30 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from -r requirements.txt (line 4)) (2.8.1)\nRequirement already satisfied: numpy>=1.26 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from -r requirements.txt (line 5)) (1.26.4)\nRequirement already satisfied: pymupdf>=1.24 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from -r requirements.txt (line 6)) (1.27.2.2)\nRequirement already satisfied: annotated-types>=0.6.0 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.7.0)\nRequirement already satisfied: pydantic-core==2.41.5 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (2.41.5)\nRequirement already satisfied: typing-extensions>=4.14.1 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (4.15.0)\nRequirement already satisfied: typing-inspection>=0.4.2 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.4.2)\nRequirement already satisfied: anyio<5,>=3.5.0 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from openai>=1.30->-r requirements.txt (line 4)) (4.12.0)\nRequirement already satisfied: distro<2,>=1.7.0 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from openai>=1.30->-r requirements.txt (line 4)) (1.9.0)\nRequirement already satisfied: httpx<1,>=0.23.0 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from openai>=1.30->-r requirements.txt (line 4)) (0.28.1)\nRequirement already satisfied: jiter<1,>=0.10.0 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from openai>=1.30->-r requirements.txt (line 4)) (0.12.0)\nRequirement already satisfied: sniffio in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from openai>=1.30->-r requirements.txt (line 4)) (1.3.1)\nRequirement already satisfied: tqdm>4 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from openai>=1.30->-r requirements.txt (line 4)) (4.67.1)\nRequirement already satisfied: idna>=2.8 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from anyio<5,>=3.5.0->openai>=1.30->-r requirements.txt (line 4)) (3.11)\nRequirement already satisfied: certifi in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from httpx<1,>=0.23.0->openai>=1.30->-r requirements.txt (line 4)) (2025.11.12)\nRequirement already satisfied: httpcore==1.* in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from httpx<1,>=0.23.0->openai>=1.30->-r requirements.txt (line 4)) (1.0.9)\nRequirement already satisfied: h11>=0.16 in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from httpcore==1.*->httpx<1,>=0.23.0->openai>=1.30->-r requirements.txt (line 4)) (0.16.0)\nRequirement already satisfied: colorama in c:\\users\\h02317\\appdata\\local\\programs\\python\\python312\\lib\\site-packages (from tqdm>4->openai>=1.30->-r requirements.txt (line 4)) (0.4.6)\n",
+    "stderr": "\n[notice] A new release of pip is available: 25.0.1 -> 26.2.1\n[notice] To update, run: python.exe -m pip install --upgrade pip\n"
+  },
+  "execution": {
+    "command": [
+      "C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "run_poc.py",
+      "--input",
+      "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\fixtures\\poc_input_bundle.json"
+    ],
+    "cwd": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\runs\\run_01\\generated_package\\poc",
+    "exit_code": 1,
+    "duration_seconds": 1.46,
+    "stdout": "=== Manufacturing Knowledge Base RAG Assistant — PoC ===\n\nInput bundle : C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\fixtures\\poc_input_bundle.json\nChat model   : gpt-5.4  (temp=0.0, reasoning=medium)\nEmbedding    : text-embedding-3-large\nTop-k        : 4\n\nDocuments found : []\nAccess manifest : []\nQueries loaded  : 0\n\n",
+    "stderr": "ERROR: No PDF files resolved from bundle.\n"
+  },
+  "outputs": [],
+  "automatic_checks": {
+    "EQ4-X01": true,
+    "EQ4-X02": false,
+    "EQ4-X03": false,
+    "EQ4-X04": null
+  },
+  "automatic_execution_successful": false,
+  "notes": "EQ4-X04 requires semantic comparison with fixtures/expected_rag_results.json, including citations and access-control behavior. Only attempt 0 is scored under EQ4; attempts 1-3 are a recovery diagnostic."
+}

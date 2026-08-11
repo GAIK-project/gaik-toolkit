@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UC04",
+  "report_title": "Q2 2026 Supplier Performance Report",
+  "required_sections": [
+    "Executive Summary",
+    "KPI Overview",
+    "Supplier Findings",
+    "Quality and Delivery Risks",
+    "Actions and Owners",
+    "Source References"
+  ],
+  "required_source_references": [
+    "supplier_kpis_q2_2026.xlsx",
+    "nordic_components_quality_audit.pdf",
+    "procurement_meeting_notes_q2_2026.md",
+    "delivery_incidents_q2_2026.csv"
+  ],
+  "required_facts": [
+    {
+      "id": "F01",
+      "fact": "Overall: 299 deliveries, 91.6% on time, 26,550 units, 2.0% defective, EUR 867,000 spend."
+    },
+    {
+      "id": "F02",
+      "fact": "Nordic Components: 135 deliveries, 85.2% on time, 13,500 units, 3.1% defective, exact spend EUR 405,000."
+    },
+    {
+      "id": "F03",
+      "fact": "Baltic Fasteners: 97 deliveries, 96.9% on time, 9,700 units, 1.0% defective, EUR 194,000 spend."
+    },
+    {
+      "id": "F04",
+      "fact": "Alpine Sensors: 67 deliveries, 97.0% on time, 3,350 units, 0.6% defective, EUR 268,000 spend."
+    },
+    {
+      "id": "F05",
+      "fact": "Nordic audit score 72/100; major findings are incomplete calibration records for 4/10 gauges and overdue CAPA-17 since 31 May 2026."
+    },
+    {
+      "id": "F06",
+      "fact": "Nordic had three delivery incidents; two caused assembly delays of 6 and 10 hours."
+    },
+    {
+      "id": "F07",
+      "fact": "Nordic remains conditional; no volume increase until the corrective-action plan is accepted and follow-up audit score is at least 85/100."
+    },
+    {
+      "id": "F08",
+      "fact": "Lena Hoffmann tracks the corrective-action plan due 15 July 2026; Marko Laine verifies the ERP block by 5 July 2026; follow-up audit is due 20 August 2026."
+    },
+    {
+      "id": "F09",
+      "fact": "Baltic is preferred for incremental fastener demand; Alpine performance is acceptable but single-source lead-time exposure is monitored."
+    },
+    {
+      "id": "F10",
+      "fact": "The approximate EUR 410,000 meeting-note value is identified as an approximation and reconciled to the authoritative workbook amount of EUR 405,000."
+    }
+  ],
+  "prohibited_behavior": [
+    "Do not invent actions, owners, deadlines, suppliers, or external market facts.",
+    "Do not silently use EUR 410,000 as the exact Nordic spend.",
+    "Do not claim the report is manager-approved; the PoC produces a draft for review."
+  ],
+  "acceptance_policy": {
+    "semantic_matching": true,
+    "numeric_values_must_be_correct": true,
+    "required_citation_format": "[source_file]",
+    "extra_unsupported_claims_are_failures": true
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UC04 execution configuration",
+  "type": "object",
+  "required": ["schema_version", "scenario_id", "run_id", "maximum_refinement_attempts", "poc"],
+  "properties": {
+    "schema_version": {"const": "1.1.0"},
+    "scenario_id": {"const": "UC04"},
+    "run_id": {"type": "string"},
+    "maximum_refinement_attempts": {"const": 3},
+    "commands": {
+      "type": "object",
+      "properties": {
+        "blueprint_validator": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "poc": {
+      "type": "object",
+      "required": ["run_command", "output_globs"],
+      "properties": {
+        "setup_command": {"type": "array", "items": {"type": "string"}},
+        "run_command": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "output_globs": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+      }
+    }
+  },
+  "additionalProperties": false
+}

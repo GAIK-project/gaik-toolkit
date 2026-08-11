@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UCXX",
+  "mappings": [
+    {
+      "wizard_field": "business_spec.users",
+      "scripted_answer_ids": ["SA01"],
+      "oracle_check_ids": ["EQ1-R01"]
+    },
+    {
+      "wizard_field": "technical_spec.runtime_interface",
+      "scripted_answer_ids": ["SA04"],
+      "oracle_check_ids": ["EQ1-R04"]
+    },
+    {
+      "wizard_field": "poc.goal_and_acceptance",
+      "scripted_answer_ids": ["SA05"],
+      "oracle_check_ids": ["EQ1-R05", "EQ4-E01"]
+    }
+  ]
+}

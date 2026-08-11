@@ -1,0 +1,14 @@
+{
+  "fixture_id": "UC01-F01",
+  "language": "fi",
+  "audio_file": "incident_report_fi.wav",
+  "transcript_file": "incident_report_fi.txt",
+  "expected_output_file": "expected_ticket.json",
+  "provenance": "Synthetic speech generated from the frozen transcript with an offline eSpeak-NG Finnish voice.",
+  "purpose": "Repeatable smoke and end-to-end execution input. It is not intended to represent natural field audio quality.",
+  "sha256": {
+    "incident_report_fi.wav": "ae7a380b378f298185434c23efe8ba892389bdbbbaee925c5717c954897c4464",
+    "incident_report_fi.txt": "330c30bdbe8abaa37d1458634342144739135790cae3c8a202fd97bbcdda03f0",
+    "expected_ticket.json": "df7c1577631983f883c9ca75284b7235d3b73d7837840ef70ccd8282c9f5acea"
+  }
+}

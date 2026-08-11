@@ -1,0 +1,18 @@
+{
+  "scenario_id": "UC03",
+  "schema_version": "1.0.0",
+  "fixture_type": "Synthetic role-aware RAG document collection",
+  "synthetic": true,
+  "description": "Three readable PDFs, document access metadata, four role-tagged queries, and expected grounded/access-controlled outcomes.",
+  "sha256": {
+    "rag_test_bundle.json": "cb9534df78f8ce040705efb11f36263972e4cd7d26a590fc1dccc0885f95486f",
+    "rag_fixture_facts.txt": "8b012310b7650788ea0add66c44ac6232685039390e6a2662f9b4afe519f15f4",
+    "expected_rag_results.json": "a45a477c7440d0070c2ad8a94ff42b55c72052c5ca10743b11b2b07ded9dca9b",
+    "poc_input_bundle.json": "0f39c932d5146754a0462ce9d09151c2238b8f980256ab7a201335970bc8da7e",
+    "poc_input/access_manifest.json": "2ce2e1a66686ff5f9ef43fcbecbe0965def3646589c60339a4584f3c16b45268",
+    "poc_input/query_set.json": "87cb2faf2618585e54764ecf6e79939304b814f25b7c7df28151f5dcc1b68be7",
+    "poc_input/documents/employee_travel_policy.pdf": "44ee9b4ce09af7deee23edd766508e771774d1863945ed25aaf6ec5b228ec4e1",
+    "poc_input/documents/mx200_maintenance_manual.pdf": "a8bb3413d6172a2def71ec696c1fb873b3f03e39ca74851e45fec022f7fa17b4",
+    "poc_input/documents/project_aurora_pricing_strategy.pdf": "de4e2424601005cd6e3df956970287b5003df6617619dee6768d1a1187d9c713"
+  }
+}

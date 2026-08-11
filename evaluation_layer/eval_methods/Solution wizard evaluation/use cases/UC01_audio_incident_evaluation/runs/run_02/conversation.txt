@@ -1,0 +1,443 @@
+The field technicians in a facility maintenance team report faults they observe daily. They describe what is broken, where it is, and how urgent it is. Currently, they manually enter this information into the maintenance system, which is slow and can result in missing details. They want an AI workflow that allows technicians to report faults via Finnish voice messages. The messages should be converted into structured maintenance tickets that a supervisor reviews before they are entered into the system.
+
+
+Reasoning
+This is an audio_to_structured use case — Finnish voice messages from field technicians are transcribed and converted into structured maintenance tickets, with supervisor review before system entry.
+
+I've noted the current process (manual data entry), the pain points (slow, incomplete), the intended users (field technicians), and the reviewer (supervisor). Let me collect the remaining business context.
+
+Round 1 of 3 — Business context
+
+1. Success criteria & expected value — What would a successful solution look like in practice? For example:
+
+Are there targets around ticket completeness (e.g. "all required fields always filled")?
+Is there a time-saving goal (e.g. "reporting takes under 2 minutes per fault")?
+What is the primary business value — faster response times, fewer errors, reduced admin load, or something else?
+2. Stakeholders & risks — Beyond the technicians and the reviewing supervisor:
+
+Who else has a stake in this? (e.g. facility managers, IT/system owners, compliance officers)
+Are there any concerns you're already aware of — for instance around voice data privacy, accuracy on technical Finnish vocabulary, or integration with an existing maintenance system?
+Business success means faster incident reporting with fewer missing details and a supervisor-verifiable ticket before transfer.
+
+The main risks are Finnish transcription errors, incorrect asset, location, fault, or urgency values, unsupported values being introduced, and transfer without supervisor approval.
+
+No additional business stakeholder is required for the PoC.
+
+
+Reasoning
+Good — that gives me a clear picture of the business context. One last Round 1 item:
+
+3. PoC goal — What should the first proof of concept specifically demonstrate? For example: "Given a sample Finnish voice message, produce a correctly structured ticket with all required fields filled and validated" — or something narrower or broader?
+
+While you answer that, I'll also start Round 2 — Technical spec with the first two questions:
+
+4. Input format & interface — How will technicians record and submit the voice messages? For example:
+
+A mobile app that records and uploads audio (MP3, M4A, WAV)?
+An existing field tool that already captures audio?
+Something else?
+5. Model provider — Do you have a preference or constraint on the AI provider? For example Azure OpenAI, OpenAI directly, or should it be left configurable?
+
+The PoC must accept the supplied Finnish audio fixture, exit successfully, produce a non-empty parseable JSON ticket, preserve the fixture facts, include required fields, and leave unsupported values null or unknown.
+
+A mobile app that records and uploads audio (MP3, M4A, WAV)
+
+Model provider: Azure OpenAI
+
+
+Reasoning
+Noted. Continuing Round 2:
+
+6. Domain vocabulary & controlled values — The risks you mentioned include unsupported values being introduced. This suggests the ticket fields should draw from defined lists. Could you share (or describe) what the allowed values are for:
+
+Asset / equipment type (e.g. HVAC unit, elevator, fire door…)
+Location (e.g. building, floor, room codes)
+Fault category (e.g. electrical, plumbing, structural…)
+Urgency / priority (e.g. critical, high, normal, low)
+Even rough examples help — I'll use them to design the extraction schema.
+
+7. Security & integration — Two related questions:
+
+Are there any constraints on how voice data is handled — for example, must recordings be deleted after transcription, stored only within a specific region, or kept out of certain cloud environments?
+What is the target maintenance system the approved ticket should be transferred into (e.g. a specific CMMS, a REST API, a database)? Or is the transfer out of scope for the PoC?
+Use the schema name MaintenanceTicket. It contains reporter_name (str, optional), asset_identifier (str, optional), location (str, required), fault_description (str, required), urgency (str, required; low, medium, or high), observation_date (date, optional; YYYY-MM-DD), observation_time (str, optional; HH:MM), actions_taken (list[str], optional), and uncertain_fields (list[str], optional). A required field may still have a null or unknown value when it was not stated, but it must be flagged rather than invented.
+
+The audio may contain an employee name and internal facility details. External model APIs are allowed, and local-only processing is not required. No provider-specific data-residency requirement is specified. The PoC must not retain raw audio after processing. The approved ticket and supervisor approval decision may be retained, but no exact retention period is specified. Authentication, production role-based access control, and a full audit-log implementation are outside the PoC scope; retaining the approval decision is sufficient.
+
+
+Reasoning
+The schema definition is very clear — I've captured all nine fields, the types, required/optional status, the urgency enum, and the null-flagging policy. That covers Round 3 as well, so we can move straight to the last two Round 2 items.
+
+8. PDF report — In addition to the structured JSON ticket, would you like the PoC to also render a formatted PDF version of the ticket (key/value layout, one page)? This can be useful for the supervisor review step.
+
+9. Model preferences & evaluation — Two quick sub-points:
+
+For transcription: the default for Finnish audio on Azure OpenAI is Whisper. Any preference, or shall I use that?
+For extraction/generation: the default is gpt-5.4 at temperature 0.0. Any preference, or are those fine?
+For evaluation: are there specific metrics or pass/fail thresholds you want the PoC eval script to check — for example, minimum field-completeness rate, urgency classification accuracy — or shall I use sensible defaults (all required fields present, urgency is one of the allowed values)?
+No PDF, HTML, or DOCX report is required. Transcription model: gpt-4o-transcribe Extraction/generation model: gpt-5.4, temperature = 0.0 Evaluate JSON parsing, required-field coverage, semantic fixture-fact matching, and unsupported-value introduction. No numerical accuracy threshold is specified for this single-fixture PoC.
+
+
+Reasoning
+That completes all three rounds. Let me now write the draft blueprint and run the completeness checker before presenting the full summary for your confirmation.Now I'll write the draft blueprint and run the completeness checker.All 13 completeness points pass. Here is the full specification — please review every field before I proceed.
+
+Specification Summary
+Use Case
+
+
+
+Field	Value
+ID	maintenance_ticket
+Name	Finnish Voice Fault Reporting — Maintenance Ticket Generator
+Description	Convert Finnish voice messages from field technicians into structured maintenance tickets for supervisor review and system entry.
+Domain	facility_maintenance
+Knowledge process	knowledge_capture
+Pattern	audio_to_structured
+Business Spec (§8.1)
+
+
+
+Field	Value
+Current process	Technicians manually enter fault reports into the maintenance system at a computer, describing the fault, location, and urgency by hand.
+Pain points	Slow data entry in the field; tickets often have missing details; no structured review gate before system entry.
+Proposed solution	AI workflow: Finnish voice message → transcription + enhancement → structured ticket extraction → supervisor approval → system entry.
+Intended users	Field technicians
+Reviewers	Supervisor
+Stakeholders	Field technicians, supervisor (no additional for PoC)
+Input artifacts	Finnish voice message (MP3, M4A, or WAV) recorded on a mobile device
+Target outputs	Structured maintenance ticket (JSON) with supervisor approval decision
+Success criteria	Faster reporting than manual entry; fewer missing details; every ticket supervisor-verifiable before transfer.
+Expected value	Reduced manual data-entry effort; higher ticket completeness and accuracy; structured approval gate prevents unauthorised transfers.
+Risks	Finnish ASR errors on technical vocabulary; incorrect field values extracted; unsupported urgency values introduced; transfer without supervisor approval.
+PoC goal	Accept Finnish audio fixture → exit successfully → produce non-empty parseable JSON ticket → required fields present (null + flagged if unstated) → fixture facts preserved → unsupported values null.
+Technical Spec (§8.2)
+
+
+
+Field	Value
+Input types	audio
+Input formats	MP3, M4A, WAV
+Output types	structured_json
+Language	Finnish (fi)
+Domain vocabulary	Urgency: low, medium, high. Location and asset identifier: free-form strings (no controlled list provided).
+Data sources	Mobile app audio recordings from field technicians
+Model provider	azure_openai
+Transcription model	gpt-4o-transcribe
+Extraction model	gpt-5.4, temperature 0.0
+Security constraints	Raw audio must not be retained after transcription. Approved ticket + supervisor decision may be retained (no retention period set). PII present (employee name, facility details). External model APIs allowed. No data-residency requirement. Auth/RBAC/audit-log outside PoC scope.
+Integration targets	None (out of PoC scope)
+Human review	Yes — always required before system entry
+Evaluation metrics	JSON parsing · required-field coverage · semantic fixture-fact matching · unsupported-value introduction
+Eval thresholds	None specified (single-fixture PoC)
+Runtime interface	CLI for PoC (python poc/run_poc.py); mobile app upload for production
+Target Output Spec (§8.3) — Schema: MaintenanceTicket
+
+
+
+Field	Type	Required	Allowed values / notes
+reporter_name	str	Optional	Free-form; from audio if stated
+asset_identifier	str	Optional	Free-form; from audio if stated
+location	str	Required	Free-form; null + flagged if not stated
+fault_description	str	Required	Free-form; null + flagged if not stated
+urgency	str	Required	low / medium / high; null + flagged if not stated or unsupported
+observation_date	date	Optional	YYYY-MM-DD
+observation_time	str	Optional	HH:MM
+actions_taken	list[str]	Optional	Immediate actions taken by technician
+uncertain_fields	list[str]	Optional	Names of absent, ambiguous, or unsupported fields
+Missing-value policy: Required fields may be null when the information was not stated in the audio, but the field name must appear in uncertain_fields. Unsupported urgency values → set to null, add "urgency" to uncertain_fields.
+
+Assumptions recorded
+
+
+
+ID	Assumption	Status
+assumption_001	Audio recordings are short fault reports, typically under 3 minutes.	Unconfirmed
+assumption_002	Location and asset_identifier are free-form; no controlled vocabulary was provided.	Unconfirmed
+assumption_003	Integration with the maintenance system is out of PoC scope.	Confirmed
+assumption_004	Output sensitivity treated as "internal" (no higher classification stated).	Unconfirmed
+Does this look correct? Reply yes to proceed, or tell me what to change.
+
+Yes. Proceed without changes.
+
+
+Reasoning
+Gate 1 passed. Before I move to schema design, I need two quick answers to enrich the visual blueprint (BPMN). This is optional — if you skip either question the diagram uses a sensible default.
+
+Phase 3.5 — Business process (BPMN enrichment)
+
+1. Rejection path — If the supervisor rejects a ticket, what should happen next?
+
+Discard (default): the process ends with a "Rejected" event — no further action.
+Rework loop: the technician is notified and can correct and resubmit a new voice message.
+2. Role assignment — I plan to map the steps to three swimlanes: Field Technician (record & upload), GAIK AI System (transcribe → extract → validate → notify), Supervisor (review & approve). Does that match how you see the process, or should any lane be renamed or split?
+
+The supervisor reviews the structured ticket, uncertainty information, and transcript. The supervisor either approves the ticket or returns it to the field technician for correction and resubmission. Only an approved ticket may be transferred to the maintenance management system. For the PoC, save the approved ticket as JSON; a live API is outside scope. The input comes from an internal field technician, not an external party. There are no branch decisions beyond approve or return for correction.
+
+The role assignment is correct.
+
+
+Reasoning
+Noted. The rejection path is a rework loop back to the technician, and the supervisor also needs to see the transcript. I'll update the blueprint with those two changes before moving to schema design.Good. Blueprint updated with the rework loop and transcript added to supervisor inputs. Now moving to Phase 4: Schema Design.
+
+The field list is already confirmed from the spec you approved. I'll write the extraction prompt now and show it to you before generating anything.Here is the extraction prompt I've written. It tells the AI model exactly what to extract from each Finnish voice message and how to handle every edge case. Please review it carefully — the accuracy of the extracted fields depends directly on this prompt.
+
+markdown
+
+
+# Extraction Requirements: MaintenanceTicket
+
+## Purpose
+
+Extract structured maintenance ticket fields from a Finnish voice message recorded by a
+field technician reporting a facility fault. The technician may speak informally, use
+abbreviations, or describe the situation in conversational Finnish. Extract only what is
+explicitly stated — do not infer, guess, or hallucinate values.
+
+## Language
+
+- Input: Finnish (fi)
+- Field values should be preserved in the language they appear in the audio (typically Finnish)
+- Field names are in English as specified below
+- Handle Finnish colloquial expressions, technical abbreviations, and regional terms for
+  facility components and locations
+
+---
+
+## Fields
+
+### reporter_name (str | None)
+- Extract only if explicitly stated; do not infer from voice
+- `null` if not mentioned
+
+### asset_identifier (str | None)
+- Code (e.g. "LVI-003") or descriptive name ("kolmannen kerroksen ilmanvaihtokone") or both
+- `null` if not mentioned
+
+### location (str | None)  [REQUIRED]
+- Extract building, floor, room, area, or zone exactly as stated; preserve wording
+- `null` + add `"location"` to `uncertain_fields` if not stated
+
+### fault_description (str | None)  [REQUIRED]
+- Faithful description of what is broken/malfunctioning
+- Finnish indicators: vuoto, melu, ei toimi, katkennut, ylikuumenee, sulake paloi, …
+- `null` + add `"fault_description"` to `uncertain_fields` if not described
+
+### urgency (str | None)  [REQUIRED]
+**Allowed values:** `low` · `medium` · `high` (English, lowercase, no other values)
+
+| Finnish expression | Maps to |
+|---|---|
+| kiireellinen, heti, välittömästi, vaarallinen, turvallisuusriski | `high` |
+| tänään, pian, melko kiireellinen, seuraavien päivien aikana | `medium` |
+| ei kiireellinen, rauhassa, kun sopii, matala prioriteetti | `low` |
+
+- Not stated or ambiguous → `null` + add `"urgency"` to `uncertain_fields`
+- Never output any value other than `"low"`, `"medium"`, `"high"`, or `null`
+
+### observation_date (date | None)
+- Format: YYYY-MM-DD
+- "tänään" → today, "eilen" → yesterday, "27. heinäkuuta" → YYYY-07-27
+- `null` if not stated
+
+### observation_time (str | None)
+- Format: HH:MM (24-hour)
+- "kello 14" → "14:00", "puoli kolme" → "14:30", "vartin yli kymmenen" → "10:15"
+- `null` if not stated
+
+### actions_taken (list[str] | None)
+- One string per completed action already taken by the technician
+- `null` if none mentioned
+
+### uncertain_fields (list[str] | None)
+- Add a field name here when: a required field is null, a value is ambiguous, or urgency
+  was stated but doesn't match allowed values
+- `null` or `[]` if all fields were clear
+
+---
+
+## Output Format Policy
+
+- All nine fields must be present in the JSON, even if `null`
+- Do not add extra fields; do not hallucinate values
+- Required fields may be `null` only when genuinely not stated — and must then appear in `uncertain_fields`
+- Field names in English; extracted text values in Finnish (as spoken)
+Does this look right? You can:
+
+Ask me to add or remove fields
+Correct field descriptions, examples, or allowed values
+Adjust any handling rules (e.g. what to do when a field is missing or ambiguous)
+Yes. Proceed without changes.
+
+
+Reasoning
+Generating the schema now.I need to fix one issue before presenting: the generator added an empty-string entry '' to the urgency Literal — this is not in the spec and should not be an allowed value. I'll remove it now.The schema has been generated from your approved extraction prompt. Here it is, with that one fix applied (noted below):
+
+python
+
+
+class MaintenanceTicket_Extraction(BaseModel):
+    """Extraction model for MaintenanceTicket"""
+    model_config = ConfigDict(extra='forbid')
+
+    reporter_name: str | None = Field(
+        default=None,
+        description="The name of the technician reporting the fault.")
+
+    asset_identifier: str | None = Field(
+        default=None,
+        description="The identifier or description of the faulty asset or equipment.")
+
+    location: str | None = Field(
+        default=None,
+        description="The physical location of the fault within the facility.")
+
+    fault_description: str | None = Field(
+        default=None,
+        description="A concise, faithful description of the fault or problem observed.")
+
+    urgency: Literal['low', 'medium', 'high'] | None = Field(
+        default=None,
+        description="The urgency level of the fault.")
+
+    observation_date: str | None = Field(
+        default=None,
+        description="The date the fault was observed, if stated.")
+
+    observation_time: str | None = Field(
+        default=None,
+        description="The time the fault was observed, if stated.")
+
+    actions_taken: list[str] | None = Field(
+        default=None,
+        description="A list of immediate actions the technician has already taken.")
+
+    uncertain_fields: list[str] | None = Field(
+        default=None,
+        description="A list of the field names that could not be confidently extracted.")
+One fix I applied automatically: The generator included '' (empty string) in the urgency Literal — I removed it. The only allowed non-null urgency values are 'low', 'medium', 'high', exactly as specified.
+
+Quick sanity check:
+
+All 9 fields present ✓
+urgency is a closed enum — the model cannot output any other string ✓
+observation_date uses str | None rather than Python's date — this is correct for Azure OpenAI structured output (the model outputs a string; format validation is handled by the extraction requirements prompt)
+No dict or list[dict] types — compatible with Azure OpenAI structured output ✓
+Do the Python types look right, or should anything be changed?
+
+Yes. Proceed without changes.
+
+
+Reasoning
+Schema approved and saved. Recording approval in the blueprint and moving to component selection.Phase 5 — Component Selection
+
+Transformation chain:
+
+
+
+fault_audio → [enhanced_transcript] → structured_json → validation_report → approved_ticket
+Selected:
+
+Module: AudioToStructuredData (contains Transcriber + TranscriptEnhancer + Extractor internally)
+
+The module's inputs (audio) and outputs (structured_json) match the use case exactly — it is the canonical choice for the audio_to_structured pattern. I configure it at the module level rather than wiring the sub-components separately.
+
+
+
+
+Option	Value	Why
+enhanced_transcript	True	Language is Finnish → two-pass Finnish ASR repair runs inside Transcriber. This subsumes a separate TranscriptEnhancer step.
+transcription_model	gpt-4o-transcribe	User specified.
+extraction_model	gpt-5.4	User specified; valid on Azure OpenAI.
+temperature	0.0	User specified; appropriate for deterministic field extraction.
+schema_ref	schemas/output_schema.py	Approved MaintenanceTicket schema.
+requirements_ref	schemas/output_schema_requirements.json	Approved extraction requirements.
+Component: LLMJudge Added because human_review = yes. It pre-screens the extracted ticket against the schema and the transcript before the supervisor sees it — flagging hallucinations and completeness gaps — reducing the supervisor's review load. Inputs: enhanced_transcript + ticket_json. Output: validation_report.
+
+Why not the alternatives:
+
+
+
+
+Alternative	Reason not selected
+Separate TranscriptEnhancer step	Subsumed by Transcriber(enhanced_transcript=True) — never add both
+VisionExtractor	Input is audio, not images or scanned documents
+DocumentsToStructuredData	Input is audio, not PDF/DOCX
+RAGWorkflow	Output is structured JSON, not a free-text answer
+MultiSourceReportGenerator	Output is structured JSON, not a narrative report
+LLMJudgePanel	Standard LLMJudge is sufficient for single-provider PoC pre-screening
+Does this selection look right? Should I add, remove, or change anything?
+
+Yes. Proceed without changes.
+
+
+Reasoning
+Now I'll finalize the blueprint and run the validator.The validator requires id and name on each participant — adding them now.One real error: the Transcriber component's registered output types are ['text', 'transcript'] — the artifact type must be transcript, not enhanced_transcript. The artifact ID stays the same; only the type changes.Blueprint validates cleanly. The three warnings are all expected and acceptable for a PoC — the schema files exist on disk, and the two unconfirmed assumptions will be resolved before production packaging.
+
+Now running Gate 2 — generating both visual views.Gate 2 passed. Here is the workflow diagram:
+
+mermaid
+
+
+
+
+
+
+Record and upload voice message
+
+Transcribe and enhance Finnish audio
+
+Extract maintenance ticket fields
+
+Validate ticket against schema and transcript
+
+Send ticket to supervisor for review
+
+Supervisor reviews and approves ticket
+
+(Blue = technician action, purple = AI system, green = human review)
+
+I also generated workflow.bpmn — the BPMN 2.0 visual blueprint with three swimlanes (Field Technician / GAIK AI System / Supervisor), the approve/return gateway, and the rework loop back to the technician. Open it in Camunda Modeler, bpmn-js, or draw.io to see the full model.
+
+Does the workflow look correct?
+
+Are all the steps right and in the right order?
+Do the roles, hand-offs, and the rejection → rework loop match your process?
+Anything to add or remove?
+Yes. Proceed without changes.
+
+
+Reasoning
+Scaffolding the PoC now.Good — 8 files generated, syntax checks pass. Let me review what the scaffolder produced and fill in any placeholders.The extraction prompt is preserved. I can see one code issue in run_poc.py — output_dir is used inside the LLMJudge block (line 234) but only defined later (line 253). Let me fix that, then improve the README and generate the docs.Two generated-code bugs to fix: output_dir referenced before definition in run_poc.py, and a stray extra-indent in run_basic_eval.py. Fixing both directly.Now improve the README with domain-specific prose, then verify both scripts parse cleanly.Both scripts parse cleanly. Now generating the documentation suite.Now filling in all narrative markers across the five documents.Now the evaluation plan — five markers:All narrative markers filled. Here is the complete handoff:
+
+Your PoC and documentation suite have been generated. Here is everything you need to run the pipeline:
+
+To run the PoC:
+
+Install dependencies:
+bash
+
+
+pip install -r poc/requirements.txt
+Set up credentials:
+bash
+
+
+cp poc/.env.example poc/.env
+# Fill in your Azure OpenAI endpoint and API key
+Add your Finnish audio fixture: Place a .wav, .mp3, or .m4a recording in poc/sample_input/
+Run the pipeline:
+bash
+
+
+python poc/run_poc.py
+Inspect the output in poc/output/:
+<stem>_ticket.json — the structured MaintenanceTicket
+<stem>_validation.json — LLMJudge hallucination-check results
+<stem>_transcript.txt — the enhanced Finnish transcript
+PoC passes Gate 3 when:
+
+Output is valid, non-empty JSON ✓
+location, fault_description, and urgency are present as keys ✓
+No extracted value contradicts what was said in the audio ✓
+urgency is "low", "medium", "high", or null — no other string ✓
+When you are ready, paste the output JSON here or describe what you see. I will help you interpret the result and refine if needed.

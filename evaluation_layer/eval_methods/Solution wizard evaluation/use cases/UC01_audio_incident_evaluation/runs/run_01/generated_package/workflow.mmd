@@ -1,0 +1,13 @@
+flowchart TD
+    record_voice_message["Technician records Finnish voice message"]
+    process_audio["Transcribe, enhance and extract maintenance ticket"]
+    validate_ticket["Validate extracted ticket against transcript (LLMJudge)"]
+    supervisor_review["Supervisor reviews ticket, transcript and validation report"]
+    record_voice_message --> process_audio
+    process_audio --> validate_ticket
+    validate_ticket --> supervisor_review
+
+    style record_voice_message fill:#dbeafe
+    style process_audio fill:#f5f3ff
+    style validate_ticket fill:#f5f3ff
+    style supervisor_review fill:#dcfce7

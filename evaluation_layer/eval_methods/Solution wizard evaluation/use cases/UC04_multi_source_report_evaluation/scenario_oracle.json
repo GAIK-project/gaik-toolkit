@@ -1,0 +1,884 @@
+{
+  "oracle_version": "1.0.0",
+  "scenario_id": "UC04",
+  "title": "Multi-source procurement evidence to a supplier-performance report",
+  "knowledge_process": "knowledge_synthesis",
+  "status": "frozen",
+  "frozen_on": "2026-08-09",
+  "purpose": "Evaluate whether the GAIK Solution Configuration Wizard captures a fixed multi-source reporting scenario, selects and configures the report-synthesis module, generates a valid package, and produces an executable grounded-report PoC.",
+  "protocol": {
+    "runs": 2,
+    "wizard_skill_file": "implementation_layer/solution_wizard/SKILL.md",
+    "wizard_skill_commit": "79586c93ea3286f68acf3ad3810a370c4295fa01",
+    "output_directory_policy": "Use the run-specific directory as wizard workspace, expose only wizard_input, and write output to generated_package.",
+    "wizard_input_policy": "Provide only run-specific wizard_input. Do not expose scenario_oracle.json, expected_report_results.json, scoring files, or comparison workbook.",
+    "initial_prompt_file": "initial_prompt.txt",
+    "scripted_answers_file": "scripted_answers.json",
+    "wizard_requirement_coverage_file": "wizard_requirement_coverage.json",
+    "confirmation_policy": "At every routine confirmation before original PoC execution, answer Yes and proceed without changes.",
+    "accept_without_correction": true,
+    "unexpected_question_answer": "Not specified for this evaluation. If a value is required, record it as an explicit assumption for user confirmation.",
+    "po_c_policy": "Execute original wizard-generated PoC without source edits. Supplying fixed fixtures and credentials is allowed. EQ4 remains permanently based on attempt 0.",
+    "recovery_policy": {
+      "trigger": "The original PoC does not execute successfully.",
+      "maximum_refinement_attempts": 3,
+      "feedback_scope": "Return recorded execution evidence to the wizard without corrective code or new requirements.",
+      "stopping_rule": "Stop after first successful execution or third unsuccessful refinement.",
+      "reported_values": {
+        "0": "Original success.",
+        "1-3": "Success after stated refinements.",
+        "N/A": "No success after three refinements."
+      },
+      "headline_metric": false
+    }
+  },
+  "gaik_basis": {
+    "repository": "GAIK-project/gaik-toolkit",
+    "verified_commit": "79586c93ea3286f68acf3ad3810a370c4295fa01",
+    "blueprint_schema_path": "implementation_layer/solution_wizard/schemas/use_case_blueprint.schema.json",
+    "registry_path": "implementation_layer/solution_wizard/registries/gaik_component_registry.json",
+    "reference_cards_path": "implementation_layer/solution_wizard/registries/component_reference_cards.json",
+    "expected_component": {
+      "id": "multi_source_report_generator",
+      "name": "MultiSourceReportGenerator",
+      "type": "software_module",
+      "required_parameters": [
+        "sections"
+      ],
+      "selection_relevant_options": {
+        "agentic": true,
+        "strict_review": true,
+        "parser_choice": "auto",
+        "sample_report_path": "bundle sample_report",
+        "include_source_references": true,
+        "output_docx": false,
+        "writer_options.model": "gpt-5.4"
+      },
+      "selection_reason": "The scenario requires an end-to-end evidence-grounded report from mixed source types with section-level review and traceability."
+    }
+  },
+  "checks": {
+    "EQ1": [
+      {
+        "id": "EQ1-R01",
+        "parameter": "Primary user",
+        "oracle_value": "Procurement analysts prepare quarterly supplier-performance reports for procurement management.",
+        "accepted_semantics": "Procurement analyst is the principal report-preparation user.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.intended_users",
+          "business_process.participants"
+        ]
+      },
+      {
+        "id": "EQ1-R02",
+        "parameter": "Current process",
+        "oracle_value": "An analyst manually combines KPI spreadsheets, quality audits, meeting notes, and incident logs.",
+        "accepted_semantics": "The current process is manual multi-source report preparation.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.current_process"
+        ]
+      },
+      {
+        "id": "EQ1-R03",
+        "parameter": "Business problem",
+        "oracle_value": "Manual preparation is slow and risks inconsistent calculations, wording, and weak source traceability.",
+        "accepted_semantics": "Time, consistency, calculation, and traceability problems are explicit.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.pain_points"
+        ]
+      },
+      {
+        "id": "EQ1-R04",
+        "parameter": "Stakeholders and reviewer",
+        "oracle_value": "Procurement analyst drafts; procurement manager reviews; category owners and Procurement Quality Team provide or maintain evidence.",
+        "accepted_semantics": "All internal roles and the manager reviewer are identified.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.stakeholders",
+          "business_spec.reviewers",
+          "business_process.participants"
+        ]
+      },
+      {
+        "id": "EQ1-R05",
+        "parameter": "Expected value",
+        "oracle_value": "Faster, consistent, evidence-grounded reporting with reliable calculations, source references, and manager oversight.",
+        "accepted_semantics": "Value covers efficiency, quality, traceability, and review.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.expected_value",
+          "business_spec.success_criteria"
+        ]
+      },
+      {
+        "id": "EQ1-R06",
+        "parameter": "Input collection",
+        "oracle_value": "Four supplied sources: supplier_kpis_q2_2026.xlsx, nordic_components_quality_audit.pdf, procurement_meeting_notes_q2_2026.md, and delivery_incidents_q2_2026.csv.",
+        "accepted_semantics": "All four fixture sources are represented.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.input_artifacts",
+          "technical_spec.data_sources",
+          "artifacts"
+        ]
+      },
+      {
+        "id": "EQ1-R07",
+        "parameter": "Input formats and language",
+        "oracle_value": "English XLSX, text-based PDF, Markdown, and CSV inputs.",
+        "accepted_semantics": "All mixed formats and English language are configured.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.input_types",
+          "technical_spec.input_formats",
+          "technical_spec.language"
+        ]
+      },
+      {
+        "id": "EQ1-R08",
+        "parameter": "Source traceability metadata",
+        "oracle_value": "Preserve exact source filename and available page, sheet, table, or row context during normalization.",
+        "accepted_semantics": "Normalization retains enough source identity to audit report claims.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.domain_vocabulary",
+          "workflow.steps",
+          "artifacts"
+        ]
+      },
+      {
+        "id": "EQ1-R09",
+        "parameter": "Target output",
+        "oracle_value": "A structured English Markdown supplier-performance report plus an evidence index.",
+        "accepted_semantics": "Markdown report and evidence index are required outputs.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.target_outputs",
+          "technical_spec.output_types",
+          "target_output_spec.schema_name"
+        ]
+      },
+      {
+        "id": "EQ1-R10",
+        "parameter": "Report title",
+        "oracle_value": "Q2 2026 Supplier Performance Report; required exact title.",
+        "accepted_semantics": "The report has the required title.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R11",
+        "parameter": "Reporting period",
+        "oracle_value": "Q2 2026, covering 1 April through 30 June 2026.",
+        "accepted_semantics": "The fixed reporting period is explicit.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "business_spec.target_outputs"
+        ]
+      },
+      {
+        "id": "EQ1-R12",
+        "parameter": "Section: Executive Summary",
+        "oracle_value": "Required section summarizing overall performance, main concern, and management decision.",
+        "accepted_semantics": "Executive Summary purpose is specified.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R13",
+        "parameter": "Section: KPI Overview",
+        "oracle_value": "Required Markdown table with supplier and overall delivery, quality, unit, and spend metrics, percentages rounded to one decimal.",
+        "accepted_semantics": "KPI table and calculations are specified.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.validation_rules"
+        ]
+      },
+      {
+        "id": "EQ1-R14",
+        "parameter": "Section: Supplier Findings",
+        "oracle_value": "Required separate evidence-grounded finding for Nordic Components, Baltic Fasteners, and Alpine Sensors.",
+        "accepted_semantics": "Every supplier receives a distinct finding.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields"
+        ]
+      },
+      {
+        "id": "EQ1-R15",
+        "parameter": "Section: Quality and Delivery Risks",
+        "oracle_value": "Required section describing supported risks and the EUR 410,000 versus EUR 405,000 source discrepancy.",
+        "accepted_semantics": "Risks and the source discrepancy are explicit.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.validation_rules"
+        ]
+      },
+      {
+        "id": "EQ1-R16",
+        "parameter": "Section: Actions and Owners",
+        "oracle_value": "Required table with Action, Owner, Due Date, and Completion Condition, using only explicit actions.",
+        "accepted_semantics": "Action table structure and anti-invention rule are specified.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.required_fields"
+        ]
+      },
+      {
+        "id": "EQ1-R17",
+        "parameter": "Section: Source References",
+        "oracle_value": "Required list of every source file used.",
+        "accepted_semantics": "The report includes a complete source list.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.fields",
+          "target_output_spec.required_fields"
+        ]
+      },
+      {
+        "id": "EQ1-R18",
+        "parameter": "Inline citation format",
+        "oracle_value": "Material factual claims cite the exact filename as [source_file].",
+        "accepted_semantics": "Filename citations in square brackets are required.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.validation_rules",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R19",
+        "parameter": "Calculation rules",
+        "oracle_value": "Calculate metrics from the KPI workbook, use the workbook as authoritative for exact spend, and round percentages to one decimal.",
+        "accepted_semantics": "Deterministic calculation and source-precedence rules are explicit.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.validation_rules",
+          "technical_spec.domain_vocabulary"
+        ]
+      },
+      {
+        "id": "EQ1-R20",
+        "parameter": "Output artifacts",
+        "oracle_value": "Write non-empty output/report.md and parseable output/evidence_index.json.",
+        "accepted_semantics": "Both primary and audit outputs are required.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.required_fields",
+          "artifacts"
+        ]
+      },
+      {
+        "id": "EQ1-R21",
+        "parameter": "Grounding policy",
+        "oracle_value": "Use only supplied evidence and cite every material factual claim.",
+        "accepted_semantics": "The report is evidence-only and cited.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.validation_rules",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R22",
+        "parameter": "Missing-evidence policy",
+        "oracle_value": "State that evidence is unavailable and omit the claim rather than speculate.",
+        "accepted_semantics": "Unsupported content is not invented.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.missing_value_policy",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R23",
+        "parameter": "Conflicting-source policy",
+        "oracle_value": "Identify conflicts or approximations, cite both relevant sources, and follow an explicit authoritative-source rule where provided.",
+        "accepted_semantics": "Conflicts are disclosed rather than silently resolved.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.validation_rules",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R24",
+        "parameter": "Citation integrity",
+        "oracle_value": "Do not fabricate references or cite a file that does not support the claim.",
+        "accepted_semantics": "References must correspond to processed evidence.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.validation_rules"
+        ]
+      },
+      {
+        "id": "EQ1-R25",
+        "parameter": "Employee interaction",
+        "oracle_value": "A web application lets analysts upload one or more source files, select the report configuration, generate a draft, and download the report.",
+        "accepted_semantics": "Intended analyst interaction is a multi-file web application.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.runtime_interface",
+          "business_process.manual_steps"
+        ]
+      },
+      {
+        "id": "EQ1-R26",
+        "parameter": "Reviewer interaction",
+        "oracle_value": "The procurement manager reviews the draft, calculations, actions, and source references before release.",
+        "accepted_semantics": "Manager review is a mandatory human gate.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.human_review",
+          "business_process.decision_points"
+        ]
+      },
+      {
+        "id": "EQ1-R27",
+        "parameter": "Rejection and return path",
+        "oracle_value": "If returned, the analyst corrects source data or report instructions and regenerates the draft; the review cycle repeats.",
+        "accepted_semantics": "The return path is employee rework, not discard.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_process.exceptions",
+          "business_process.decision_points"
+        ]
+      },
+      {
+        "id": "EQ1-R28",
+        "parameter": "Fixture data source",
+        "oracle_value": "PoC reads poc_input_bundle.json and resolves all source, specification, and sample-report paths relative to that bundle.",
+        "accepted_semantics": "The fixed portable bundle is the PoC input; no sample_input copying is required.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.data_sources",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R29",
+        "parameter": "Information sensitivity",
+        "oracle_value": "Synthetic fixtures are internal procurement information and contain no personal data.",
+        "accepted_semantics": "Internal classification and synthetic-data status are stated.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.security_constraints"
+        ]
+      },
+      {
+        "id": "EQ1-R30",
+        "parameter": "External-source boundary",
+        "oracle_value": "The report uses only supplied local evidence; web browsing and external enrichment are outside scope.",
+        "accepted_semantics": "No external evidence may enter the report.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.integration_targets",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R31",
+        "parameter": "Release gate",
+        "oracle_value": "The AI output is a draft and must not be labelled approved or released until the procurement manager approves it.",
+        "accepted_semantics": "Human approval controls final release.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.human_review",
+          "business_process.decision_points"
+        ]
+      },
+      {
+        "id": "EQ1-R32",
+        "parameter": "Privacy, provider, and retention boundary",
+        "oracle_value": "External model APIs are allowed; fixtures contain no personal data; no exact retention period, SLA, or data-residency target is specified.",
+        "accepted_semantics": "Specified and unspecified boundaries are distinguished.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.security_constraints"
+        ]
+      },
+      {
+        "id": "EQ1-R33",
+        "parameter": "PoC runtime interface",
+        "oracle_value": "CLI supports python run_poc.py --input <path-to-poc_input_bundle.json>, uses bundle-relative paths, writes report outputs, and uses Windows-safe console text.",
+        "accepted_semantics": "Portable CLI and Windows console compatibility are required.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.runtime_interface",
+          "workflow.steps"
+        ]
+      },
+      {
+        "id": "EQ1-R34",
+        "parameter": "Participants and external parties",
+        "oracle_value": "Procurement analyst, procurement manager, category owners, Procurement Quality Team, and AI system participate; suppliers are outside the evaluated workflow.",
+        "accepted_semantics": "Internal participants and external-party scope are clear.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_process.participants",
+          "business_process.external_parties"
+        ]
+      },
+      {
+        "id": "EQ1-R35",
+        "parameter": "Business and technical success",
+        "oracle_value": "A complete cited draft is generated faster and with correct calculations and actions; no numerical improvement threshold is specified.",
+        "accepted_semantics": "Qualitative and fixture-based success are explicit without invented targets.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.success_criteria",
+          "technical_spec.evaluation_requirements"
+        ]
+      },
+      {
+        "id": "EQ1-R36",
+        "parameter": "Model configuration",
+        "oracle_value": "Azure OpenAI gpt-5.4, temperature 0.0, reasoning effort medium.",
+        "accepted_semantics": "Provider and generation settings are fixed.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.model_provider",
+          "technical_spec.model_preferences"
+        ]
+      },
+      {
+        "id": "EQ1-R37",
+        "parameter": "Risks",
+        "oracle_value": "Hallucinated facts, calculation errors, missing or wrong source references, silent conflict resolution, omitted actions, and premature release.",
+        "accepted_semantics": "Principal synthesis and governance risks are represented.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.risks"
+        ]
+      },
+      {
+        "id": "EQ1-R38",
+        "parameter": "First PoC goal",
+        "oracle_value": "Process the four supplied sources and generate the six-section grounded draft report and evidence index through the fixed CLI.",
+        "accepted_semantics": "PoC demonstrates end-to-end multi-source report synthesis.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "business_spec.poc_goal",
+          "technical_spec.evaluation_requirements"
+        ]
+      },
+      {
+        "id": "EQ1-R39",
+        "parameter": "Report validation rules",
+        "oracle_value": "Required title and sections, correct one-decimal calculations, exact filenames, supported actions, explicit discrepancy handling, and no unsupported claims.",
+        "accepted_semantics": "The report has concrete structural and semantic validation rules.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "target_output_spec.validation_rules"
+        ]
+      },
+      {
+        "id": "EQ1-R40",
+        "parameter": "Employee interaction and PoC separation",
+        "oracle_value": "The intended interaction is a web application, while the first PoC may use CLI input and Markdown/JSON files.",
+        "accepted_semantics": "Employee interaction is separated from the PoC interface.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.runtime_interface",
+          "business_spec.poc_goal"
+        ]
+      },
+      {
+        "id": "EQ1-R41",
+        "parameter": "Report-generation configuration",
+        "oracle_value": "Use agentic per-section drafting and review, strict review, auto parsing, source references, evidence index, the supplied sample report, no DOCX, and no redundant parser pipeline.",
+        "accepted_semantics": "Selection-relevant MultiSourceReportGenerator options are fixed.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "workflow.steps",
+          "components.selected_modules"
+        ]
+      },
+      {
+        "id": "EQ1-R42",
+        "parameter": "Fixture acceptance conditions",
+        "oracle_value": "Report contains the six required sections, all four source references, the ten expected facts, correct metrics, disclosed spend discrepancy, and no invented approval or action.",
+        "accepted_semantics": "Fixture-specific semantic acceptance is complete.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "technical_spec.evaluation_requirements",
+          "target_output_spec.validation_rules"
+        ]
+      }
+    ],
+    "EQ1_diagnostics": [
+      {
+        "id": "EQ1-D01",
+        "parameter": "Unsupported quantified business target",
+        "oracle_value": "No numerical time-saving, cost-saving, adoption, or accuracy target is specified.",
+        "accepted_semantics": "Any numeric business target is an assumption, not captured fact.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "assumptions"
+        ],
+        "scored": false
+      },
+      {
+        "id": "EQ1-D02",
+        "parameter": "Unsupported operational target",
+        "oracle_value": "No SLA, throughput, latency, source-volume, retention-period, or data-residency target is specified.",
+        "accepted_semantics": "Operational targets remain explicitly unspecified.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "assumptions"
+        ],
+        "scored": false
+      },
+      {
+        "id": "EQ1-D03",
+        "parameter": "Implementation assumptions",
+        "oracle_value": "Deployment topology, authentication product, exact hosting, and budget may be assumptions but not user-confirmed requirements.",
+        "accepted_semantics": "Implementation defaults are labelled as assumptions.",
+        "source": [
+          "initial_prompt.txt",
+          "scripted_answers.json"
+        ],
+        "blueprint_hints": [
+          "assumptions"
+        ],
+        "scored": false
+      }
+    ],
+    "EQ2": [
+      {
+        "id": "EQ2-C01",
+        "parameter": "Knowledge-process classification",
+        "oracle_value": "Classify as knowledge synthesis through multi-source report generation.",
+        "evidence_required": [
+          "blueprint use-case classification"
+        ]
+      },
+      {
+        "id": "EQ2-C02",
+        "parameter": "Primary GAIK module",
+        "oracle_value": "Select MultiSourceReportGenerator (multi_source_report_generator) as the primary end-to-end module.",
+        "evidence_required": [
+          "selected modules",
+          "GAIK registry"
+        ]
+      },
+      {
+        "id": "EQ2-C03",
+        "parameter": "Module-first composition",
+        "oracle_value": "Do not add separate executable PDF, spreadsheet, or text parser stages already subsumed by MultiSourceReportGenerator.",
+        "evidence_required": [
+          "selected assets",
+          "workflow steps"
+        ]
+      },
+      {
+        "id": "EQ2-C04",
+        "parameter": "Input normalization",
+        "oracle_value": "Pass the four bundle-resolved files as input_paths; use parser_choice=auto and built-in XLSX/CSV/Markdown normalization.",
+        "evidence_required": [
+          "module parameters",
+          "PoC files"
+        ]
+      },
+      {
+        "id": "EQ2-C05",
+        "parameter": "Report structure and dependencies",
+        "oracle_value": "Configure the six required section specifications and their depends_on relationships from report_spec.json.",
+        "evidence_required": [
+          "workflow",
+          "report configuration"
+        ]
+      },
+      {
+        "id": "EQ2-C06",
+        "parameter": "Agentic review configuration",
+        "oracle_value": "Set agentic=true and strict_review=true; use gpt-5.4 writer/reviewer configuration and ASCII-safe progress output.",
+        "evidence_required": [
+          "module options",
+          "PoC configuration"
+        ]
+      },
+      {
+        "id": "EQ2-C07",
+        "parameter": "Grounding and traceability configuration",
+        "oracle_value": "Set include_source_references=true and include_evidence_index=true; enforce supplied-evidence-only writing and conflict disclosure.",
+        "evidence_required": [
+          "module options",
+          "prompts"
+        ]
+      },
+      {
+        "id": "EQ2-C08",
+        "parameter": "Workflow and human gate",
+        "oracle_value": "Upload/select inputs, normalize sources, draft and review sections, assemble draft, validate outputs, obtain manager approval or return to analyst rework, then release.",
+        "evidence_required": [
+          "workflow steps",
+          "BPMN"
+        ]
+      },
+      {
+        "id": "EQ2-C09",
+        "parameter": "PoC scope",
+        "oracle_value": "CLI accepts --input bundle, resolves all paths relative to it, writes report.md and evidence_index.json; web UI, external sources, enterprise integration, and DOCX/Pandoc are not required.",
+        "evidence_required": [
+          "PoC README",
+          "run_poc.py",
+          "configuration"
+        ]
+      }
+    ],
+    "EQ3": [
+      {
+        "id": "EQ3-P01",
+        "parameter": "Blueprint existence and JSON parsing",
+        "oracle_value": "A non-empty use_case.blueprint.json exists and parses as JSON.",
+        "evidence_required": [
+          "generated package"
+        ]
+      },
+      {
+        "id": "EQ3-P02",
+        "parameter": "Official blueprint validation",
+        "oracle_value": "The GAIK Solution Wizard validator returns exit code 0 with no blocking errors.",
+        "evidence_required": [
+          "validator command",
+          "exit code",
+          "validator output excerpt"
+        ]
+      },
+      {
+        "id": "EQ3-P03",
+        "parameter": "Artifact-flow consistency",
+        "oracle_value": "Workflow inputs and outputs reference declared artifacts with valid producers and dependencies.",
+        "evidence_required": [
+          "blueprint artifacts and workflow"
+        ]
+      },
+      {
+        "id": "EQ3-P04",
+        "parameter": "Mermaid workflow",
+        "oracle_value": "A non-empty workflow.mmd covers every blueprint workflow step.",
+        "evidence_required": [
+          "workflow.mmd",
+          "blueprint steps"
+        ]
+      },
+      {
+        "id": "EQ3-P05",
+        "parameter": "BPMN validity and mapping",
+        "oracle_value": "workflow.bpmn parses as XML and maps every blueprint workflow step through IDs, names, or bpmn_mapping.",
+        "evidence_required": [
+          "workflow.bpmn",
+          "bpmn mapping"
+        ]
+      },
+      {
+        "id": "EQ3-P06",
+        "parameter": "PoC scaffold completeness",
+        "oracle_value": "The PoC contains an entry point, dependency file, configuration, prompts, and schemas.",
+        "evidence_required": [
+          "generated PoC files"
+        ]
+      },
+      {
+        "id": "EQ3-P07",
+        "parameter": "Documentation completeness",
+        "oracle_value": "The package contains non-empty documentation plus PoC usage instructions.",
+        "evidence_required": [
+          "docs",
+          "PoC README"
+        ]
+      },
+      {
+        "id": "EQ3-P08",
+        "parameter": "Requirement-to-component traceability",
+        "oracle_value": "Traceability entries connect requirements to at least one selected GAIK module or building block.",
+        "evidence_required": [
+          "blueprint traceability",
+          "selected assets"
+        ]
+      }
+    ],
+    "EQ4": [
+      {
+        "id": "EQ4-X01",
+        "parameter": "Setup succeeds",
+        "oracle_value": "The original unmodified generated PoC setup or build command exits with code 0.",
+        "evidence_required": [
+          "poc_execution.json setup"
+        ]
+      },
+      {
+        "id": "EQ4-X02",
+        "parameter": "End-to-end execution",
+        "oracle_value": "The original unmodified PoC processes the supplied four-source bundle and exits with code 0.",
+        "evidence_required": [
+          "poc_execution.json execution"
+        ]
+      },
+      {
+        "id": "EQ4-X03",
+        "parameter": "Report outputs",
+        "oracle_value": "The original PoC creates a new non-empty report.md and a non-empty parseable evidence_index.json.",
+        "evidence_required": [
+          "poc_execution.json outputs"
+        ]
+      },
+      {
+        "id": "EQ4-X04",
+        "parameter": "Grounded report correctness",
+        "oracle_value": "The original report semantically matches expected_report_results.json: required structure, exact metrics, decisions, actions, discrepancy handling, source references, and no unsupported claims.",
+        "evidence_required": [
+          "report.md",
+          "evidence_index.json",
+          "expected_report_results.json"
+        ]
+      }
+    ]
+  }
+}

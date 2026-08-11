@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "UC03_run_01",
+  "attempt_number": 1,
+  "poc": {
+    "setup_command": [
+      "python",
+      "-m",
+      "pip",
+      "install",
+      "-r",
+      "requirements.txt"
+    ],
+    "run_command": [
+      "python",
+      "run_poc.py",
+      "--input",
+      "{fixture}"
+    ],
+    "output_globs": [
+      "output/**/*.json",
+      "output/*.json"
+    ]
+  },
+  "scenario_id": "UC03"
+}

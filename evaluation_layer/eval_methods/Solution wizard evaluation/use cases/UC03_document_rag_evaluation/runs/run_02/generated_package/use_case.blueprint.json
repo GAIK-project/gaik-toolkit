@@ -1,0 +1,593 @@
+{
+  "blueprint_version": "1.0",
+  "metadata": {
+    "blueprint_id": "manufacturing_rag_assistant_v1",
+    "created_by": "solution_configuration_wizard",
+    "created_at": "2026-08-08T00:00:00Z",
+    "last_updated_at": "2026-08-08T00:00:00Z",
+    "status": "draft"
+  },
+  "use_case": {
+    "id": "manufacturing_rag_assistant",
+    "name": "Manufacturing Internal Knowledge Assistant",
+    "description": "Role-aware RAG assistant that answers employee questions over internal manufacturing policies, equipment manuals, and management documents with citations and enforced role-based access control.",
+    "domain": "manufacturing",
+    "knowledge_processes": [
+      "knowledge_access"
+    ]
+  },
+  "business_spec": {
+    "current_process": "Employees manually search across internal policies, equipment manuals, and management documents to find relevant information, which is slow and can lead to incomplete or unsupported answers.",
+    "pain_points": [
+      "Manual document search is slow and time-consuming",
+      "Employees may overlook the applicable source document",
+      "Risk of incomplete or unsupported answers",
+      "No enforcement of document access boundaries between roles"
+    ],
+    "proposed_solution": "RAG-based assistant that answers employee questions using the document collection, provides citations to the supporting source, and enforces role-based access so restricted documents are never retrieved or disclosed to unauthorized employees.",
+    "intended_users": [
+      "employee",
+      "manager"
+    ],
+    "reviewers": [],
+    "stakeholders": [
+      "employees",
+      "managers",
+      "knowledge_owners"
+    ],
+    "input_artifacts": [
+      "employee_travel_policy.pdf",
+      "mx200_maintenance_manual.pdf",
+      "project_aurora_pricing_strategy.pdf",
+      "access_manifest.json",
+      "query_set.json",
+      "poc_input_bundle.json"
+    ],
+    "target_outputs": [
+      "rag_answer_records_json"
+    ],
+    "success_criteria": [
+      "Employees find reliable answers faster than manual search",
+      "Answers are verifiable through document citations",
+      "Employees never receive content outside their authorized role",
+      "System correctly refuses to answer from unauthorized content"
+    ],
+    "expected_value": [
+      "Faster access to reliable internal knowledge",
+      "Traceable answers via source citations",
+      "Enforced access boundaries with no content leakage across roles"
+    ],
+    "risks": [
+      "Hallucinated answers not grounded in retrieved content",
+      "Fabricated or incorrect citations",
+      "Retrieval of restricted chunks for unauthorized roles",
+      "Leakage of restricted content through answer text or citations",
+      "Stale documents producing outdated answers",
+      "System returning speculative answer when no authorized source supports the query"
+    ],
+    "poc_goal": "Demonstrate role-aware citation-grounded Q&A over three PDFs with access_manifest.json and query_set.json from the supplied input bundle. Prove correct access control (deny management-confidential content to general employees), accurate [filename, page] citations, and graceful not-found response when no authorized content supports the query. Pass all four role-tagged queries (Q01-Q04) with exact expected access decisions and citation pairs."
+  },
+  "technical_spec": {
+    "input_types": [
+      "pdf",
+      "document_collection",
+      "text"
+    ],
+    "input_formats": [
+      "pdf",
+      "json"
+    ],
+    "output_types": [
+      "structured_json"
+    ],
+    "language": "en",
+    "domain_vocabulary": "Manufacturing terminology (MX-200 maintenance unit, operating hours, pressure in bar), finance terminology (EUR, pricing strategy). Exact numeric values and units (EUR 180, 250 operating hours, 1000 operating hours, 1.8 bar, 12 percent, 22 percent) must be preserved verbatim from source documents.",
+    "data_sources": [
+      "local_file_bundle"
+    ],
+    "model_provider": "azure_openai",
+    "model_preferences": {
+      "generation_model": "gpt-5.4",
+      "temperature": 1.0,
+      "reasoning_effort": "medium",
+      "embedding_model": "${AZURE_OPENAI_EMBEDDING_DEPLOYMENT}"
+    },
+    "security_constraints": "Role-based access control enforced via per-chunk allowed_roles metadata stored in the vector index. Role is trusted request metadata supplied with each query and must never be inferred from question content. Role filter applied before similarity retrieval so only chunks where allowed_roles contains the query role are candidates. Management-confidential documents (project_aurora_pricing_strategy.pdf) are never retrieved or disclosed to users with the 'employee' role.",
+    "integration_targets": [],
+    "human_review": false,
+    "human_review_required": false,
+    "evaluation_requirements": "Four role-tagged queries (Q01-Q04) with exact expected access decisions, answer content, and citation pairs. Q01 (employee, Helsinki hotel limit): access=allowed, EUR 180/night + Finance Director approval, cite [employee_travel_policy.pdf, 3]. Q02 (employee, MX-200 filter): access=allowed, 250h inspection + 1000h or 1.8bar replacement, cite [mx200_maintenance_manual.pdf, 3] and [mx200_maintenance_manual.pdf, 4]. Q03 (employee, Project Aurora ceiling): access=denied, empty citations, no 12%/22%/CFO details. Q04 (manager, Project Aurora ceiling and approver): access=allowed, 12% ceiling + CFO written approval, cite [project_aurora_pricing_strategy.pdf, 3].",
+    "runtime_interface": "cli"
+  },
+  "target_output_spec": {
+    "schema_name": "RAGAnswerRecord",
+    "fields": [
+      "query_id",
+      "role",
+      "question",
+      "access_decision",
+      "answer",
+      "citations",
+      "refusal_reason"
+    ],
+    "required_fields": [
+      "query_id",
+      "role",
+      "question",
+      "access_decision",
+      "answer",
+      "citations"
+    ],
+    "optional_fields": [
+      "refusal_reason"
+    ],
+    "field_descriptions": {
+      "query_id": "Unique identifier for the query, e.g. Q01",
+      "role": "Role of the user making the query: 'employee' or 'manager'",
+      "question": "The natural-language question asked by the user",
+      "access_decision": "Whether access was granted: 'allowed' or 'denied'",
+      "answer": "The generated answer, or a refusal message if access is denied",
+      "citations": "List of [file_name, page_number] pairs citing source material. Empty list for denied queries.",
+      "refusal_reason": "Required when access_decision is 'denied'; explains why access was refused. Null for allowed queries."
+    },
+    "allowed_values": {
+      "role": [
+        "employee",
+        "manager"
+      ],
+      "access_decision": [
+        "allowed",
+        "denied"
+      ]
+    },
+    "validation_rules": [
+      "access_decision must be 'allowed' or 'denied'",
+      "Allowed factual answers require at least one citation",
+      "Each citation must be a two-element list [string file_name, integer page_number] with 1-based page number",
+      "Denied answers require refusal_reason, empty citations list, and must not reveal restricted content",
+      "Do not answer from model memory when authorized evidence is absent"
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "assumption_001",
+      "text": "Embedding deployment name for Azure OpenAI is provided via environment variable AZURE_OPENAI_EMBEDDING_DEPLOYMENT. The specific model name is not user-confirmed.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-08T00:00:00Z"
+    },
+    {
+      "id": "assumption_002",
+      "text": "RAGWorkflow uses a Chroma vector store (persist=True) for the PoC. The RBAC role filter is implemented as a Chroma metadata filter on the allowed_roles field, applied before similarity retrieval.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-08T00:00:00Z"
+    },
+    {
+      "id": "assumption_003",
+      "text": "conversation_history is set to false because this is a batch CLI pipeline processing a fixed query set, not an interactive conversational interface.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-08T00:00:00Z"
+    },
+    {
+      "id": "assumption_004",
+      "text": "stream is set to false because this is a batch CLI pipeline; streaming is only relevant for interactive UIs.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-08T00:00:00Z"
+    },
+    {
+      "id": "assumption_005",
+      "text": "The documents are assumed not to contain personal data. The management-confidential document is commercially sensitive but not personal data. This affects governance.data_handling.contains_personal_data.",
+      "status": "unconfirmed",
+      "impact": "security_constraint",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-08T00:00:00Z"
+    },
+    {
+      "id": "assumption_006",
+      "text": "Valid implementation defaults are recorded as assumptions per user instruction. No SLA, throughput, document volume, latency, or budget targets are specified.",
+      "status": "confirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-08T00:00:00Z"
+    },
+    {
+      "id": "assumption_007",
+      "text": "Document loading and maintenance by knowledge owners is assumed to be a separate operational process outside the Q&A workflow. No document-ingestion step is modelled in the workflow diagram.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-08T00:00:00Z"
+    }
+  ],
+  "artifacts": {
+    "poc_input_bundle": {
+      "type": "text",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "document_collection": {
+      "type": "document_collection",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "access_manifest": {
+      "type": "text",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "query_set": {
+      "type": "text",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "answer_records": {
+      "type": "answer_with_citations",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "run_rag_pipeline",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "saved_results": {
+      "type": "structured_json",
+      "source": "generated",
+      "optional": false,
+      "final_output": true,
+      "externally_visible": false,
+      "produced_by": "save_results",
+      "schema_ref": null,
+      "overwrite": false
+    }
+  },
+  "inputs": {},
+  "outputs": {},
+  "schemas": {},
+  "components": {
+    "selected_modules": [
+      {
+        "id": "rag_workflow",
+        "name": "RAGWorkflow",
+        "reason": "Use case is document Q&A with citations over a local document collection. RAGWorkflow covers the full indexing (chunking, embedding, storage) and retrieval-augmented generation pipeline. Citations are required and enabled. RBAC metadata filtering is implemented at the PoC level using the Chroma store metadata filter on allowed_roles."
+      }
+    ],
+    "selected_building_blocks": [],
+    "custom_components": []
+  },
+  "workflow": {
+    "steps": [
+      {
+        "id": "load_input_bundle",
+        "name": "Load PoC input bundle",
+        "type": "user_task",
+        "component": null,
+        "inputs": [],
+        "outputs": [
+          "poc_input_bundle",
+          "document_collection",
+          "access_manifest",
+          "query_set"
+        ],
+        "parameters": {
+          "entrypoint_flag": "--input",
+          "description": "User provides path to poc_input_bundle.json via CLI. All referenced files (PDFs, access_manifest.json, query_set.json) are resolved relative to the bundle file."
+        },
+        "depends_on": [],
+        "loop": null
+      },
+      {
+        "id": "run_rag_pipeline",
+        "name": "Index documents and process queries with role-filtered retrieval",
+        "type": "automated_task",
+        "component": "RAGWorkflow",
+        "inputs": [
+          "document_collection",
+          "access_manifest",
+          "query_set"
+        ],
+        "outputs": [
+          "answer_records"
+        ],
+        "parameters": {
+          "collection_name": "manufacturing_knowledge",
+          "citations": true,
+          "conversation_history": false,
+          "stream": false,
+          "retriever_top_k": 4,
+          "persist": true,
+          "rbac_metadata_fields": [
+            "classification",
+            "allowed_roles",
+            "file_name",
+            "page_number"
+          ],
+          "chunking_strategy": "structure_aware",
+          "chunk_overlap": "moderate",
+          "role_filter_field": "allowed_roles",
+          "role_source": "query_metadata",
+          "deny_when_no_allowed_chunks": true,
+          "citation_format": "[file_name, page_number]",
+          "citation_page_type": "1-based integer",
+          "preserve_exact_values": true,
+          "no_speculation": true
+        },
+        "depends_on": [
+          "load_input_bundle"
+        ],
+        "loop": null
+      },
+      {
+        "id": "save_results",
+        "name": "Save RAGAnswerRecord results to output file",
+        "type": "automated_task",
+        "component": null,
+        "inputs": [
+          "answer_records"
+        ],
+        "outputs": [
+          "saved_results"
+        ],
+        "parameters": {
+          "output_file": "output/results.json",
+          "format": "json_array"
+        },
+        "depends_on": [
+          "run_rag_pipeline"
+        ],
+        "loop": null
+      }
+    ]
+  },
+  "business_process": {
+    "participants": [
+      {
+        "id": "employee",
+        "name": "Employee",
+        "kind": "human_role",
+        "default_lane_for": []
+      },
+      {
+        "id": "manager",
+        "name": "Manager",
+        "kind": "human_role",
+        "default_lane_for": []
+      },
+      {
+        "id": "gaik_ai_system",
+        "name": "GAIK AI System",
+        "kind": "human_role",
+        "default_lane_for": []
+      }
+    ],
+    "manual_steps": [],
+    "external_parties": [],
+    "message_flows": [],
+    "exceptions": [],
+    "decision_points": [
+      {
+        "id": "access_check",
+        "name": "Access allowed?",
+        "after": "",
+        "branches": []
+      }
+    ]
+  },
+  "prompts": {},
+  "models": {
+    "provider": "azure_openai",
+    "answer_model": "gpt-5.4",
+    "embedding_model": "${AZURE_OPENAI_EMBEDDING_DEPLOYMENT}",
+    "temperature": 1.0,
+    "reasoning_effort": "medium"
+  },
+  "validation": {
+    "human_review_required": false,
+    "completeness_check": true,
+    "hallucination_check": false
+  },
+  "evaluation": {
+    "metrics": [
+      "access_control_correctness",
+      "citation_accuracy",
+      "answer_groundedness",
+      "refusal_correctness"
+    ],
+    "eval_framework": "RAG_eval",
+    "sample_data_dir": "data/samples",
+    "ground_truth_dir": "evals/ground_truth",
+    "test_queries": [
+      {
+        "id": "Q01",
+        "role": "employee",
+        "question": "What is the Helsinki hotel limit?",
+        "expected_access_decision": "allowed",
+        "expected_citations": [
+          [
+            "employee_travel_policy.pdf",
+            3
+          ]
+        ],
+        "key_facts": [
+          "EUR 180 per night",
+          "Finance Director approval required when exceeded"
+        ]
+      },
+      {
+        "id": "Q02",
+        "role": "employee",
+        "question": "When should the MX-200 filter be inspected and replaced?",
+        "expected_access_decision": "allowed",
+        "expected_citations": [
+          [
+            "mx200_maintenance_manual.pdf",
+            3
+          ],
+          [
+            "mx200_maintenance_manual.pdf",
+            4
+          ]
+        ],
+        "key_facts": [
+          "Inspection every 250 operating hours",
+          "Replacement after 1000 operating hours or above 1.8 bar, whichever occurs first"
+        ]
+      },
+      {
+        "id": "Q03",
+        "role": "employee",
+        "question": "What is the Project Aurora discount ceiling?",
+        "expected_access_decision": "denied",
+        "expected_citations": [],
+        "key_facts": [
+          "Must NOT reveal 12%, 22%, or CFO details"
+        ]
+      },
+      {
+        "id": "Q04",
+        "role": "manager",
+        "question": "What is the Project Aurora discount ceiling and who approves exceptions?",
+        "expected_access_decision": "allowed",
+        "expected_citations": [
+          [
+            "project_aurora_pricing_strategy.pdf",
+            3
+          ]
+        ],
+        "key_facts": [
+          "12 percent ceiling",
+          "Written Chief Financial Officer approval required above ceiling"
+        ]
+      }
+    ]
+  },
+  "governance": {
+    "data_handling": {
+      "external_model_api_allowed": true,
+      "local_processing_required": false,
+      "stores_input_data": true,
+      "stores_outputs": true,
+      "retention_policy": "not_specified",
+      "contains_personal_data": "unknown",
+      "output_sensitivity": "high",
+      "audit_log_required": false
+    }
+  },
+  "runtime": {
+    "interface": "cli",
+    "entrypoint": "poc/run_poc.py",
+    "env_file": "poc/.env.example"
+  },
+  "package": {
+    "name": "manufacturing_rag_assistant_use_case",
+    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\a34c17e7bc10",
+    "include_tests": true,
+    "include_evals": true,
+    "include_docs": true
+  },
+  "visualizations": {
+    "bpmn_mapping": {
+      "Lane_users": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.intended_users"
+      },
+      "Activity_load_input_bundle": {
+        "kind": "user_task",
+        "blueprint_path": "workflow.steps[0]"
+      },
+      "Lane_gaik_ai": {
+        "kind": "lane",
+        "blueprint_path": "derived:system"
+      },
+      "Activity_run_rag_pipeline": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[1]"
+      },
+      "Activity_save_results": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[2]"
+      },
+      "StartEvent_1": {
+        "kind": "start_event",
+        "blueprint_path": "derived:start"
+      },
+      "EndEvent_success": {
+        "kind": "end_event",
+        "blueprint_path": "derived:end"
+      },
+      "DataObjectRef_poc_input_bundle": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.poc_input_bundle"
+      },
+      "DataObjectRef_document_collection": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.document_collection"
+      },
+      "DataObjectRef_access_manifest": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.access_manifest"
+      },
+      "DataObjectRef_query_set": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.query_set"
+      },
+      "DataObjectRef_answer_records": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.answer_records"
+      },
+      "DataObjectRef_saved_results": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.saved_results"
+      },
+      "TextAnnotation_1": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      }
+    }
+  },
+  "traceability": [
+    {
+      "component": "RAGWorkflow",
+      "required_by": "input_type=document_collection, output_type=answer_with_citations, citations=required"
+    },
+    {
+      "component": "RBAC_metadata_filter",
+      "required_by": "security_constraint=role_based_access_control, restricted documents must never be disclosed to unauthorized roles"
+    }
+  ],
+  "change_log": [
+    {
+      "version": "1.0",
+      "date": "2026-08-08",
+      "change": "Initial blueprint generated by solution_configuration_wizard V1",
+      "changed_by": "solution_configuration_wizard"
+    }
+  ]
+}

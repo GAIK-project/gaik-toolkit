@@ -1,0 +1,905 @@
+Run: UC02_run_02
+Attempt: 0 (original)
+EQ4 baseline: True
+Fixture: {'path': 'C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\fixtures\\purchase_order_complex.pdf', 'sha256': 'e8d0ec6d20e6d3ede18f5d250c1229ce2fbdf0991b5c3d0a4a1d06a662e25fe9', 'size_bytes': 47474}
+Setup command: ['C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-m', 'pip', 'install', '-r', 'requirements.txt']
+Setup exit code: 0
+--- setup stdout ---
+Requirement already satisfied: pydantic>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 1)) (2.12.5)
+Requirement already satisfied: python-dotenv in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 2)) (1.2.1)
+Requirement already satisfied: pyyaml in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 5)) (6.0.3)
+Requirement already satisfied: gaik[llm-judge] in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 3)) (0.5.16)
+Requirement already satisfied: annotated-types>=0.6.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.7.0)
+Requirement already satisfied: pydantic-core==2.41.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (2.41.5)
+Requirement already satisfied: typing-extensions>=4.14.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (4.15.0)
+Requirement already satisfied: typing-inspection>=0.4.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.4.2)
+Requirement already satisfied: openai>=2.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[llm-judge]->-r requirements.txt (line 3)) (2.8.1)
+Requirement already satisfied: anthropic>=0.43.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[vision-extract]->-r requirements.txt (line 4)) (0.96.0)
+Requirement already satisfied: google-auth>=2.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[vision-extract]->-r requirements.txt (line 4)) (2.50.0)
+Requirement already satisfied: requests>=2.31.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[vision-extract]->-r requirements.txt (line 4)) (2.32.5)
+Requirement already satisfied: anyio<5,>=3.5.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (4.12.0)
+Requirement already satisfied: distro<2,>=1.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (1.9.0)
+Requirement already satisfied: docstring-parser<1,>=0.15 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.18.0)
+Requirement already satisfied: httpx<1,>=0.25.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.28.1)
+Requirement already satisfied: jiter<1,>=0.4.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.12.0)
+Requirement already satisfied: sniffio in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (1.3.1)
+Requirement already satisfied: pyasn1-modules>=0.2.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.4.2)
+Requirement already satisfied: cryptography>=38.0.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (46.0.3)
+Requirement already satisfied: tqdm>4 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[llm-judge]->-r requirements.txt (line 3)) (4.67.1)
+Requirement already satisfied: charset_normalizer<4,>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (3.4.4)
+Requirement already satisfied: idna<4,>=2.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (3.11)
+Requirement already satisfied: urllib3<3,>=1.21.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2.6.2)
+Requirement already satisfied: certifi>=2017.4.17 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2025.11.12)
+Requirement already satisfied: google-genai>=0.3.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[llm-judge]->-r requirements.txt (line 3)) (1.74.0)
+Requirement already satisfied: cffi>=2.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from cryptography>=38.0.3->google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2.0.0)
+Requirement already satisfied: tenacity<9.2.0,>=8.2.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[llm-judge]->-r requirements.txt (line 3)) (9.1.2)
+Requirement already satisfied: websockets<17.0,>=13.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[llm-judge]->-r requirements.txt (line 3)) (15.0.1)
+Requirement already satisfied: httpcore==1.* in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpx<1,>=0.25.0->anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (1.0.9)
+Requirement already satisfied: h11>=0.16 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpcore==1.*->httpx<1,>=0.25.0->anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.16.0)
+Requirement already satisfied: pyasn1<0.7.0,>=0.6.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pyasn1-modules>=0.2.1->google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.6.1)
+Requirement already satisfied: colorama in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from tqdm>4->openai>=2.7.0->gaik[llm-judge]->-r requirements.txt (line 3)) (0.4.6)
+Requirement already satisfied: pycparser in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from cffi>=2.0.0->cryptography>=38.0.3->google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2.23)
+
+--- setup stderr ---
+
+[notice] A new release of pip is available: 25.0.1 -> 26.1.2
+[notice] To update, run: python.exe -m pip install --upgrade pip
+
+Run command: ['C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', 'run_poc.py']
+Run exit code: 0
+--- run stdout ---
+Input: C:\Users\h02317\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\poc\sample_input\purchase_order_complex.pdf
+Warning: Additional format options not available. Only PDF will be supported.
+Using wizard-approved schema (requirements unchanged).
+Extracting PO fields with VisionExtractor...
+Extraction complete: 1 document(s) processed.
+Usage: 8341 tokens  |  Cost: $0.053503
+
+Result written to: C:\Users\h02317\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\poc\output\result.json
+{
+  "purchase_order_number": {
+    "value": "PO-2026-0471",
+    "confidence_score": 0.99,
+    "confidence_reason": "Value appears explicitly next to the matching field label 'PO Number' in the document header."
+  },
+  "delivery_date": {
+    "value": "10/08/2026",
+    "confidence_score": 0.98,
+    "confidence_reason": "Value appears explicitly next to the matching field label 'Delivery Date' in the header and already matches the required format."
+  },
+  "delivery_address": {
+    "value": "Northstar Manufacturing Ltd., Plant 4, 125 Industrial Way, 00180 Helsinki, Finland",
+    "confidence_score": 0.98,
+    "confidence_reason": "Full ship-to address appears explicitly next to the matching field label 'Delivery Address' in the header."
+  },
+  "vendor_number": {
+    "value": "V-518834",
+    "confidence_score": 0.99,
+    "confidence_reason": "Value appears explicitly next to the matching field label 'Vendor Number' in the header."
+  },
+  "line_items": [
+    {
+      "item_number": {
+        "value": "0010",
+        "confidence_score": 0.99,
+        "confidence_reason": "Item number appears clearly in the first column of the line-item table."
+      },
+      "article_code": {
+        "value": "AX-7041832",
+        "confidence_score": 0.99,
+        "confidence_reason": "Article code appears explicitly in the row under the article code field."
+      },
+      "dimensions": {
+        "value": "10x80mm",
+        "confidence_score": 0.98,
+        "confidence_reason": "Dimension string appears explicitly in the dimensions/form section of the row."
+      },
+      "material_grade": {
+        "value": "CW506L",
+        "confidence_score": 0.88,
+        "confidence_reason": "The row lists material description, designation, and standard; 'CW506L' is the explicit grade/designation line."
+      },
+      "quantity": {
+        "value": "8.600 kg",
+        "confidence_score": 0.99,
+        "confidence_reason": "Quantity appears explicitly in the quantity column with its unit preserved."
+      },
+      "product_form": {
+        "value": "Flat",
+        "confidence_score": 0.99,
+        "confidence_reason": "Product form is explicitly stated as 'Flat' in the row."
+      },
+      "standard_designation": {
+        "value": "EN 1652",
+        "confidence_score": 0.98,
+        "confidence_reason": "Standard reference appears explicitly in the material/designation/standard section of the row."
+      },
+      "cut_length": {
+        "value": "2000mm",
+        "confidence_score": 0.97,
+        "confidence_reason": "Cut length appears explicitly in the cut length / condition column."
+      },
+      "temper_or_condition": {
+        "value": "Cold drawn",
+        "confidence_score": 0.97,
+        "confidence_reason": "Condition appears explicitly in the cut length / condition column after the cut length."
+      },
+      "hardness_hv": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No hardness value was found in this line item or nearby notes."
+      },
+      "min_bend_radius": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No minimum bend radius was found in this line item or nearby notes."
+      },
+      "delivery_length_note": {
+        "value": null,
+        "confidence_score": 0.92,
+        "confidence_reason": "No delivery-length note was found for this specific line item."
+      },
+      "applicable_standard": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No additional applicable standard beyond the main standard designation was found for this row."
+      },
+      "special_flags": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No special requirement or flag was stated for this specific line item."
+      }
+    },
+    {
+      "item_number": {
+        "value": "0020",
+        "confidence_score": 0.99,
+        "confidence_reason": "Item number appears clearly in the first column of the line-item table."
+      },
+      "article_code": {
+        "value": "BX-7041833",
+        "confidence_score": 0.99,
+        "confidence_reason": "Article code appears explicitly in the row under the article code field."
+      },
+      "dimensions": {
+        "value": "25x8mm",
+        "confidence_score": 0.98,
+        "confidence_reason": "Dimension string appears explicitly in the dimensions/form section of the row."
+      },
+      "material_grade": {
+        "value": "1.4401",
+        "confidence_score": 0.96,
+        "confidence_reason": "The designation line '1.4401' is explicitly stated in the material/designation/standard section."
+      },
+      "quantity": {
+        "value": "2.500 kg",
+        "confidence_score": 0.99,
+        "confidence_reason": "Quantity appears explicitly in the quantity column with its unit preserved."
+      },
+      "product_form": {
+        "value": "rectangular bar",
+        "confidence_score": 0.99,
+        "confidence_reason": "Product form is explicitly stated as 'rectangular bar' in the row."
+      },
+      "standard_designation": {
+        "value": "ASTM A276",
+        "confidence_score": 0.98,
+        "confidence_reason": "Standard reference appears explicitly in the material/designation/standard section of the row."
+      },
+      "cut_length": {
+        "value": "3000mm",
+        "confidence_score": 0.97,
+        "confidence_reason": "Cut length appears explicitly in the cut length / condition column."
+      },
+      "temper_or_condition": {
+        "value": "Bright finish",
+        "confidence_score": 0.97,
+        "confidence_reason": "Condition appears explicitly in the cut length / condition column after the cut length."
+      },
+      "hardness_hv": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No hardness value was found in this line item or nearby notes."
+      },
+      "min_bend_radius": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No minimum bend radius was found in this line item or nearby notes."
+      },
+      "delivery_length_note": {
+        "value": null,
+        "confidence_score": 0.92,
+        "confidence_reason": "No delivery-length note was found for this specific line item."
+      },
+      "applicable_standard": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No additional applicable standard beyond the main standard designation was found for this row."
+      },
+      "special_flags": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No special requirement or flag was stated for this specific line item."
+      }
+    },
+    {
+      "item_number": {
+        "value": "0030",
+        "confidence_score": 0.99,
+        "confidence_reason": "Item number appears clearly and the continuation is explicitly marked across the page break."
+      },
+      "article_code": {
+        "value": "CX-7041834",
+        "confidence_score": 0.99,
+        "confidence_reason": "Article code appears explicitly in the continued row and matches the page-1 partial row."
+      },
+      "dimensions": {
+        "value": "20mm diameter",
+        "confidence_score": 0.98,
+        "confidence_reason": "Dimension string appears explicitly in the dimensions/form section of the continued row."
+      },
+      "material_grade": {
+        "value": "AA6061",
+        "confidence_score": 0.95,
+        "confidence_reason": "The designation line 'AA6061' is explicitly stated in the material/designation/standard section across the continued row."
+      },
+      "quantity": {
+        "value": "1.200 kg",
+        "confidence_score": 0.98,
+        "confidence_reason": "Quantity appears explicitly in the continued row with its unit preserved."
+      },
+      "product_form": {
+        "value": "round",
+        "confidence_score": 0.99,
+        "confidence_reason": "Product form is explicitly stated as 'round' in the continued row."
+      },
+      "standard_designation": {
+        "value": "ASTM B221",
+        "confidence_score": 0.98,
+        "confidence_reason": "Standard reference appears explicitly in the material/designation/standard section of the continued row."
+      },
+      "cut_length": {
+        "value": "3000mm",
+        "confidence_score": 0.97,
+        "confidence_reason": "Cut length appears explicitly in the continued row under the cut length / condition column."
+      },
+      "temper_or_condition": {
+        "value": "T6",
+        "confidence_score": 0.98,
+        "confidence_reason": "Condition appears explicitly in the continued row as 'T6'."
+      },
+      "hardness_hv": {
+        "value": null,
+        "confidence_score": 0.98,
+        "confidence_reason": "The document explicitly states 'Hardness HV Not stated' for the continued item, so no numeric value is present."
+      },
+      "min_bend_radius": {
+        "value": null,
+        "confidence_score": 0.98,
+        "confidence_reason": "The document explicitly states 'Minimum bend radius Not stated' for the continued item, so no numeric value is present."
+      },
+      "delivery_length_note": {
+        "value": "in lengths of 3000mm",
+        "confidence_score": 0.95,
+        "confidence_reason": "A note immediately following the continued item explicitly states 'Delivery length note in lengths of 3000mm'."
+      },
+      "applicable_standard": {
+        "value": null,
+        "confidence_score": 0.9,
+        "confidence_reason": "No additional applicable standard beyond the main standard designation was found for this row."
+      },
+      "special_flags": {
+        "value": "chamfered edges",
+        "confidence_score": 0.95,
+        "confidence_reason": "A note immediately following the continued item explicitly states 'Special flags chamfered edges'."
+      }
+    }
+  ]
+}
+
+Running LLMJudge hallucination detection...
+WARNING: 5 hallucination flag(s) detected:
+  field=line_items[0].applicable_standard  value=null  reason=Source gives only EN 1652 as the standard; no extra applicable standard is stated.
+  field=line_items[0].special_flags  value=null  reason=No special flags are stated for item 0010 anywhere in the source.
+  field=line_items[1].applicable_standard  value=null  reason=Source gives only ASTM A276 as the standard; no extra applicable standard is stated.
+  field=line_items[1].special_flags  value=null  reason=No special flags are stated for item 0020 anywhere in the source.
+  field=line_items[2].applicable_standard  value=null  reason=Source gives only ASTM B221 as the standard; no extra applicable standard is stated.
+Validation report written to: C:\Users\h02317\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\poc\output\validation.json
+
+--- Record ready for reviewer verification ---
+Approved JSON may be transferred to ERP. Unreviewed records must NOT be transferred.
+
+No fixture found at C:\Users\h02317\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\fixtures\expected_erp_record.json -- skipping comparison.
+To enable: place your expected_erp_record.json in the fixtures/ directory.
+
+PoC complete.
+
+--- run stderr ---
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/responses?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4-mini/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+
+--- outputs ---
+[
+  {
+    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\result.json",
+    "relative_path": "output\\result.json",
+    "size_bytes": 10052,
+    "new_or_modified": true,
+    "sha256": "82b518b3270c0188d024fea98af8cee0beac2336ee43c88007eaa8e61348400b",
+    "json_parsed": true,
+    "json_value": {
+      "purchase_order_number": {
+        "value": "PO-2026-0471",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly next to the matching field label 'PO Number' in the document header."
+      },
+      "delivery_date": {
+        "value": "10/08/2026",
+        "confidence_score": 0.98,
+        "confidence_reason": "Value appears explicitly next to the matching field label 'Delivery Date' in the header and already matches the required format."
+      },
+      "delivery_address": {
+        "value": "Northstar Manufacturing Ltd., Plant 4, 125 Industrial Way, 00180 Helsinki, Finland",
+        "confidence_score": 0.98,
+        "confidence_reason": "Full ship-to address appears explicitly next to the matching field label 'Delivery Address' in the header."
+      },
+      "vendor_number": {
+        "value": "V-518834",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly next to the matching field label 'Vendor Number' in the header."
+      },
+      "line_items": [
+        {
+          "item_number": {
+            "value": "0010",
+            "confidence_score": 0.99,
+            "confidence_reason": "Item number appears clearly in the first column of the line-item table."
+          },
+          "article_code": {
+            "value": "AX-7041832",
+            "confidence_score": 0.99,
+            "confidence_reason": "Article code appears explicitly in the row under the article code field."
+          },
+          "dimensions": {
+            "value": "10x80mm",
+            "confidence_score": 0.98,
+            "confidence_reason": "Dimension string appears explicitly in the dimensions/form section of the row."
+          },
+          "material_grade": {
+            "value": "CW506L",
+            "confidence_score": 0.88,
+            "confidence_reason": "The row lists material description, designation, and standard; 'CW506L' is the explicit grade/designation line."
+          },
+          "quantity": {
+            "value": "8.600 kg",
+            "confidence_score": 0.99,
+            "confidence_reason": "Quantity appears explicitly in the quantity column with its unit preserved."
+          },
+          "product_form": {
+            "value": "Flat",
+            "confidence_score": 0.99,
+            "confidence_reason": "Product form is explicitly stated as 'Flat' in the row."
+          },
+          "standard_designation": {
+            "value": "EN 1652",
+            "confidence_score": 0.98,
+            "confidence_reason": "Standard reference appears explicitly in the material/designation/standard section of the row."
+          },
+          "cut_length": {
+            "value": "2000mm",
+            "confidence_score": 0.97,
+            "confidence_reason": "Cut length appears explicitly in the cut length / condition column."
+          },
+          "temper_or_condition": {
+            "value": "Cold drawn",
+            "confidence_score": 0.97,
+            "confidence_reason": "Condition appears explicitly in the cut length / condition column after the cut length."
+          },
+          "hardness_hv": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No hardness value was found in this line item or nearby notes."
+          },
+          "min_bend_radius": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No minimum bend radius was found in this line item or nearby notes."
+          },
+          "delivery_length_note": {
+            "value": null,
+            "confidence_score": 0.92,
+            "confidence_reason": "No delivery-length note was found for this specific line item."
+          },
+          "applicable_standard": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No additional applicable standard beyond the main standard designation was found for this row."
+          },
+          "special_flags": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No special requirement or flag was stated for this specific line item."
+          }
+        },
+        {
+          "item_number": {
+            "value": "0020",
+            "confidence_score": 0.99,
+            "confidence_reason": "Item number appears clearly in the first column of the line-item table."
+          },
+          "article_code": {
+            "value": "BX-7041833",
+            "confidence_score": 0.99,
+            "confidence_reason": "Article code appears explicitly in the row under the article code field."
+          },
+          "dimensions": {
+            "value": "25x8mm",
+            "confidence_score": 0.98,
+            "confidence_reason": "Dimension string appears explicitly in the dimensions/form section of the row."
+          },
+          "material_grade": {
+            "value": "1.4401",
+            "confidence_score": 0.96,
+            "confidence_reason": "The designation line '1.4401' is explicitly stated in the material/designation/standard section."
+          },
+          "quantity": {
+            "value": "2.500 kg",
+            "confidence_score": 0.99,
+            "confidence_reason": "Quantity appears explicitly in the quantity column with its unit preserved."
+          },
+          "product_form": {
+            "value": "rectangular bar",
+            "confidence_score": 0.99,
+            "confidence_reason": "Product form is explicitly stated as 'rectangular bar' in the row."
+          },
+          "standard_designation": {
+            "value": "ASTM A276",
+            "confidence_score": 0.98,
+            "confidence_reason": "Standard reference appears explicitly in the material/designation/standard section of the row."
+          },
+          "cut_length": {
+            "value": "3000mm",
+            "confidence_score": 0.97,
+            "confidence_reason": "Cut length appears explicitly in the cut length / condition column."
+          },
+          "temper_or_condition": {
+            "value": "Bright finish",
+            "confidence_score": 0.97,
+            "confidence_reason": "Condition appears explicitly in the cut length / condition column after the cut length."
+          },
+          "hardness_hv": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No hardness value was found in this line item or nearby notes."
+          },
+          "min_bend_radius": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No minimum bend radius was found in this line item or nearby notes."
+          },
+          "delivery_length_note": {
+            "value": null,
+            "confidence_score": 0.92,
+            "confidence_reason": "No delivery-length note was found for this specific line item."
+          },
+          "applicable_standard": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No additional applicable standard beyond the main standard designation was found for this row."
+          },
+          "special_flags": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No special requirement or flag was stated for this specific line item."
+          }
+        },
+        {
+          "item_number": {
+            "value": "0030",
+            "confidence_score": 0.99,
+            "confidence_reason": "Item number appears clearly and the continuation is explicitly marked across the page break."
+          },
+          "article_code": {
+            "value": "CX-7041834",
+            "confidence_score": 0.99,
+            "confidence_reason": "Article code appears explicitly in the continued row and matches the page-1 partial row."
+          },
+          "dimensions": {
+            "value": "20mm diameter",
+            "confidence_score": 0.98,
+            "confidence_reason": "Dimension string appears explicitly in the dimensions/form section of the continued row."
+          },
+          "material_grade": {
+            "value": "AA6061",
+            "confidence_score": 0.95,
+            "confidence_reason": "The designation line 'AA6061' is explicitly stated in the material/designation/standard section across the continued row."
+          },
+          "quantity": {
+            "value": "1.200 kg",
+            "confidence_score": 0.98,
+            "confidence_reason": "Quantity appears explicitly in the continued row with its unit preserved."
+          },
+          "product_form": {
+            "value": "round",
+            "confidence_score": 0.99,
+            "confidence_reason": "Product form is explicitly stated as 'round' in the continued row."
+          },
+          "standard_designation": {
+            "value": "ASTM B221",
+            "confidence_score": 0.98,
+            "confidence_reason": "Standard reference appears explicitly in the material/designation/standard section of the continued row."
+          },
+          "cut_length": {
+            "value": "3000mm",
+            "confidence_score": 0.97,
+            "confidence_reason": "Cut length appears explicitly in the continued row under the cut length / condition column."
+          },
+          "temper_or_condition": {
+            "value": "T6",
+            "confidence_score": 0.98,
+            "confidence_reason": "Condition appears explicitly in the continued row as 'T6'."
+          },
+          "hardness_hv": {
+            "value": null,
+            "confidence_score": 0.98,
+            "confidence_reason": "The document explicitly states 'Hardness HV Not stated' for the continued item, so no numeric value is present."
+          },
+          "min_bend_radius": {
+            "value": null,
+            "confidence_score": 0.98,
+            "confidence_reason": "The document explicitly states 'Minimum bend radius Not stated' for the continued item, so no numeric value is present."
+          },
+          "delivery_length_note": {
+            "value": "in lengths of 3000mm",
+            "confidence_score": 0.95,
+            "confidence_reason": "A note immediately following the continued item explicitly states 'Delivery length note in lengths of 3000mm'."
+          },
+          "applicable_standard": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No additional applicable standard beyond the main standard designation was found for this row."
+          },
+          "special_flags": {
+            "value": "chamfered edges",
+            "confidence_score": 0.95,
+            "confidence_reason": "A note immediately following the continued item explicitly states 'Special flags chamfered edges'."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\validation.json",
+    "relative_path": "output\\validation.json",
+    "size_bytes": 1124,
+    "new_or_modified": true,
+    "sha256": "bd54574fbe3f568ae24867ed22b2ca2a1ca2f6fc507309ce8777ae24badbdd3d",
+    "json_parsed": true,
+    "json_value": {
+      "hallucination_flags": [
+        {
+          "field": "line_items[0].applicable_standard",
+          "value": "null",
+          "severity": "wrong",
+          "reason": "Source gives only EN 1652 as the standard; no extra applicable standard is stated."
+        },
+        {
+          "field": "line_items[0].special_flags",
+          "value": "null",
+          "severity": "wrong",
+          "reason": "No special flags are stated for item 0010 anywhere in the source."
+        },
+        {
+          "field": "line_items[1].applicable_standard",
+          "value": "null",
+          "severity": "wrong",
+          "reason": "Source gives only ASTM A276 as the standard; no extra applicable standard is stated."
+        },
+        {
+          "field": "line_items[1].special_flags",
+          "value": "null",
+          "severity": "wrong",
+          "reason": "No special flags are stated for item 0020 anywhere in the source."
+        },
+        {
+          "field": "line_items[2].applicable_standard",
+          "value": "null",
+          "severity": "wrong",
+          "reason": "Source gives only ASTM B221 as the standard; no extra applicable standard is stated."
+        }
+      ],
+      "passed": false
+    }
+  },
+  {
+    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\result.json",
+    "relative_path": "output\\result.json",
+    "size_bytes": 10052,
+    "new_or_modified": true,
+    "sha256": "82b518b3270c0188d024fea98af8cee0beac2336ee43c88007eaa8e61348400b",
+    "json_parsed": true,
+    "json_value": {
+      "purchase_order_number": {
+        "value": "PO-2026-0471",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly next to the matching field label 'PO Number' in the document header."
+      },
+      "delivery_date": {
+        "value": "10/08/2026",
+        "confidence_score": 0.98,
+        "confidence_reason": "Value appears explicitly next to the matching field label 'Delivery Date' in the header and already matches the required format."
+      },
+      "delivery_address": {
+        "value": "Northstar Manufacturing Ltd., Plant 4, 125 Industrial Way, 00180 Helsinki, Finland",
+        "confidence_score": 0.98,
+        "confidence_reason": "Full ship-to address appears explicitly next to the matching field label 'Delivery Address' in the header."
+      },
+      "vendor_number": {
+        "value": "V-518834",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly next to the matching field label 'Vendor Number' in the header."
+      },
+      "line_items": [
+        {
+          "item_number": {
+            "value": "0010",
+            "confidence_score": 0.99,
+            "confidence_reason": "Item number appears clearly in the first column of the line-item table."
+          },
+          "article_code": {
+            "value": "AX-7041832",
+            "confidence_score": 0.99,
+            "confidence_reason": "Article code appears explicitly in the row under the article code field."
+          },
+          "dimensions": {
+            "value": "10x80mm",
+            "confidence_score": 0.98,
+            "confidence_reason": "Dimension string appears explicitly in the dimensions/form section of the row."
+          },
+          "material_grade": {
+            "value": "CW506L",
+            "confidence_score": 0.88,
+            "confidence_reason": "The row lists material description, designation, and standard; 'CW506L' is the explicit grade/designation line."
+          },
+          "quantity": {
+            "value": "8.600 kg",
+            "confidence_score": 0.99,
+            "confidence_reason": "Quantity appears explicitly in the quantity column with its unit preserved."
+          },
+          "product_form": {
+            "value": "Flat",
+            "confidence_score": 0.99,
+            "confidence_reason": "Product form is explicitly stated as 'Flat' in the row."
+          },
+          "standard_designation": {
+            "value": "EN 1652",
+            "confidence_score": 0.98,
+            "confidence_reason": "Standard reference appears explicitly in the material/designation/standard section of the row."
+          },
+          "cut_length": {
+            "value": "2000mm",
+            "confidence_score": 0.97,
+            "confidence_reason": "Cut length appears explicitly in the cut length / condition column."
+          },
+          "temper_or_condition": {
+            "value": "Cold drawn",
+            "confidence_score": 0.97,
+            "confidence_reason": "Condition appears explicitly in the cut length / condition column after the cut length."
+          },
+          "hardness_hv": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No hardness value was found in this line item or nearby notes."
+          },
+          "min_bend_radius": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No minimum bend radius was found in this line item or nearby notes."
+          },
+          "delivery_length_note": {
+            "value": null,
+            "confidence_score": 0.92,
+            "confidence_reason": "No delivery-length note was found for this specific line item."
+          },
+          "applicable_standard": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No additional applicable standard beyond the main standard designation was found for this row."
+          },
+          "special_flags": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No special requirement or flag was stated for this specific line item."
+          }
+        },
+        {
+          "item_number": {
+            "value": "0020",
+            "confidence_score": 0.99,
+            "confidence_reason": "Item number appears clearly in the first column of the line-item table."
+          },
+          "article_code": {
+            "value": "BX-7041833",
+            "confidence_score": 0.99,
+            "confidence_reason": "Article code appears explicitly in the row under the article code field."
+          },
+          "dimensions": {
+            "value": "25x8mm",
+            "confidence_score": 0.98,
+            "confidence_reason": "Dimension string appears explicitly in the dimensions/form section of the row."
+          },
+          "material_grade": {
+            "value": "1.4401",
+            "confidence_score": 0.96,
+            "confidence_reason": "The designation line '1.4401' is explicitly stated in the material/designation/standard section."
+          },
+          "quantity": {
+            "value": "2.500 kg",
+            "confidence_score": 0.99,
+            "confidence_reason": "Quantity appears explicitly in the quantity column with its unit preserved."
+          },
+          "product_form": {
+            "value": "rectangular bar",
+            "confidence_score": 0.99,
+            "confidence_reason": "Product form is explicitly stated as 'rectangular bar' in the row."
+          },
+          "standard_designation": {
+            "value": "ASTM A276",
+            "confidence_score": 0.98,
+            "confidence_reason": "Standard reference appears explicitly in the material/designation/standard section of the row."
+          },
+          "cut_length": {
+            "value": "3000mm",
+            "confidence_score": 0.97,
+            "confidence_reason": "Cut length appears explicitly in the cut length / condition column."
+          },
+          "temper_or_condition": {
+            "value": "Bright finish",
+            "confidence_score": 0.97,
+            "confidence_reason": "Condition appears explicitly in the cut length / condition column after the cut length."
+          },
+          "hardness_hv": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No hardness value was found in this line item or nearby notes."
+          },
+          "min_bend_radius": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No minimum bend radius was found in this line item or nearby notes."
+          },
+          "delivery_length_note": {
+            "value": null,
+            "confidence_score": 0.92,
+            "confidence_reason": "No delivery-length note was found for this specific line item."
+          },
+          "applicable_standard": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No additional applicable standard beyond the main standard designation was found for this row."
+          },
+          "special_flags": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No special requirement or flag was stated for this specific line item."
+          }
+        },
+        {
+          "item_number": {
+            "value": "0030",
+            "confidence_score": 0.99,
+            "confidence_reason": "Item number appears clearly and the continuation is explicitly marked across the page break."
+          },
+          "article_code": {
+            "value": "CX-7041834",
+            "confidence_score": 0.99,
+            "confidence_reason": "Article code appears explicitly in the continued row and matches the page-1 partial row."
+          },
+          "dimensions": {
+            "value": "20mm diameter",
+            "confidence_score": 0.98,
+            "confidence_reason": "Dimension string appears explicitly in the dimensions/form section of the continued row."
+          },
+          "material_grade": {
+            "value": "AA6061",
+            "confidence_score": 0.95,
+            "confidence_reason": "The designation line 'AA6061' is explicitly stated in the material/designation/standard section across the continued row."
+          },
+          "quantity": {
+            "value": "1.200 kg",
+            "confidence_score": 0.98,
+            "confidence_reason": "Quantity appears explicitly in the continued row with its unit preserved."
+          },
+          "product_form": {
+            "value": "round",
+            "confidence_score": 0.99,
+            "confidence_reason": "Product form is explicitly stated as 'round' in the continued row."
+          },
+          "standard_designation": {
+            "value": "ASTM B221",
+            "confidence_score": 0.98,
+            "confidence_reason": "Standard reference appears explicitly in the material/designation/standard section of the continued row."
+          },
+          "cut_length": {
+            "value": "3000mm",
+            "confidence_score": 0.97,
+            "confidence_reason": "Cut length appears explicitly in the continued row under the cut length / condition column."
+          },
+          "temper_or_condition": {
+            "value": "T6",
+            "confidence_score": 0.98,
+            "confidence_reason": "Condition appears explicitly in the continued row as 'T6'."
+          },
+          "hardness_hv": {
+            "value": null,
+            "confidence_score": 0.98,
+            "confidence_reason": "The document explicitly states 'Hardness HV Not stated' for the continued item, so no numeric value is present."
+          },
+          "min_bend_radius": {
+            "value": null,
+            "confidence_score": 0.98,
+            "confidence_reason": "The document explicitly states 'Minimum bend radius Not stated' for the continued item, so no numeric value is present."
+          },
+          "delivery_length_note": {
+            "value": "in lengths of 3000mm",
+            "confidence_score": 0.95,
+            "confidence_reason": "A note immediately following the continued item explicitly states 'Delivery length note in lengths of 3000mm'."
+          },
+          "applicable_standard": {
+            "value": null,
+            "confidence_score": 0.9,
+            "confidence_reason": "No additional applicable standard beyond the main standard designation was found for this row."
+          },
+          "special_flags": {
+            "value": "chamfered edges",
+            "confidence_score": 0.95,
+            "confidence_reason": "A note immediately following the continued item explicitly states 'Special flags chamfered edges'."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\validation.json",
+    "relative_path": "output\\validation.json",
+    "size_bytes": 1124,
+    "new_or_modified": true,
+    "sha256": "bd54574fbe3f568ae24867ed22b2ca2a1ca2f6fc507309ce8777ae24badbdd3d",
+    "json_parsed": true,
+    "json_value": {
+      "hallucination_flags": [
+        {
+          "field": "line_items[0].applicable_standard",
+          "value": "null",
+          "severity": "wrong",
+          "reason": "Source gives only EN 1652 as the standard; no extra applicable standard is stated."
+        },
+        {
+          "field": "line_items[0].special_flags",
+          "value": "null",
+          "severity": "wrong",
+          "reason": "No special flags are stated for item 0010 anywhere in the source."
+        },
+        {
+          "field": "line_items[1].applicable_standard",
+          "value": "null",
+          "severity": "wrong",
+          "reason": "Source gives only ASTM A276 as the standard; no extra applicable standard is stated."
+        },
+        {
+          "field": "line_items[1].special_flags",
+          "value": "null",
+          "severity": "wrong",
+          "reason": "No special flags are stated for item 0020 anywhere in the source."
+        },
+        {
+          "field": "line_items[2].applicable_standard",
+          "value": "null",
+          "severity": "wrong",
+          "reason": "Source gives only ASTM B221 as the standard; no extra applicable standard is stated."
+        }
+      ],
+      "passed": false
+    }
+  }
+]

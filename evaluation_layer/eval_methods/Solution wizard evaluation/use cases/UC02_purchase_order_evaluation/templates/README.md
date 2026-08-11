@@ -1,0 +1,1 @@
+`UC02_comparison_template.xlsx` contains the frozen oracle rows, blank Run 1/Run 2 evidence and verdict columns, and an unscored PoC Recovery sheet. Build the populated workbook with `python scripts/build_workbook.py`.

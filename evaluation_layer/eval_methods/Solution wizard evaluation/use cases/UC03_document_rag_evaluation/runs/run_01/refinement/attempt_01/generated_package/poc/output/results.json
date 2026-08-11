@@ -1,0 +1,61 @@
+[
+  {
+    "query_id": "Q01",
+    "role": "employee",
+    "question": "What is the maximum reimbursable hotel rate in Helsinki, and what happens if it is exceeded?",
+    "access_decision": "allowed",
+    "answer": "The maximum reimbursable hotel rate in Helsinki is EUR 180 per night [employee_travel_policy.pdf, 3].\n\nIf the rate exceeds that limit, written approval from the Finance Director is required before booking [employee_travel_policy.pdf, 3]. If only a suitable room exceeds the city limit, the traveller must explain the reason and obtain written Finance Director approval before booking [employee_travel_policy.pdf, 3]. Bookings must not be confirmed until the required trip approval and any applicable exception approval have been documented [employee_travel_policy.pdf, 2].",
+    "citations": [
+      [
+        "employee_travel_policy.pdf",
+        3
+      ],
+      [
+        "employee_travel_policy.pdf",
+        2
+      ]
+    ],
+    "refusal_reason": null
+  },
+  {
+    "query_id": "Q02",
+    "role": "employee",
+    "question": "How often should the MX-200 main process filter be inspected and when must it be replaced?",
+    "access_decision": "allowed",
+    "answer": "The MX-200 main process filter should be inspected every 250 operating hours [mx200_maintenance_manual.pdf, 3].\n\nIt must be replaced after 1,000 operating hours or earlier when differential pressure exceeds 1.8 bar, whichever occurs first [mx200_maintenance_manual.pdf, 4]. The operating-hour and pressure triggers are independent, so reaching either trigger requires replacement even if the other value is still normal [mx200_maintenance_manual.pdf, 4]. A visibly damaged or collapsed element must also be replaced immediately [mx200_maintenance_manual.pdf, 4].",
+    "citations": [
+      [
+        "mx200_maintenance_manual.pdf",
+        3
+      ],
+      [
+        "mx200_maintenance_manual.pdf",
+        4
+      ]
+    ],
+    "refusal_reason": null
+  },
+  {
+    "query_id": "Q03",
+    "role": "employee",
+    "question": "What discount ceiling applies to Project Aurora?",
+    "access_decision": "denied",
+    "answer": "Access denied. You are not authorised to access this information.",
+    "citations": [],
+    "refusal_reason": "Access denied: the information you requested is contained in a document classified as restricted for your role. Contact your manager if you require access."
+  },
+  {
+    "query_id": "Q04",
+    "role": "manager",
+    "question": "What discount ceiling applies to Project Aurora and who approves an exception?",
+    "access_decision": "allowed",
+    "answer": "The standard discount ceiling for Project Aurora is 12 percent [project_aurora_pricing_strategy.pdf, 3]. Any discount above 12 percent requires written approval from the Chief Financial Officer before an offer is issued [project_aurora_pricing_strategy.pdf, 3].",
+    "citations": [
+      [
+        "project_aurora_pricing_strategy.pdf",
+        3
+      ]
+    ],
+    "refusal_reason": null
+  }
+]

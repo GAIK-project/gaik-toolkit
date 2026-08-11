@@ -1,0 +1,137 @@
+{
+  "additionalProperties": false,
+  "description": "Extraction model for MaintenanceTicket",
+  "properties": {
+    "reporter_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The full name of the technician who recorded the message.",
+      "title": "Reporter Name"
+    },
+    "asset_identifier": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The identifier of the specific asset or piece of equipment that is faulty.",
+      "title": "Asset Identifier"
+    },
+    "location": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The location of the fault within the facility.",
+      "title": "Location"
+    },
+    "fault_description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "A description of what is broken, malfunctioning, or requires attention.",
+      "title": "Fault Description"
+    },
+    "urgency": {
+      "anyOf": [
+        {
+          "enum": [
+            "",
+            "low",
+            "medium",
+            "high"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The urgency level of the fault.",
+      "title": "Urgency"
+    },
+    "observation_date": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The date the fault was observed, in YYYY-MM-DD format.",
+      "title": "Observation Date"
+    },
+    "observation_time": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The time the fault was observed, in HH:MM (24-hour) format.",
+      "title": "Observation Time"
+    },
+    "actions_taken": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "A list of immediate actions the technician already took before or while reporting.",
+      "title": "Actions Taken"
+    },
+    "uncertain_fields": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "A list of field names whose values could not be reliably extracted.",
+      "title": "Uncertain Fields"
+    }
+  },
+  "title": "MaintenanceTicket_Extraction",
+  "type": "object"
+}

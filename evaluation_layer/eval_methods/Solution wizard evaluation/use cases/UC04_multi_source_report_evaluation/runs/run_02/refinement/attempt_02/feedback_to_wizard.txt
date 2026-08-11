@@ -1,0 +1,1 @@
+Paste only the preceding attempt's recorded execution error and request a PoC refinement. Do not add corrective code or new requirements.

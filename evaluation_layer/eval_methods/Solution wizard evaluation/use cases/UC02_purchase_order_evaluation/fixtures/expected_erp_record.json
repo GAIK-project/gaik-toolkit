@@ -1,0 +1,56 @@
+{
+  "purchase_order_number": "PO-2026-0471",
+  "delivery_date": "10/08/2026",
+  "delivery_address": "Northstar Manufacturing Ltd., Plant 4, 125 Industrial Way, 00180 Helsinki, Finland",
+  "vendor_number": "V-518834",
+  "line_items": [
+    {
+      "item_number": "0010",
+      "article_code": "AX-7041832",
+      "dimensions": "10x80mm",
+      "product_form": "Flat",
+      "material_grade": "C260 Brass",
+      "standard_designation": "CW506L",
+      "cut_length": "2000mm",
+      "temper_or_condition": "Cold drawn",
+      "hardness_hv": null,
+      "min_bend_radius": null,
+      "delivery_length_note": null,
+      "applicable_standard": "EN 1652",
+      "special_flags": null,
+      "quantity": "8.600 kg"
+    },
+    {
+      "item_number": "0020",
+      "article_code": "BX-7041833",
+      "dimensions": "25x8mm",
+      "product_form": "rectangular bar",
+      "material_grade": "316 Stainless",
+      "standard_designation": "1.4401",
+      "cut_length": "3000mm",
+      "temper_or_condition": "Bright finish",
+      "hardness_hv": null,
+      "min_bend_radius": null,
+      "delivery_length_note": null,
+      "applicable_standard": "ASTM A276",
+      "special_flags": null,
+      "quantity": "2.500 kg"
+    },
+    {
+      "item_number": "0030",
+      "article_code": "CX-7041834",
+      "dimensions": "20mm diameter",
+      "product_form": "round",
+      "material_grade": "6061 Aluminum",
+      "standard_designation": "AA6061",
+      "cut_length": "3000mm",
+      "temper_or_condition": "T6",
+      "hardness_hv": null,
+      "min_bend_radius": null,
+      "delivery_length_note": "in lengths of 3000mm",
+      "applicable_standard": "ASTM B221",
+      "special_flags": "chamfered edges",
+      "quantity": "1.200 kg"
+    }
+  ]
+}

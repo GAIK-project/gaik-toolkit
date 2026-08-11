@@ -1,0 +1,19 @@
+{
+  "reporter_name": "Matti Virtanen",
+  "asset_identifier": "P-17",
+  "location": "kattilahuone B2",
+  "fault_description": "Pumppu P-17 vuotaa",
+  "urgency": "korkea",
+  "observation_date": "2026-07-26",
+  "observation_time": "09:30",
+  "actions_taken": [
+    "alue merkitty",
+    "pumppu pysäytetty"
+  ],
+  "must_not_appear_without_explicit_unknown_marker": [
+    "maintenance_ticket_id",
+    "repair_cost",
+    "root_cause",
+    "repair_deadline"
+  ]
+}

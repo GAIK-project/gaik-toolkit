@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UC03 evidence comparison",
+  "type": "object",
+  "required": ["schema_version", "scenario_id", "run_id", "recovery_diagnostic", "results"],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "scenario_id": {"const": "UC03"},
+    "run_id": {"type": "string"},
+    "recovery_diagnostic": {
+      "type": "object",
+      "required": ["initial_execution_successful", "refinement_attempts_to_success", "final_execution_successful", "status", "evidence", "eq4_uses_baseline_only"],
+      "properties": {
+        "initial_execution_successful": {"type": ["boolean", "null"]},
+        "refinement_attempts_to_success": {
+          "oneOf": [
+            {"type": "integer", "minimum": 0, "maximum": 3},
+            {"const": "N/A"},
+            {"type": "null"}
+          ]
+        },
+        "final_execution_successful": {"type": ["boolean", "null"]},
+        "status": {"type": "string"},
+        "evidence": {"type": "string"},
+        "eq4_uses_baseline_only": {"const": true}
+      },
+      "additionalProperties": true
+    },
+    "results": {
+      "type": "object",
+      "required": ["EQ1", "EQ1_diagnostics", "EQ2", "EQ3", "EQ4"],
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["check_id", "parameter", "oracle_value", "generated_value", "evidence", "human_verdict"],
+          "properties": {
+            "check_id": {"type": "string"},
+            "parameter": {"type": "string"},
+            "oracle_value": {},
+            "generated_value": {},
+            "evidence": {"type": "string"},
+            "automatic_result": {"enum": ["pass", "fail", "needs_review"]},
+            "human_verdict": {"type": ["string", "null"], "enum": ["Yes", "No", null]}
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

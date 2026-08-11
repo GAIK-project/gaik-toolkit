@@ -1,0 +1,287 @@
+{
+  "scenario_id": "UC02",
+  "coverage_version": "1.1.0",
+  "wizard_skill_basis": {
+    "repository": "GAIK-project/gaik-toolkit",
+    "commit": "79586c93ea3286f68acf3ad3810a370c4295fa01",
+    "skill_path": "implementation_layer/solution_wizard/SKILL.md",
+    "requirements_implementation_path": "implementation_layer/solution_wizard/src/solution_wizard/requirements.py"
+  },
+  "coverage_claim": "The fixed prompt and answer sheet provide an answer source for every requirement field defined by the cited wizard version. One global Yes-without-changes policy covers routine confirmations, and adaptive clarifying questions remain covered by the fixed fallback answer.",
+  "phase_1": [
+    {
+      "field": "output_directory",
+      "source": "scripted_answers.json#run_setup",
+      "status": "covered"
+    },
+    {
+      "field": "use_case_description",
+      "source": "initial_prompt.txt",
+      "status": "covered"
+    }
+  ],
+  "business_spec": [
+    {
+      "field": "current_process",
+      "source": "SA01",
+      "status": "covered"
+    },
+    {
+      "field": "pain_points",
+      "source": "SA01",
+      "status": "covered"
+    },
+    {
+      "field": "proposed_solution",
+      "source": "initial_prompt.txt; SA01",
+      "status": "covered"
+    },
+    {
+      "field": "intended_users",
+      "source": "SA01",
+      "status": "covered"
+    },
+    {
+      "field": "reviewers",
+      "source": "SA01; SA05",
+      "status": "covered"
+    },
+    {
+      "field": "stakeholders",
+      "source": "SA01; SA05",
+      "status": "covered"
+    },
+    {
+      "field": "input_artifacts",
+      "source": "initial_prompt.txt; SA02",
+      "status": "covered"
+    },
+    {
+      "field": "target_outputs",
+      "source": "initial_prompt.txt; SA03; SA07",
+      "status": "covered"
+    },
+    {
+      "field": "success_criteria",
+      "source": "SA07; SA09",
+      "status": "covered"
+    },
+    {
+      "field": "expected_value",
+      "source": "SA01; SA09",
+      "status": "covered"
+    },
+    {
+      "field": "risks",
+      "source": "SA09",
+      "status": "covered"
+    },
+    {
+      "field": "poc_goal",
+      "source": "SA07",
+      "status": "covered"
+    }
+  ],
+  "technical_spec": [
+    {
+      "field": "input_types",
+      "source": "SA02",
+      "status": "covered"
+    },
+    {
+      "field": "input_formats",
+      "source": "SA02",
+      "status": "covered"
+    },
+    {
+      "field": "output_types",
+      "source": "SA03; SA07",
+      "status": "covered"
+    },
+    {
+      "field": "language",
+      "source": "SA02",
+      "status": "covered"
+    },
+    {
+      "field": "domain_vocabulary",
+      "source": "SA10",
+      "status": "covered"
+    },
+    {
+      "field": "data_sources",
+      "source": "SA02",
+      "status": "covered"
+    },
+    {
+      "field": "model_provider",
+      "source": "SA08",
+      "status": "covered"
+    },
+    {
+      "field": "model_preferences",
+      "source": "SA08",
+      "status": "covered"
+    },
+    {
+      "field": "security_constraints",
+      "source": "SA06",
+      "status": "covered"
+    },
+    {
+      "field": "integration_targets",
+      "source": "SA05",
+      "status": "covered"
+    },
+    {
+      "field": "human_review",
+      "source": "SA04; SA05",
+      "status": "covered"
+    },
+    {
+      "field": "evaluation_requirements",
+      "source": "SA07",
+      "status": "covered"
+    },
+    {
+      "field": "runtime_interface",
+      "source": "SA05",
+      "status": "covered"
+    },
+    {
+      "field": "formatted_pdf_question",
+      "source": "SA07",
+      "status": "covered"
+    }
+  ],
+  "target_output_spec": [
+    {
+      "field": "schema_name",
+      "source": "SA03",
+      "status": "covered"
+    },
+    {
+      "field": "fields",
+      "source": "SA03",
+      "status": "covered"
+    },
+    {
+      "field": "field_types",
+      "source": "SA03",
+      "status": "covered"
+    },
+    {
+      "field": "required_fields",
+      "source": "SA03; SA11",
+      "status": "covered"
+    },
+    {
+      "field": "optional_fields",
+      "source": "SA03",
+      "status": "covered"
+    },
+    {
+      "field": "field_descriptions",
+      "source": "SA03; semantic names",
+      "status": "covered"
+    },
+    {
+      "field": "allowed_values",
+      "source": "SA03; SA10; SA11",
+      "status": "covered"
+    },
+    {
+      "field": "confidence_required",
+      "source": "SA04",
+      "status": "covered"
+    },
+    {
+      "field": "missing_value_policy",
+      "source": "SA03; SA04; SA11",
+      "status": "covered"
+    },
+    {
+      "field": "validation_rules",
+      "source": "SA11",
+      "status": "covered"
+    }
+  ],
+  "business_process": [
+    {
+      "field": "participants",
+      "source": "SA01; SA05",
+      "status": "covered"
+    },
+    {
+      "field": "external_parties",
+      "source": "SA01; SA05",
+      "status": "covered"
+    },
+    {
+      "field": "manual_steps",
+      "source": "SA05",
+      "status": "covered"
+    },
+    {
+      "field": "exceptions",
+      "source": "SA05",
+      "status": "covered"
+    },
+    {
+      "field": "decision_points",
+      "source": "SA05",
+      "status": "covered"
+    }
+  ],
+  "selection_relevant_options": [
+    {
+      "field": "VisionExtractor.task",
+      "source": "SA03; SA11; GAIK registry",
+      "expected_value": "Purchase-order extraction task",
+      "status": "covered"
+    },
+    {
+      "field": "VisionExtractor.schema_ref",
+      "source": "SA03; SA11",
+      "expected_value": "PurchaseOrderERPRecord schema or equivalent generated schema assets",
+      "status": "covered"
+    },
+    {
+      "field": "VisionExtractor.include_verification",
+      "source": "SA04; GAIK registry",
+      "expected_value": true,
+      "status": "covered"
+    },
+    {
+      "field": "single_extraction_path",
+      "source": "GAIK registry; EQ2-C06",
+      "expected_value": "Use VisionExtractor without a second executable DocumentsToStructuredData or MultimodalParser-to-Extractor pipeline over the same input.",
+      "status": "covered"
+    }
+  ],
+  "confirmation_policy": {
+    "source": "scripted_answers.json#confirmation_policy",
+    "response": "Yes. Proceed without changes.",
+    "covered_questions": [
+      "Complete specification confirmation",
+      "Target field-list confirmation",
+      "Extraction-prompt approval",
+      "Generated schema and Python-type confirmation",
+      "Component and module selection confirmation",
+      "Workflow and BPMN confirmation",
+      "PoC-scaffolding confirmation"
+    ],
+    "status": "covered"
+  },
+  "recovery_policy": {
+    "source": "scripted_answers.json#recovery_policy",
+    "maximum_refinement_attempts": 3,
+    "scope": "Post-baseline recovery only; original EQ4 remains unchanged."
+  },
+  "adaptive_question_policy": {
+    "source": "scripted_answers.json#fallback_answer",
+    "answer": "Not specified for this evaluation. If a value is required, record it as an explicit assumption for user confirmation.",
+    "reason": "The wizard may phrase or split clarification questions adaptively. The fallback prevents evaluators from inventing new ground-truth values."
+  },
+  "completeness_caveat": "The wizard implementation treats explicit unknown or not-specified values as answered. Its completeness indicator therefore measures whether required categories are represented, not whether every category contains a substantive constraint."
+}

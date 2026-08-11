@@ -1,0 +1,5 @@
+pydantic>=2
+python-dotenv
+gaik[llm-judge]
+gaik[vision-extract]
+pyyaml

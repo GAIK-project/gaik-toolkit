@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UC04",
+  "source_files": [
+    "poc_input/sources/supplier_kpis_q2_2026.xlsx",
+    "poc_input/sources/nordic_components_quality_audit.pdf",
+    "poc_input/sources/procurement_meeting_notes_q2_2026.md",
+    "poc_input/sources/delivery_incidents_q2_2026.csv"
+  ],
+  "report_spec": "poc_input/report_spec.json",
+  "sample_report": "poc_input/report_template.md",
+  "path_resolution": "Resolve every relative path against the directory containing this bundle file."
+}

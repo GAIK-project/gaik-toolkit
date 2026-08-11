@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "documents": [
+    {
+      "file": "documents/employee_travel_policy.pdf",
+      "title": "Employee Travel Policy",
+      "classification": "internal",
+      "allowed_roles": [
+        "employee",
+        "manager"
+      ]
+    },
+    {
+      "file": "documents/mx200_maintenance_manual.pdf",
+      "title": "MX-200 Preventive Maintenance Manual",
+      "classification": "internal",
+      "allowed_roles": [
+        "employee",
+        "manager"
+      ]
+    },
+    {
+      "file": "documents/project_aurora_pricing_strategy.pdf",
+      "title": "Project Aurora Pricing Strategy",
+      "classification": "management_confidential",
+      "allowed_roles": [
+        "manager"
+      ]
+    }
+  ],
+  "policy": "Filter documents by allowed_roles before retrieval. Unauthorized content must not be placed in the model context or exposed in answers or citations."
+}

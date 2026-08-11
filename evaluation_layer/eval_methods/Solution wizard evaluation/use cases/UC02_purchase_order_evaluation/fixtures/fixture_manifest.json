@@ -1,0 +1,27 @@
+{
+  "scenario_id": "UC02",
+  "fixture_type": "Synthetic text-based two-page PDF purchase order",
+  "primary_fixture": "purchase_order_complex.pdf",
+  "acceptance_oracle": "expected_erp_record.json",
+  "audit_facts": "purchase_order_fixture_facts.txt",
+  "design_features": [
+    "born-digital PDF with selectable text",
+    "landscape A4 layout for readable table content",
+    "hierarchical table header",
+    "three line items",
+    "item 0030 split across pages",
+    "leading-zero item identifiers",
+    "units and case-sensitive article codes",
+    "explicitly unstated optional values"
+  ],
+  "sha256": {
+    "purchase_order_complex.pdf": "e8d0ec6d20e6d3ede18f5d250c1229ce2fbdf0991b5c3d0a4a1d06a662e25fe9",
+    "expected_erp_record.json": "08139b5adf33765ca2e59b0641390354b9a00a096814f408d15bdbe8f3316df1",
+    "purchase_order_fixture_facts.txt": "30df65d2ce4a18bfdb8c5f58997db8c0b10eab2981dd8c75bc939ec99c255627"
+  },
+  "pdf_properties": {
+    "pages": 2,
+    "page_size": "A4 landscape",
+    "text_layer": true
+  }
+}

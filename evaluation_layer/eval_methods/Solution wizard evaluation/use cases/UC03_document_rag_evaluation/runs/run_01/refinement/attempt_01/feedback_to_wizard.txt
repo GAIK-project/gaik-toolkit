@@ -1,0 +1,25 @@
+
+Paste the preceding attempt's recorded execution error evidence below this line. Do not add corrective code or new requirements.
+
+--- execution evidence ---
+
+Run command: ['C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', 'run_poc.py', '--input', 'C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\fixtures\\poc_input_bundle.json']
+Run exit code: 1
+--- run stdout ---
+=== Manufacturing Knowledge Base RAG Assistant — PoC ===
+
+Input bundle : C:\Users\h02317\Downloads\Wizard evaluation\UC03_document_rag_evaluation\fixtures\poc_input_bundle.json
+Chat model   : gpt-5.4  (temp=0.0, reasoning=medium)
+Embedding    : text-embedding-3-large
+Top-k        : 4
+
+Documents found : []
+Access manifest : []
+Queries loaded  : 0
+
+
+--- run stderr ---
+ERROR: No PDF files resolved from bundle.
+
+--- outputs ---
+[]

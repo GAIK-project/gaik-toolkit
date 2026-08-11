@@ -1,0 +1,13 @@
+flowchart TD
+    upload_sources["Analyst assembles four source documents"]
+    generate_report["Generate supplier performance report draft"]
+    notify_reviewer["Deliver draft report to procurement manager"]
+    manager_review["Procurement manager reviews and approves draft"]
+    upload_sources --> generate_report
+    generate_report --> notify_reviewer
+    notify_reviewer --> manager_review
+
+    style upload_sources fill:#dbeafe
+    style generate_report fill:#dcfce7
+    style notify_reviewer fill:#f5f3ff
+    style manager_review fill:#dcfce7

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PoC Recovery Record",
+  "type": "object",
+  "required": ["run_id", "maximum_refinement_attempts", "initial_execution_successful", "status", "attempts", "eq4_uses_baseline_only"],
+  "properties": {
+    "run_id": {"type": "string"},
+    "maximum_refinement_attempts": {"const": 3},
+    "initial_execution_successful": {"type": ["boolean", "null"]},
+    "refinement_attempts_to_success": {"type": ["integer", "string", "null"]},
+    "final_execution_successful": {"type": ["boolean", "null"]},
+    "status": {"enum": ["not_started", "successful_original", "pending_refinement", "recovered", "unsuccessful_after_maximum_refinements"]},
+    "attempts": {"type": "array"},
+    "eq4_uses_baseline_only": {"const": true}
+  }
+}

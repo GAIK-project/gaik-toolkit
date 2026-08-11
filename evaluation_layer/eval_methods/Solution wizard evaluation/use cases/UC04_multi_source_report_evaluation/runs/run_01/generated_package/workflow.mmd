@@ -1,0 +1,13 @@
+flowchart TD
+    upload_sources["Analyst uploads source bundle"]
+    synthesise_report["Generate supplier performance report"]
+    notify_manager["Notify procurement manager of draft"]
+    manager_review["Procurement manager reviews and approves draft"]
+    upload_sources --> synthesise_report
+    synthesise_report --> notify_manager
+    notify_manager --> manager_review
+
+    style upload_sources fill:#dbeafe
+    style synthesise_report fill:#dcfce7
+    style notify_manager fill:#f5f3ff
+    style manager_review fill:#fefce8

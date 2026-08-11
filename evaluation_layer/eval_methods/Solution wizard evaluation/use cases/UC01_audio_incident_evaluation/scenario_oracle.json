@@ -1,0 +1,616 @@
+{
+  "oracle_version": "1.3.0",
+  "scenario_id": "UC01",
+  "title": "Audio to structured incident reports",
+  "knowledge_process": "knowledge_capture",
+  "status": "frozen",
+  "frozen_on": "2026-07-26",
+  "purpose": "Evaluate whether the GAIK Solution Configuration Wizard captures the fixed scenario, chooses and configures a valid GAIK solution, generates a valid solution package, and produces an executable PoC.",
+  "protocol": {
+    "runs": 2,
+    "wizard_skill_file": "implementation_layer/solution_wizard/SKILL.md",
+    "wizard_skill_commit": "79586c93ea3286f68acf3ad3810a370c4295fa01",
+    "output_directory_policy": "Write the wizard output to the run-specific generated_package directory, or copy the complete unmodified output there after the run. No absolute path is stored in run metadata.",
+    "initial_prompt_file": "initial_prompt.txt",
+    "scripted_answers_file": "scripted_answers.json",
+    "wizard_requirement_coverage_file": "wizard_requirement_coverage.json",
+    "confirmation_policy": "At every routine confirmation before original PoC execution, answer Yes and proceed without changes.",
+    "accept_without_correction": true,
+    "unexpected_question_answer": "Not specified for this evaluation. If a value is required, record it as an explicit assumption for user confirmation.",
+    "po_c_policy": "Execute the original wizard-generated PoC without editing its source files. Environment variables and credentials may be supplied externally. EQ4 is permanently based on this original execution.",
+    "recovery_policy": {
+      "trigger": "The original PoC does not execute successfully.",
+      "maximum_refinement_attempts": 3,
+      "feedback_scope": "Return recorded execution evidence to the wizard without adding corrective code or new requirements.",
+      "stopping_rule": "Stop after the first successful execution or after the third unsuccessful refinement.",
+      "reported_values": {
+        "0": "Original PoC executed successfully.",
+        "1-3": "PoC executed successfully after the stated number of refinement attempts.",
+        "N/A": "PoC never executed successfully after three refinement attempts."
+      },
+      "headline_metric": false
+    }
+  },
+  "gaik_basis": {
+    "repository": "GAIK-project/gaik-toolkit",
+    "verified_commit": "79586c93ea3286f68acf3ad3810a370c4295fa01",
+    "blueprint_schema_path": "implementation_layer/solution_wizard/schemas/use_case_blueprint.schema.json",
+    "registry_path": "implementation_layer/solution_wizard/registries/gaik_component_registry.json",
+    "reference_cards_path": "implementation_layer/solution_wizard/registries/component_reference_cards.json",
+    "expected_module": {
+      "id": "audio_to_structured_data",
+      "name": "AudioToStructuredData",
+      "uses_components": [
+        "Transcriber",
+        "TranscriptEnhancer",
+        "SchemaGenerator",
+        "DataExtractor"
+      ],
+      "selection_relevant_options": {
+        "enhanced_transcript": true
+      }
+    }
+  },
+  "checks": {
+    "EQ1": [
+      {
+        "id": "EQ1-R01",
+        "parameter": "Primary user",
+        "oracle_value": "Field technician",
+        "accepted_semantics": "A field, facility, or maintenance technician creates the report.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA01"],
+        "blueprint_hints": ["business_spec.intended_users", "business_process.participants", "use_case.description"]
+      },
+      {
+        "id": "EQ1-R02",
+        "parameter": "Current process",
+        "oracle_value": "Technician manually enters fault information into the maintenance system.",
+        "accepted_semantics": "Manual entry into a maintenance or maintenance-management system is described.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA01"],
+        "blueprint_hints": ["business_spec.current_process", "use_case.description"]
+      },
+      {
+        "id": "EQ1-R03",
+        "parameter": "Business problem",
+        "oracle_value": "Manual reporting is slow and can omit details.",
+        "accepted_semantics": "Both reporting delay/effort and missing/incomplete details are captured.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA01"],
+        "blueprint_hints": ["business_spec.pain_points", "business_spec.expected_value"]
+      },
+      {
+        "id": "EQ1-R04",
+        "parameter": "Human reviewer",
+        "oracle_value": "Maintenance supervisor",
+        "accepted_semantics": "A supervisor or equivalent maintenance reviewer checks the ticket.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA01", "scripted_answers.json#SA05"],
+        "blueprint_hints": ["business_spec.reviewers", "business_process.participants", "workflow.steps"]
+      },
+      {
+        "id": "EQ1-R05",
+        "parameter": "Expected value",
+        "oracle_value": "Faster reporting with fewer missing details.",
+        "accepted_semantics": "The proposed solution reduces reporting effort/time and improves completeness.",
+        "source": ["scripted_answers.json#SA01"],
+        "blueprint_hints": ["business_spec.expected_value"]
+      },
+      {
+        "id": "EQ1-R06",
+        "parameter": "Primary input",
+        "oracle_value": "Voice message/audio file",
+        "accepted_semantics": "The solution accepts a spoken report or audio recording.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA02"],
+        "blueprint_hints": ["technical_spec.input_types", "inputs", "artifacts"]
+      },
+      {
+        "id": "EQ1-R07",
+        "parameter": "Input language",
+        "oracle_value": "Finnish (fi)",
+        "accepted_semantics": "Finnish is explicitly represented, with fi accepted as the language code.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA02"],
+        "blueprint_hints": ["technical_spec.language", "workflow.steps.parameters.language"]
+      },
+      {
+        "id": "EQ1-R08",
+        "parameter": "Speaker pattern",
+        "oracle_value": "One speaker; diarization not required.",
+        "accepted_semantics": "The report is single-speaker and diarization is false, absent because unnecessary, or explicitly not required.",
+        "source": ["scripted_answers.json#SA02"],
+        "blueprint_hints": ["technical_spec", "workflow.steps.parameters.diarization", "assumptions"]
+      },
+      {
+        "id": "EQ1-R09",
+        "parameter": "Target output",
+        "oracle_value": "Structured maintenance ticket in JSON-compatible form.",
+        "accepted_semantics": "The final machine-readable output is a structured maintenance incident/fault ticket.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA03", "scripted_answers.json#SA05"],
+        "blueprint_hints": ["technical_spec.output_types", "target_output_spec", "artifacts", "outputs"]
+      },
+      {
+        "id": "EQ1-R10",
+        "parameter": "Output field: reporter name",
+        "oracle_value": "reporter_name",
+        "accepted_semantics": "A field records the reporting technician or reporter identity.",
+        "source": ["scripted_answers.json#SA03"],
+        "blueprint_hints": ["target_output_spec.fields", "schemas"]
+      },
+      {
+        "id": "EQ1-R11",
+        "parameter": "Output field: asset identifier",
+        "oracle_value": "asset_identifier",
+        "accepted_semantics": "A field identifies the affected asset, equipment, or component.",
+        "source": ["scripted_answers.json#SA03"],
+        "blueprint_hints": ["target_output_spec.fields", "schemas"]
+      },
+      {
+        "id": "EQ1-R12",
+        "parameter": "Output field: location",
+        "oracle_value": "location; required",
+        "accepted_semantics": "Location is present and required.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA03"],
+        "blueprint_hints": ["target_output_spec.fields", "target_output_spec.required_fields", "schemas"]
+      },
+      {
+        "id": "EQ1-R13",
+        "parameter": "Output field: fault description",
+        "oracle_value": "fault_description; required",
+        "accepted_semantics": "The broken/fault condition is present as a required description field.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA03"],
+        "blueprint_hints": ["target_output_spec.fields", "target_output_spec.required_fields", "schemas"]
+      },
+      {
+        "id": "EQ1-R14",
+        "parameter": "Output field: urgency",
+        "oracle_value": "urgency; required",
+        "accepted_semantics": "Urgency, priority, or severity is present and required.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA03"],
+        "blueprint_hints": ["target_output_spec.fields", "target_output_spec.required_fields", "schemas"]
+      },
+      {
+        "id": "EQ1-R15",
+        "parameter": "Output field: observation date and time",
+        "oracle_value": "observation_date and observation_time, or one equivalent timestamp field",
+        "accepted_semantics": "The time of observation is captured, either as separate date/time fields or one timestamp.",
+        "source": ["scripted_answers.json#SA03"],
+        "blueprint_hints": ["target_output_spec.fields", "schemas"]
+      },
+      {
+        "id": "EQ1-R16",
+        "parameter": "Output field: actions taken",
+        "oracle_value": "actions_taken",
+        "accepted_semantics": "The ticket records any immediate actions already performed.",
+        "source": ["scripted_answers.json#SA03"],
+        "blueprint_hints": ["target_output_spec.fields", "schemas"]
+      },
+      {
+        "id": "EQ1-R17",
+        "parameter": "Missing-value policy",
+        "oracle_value": "Leave missing values empty or unknown; never invent a value.",
+        "accepted_semantics": "The output or prompt specifies that unstated values remain blank/unknown and must not be fabricated.",
+        "source": ["scripted_answers.json#SA03", "scripted_answers.json#SA04"],
+        "blueprint_hints": ["target_output_spec", "validation", "assumptions", "poc/prompts"]
+      },
+      {
+        "id": "EQ1-R18",
+        "parameter": "Uncertainty handling",
+        "oracle_value": "Flag missing or uncertain fields for supervisor review.",
+        "accepted_semantics": "Missing, ambiguous, low-confidence, or uncertain fields are surfaced to the reviewer.",
+        "source": ["scripted_answers.json#SA04"],
+        "blueprint_hints": ["target_output_spec", "validation", "workflow.steps"]
+      },
+      {
+        "id": "EQ1-R19",
+        "parameter": "Review evidence",
+        "oracle_value": "Original transcript is available to the supervisor.",
+        "accepted_semantics": "The reviewer can inspect the transcript or equivalent source evidence.",
+        "source": ["scripted_answers.json#SA04"],
+        "blueprint_hints": ["artifacts", "workflow.steps.inputs", "business_process.manual_steps"]
+      },
+      {
+        "id": "EQ1-R20",
+        "parameter": "Review gate",
+        "oracle_value": "Supervisor reviews before transfer.",
+        "accepted_semantics": "A mandatory human review occurs after ticket generation and before external-system transfer.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA05"],
+        "blueprint_hints": ["technical_spec.human_review_required", "workflow.steps", "validation.human_review_required"]
+      },
+      {
+        "id": "EQ1-R21",
+        "parameter": "Review outcomes",
+        "oracle_value": "Approve or return for correction.",
+        "accepted_semantics": "The supervisor can approve and can reject/return/rework the generated ticket.",
+        "source": ["scripted_answers.json#SA05"],
+        "blueprint_hints": ["business_process.decision_points", "business_process.exceptions", "workflow.steps"]
+      },
+      {
+        "id": "EQ1-R22",
+        "parameter": "Integration scope",
+        "oracle_value": "Production target is the maintenance management system; PoC exports approved JSON and does not implement the live API.",
+        "accepted_semantics": "The maintenance system is the intended target, while the PoC is limited to file/JSON output.",
+        "source": ["initial_prompt.txt", "scripted_answers.json#SA05"],
+        "blueprint_hints": ["technical_spec.integration_targets", "runtime", "package", "assumptions"]
+      },
+      {
+        "id": "EQ1-R23",
+        "parameter": "Data classification",
+        "oracle_value": "Audio may contain employee identity and internal facility details.",
+        "accepted_semantics": "Personal data and internal/sensitive facility information are recognized.",
+        "source": ["scripted_answers.json#SA06"],
+        "blueprint_hints": ["governance.data_handling.contains_personal_data", "governance.data_handling.output_sensitivity"]
+      },
+      {
+        "id": "EQ1-R24",
+        "parameter": "External model API policy",
+        "oracle_value": "Allowed",
+        "accepted_semantics": "External model APIs are permitted and local-only processing is not required.",
+        "source": ["scripted_answers.json#SA06"],
+        "blueprint_hints": ["governance.data_handling.external_model_api_allowed", "governance.data_handling.local_processing_required"]
+      },
+      {
+        "id": "EQ1-R25",
+        "parameter": "Raw audio retention",
+        "oracle_value": "Do not retain raw audio after processing in the PoC.",
+        "accepted_semantics": "The PoC does not persist input audio beyond processing.",
+        "source": ["scripted_answers.json#SA06"],
+        "blueprint_hints": ["governance.data_handling.stores_input_data", "assumptions", "docs"]
+      },
+      {
+        "id": "EQ1-R26",
+        "parameter": "Retained evidence",
+        "oracle_value": "Approved ticket and supervisor approval decision may be retained; no exact retention period.",
+        "accepted_semantics": "Structured approved output and approval evidence may be stored, without inventing a retention duration.",
+        "source": ["scripted_answers.json#SA06"],
+        "blueprint_hints": ["governance.data_handling.stores_outputs", "governance.data_handling.audit_log_required", "governance.data_handling.retention_policy", "assumptions"]
+      },
+      {
+        "id": "EQ1-R27",
+        "parameter": "PoC interface",
+        "oracle_value": "Command-line interface",
+        "accepted_semantics": "The generated PoC can be run from a CLI.",
+        "source": ["scripted_answers.json#SA07"],
+        "blueprint_hints": ["runtime.interface", "runtime.entrypoint", "package"]
+      },
+      {
+        "id": "EQ1-R28",
+        "parameter": "Stakeholder and party scope",
+        "oracle_value": "Field technicians and the maintenance supervisor are the only required PoC participants; the voice report is internal and has no external party.",
+        "accepted_semantics": "The required actors are the technician and supervisor, and no external sender or additional business stakeholder is introduced as confirmed scope.",
+        "source": ["scripted_answers.json#SA01", "scripted_answers.json#SA05"],
+        "blueprint_hints": ["business_spec.stakeholders", "business_process.participants", "business_process.external_parties"]
+      },
+      {
+        "id": "EQ1-R29",
+        "parameter": "Business and PoC success criteria",
+        "oracle_value": "Faster reporting, fewer missing details, a supervisor-verifiable ticket, and successful execution over the supplied fixture; no numerical improvement threshold.",
+        "accepted_semantics": "Success includes the stated qualitative business outcome and runnable single-fixture PoC without inventing a quantified target.",
+        "source": ["scripted_answers.json#SA07", "scripted_answers.json#SA09"],
+        "blueprint_hints": ["business_spec.success_criteria", "business_spec.poc_goal", "technical_spec.evaluation_requirements", "evaluation"]
+      },
+      {
+        "id": "EQ1-R30",
+        "parameter": "Principal risks",
+        "oracle_value": "Finnish transcription errors; incorrect asset, location, fault, or urgency values; unsupported values; transfer without supervisor approval.",
+        "accepted_semantics": "The risk description covers transcription/extraction error, unsupported data, and bypass of the review gate.",
+        "source": ["scripted_answers.json#SA09"],
+        "blueprint_hints": ["business_spec.risks", "governance.risks", "docs"]
+      },
+      {
+        "id": "EQ1-R31",
+        "parameter": "Data source and output language",
+        "oracle_value": "An internal technician records or uploads Finnish audio; extracted free-text values remain Finnish, while JSON keys and canonical urgency labels are English.",
+        "accepted_semantics": "The solution distinguishes Finnish source/free text from English machine-readable keys and canonical labels.",
+        "source": ["scripted_answers.json#SA02"],
+        "blueprint_hints": ["business_spec.input_artifacts", "technical_spec.data_sources", "technical_spec.language", "target_output_spec", "schemas"]
+      },
+      {
+        "id": "EQ1-R32",
+        "parameter": "Domain vocabulary and identifiers",
+        "oracle_value": "Finnish facility names and alphanumeric room/asset identifiers may occur; identifiers such as P-17 and B2 must be preserved exactly; no fixed glossary.",
+        "accepted_semantics": "The design preserves domain identifiers and does not claim a supplied glossary.",
+        "source": ["scripted_answers.json#SA10"],
+        "blueprint_hints": ["technical_spec.domain_vocabulary", "target_output_spec.validation_rules", "poc/prompts"]
+      },
+      {
+        "id": "EQ1-R33",
+        "parameter": "Model and provider preference",
+        "oracle_value": "Provider remains configurable; no exact provider, model, temperature, or transcription model is user-specified.",
+        "accepted_semantics": "The specification records configurability or no preference and does not turn an implementation default into a confirmed requirement.",
+        "source": ["scripted_answers.json#SA08"],
+        "blueprint_hints": ["technical_spec.model_provider", "technical_spec.model_preferences", "assumptions", "runtime"]
+      },
+      {
+        "id": "EQ1-R34",
+        "parameter": "Required output formats",
+        "oracle_value": "Final machine-readable JSON ticket; transcript and uncertainty information as review evidence; no formatted PDF, HTML, or DOCX report.",
+        "accepted_semantics": "JSON is the required final format and formatted-report output is explicitly unnecessary.",
+        "source": ["scripted_answers.json#SA07"],
+        "blueprint_hints": ["technical_spec.output_types", "business_spec.target_outputs", "artifacts", "outputs", "package"]
+      },
+      {
+        "id": "EQ1-R35",
+        "parameter": "Target schema name",
+        "oracle_value": "MaintenanceTicket",
+        "accepted_semantics": "The target output schema is named MaintenanceTicket or a clearly equivalent maintenance-ticket schema.",
+        "source": ["scripted_answers.json#SA03"],
+        "blueprint_hints": ["target_output_spec.schema_name", "schemas"]
+      },
+      {
+        "id": "EQ1-R36",
+        "parameter": "Target field types and optionality",
+        "oracle_value": "Strings for reporter_name, asset_identifier, location, fault_description, urgency, and observation_time; date for observation_date; lists of strings for actions_taken and uncertain_fields. location, fault_description, and urgency are required; other fields are optional.",
+        "accepted_semantics": "All named fields have semantically compatible types and the required/optional split is preserved.",
+        "source": ["scripted_answers.json#SA03"],
+        "blueprint_hints": ["target_output_spec.field_types", "target_output_spec.required_fields", "target_output_spec.optional_fields", "schemas"]
+      },
+      {
+        "id": "EQ1-R37",
+        "parameter": "Allowed values and formats",
+        "oracle_value": "urgency is low, medium, or high; observation_date uses YYYY-MM-DD; observation_time uses HH:MM.",
+        "accepted_semantics": "The controlled urgency vocabulary and date/time formats are represented in the schema, prompt, or validation rules.",
+        "source": ["scripted_answers.json#SA03", "scripted_answers.json#SA10", "scripted_answers.json#SA11"],
+        "blueprint_hints": ["target_output_spec.allowed_values", "target_output_spec.validation_rules", "schemas", "poc/prompts"]
+      },
+      {
+        "id": "EQ1-R38",
+        "parameter": "Confidence representation",
+        "oracle_value": "A numerical confidence score is not required; component-supplied confidence may be included only as supplementary evidence.",
+        "accepted_semantics": "The design does not make numeric confidence mandatory and keeps uncertainty reviewable.",
+        "source": ["scripted_answers.json#SA04"],
+        "blueprint_hints": ["target_output_spec.confidence_required", "technical_spec.evaluation_requirements", "workflow.steps", "artifacts"]
+      },
+      {
+        "id": "EQ1-R39",
+        "parameter": "Output validation rules",
+        "oracle_value": "Required keys must exist; constrained formats and urgency values must be respected; values must be grounded in the message; missing or uncertain values remain null/unknown and are listed in uncertain_fields.",
+        "accepted_semantics": "The generated validation rules cover structure, controlled values/formats, grounding, and missing-value handling.",
+        "source": ["scripted_answers.json#SA03", "scripted_answers.json#SA04", "scripted_answers.json#SA11"],
+        "blueprint_hints": ["target_output_spec.validation_rules", "validation", "schemas", "poc/prompts"]
+      },
+      {
+        "id": "EQ1-R40",
+        "parameter": "Business-process detail",
+        "oracle_value": "Technician submits audio; AI creates a ticket and review evidence; supervisor approves or returns it; only approved JSON proceeds. There are no external parties or additional decision branches.",
+        "accepted_semantics": "Roles, hand-offs, manual review, rejection/resubmission, and the approval condition are present without unsupported branches.",
+        "source": ["scripted_answers.json#SA05"],
+        "blueprint_hints": ["business_process.participants", "business_process.external_parties", "business_process.manual_steps", "business_process.exceptions", "business_process.decision_points", "workflow.steps"]
+      },
+      {
+        "id": "EQ1-R41",
+        "parameter": "PoC evaluation requirements",
+        "oracle_value": "Run the supplied Finnish audio fixture; require successful exit, parseable non-empty JSON, required-field coverage, semantic preservation of fixture facts, and no unsupported values; no numerical threshold.",
+        "accepted_semantics": "The evaluation plan defines the fixture and observable acceptance checks without inventing a benchmark threshold.",
+        "source": ["scripted_answers.json#SA07"],
+        "blueprint_hints": ["technical_spec.evaluation_requirements", "evaluation", "package.tests", "docs"]
+      },
+      {
+        "id": "EQ1-R42",
+        "parameter": "Security, access, and audit scope",
+        "oracle_value": "External APIs are allowed; raw audio is not retained; approved ticket and approval decision may be retained; authentication, production RBAC, and a full audit-log implementation are outside PoC scope.",
+        "accepted_semantics": "The specification captures the stated PoC data-handling boundaries and does not add production security implementations as confirmed requirements.",
+        "source": ["scripted_answers.json#SA06"],
+        "blueprint_hints": ["technical_spec.security_constraints", "governance.data_handling", "assumptions", "docs"]
+      }
+    ],
+    "EQ1_diagnostics": [
+      {
+        "id": "EQ1-D01",
+        "parameter": "Unsupported provider/model commitment",
+        "oracle_value": "The provider must remain configurable; no exact provider or model was supplied.",
+        "accepted_semantics": "Configurability is preserved. Any concrete provider/model is marked as an explicit assumption or implementation default, not as a user-confirmed requirement.",
+        "source": ["scripted_answers.json#SA08"],
+        "scored": false
+      },
+      {
+        "id": "EQ1-D02",
+        "parameter": "Unsupported retention period",
+        "oracle_value": "No exact retention period was supplied.",
+        "accepted_semantics": "No exact duration is silently presented as user-confirmed; not_specified or an explicit assumption is acceptable.",
+        "source": ["scripted_answers.json#SA06"],
+        "scored": false
+      },
+      {
+        "id": "EQ1-D03",
+        "parameter": "Unsupported SLA, volume, budget, or deployment commitment",
+        "oracle_value": "No SLA, throughput, budget, or deployment topology was supplied.",
+        "accepted_semantics": "Any concrete value is marked as an explicit assumption rather than a confirmed requirement.",
+        "source": ["scripted_answers.json#SA08"],
+        "scored": false
+      }
+    ],
+    "EQ2": [
+      {
+        "id": "EQ2-C01",
+        "parameter": "Knowledge-process classification",
+        "oracle_value": "knowledge_capture",
+        "accepted_semantics": "The use case is classified as knowledge capture.",
+        "source": ["initial_prompt.txt"],
+        "blueprint_hints": ["use_case.knowledge_processes"]
+      },
+      {
+        "id": "EQ2-C02",
+        "parameter": "Module-first selection",
+        "oracle_value": "AudioToStructuredData (id: audio_to_structured_data)",
+        "accepted_semantics": "The GAIK AudioToStructuredData module is selected as the end-to-end solution for audio-to-structured-data.",
+        "source": ["gaik_basis.expected_module"],
+        "blueprint_hints": ["components.selected_modules"]
+      },
+      {
+        "id": "EQ2-C03",
+        "parameter": "Transcription language option",
+        "oracle_value": "language = fi",
+        "accepted_semantics": "The Finnish language is configured at technical or component level.",
+        "source": ["scripted_answers.json#SA02", "gaik_basis"],
+        "blueprint_hints": ["technical_spec.language", "workflow.steps.parameters.language"]
+      },
+      {
+        "id": "EQ2-C04",
+        "parameter": "Finnish transcript enhancement option",
+        "oracle_value": "enhanced_transcript = true",
+        "accepted_semantics": "The module/transcriber enables the Finnish-tuned enhanced transcript behavior.",
+        "source": ["gaik_basis.expected_module.selection_relevant_options"],
+        "blueprint_hints": ["workflow.steps.parameters.enhanced_transcript", "technical_spec.enhanced_transcript", "poc/config.yaml", "poc/run_poc.py"]
+      },
+      {
+        "id": "EQ2-C05",
+        "parameter": "No redundant implementation pipeline",
+        "oracle_value": "The PoC invokes AudioToStructuredData once and does not independently invoke its subsumed Transcriber, TranscriptEnhancer, SchemaGenerator, or DataExtractor pipeline.",
+        "accepted_semantics": "Components may be named for traceability or internal decomposition, but the executable design must not run a duplicate standalone pipeline alongside the selected module.",
+        "source": ["gaik_basis.expected_module.uses_components"],
+        "blueprint_hints": ["components", "workflow.steps", "poc/run_poc.py"]
+      },
+      {
+        "id": "EQ2-C06",
+        "parameter": "Structured extraction configuration",
+        "oracle_value": "A schema/requirements artifact defines all required maintenance-ticket fields.",
+        "accepted_semantics": "Schema and extraction requirements are connected to the audio-to-structured module and cover the EQ1 output fields.",
+        "source": ["scripted_answers.json#SA03", "gaik_basis"],
+        "blueprint_hints": ["target_output_spec", "schemas", "workflow.steps.parameters.schema_ref", "workflow.steps.parameters.requirements_ref", "poc/schemas", "poc/prompts"]
+      },
+      {
+        "id": "EQ2-C07",
+        "parameter": "Review placement",
+        "oracle_value": "Human review follows structured extraction and precedes maintenance-system transfer.",
+        "accepted_semantics": "Workflow ordering and dependencies enforce the review gate in the required position.",
+        "source": ["scripted_answers.json#SA05"],
+        "blueprint_hints": ["workflow.steps", "business_process", "technical_spec.integration_targets"]
+      },
+      {
+        "id": "EQ2-C08",
+        "parameter": "Review inputs",
+        "oracle_value": "Supervisor receives the structured ticket, uncertainty/missing-field information, and transcript evidence.",
+        "accepted_semantics": "The review step has enough artifacts to verify and correct the ticket.",
+        "source": ["scripted_answers.json#SA04", "scripted_answers.json#SA05"],
+        "blueprint_hints": ["workflow.steps.inputs", "artifacts", "business_process.manual_steps"]
+      },
+      {
+        "id": "EQ2-C09",
+        "parameter": "PoC output behavior",
+        "oracle_value": "CLI accepts audio and saves JSON; live API integration is not required.",
+        "accepted_semantics": "The generated runtime and package match the agreed PoC scope.",
+        "source": ["scripted_answers.json#SA05", "scripted_answers.json#SA07"],
+        "blueprint_hints": ["runtime", "technical_spec.integration_targets", "package", "poc"]
+      }
+    ],
+    "EQ3": [
+      {
+        "id": "EQ3-P01",
+        "parameter": "Blueprint presence and JSON parsing",
+        "oracle_value": "generated_package/use_case.blueprint.json exists, is non-empty, and parses as JSON.",
+        "automated_check": "blueprint_json",
+        "evidence_required": ["file path", "file size", "JSON parser result"]
+      },
+      {
+        "id": "EQ3-P02",
+        "parameter": "Official blueprint validation",
+        "oracle_value": "The GAIK Solution Wizard validator returns exit code 0 with no blocking errors.",
+        "automated_check": "official_validator",
+        "evidence_required": ["validator command", "exit code", "validator output excerpt"]
+      },
+      {
+        "id": "EQ3-P03",
+        "parameter": "Artifact-flow consistency",
+        "oracle_value": "Step inputs/outputs reference declared artifacts; generated artifacts have valid producers; dependencies are resolvable.",
+        "automated_check": "artifact_flow",
+        "evidence_required": ["checked step/artifact counts", "rule result", "relevant JSON paths"]
+      },
+      {
+        "id": "EQ3-P04",
+        "parameter": "Mermaid workflow",
+        "oracle_value": "workflow.mmd exists, is non-empty, and contains the workflow step labels or identifiers.",
+        "automated_check": "mermaid",
+        "evidence_required": ["file path", "file size", "matched step count"]
+      },
+      {
+        "id": "EQ3-P05",
+        "parameter": "BPMN workflow and traceability",
+        "oracle_value": "workflow.bpmn is well-formed XML and its mapping or element identifiers cover the blueprint workflow.",
+        "automated_check": "bpmn",
+        "evidence_required": ["file path", "XML parser result", "matched step/mapping count"]
+      },
+      {
+        "id": "EQ3-P06",
+        "parameter": "PoC scaffold completeness",
+        "oracle_value": "poc/ contains an executable entrypoint, dependency declaration, configuration/example environment, extraction prompt, and output schema or schema-generation assets.",
+        "automated_check": "poc_manifest",
+        "evidence_required": ["matched files", "missing alternatives, if any"]
+      },
+      {
+        "id": "EQ3-P07",
+        "parameter": "Documentation completeness",
+        "oracle_value": "docs/ contains at least one non-empty use-case-specific document and the PoC contains usage instructions.",
+        "automated_check": "documentation",
+        "evidence_required": ["document paths", "file sizes"]
+      },
+      {
+        "id": "EQ3-P08",
+        "parameter": "Requirement-to-component traceability",
+        "oracle_value": "The blueprint traceability data connects selected module/component decisions to stated requirements.",
+        "automated_check": "traceability",
+        "evidence_required": ["traceability entry count", "module/component names", "requirement references"]
+      }
+    ],
+    "EQ4": [
+      {
+        "id": "EQ4-X01",
+        "parameter": "PoC setup/build",
+        "oracle_value": "For the original unmodified PoC, the declared setup or import command completes with exit code 0.",
+        "automated_check": "setup_exit_code",
+        "evidence_required": ["command", "exit code", "log excerpt"]
+      },
+      {
+        "id": "EQ4-X02",
+        "parameter": "End-to-end execution",
+        "oracle_value": "The original unmodified generated PoC processes incident_report_fi.wav and exits with code 0.",
+        "automated_check": "run_exit_code",
+        "evidence_required": ["command", "input fixture path/hash", "exit code", "log excerpt"]
+      },
+      {
+        "id": "EQ4-X03",
+        "parameter": "Machine-readable output",
+        "oracle_value": "The original unmodified PoC generates a new non-empty JSON ticket that parses successfully.",
+        "automated_check": "output_json",
+        "evidence_required": ["output path", "file size", "JSON parser result"]
+      },
+      {
+        "id": "EQ4-X04",
+        "parameter": "Fixture acceptance",
+        "oracle_value": "The original unmodified PoC output preserves the expected incident facts in expected_ticket.json and does not silently invent unsupported ticket facts.",
+        "automated_check": "fixture_semantic_match",
+        "evidence_required": ["expected value", "generated value", "output JSON path", "comparison explanation"]
+      }
+    ]
+  },
+  "scoring": {
+    "EQ1": {
+      "metric": "Requirement capture recall",
+      "formula": "Yes verdicts for EQ1-R rows / total EQ1-R rows",
+      "diagnostics_excluded": ["EQ1-D01", "EQ1-D02", "EQ1-D03"]
+    },
+    "EQ2": {
+      "metric": "Configuration constraint satisfaction",
+      "formula": "Yes verdicts for EQ2-C rows / total EQ2-C rows"
+    },
+    "EQ3": {
+      "metric": "Valid solution package rate",
+      "formula": "A run passes only if every mandatory EQ3-P check is Yes; passed runs / 2"
+    },
+    "EQ4": {
+      "metric": "PoC execution success rate",
+      "formula": "A run passes only if every mandatory EQ4-X check for the original unmodified PoC is Yes; passed runs / 2"
+    },
+    "recovery_diagnostic": {
+      "metric": "Refinement attempts to successful execution",
+      "values": "0, 1, 2, 3, or N/A",
+      "formula": "Record the first successful execution: 0 for original success, 1-3 for success after that many refinements, and N/A when all three refinements fail.",
+      "scored_under_EQ4": false,
+      "reporting": "Report initially successful runs, runs recovered within three refinements, and runs that never executed successfully."
+    },
+    "two_run_aggregation": "For EQ1 and EQ2, pool Yes verdicts across both runs and divide by the pooled number of scored checks. For EQ3 and EQ4, divide the number of passing runs by two."
+  },
+  "verdict_policy": {
+    "allowed": ["Yes", "No"],
+    "human_is_final_judge": true,
+    "semantic_matching": "The LLM may align semantically equivalent wording and identify evidence, but it must not enter the final verdict. The evaluator reviews the side-by-side evidence and enters Yes or No.",
+    "missing_requirement": "If an oracle requirement is absent, the generated-value cell states NOT FOUND, the evidence cell lists the searched sources/paths, and the evaluator enters No. This keeps omitted requirements in the denominator.",
+    "evidence_rule": "Every verdict cell must have adjacent evidence that identifies the source file and a concrete excerpt, path, command result, or parser/validator result."
+  }
+}
