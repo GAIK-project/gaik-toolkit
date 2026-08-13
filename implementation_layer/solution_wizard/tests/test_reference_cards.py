@@ -268,12 +268,14 @@ def test_docxparser_flags_the_dot_doc_gap():
     routed into a parser that will crash on it.
     """
     card = get_reference_cards().get("DocxParser")
-    haystack = " ".join(
-        str(card.get(k, "")) for k in ("note", "returns")
-    ) + " ".join(o.get("effect", "") for o in card.get("options", []))
+    haystack = " ".join(str(card.get(k, "")) for k in ("note", "returns")) + " ".join(
+        o.get("effect", "") for o in card.get("options", [])
+    )
     assert ".doc" in haystack and (
         "PackageNotFoundError" in haystack or "cannot open" in haystack
-    ), "DocxParser card must flag that legacy .doc is accepted by is_supported_file() but not actually parseable"
+    ), (
+        "DocxParser card must flag that legacy .doc is accepted by is_supported_file() but not actually parseable"
+    )
 
 
 def test_no_parser_other_than_visionparser_and_pymupdf_claims_page_citations():
