@@ -1,11 +1,18 @@
 """Unit tests for field policy logic — no LLM calls required."""
 
+from unittest import mock
+
 import pytest
+from gaik.software_components.extractor.extractor import DataExtractor
 from gaik.software_components.extractor.schema import (
+    ChildRequirements,
+    CompositeExtractionRequirements,
     ExtractionRequirements,
     FieldSpec,
+    apply_composite_field_policies,
     apply_field_policies,
     create_extraction_model,
+    normalize_composite_extracted_data,
 )
 
 
@@ -436,3 +443,111 @@ class TestFinnishIncidentReport:
         assert result["tapahtumapaikan_tarkenne"] == ""
         assert result["mahdolliset_seuraukset"] == ""
         assert result["ehdotus"] == ""
+
+
+# ---------------------------------------------------------------------------
+# Composite (parent_with_nested_list) post-processing
+# ---------------------------------------------------------------------------
+
+
+class TestCompositeFieldPolicies:
+    """A CompositeExtractionRequirements has no ``.fields``; the parent and each
+    child collection carry their own specs and must be policed separately."""
+
+    @pytest.fixture
+    def composite(self):
+        parent = _make_requirements(
+            [
+                FieldSpec(field_name="meeting_id", field_type="str", description="id"),
+                FieldSpec(field_name="meeting_date", field_type="date", description="date"),
+                FieldSpec(
+                    field_name="review_status",
+                    field_type="str",
+                    description="status",
+                    enum=["ok", "blocked"],
+                ),
+            ]
+        )
+        topics = _make_requirements(
+            [
+                FieldSpec(field_name="title", field_type="str", description="title"),
+                FieldSpec(field_name="tags", field_type="list[str]", description="tags"),
+            ]
+        )
+        decisions = _make_requirements(
+            [FieldSpec(field_name="what", field_type="str", description="what")]
+        )
+        return CompositeExtractionRequirements(
+            parent_requirements=parent,
+            children=[
+                ChildRequirements(
+                    container_name="topics", container_description="t", requirements=topics
+                ),
+                ChildRequirements(
+                    container_name="decisions", container_description="d", requirements=decisions
+                ),
+            ],
+        )
+
+    @pytest.fixture
+    def record(self):
+        return {
+            "meeting_id": "M-1",
+            "meeting_date": "2026-08-11",
+            "review_status": "not-a-valid-status",
+            "topics": [{"title": "Budget", "tags": "cost, q3"}, {"title": None}],
+            "decisions": [{"what": "ship it"}],
+        }
+
+    def test_parent_fields_do_not_leak_into_children(self, composite, record):
+        result = apply_composite_field_policies(record, composite)
+        for item in result["topics"] + result["decisions"]:
+            assert "meeting_id" not in item
+            assert "meeting_date" not in item
+            assert "review_status" not in item
+
+    def test_parent_policies_still_apply(self, composite, record):
+        result = apply_composite_field_policies(record, composite)
+        assert result["meeting_id"] == "M-1"
+        assert result["review_status"] == ""  # out-of-enum -> fallback
+
+    def test_child_policies_apply_per_container(self, composite, record):
+        result = apply_composite_field_policies(record, composite)
+        assert result["topics"][1]["title"] == ""  # missing required str -> ""
+        assert result["topics"][1]["tags"] == []  # missing required list -> []
+        assert result["decisions"][0] == {"what": "ship it"}
+
+    def test_normalization_runs_on_child_items(self, composite, record):
+        result = normalize_composite_extracted_data(
+            apply_composite_field_policies(record, composite), composite
+        )
+        assert result["topics"][0]["tags"] == ["cost", "q3"]
+
+    def test_unknown_keys_pass_through(self, composite, record):
+        result = apply_composite_field_policies({**record, "extra": 42}, composite)
+        assert result["extra"] == 42
+
+    def test_extractor_dispatches_composite(self, composite, record):
+        """_extract_one must route composite requirements away from the flat path."""
+        extractor = DataExtractor.__new__(DataExtractor)
+        extractor.client = object()
+        extractor.model = "test-model"
+        extractor.temperature = 0.0
+        extractor.reasoning_effort = None
+        parsed = type("P", (), {"model_dump": lambda self: dict(record)})()
+        resp = type(
+            "R",
+            (),
+            {
+                "choices": [type("C", (), {"message": type("M", (), {"parsed": parsed})()})()],
+                "usage": None,
+            },
+        )()
+        with mock.patch(
+            "gaik.software_components.extractor.extractor._parse_with", return_value=resp
+        ):
+            result, _ = extractor._extract_one(
+                doc="d", extraction_model=object, requirements=composite, user_requirements="u"
+            )
+        assert "meeting_id" not in result["topics"][0]
+        assert result["topics"][0]["tags"] == ["cost", "q3"]

@@ -27,7 +27,10 @@ from solution_wizard.selector import (
 
 def test_registry_loads_and_validates():
     reg = get_registry()
-    assert len(reg.all()) == 20
+    # Floor rather than an exact count: entries are added by gaik-sync as gaik
+    # grows, and an exact assertion turns every legitimate addition into a
+    # failure. The floor still catches a truncated or half-written registry.
+    assert len(reg.all()) >= 30
 
 
 def test_registry_validation_catches_missing_keys():

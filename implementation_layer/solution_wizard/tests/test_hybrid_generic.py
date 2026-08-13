@@ -1,6 +1,7 @@
 """Tests for the enhanced _generic template + pattern key + dynamic discovery (Parts 1b-1d, 2a-2b)."""
 
 import ast
+import json
 import string
 import sys
 from pathlib import Path
@@ -221,25 +222,86 @@ def test_scaffold_hybrid_endtoend(tmp_path):
     assert "source_text" in run_poc
 
 
-def test_validator_accepts_reference_card_component():
-    """A hybrid step using a card-only building block (MultimodalParser) must validate."""
+# ---------------------------------------------------------------------------
+# Card-only components (wireable via a reference card, absent from the registry)
+# ---------------------------------------------------------------------------
+
+_CARD_ONLY_NAME = "FictionalCardOnlyParser"
+_CARD_ONLY_EXTRA = "fictional-parser"
+_CARD_ONLY_CARD = {
+    "import": "from gaik.software_components.fictional import FictionalCardOnlyParser",
+    "construct": "parser = FictionalCardOnlyParser()",
+    "call": "parsed_text = parser.parse(str(input_path))",
+    "returns": "str (markdown)",
+    "install_extra": _CARD_ONLY_EXTRA,
+}
+
+
+@pytest.fixture
+def card_only_component(tmp_path, monkeypatch):
+    """Expose a synthetic component that has a reference card but no registry entry.
+
+    These tests must exercise the card-only code path itself, not whichever real
+    component happens to be unregistered today. Naming a real one couples the
+    test to a registry that gaik-sync keeps editing: both of these tests used
+    MultimodalParser, and when it gained a registry entry they kept passing while
+    silently resolving through the registry and testing nothing. The assert below
+    is the guard -- if this name is ever added to the registry, the fixture fails
+    loudly instead of the tests going vacuous again.
+    """
+    from solution_wizard import registry as registry_mod
+
+    cards_path = tmp_path / "cards.json"
+    cards_path.write_text(json.dumps({_CARD_ONLY_NAME: _CARD_ONLY_CARD}), encoding="utf-8")
+    cards = registry_mod.ReferenceCards(cards_path)
+    monkeypatch.setattr(registry_mod, "get_reference_cards", lambda: cards)
+
+    assert not registry_mod.get_registry().exists(_CARD_ONLY_NAME), (
+        f"{_CARD_ONLY_NAME} must stay out of the registry for these tests to mean anything"
+    )
+    return _CARD_ONLY_NAME
+
+
+def _blueprint_with_parser(component_name: str) -> Blueprint:
+    """The hybrid blueprint with its parse step rewired to `component_name`."""
+    bp = _hybrid_blueprint()
+    bp.components.selected_building_blocks = [
+        component_name if b == "MultimodalParser" else b
+        for b in bp.components.selected_building_blocks
+    ]
+    next(s for s in bp.workflow.steps if s.id == "parse").component = component_name
+    return bp
+
+
+def test_validator_accepts_card_only_component(card_only_component):
+    """Rule 3 must accept a step whose component exists only as a reference card."""
     from solution_wizard.validator import validate
 
-    bp = _hybrid_blueprint()
-    result = validate(bp)
-    # MultimodalParser is not in the registry but has a card -> no rule-3 error for it
-    rule3_for_parser = [e for e in result.errors if e.rule == 3 and "MultimodalParser" in e.message]
-    assert not rule3_for_parser
+    result = validate(_blueprint_with_parser(card_only_component))
+    rule3 = [e for e in result.errors if e.rule == 3 and card_only_component in e.message]
+    assert not rule3
 
 
-def test_pip_requirements_includes_card_only_extra():
-    """requirements.txt must include extras for card-only components like parsers."""
+def test_validator_rejects_component_in_neither_registry_nor_cards(card_only_component):
+    """Negative control: without a card *or* a registry entry, rule 3 must fire.
+
+    Without this, test_validator_accepts_card_only_component would still pass if
+    rule 3 stopped checking components altogether.
+    """
+    from solution_wizard.validator import validate
+
+    result = validate(_blueprint_with_parser("NotAComponentAnywhere"))
+    rule3 = [e for e in result.errors if e.rule == 3 and "NotAComponentAnywhere" in e.message]
+    assert rule3
+
+
+def test_pip_requirements_falls_back_to_card_install_extra(card_only_component):
+    """requirements.txt must pick up install_extra from the card when the registry has no entry."""
     from solution_wizard.registry import get_registry
 
-    lines = get_registry().pip_requirements(["Transcriber", "MultimodalParser", "Extractor"])
-    combined = " ".join(lines)
-    assert "transcriber" in combined
-    assert "multimodal-parser" in combined  # card-only fallback
+    lines = get_registry().pip_requirements(["Transcriber", card_only_component])
+    assert "gaik[transcriber]" in lines  # resolved via the registry
+    assert f"gaik[{_CARD_ONLY_EXTRA}]" in lines  # resolved via the card fallback
 
 
 def test_same_graph_different_order_same_key():

@@ -317,13 +317,34 @@ Before applying the module-first rule, check whether the user has described any 
 
 If **any** of the above apply, prefer `VisionExtractor` over `DocumentsToStructuredData`, regardless of the module-first rule. VisionExtractor sends the full visual context directly to a vision LLM in a single pass, which delivers higher fidelity on visually complex documents. Flag the cost trade-off to the user: *"VisionExtractor could be more expensive, but delivers higher fidelity on visually complex documents."* Ask whether the higher accuracy is worth the potential added cost before confirming the choice. If the user says cost is a concern, offer `DocumentsToStructuredData` with `parser_choice="vision_parser"` as a cheaper alternative and note that accuracy may be lower on complex layouts.
 
+**Provenance override (check BEFORE Step 1)**
+
+Before applying the module-first rule, check whether the use case needs anything that points *into* the recording rather than merely repeating its words:
+
+- Timestamps, time-coded segments, subtitles, or captions
+- Speaker labels / speaker attribution ("who said what", diarization)
+- Citations or evidence that must locate a claim in the audio (e.g. `file|start|end`)
+- Per-speaker summaries, or owners/actions attributed to named speakers
+
+If **any** of the above apply, do **not** select `AudioToStructuredData` — it wraps `Transcriber` on the hosted path, which returns plain text only. Decompose into explicit steps and choose the transcription component by capability:
+
+| Need | Component | Where the data is |
+|------|-----------|-------------------|
+| Speaker labels (with or without timestamps) | `Transcriber(transcription_model="whisper_local", diarization=True)` | `.segments` — **not** `.srt_content`/`.vtt_content`, which carry timings only |
+| Timestamps only, no speaker labels | `ParallelTranscriber(config=TranscriptionConfig(response_format="srt"))` | `.content` (SRT), `.plain_text` for the bare text |
+| Neither | module-first rule applies unchanged | — |
+
+`whisper_local` requires a self-hosted transcription endpoint (`local_api_base` + `local_api_key`); `Transcriber` raises `ValueError` at transcribe time without both. gaik has **no** environment fallback for these — they are constructor kwargs that must be passed explicitly, and they are separate from `api_config` (which carries the OpenAI/Azure credentials and is unused on this path). In generated code read them from `LOCAL_TRANSCRIBER_API_BASE` / `LOCAL_TRANSCRIBER_API_KEY`, the convention `toolkit_demo_app` already uses. When speaker labels are required, ask the user whether they have such an endpoint before confirming the choice. If they do not, say so plainly: speaker attribution is unavailable, and offer `ParallelTranscriber` with `response_format="srt"` for timestamps alone.
+
+Do **not** route diarization to `ParallelTranscriber` with the `gpt-4o-transcribe-diarize` backend. It requests diarized output and parses the speaker field, then discards it when building the SRT — the caller receives timestamps only.
+
 **Step 1 -- Module-first rule**
 
 Check whether a single GAIK software module covers the use case end-to-end:
 
 | Pattern | Module to try first |
 |---------|-------------------|
-| Audio/video → structured JSON | `AudioToStructuredData` |
+| Audio/video → structured JSON | `AudioToStructuredData` (subject to provenance override above) |
 | PDF/DOCX → structured JSON | `DocumentsToStructuredData` (subject to accuracy override above) |
 | Document collection → answer | `RAGWorkflow` |
 | Any mix of audio, documents, images, or text → narrative report (not structured JSON) | `MultiSourceReportGenerator` |
@@ -335,6 +356,26 @@ If the module's `input_artifact_types` and `output_artifact_types` match the use
 If no module covers the full chain, or the user needs to skip/add/reorder steps, select individual components by matching each transformation step against `input_artifact_types` and `output_artifact_types` in the registry. Use `best_for` and `known_limitations` to choose between alternatives. Common reasoning:
 
 - Input is audio → `Transcriber` produces the transcript. **Finnish audio → set `Transcriber(enhanced_transcript=True)` (Finnish-tuned two-pass enhancement, run internally) — do NOT add a separate `TranscriptEnhancer` step.** For non-Finnish audio, leave it off and flag that enhancement would need prompt customisation. Use a standalone `TranscriptEnhancer` only to enhance an existing text transcript (no audio step).
+- Input is audio **and** timestamps or speaker labels are required → see the provenance override above: speaker labels → `Transcriber(transcription_model="whisper_local", diarization=True)`, timestamps only → `ParallelTranscriber(response_format="srt")`. The hosted models (`whisper`, `whisper-1`, `gpt-4o-transcribe`) return plain text — `Transcriber` populates `.segments`/`.srt_content`/`.vtt_content` on the `whisper_local` path only, and silently ignores `diarization` on every other model.
+- Long media (roughly > 25 min) or bulk throughput matters → `ParallelTranscriber` (FFmpeg chunking, parallel calls) instead of `Transcriber`; note it has no Finnish enhancement.
+- Input is a PDF/DOCX that must become text before any other step → add an explicit parser step. `DocumentsToStructuredData` and `RAGWorkflow` already parse internally, so only add a parser when neither module is selected. There is no single default parser — choose by capability:
+
+  | Need | Parser | Why |
+  |---|---|---|
+  | Page-level citations from a text-layer PDF, at the lowest cost | `PyMuPDFParser`; call `parse_document(path, use_markdown=False)` | Structured mode inserts explicit `=== PAGE N ===` markers and per-line `[x:,y:]` position tags into `text_content`. It is local and makes no model calls. The position tags add noise, so extraction must tolerate or remove them. Preserve `(file_name, page_number, page_text)` through downstream steps. It has no OCR, so scanned PDFs may produce empty or incomplete text; empty extraction logs a warning but does not raise an exception. |
+  | Page-level citations from a scanned, image-based, or visually complex PDF | `VisionParser(use_context=False)`; call `convert_pdf(path, clean_output=False)` | This is the only parser returning a native `list[str]` with one item per PDF page. Page number is the list index plus one; the caller must add the filename. `clean_output=True` merges the pages into one list item and destroys page-level attribution. For strict grounding, use `use_context=False` so text from the preceding page is not supplied while parsing the current page. Preserve `(file_name, page_number, page_text)` instead of joining the list. |
+  | Cross-page table continuity with page-level citations | `VisionParser(use_context=True)`; call `convert_pdf(path, clean_output=False)` | Previous-page context can help continue split tables while retaining separate page outputs. However, the model sees the preceding page's final 500 characters, so strict page attribution becomes less certain. Flag this tradeoff when citations must identify exactly where each statement appeared. Preserve `(file_name, page_number, page_text)` instead of joining the list. |
+  | Standalone image such as PNG, JPG, WEBP, or TIFF | `VisionParser`; call `convert_image(path)` | This is a different method from `convert_pdf()`. It returns one Markdown `str` and has no `clean_output` parameter or page concept. The source can be attributed to the image filename, but not to a page number. |
+  | Complex tables or layouts spanning pages, without page provenance | `MultimodalParser` | The whole PDF is supplied in one request, allowing the model to reason across pages. The current API returns one flattened `ParseResult.clean_markdown` value and has no per-page mode. |
+  | Layout- and OCR-oriented local parsing, without page provenance | `DoclingParser(enable_ocr=True)` | Runs Docling locally with OCR and table-structure processing. Its public return value contains one flattened `text_content` string; the page information available inside Docling's internal document object is not exposed by this parser. |
+  | Figures and diagrams must be described at their document positions | `VisionPlusParser` | Combines Docling layout processing with vision-generated image descriptions inserted into the Markdown. `metadata.pages_with_images` identifies pages containing detected images, but arbitrary text is not mapped to pages. Do not use it for text-level page citations. |
+  | Fast, free parsing of a text-layer PDF when page provenance is unnecessary | `PyMuPDFParser`; call `parse_document(path, use_markdown=True)` | Uses no model calls and extracts the PDF text layer locally. It has no OCR; scanned documents may return empty or incomplete `text_content` -- check the returned `content_length`/`word_count` fields rather than assuming success means real content. |
+  | Word `.docx` documents | `DocxParser` | Extracts paragraphs and tables with `python-docx`. A DOCX file is reflowable and has no stable page model, so reliable `file_name\|page_number` attribution cannot be recovered. Legacy binary `.doc` files should not be presented as reliably supported: `is_supported_file()` accepts the `.doc` extension, but `python-docx` cannot open the legacy binary format and `Document()` raises on a real `.doc` file. |
+  | Docling parsing offloaded to a remote GPU service | `DoclingApiClientParser` | Performs remote Docling-style parsing. It returns `dict["parsed_markdown"]`, unlike local `DoclingParser`, which returns `dict["text_content"]`. It requires `api_base` and `password`; generated code may read these from `DOCLING_API_BASE` and `DOCLING_API_PASSWORD`, but GAIK itself has no environment fallback. Remote `metadata` is undocumented, so page provenance must not be assumed. Ask whether the endpoint is available before selecting it. |
+
+  **No parser other than `VisionParser` (called with `clean_output=False`) or `PyMuPDFParser` (called with `use_markdown=False`, text-layer PDFs only) can support `file_name|page_number` citations.** If a use case needs page-level citations and the source is a `.docx`, that requirement cannot be satisfied by any current parser -- flag it as a gap (e.g. cite by paragraph index or section heading instead) rather than silently picking the closest parser.
+
+  Return shapes differ and are a common PoC failure: `VisionParser` → `list[str]`; `PyMuPDFParser`/`DocxParser`/`DoclingParser` → `dict` with `text_content`; `VisionPlusParser`/`DoclingApiClientParser` → `dict` with `parsed_markdown`. Check the reference card's `returns` before writing the step.
 - Text/transcript → structured JSON → `Extractor`
 - Image or visually complex PDF → `VisionExtractor` (note: could be more expensive; flag cost tradeoff — see accuracy override above)
 - Document type detection needed → `DocumentClassifier`
@@ -352,10 +393,12 @@ Every selected component exposes behaviour-changing options. Read each selected 
 
 - **Infer it** from the requirements you collected in Phase 2 whenever the `infer_from` rule applies. Examples:
   - `language == Finnish` + audio → `Transcriber.enhanced_transcript = True`
+  - timestamps or speaker labels required → `Transcriber.transcription_model = "whisper_local"` (+ `local_api_base`, `local_api_key`); timestamps alone are cheaper via `ParallelTranscriber.response_format = "srt"`
+  - multiple speakers / meeting / interview **and** whisper_local selected → `Transcriber.diarization = True`, then ask for `speaker_count` (exact) or `min_speakers` + `max_speakers` (range)
   - `human_review == yes` or `confidence_required` → `VisionExtractor.include_verification = True`
   - queries mix exact terms with concepts → `Retriever.hybrid_search = True`
   - citation/traceability requirement → `AnswerGenerator.citations = True` (or `RAGWorkflow.citations = True`)
-  - scanned/image PDFs → `DoclingParser.enable_ocr = True`, or `DocumentsToStructuredData.parser_choice = "docling_parser"`
+  - scanned/image PDFs → `DoclingParser.enable_ocr = True`, or `DocumentsToStructuredData.parser_choice = "docling"` (the accepted literals are `vision_parser`, `docling`, `pymupdf`, `docx` — only the first carries the `_parser` suffix; the registry component *ids* `docling_parser`/`pymupdf_parser`/`docx_parser` are a different namespace and raise `ValueError` if passed here)
   - access controls on a database → `PostgresAgent.table_allowlist = [...]`
 - **Ask the user** when an option is `selection_relevant` but cannot be inferred from the requirements.
 - **Conditional options**: when an option's `infer_from` field encodes a condition (e.g. `"diarization_required → ask for speaker count"`), only surface that option — either by inferring or asking — when the condition holds. If the condition does not hold, leave the option at its default silently.

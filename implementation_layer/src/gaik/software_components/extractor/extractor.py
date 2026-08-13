@@ -22,9 +22,12 @@ from gaik.software_components.llm.factory import build_compat_client
 
 from .schema import (
     SYSTEM_PARSER,
+    CompositeExtractionRequirements,
     ExtractionRequirements,
     _parse_with,
+    apply_composite_field_policies,
     apply_field_policies,
+    normalize_composite_extracted_data,
     normalize_extracted_data,
 )
 
@@ -103,23 +106,42 @@ class DataExtractor:
         )
     """
 
-    def __init__(self, config: dict, model: str | None = None):
+    def __init__(
+        self,
+        config: dict,
+        model: str | None = None,
+        *,
+        temperature: float | None = 0.0,
+        reasoning_effort: str | None = None,
+    ):
         """
         Initialize the DataExtractor.
 
         Args:
             config: OpenAI configuration dict from get_openai_config()
             model: Optional model name override
+            temperature: Sampling temperature for every extraction call.
+                Defaults to ``0.0`` so the same document yields the same
+                record. ``None`` omits the parameter from the request.
+            reasoning_effort: Reasoning effort for a gpt-5.x reasoning
+                deployment; not sent by default, since the non-reasoning models
+                reject it. The two settings are coupled — a reasoning
+                deployment accepts an explicit temperature only at effort
+                ``"none"``, so run it either as ``reasoning_effort="none"``
+                (determinism kept) or as an active effort with
+                ``temperature=None``.
         """
         self.config = config
         self.model = model if model else self.config["model"]
+        self.temperature = temperature
+        self.reasoning_effort = reasoning_effort
         self.client = build_compat_client(self.config)
 
     def _extract_one(
         self,
         doc: str,
         extraction_model: type[BaseModel],
-        requirements: ExtractionRequirements,
+        requirements: ExtractionRequirements | CompositeExtractionRequirements,
         user_requirements: str,
     ) -> tuple[dict, UsageRecord | None]:
         """Run extraction on a single document.
@@ -144,6 +166,8 @@ class DataExtractor:
                 model=self.model,
                 messages=messages,
                 response_format=extraction_model,
+                temperature=self.temperature,
+                reasoning_effort=self.reasoning_effort,
             )
         duration_s = elapsed()
 
@@ -156,6 +180,17 @@ class DataExtractor:
 
         parsed = resp.choices[0].message.parsed
         result_dict = parsed.model_dump()
+
+        if isinstance(result_dict, dict) and isinstance(
+            requirements, CompositeExtractionRequirements
+        ):
+            # parent_with_nested_list: parent and each child collection carry
+            # their own field specs, so they must be policed separately. The
+            # shape-sniffing below cannot do this — it would apply one flat spec
+            # set to both halves.
+            result_dict = apply_composite_field_policies(result_dict, requirements)
+            result_dict = normalize_composite_extracted_data(result_dict, requirements)
+            return result_dict, usage
 
         # Apply field policies (fix nulls, missing keys, out-of-enum values)
         if isinstance(result_dict, dict):
@@ -181,7 +216,7 @@ class DataExtractor:
     def extract(
         self,
         extraction_model: type[BaseModel],
-        requirements: ExtractionRequirements,
+        requirements: ExtractionRequirements | CompositeExtractionRequirements,
         user_requirements: str,
         documents: list[str],
         save_json: bool = False,
@@ -232,7 +267,7 @@ class DataExtractor:
     def extract_with_usage(
         self,
         extraction_model: type[BaseModel],
-        requirements: ExtractionRequirements,
+        requirements: ExtractionRequirements | CompositeExtractionRequirements,
         user_requirements: str,
         documents: list[str],
         save_json: bool = False,

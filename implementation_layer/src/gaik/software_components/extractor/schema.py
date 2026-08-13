@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -94,7 +95,40 @@ class _ParsedShim:
         self.usage = None
 
 
-def _parse_with(*, client, model: str, messages: list[dict], response_format: type[BaseModel]):
+def _sampling_kwargs(
+    temperature: float | None, reasoning_effort: str | None
+) -> dict[str, float | str]:
+    """The sampling half of a ``parse`` call, with either half omittable.
+
+    ``temperature`` and ``reasoning_effort`` are coupled on the gpt-5.x
+    reasoning deployments, so they are resolved together rather than
+    independently. A custom temperature is accepted only while reasoning
+    effort is ``"none"``; under any active effort (``low``/``medium``/
+    ``high``/``max``) the API rejects it outright::
+
+        Unsupported value: 'temperature' does not support 0 with this model.
+        Only the default (1) value is supported.
+
+    A parameter set to ``None`` is left out of the request entirely, which is
+    what the API requires — sending ``null`` is not the same as not sending it.
+    """
+    kwargs: dict[str, float | str] = {}
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    if reasoning_effort is not None:
+        kwargs["reasoning_effort"] = reasoning_effort
+    return kwargs
+
+
+def _parse_with(
+    *,
+    client,
+    model: str,
+    messages: list[dict],
+    response_format: type[BaseModel],
+    temperature: float | None = 0.0,
+    reasoning_effort: str | None = None,
+):
     """
     Wraps client.beta.chat.completions.parse in a retry + deterministic settings.
 
@@ -107,6 +141,15 @@ def _parse_with(*, client, model: str, messages: list[dict], response_format: ty
         model: Model name to use
         messages: Messages to send
         response_format: Pydantic model for structured output
+        temperature: Sampling temperature. Defaults to ``0`` — the same
+            requirements should yield the same schema. ``None`` omits it.
+        reasoning_effort: Reasoning effort for a reasoning deployment.
+            Defaults to ``None`` (not sent), which is required by the
+            non-reasoning models that reject the parameter. See
+            :func:`_sampling_kwargs` for why the two are set as a pair: to run
+            a gpt-5.x reasoning deployment, either pair ``"none"`` with an
+            explicit temperature to keep determinism, or pass an active effort
+            with ``temperature=None``.
     """
     if isinstance(client, ProviderClient):
         parsed = _with_retries(
@@ -117,14 +160,15 @@ def _parse_with(*, client, model: str, messages: list[dict], response_format: ty
             )
         )
         return _ParsedShim(parsed)
+    sampling = _sampling_kwargs(temperature, reasoning_effort)
     return _with_retries(
         lambda: client.beta.chat.completions.parse(
             model=model,
             messages=messages,
             response_format=response_format,
-            temperature=0,
             top_p=1.0,
             timeout=30,
+            **sampling,
         )
     )
 
@@ -303,10 +347,16 @@ def detect_structure_type(
     *,
     client=None,
     model: str = None,
+    temperature: float | None = 0.0,
+    reasoning_effort: str | None = None,
     _usage_sink: list | None = None,
 ) -> StructureAnalysis:
     """
     Analyze if the extraction requires a nested list structure or flat structure.
+
+    ``temperature`` / ``reasoning_effort`` are passed straight to
+    :func:`_parse_with`; see it for how the two interact on reasoning
+    deployments.
 
     When ``_usage_sink`` is a list, the OpenAI usage dict from the underlying
     LLM call is appended to it. This is an internal hook used by
@@ -385,6 +435,8 @@ def detect_structure_type(
             },
         ],
         response_format=StructureAnalysis,
+        temperature=temperature,
+        reasoning_effort=reasoning_effort,
     )
     analysis = resp.choices[0].message.parsed
     if _usage_sink is not None:
@@ -568,6 +620,8 @@ def parse_nested_requirements(
     *,
     client=None,
     model: str = None,
+    temperature: float | None = 0.0,
+    reasoning_effort: str | None = None,
     _usage_sink: list | None = None,
 ) -> tuple[
     type[BaseModel],
@@ -582,6 +636,10 @@ def parse_nested_requirements(
 
     Returns: (ParentModel, item_requirements, structure_analysis)
 
+    ``temperature`` / ``reasoning_effort`` are forwarded to every underlying
+    call; see :func:`_parse_with` for how the two interact on reasoning
+    deployments.
+
     When ``_usage_sink`` is a list, OpenAI usage dicts from each underlying
     LLM call are appended to it. Internal hook for :class:`SchemaGenerator`;
     external callers can ignore it.
@@ -594,8 +652,9 @@ def parse_nested_requirements(
         raise ValueError("model must be provided when client is specified")
 
     print("Analyzing structure type...")
+    sampling = {"temperature": temperature, "reasoning_effort": reasoning_effort}
     analysis = detect_structure_type(
-        user_description, client=client, model=model, _usage_sink=_usage_sink
+        user_description, client=client, model=model, _usage_sink=_usage_sink, **sampling
     )
 
     print(f"Structure type: {analysis.structure_type}")
@@ -605,7 +664,7 @@ def parse_nested_requirements(
         # Just parse as flat requirements
         print("Using flat structure")
         requirements = parse_user_requirements(
-            user_description, client=client, model=model, _usage_sink=_usage_sink
+            user_description, client=client, model=model, _usage_sink=_usage_sink, **sampling
         )
         extraction_model = create_extraction_model(requirements)
         return extraction_model, requirements, analysis
@@ -628,6 +687,7 @@ def parse_nested_requirements(
             client=client,
             model=model,
             _usage_sink=_usage_sink,
+            **sampling,
         )
 
         # Recovery: if the parent parse still emitted any list[dict] field, a
@@ -670,6 +730,7 @@ def parse_nested_requirements(
                 model=model,
                 _usage_sink=_usage_sink,
                 parse_mode="repeated_item",
+                **sampling,
             )
             _ensure_no_list_dict_fields(child_req, context=f"Child requirements for '{cname}'")
 
@@ -908,12 +969,18 @@ def parse_user_requirements(
     *,
     client=None,
     model: str = None,
+    temperature: float | None = 0.0,
+    reasoning_effort: str | None = None,
     _usage_sink: list | None = None,
     parse_mode: RequirementsParseMode = "normal",
 ) -> ExtractionRequirements:
     """
     Parse extraction requirements from natural language using LLM with type detection rules.
     Works with any input format - numbered lists, bullets, prose, tables, etc.
+
+    ``temperature`` / ``reasoning_effort`` are passed straight to
+    :func:`_parse_with`; see it for how the two interact on reasoning
+    deployments.
 
     When ``_usage_sink`` is a list, the OpenAI usage dict from the underlying
     LLM call is appended to it. Internal hook for :class:`SchemaGenerator`;
@@ -937,6 +1004,8 @@ def parse_user_requirements(
             {"role": "user", "content": prompt},
         ],
         response_format=ExtractionRequirements,
+        temperature=temperature,
+        reasoning_effort=reasoning_effort,
     )
     req = resp.choices[0].message.parsed
     _apply_type_overrides(req, original_text=cleaned_description)
@@ -1466,6 +1535,60 @@ def apply_field_policies(data: dict, requirements: ExtractionRequirements) -> di
     return output
 
 
+def _map_over_composite(
+    data: dict,
+    requirements: CompositeExtractionRequirements,
+    per_record: Callable[[dict, ExtractionRequirements], dict],
+) -> dict:
+    """Apply a flat per-record post-processor across a parent-with-children record.
+
+    ``per_record`` runs once on the parent's own (scalar) fields, then once per
+    item in each recognised child container using *that container's* own
+    requirements. Applying the parent specs to child items would be wrong: it
+    injects the parent's required fields into every child row.
+
+    A container that was demoted to a ``list[str]`` parent field (see
+    ``parse_nested_requirements``) is absent from ``children``, so it stays with
+    the parent and is policed as the scalar list it now is. Any key belonging to
+    neither side passes through untouched.
+    """
+    child_by_name = {c.container_name: c.requirements for c in requirements.children}
+
+    parent_only = {k: v for k, v in data.items() if k not in child_by_name}
+    output = per_record(parent_only, requirements.parent_requirements)
+
+    for name, child_req in child_by_name.items():
+        if name not in data:
+            continue
+        value = data[name]
+        if isinstance(value, list):
+            output[name] = [
+                per_record(item, child_req) if isinstance(item, dict) else item for item in value
+            ]
+        else:
+            output[name] = value
+
+    return output
+
+
+def apply_composite_field_policies(
+    data: dict, requirements: CompositeExtractionRequirements
+) -> dict:
+    """``apply_field_policies`` for a ``parent_with_nested_list`` record.
+
+    Policies are enforced against the parent requirements for the parent's own
+    fields and against each child container's requirements for its items.
+    """
+    return _map_over_composite(data, requirements, apply_field_policies)
+
+
+def normalize_composite_extracted_data(
+    data: dict, requirements: CompositeExtractionRequirements
+) -> dict:
+    """``normalize_extracted_data`` for a ``parent_with_nested_list`` record."""
+    return _map_over_composite(data, requirements, normalize_extracted_data)
+
+
 # -----------------------------------------------------------------------------
 # REUSABLE CLASS INTERFACE
 # -----------------------------------------------------------------------------
@@ -1532,16 +1655,35 @@ class SchemaGenerator:
         # latency / cost in the return value.
     """
 
-    def __init__(self, config: dict, model: str | None = None):
+    def __init__(
+        self,
+        config: dict,
+        model: str | None = None,
+        *,
+        temperature: float | None = 0.0,
+        reasoning_effort: str | None = None,
+    ):
         """
         Initialize the SchemaGenerator.
 
         Args:
             config: OpenAI configuration dict from get_openai_config()
             model: Optional model name override
+            temperature: Sampling temperature for every schema-generation call.
+                Defaults to ``0.0`` so the same requirements yield the same
+                schema. ``None`` omits the parameter from the request.
+            reasoning_effort: Reasoning effort for a gpt-5.x reasoning
+                deployment; not sent by default, since the non-reasoning models
+                reject it. The two settings are coupled — a reasoning
+                deployment accepts an explicit temperature only at effort
+                ``"none"``, so run it either as ``reasoning_effort="none"``
+                (determinism kept) or as an active effort with
+                ``temperature=None``. See :func:`_parse_with`.
         """
         self.config = config
         self.model = model if model else self.config["model"]
+        self.temperature = temperature
+        self.reasoning_effort = reasoning_effort
         self.client = create_openai_client(self.config)
         self.extraction_model = None
         self.item_requirements = None
@@ -1563,7 +1705,11 @@ class SchemaGenerator:
             StructureAnalysis with structure type and descriptions
         """
         self.structure_analysis = detect_structure_type(
-            user_requirements, client=self.client, model=self.model
+            user_requirements,
+            client=self.client,
+            model=self.model,
+            temperature=self.temperature,
+            reasoning_effort=self.reasoning_effort,
         )
         return self.structure_analysis
 
@@ -1585,6 +1731,8 @@ class SchemaGenerator:
                 user_requirements,
                 client=self.client,
                 model=self.model,
+                temperature=self.temperature,
+                reasoning_effort=self.reasoning_effort,
                 _usage_sink=usage_sink,
             )
         duration_s = round(elapsed(), 3)

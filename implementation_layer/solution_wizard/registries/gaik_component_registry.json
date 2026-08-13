@@ -47,7 +47,8 @@
     },
     "known_limitations": [
       "Requires audio/video input; cannot process text-only input without bypassing Transcriber",
-      "TranscriptEnhancer is tuned for Finnish; other languages require prompt customisation"
+      "TranscriptEnhancer is tuned for Finnish; other languages require prompt customisation",
+      "Drives Transcriber on the hosted path, so the transcript it extracts from carries no timestamps and no speaker labels. Use cases needing time-coded citations, subtitles, or speaker attribution must not use this module -- decompose into an explicit transcription step (Transcriber with whisper_local for speakers, ParallelTranscriber with response_format='srt' for timestamps only) + SchemaGenerator + DataExtractor."
     ],
     "best_for": [
       "spoken_report_to_structured_form",
@@ -205,28 +206,28 @@
       "Retriever",
       "AnswerGenerator"
     ],
-    "required_parameters": [
-      "collection_name"
-    ],
+    "required_parameters": [],
     "optional_parameters": [
       "embedding_model",
-      "retrieval_top_k",
-      "answer_model",
+      "retriever_top_k",
       "retriever_hybrid",
       "retriever_rerank",
       "stream",
       "conversation_history",
       "last_n",
       "persist",
-      "retriever_threshold"
+      "persist_path",
+      "retriever_threshold",
+      "collection_name",
+      "citations",
+      "use_azure"
     ],
     "supported_providers": [
       "openai",
       "azure_openai"
     ],
     "cost_relevant_parameters": [
-      "embedding_model",
-      "answer_model"
+      "embedding_model"
     ],
     "quality_tradeoffs": {
       "speed_vs_accuracy": "Larger top_k improves recall but increases generation cost",
@@ -308,10 +309,13 @@
     "optional_parameters": [
       "transcription_model",
       "language",
-      "word_timestamps",
       "enhanced_transcript",
       "diarization",
       "speaker_count",
+      "min_speakers",
+      "max_speakers",
+      "local_api_base",
+      "local_api_key",
       "enhanced_transcript_instructions",
       "default_prompt",
       "initial_prompt"
@@ -333,12 +337,18 @@
     },
     "known_limitations": [
       "Does not produce structured output -- use Extractor downstream",
-      "Built-in transcript enhancement (enhanced_transcript=True) is Finnish-tuned; calls TranscriptEnhancer internally. For audio input, set this option instead of adding a separate TranscriptEnhancer step. For non-Finnish audio, enhancement needs prompt customisation -- default off and flag it."
+      "Built-in transcript enhancement (enhanced_transcript=True) is Finnish-tuned; calls TranscriptEnhancer internally. For audio input, set this option instead of adding a separate TranscriptEnhancer step. For non-Finnish audio, enhancement needs prompt customisation -- default off and flag it.",
+      "The hosted models (whisper, whisper-1, gpt-4o-transcribe) return plain text only: .segments, .srt_content and .vtt_content stay None, and diarization/speaker_count/min_speakers/max_speakers are silently ignored. Timestamps and speaker labels require transcription_model='whisper_local'.",
+      "whisper_local requires a self-hosted transcription endpoint (local_api_base + local_api_key); transcribe() raises ValueError without both. Confirm the user has one before selecting this path.",
+      "Speaker labels are exposed on .segments only. .srt_content and .vtt_content are built by segments_to_srt/segments_to_vtt, which read start/end/text and drop every other key."
     ],
     "best_for": [
       "audio_to_transcript",
       "video_subtitles",
-      "meeting_notes"
+      "meeting_notes",
+      "timestamped_transcript",
+      "speaker_attributed_transcript",
+      "who_said_what_diarization"
     ],
     "example_blueprint_steps": [
       {
@@ -511,14 +521,17 @@
     ],
     "uses_components": [],
     "required_parameters": [
-      "task"
+      "user_requirements"
     ],
     "optional_parameters": [
-      "schema_ref",
-      "reasoning_effort",
-      "include_verification",
+      "model_provider",
+      "model",
+      "merge_table",
       "use_azure",
-      "additional_instructions"
+      "vertex_ai",
+      "additional_instructions",
+      "reasoning_effort",
+      "include_verification"
     ],
     "supported_providers": [
       "openai",
@@ -527,8 +540,9 @@
       "google"
     ],
     "cost_relevant_parameters": [
-      "reasoning_effort",
-      "model_provider"
+      "model_provider",
+      "model",
+      "reasoning_effort"
     ],
     "quality_tradeoffs": {
       "speed_vs_accuracy": "High reasoning_effort significantly improves complex layout handling",
@@ -564,7 +578,7 @@
           "structured_json"
         ],
         "parameters": {
-          "task": "Extract all relevant fields",
+          "user_requirements": "Extract all relevant fields",
           "schema_ref": "schemas/output_schema.py"
         }
       }
@@ -593,11 +607,10 @@
     ],
     "uses_components": [],
     "required_parameters": [
-      "categories"
+      "classes"
     ],
     "optional_parameters": [
-      "classification_model",
-      "include_confidence",
+      "model",
       "parser"
     ],
     "supported_providers": [
@@ -606,7 +619,7 @@
       "anthropic"
     ],
     "cost_relevant_parameters": [
-      "classification_model"
+      "model"
     ],
     "quality_tradeoffs": {
       "speed_vs_accuracy": "Zero-shot with good category descriptions is usually sufficient",
@@ -637,7 +650,7 @@
           "classification_result"
         ],
         "parameters": {
-          "categories": [
+          "classes": [
             "invoice",
             "receipt",
             "contract",
@@ -669,20 +682,20 @@
     ],
     "uses_components": [],
     "required_parameters": [
-      "connection_string",
-      "collection_name"
+      "connection_string"
     ],
     "optional_parameters": [
-      "embedding_model",
-      "retrieval_top_k"
+      "table_name",
+      "embedding_dim",
+      "fts_language",
+      "text_processor",
+      "create_extensions"
     ],
     "supported_providers": [
       "openai",
       "azure_openai"
     ],
-    "cost_relevant_parameters": [
-      "embedding_model"
-    ],
+    "cost_relevant_parameters": [],
     "quality_tradeoffs": {
       "speed_vs_accuracy": "Larger top_k improves recall at cost of generation context",
       "cost_sensitivity": "low -- embedding calls only",
@@ -749,10 +762,12 @@
     "uses_components": [],
     "required_parameters": [],
     "optional_parameters": [
-      "rubric_ref",
-      "judge_model",
-      "panel_size",
-      "max_tokens"
+      "model_provider",
+      "model",
+      "use_azure",
+      "use_vertexai",
+      "max_tokens",
+      "reasoning_effort"
     ],
     "supported_providers": [
       "openai",
@@ -761,8 +776,7 @@
       "google"
     ],
     "cost_relevant_parameters": [
-      "judge_model",
-      "panel_size"
+      "model"
     ],
     "quality_tradeoffs": {
       "speed_vs_accuracy": "Panel of judges (LLMJudgePanel) increases reliability at higher cost",
@@ -790,10 +804,7 @@
         ],
         "outputs": [
           "validation_report"
-        ],
-        "parameters": {
-          "rubric_ref": "prompts/validation_rubric.md"
-        }
+        ]
       }
     ],
     "source_path": "implementation_layer/src/gaik/software_components/validators/llm_judge/",
@@ -820,19 +831,28 @@
     "uses_components": [],
     "required_parameters": [],
     "optional_parameters": [
-      "transcription_model",
+      "model",
       "response_format",
       "chunk_duration_minutes",
       "transcription_workers",
       "language",
-      "prompt"
+      "prompt",
+      "max_single_file_mb",
+      "chunk_overlap_seconds",
+      "max_retries",
+      "max_429_retries",
+      "gpt4o_chunk_parallelism",
+      "gpt4o_chunk_duration_minutes",
+      "whisper_local_chunk_parallelism",
+      "whisper_local_chunk_duration_minutes",
+      "whisper_local_max_audio_minutes"
     ],
     "supported_providers": [
       "openai",
       "azure_openai"
     ],
     "cost_relevant_parameters": [
-      "transcription_model",
+      "model",
       "transcription_workers"
     ],
     "quality_tradeoffs": {
@@ -846,12 +866,15 @@
     "known_limitations": [
       "Requires FFmpeg + ffprobe on PATH (system dependency); no pure-Python fallback",
       "Does not produce structured output -- use Extractor downstream",
-      "Overlap deduplication is SRT-based; use response_format='srt' for the cleanest chunk merging"
+      "Overlap deduplication is SRT-based; use response_format='srt' for the cleanest chunk merging",
+      "Produces timestamps but never speaker labels, on any backend. gpt-4o-transcribe-diarize requests diarized output and parses the speaker field, then discards it when building the SRT (and TranscriptionResult exposes only .content, so it cannot be recovered); the whisper_local backend hardcodes diarization=False in its request payload. For speaker attribution use Transcriber(transcription_model='whisper_local', diarization=True).",
+      "The whisper_local backend takes its endpoint from api_config['api_base'] (required) and api_config['key'] or ['api_key'] (optional -- the auth header is omitted when empty). This differs from Transcriber, which uses the local_api_base/local_api_key constructor kwargs and requires both."
     ],
     "best_for": [
       "long_audio_transcription",
       "video_subtitles",
-      "fast_bulk_transcription"
+      "fast_bulk_transcription",
+      "timestamped_transcript_without_local_endpoint"
     ],
     "example_blueprint_steps": [
       {
@@ -924,7 +947,8 @@
       "transcriber_options",
       "curate_evidence",
       "polish",
-      "verbose"
+      "verbose",
+      "additional_instructions"
     ],
     "supported_providers": [
       "openai",
@@ -1121,7 +1145,7 @@
     "source_path": "implementation_layer/src/gaik/software_components/evaluators/",
     "import_path": "gaik.software_components.evaluators",
     "example_script_path": "implementation_layer/examples/software_components/evaluators/",
-    "readme_path": "implementation_layer/src/gaik/software_components/evaluators/README.md",
+    "readme_path": "implementation_layer/src/gaik/software_components/evaluators/__init__.py",
     "install_extra": "evaluators"
   },
   {
@@ -1186,7 +1210,7 @@
     "source_path": "implementation_layer/src/gaik/software_components/evaluators/",
     "import_path": "gaik.software_components.evaluators",
     "example_script_path": "implementation_layer/examples/software_components/evaluators/",
-    "readme_path": "implementation_layer/src/gaik/software_components/evaluators/README.md",
+    "readme_path": "implementation_layer/src/gaik/software_components/evaluators/__init__.py",
     "install_extra": "evaluators"
   },
   {
@@ -1242,7 +1266,7 @@
     "source_path": "implementation_layer/src/gaik/software_components/evaluators/",
     "import_path": "gaik.software_components.evaluators",
     "example_script_path": "implementation_layer/examples/software_components/evaluators/",
-    "readme_path": "implementation_layer/src/gaik/software_components/evaluators/README.md",
+    "readme_path": "implementation_layer/src/gaik/software_components/evaluators/__init__.py",
     "install_extra": "evaluators"
   },
   {
@@ -1507,5 +1531,688 @@
     "example_script_path": "",
     "readme_path": "",
     "install_extra": ""
+  },
+  {
+    "id": "vision_parser",
+    "name": "VisionParser",
+    "type": "software_component",
+    "input_artifact_types": [
+      "pdf",
+      "image"
+    ],
+    "output_artifact_types": [
+      "parsed_text",
+      "paged_text",
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "openai_config"
+    ],
+    "optional_parameters": [
+      "custom_prompt",
+      "use_context",
+      "max_tokens",
+      "temperature",
+      "dpi",
+      "clean_output"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "dpi",
+      "max_tokens"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "One vision call per page -- slower and costlier than local parsers, but preserves layout, tables, and page boundaries",
+      "cost_sensitivity": "medium-high -- scales linearly with page count",
+      "degrades_on": [
+        "very_low_dpi_scans",
+        "handwritten_documents"
+      ]
+    },
+    "known_limitations": [
+      "One vision-model call per page -- cost and latency scale linearly with page count",
+      "Requires OpenAI or Azure OpenAI access; there is no local-only mode",
+      "convert_image (image input) returns a single markdown string, not a page list -- page provenance applies to PDF input only"
+    ],
+    "best_for": [
+      "page_attributed_parsing",
+      "page_level_citations",
+      "complex_layouts",
+      "table_extraction",
+      "scanned_pdf_parsing"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "parse_pdf_pages",
+        "component": "VisionParser",
+        "inputs": [
+          "source_document"
+        ],
+        "outputs": [
+          "paged_text"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/parsers/vision.py",
+    "import_path": "gaik.software_components.parsers",
+    "example_script_path": "implementation_layer/examples/software_components/parsers/demo_vision_simple.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/parsers/README.md",
+    "install_extra": "parser"
+  },
+  {
+    "id": "multimodal_parser",
+    "name": "MultimodalParser",
+    "type": "software_component",
+    "input_artifact_types": [
+      "pdf",
+      "document"
+    ],
+    "output_artifact_types": [
+      "parsed_text",
+      "text",
+      "html"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "model_provider",
+      "model",
+      "reasoning_effort",
+      "merge_table",
+      "use_azure",
+      "vertex_ai",
+      "additional_instructions",
+      "create_html"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai",
+      "anthropic",
+      "google"
+    ],
+    "cost_relevant_parameters": [
+      "model_provider",
+      "model",
+      "reasoning_effort"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Slowest parser -- highest accuracy for layout preservation and irregular tables that span pages",
+      "cost_sensitivity": "high -- one premium multimodal call over the whole document",
+      "degrades_on": [
+        "very_long_documents_in_a_single_call",
+        "workflows_needing_page_level_provenance"
+      ]
+    },
+    "known_limitations": [
+      "Parses the whole PDF in a single model call and returns flat markdown (ParseResult.clean_markdown) -- page boundaries are NOT preserved, so it cannot support 'file_name|page_number' citations. Use VisionParser when page provenance is required.",
+      "PDF input only -- use DocxParser for Word documents",
+      "Requires a premium multimodal model from OpenAI/Azure, Anthropic, or Google (pip install gaik[multimodal-parser])"
+    ],
+    "best_for": [
+      "complex_tables_spanning_pages",
+      "layout_preservation",
+      "highest_accuracy_pdf_parsing",
+      "multi_provider_parsing"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "parse_document",
+        "component": "MultimodalParser",
+        "inputs": [
+          "source_document"
+        ],
+        "outputs": [
+          "parsed_text"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/parsers/multimodal_parser/",
+    "import_path": "gaik.software_components.parsers",
+    "example_script_path": "implementation_layer/examples/software_components/parsers/demo_multimodal_parser.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/parsers/multimodal_parser/README.md",
+    "install_extra": "multimodal-parser"
+  },
+  {
+    "id": "docling_parser",
+    "name": "DoclingParser",
+    "type": "software_component",
+    "input_artifact_types": [
+      "pdf",
+      "document",
+      "image"
+    ],
+    "output_artifact_types": [
+      "parsed_text",
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "enable_ocr",
+      "enable_table_structure",
+      "enable_formula_enrichment",
+      "num_threads",
+      "ocr_engine",
+      "use_markdown"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [
+      "enable_ocr",
+      "enable_formula_enrichment",
+      "num_threads"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "OCR and formula enrichment raise accuracy on scanned and scientific documents at a large latency cost on CPU",
+      "cost_sensitivity": "none -- runs locally, no API calls; cost is compute time",
+      "degrades_on": [
+        "cpu_only_machines",
+        "handwritten_documents"
+      ]
+    },
+    "known_limitations": [
+      "Slow without a CUDA-enabled GPU -- OCR and formula enrichment dominate runtime on CPU",
+      "ocr_engine choice affects language support and system dependencies ('tesseract_cli' requires a system Tesseract install)",
+      "parse_document flattens the document into one text_content string -- no page-level provenance"
+    ],
+    "best_for": [
+      "scanned_document_ocr",
+      "multi_format_parsing",
+      "advanced_table_extraction",
+      "local_parsing_without_api_cost"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "parse_document",
+        "component": "DoclingParser",
+        "inputs": [
+          "source_document"
+        ],
+        "outputs": [
+          "parsed_text"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/parsers/docling.py",
+    "import_path": "gaik.software_components.parsers",
+    "example_script_path": "implementation_layer/examples/software_components/parsers/demo_docling.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/parsers/README.md",
+    "install_extra": "parser"
+  },
+  {
+    "id": "vision_plus_parser",
+    "name": "VisionPlusParser",
+    "type": "software_component",
+    "input_artifact_types": [
+      "pdf",
+      "document"
+    ],
+    "output_artifact_types": [
+      "parsed_text",
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "vision_config"
+    ],
+    "optional_parameters": [
+      "enable_ocr",
+      "ocr_engine",
+      "enable_table_structure",
+      "enable_formula_enrichment",
+      "num_threads",
+      "verbose",
+      "vision_prompt"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "enable_ocr",
+      "enable_formula_enrichment",
+      "vision_prompt"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Docling layout analysis plus a vision model per detected image -- the most accurate option for documents whose figures carry meaning, and the slowest",
+      "cost_sensitivity": "medium -- one vision call per detected image, not per page",
+      "degrades_on": [
+        "cpu_only_machines",
+        "documents_without_meaningful_images"
+      ]
+    },
+    "known_limitations": [
+      "Runs Docling locally AND calls a vision model -- combines both cost profiles",
+      "Requires the 'parser' extra plus OpenAI/Azure access",
+      "Returns one flat parsed_markdown string -- no page-level provenance"
+    ],
+    "best_for": [
+      "documents_with_meaningful_images",
+      "inline_image_descriptions",
+      "advanced_table_extraction_with_visual_context"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "parse_document",
+        "component": "VisionPlusParser",
+        "inputs": [
+          "source_document"
+        ],
+        "outputs": [
+          "parsed_text"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/parsers/visionPlus.py",
+    "import_path": "gaik.software_components.parsers",
+    "example_script_path": "implementation_layer/examples/software_components/parsers/demo_visionPlus.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/parsers/README.md",
+    "install_extra": "parser"
+  },
+  {
+    "id": "docling_api_client_parser",
+    "name": "DoclingApiClientParser",
+    "type": "software_component",
+    "input_artifact_types": [
+      "pdf",
+      "document"
+    ],
+    "output_artifact_types": [
+      "parsed_text",
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "api_base",
+      "password"
+    ],
+    "optional_parameters": [
+      "timeout_seconds",
+      "healthcheck_timeout_seconds"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Same Docling quality as the local parser but GPU-accelerated server-side -- far faster than local CPU Docling",
+      "cost_sensitivity": "none in API terms; requires service access",
+      "degrades_on": [
+        "documents_exceeding_the_request_timeout",
+        "unavailable_service"
+      ]
+    },
+    "known_limitations": [
+      "Requires access to the Haaga-Helia hosted Docling service. api_base and password are constructor kwargs with NO environment fallback in gaik -- read them from DOCLING_API_BASE / DOCLING_API_PASSWORD in generated code (the convention used by toolkit_demo_app and the OpenShift deployment).",
+      "Raises ValueError at construction when either credential is empty",
+      "Sends the document to an external service -- unsuitable when data must not leave the local environment",
+      "Returns parsed_markdown (not text_content like the local DoclingParser) and flattens pages -- no page-level provenance",
+      "Declared under the 'parser' extra because that is where requests is pinned; the client itself does not need docling installed locally"
+    ],
+    "best_for": [
+      "gpu_accelerated_docling_parsing",
+      "offloading_parsing_from_the_client",
+      "haaga_helia_hosted_parsing"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "parse_document",
+        "component": "DoclingApiClientParser",
+        "inputs": [
+          "source_document"
+        ],
+        "outputs": [
+          "parsed_text"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/parsers/docling_api_client.py",
+    "import_path": "gaik.software_components.parsers",
+    "example_script_path": "implementation_layer/examples/software_components/parsers/demo_docling_api_client.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/parsers/README.md",
+    "install_extra": "parser"
+  },
+  {
+    "id": "pymupdf_parser",
+    "name": "PyMuPDFParser",
+    "type": "software_component",
+    "input_artifact_types": [
+      "pdf"
+    ],
+    "output_artifact_types": [
+      "parsed_text",
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "use_markdown"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Fastest parser by a wide margin; accuracy drops on anything but simple text layouts",
+      "cost_sensitivity": "none -- fully local, no API calls",
+      "degrades_on": [
+        "scanned_pdfs",
+        "multi_column_layouts",
+        "complex_tables"
+      ]
+    },
+    "known_limitations": [
+      "No OCR -- cannot read scanned or image-only PDFs (use DoclingParser)",
+      "Simple layouts only; tables and multi-column text degrade badly",
+      "Default (use_markdown=True) concatenates pages into one text_content string with no page marker -- no page-level provenance. use_markdown=False inserts '=== PAGE N ===' markers (plus per-line [x:,y:] bounding-box tags) and IS a valid, free/local way to get file_name|page_number citations for text-layer PDFs -- see the reference card's call_page_citations pattern."
+    ],
+    "best_for": [
+      "fast_local_text_extraction",
+      "no_api_cost",
+      "simple_pdf_layouts",
+      "high_volume_preprocessing"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "parse_document",
+        "component": "PyMuPDFParser",
+        "inputs": [
+          "source_document"
+        ],
+        "outputs": [
+          "parsed_text"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/parsers/pymypdf.py",
+    "import_path": "gaik.software_components.parsers",
+    "example_script_path": "implementation_layer/examples/software_components/parsers/demo_pymupdf.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/parsers/README.md",
+    "install_extra": "parser-cpu"
+  },
+  {
+    "id": "docx_parser",
+    "name": "DocxParser",
+    "type": "software_component",
+    "input_artifact_types": [
+      "docx",
+      "document"
+    ],
+    "output_artifact_types": [
+      "parsed_text",
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "use_markdown"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Fast and lossless for text and tables; carries no layout or visual information",
+      "cost_sensitivity": "none -- fully local, no API calls",
+      "degrades_on": [
+        "documents_whose_meaning_depends_on_images_or_layout"
+      ]
+    },
+    "known_limitations": [
+      "Word documents -- use a PDF parser for PDFs. Declares .doc support (is_supported_file() accepts it), but python-docx's Document() cannot open the legacy binary .doc format -- a real .doc file raises PackageNotFoundError at parse time. Treat only .docx as actually supported.",
+      "DOCX has no fixed page model, so page-level citations are not possible",
+      "use_markdown=False emits paragraph-index and style markers rather than clean prose"
+    ],
+    "best_for": [
+      "word_document_parsing",
+      "fast_local_processing",
+      "style_aware_extraction"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "parse_document",
+        "component": "DocxParser",
+        "inputs": [
+          "source_document"
+        ],
+        "outputs": [
+          "parsed_text"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/parsers/docx_parser.py",
+    "import_path": "gaik.software_components.parsers",
+    "example_script_path": "implementation_layer/examples/software_components/parsers/",
+    "readme_path": "implementation_layer/src/gaik/software_components/parsers/README.md",
+    "install_extra": "parser-cpu"
+  },
+  {
+    "id": "embedder",
+    "name": "Embedder",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text_chunks",
+      "text"
+    ],
+    "output_artifact_types": [
+      "embeddings"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "config"
+    ],
+    "optional_parameters": [
+      "model",
+      "batch_size"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "model",
+      "batch_size"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Larger embedding models improve retrieval quality at higher cost per chunk",
+      "cost_sensitivity": "low -- embedding calls are cheap relative to generation",
+      "degrades_on": [
+        "very_long_unchunked_documents"
+      ]
+    },
+    "known_limitations": [
+      "RAGWorkflow already performs embedding -- select this directly only when building a custom pipeline that needs to skip or reorder steps",
+      "Requires OpenAI or Azure OpenAI access",
+      "Accepts LangChain Documents or plain strings; metadata is preserved only for Documents"
+    ],
+    "best_for": [
+      "custom_rag_pipelines",
+      "batch_embedding_generation",
+      "document_indexing"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "embed_chunks",
+        "component": "Embedder",
+        "inputs": [
+          "text_chunks"
+        ],
+        "outputs": [
+          "embeddings"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/RAG/embedder/",
+    "import_path": "gaik.software_components.RAG.embedder",
+    "example_script_path": "implementation_layer/examples/software_components/RAG/embedder_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/RAG/embedder/README.md",
+    "install_extra": "embedder"
+  },
+  {
+    "id": "retriever",
+    "name": "Retriever",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text",
+      "vector_index"
+    ],
+    "output_artifact_types": [
+      "retrieved_chunks"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "embedder",
+      "vector_store"
+    ],
+    "optional_parameters": [
+      "hybrid_search",
+      "re_rank",
+      "rerank_model",
+      "top_k",
+      "score_threshold",
+      "filters",
+      "include_scores"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "top_k",
+      "re_rank"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "hybrid_search and re_rank raise recall and precision at the cost of extra computation per query",
+      "cost_sensitivity": "low -- one embedding call per query",
+      "degrades_on": [
+        "very_large_collections_without_filtering",
+        "queries_far_from_the_indexed_domain"
+      ]
+    },
+    "known_limitations": [
+      "Requires an already-constructed Embedder and vector store -- not usable standalone",
+      "RAGWorkflow already performs retrieval -- select this directly only for custom pipelines",
+      "re_rank downloads a cross-encoder model on first use"
+    ],
+    "best_for": [
+      "custom_rag_pipelines",
+      "hybrid_keyword_and_semantic_search",
+      "reranked_retrieval"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "retrieve_chunks",
+        "component": "Retriever",
+        "inputs": [
+          "user_query",
+          "vector_index"
+        ],
+        "outputs": [
+          "retrieved_chunks"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/RAG/retriever/",
+    "import_path": "gaik.software_components.RAG.retriever",
+    "example_script_path": "implementation_layer/examples/software_components/RAG/retriever_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/RAG/retriever/README.md",
+    "install_extra": "retriever"
+  },
+  {
+    "id": "answer_generator",
+    "name": "AnswerGenerator",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text",
+      "retrieved_chunks"
+    ],
+    "output_artifact_types": [
+      "answer",
+      "answer_with_citations"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "config",
+      "use_azure",
+      "model",
+      "citations",
+      "prompt",
+      "stream",
+      "conversation_history",
+      "last_n"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai"
+    ],
+    "cost_relevant_parameters": [
+      "model",
+      "conversation_history",
+      "last_n"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Larger models give better grounded answers; citations add prompt overhead but make outputs auditable",
+      "cost_sensitivity": "medium -- one generation call per query, scaled by context size",
+      "degrades_on": [
+        "poorly_retrieved_context",
+        "very_long_conversation_history"
+      ]
+    },
+    "known_limitations": [
+      "RAGWorkflow already performs answer generation -- select this directly only for custom pipelines",
+      "Streams by default (stream=True); set stream=False to receive a single string",
+      "Citation quality depends entirely on the retrieved context -- it formats citations, it does not verify sources"
+    ],
+    "best_for": [
+      "custom_rag_pipelines",
+      "cited_answers",
+      "conversational_qa"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "generate_answer",
+        "component": "AnswerGenerator",
+        "inputs": [
+          "user_query",
+          "retrieved_chunks"
+        ],
+        "outputs": [
+          "answer_with_citations"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/RAG/answer_generator/",
+    "import_path": "gaik.software_components.RAG.answer_generator",
+    "example_script_path": "implementation_layer/examples/software_components/RAG/answer_generator_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/RAG/answer_generator/README.md",
+    "install_extra": "answer-generator"
   }
 ]

@@ -209,3 +209,101 @@ def test_card_call_method_exists_on_class():
                 f"but {cls.__name__} does not have it"
             )
     assert not failures, "\n".join(failures)
+
+
+# ---------------------------------------------------------------------------
+# Parser page-attribution correctness (UC05 finding: the default VisionParser
+# 'call' pattern -- clean_output=True + join -- silently destroys the exact
+# page provenance a citation use case selects it for; the fix is a documented
+# citation-mode alternative, not a change to the default pattern).
+# ---------------------------------------------------------------------------
+
+
+def test_visionparser_default_call_is_not_mistaken_for_citation_safe():
+    """The default 'call' pattern must never be presented as citation-safe.
+
+    clean_output=True collapses a multi-page convert_pdf() result to a single
+    list element, and the default pattern joins the list regardless -- so the
+    default 'call' must not itself claim page-level provenance, and a distinct
+    'call_page_citations' key must exist for that use case instead.
+    """
+    card = get_reference_cards().get("VisionParser")
+    assert "clean_output=True" in card["call"]
+    assert "call_page_citations" in card, (
+        "VisionParser must document a separate citation-mode call pattern; "
+        "the default pattern (clean_output=True + join) discards page attribution"
+    )
+    assert "clean_output=False" in card["call_page_citations"]
+    assert ".join(" not in card["call_page_citations"], (
+        "the citation-mode call must not join pages back into one string"
+    )
+
+
+def test_visionparser_clean_output_is_selection_relevant():
+    """clean_output decides whether page citations are possible at all -- it
+    must be flagged for the wizard's attention, not treated as a minor default.
+    """
+    opts = {o["name"]: o for o in get_reference_cards().get("VisionParser")["options"]}
+    assert opts["clean_output"]["selection_relevant"] is True
+
+
+def test_pymupdfparser_documents_page_markers_and_citation_call():
+    """use_markdown=False inserts '=== PAGE N ===' markers (_extract_structured_pdf) --
+    this is a real, free/local alternative to VisionParser for page citations on
+    text-layer PDFs, and must be documented as such, not just as a layout option.
+    """
+    card = get_reference_cards().get("PyMuPDFParser")
+    opts = {o["name"]: o for o in card["options"]}
+    assert "PAGE" in opts["use_markdown"]["effect"]
+    assert opts["use_markdown"]["selection_relevant"] is True
+    assert "call_page_citations" in card
+    assert "use_markdown=False" in card["call_page_citations"]
+
+
+def test_docxparser_flags_the_dot_doc_gap():
+    """DocxParser's is_supported_file() accepts legacy .doc, but python-docx's
+    Document() cannot open it and raises at parse time -- this must be flagged
+    somewhere on the card (not silently presented as supported), so a use case
+    receiving real .doc (not .docx) files is flagged as unsupported rather than
+    routed into a parser that will crash on it.
+    """
+    card = get_reference_cards().get("DocxParser")
+    haystack = " ".join(
+        str(card.get(k, "")) for k in ("note", "returns")
+    ) + " ".join(o.get("effect", "") for o in card.get("options", []))
+    assert ".doc" in haystack and (
+        "PackageNotFoundError" in haystack or "cannot open" in haystack
+    ), "DocxParser card must flag that legacy .doc is accepted by is_supported_file() but not actually parseable"
+
+
+def test_no_parser_other_than_visionparser_and_pymupdf_claims_page_citations():
+    """Guard against a future card update re-introducing an unqualified
+    page-attribution claim on a parser that cannot actually support it
+    (MultimodalParser, DoclingParser, VisionPlusParser, DocxParser,
+    DoclingApiClientParser all flatten to one string or have no page model).
+
+    Checks for affirmative per-page-output phrasing rather than mere presence
+    of the word 'page', since several of these cards correctly explain, in
+    negative terms, why they do NOT support page attribution.
+    """
+    affirmative_phrases = (
+        "one item per page",
+        "one element per page",
+        "per-page output",
+        "page-attributed",
+        "list per page",
+    )
+    cards = get_reference_cards()
+    for name in (
+        "MultimodalParser",
+        "DoclingParser",
+        "VisionPlusParser",
+        "DocxParser",
+        "DoclingApiClientParser",
+    ):
+        card = cards.get(name)
+        if card is None:
+            continue
+        returns_text = str(card.get("returns", "")).lower()
+        hits = [p for p in affirmative_phrases if p in returns_text]
+        assert not hits, f"{name}'s 'returns' text wrongly claims page attribution: {hits}"

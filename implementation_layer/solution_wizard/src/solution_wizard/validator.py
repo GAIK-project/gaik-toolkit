@@ -85,8 +85,10 @@ def validate(blueprint: Blueprint, registry: Optional[Registry] = None) -> Valid
     # Rule 3: components exist in registry, OR as a reference card (wireable in
     # custom/hybrid pipelines), OR are marked custom.
     # The reference cards are the superset of components that can be wired in a
-    # _generic pipeline (registry's 10 + building blocks like parsers / RAG
-    # sub-components), so a hybrid step using e.g. MultimodalParser is valid.
+    # _generic pipeline (every registry entry, plus building blocks that are
+    # callable but not independently selectable), so a hybrid step naming a
+    # card-only component is valid. Which components are card-only changes as
+    # gaik-sync adds registry entries -- don't hard-code an example here.
     _card_names = set()
     try:
         from .registry import get_reference_cards
