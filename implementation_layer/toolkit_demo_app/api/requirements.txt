@@ -6,9 +6,10 @@ fpdf2>=2.8.5
 openpyxl>=3.1.0
 # gaik toolkit + the extras the demo needs (Report Writer's
 # multi_source_report_generator is included). Published to PyPI from this repo's
-# git tags. 0.5.16 is the first release that ships the Report Writer module, so
-# the API installs the published wheel instead of building gaik from source.
-gaik[all-cpu,multimodal-parser,postgres-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]>=0.5.16
+# git tags; the API installs the published wheel instead of building gaik from
+# source. 0.5.18 carries the extractor sampling / schema field-policy fixes and
+# the configurable postgres_agent temperature the demos now rely on.
+gaik[all-cpu,multimodal-parser,postgres-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]>=0.5.18
 # Solution Wizard (routers/solution_wizard.py): Claude Agent SDK session per user.
 # Also requires CLAUDE_CODE_USE_FOUNDRY, ANTHROPIC_FOUNDRY_API_KEY and
 # ANTHROPIC_FOUNDRY_RESOURCE in .env.local (or the deployment secret).
