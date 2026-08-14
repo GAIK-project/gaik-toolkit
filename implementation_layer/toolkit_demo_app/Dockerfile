@@ -33,7 +33,18 @@ COPY . .
 # .env.production contains only public/publishable values (no secrets)
 COPY .env.production .env.production
 
-RUN bun run build
+# Bun 1.3.14 (linux x64 baseline) segfaults while tearing down its build workers
+# *after* `next build` has already finished: the log ends with the complete route
+# table and "Generating static pages (31/31)", then Bun's own crash handler prints
+# "this indicates a bug in Bun, not your code". The panic still sets a non-zero
+# exit code, which would fail this layer despite a good build. The same build runs
+# clean on Bun for Windows, so this is platform-specific to the container.
+#
+# So don't trust the exit status here — verify the artifacts the runner stage
+# actually copies. A real build failure never writes them, so this still fails
+# loudly; it only tolerates a crash that happens after the output is on disk.
+RUN bun run build || echo "next build exited non-zero - verifying build output below"; \
+    test -f .next/standalone/server.js && test -d .next/static
 
 # ----------------------------
 # Runner stage (CSC Rahti 2 / OpenShift optimized)
