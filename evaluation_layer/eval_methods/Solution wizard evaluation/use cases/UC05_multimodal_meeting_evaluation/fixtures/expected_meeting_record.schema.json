@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UC05 Expected Meeting Record",
+  "type": "object",
+  "required": ["meeting_id","title","meeting_date","start_time","end_time","participants","topics","decisions","action_items","unresolved_issues","conflicts","review_status"],
+  "properties": {
+    "meeting_id": {"type":"string"},
+    "title": {"type":"string"},
+    "meeting_date": {"type":"string","format":"date"},
+    "start_time": {"type":"string"},
+    "end_time": {"type":"string"},
+    "participants": {"type":"array","items":{"type":"object","required":["name","role"],"properties":{"name":{"type":"string"},"role":{"type":"string"}}}},
+    "topics": {"type":"array","items":{"type":"object","required":["title","discussion_summary"],"properties":{"title":{"type":"string"},"discussion_summary":{"type":"string"}}}},
+    "decisions": {"type":"array","items":{"type":"object","required":["decision_id","statement","citations"],"properties":{"decision_id":{"type":"string"},"statement":{"type":"string"},"citations":{"$ref":"#/$defs/citations"}}}},
+    "action_items": {"type":"array","items":{"type":"object","required":["action_id","description","owner","due_date","uncertainty_reason","citations"],"properties":{"action_id":{"type":"string"},"description":{"type":"string"},"owner":{"type":["string","null"]},"due_date":{"type":["string","null"]},"uncertainty_reason":{"type":["string","null"]},"citations":{"$ref":"#/$defs/citations"}}}},
+    "unresolved_issues": {"type":"array","items":{"type":"object","required":["description","citations"],"properties":{"description":{"type":"string"},"citations":{"$ref":"#/$defs/citations"}}}},
+    "conflicts": {"type":"array","items":{"type":"object","required":["description","citations"],"properties":{"description":{"type":"string"},"citations":{"$ref":"#/$defs/citations"}}}},
+    "review_status": {"const":"pending_review"}
+  },
+  "$defs": {"citations":{"type":"array","minItems":1,"items":{"type":"string","pattern":"^[^|]+\\|(?:[0-9]{2}:[0-9]{2}:[0-9]{2}\\|[0-9]{2}:[0-9]{2}:[0-9]{2}|[0-9]+)$"}}}
+}

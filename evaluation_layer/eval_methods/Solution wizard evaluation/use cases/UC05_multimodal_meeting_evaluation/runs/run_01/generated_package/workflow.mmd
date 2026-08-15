@@ -1,0 +1,20 @@
+flowchart TD
+    provide_meeting_bundle["Provide meeting recording, agenda, and participant list"]
+    transcribe_audio["Transcribe meeting recording (self-hosted Whisper, timestamped)"]
+    parse_agenda["Parse agenda PDF with page-level citations"]
+    extract_meeting_record["Extract structured meeting record"]
+    validate_extraction["Validate extracted record against sources"]
+    human_review["Project manager reviews and approves the meeting record"]
+    provide_meeting_bundle --> transcribe_audio
+    provide_meeting_bundle --> parse_agenda
+    transcribe_audio --> extract_meeting_record
+    parse_agenda --> extract_meeting_record
+    extract_meeting_record --> validate_extraction
+    validate_extraction --> human_review
+
+    style provide_meeting_bundle fill:#dbeafe
+    style transcribe_audio fill:#f5f3ff
+    style parse_agenda fill:#f5f3ff
+    style extract_meeting_record fill:#f5f3ff
+    style validate_extraction fill:#f5f3ff
+    style human_review fill:#dcfce7

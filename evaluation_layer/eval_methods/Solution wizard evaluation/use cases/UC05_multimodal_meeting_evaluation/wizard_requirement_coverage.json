@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UC05",
+  "mappings": [
+    {
+      "wizard_field": "business_spec.users_current_process_and_problem",
+      "scripted_answer_ids": ["SA01"],
+      "oracle_check_ids": ["EQ1-R01", "EQ1-R02", "EQ1-R03", "EQ1-R04", "EQ1-R05"]
+    },
+    {
+      "wizard_field": "business_spec.objective_and_success",
+      "scripted_answer_ids": ["SA02"],
+      "oracle_check_ids": ["EQ1-R06", "EQ1-R07", "EQ1-R08"]
+    },
+    {
+      "wizard_field": "technical_spec.inputs_and_language",
+      "scripted_answer_ids": ["SA03"],
+      "oracle_check_ids": ["EQ1-R09", "EQ1-R10", "EQ1-R11", "EQ1-R12", "EQ1-R13", "EQ1-R14"]
+    },
+    {
+      "wizard_field": "technical_spec.target_output_schema",
+      "scripted_answer_ids": ["SA04"],
+      "oracle_check_ids": ["EQ1-R15", "EQ1-R16", "EQ1-R17", "EQ1-R18", "EQ1-R19", "EQ1-R20", "EQ1-R21", "EQ1-R22", "EQ1-R23", "EQ1-R24", "EQ1-R25", "EQ1-R26", "EQ1-R27"]
+    },
+    {
+      "wizard_field": "technical_spec.provenance_uncertainty_and_conflicts",
+      "scripted_answer_ids": ["SA05"],
+      "oracle_check_ids": ["EQ1-R29", "EQ1-R30", "EQ1-R31", "EQ1-R32", "EQ1-R33", "EQ1-R34", "EQ1-R35", "EQ1-R36"]
+    },
+    {
+      "wizard_field": "business_process.human_review_and_return_path",
+      "scripted_answer_ids": ["SA06"],
+      "oracle_check_ids": ["EQ1-R37", "EQ1-R38"]
+    },
+    {
+      "wizard_field": "technical_spec.runtime_interface",
+      "scripted_answer_ids": ["SA07"],
+      "oracle_check_ids": ["EQ1-R28", "EQ1-R39"]
+    },
+    {
+      "wizard_field": "governance.security_integration_and_assumptions",
+      "scripted_answer_ids": ["SA08"],
+      "oracle_check_ids": ["EQ1-R40", "EQ1-R41", "EQ1-D01", "EQ1-D02"]
+    },
+    {
+      "wizard_field": "nonfunctional.scale_and_service_levels",
+      "scripted_answer_ids": ["SA09"],
+      "oracle_check_ids": ["EQ1-D03"]
+    },
+    {
+      "wizard_field": "poc.goal_interface_fixture_and_acceptance",
+      "scripted_answer_ids": ["SA10"],
+      "oracle_check_ids": ["EQ1-R42", "EQ4-E01", "EQ4-E02", "EQ4-E03", "EQ4-E04"]
+    }
+  ]
+}

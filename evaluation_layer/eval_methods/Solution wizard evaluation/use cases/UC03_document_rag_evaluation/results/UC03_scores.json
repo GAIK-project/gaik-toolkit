@@ -1,15 +1,15 @@
 {
   "schema_version": "1.0.0",
   "scenario_id": "UC03",
-  "source_workbook": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\results\\UC03_comparison.xlsx",
+  "source_workbook": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC03_document_rag_evaluation\\results\\UC03_comparison.xlsx",
   "complete": true,
   "metrics": {
     "EQ1": {
       "complete": true,
       "scored_checks_per_run": 42,
-      "run_01": 0.9047619047619048,
-      "run_02": 0.9285714285714286,
-      "combined": 0.9166666666666666
+      "run_01": 1.0,
+      "run_02": 0.9761904761904762,
+      "combined": 0.9880952380952381
     },
     "EQ2": {
       "complete": true,
@@ -28,9 +28,9 @@
     "EQ4": {
       "complete": true,
       "scored_checks_per_run": 4,
-      "run_01": 0,
+      "run_01": 1,
       "run_02": 1,
-      "combined": 0.5
+      "combined": 1.0
     }
   },
   "diagnostics": {
@@ -38,10 +38,10 @@
       "scored_under_EQ4": false,
       "maximum_refinement_attempts": 3,
       "run_01": {
-        "initial_execution_successful": "No",
-        "refinement_attempts_to_success": "1",
+        "initial_execution_successful": "Yes",
+        "refinement_attempts_to_success": "0",
         "final_execution_successful": "Yes",
-        "status": "recovered"
+        "status": "successful_original"
       },
       "run_02": {
         "initial_execution_successful": "Yes",

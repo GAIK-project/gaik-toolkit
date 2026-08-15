@@ -1,13 +1,13 @@
 flowchart TD
-    load_input["Load PoC input bundle via CLI"]
-    ingest_and_index["Parse PDFs, chunk with metadata, embed, build local vector index"]
-    apply_rbac_and_retrieve["Apply RBAC pre-filter and retrieve top-4 eligible chunks per query"]
-    generate_answers["Generate cited answers and format as RAGAnswerRecord list"]
-    load_input --> ingest_and_index
-    ingest_and_index --> apply_rbac_and_retrieve
-    apply_rbac_and_retrieve --> generate_answers
+    upload_documents["Upload internal document collection"]
+    provide_access_manifest["Provide document classification and allowed-roles manifest"]
+    submit_queries["Employee/manager submits role-tagged question(s)"]
+    generate_role_aware_answers["Index documents with role metadata, retrieve role-filtered context, generate cited answer per query"]
+    upload_documents --> generate_role_aware_answers
+    provide_access_manifest --> generate_role_aware_answers
+    submit_queries --> generate_role_aware_answers
 
-    style load_input fill:#dbeafe
-    style ingest_and_index fill:#f5f3ff
-    style apply_rbac_and_retrieve fill:#f5f3ff
-    style generate_answers fill:#dcfce7
+    style upload_documents fill:#dbeafe
+    style provide_access_manifest fill:#dbeafe
+    style submit_queries fill:#dbeafe
+    style generate_role_aware_answers fill:#dcfce7

@@ -1,0 +1,368 @@
+{
+  "model_name": "MeetingRecord_Extraction",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "MeetingRecord",
+      "fields": [
+        {
+          "field_name": "meeting_id",
+          "field_type": "str",
+          "description": "A stable identifier for this meeting instance.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "title",
+          "field_type": "str",
+          "description": "The meeting title as stated in the agenda or transcript.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "meeting_date",
+          "field_type": "date",
+          "description": "The date the meeting was actually held, per the transcript if stated there; leave unset if neither source states it explicitly.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "start_time",
+          "field_type": "str",
+          "description": "As explicitly stated (agenda or transcript). Leave unset if not stated.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "end_time",
+          "field_type": "str",
+          "description": "As explicitly stated (agenda or transcript). Leave unset if not stated.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": "",
+          "format": ""
+        },
+        {
+          "field_name": "review_status",
+          "field_type": "str",
+          "description": "Always set to pending_review in the extracted output.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": [
+            "pending_review"
+          ],
+          "default": "pending_review",
+          "has_explicit_default": true,
+          "required": true,
+          "pattern": "",
+          "format": ""
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "participants",
+        "container_description": "One entry per confirmed meeting participant with name and role.",
+        "requirements": {
+          "use_case_name": "participants_record",
+          "fields": [
+            {
+              "field_name": "name",
+              "field_type": "str",
+              "description": "Name of the participant, normalized using the supplied participant list",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "role",
+              "field_type": "str",
+              "description": "Role of the participant, normalized using the supplied participant list",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "topics",
+        "container_description": "One entry per agenda topic that was actually discussed, with title and discussion_summary.",
+        "requirements": {
+          "use_case_name": "topics_record",
+          "fields": [
+            {
+              "field_name": "title",
+              "field_type": "str",
+              "description": "The agenda topic title that was actually discussed in the meeting.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "discussion_summary",
+              "field_type": "str",
+              "description": "A concise, neutral summary of what was said about the topic, grounded only in the transcript.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "decisions",
+        "container_description": "One entry per explicit decision made in the meeting, including decision_id, statement, and citations.",
+        "requirements": {
+          "use_case_name": "meeting_record_decisions_record",
+          "fields": [
+            {
+              "field_name": "decision_id",
+              "field_type": "str",
+              "description": "A short stable slug for the decision record.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "statement",
+              "field_type": "str",
+              "description": "A concise statement of what was decided.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "citations",
+              "field_type": "list[str]",
+              "description": "At least one citation for the decision, using the specified pipe-delimited citation format.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "action_items",
+        "container_description": "One entry per action assigned or agreed in the meeting, including action_id, description, owner, due_date, uncertainty_reason, and citations.",
+        "requirements": {
+          "use_case_name": "meeting_record_action_items_record",
+          "fields": [
+            {
+              "field_name": "action_id",
+              "field_type": "str",
+              "description": "Short stable identifier for the action item",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "description",
+              "field_type": "str",
+              "description": "Description of the action assigned or agreed in the meeting",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "owner",
+              "field_type": "str",
+              "description": "Owner of the action item, only when explicitly stated in the transcript and normalized against the participant list",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "due_date",
+              "field_type": "date",
+              "description": "Due date of the action item, only when explicitly stated in the transcript",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "uncertainty_reason",
+              "field_type": "str",
+              "description": "Explanation of why owner or due_date is null when not explicitly stated; null when both are known",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": true,
+              "required": false,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "citations",
+              "field_type": "list[str]",
+              "description": "List of one or more citation strings supporting the action item",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "unresolved_issues",
+        "container_description": "One entry per topic or question raised but not resolved, including description and citations.",
+        "requirements": {
+          "use_case_name": "unresolved_issues_record",
+          "fields": [
+            {
+              "field_name": "description",
+              "field_type": "str",
+              "description": "Description of the topic or question raised in the meeting that was not resolved by the end of the discussion.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "citations",
+              "field_type": "list[str]",
+              "description": "List of at least one citation supporting the unresolved issue entry.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "conflicts",
+        "container_description": "One entry per contradiction between agenda and transcript or within the transcript, including description and citations.",
+        "requirements": {
+          "use_case_name": "conflicts_record",
+          "fields": [
+            {
+              "field_name": "description",
+              "field_type": "str",
+              "description": "Description of the contradiction between the agenda and the transcript, or within the transcript itself.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            },
+            {
+              "field_name": "citations",
+              "field_type": "list[str]",
+              "description": "One or more citations supporting the conflict entry.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": "",
+              "format": ""
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

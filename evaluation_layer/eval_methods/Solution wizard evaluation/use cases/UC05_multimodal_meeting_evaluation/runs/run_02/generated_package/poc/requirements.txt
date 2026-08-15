@@ -1,0 +1,7 @@
+pydantic>=2
+python-dotenv
+gaik[extract]
+gaik[llm-judge]
+gaik[parser-cpu]
+gaik[transcriber]
+pyyaml

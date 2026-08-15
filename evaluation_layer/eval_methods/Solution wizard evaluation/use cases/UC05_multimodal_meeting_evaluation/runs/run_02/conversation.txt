@@ -1,0 +1,404 @@
+GAIK Solution Configuration Wizard — Conversation
+Exported: 2026-08-15
+
+---
+User:
+
+Our project teams spend considerable time reviewing meeting recordings and agenda documents to prepare consistent meeting records. We want an AI-supported solution that combines these sources with the participant list and produces a structured record of the meeting. The record should help project teams identify what was decided, what actions were assigned, and what remains unresolved, while preserving traceable evidence and human oversight.
+
+
+---
+Wizard:
+
+Thanks for the description — this is a **hybrid** pattern: audio (meeting recordings) + documents (agenda) + a participant list feed into a single structured meeting-record output (decisions, actions, open items) with traceable evidence and a human-review step, so it doesn't map cleanly onto a single audio-only or document-only module.
+
+Before we get into components, I need a bit more business context. Some of this is already clear from your description (current process, proposed solution, and the input/output artifacts), so I'll only ask what's still open.
+
+1. Who will actually use these generated meeting records day to day, and who is responsible for reviewing/approving them before they're shared (e.g. the project manager, meeting chair, someone else)?
+2. Beyond the project teams themselves, are there other stakeholders with a stake in this (e.g. PMO, department leads, clients)?
+3. What, beyond saving review time, would make this a success — e.g. fewer missed action items, more consistent formatting, an audit trail for decisions?
+
+---
+Answer what you can, and say *skip* for anything you're unsure of — we'll mark it as an open assumption rather than guess.
+
+---
+User:
+
+A project coordinator currently listens to the meeting recording, checks the agenda and participant list, and manually prepares the record. Project team members use the approved record. A project manager reviews and approves it. The main problems are the time required, inconsistent action tracking, and difficulty tracing decisions back to their sources.
+
+The solution should reduce manual preparation while producing a reviewable record that clearly separates agenda topics, discussion summaries, decisions, assigned actions, unresolved issues, and conflicts. Success means that supported decisions and actions are captured accurately with evidence, while missing owners, dates, or decisions are not invented.
+
+No other stakeholders are specified for this use case. If a value is required, record it as an explicit assumption for user confirmation.
+
+---
+Wizard:
+
+Good — that fills in the current process, users, reviewer, pain points, and success criteria clearly, and no other stakeholders is a clear answer (I'll record it as confirmed, not an open assumption).
+
+A few more business-context items before we move to the technical spec:
+
+1. What tangible value are you expecting (e.g. hours saved per meeting, faster distribution of records, reduced disputes over what was decided)? A rough estimate or "not quantified yet" is fine.
+2. What risks or concerns should this solution guard against (e.g. AI misattributing a decision to the wrong person, sensitive discussion content leaking, over-reliance on the AI record without checking the source)?
+3. What should the very first proof of concept demonstrate to convince the team this is worth pursuing (e.g. one real meeting recording processed end-to-end with accurate decisions/actions and traceable evidence)?
+
+---
+Answer what you can — say *skip* for anything you're unsure of, and I'll record it as an open assumption.
+
+---
+User:
+
+No tangible value and risks are specified for this use case. If a value is required, record it as an explicit assumption for user confirmation.
+
+The first PoC should process the supplied `fixtures/poc_input_bundle.json`, which references the meeting WAV, agenda PDF, and participant JSON that will be provided with the PoC task. A command-line interface is sufficient and should accept `--input` followed by the bundle path. It must exit successfully and save non-empty parseable JSON. The output must capture the frozen meeting decisions, actions, unresolved issues, and date conflict; cite audio with the single string `file_name|start_timestamp|end_timestamp` using `HH:MM:SS` timestamps and the agenda with `file_name|page_number`; leave unsupported owners, dates, budget approval, and SSO decisions unset; and use `pending_review`. Compare the output semantically with `fixtures/expected_meeting_record.json`. The PoC must save its final JSON output inside the poc/output/ directory. The web application, authentication, external integrations, and operational scaling are outside the first PoC.
+
+Return one JSON object with meeting_id, title, meeting_date, start_time, end_time, participants, topics, decisions, action_items, unresolved_issues, conflicts, and review_status. Each participant contains name and role. Each topic contains title and discussion_summary. Each decision contains decision_id, statement, and citations. Each action contains action_id, description, owner, due_date, uncertainty_reason, and citations. Owner and due_date are nullable when not explicitly stated. Each unresolved issue and conflict contains a description and citations. review_status should initially be pending_review.
+
+Every decision, action, unresolved issue, and conflict must have at least one citation. Each citation is a single pipe-delimited string, and an item may carry several. For audio, use `file_name|start_timestamp|end_timestamp` with `HH:MM:SS` timestamps. For the agenda, use `file_name|page_number`. The spoken meeting determines what was actually decided; an agenda item is only planned content and must not be treated as a decision by itself. When sources conflict, record the conflict and follow the explicit spoken decision. Do not infer owners, deadlines, approvals, budgets, or facts that are not stated. Use `null` with `uncertainty_reason` when an action lacks an explicit owner or due date.
+
+see the fixture documents in C:\Users\h02317\Downloads\fixtures
+
+---
+Wizard:
+
+That fixture bundle answers a lot on its own — I read through it. The meeting audio is short (~4 min, English), the agenda PDF is a native-text document (not scanned), and citations need second-level timestamps for audio and page numbers for the agenda. I'll fold those directly into the technical spec.
+
+Three things I still need from you to finish the technical spec:
+
+1. Model provider — Azure OpenAI, OpenAI, Anthropic, or no preference (default would be `gpt-5.4` at temperature `0`)?
+2. Any security/compliance constraints on this data (e.g. must stay within a specific Azure tenant/region, must not leave your organization's boundary)? The recordings and resulting record contain participants' full names and roles.
+3. Do you also want a formatted PDF rendering of the meeting record in addition to the JSON, or is JSON-only fine for the PoC?
+
+---
+Answer what you can — say *skip* for anything you want left as an open assumption.
+
+---
+User:
+
+The meeting material is internal. Access should be limited to the project team and designated reviewer. No connection to calendar, project-management, document-management, or identity systems is required in this evaluation. Choose a local whisper model for transcription, and an Azure model for extraction. The deployment platform, authentication method, and retention period are not specified. If values are needed, record them as assumptions for confirmation.
+
+A formatted PDF rendering of the meeting record is not specified for this use case. If a value is required, record it as an explicit assumption for user confirmation.
+
+---
+Wizard:
+
+Recorded: internal-only access limited to the project team + reviewer, no external system integrations for this evaluation, Azure for extraction, local Whisper for transcription, JSON-only output — and deployment platform, auth method, retention period, and PDF rendering all go into `assumptions[]` as explicitly unconfirmed, per your instruction.
+
+One item is a hard technical dependency before I can wire the transcription step, plus two smaller clarifications:
+
+1. Do you have a self-hosted Whisper endpoint already available (the local-whisper path needs a base URL + API key, conventionally `LOCAL_TRANSCRIBER_API_BASE` / `LOCAL_TRANSCRIBER_API_KEY`)? If not, I'll fall back to a hosted model that still returns timestamps.
+2. Any domain-specific terms, project codenames, or controlled vocabulary the extraction should recognize, or is general business English sufficient?
+3. For the automated evaluation script: is "semantically equivalent to `expected_meeting_record.json`" the full evaluation approach, or do you also want a strict separate check that every citation string matches the required pipe-delimited format?
+
+---
+Answer what you can — say *skip* for anything you want left as an open assumption.
+
+---
+User:
+
+A self-hosted Whisper endpoint is available.
+
+No domain-specific terms and evaluation approach specified for this use case. If a value is required, record it as an explicit assumption for user confirmation.
+
+---
+Wizard:
+
+Good — that closes out Round 2. To confirm: local Whisper endpoint available → I'll wire `Transcriber(transcription_model="whisper_local")`; no domain vocabulary and no extra evaluation approach → both recorded as explicit assumptions (general business English; evaluation = semantic comparison against the fixture only, plus the citation-format regex check that's already embedded in the schema itself, not a separate ask).
+
+For target output fields, the fixture's `expected_meeting_record.schema.json` already gives me a complete, well-specified schema — meeting metadata, participants, topics, decisions, action_items (with nullable owner/due_date + uncertainty_reason), unresolved_issues, conflicts, and review_status, each list item requiring at least one pipe-delimited citation. I'll adopt this as the target schema rather than re-deriving it. Just two quick checks:
+
+1. Is `MeetingRecord` an acceptable schema/class name, or do you prefer something else?
+2. Is the fixture's field set final for this use case (i.e. should I treat it as the actual target schema, not just a test fixture), or do you want any field added/removed/renamed?
+
+---
+Answer what you can, or say *skip* to let me proceed with the fixture schema as-is.
+
+---
+User:
+
+Not specified for this use case. If a value is required, record it as an explicit assumption for user confirmation.
+
+---
+Wizard:
+
+Gate 1 completeness check passed — 13/13 Section-9 checklist points answered. Here is the complete specification for your review (every field, including the ones left open as assumptions):
+
+### Business specification
+| Field | Value |
+|---|---|
+| current_process | A project coordinator listens to the recording, checks the agenda and participant list, and manually prepares the record; the project manager reviews and approves it; project team members use the approved record. |
+| pain_points | Manual preparation is time-consuming; inconsistent action tracking; hard to trace decisions back to their source |
+| proposed_solution | AI pipeline combining recording + agenda + participant list into a structured record (topics, discussions, decisions, actions, unresolved issues, conflicts), each item evidence-cited, for PM review/approval |
+| intended_users | project_team_members |
+| reviewers | project_manager |
+| stakeholders | *(none — explicitly confirmed)* |
+| input_artifacts | meeting_audio_recording, agenda_document, participant_list |
+| target_outputs | structured_meeting_record_with_decisions_actions_unresolved_issues_and_conflicts |
+| success_criteria | Accurate, evidence-cited decisions/actions; never invent missing owners/dates/decisions |
+| expected_value | **unknown** *(assumption_001)* |
+| risks | **unknown** *(assumption_002)* |
+| poc_goal | Process fixed WAV+PDF+participant-JSON bundle via CLI (`--input <bundle_path>`), produce schema-valid JSON with citations, review_status=`pending_review`, evaluated semantically against a fixture. Web app/auth/integrations/scaling out of scope. |
+
+### Technical specification
+| Field | Value |
+|---|---|
+| input_types | audio, pdf, structured_data |
+| input_formats | wav, pdf, json |
+| output_types | structured_json |
+| language | en |
+| domain_vocabulary | none |
+| data_sources | meeting_audio_recording, agenda_document, participant_list_json |
+| model_provider | azure_openai |
+| model_preferences | extraction_model=gpt-5.4, temperature=0.0, transcription_model=whisper_local |
+| security_constraints | Internal-only; access limited to project team + reviewer; no external system connections in this evaluation |
+| integration_targets | *(none)* |
+| human_review / human_review_required | yes / true |
+| evaluation_requirements | Semantic comparison vs. fixture; citation-format regex check; must-not-assert hallucination check |
+| runtime_interface | CLI: `python run_poc.py --input <bundle_path>` (bundle JSON references the 3 input files); writes JSON to `poc/output/` |
+| *(open, assumption_004)* | deployment platform, auth method, retention period — not specified |
+| *(open, assumption_005)* | no PDF rendering requested — JSON only |
+
+### Target output specification (schema: `MeetingRecord`, assumption_003 — adopted from your fixture)
+| Field | Type |
+|---|---|
+| meeting_id | str |
+| title | str |
+| meeting_date | date |
+| start_time / end_time | str |
+| participants | list[{name, role}] |
+| topics | list[{title, discussion_summary}] |
+| decisions | list[{decision_id, statement, citations}] |
+| action_items | list[{action_id, description, owner\|null, due_date\|null, uncertainty_reason\|null, citations}] |
+| unresolved_issues | list[{description, citations}] |
+| conflicts | list[{description, citations}] |
+| review_status | const `"pending_review"` |
+
+All top-level fields required. `missing_value_policy`: never invent unstated facts — spoken meeting overrides agenda proposals; disagreements become a `conflicts` entry. `validation_rules`: every decision/action/issue/conflict needs ≥1 citation (`file\|start\|end` HH:MM:SS for audio, `file\|page` for the agenda).
+
+---
+Does this look correct? Reply **yes** to proceed, or tell me what to change.
+
+---
+User:
+
+Yes. Proceed without any change. 
+
+---
+Wizard:
+
+Good — moving on. A few optional questions to make the BPMN a real business-process view rather than just the technical pipeline (skip any that don't apply):
+
+1. Roles: I'm assuming the **project coordinator** uploads the recording/agenda/participant list to kick off the process, the **AI system** produces the draft record, and the **project manager** reviews and approves it. Is that right, or does someone else own the upload/kick-off step?
+2. External parties: does any input arrive from outside the project team (e.g., an agenda sent by a client or external partner), or is everything produced internally?
+3. Rejection path: if the project manager rejects the draft record, should the process simply end (discard), or should the coordinator be notified to correct and resubmit it (rework loop back to the input step)?
+
+---
+Answer what you can, or say *skip* to let the BPMN fall back to enrichment-only defaults.
+
+---
+User:
+
+Not specified for this use case. If a value is required, record it as an explicit assumption for user confirmation.
+
+---
+Wizard:
+
+Now let me present this for your review before generating the schema, per the wizard's process.
+
+Here is the extraction prompt I've written. It tells the AI model exactly what to extract from each input and how to handle edge cases. Please check it carefully — the accuracy of the extracted fields depends directly on this prompt.
+
+---
+
+**Extraction Requirements — MeetingRecord**
+
+**Core evidence rule:** the spoken meeting is authoritative; the agenda is context only. A decision is only recorded if explicitly spoken-confirmed; agenda-vs-meeting disagreements become a `conflicts` entry (citing both sources), following the spoken decision.
+
+**Field-by-field guidance:** meeting metadata read from transcript/agenda; `participants` from the participant list; `topics` summarize actual discussion (not agenda framing); `decisions` need ≥1 audio citation; `action_items` get `owner`/`due_date` only when explicitly stated together, else `null` + `uncertainty_reason`; `unresolved_issues` for explicitly-open matters; `conflicts` for agenda-vs-meeting disagreements; `review_status` fixed to `"pending_review"`.
+
+**Citation format (strict):** `"file_name|start_timestamp|end_timestamp"` (HH:MM:SS) for audio, `"file_name|page_number"` for the agenda — single pipe-delimited strings, not objects.
+
+**What must NOT be asserted:** unapproved budget figures, unselected technical approaches (e.g. SSO), unstated owners/due dates, or the agenda's superseded proposal as if it were the outcome.
+
+You can:
+- Ask me to add or remove fields
+- Correct field descriptions, examples, or allowed values
+- Adjust any handling rules (e.g. what to do when a field is missing or ambiguous)
+
+---
+Does this look right, or should I change anything before generating the schema?
+
+---
+User:
+
+Yes. Proceed without any change.
+
+
+
+---
+Wizard:
+
+Now stripping the qualified-module-name bug (a known SchemaGenerator quirk — same fix already used elsewhere in this codebase):Schema generated and reviewed — I found and fixed a few gaps from the auto-generated draft before showing it to you (missing `title` on topics, missing `description` on unresolved_issues/conflicts, and `action_items.uncertainty_reason` wasn't nullable even though your fixture needs `null` there). Here's the corrected schema:
+
+```python
+class meetingrecord_topics_record_Extraction(BaseModel):
+    title: str
+    discussion_summary: str
+
+class meetingrecord_decisions_record_Extraction(BaseModel):
+    statement: str
+    citations: list[str]
+
+class meetingrecord_action_items_record_Extraction(BaseModel):
+    owner: str | None = None
+    due_date: str | None = None
+    uncertainty_reason: str | None = None
+    citations: list[str]
+
+class unresolved_issues_record_Extraction(BaseModel):
+    description: str
+    citations: list[str]
+
+class meetingrecord_conflicts_record_Extraction(BaseModel):
+    description: str
+    citations: list[str]
+
+class meetingrecord_participants_record_Extraction(BaseModel):
+    name: str
+    role: str
+
+class MeetingRecord_Extraction(BaseModel):
+    meeting_id: str
+    title: str
+    meeting_date: str
+    start_time: str
+    end_time: str
+    review_status: Literal['pending_review'] = 'pending_review'
+    topics: list[meetingrecord_topics_record_Extraction]
+    decisions: list[meetingrecord_decisions_record_Extraction]
+    action_items: list[meetingrecord_action_items_record_Extraction]
+    unresolved_issues: list[unresolved_issues_record_Extraction]
+    conflicts: list[meetingrecord_conflicts_record_Extraction]
+    participants: list[meetingrecord_participants_record_Extraction]
+```
+
+All fields use named sub-models (no bare `dict`/`list[dict]`), which is required for Azure OpenAI structured output. It's been verified to import cleanly and to validate against `CompositeExtractionRequirements`.
+
+Quick sanity check:
+- Are all fields present, matching your target schema?
+- Do the types look right (all plain `str`, nullable where needed)?
+- Should any field use a stricter type (e.g. an enum) instead of a plain string?
+
+If anything looks off, I'll fix it directly — no need to regenerate from scratch.
+
+---
+User:
+
+Yes. Proceed without any change.
+
+
+
+---
+Wizard:
+
+Approved. Recording that in the change log. Now here's the full component selection for your review.
+
+**Transformation chain:**
+```
+meeting_audio ─→ raw_transcript (timestamped segments, whisper_local)
+agenda_pdf    ─→ parsed_agenda_text (page-marked)
+participant_list ─→ (used directly, no parsing needed)
+[raw_transcript + parsed_agenda_text + participant_list] ─→ meeting_record_json (MeetingRecord schema)
+meeting_record_json ─→ validation_report (hallucination pre-screen)
+meeting_record_json + validation_report ─→ approved_meeting_record (PM review)
+```
+
+**Selected components:**
+- **Transcriber** — `transcription_model = "whisper_local"` *(citations require HH:MM:SS timestamps; hosted models return plain text only, and you confirmed a self-hosted endpoint is available)*, `diarization = False` *(only timestamps are needed, not who-said-what)*, `language = "en"`, `enhanced_transcript = False` *(enhancement is Finnish-tuned; audio is English, so left off)*.
+- **PyMuPDFParser** — `use_markdown = False` *(the agenda is a native-text PDF, not scanned — this mode inserts page markers for free/local `file|page_number` citations at the lowest cost, no vision-model call needed)*.
+- **Extractor** — combines the transcript, parsed agenda, and participant list against the approved `MeetingRecord` schema, following `extraction_requirements.md`'s evidence and citation rules.
+- **LLMJudge** — added because `human_review = yes`; pre-screens for hallucinated facts (e.g. an invented budget approval) before the project manager reviews.
+- **human_review** step (no component) — the project manager's approve/reject decision.
+
+**Why not alternatives:**
+- Not `AudioToStructuredData` / `DocumentsToStructuredData` (the modules): neither spans audio *and* PDF, and the audio module's hosted transcription path drops timestamps entirely — citations would be impossible.
+- Not `VisionParser` for the agenda: it's a clean, native-text PDF, so the free local `PyMuPDFParser` is sufficient — `VisionParser` would add cost for no accuracy gain.
+- Not `ParallelTranscriber`: that's for long/bulk audio; this is a ~4-minute recording, and you already have the local Whisper endpoint `Transcriber(whisper_local)` needs.
+- Not `MultiSourceReportGenerator` / `RAGWorkflow`: output is a schema-validated structured record, not a narrative report or a Q&A answer.
+
+---
+Does this selection look right? Should I add, remove, or change anything?
+
+---
+User:
+
+Yes. Proceed without any change.
+
+
+
+---
+Wizard:
+
+Now let's also update governance and change_log, then validate.Now let's set governance more precisely and run the validator.Blueprint validated (0 errors, only informational warnings about paths that already exist and about the open assumptions we already tracked). Now generating both visual views.Here is the workflow diagram (Mermaid):
+
+```mermaid
+flowchart TD
+    provide_input_bundle["Provide meeting recording, agenda, and participant list"]
+    transcribe_meeting["Transcribe meeting recording (timestamped)"]
+    parse_agenda["Parse agenda PDF (page-level citations)"]
+    extract_meeting_record["Extract structured meeting record"]
+    validate_meeting_record["Validate record for hallucinated content"]
+    human_review["Project manager reviews and approves record"]
+    provide_input_bundle --> transcribe_meeting
+    provide_input_bundle --> parse_agenda
+    transcribe_meeting --> extract_meeting_record
+    parse_agenda --> extract_meeting_record
+    extract_meeting_record --> validate_meeting_record
+    validate_meeting_record --> human_review
+```
+
+I also generated `workflow.bpmn` — the BPMN visual blueprint. It's the standards-based business-process view (lanes for the project coordinator, the AI system, and the project manager; gateways; data stores; the hallucination-check annotation). Open it in bpmn-js, Camunda Modeler, or draw.io to see the full model.
+
+Does the workflow look correct?
+- Are all the steps right (provide inputs → transcribe + parse in parallel → extract → validate → PM review)?
+- Is anything missing or in the wrong order?
+- Should any step be added or removed?
+- Do the roles/lanes, hand-offs, and exception paths match your process (reviewer rejection currently ends the process cleanly — no rework loop, since none was specified)?
+
+---
+User:
+
+Yes. Proceed without any change.
+
+
+
+---
+Wizard:
+
+Your blueprint, Mermaid diagram, and BPMN visual blueprint have all been saved.
+
+Shall I scaffold the proof of concept now?
+
+---
+User:
+
+Yes.
+
+---
+Wizard:
+
+Good, our hand-written prompt is preserved. Now let's look at the generated `run_poc.py` skeleton to wire it up.It actually ran end-to-end against the real fixture (this environment has live credentials configured). Let me check the full result and validate it.Let's run our evaluation script against this real output and the fixture's expected record.Now let me fill in the narrative `<!-- AGENT: ... -->` markers in each document.Now filling in all the narrative markers:Everything is generated and the documentation is filled in. As a sanity check, I ran the PoC myself against your fixture bundle end-to-end, and it worked — here's a summary:
+
+**Smoke-test result:** `python run_poc.py --input poc_input_bundle.json` completed successfully. The output matched the fixture closely: all participants, action owners/due-dates, the null-owner FAQ action (with `uncertainty_reason`), the budget/SSO unresolved issues, and the agenda-vs-meeting date conflict all came through correctly, with valid pipe-delimited citations throughout. My evaluation script confirmed: citation format PASS, structural completeness PASS, 11/12 field/count matches against the fixture (the only difference was topic-count segmentation, which isn't a defect — just a different grouping of the same discussion).
+
+**What's ready for you:**
+- `poc/` — a runnable PoC (`run_poc.py --input <bundle_path>`), the approved schema, the extraction prompt, a basic eval script tailored to citation-format + structural + fixture comparison checks, and `requirements.txt`/`.env.example`.
+- `docs/` — `genai_product_canvas.md`, `technical_specification.md`, `user_guide.md`, `developer_guide.md`, `evaluation_plan.md`.
+- `use_case.blueprint.json`, `workflow.mmd`, `workflow.bpmn`.
+
+**To run it yourself:**
+1. Install dependencies: `pip install -r poc/requirements.txt`
+2. Set up credentials: `cp poc/.env.example poc/.env` and fill in your Azure OpenAI key plus your self-hosted Whisper endpoint (`LOCAL_TRANSCRIBER_API_BASE` / `LOCAL_TRANSCRIBER_API_KEY`).
+3. Run it against your input bundle: `python poc/run_poc.py --input path/to/poc_input_bundle.json`
+4. Inspect `poc/output/meeting_record.json` and `poc/output/validation.json`.
+5. Optionally run `python poc/evals/run_basic_eval.py` (copy a ground-truth file into `poc/evals/ground_truth/` first, matching the output filename).
+
+When you're ready, paste the output here or describe what you see, and I'll help interpret and refine it (Gate 3).

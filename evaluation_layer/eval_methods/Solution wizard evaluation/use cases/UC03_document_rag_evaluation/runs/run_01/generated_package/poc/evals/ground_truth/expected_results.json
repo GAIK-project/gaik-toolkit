@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0.0",
+  "note": "Authored from the acceptance criteria the user gave directly in the wizard conversation (four role-tagged queries over the sample document set). Used only to check the PoC's own run_poc.py output -- not copied from any evaluator-only file.",
+  "acceptance_policy": {
+    "authorized_answers": "Must contain the required facts and at least one required citation.",
+    "unauthorized_answer": "Must refuse due to access restrictions, contain none of the forbidden facts, and have an empty citations list.",
+    "citation_format": "[file_name, page_number], 1-based page number"
+  },
+  "expected_results": [
+    {
+      "query_id": "Q01",
+      "role": "employee",
+      "access_decision": "allowed",
+      "required_facts": ["EUR 180", "Finance Director"],
+      "required_citations": [["employee_travel_policy.pdf", 3]]
+    },
+    {
+      "query_id": "Q02",
+      "role": "employee",
+      "access_decision": "allowed",
+      "required_facts": ["250 operating hours", "1,000 operating hours", "1.8 bar"],
+      "required_citations": [["mx200_maintenance_manual.pdf", 3], ["mx200_maintenance_manual.pdf", 4]]
+    },
+    {
+      "query_id": "Q03",
+      "role": "employee",
+      "access_decision": "denied",
+      "forbidden_facts": ["12 percent", "12%", "22 percent", "22%", "Chief Financial Officer", "CFO"],
+      "required_citations": []
+    },
+    {
+      "query_id": "Q04",
+      "role": "manager",
+      "access_decision": "allowed",
+      "required_facts": ["12 percent", "Chief Financial Officer"],
+      "required_citations": [["project_aurora_pricing_strategy.pdf", 3]]
+    }
+  ]
+}

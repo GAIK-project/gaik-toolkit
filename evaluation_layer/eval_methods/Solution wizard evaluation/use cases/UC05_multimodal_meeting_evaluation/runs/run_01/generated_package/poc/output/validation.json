@@ -1,0 +1,71 @@
+{
+  "hallucination_flags": [
+    {
+      "field": "end_time",
+      "value": "09:18",
+      "severity": "wrong",
+      "reason": "Source says the meeting closes at 9.18, but never states the end time as 09:18 explicitly."
+    },
+    {
+      "field": "review_status",
+      "value": "pending_review",
+      "severity": "suspect",
+      "reason": "Source says the record remains pending review until approval, but does not label a review_status field."
+    },
+    {
+      "field": "participants[2].name",
+      "value": "Sofia Niemi",
+      "severity": "wrong",
+      "reason": "Transcript names the participant Sophia Nimi, not Sofia Niemi."
+    },
+    {
+      "field": "topics[0].discussion_summary",
+      "value": "The chair opened the Project Nimbus pilot readiness review, confirmed the date and time, and stated that all five expected participants were present.",
+      "severity": "suspect",
+      "reason": "Source mentions opening, date/time, and attendance complete, but not this full combined summary verbatim."
+    },
+    {
+      "field": "topics[6].discussion_summary",
+      "value": "The meeting recap restated the approved limited Helsinki pilot, the restriction to synthetic or anonymized data, and that budget and single sign-on remained open. The chair also stated that named actions and dates should be recorded exactly before closing the meeting.",
+      "severity": "suspect",
+      "reason": "Source supports recap points, but 'chair' and the full combined summary are not stated as one explicit recap."
+    },
+    {
+      "field": "decisions[0].statement",
+      "value": "The pilot will cover only the Helsinki customer service team with 30 users for a two-week period starting on 2026-10-20.",
+      "severity": "wrong",
+      "reason": "Source says the pilot starts October 20th for two weeks, but not the ISO date format or exact wording."
+    },
+    {
+      "field": "decisions[1].statement",
+      "value": "No production customer data will be used in the pilot; only synthetic or anonymized records are permitted in the pilot environment.",
+      "severity": "suspect",
+      "reason": "Source separately states no production data and synthetic/anonymized records, but not this merged statement verbatim."
+    },
+    {
+      "field": "action_items[5].description",
+      "value": "Send the consolidated go or no go summary to the steering group after the data protection, procurement, training, and sandbox updates are available.",
+      "severity": "suspect",
+      "reason": "Source states the action and dependencies, but not the exact merged description wording."
+    },
+    {
+      "field": "action_items[5].owner",
+      "value": "Elena Markovic",
+      "severity": "wrong",
+      "reason": "Transcript says 'I will send' but never explicitly names Elena Markovic as the owner for that action."
+    },
+    {
+      "field": "action_items[5].due_date",
+      "value": "2026-10-06",
+      "severity": "suspect",
+      "reason": "Source gives October 6th, but not the ISO-formatted date."
+    },
+    {
+      "field": "conflicts[0].description",
+      "value": "The agenda proposed a pilot launch date of 2026-10-15, but the meeting decided on a start date of 2026-10-20 for the limited Helsinki pilot.",
+      "severity": "suspect",
+      "reason": "Source mentions proposed October 15th and decided October 20th, but not this exact combined conflict wording."
+    }
+  ],
+  "passed": false
+}

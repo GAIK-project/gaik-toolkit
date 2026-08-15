@@ -1,0 +1,165 @@
+{
+  "meeting_id": "NIMBUS-PRR-2026-09-17",
+  "title": "Project Nimbus Pilot Readiness Review",
+  "meeting_date": "2026-09-17",
+  "start_time": "09:00:00",
+  "end_time": "09:18:00",
+  "review_status": "pending_review",
+  "participants": [
+    {
+      "name": "Elena Markovic",
+      "role": "Project Manager"
+    },
+    {
+      "name": "Liam Chen",
+      "role": "Technical Lead"
+    },
+    {
+      "name": "Sofia Niemi",
+      "role": "Data Protection Specialist"
+    },
+    {
+      "name": "Arjun Patel",
+      "role": "Project Coordinator"
+    },
+    {
+      "name": "Mia Roberts",
+      "role": "Procurement Specialist"
+    }
+  ],
+  "topics": [
+    {
+      "title": "Opening and attendance",
+      "discussion_summary": "Elena Markovic opened the Project Nimbus pilot readiness review, the participants introduced themselves, and Arjun Patel confirmed that all five expected participants were present."
+    },
+    {
+      "title": "Pilot scope",
+      "discussion_summary": "The team discussed limiting the pilot to the Helsinki customer service team with 30 users for two weeks. Liam Chen stated that the sandbox would not be ready for the proposed 15 October date and recommended a 20 October start, which Elena Markovic then confirmed as the decision."
+    },
+    {
+      "title": "Data protection",
+      "discussion_summary": "Sofia Niemi stated that the pilot should use synthetic or anonymized records only and that production customer data must not enter the pilot environment. She also stated that she could complete the data protection impact assessment by 29 September."
+    },
+    {
+      "title": "Procurement and budget",
+      "discussion_summary": "Mia Roberts said that three supplier quotations were expected and that she could compare them by 24 September. She also stated that the agenda's 18,000 euro ceiling had not been confirmed by finance and that no budget would be approved in this meeting."
+    },
+    {
+      "title": "Open technical risks",
+      "discussion_summary": "Liam Chen reported that the single sign-on approach was still with the architecture board, which would meet on 22 September. He stated that there was no single sign-on decision in this meeting and that no project team owner should be inferred for that decision."
+    },
+    {
+      "title": "Training and readiness",
+      "discussion_summary": "Elena Markovic assigned actions for scheduling the pilot training session, configuring and testing the sandbox, preparing a support FAQ document, and sending the consolidated go or no-go summary to the steering group. She also stated that the training should take place before the 20 October pilot start."
+    },
+    {
+      "title": "Recap and close",
+      "discussion_summary": "Elena Markovic recapped the approved limited Helsinki pilot with 30 users starting on 20 October and the decision to use synthetic or anonymized data only. She also stated that the budget and single sign-on approach remained open and closed the meeting at 9:18."
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "D1",
+      "statement": "The pilot scope was limited to the Helsinki customer service team with 30 users for a two-week period starting on October 20, 2026.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:01:57|00:02:08",
+        "project_nimbus_agenda.pdf|2"
+      ]
+    },
+    {
+      "decision_id": "D2",
+      "statement": "The pilot was restricted to synthetic or anonymized data, and no production customer data was to be used.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:25|00:02:33",
+        "project_nimbus_agenda.pdf|2"
+      ]
+    }
+  ],
+  "action_items": [
+    {
+      "action_id": "A1",
+      "description": "Complete the data protection impact assessment.",
+      "owner": "Sofia Niemi",
+      "due_date": "2026-09-29",
+      "uncertainty_reason": "",
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:18|00:02:33"
+      ]
+    },
+    {
+      "action_id": "A2",
+      "description": "Compare the three supplier quotations.",
+      "owner": "Mia Roberts",
+      "due_date": "2026-09-24",
+      "uncertainty_reason": "",
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:37|00:02:53"
+      ]
+    },
+    {
+      "action_id": "A3",
+      "description": "Schedule the pilot training session.",
+      "owner": "Arjun Patel",
+      "due_date": "2026-10-03",
+      "uncertainty_reason": "",
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:12|00:03:21"
+      ]
+    },
+    {
+      "action_id": "A4",
+      "description": "Configure and test the sandbox using synthetic test data only.",
+      "owner": "Liam Chen",
+      "due_date": "2026-09-25",
+      "uncertainty_reason": "",
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:22|00:03:28"
+      ]
+    },
+    {
+      "action_id": "A5",
+      "description": "Draft a short support frequently asked questions document before training.",
+      "owner": null,
+      "due_date": null,
+      "uncertainty_reason": "No explicit owner or exact due date was agreed in the meeting.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:29|00:03:41"
+      ]
+    },
+    {
+      "action_id": "A6",
+      "description": "Send the consolidated go or no-go summary to the steering group after the data protection, procurement, training, and sandbox updates are available.",
+      "owner": "Elena Markovic",
+      "due_date": "2026-10-06",
+      "uncertainty_reason": "",
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:42|00:03:54"
+      ]
+    }
+  ],
+  "unresolved_issues": [
+    {
+      "description": "The final budget approval and confirmed budget ceiling remained unresolved pending a response from finance.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:39|00:02:58",
+        "project_nimbus_agenda.pdf|2"
+      ]
+    },
+    {
+      "description": "The single sign-on approach remained unresolved pending architecture board input, and no project team owner was assigned for that decision.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:59|00:03:11",
+        "project_nimbus_agenda.pdf|2"
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "description": "The agenda proposed a pilot launch date of 15 October 2026, but the meeting explicitly decided that the pilot would start on 20 October 2026.",
+      "citations": [
+        "project_nimbus_agenda.pdf|2",
+        "project_nimbus_meeting.wav|00:01:49|00:02:08"
+      ]
+    }
+  ]
+}

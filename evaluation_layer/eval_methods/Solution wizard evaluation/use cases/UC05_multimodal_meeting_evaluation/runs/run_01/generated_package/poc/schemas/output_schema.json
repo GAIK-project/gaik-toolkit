@@ -1,0 +1,308 @@
+{
+  "$defs": {
+    "conflicts_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for conflicts_record",
+      "properties": {
+        "description": {
+          "description": "Description of the contradiction between the agenda and the transcript, or within the transcript itself.",
+          "title": "Description",
+          "type": "string"
+        },
+        "citations": {
+          "description": "One or more citations supporting the conflict entry.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Citations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "conflicts_record_Extraction",
+      "type": "object"
+    },
+    "meeting_record_action_items_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for meeting_record_action_items_record",
+      "properties": {
+        "action_id": {
+          "description": "Short stable identifier for the action item",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "description": {
+          "description": "Description of the action assigned or agreed in the meeting",
+          "title": "Description",
+          "type": "string"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Owner of the action item, only when explicitly stated in the transcript and normalized against the participant list",
+          "title": "Owner"
+        },
+        "due_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Due date of the action item, only when explicitly stated in the transcript",
+          "title": "Due Date"
+        },
+        "uncertainty_reason": {
+          "description": "Explanation of why owner or due_date is null when not explicitly stated",
+          "title": "Uncertainty Reason",
+          "type": "string"
+        },
+        "citations": {
+          "description": "List of one or more citation strings supporting the action item",
+          "items": {
+            "type": "string"
+          },
+          "title": "Citations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "action_id",
+        "description",
+        "uncertainty_reason"
+      ],
+      "title": "meeting_record_action_items_record_Extraction",
+      "type": "object"
+    },
+    "meeting_record_decisions_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for meeting_record_decisions_record",
+      "properties": {
+        "decision_id": {
+          "description": "A short stable slug for the decision record.",
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "statement": {
+          "description": "A concise statement of what was decided.",
+          "title": "Statement",
+          "type": "string"
+        },
+        "citations": {
+          "description": "At least one citation for the decision, using the specified pipe-delimited citation format.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Citations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "decision_id",
+        "statement"
+      ],
+      "title": "meeting_record_decisions_record_Extraction",
+      "type": "object"
+    },
+    "participants_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for participants_record",
+      "properties": {
+        "name": {
+          "description": "Name of the participant, normalized using the supplied participant list",
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "description": "Role of the participant, normalized using the supplied participant list",
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "role"
+      ],
+      "title": "participants_record_Extraction",
+      "type": "object"
+    },
+    "topics_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for topics_record",
+      "properties": {
+        "title": {
+          "description": "The agenda topic title that was actually discussed in the meeting.",
+          "title": "Title",
+          "type": "string"
+        },
+        "discussion_summary": {
+          "description": "A concise, neutral summary of what was said about the topic, grounded only in the transcript.",
+          "title": "Discussion Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "discussion_summary"
+      ],
+      "title": "topics_record_Extraction",
+      "type": "object"
+    },
+    "unresolved_issues_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for unresolved_issues_record",
+      "properties": {
+        "description": {
+          "description": "Description of the topic or question raised in the meeting that was not resolved by the end of the discussion.",
+          "title": "Description",
+          "type": "string"
+        },
+        "citations": {
+          "description": "List of at least one citation supporting the unresolved issue entry.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Citations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "unresolved_issues_record_Extraction",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Extraction model for MeetingRecord with repeated participants, topics, decisions, action_items, unresolved_issues, conflicts",
+  "properties": {
+    "meeting_id": {
+      "description": "A stable identifier for this meeting instance.",
+      "title": "Meeting Id",
+      "type": "string"
+    },
+    "title": {
+      "description": "The meeting title as stated in the agenda or transcript.",
+      "title": "Title",
+      "type": "string"
+    },
+    "meeting_date": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The date the meeting was actually held, per the transcript if stated there; leave unset if neither source states it explicitly.",
+      "title": "Meeting Date"
+    },
+    "start_time": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "As explicitly stated (agenda or transcript). Leave unset if not stated.",
+      "title": "Start Time"
+    },
+    "end_time": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "As explicitly stated (agenda or transcript). Leave unset if not stated.",
+      "title": "End Time"
+    },
+    "review_status": {
+      "const": "pending_review",
+      "default": "pending_review",
+      "description": "Always set to pending_review in the extracted output.",
+      "title": "Review Status",
+      "type": "string"
+    },
+    "participants": {
+      "description": "One entry per confirmed meeting participant with name and role.",
+      "items": {
+        "$ref": "#/$defs/participants_record_Extraction"
+      },
+      "title": "Participants",
+      "type": "array"
+    },
+    "topics": {
+      "description": "One entry per agenda topic that was actually discussed, with title and discussion_summary.",
+      "items": {
+        "$ref": "#/$defs/topics_record_Extraction"
+      },
+      "title": "Topics",
+      "type": "array"
+    },
+    "decisions": {
+      "description": "One entry per explicit decision made in the meeting, including decision_id, statement, and citations.",
+      "items": {
+        "$ref": "#/$defs/meeting_record_decisions_record_Extraction"
+      },
+      "title": "Decisions",
+      "type": "array"
+    },
+    "action_items": {
+      "description": "One entry per action assigned or agreed in the meeting, including action_id, description, owner, due_date, uncertainty_reason, and citations.",
+      "items": {
+        "$ref": "#/$defs/meeting_record_action_items_record_Extraction"
+      },
+      "title": "Action Items",
+      "type": "array"
+    },
+    "unresolved_issues": {
+      "description": "One entry per topic or question raised but not resolved, including description and citations.",
+      "items": {
+        "$ref": "#/$defs/unresolved_issues_record_Extraction"
+      },
+      "title": "Unresolved Issues",
+      "type": "array"
+    },
+    "conflicts": {
+      "description": "One entry per contradiction between agenda and transcript or within the transcript, including description and citations.",
+      "items": {
+        "$ref": "#/$defs/conflicts_record_Extraction"
+      },
+      "title": "Conflicts",
+      "type": "array"
+    }
+  },
+  "required": [
+    "meeting_id",
+    "title",
+    "participants",
+    "topics",
+    "decisions",
+    "action_items",
+    "unresolved_issues",
+    "conflicts"
+  ],
+  "title": "MeetingRecord_Extraction",
+  "type": "object"
+}

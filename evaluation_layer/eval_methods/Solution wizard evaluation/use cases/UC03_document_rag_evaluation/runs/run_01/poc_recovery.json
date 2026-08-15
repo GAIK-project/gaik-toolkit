@@ -2,19 +2,19 @@
   "schema_version": "1.0.0",
   "run_id": "UC03_run_01",
   "maximum_refinement_attempts": 3,
-  "baseline_execution_file": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\runs\\run_01\\poc_execution.json",
-  "initial_execution_successful": false,
-  "refinement_attempts_to_success": 1,
+  "baseline_execution_file": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC03_document_rag_evaluation\\runs\\run_01\\poc_execution.json",
+  "initial_execution_successful": true,
+  "refinement_attempts_to_success": 0,
   "final_execution_successful": true,
-  "status": "recovered",
+  "status": "successful_original",
   "attempts": [
     {
       "attempt": 1,
       "successful": true,
-      "feedback_file": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\runs\\run_01\\refinement\\attempt_01\\feedback_to_wizard.txt",
-      "conversation_file": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\runs\\run_01\\refinement\\attempt_01\\conversation.txt",
-      "execution_file": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\runs\\run_01\\refinement\\attempt_01\\poc_execution.json",
-      "generated_package": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC03_document_rag_evaluation\\runs\\run_01\\refinement\\attempt_01\\generated_package"
+      "feedback_file": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC03_document_rag_evaluation\\runs\\run_01\\refinement\\attempt_01\\feedback_to_wizard.txt",
+      "conversation_file": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC03_document_rag_evaluation\\runs\\run_01\\refinement\\attempt_01\\conversation.txt",
+      "execution_file": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC03_document_rag_evaluation\\runs\\run_01\\refinement\\attempt_01\\poc_execution.json",
+      "generated_package": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC03_document_rag_evaluation\\runs\\run_01\\refinement\\attempt_01\\generated_package"
     }
   ],
   "eq4_uses_baseline_only": true,

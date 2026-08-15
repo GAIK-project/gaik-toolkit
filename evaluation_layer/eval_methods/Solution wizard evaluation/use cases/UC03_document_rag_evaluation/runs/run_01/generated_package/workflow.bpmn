@@ -1,146 +1,133 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1" targetNamespace="http://gaik.solutionwizard/bpmn">
   <bpmn:collaboration id="Collaboration_1">
-    <bpmn:participant id="Participant_main" name="Manufacturing Knowledge Base RAG Assistant" processRef="Process_1" />
+    <bpmn:participant id="Participant_main" name="Manufacturing Knowledge Assistant" processRef="Process_1" />
   </bpmn:collaboration>
   <bpmn:process id="Process_1" isExecutable="false">
     <bpmn:laneSet id="LaneSet_1">
-      <bpmn:lane id="Lane_users" name="Employee / Manager / Knowledge Owner">
-        <bpmn:flowNodeRef>Activity_load_input</bpmn:flowNodeRef>
+      <bpmn:lane id="Lane_requesting_user" name="Employee / Manager">
+        <bpmn:flowNodeRef>Activity_upload_documents</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_provide_access_manifest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_submit_queries</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_gaik_ai" name="GAIK AI System">
-        <bpmn:flowNodeRef>Activity_ingest_and_index</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Activity_apply_rbac_and_retrieve</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Activity_generate_answers</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_generate_role_aware_answers</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_join_generate_role_aware_answers</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>EndEvent_success</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_decision_access_decision_gateway</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
-    <bpmn:userTask id="Activity_load_input" name="Load PoC input bundle via CLI">
+    <bpmn:userTask id="Activity_upload_documents" name="Upload internal document collection">
       <bpmn:incoming>Flow_1</bpmn:incoming>
-      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
       <bpmn:dataOutputAssociation id="Association_1">
-        <bpmn:targetRef>DataObjectRef_poc_input_bundle</bpmn:targetRef>
-      </bpmn:dataOutputAssociation>
-      <bpmn:dataOutputAssociation id="Association_2">
-        <bpmn:targetRef>DataObjectRef_document_collection</bpmn:targetRef>
-      </bpmn:dataOutputAssociation>
-      <bpmn:dataOutputAssociation id="Association_3">
-        <bpmn:targetRef>DataObjectRef_access_manifest</bpmn:targetRef>
-      </bpmn:dataOutputAssociation>
-      <bpmn:dataOutputAssociation id="Association_4">
-        <bpmn:targetRef>DataObjectRef_query_set</bpmn:targetRef>
+        <bpmn:targetRef>DataObjectRef_source_documents</bpmn:targetRef>
       </bpmn:dataOutputAssociation>
     </bpmn:userTask>
-    <bpmn:serviceTask id="Activity_ingest_and_index" name="Parse PDFs, chunk with metadata, embed, build local vector index
-[custom]">
+    <bpmn:userTask id="Activity_provide_access_manifest" name="Provide document classification and allowed-roles manifest">
       <bpmn:incoming>Flow_2</bpmn:incoming>
-      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="Association_2">
+        <bpmn:targetRef>DataObjectRef_access_manifest</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:userTask id="Activity_submit_queries" name="Employee/manager submits role-tagged question(s)">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="Association_3">
+        <bpmn:targetRef>DataObjectRef_query_batch</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Activity_generate_role_aware_answers" name="Index documents with role metadata, retrieve role-filtered context, generate cited answer per query
+[RAGWorkflow]">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
       <bpmn:property id="Property_1" name="__targetRef_placeholder" />
-      <bpmn:dataInputAssociation id="Association_7">
-        <bpmn:sourceRef>DataObjectRef_document_collection</bpmn:sourceRef>
+      <bpmn:dataInputAssociation id="Association_5">
+        <bpmn:sourceRef>DataObjectRef_source_documents</bpmn:sourceRef>
         <bpmn:targetRef>Property_1</bpmn:targetRef>
       </bpmn:dataInputAssociation>
       <bpmn:property id="Property_2" name="__targetRef_placeholder" />
-      <bpmn:dataInputAssociation id="Association_8">
+      <bpmn:dataInputAssociation id="Association_6">
         <bpmn:sourceRef>DataObjectRef_access_manifest</bpmn:sourceRef>
         <bpmn:targetRef>Property_2</bpmn:targetRef>
       </bpmn:dataInputAssociation>
-      <bpmn:dataOutputAssociation id="Association_5">
-        <bpmn:targetRef>DataObjectRef_chunked_documents</bpmn:targetRef>
-      </bpmn:dataOutputAssociation>
-      <bpmn:dataOutputAssociation id="Association_6">
-        <bpmn:targetRef>DataObjectRef_local_vector_index</bpmn:targetRef>
-      </bpmn:dataOutputAssociation>
-    </bpmn:serviceTask>
-    <bpmn:serviceTask id="Activity_apply_rbac_and_retrieve" name="Apply RBAC pre-filter and retrieve top-4 eligible chunks per query
-[custom]">
-      <bpmn:incoming>Flow_3</bpmn:incoming>
-      <bpmn:outgoing>Flow_4</bpmn:outgoing>
       <bpmn:property id="Property_3" name="__targetRef_placeholder" />
-      <bpmn:dataInputAssociation id="Association_10">
-        <bpmn:sourceRef>DataObjectRef_local_vector_index</bpmn:sourceRef>
+      <bpmn:dataInputAssociation id="Association_7">
+        <bpmn:sourceRef>DataObjectRef_query_batch</bpmn:sourceRef>
         <bpmn:targetRef>Property_3</bpmn:targetRef>
       </bpmn:dataInputAssociation>
-      <bpmn:property id="Property_4" name="__targetRef_placeholder" />
-      <bpmn:dataInputAssociation id="Association_11">
-        <bpmn:sourceRef>DataObjectRef_query_set</bpmn:sourceRef>
-        <bpmn:targetRef>Property_4</bpmn:targetRef>
-      </bpmn:dataInputAssociation>
-      <bpmn:dataOutputAssociation id="Association_9">
-        <bpmn:targetRef>DataObjectRef_retrieved_chunks_per_query</bpmn:targetRef>
-      </bpmn:dataOutputAssociation>
-    </bpmn:serviceTask>
-    <bpmn:serviceTask id="Activity_generate_answers" name="Generate cited answers and format as RAGAnswerRecord list
-[custom]">
-      <bpmn:incoming>Flow_4</bpmn:incoming>
-      <bpmn:outgoing>Flow_5</bpmn:outgoing>
-      <bpmn:property id="Property_5" name="__targetRef_placeholder" />
-      <bpmn:dataInputAssociation id="Association_13">
-        <bpmn:sourceRef>DataObjectRef_retrieved_chunks_per_query</bpmn:sourceRef>
-        <bpmn:targetRef>Property_5</bpmn:targetRef>
-      </bpmn:dataInputAssociation>
-      <bpmn:property id="Property_6" name="__targetRef_placeholder" />
-      <bpmn:dataInputAssociation id="Association_14">
-        <bpmn:sourceRef>DataObjectRef_query_set</bpmn:sourceRef>
-        <bpmn:targetRef>Property_6</bpmn:targetRef>
-      </bpmn:dataInputAssociation>
-      <bpmn:dataOutputAssociation id="Association_12">
-        <bpmn:targetRef>DataObjectRef_rag_answer_records</bpmn:targetRef>
+      <bpmn:dataOutputAssociation id="Association_4">
+        <bpmn:targetRef>DataObjectRef_answer_records</bpmn:targetRef>
       </bpmn:dataOutputAssociation>
     </bpmn:serviceTask>
     <bpmn:startEvent id="StartEvent_1" name="Start">
       <bpmn:outgoing>Flow_1</bpmn:outgoing>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
     </bpmn:startEvent>
-    <bpmn:endEvent id="EndEvent_success" name="Process complete">
+    <bpmn:parallelGateway id="Gateway_join_generate_role_aware_answers">
       <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:endEvent id="EndEvent_success" name="Process complete">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:incoming>Flow_11</bpmn:incoming>
     </bpmn:endEvent>
-    <bpmn:dataObjectReference id="DataObjectRef_poc_input_bundle" name="poc_input_bundle" dataObjectRef="DataObject_poc_input_bundle" />
-    <bpmn:dataObject id="DataObject_poc_input_bundle" />
-    <bpmn:dataObjectReference id="DataObjectRef_document_collection" name="document_collection" dataObjectRef="DataObject_document_collection" />
-    <bpmn:dataObject id="DataObject_document_collection" />
+    <bpmn:exclusiveGateway id="Gateway_decision_access_decision_gateway" name="Is the requesting role authorized for this content?">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:dataObjectReference id="DataObjectRef_source_documents" name="source_documents" dataObjectRef="DataObject_source_documents" />
+    <bpmn:dataObject id="DataObject_source_documents" />
     <bpmn:dataObjectReference id="DataObjectRef_access_manifest" name="access_manifest" dataObjectRef="DataObject_access_manifest" />
     <bpmn:dataObject id="DataObject_access_manifest" />
-    <bpmn:dataObjectReference id="DataObjectRef_query_set" name="query_set" dataObjectRef="DataObject_query_set" />
-    <bpmn:dataObject id="DataObject_query_set" />
-    <bpmn:dataObjectReference id="DataObjectRef_chunked_documents" name="chunked_documents" dataObjectRef="DataObject_chunked_documents" />
-    <bpmn:dataObject id="DataObject_chunked_documents" />
-    <bpmn:dataObjectReference id="DataObjectRef_local_vector_index" name="local_vector_index" dataObjectRef="DataObject_local_vector_index" />
-    <bpmn:dataObject id="DataObject_local_vector_index" />
-    <bpmn:dataObjectReference id="DataObjectRef_retrieved_chunks_per_query" name="retrieved_chunks_per_query" dataObjectRef="DataObject_retrieved_chunks_per_query" />
-    <bpmn:dataObject id="DataObject_retrieved_chunks_per_query" />
-    <bpmn:dataObjectReference id="DataObjectRef_rag_answer_records" name="rag_answer_records" dataObjectRef="DataObject_rag_answer_records" />
-    <bpmn:dataObject id="DataObject_rag_answer_records" />
-    <bpmn:textAnnotation id="TextAnnotation_1"><bpmn:text>Contains personal data (PII)</bpmn:text></bpmn:textAnnotation>
-    <bpmn:textAnnotation id="TextAnnotation_2"><bpmn:text>Output sensitivity: mixed</bpmn:text></bpmn:textAnnotation>
-    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Activity_load_input" />
-    <bpmn:sequenceFlow id="Flow_2" sourceRef="Activity_load_input" targetRef="Activity_ingest_and_index" />
-    <bpmn:sequenceFlow id="Flow_3" sourceRef="Activity_ingest_and_index" targetRef="Activity_apply_rbac_and_retrieve" />
-    <bpmn:sequenceFlow id="Flow_4" sourceRef="Activity_apply_rbac_and_retrieve" targetRef="Activity_generate_answers" />
-    <bpmn:sequenceFlow id="Flow_5" sourceRef="Activity_generate_answers" targetRef="EndEvent_success" />
+    <bpmn:dataObjectReference id="DataObjectRef_query_batch" name="query_batch" dataObjectRef="DataObject_query_batch" />
+    <bpmn:dataObject id="DataObject_query_batch" />
+    <bpmn:dataObjectReference id="DataObjectRef_answer_records" name="answer_records" dataObjectRef="DataObject_answer_records" />
+    <bpmn:dataObject id="DataObject_answer_records" />
+    <bpmn:textAnnotation id="TextAnnotation_1"><bpmn:text>Output sensitivity: high</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="TextAnnotation_2"><bpmn:text>Audit log required</bpmn:text></bpmn:textAnnotation>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Activity_upload_documents" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="StartEvent_1" targetRef="Activity_provide_access_manifest" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="StartEvent_1" targetRef="Activity_submit_queries" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Gateway_join_generate_role_aware_answers" targetRef="Activity_generate_role_aware_answers" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Activity_upload_documents" targetRef="Gateway_join_generate_role_aware_answers" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Activity_provide_access_manifest" targetRef="Gateway_join_generate_role_aware_answers" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Activity_submit_queries" targetRef="Gateway_join_generate_role_aware_answers" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Gateway_decision_access_decision_gateway" targetRef="EndEvent_success" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Activity_generate_role_aware_answers" targetRef="Gateway_decision_access_decision_gateway" />
+    <bpmn:sequenceFlow id="Flow_10" name="allowed" sourceRef="Gateway_decision_access_decision_gateway" targetRef="EndEvent_success" />
+    <bpmn:sequenceFlow id="Flow_11" name="denied" sourceRef="Gateway_decision_access_decision_gateway" targetRef="EndEvent_success" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
       <bpmndi:BPMNShape id="Participant_main_di" bpmnElement="Participant_main" isHorizontal="true">
-        <omgdc:Bounds x="160" y="90" width="1350" height="478" />
+        <omgdc:Bounds x="160" y="90" width="1350" height="908" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Lane_users_di" bpmnElement="Lane_users" isHorizontal="true">
-        <omgdc:Bounds x="190" y="90" width="1320" height="239" />
+      <bpmndi:BPMNShape id="Lane_requesting_user_di" bpmnElement="Lane_requesting_user" isHorizontal="true">
+        <omgdc:Bounds x="190" y="90" width="1320" height="669" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_gaik_ai_di" bpmnElement="Lane_gaik_ai" isHorizontal="true">
-        <omgdc:Bounds x="190" y="329" width="1320" height="239" />
+        <omgdc:Bounds x="190" y="759" width="1320" height="239" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_load_input_di" bpmnElement="Activity_load_input">
+      <bpmndi:BPMNShape id="Activity_upload_documents_di" bpmnElement="Activity_upload_documents">
         <omgdc:Bounds x="435" y="212" width="130" height="90" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_ingest_and_index_di" bpmnElement="Activity_ingest_and_index">
-        <omgdc:Bounds x="635" y="451" width="130" height="90" />
+      <bpmndi:BPMNShape id="Activity_provide_access_manifest_di" bpmnElement="Activity_provide_access_manifest">
+        <omgdc:Bounds x="435" y="427" width="130" height="90" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_apply_rbac_and_retrieve_di" bpmnElement="Activity_apply_rbac_and_retrieve">
-        <omgdc:Bounds x="835" y="451" width="130" height="90" />
+      <bpmndi:BPMNShape id="Activity_submit_queries_di" bpmnElement="Activity_submit_queries">
+        <omgdc:Bounds x="435" y="642" width="130" height="90" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Activity_generate_answers_di" bpmnElement="Activity_generate_answers">
-        <omgdc:Bounds x="1035" y="451" width="130" height="90" />
+      <bpmndi:BPMNShape id="Activity_generate_role_aware_answers_di" bpmnElement="Activity_generate_role_aware_answers">
+        <omgdc:Bounds x="835" y="881" width="130" height="90" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
         <omgdc:Bounds x="282" y="239" width="36" height="36" />
@@ -148,35 +135,32 @@
           <omgdc:Bounds x="272" y="279" width="56" height="20" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_join_generate_role_aware_answers_di" bpmnElement="Gateway_join_generate_role_aware_answers">
+        <omgdc:Bounds x="675" y="901" width="50" height="50" />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="EndEvent_success_di" bpmnElement="EndEvent_success">
-        <omgdc:Bounds x="1282" y="478" width="36" height="36" />
+        <omgdc:Bounds x="1282" y="908" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <omgdc:Bounds x="1272" y="518" width="56" height="20" />
+          <omgdc:Bounds x="1272" y="948" width="56" height="20" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DataObjectRef_poc_input_bundle_di" bpmnElement="DataObjectRef_poc_input_bundle">
-        <omgdc:Bounds x="323" y="110" width="36" height="50" />
+      <bpmndi:BPMNShape id="Gateway_decision_access_decision_gateway_di" bpmnElement="Gateway_decision_access_decision_gateway" isMarkerVisible="true">
+        <omgdc:Bounds x="1075" y="901" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1065" y="955" width="70" height="20" />
+        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DataObjectRef_document_collection_di" bpmnElement="DataObjectRef_document_collection">
-        <omgdc:Bounds x="429" y="110" width="36" height="50" />
+      <bpmndi:BPMNShape id="DataObjectRef_source_documents_di" bpmnElement="DataObjectRef_source_documents">
+        <omgdc:Bounds x="482" y="110" width="36" height="50" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="DataObjectRef_access_manifest_di" bpmnElement="DataObjectRef_access_manifest">
-        <omgdc:Bounds x="535" y="110" width="36" height="50" />
+        <omgdc:Bounds x="482" y="325" width="36" height="50" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DataObjectRef_query_set_di" bpmnElement="DataObjectRef_query_set">
-        <omgdc:Bounds x="641" y="110" width="36" height="50" />
+      <bpmndi:BPMNShape id="DataObjectRef_query_batch_di" bpmnElement="DataObjectRef_query_batch">
+        <omgdc:Bounds x="482" y="540" width="36" height="50" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DataObjectRef_chunked_documents_di" bpmnElement="DataObjectRef_chunked_documents">
-        <omgdc:Bounds x="629" y="349" width="36" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DataObjectRef_local_vector_index_di" bpmnElement="DataObjectRef_local_vector_index">
-        <omgdc:Bounds x="735" y="349" width="36" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DataObjectRef_retrieved_chunks_per_query_di" bpmnElement="DataObjectRef_retrieved_chunks_per_query">
-        <omgdc:Bounds x="882" y="349" width="36" height="50" />
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="DataObjectRef_rag_answer_records_di" bpmnElement="DataObjectRef_rag_answer_records">
-        <omgdc:Bounds x="1082" y="349" width="36" height="50" />
+      <bpmndi:BPMNShape id="DataObjectRef_answer_records_di" bpmnElement="DataObjectRef_answer_records">
+        <omgdc:Bounds x="882" y="779" width="36" height="50" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="TextAnnotation_1_di" bpmnElement="TextAnnotation_1">
         <omgdc:Bounds x="1550" y="110" width="180" height="50" />
@@ -189,78 +173,82 @@
         <omgdi:waypoint x="435" y="257" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
-        <omgdi:waypoint x="565" y="257" />
-        <omgdi:waypoint x="600" y="257" />
-        <omgdi:waypoint x="600" y="496" />
-        <omgdi:waypoint x="635" y="496" />
+        <omgdi:waypoint x="318" y="257" />
+        <omgdi:waypoint x="376" y="257" />
+        <omgdi:waypoint x="376" y="472" />
+        <omgdi:waypoint x="435" y="472" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
-        <omgdi:waypoint x="765" y="496" />
-        <omgdi:waypoint x="835" y="496" />
+        <omgdi:waypoint x="318" y="257" />
+        <omgdi:waypoint x="376" y="257" />
+        <omgdi:waypoint x="376" y="687" />
+        <omgdi:waypoint x="435" y="687" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
-        <omgdi:waypoint x="965" y="496" />
-        <omgdi:waypoint x="1035" y="496" />
+        <omgdi:waypoint x="725" y="926" />
+        <omgdi:waypoint x="835" y="926" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
-        <omgdi:waypoint x="1165" y="496" />
-        <omgdi:waypoint x="1282" y="496" />
+        <omgdi:waypoint x="565" y="257" />
+        <omgdi:waypoint x="620" y="257" />
+        <omgdi:waypoint x="620" y="926" />
+        <omgdi:waypoint x="675" y="926" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <omgdi:waypoint x="565" y="472" />
+        <omgdi:waypoint x="620" y="472" />
+        <omgdi:waypoint x="620" y="926" />
+        <omgdi:waypoint x="675" y="926" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <omgdi:waypoint x="565" y="687" />
+        <omgdi:waypoint x="620" y="687" />
+        <omgdi:waypoint x="620" y="926" />
+        <omgdi:waypoint x="675" y="926" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <omgdi:waypoint x="1125" y="926" />
+        <omgdi:waypoint x="1282" y="926" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <omgdi:waypoint x="965" y="926" />
+        <omgdi:waypoint x="1075" y="926" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <omgdi:waypoint x="1125" y="926" />
+        <omgdi:waypoint x="1282" y="926" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <omgdi:waypoint x="1125" y="926" />
+        <omgdi:waypoint x="1282" y="926" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Association_1_di" bpmnElement="Association_1">
-        <omgdi:waypoint x="441" y="212" />
-        <omgdi:waypoint x="359" y="148" />
+        <omgdi:waypoint x="500" y="212" />
+        <omgdi:waypoint x="500" y="160" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Association_2_di" bpmnElement="Association_2">
-        <omgdi:waypoint x="480" y="212" />
-        <omgdi:waypoint x="457" y="160" />
+        <omgdi:waypoint x="500" y="427" />
+        <omgdi:waypoint x="500" y="375" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Association_3_di" bpmnElement="Association_3">
-        <omgdi:waypoint x="519" y="212" />
-        <omgdi:waypoint x="542" y="160" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Association_4_di" bpmnElement="Association_4">
-        <omgdi:waypoint x="558" y="212" />
-        <omgdi:waypoint x="641" y="148" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Association_7_di" bpmnElement="Association_7">
-        <omgdi:waypoint x="464" y="160" />
-        <omgdi:waypoint x="668" y="451" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Association_8_di" bpmnElement="Association_8">
-        <omgdi:waypoint x="563" y="160" />
-        <omgdi:waypoint x="681" y="451" />
+        <omgdi:waypoint x="500" y="642" />
+        <omgdi:waypoint x="500" y="590" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Association_5_di" bpmnElement="Association_5">
-        <omgdi:waypoint x="680" y="451" />
-        <omgdi:waypoint x="657" y="399" />
+        <omgdi:waypoint x="512" y="160" />
+        <omgdi:waypoint x="877" y="881" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Association_6_di" bpmnElement="Association_6">
-        <omgdi:waypoint x="719" y="451" />
-        <omgdi:waypoint x="742" y="399" />
+        <omgdi:waypoint x="517" y="375" />
+        <omgdi:waypoint x="868" y="881" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Association_10_di" bpmnElement="Association_10">
-        <omgdi:waypoint x="771" y="388" />
-        <omgdi:waypoint x="845" y="451" />
+      <bpmndi:BPMNEdge id="Association_7_di" bpmnElement="Association_7">
+        <omgdi:waypoint x="518" y="581" />
+        <omgdi:waypoint x="850" y="881" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Association_11_di" bpmnElement="Association_11">
-        <omgdi:waypoint x="675" y="160" />
-        <omgdi:waypoint x="869" y="451" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Association_9_di" bpmnElement="Association_9">
-        <omgdi:waypoint x="900" y="451" />
-        <omgdi:waypoint x="900" y="399" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Association_13_di" bpmnElement="Association_13">
-        <omgdi:waypoint x="918" y="384" />
-        <omgdi:waypoint x="1035" y="456" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Association_14_di" bpmnElement="Association_14">
-        <omgdi:waypoint x="677" y="149" />
-        <omgdi:waypoint x="1045" y="451" />
-      </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Association_12_di" bpmnElement="Association_12">
-        <omgdi:waypoint x="1100" y="451" />
-        <omgdi:waypoint x="1100" y="399" />
+      <bpmndi:BPMNEdge id="Association_4_di" bpmnElement="Association_4">
+        <omgdi:waypoint x="900" y="881" />
+        <omgdi:waypoint x="900" y="829" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

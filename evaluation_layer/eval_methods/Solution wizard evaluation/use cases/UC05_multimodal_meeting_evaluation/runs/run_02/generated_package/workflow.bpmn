@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1" targetNamespace="http://gaik.solutionwizard/bpmn">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_main" name="AI-Supported Meeting Record Generation" processRef="Process_1" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_project_coordinator" name="Project Coordinator">
+        <bpmn:flowNodeRef>Activity_provide_input_bundle</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_fork_provide_input_bundle</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_ai_system" name="GAIK AI System">
+        <bpmn:flowNodeRef>Activity_transcribe_meeting</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_parse_agenda</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_extract_meeting_record</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_validate_meeting_record</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_join_extract_meeting_record</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_project_manager" name="Project Manager">
+        <bpmn:flowNodeRef>Activity_human_review</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_success</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_approve_human_review</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_rejected_human_review</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:userTask id="Activity_provide_input_bundle" name="Provide meeting recording, agenda, and participant list">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="Association_1">
+        <bpmn:targetRef>DataObjectRef_meeting_audio</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:dataOutputAssociation id="Association_2">
+        <bpmn:targetRef>DataObjectRef_agenda_pdf</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+      <bpmn:dataOutputAssociation id="Association_3">
+        <bpmn:targetRef>DataObjectRef_participant_list</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Activity_transcribe_meeting" name="Transcribe meeting recording (timestamped)
+[Transcriber]">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+      <bpmn:property id="Property_1" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_5">
+        <bpmn:sourceRef>DataObjectRef_meeting_audio</bpmn:sourceRef>
+        <bpmn:targetRef>Property_1</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataOutputAssociation id="Association_4">
+        <bpmn:targetRef>DataObjectRef_raw_transcript</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Activity_parse_agenda" name="Parse agenda PDF (page-level citations)
+[PyMuPDFParser]">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+      <bpmn:property id="Property_2" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_7">
+        <bpmn:sourceRef>DataObjectRef_agenda_pdf</bpmn:sourceRef>
+        <bpmn:targetRef>Property_2</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataOutputAssociation id="Association_6">
+        <bpmn:targetRef>DataObjectRef_parsed_agenda</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Activity_extract_meeting_record" name="Extract structured meeting record
+[Extractor]">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+      <bpmn:property id="Property_3" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_9">
+        <bpmn:sourceRef>DataObjectRef_raw_transcript</bpmn:sourceRef>
+        <bpmn:targetRef>Property_3</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:property id="Property_4" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_10">
+        <bpmn:sourceRef>DataObjectRef_parsed_agenda</bpmn:sourceRef>
+        <bpmn:targetRef>Property_4</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:property id="Property_5" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_11">
+        <bpmn:sourceRef>DataObjectRef_participant_list</bpmn:sourceRef>
+        <bpmn:targetRef>Property_5</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataOutputAssociation id="Association_8">
+        <bpmn:targetRef>DataObjectRef_meeting_record_json</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Activity_validate_meeting_record" name="Validate record for hallucinated content
+[LLMJudge]">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+      <bpmn:property id="Property_6" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_13">
+        <bpmn:sourceRef>DataObjectRef_raw_transcript</bpmn:sourceRef>
+        <bpmn:targetRef>Property_6</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:property id="Property_7" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_14">
+        <bpmn:sourceRef>DataObjectRef_meeting_record_json</bpmn:sourceRef>
+        <bpmn:targetRef>Property_7</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataOutputAssociation id="Association_12">
+        <bpmn:targetRef>DataObjectRef_validation_report</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Activity_human_review" name="Project manager reviews and approves record">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+      <bpmn:property id="Property_8" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_16">
+        <bpmn:sourceRef>DataObjectRef_meeting_record_json</bpmn:sourceRef>
+        <bpmn:targetRef>Property_8</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:property id="Property_9" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_17">
+        <bpmn:sourceRef>DataObjectRef_validation_report</bpmn:sourceRef>
+        <bpmn:targetRef>Property_9</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataOutputAssociation id="Association_15">
+        <bpmn:targetRef>DataObjectRef_approved_meeting_record</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:startEvent id="StartEvent_1" name="Start">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:parallelGateway id="Gateway_fork_provide_input_bundle">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:parallelGateway id="Gateway_join_extract_meeting_record">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:endEvent id="EndEvent_success" name="Process complete">
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gateway_approve_human_review" name="Approved?">
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EndEvent_rejected_human_review" name="Rejected">
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:dataObjectReference id="DataObjectRef_meeting_audio" name="meeting_audio" dataObjectRef="DataObject_meeting_audio" />
+    <bpmn:dataObject id="DataObject_meeting_audio" />
+    <bpmn:dataObjectReference id="DataObjectRef_agenda_pdf" name="agenda_pdf" dataObjectRef="DataObject_agenda_pdf" />
+    <bpmn:dataObject id="DataObject_agenda_pdf" />
+    <bpmn:dataObjectReference id="DataObjectRef_participant_list" name="participant_list" dataObjectRef="DataObject_participant_list" />
+    <bpmn:dataObject id="DataObject_participant_list" />
+    <bpmn:dataObjectReference id="DataObjectRef_raw_transcript" name="raw_transcript" dataObjectRef="DataObject_raw_transcript" />
+    <bpmn:dataObject id="DataObject_raw_transcript" />
+    <bpmn:dataObjectReference id="DataObjectRef_parsed_agenda" name="parsed_agenda" dataObjectRef="DataObject_parsed_agenda" />
+    <bpmn:dataObject id="DataObject_parsed_agenda" />
+    <bpmn:dataObjectReference id="DataObjectRef_meeting_record_json" name="meeting_record_json" dataObjectRef="DataObject_meeting_record_json" />
+    <bpmn:dataObject id="DataObject_meeting_record_json" />
+    <bpmn:dataObjectReference id="DataObjectRef_validation_report" name="validation_report" dataObjectRef="DataObject_validation_report" />
+    <bpmn:dataObject id="DataObject_validation_report" />
+    <bpmn:dataObjectReference id="DataObjectRef_approved_meeting_record" name="approved_meeting_record" dataObjectRef="DataObject_approved_meeting_record" />
+    <bpmn:dataObject id="DataObject_approved_meeting_record" />
+    <bpmn:textAnnotation id="TextAnnotation_1"><bpmn:text>Contains personal data (PII)</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="TextAnnotation_2"><bpmn:text>Output sensitivity: medium</bpmn:text></bpmn:textAnnotation>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Activity_provide_input_bundle" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Activity_provide_input_bundle" targetRef="Gateway_fork_provide_input_bundle" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Gateway_join_extract_meeting_record" targetRef="Activity_extract_meeting_record" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Gateway_fork_provide_input_bundle" targetRef="Activity_transcribe_meeting" />
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Gateway_fork_provide_input_bundle" targetRef="Activity_parse_agenda" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Activity_transcribe_meeting" targetRef="Gateway_join_extract_meeting_record" />
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Activity_parse_agenda" targetRef="Gateway_join_extract_meeting_record" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Activity_extract_meeting_record" targetRef="Activity_validate_meeting_record" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Activity_validate_meeting_record" targetRef="Activity_human_review" />
+    <bpmn:sequenceFlow id="Flow_10" name="Yes" sourceRef="Gateway_approve_human_review" targetRef="EndEvent_success" />
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Activity_human_review" targetRef="Gateway_approve_human_review" />
+    <bpmn:sequenceFlow id="Flow_12" name="No" sourceRef="Gateway_approve_human_review" targetRef="EndEvent_rejected_human_review" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
+      <bpmndi:BPMNShape id="Participant_main_di" bpmnElement="Participant_main" isHorizontal="true">
+        <omgdc:Bounds x="160" y="90" width="2150" height="1147" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_project_coordinator_di" bpmnElement="Lane_project_coordinator" isHorizontal="true">
+        <omgdc:Bounds x="190" y="90" width="2120" height="239" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ai_system_di" bpmnElement="Lane_ai_system" isHorizontal="true">
+        <omgdc:Bounds x="190" y="329" width="2120" height="454" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_project_manager_di" bpmnElement="Lane_project_manager" isHorizontal="true">
+        <omgdc:Bounds x="190" y="783" width="2120" height="454" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_provide_input_bundle_di" bpmnElement="Activity_provide_input_bundle">
+        <omgdc:Bounds x="435" y="212" width="130" height="90" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_transcribe_meeting_di" bpmnElement="Activity_transcribe_meeting">
+        <omgdc:Bounds x="835" y="451" width="130" height="90" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_parse_agenda_di" bpmnElement="Activity_parse_agenda">
+        <omgdc:Bounds x="835" y="666" width="130" height="90" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_extract_meeting_record_di" bpmnElement="Activity_extract_meeting_record">
+        <omgdc:Bounds x="1235" y="451" width="130" height="90" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_validate_meeting_record_di" bpmnElement="Activity_validate_meeting_record">
+        <omgdc:Bounds x="1435" y="451" width="130" height="90" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_human_review_di" bpmnElement="Activity_human_review">
+        <omgdc:Bounds x="1635" y="905" width="130" height="90" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <omgdc:Bounds x="282" y="239" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="272" y="279" width="56" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_fork_provide_input_bundle_di" bpmnElement="Gateway_fork_provide_input_bundle">
+        <omgdc:Bounds x="675" y="232" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_join_extract_meeting_record_di" bpmnElement="Gateway_join_extract_meeting_record">
+        <omgdc:Bounds x="1075" y="471" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_success_di" bpmnElement="EndEvent_success">
+        <omgdc:Bounds x="2082" y="932" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="2072" y="972" width="56" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_approve_human_review_di" bpmnElement="Gateway_approve_human_review" isMarkerVisible="true">
+        <omgdc:Bounds x="1875" y="925" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1865" y="979" width="70" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_rejected_human_review_di" bpmnElement="EndEvent_rejected_human_review">
+        <omgdc:Bounds x="2082" y="1147" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="2072" y="1187" width="56" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_meeting_audio_di" bpmnElement="DataObjectRef_meeting_audio">
+        <omgdc:Bounds x="376" y="110" width="36" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_agenda_pdf_di" bpmnElement="DataObjectRef_agenda_pdf">
+        <omgdc:Bounds x="482" y="110" width="36" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_participant_list_di" bpmnElement="DataObjectRef_participant_list">
+        <omgdc:Bounds x="588" y="110" width="36" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_raw_transcript_di" bpmnElement="DataObjectRef_raw_transcript">
+        <omgdc:Bounds x="882" y="349" width="36" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_parsed_agenda_di" bpmnElement="DataObjectRef_parsed_agenda">
+        <omgdc:Bounds x="882" y="564" width="36" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_meeting_record_json_di" bpmnElement="DataObjectRef_meeting_record_json">
+        <omgdc:Bounds x="1282" y="349" width="36" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_validation_report_di" bpmnElement="DataObjectRef_validation_report">
+        <omgdc:Bounds x="1482" y="349" width="36" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_approved_meeting_record_di" bpmnElement="DataObjectRef_approved_meeting_record">
+        <omgdc:Bounds x="1682" y="803" width="36" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="TextAnnotation_1_di" bpmnElement="TextAnnotation_1">
+        <omgdc:Bounds x="2350" y="110" width="180" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="TextAnnotation_2_di" bpmnElement="TextAnnotation_2">
+        <omgdc:Bounds x="2350" y="178" width="180" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <omgdi:waypoint x="318" y="257" />
+        <omgdi:waypoint x="435" y="257" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <omgdi:waypoint x="565" y="257" />
+        <omgdi:waypoint x="675" y="257" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <omgdi:waypoint x="1125" y="496" />
+        <omgdi:waypoint x="1235" y="496" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <omgdi:waypoint x="725" y="257" />
+        <omgdi:waypoint x="780" y="257" />
+        <omgdi:waypoint x="780" y="496" />
+        <omgdi:waypoint x="835" y="496" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <omgdi:waypoint x="725" y="257" />
+        <omgdi:waypoint x="780" y="257" />
+        <omgdi:waypoint x="780" y="711" />
+        <omgdi:waypoint x="835" y="711" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <omgdi:waypoint x="965" y="496" />
+        <omgdi:waypoint x="1075" y="496" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <omgdi:waypoint x="965" y="711" />
+        <omgdi:waypoint x="1020" y="711" />
+        <omgdi:waypoint x="1020" y="496" />
+        <omgdi:waypoint x="1075" y="496" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <omgdi:waypoint x="1365" y="496" />
+        <omgdi:waypoint x="1435" y="496" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <omgdi:waypoint x="1565" y="496" />
+        <omgdi:waypoint x="1600" y="496" />
+        <omgdi:waypoint x="1600" y="950" />
+        <omgdi:waypoint x="1635" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <omgdi:waypoint x="1925" y="950" />
+        <omgdi:waypoint x="2082" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <omgdi:waypoint x="1765" y="950" />
+        <omgdi:waypoint x="1875" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <omgdi:waypoint x="1925" y="950" />
+        <omgdi:waypoint x="2003" y="950" />
+        <omgdi:waypoint x="2003" y="1165" />
+        <omgdi:waypoint x="2082" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_1_di" bpmnElement="Association_1">
+        <omgdi:waypoint x="460" y="212" />
+        <omgdi:waypoint x="412" y="155" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_2_di" bpmnElement="Association_2">
+        <omgdi:waypoint x="500" y="212" />
+        <omgdi:waypoint x="500" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_3_di" bpmnElement="Association_3">
+        <omgdi:waypoint x="539" y="212" />
+        <omgdi:waypoint x="588" y="155" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_5_di" bpmnElement="Association_5">
+        <omgdi:waypoint x="412" y="147" />
+        <omgdi:waypoint x="836" y="451" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_4_di" bpmnElement="Association_4">
+        <omgdi:waypoint x="900" y="451" />
+        <omgdi:waypoint x="900" y="399" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_7_di" bpmnElement="Association_7">
+        <omgdi:waypoint x="517" y="160" />
+        <omgdi:waypoint x="868" y="666" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_6_di" bpmnElement="Association_6">
+        <omgdi:waypoint x="900" y="666" />
+        <omgdi:waypoint x="900" y="614" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_9_di" bpmnElement="Association_9">
+        <omgdi:waypoint x="918" y="379" />
+        <omgdi:waypoint x="1235" y="476" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_10_di" bpmnElement="Association_10">
+        <omgdi:waypoint x="918" y="584" />
+        <omgdi:waypoint x="1235" y="511" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_11_di" bpmnElement="Association_11">
+        <omgdi:waypoint x="624" y="144" />
+        <omgdi:waypoint x="1235" y="462" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_8_di" bpmnElement="Association_8">
+        <omgdi:waypoint x="1300" y="451" />
+        <omgdi:waypoint x="1300" y="399" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_13_di" bpmnElement="Association_13">
+        <omgdi:waypoint x="918" y="377" />
+        <omgdi:waypoint x="1435" y="482" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_14_di" bpmnElement="Association_14">
+        <omgdi:waypoint x="1318" y="384" />
+        <omgdi:waypoint x="1435" y="456" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_12_di" bpmnElement="Association_12">
+        <omgdi:waypoint x="1500" y="451" />
+        <omgdi:waypoint x="1500" y="399" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_16_di" bpmnElement="Association_16">
+        <omgdi:waypoint x="1317" y="399" />
+        <omgdi:waypoint x="1668" y="905" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_17_di" bpmnElement="Association_17">
+        <omgdi:waypoint x="1508" y="399" />
+        <omgdi:waypoint x="1684" y="905" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_15_di" bpmnElement="Association_15">
+        <omgdi:waypoint x="1700" y="905" />
+        <omgdi:waypoint x="1700" y="853" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

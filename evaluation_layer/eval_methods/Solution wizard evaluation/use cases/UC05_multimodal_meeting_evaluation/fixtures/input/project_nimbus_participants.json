@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "meeting_id": "NIMBUS-PRR-2026-09-17",
+  "meeting_title": "Project Nimbus Pilot Readiness Review",
+  "scheduled_date": "2026-09-17",
+  "scheduled_start_time": "09:00",
+  "scheduled_end_time": "09:30",
+  "participants": [
+    {
+      "name": "Elena Markovic",
+      "role": "Project Manager",
+      "meeting_responsibility": "Chair and reviewer"
+    },
+    {
+      "name": "Liam Chen",
+      "role": "Technical Lead",
+      "meeting_responsibility": "Technical readiness"
+    },
+    {
+      "name": "Sofia Niemi",
+      "role": "Data Protection Specialist",
+      "meeting_responsibility": "Data protection review"
+    },
+    {
+      "name": "Arjun Patel",
+      "role": "Project Coordinator",
+      "meeting_responsibility": "Meeting coordination and record preparation"
+    },
+    {
+      "name": "Mia Roberts",
+      "role": "Procurement Specialist",
+      "meeting_responsibility": "Vendor quotation review"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+flowchart TD
+    provide_input_bundle["Provide meeting recording, agenda, and participant list"]
+    transcribe_meeting["Transcribe meeting recording (timestamped)"]
+    parse_agenda["Parse agenda PDF (page-level citations)"]
+    extract_meeting_record["Extract structured meeting record"]
+    validate_meeting_record["Validate record for hallucinated content"]
+    human_review["Project manager reviews and approves record"]
+    provide_input_bundle --> transcribe_meeting
+    provide_input_bundle --> parse_agenda
+    transcribe_meeting --> extract_meeting_record
+    parse_agenda --> extract_meeting_record
+    extract_meeting_record --> validate_meeting_record
+    validate_meeting_record --> human_review
+
+    style provide_input_bundle fill:#dbeafe
+    style transcribe_meeting fill:#f5f3ff
+    style parse_agenda fill:#f5f3ff
+    style extract_meeting_record fill:#dcfce7
+    style validate_meeting_record fill:#f5f3ff
+    style human_review fill:#dcfce7

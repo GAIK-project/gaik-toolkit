@@ -1,0 +1,291 @@
+GAIK Solution Configuration Wizard — Conversation
+Exported: 2026-08-14
+
+---
+User:
+
+We are a manufacturing company with internal policies, equipment manuals, and commercially sensitive management documents. Employees spend too much time searching across these documents and may overlook the applicable source. We want an assistant that answers employee questions using the document collection, provides citations to the supporting source, and enforces role-based access so restricted documents are never retrieved or disclosed to unauthorized employees.
+
+
+---
+Wizard:
+
+Understood — this is a **RAG** (document collection + question-answering) use case: employees will query your internal policy, manual, and management documents through an assistant that answers with citations while enforcing role-based access control so restricted content stays hidden from unauthorized users.
+
+Before we get to component design, I need a bit more business context — some of this is already covered by your description, so I'll only ask what's still open.
+
+1. Who should review or sign off on this solution before rollout (e.g. IT/security, document owners, department heads), and are there other stakeholders with a stake in it?
+2. How will you measure success, and what value do you expect (e.g. % reduction in time spent searching, fewer misdirected/incorrect answers, fewer help-desk queries)?
+3. Beyond unauthorized disclosure, what other risks concern you (e.g. the assistant citing outdated document versions, hallucinated answers), and what should the first PoC specifically demonstrate?
+
+---
+Answer what you can, and say *skip* for anything you're not sure about yet.
+
+---
+User:
+
+mployees are the main users. Today they search internal policies, manuals, and management documents manually, which is slow and can lead to incomplete or unsupported answers. Knowledge owners maintain the source documents, managers can access management-confidential material, and ordinary employees cannot. The expected value is faster access to reliable internal knowledge with traceable sources and enforced access boundaries. No human reviewer is required for every answer.
+
+Business success means employees find reliable answers faster, can verify them through citations, and never receive content outside their role. No numerical time-saving, answer-accuracy, cost, or adoption target is specified. Key risks are hallucinated answers, fabricated or wrong citations, retrieval of restricted chunks, leakage through answer text or citations, stale documents, and returning an answer when the authorized collection contains no support.
+
+Other risks are not specified for this evaluation. If a value is required, record it as an explicit assumption for user confirmation.
+
+
+---
+Wizard:
+
+Got it — that gives me solid business context. I'll record two things as explicit assumptions for you to confirm later: no numeric success target was given (I'll flag `success_criteria` accordingly), and I'll infer the PoC goal as *"demonstrate role-filtered retrieval, grounded citations, and correct refusal when no authorized document supports an answer."* Let me know if that's not right.
+
+Now the technical side.
+
+1. What language(s) are the documents in, what file formats are they (PDF, Word, scanned images, etc.), and where do they currently live (SharePoint, file share, a document management system)?
+2. How is role-based restriction currently determined for a document today (e.g. folder/library permissions, a metadata tag like "management-confidential", an access-control list per document)? This drives how retrieval filtering will work.
+3. Do you have a preferred model provider (Azure OpenAI, OpenAI, Anthropic, or "no preference/configurable"), and any security/compliance constraints on handling this content (e.g. data residency, no external data retention, on-prem only)?
+
+---
+Answer what you can, and say *skip* for anything you're unsure of — we can mark it as an open assumption.
+
+---
+User:
+
+The evaluated collection contains three synthetic, text-based English PDFs supplied in the wizard-visible input bundle: `employee_travel_policy.pdf`, `mx200_maintenance_manual.pdf`, and the management-confidential `project_aurora_pricing_strategy.pdf`. The same bundle contains `access_manifest.json`, `query_set.json`, and `poc_input_bundle.json`. Each document has a title, filename, classification, allowed-role metadata, and 1-based PDF page-number metadata. The first PoC uses these supplied local inputs; connection to a live document repository is outside its scope.
+
+The travel policy and maintenance manual are available to employee and manager roles. The Project Aurora strategy is management-confidential and available only to the manager role. Access filtering must happen before retrieval so unauthorized chunks never enter the model context. An unauthorized answer must refuse without exposing restricted facts or citations. External model APIs are allowed. The synthetic fixtures contain no personal data. The PoC may use a local vector store and simulated role values; enterprise identity integration and a full audit-log service are outside PoC scope. No exact retention period is specified.
+
+Use Azure OpenAI for generation with model gpt-5.4, temperature 1.0, and reasoning effort medium. Use an Azure OpenAI embedding model supported by the selected GAIK RAG workflow; the exact embedding deployment name is an environment setting. No SLA, throughput, document-volume, latency, or budget target is specified. Valid implementation defaults may be recorded as assumptions, not user-confirmed requirements.
+
+---
+Wizard:
+
+Excellent detail — that covers most of the technical spec (formats, data sources, security constraints, provider/model, integration scope). A few closing items before I move to component selection.
+
+1. **Runtime interface** — how should employees interact with this in the PoC (a command-line script, a simple local web chat UI, an API endpoint)?
+2. **Evaluation** — using `query_set.json` and `access_manifest.json` as test data, do you want specific target metrics (e.g. citation accuracy, correct-refusal rate, retrieval precision) with pass/fail thresholds, or should the eval script just report these metrics with no fixed targets?
+3. **Output extras** — do you want a formatted PDF report of each answer in addition to the on-screen response, and is there any controlled vocabulary (policy codes, equipment IDs, etc.) the assistant must recognize? Say "none" if not applicable.
+
+---
+Answer what you can — anything left open will be recorded as an explicit assumption.
+
+---
+User:
+
+The first PoC should demonstrate role-aware, citation-grounded question answering over the three PDFs, `access_manifest.json`, and `query_set.json` supplied in the wizard-visible input bundle. It must support the command `python run_poc.py --input <path-to-poc_input_bundle.json>`, resolve the other supplied files relative to that bundle, execute all four role-tagged queries, and save non-empty parseable JSON results. The role is trusted request metadata and must not be inferred from the question. Q01 uses role `employee` and asks the Helsinki hotel limit; it must answer EUR 180 per night and written Finance Director approval before booking when exceeded, citing `["employee_travel_policy.pdf", 3]`. Q02 uses role `employee` and asks about the MX-200 filter; it must answer inspection every 250 operating hours and replacement after 1,000 operating hours or above 1.8 bar, whichever occurs first, citing `["mx200_maintenance_manual.pdf", 3]` and `["mx200_maintenance_manual.pdf", 4]`. Q03 uses role `employee` and asks for the Project Aurora discount ceiling; it must return `access_decision` `denied`, an empty citations list, and no 12 percent, 22 percent, or Chief Financial Officer details. Q04 uses role `manager` and asks for the Project Aurora ceiling and exception approver; it must answer 12 percent and written Chief Financial Officer approval above the ceiling, citing `["project_aurora_pricing_strategy.pdf", 3]`. A web interface, live repository connector, enterprise sign-in, and numerical RAG-quality threshold are outside the first PoC.
+
+The evaluated collection contains three synthetic, text-based English PDFs supplied in the wizard-visible input bundle: `employee_travel_policy.pdf`, `mx200_maintenance_manual.pdf`, and the management-confidential `project_aurora_pricing_strategy.pdf`. The same bundle contains `access_manifest.json`, `query_set.json`, and `poc_input_bundle.json`. Each document has a title, filename, classification, allowed-role metadata, and 1-based PDF page-number metadata. The first PoC uses these supplied local inputs; connection to a live document repository is outside its scope.
+
+Use a RAGAnswerRecord or equivalent JSON structure. Required fields are `query_id` (string), `role` (`employee` or `manager`), `question` (string), `access_decision` (`allowed` or `denied`), `answer` (string), and `citations` (list). Each citation must be a two-element list in the exact format `[file_name, page_number]`, where `file_name` is a string and `page_number` is a 1-based integer. `refusal_reason` is required when `access_decision` is `denied` and may otherwise be null. Authorized factual answers require at least one supporting citation. Denied answers require an empty citations list and must not reveal restricted content.
+
+Answers must use only retrieved content that the user's role is allowed to access. Cite every material factual claim using `[file_name, page_number]`. If the authorized sources do not support an answer, state that the information was not found and do not speculate. If sources conflict, identify the conflict and cite both sources. Do not fabricate citations. A per-answer human reviewer is not required.
+
+Preserve `file_name`, 1-based integer `page_number`, `classification`, and `allowed_roles` metadata on every chunk. Use structure-aware chunking with moderate overlap. Retrieve the top four eligible chunks using semantic similarity; hybrid search or reranking may be added but is not required. Apply the role filter before similarity retrieval. Generate citations only as `[file_name, page_number]`. Preserve exact values and units such as EUR 180, 250 operating hours, 1,000 operating hours, 1.8 bar, 12 percent, and 22 percent.
+
+Every output must preserve `query_id` and `role`. `access_decision` must be `allowed` or `denied`. An allowed factual answer requires at least one citation to a document allowed for that role. Each citation must contain exactly two elements in the order `[file_name, page_number]`, with a string filename and a 1-based integer page number. A denied answer requires a `refusal_reason`, an empty citations list, and no restricted facts. Do not answer from model memory when authorized evidence is absent. The four PoC results must be returned separately and must match the expected access behavior and citation pairs.
+
+See the aforementioned fixture documents in C:\Users\h02317\Downloads\fixtures
+
+---
+Wizard:
+
+Directory exists and is empty. Now writing the draft blueprint (business/technical/target-output specs + governance) so the completeness gate can run.Gate 1 completeness check passed (13/13). Here is the complete specification for review — every field, including the assumptions I recorded where nothing numeric was specified.
+
+## Business Specification
+
+| Field | Value |
+|---|---|
+| Current process | Employees manually search across internal policies, equipment manuals, and management documents, with no systematic way to verify which source supports an answer. |
+| Pain points | Manual search is slow; answers can be incomplete/unsupported because employees may overlook the applicable source. |
+| Proposed solution | AI assistant answering employee questions from the document collection, with citations, enforcing role-based access so restricted documents are never retrieved or disclosed. |
+| Intended users | employee, manager |
+| Reviewers | none — no per-answer human review required |
+| Stakeholders | knowledge owners (maintain/classify documents), managers (access confidential material), employees (primary users) |
+| Input artifacts | internal policies, equipment manuals, commercially sensitive management documents |
+| Target outputs | role-aware answer to an employee question, grounded with citations |
+| Success criteria | Faster reliable answers, verifiable via citations, no out-of-role disclosure. *No numeric target specified (assumption).* |
+| Expected value | faster access to reliable knowledge; traceable answers; enforced access boundaries |
+| Risks | hallucinated answers; fabricated/wrong citations; restricted-chunk retrieval; leakage via answer/citation text; stale documents; answering when no support exists |
+| PoC goal | Role-aware, citation-grounded QA over 3 sample PDFs + access manifest + query set; CLI run over 4 role-tagged queries producing parseable JSON with correct access decisions/citations. Web UI, live repo connector, enterprise sign-in, audit-log service, and numeric quality threshold are out of scope for this PoC. |
+
+## Technical Specification
+
+| Field | Value |
+|---|---|
+| Input types | document_collection, pdf |
+| Input formats | PDF (text-based, English); JSON (access manifest, query set, input bundle) |
+| Output types | answer_with_citations, structured_json |
+| Language | en |
+| Domain vocabulary | none beyond preserving exact values/units verbatim (EUR amounts, hours, bar, percent) |
+| Data sources | Local fixture bundle (3 PDFs + access_manifest.json + query_set.json, resolved relative to poc_input_bundle.json). Live repository integration out of scope. |
+| Model provider | azure_openai |
+| Model preferences | generation model gpt-5.4, temperature 1.0, reasoning effort medium; embedding model = Azure OpenAI embedding deployment (exact name via env — assumption) |
+| Security constraints | Pre-retrieval role filtering (unauthorized chunks never enter model context); role is trusted metadata, never inferred from the question; denied answers reveal no restricted facts/citations; external APIs allowed; fixtures contain no personal data; enterprise identity/audit-log out of PoC scope; retention period unspecified |
+| Integration targets | none |
+| Human review | no |
+| Evaluation requirements | Deterministic 4-query acceptance test (Q01–Q04) against required facts/access decision/citations; no numeric RAG-quality threshold |
+| Runtime interface | CLI: `python run_poc.py --input <path-to-poc_input_bundle.json>` |
+
+## Target Output Specification — `RAGAnswerRecord`
+
+| Field | Type | Required |
+|---|---|---|
+| query_id | str | yes |
+| role | str (employee \| manager) | yes |
+| question | str | yes |
+| access_decision | str (allowed \| denied) | yes |
+| answer | str | yes |
+| citations | list of [file_name: str, page_number: int] | yes |
+| refusal_reason | str \| null | only when denied |
+
+Validation rules: allowed answers need ≥1 citation to a role-permitted document; denied answers need empty citations + a refusal reason + no restricted facts; citation format is strictly `[file_name, page_number]`; `query_id`/`role` must be preserved; no fabricated citations; no answering from model memory when evidence is absent.
+
+## Assumptions recorded (unconfirmed)
+
+1. No numeric success target was given — success is qualitative.
+2. Embedding deployment name unspecified — PoC reads it from an environment variable (default `text-embedding-3-large`).
+3. Retention period unspecified.
+4. No numeric RAG-quality threshold — evaluation is the 4-query acceptance test only.
+5. Whether real production documents (beyond the synthetic PoC fixtures) contain personal data is unknown — this will block production packaging later.
+
+---
+Does this look correct? Reply **yes** to proceed to component selection, or tell me what to change.
+
+---
+User:
+
+Yes. Proceed without any change. 
+
+---
+Wizard:
+
+Optional step — a few quick questions to make the BPMN a genuine business-process view (roles, manual steps, exception paths), not just the technical pipeline. Skip any that don't apply.
+
+1. **Roles/swimlanes** — I'd model three participants: *Employee* (asks questions), *Manager* (asks questions, broader access), and *Knowledge Owner* (classifies/maintains the source documents, outside the automated pipeline). Does that match, or should any role be added/renamed?
+2. **Manual steps** — Is tagging a document's classification and allowed roles (as in `access_manifest.json`) a manual step knowledge owners perform before documents are ingested, or should the diagram just treat that metadata as already-given static input?
+3. **Denied-query handling** — When access is denied, should the process simply end with a refusal (no further action), or do you want a path where the employee can request access/escalate to a knowledge owner?
+
+---
+Answer what you can, or say *skip* to use sensible defaults (three roles as above, classification treated as static input, denial ends cleanly).
+
+---
+User:
+
+Not specified for this evaluation. If a value is required, record it as an explicit assumption for user confirmation.
+
+---
+Wizard:
+
+## Component Selection
+
+**Transformation chain**
+
+```
+document_collection + access_manifest  →  role-scoped vector index  →  role-filtered retrieved chunks  →  RAGAnswerRecord (answer + citations + access_decision)
+```
+
+**Selected**
+
+```
+Module: RAGWorkflow   (contains, internally: Embedder + vector store + Retriever + AnswerGenerator)
+  Instantiated twice, once per access level, to satisfy "filter before retrieval":
+    - "employee" index  — built only from documents where allowed_roles includes "employee"
+                           (employee_travel_policy.pdf, mx200_maintenance_manual.pdf)
+    - "manager" index   — built from all three documents (manager is authorized for everything)
+  Each incoming query is routed to the index matching its role BEFORE any similarity
+  search runs — so a restricted document's chunks are never even present in the search
+  space an employee query can reach, not just filtered out afterward.
+```
+
+| Option | Value | Why | Effect |
+|---|---|---|---|
+| `persist` | `True` (local Chroma store) | matches "may use a local vector store" | store survives the run under `poc/chroma_store/` |
+| `collection_name` | `gaik_rag_employee` / `gaik_rag_manager` | the mechanism that enforces pre-retrieval RBAC filtering | two physically separate search spaces, one per access level |
+| `retriever_top_k` | `4` (default 5) | spec: "top four eligible chunks" | up to 4 chunks retrieved per query |
+| `citations` | `True` (default) | citation/traceability is a core requirement | answer includes source grounding |
+| `conversation_history` | `False` (default True) | runtime is a batch CLI over 4 independent queries, not a chat session | each query answered independently, no cross-query bleed |
+| `stream` | `False` (default True) | CLI writes one JSON record per query, not a token stream | full answer string returned synchronously |
+| `use_azure` | `True` | `model_provider = azure_openai` | routes both embedding and generation through Azure OpenAI |
+| `embedding_model` | env-configurable (default `text-embedding-3-large`) | exact deployment name not specified (assumption_002) | consistent vector dimension across ingestion and query |
+| `retriever_hybrid`, `retriever_rerank` | left at default `False` | explicitly "not required" | plain semantic top-k search, matching the spec literally |
+
+**Custom logic layered around the module (not a registry component):** to distinguish a genuine **denial** (Q03 — an employee asking about the manager-only document) from an **honest "not found"** (a permitted-topic question the corpus simply doesn't cover), the PoC also runs an internal-only relevance check against the full ("manager") index — used *solely* to decide `access_decision`/`refusal_reason`, never to source the answer text or citations shown to an unauthorized role. This keeps "denied answers reveal no restricted facts" true by construction.
+
+**Why not other options:**
+- *LLMJudge* — skipped: `human_review = no` and no explicit quality-check request.
+- *Standalone Embedder / vector-store component / Retriever / AnswerGenerator* — skipped: `RAGWorkflow` already subsumes them; adding them separately would be redundant.
+- *A separate parser step (PyMuPDF/Vision/Docling)* — skipped: `RAGWorkflow` parses the PDFs internally, and the accuracy override doesn't apply (documents are plain text-layer PDFs, not scanned/complex).
+- *VisionExtractor / DocumentsToStructuredData* — wrong shape: output is a conversational/RAG answer with citations, not single-document structured extraction.
+
+---
+Does this selection look right? Should I add, remove, or change anything?
+
+---
+User:
+
+Yes. Proceed without any change.
+
+
+
+---
+Wizard:
+
+Now adding artifacts, components, workflow, models, validation, evaluation, runtime, traceability, and change_log:Now let's validate the assembled blueprint:Validation passed (only expected warnings about the unconfirmed assumptions we already flagged). Now generating the workflow diagrams.Both diagrams are generated. Here's the workflow (Mermaid, quick technical view):
+
+```mermaid
+flowchart TD
+    upload_documents["Upload internal document collection"]
+    provide_access_manifest["Provide document classification and allowed-roles manifest"]
+    submit_queries["Employee/manager submits role-tagged question(s)"]
+    generate_role_aware_answers["Index documents with role metadata, retrieve role-filtered context, generate cited answer per query"]
+    upload_documents --> generate_role_aware_answers
+    provide_access_manifest --> generate_role_aware_answers
+    submit_queries --> generate_role_aware_answers
+
+    style upload_documents fill:#dbeafe
+    style provide_access_manifest fill:#dbeafe
+    style submit_queries fill:#dbeafe
+    style generate_role_aware_answers fill:#dcfce7
+```
+
+I also generated `workflow.bpmn` — the BPMN 2.0 visual blueprint, with the *Employee / Manager* swimlane, the GAIK AI System lane, and an access-decision gateway (authorized vs. denied) after the answer-generation task. Open it in bpmn-js, Camunda Modeler, or draw.io to see the full model.
+
+Does the workflow look correct?
+- Are all the steps right (upload documents, provide access manifest, submit queries, generate role-aware answers)?
+- Is anything missing or in the wrong order?
+- Do the roles/lanes and the access-decision gateway match your process?
+
+---
+Reply **yes** to confirm and I'll scaffold the proof of concept, or tell me what to change.
+
+---
+User:
+
+Yes. Proceed without any change.
+
+
+
+---
+Wizard:
+
+Now writing the hand-authored output schema (RAGAnswerRecord — no SchemaGenerator call needed for RAG per the skill; this is a custom structured contract the user specified):Now copying the legitimate PoC input fixtures (documents, access manifest, query set, bundle pointer — not the evaluator-only files) into the PoC's sample input:Good, all fixtures copied. Now writing the full `run_poc.py` implementing the RBAC-aware RAG pipeline:Let me clean up unused imports and move `os` import to the top:Now updating `config.yaml` to reflect the real model settings (removing the stale generic placeholders):Now updating `.env.example` to document the embedding-deployment override:Now the eval script itself (the scaffolder's generated one has a syntax error and doesn't fit this use case — replacing it):Now updating the README to reflect the actual CLI usage and design (removing generic/stale placeholders):Now let's finalize the blueprint's change log, then generate the documentation suite.Let's re-validate to make sure the blueprint is still consistent, then generate the documentation suite.Good, still valid. Now generating the documentation suite:Let me read all five documents to fill in the markers with accurate, use-case-specific content.Now the user_guide.md — filling markers and fixing the stale/generic lines that don't match this pipeline:Now the developer_guide.md:Now the evaluation_plan.md:Everything is in place. Here's the handoff:
+
+Your PoC and documentation have been generated:
+
+```
+poc/               -- runnable proof of concept (customized RAG + RBAC pipeline)
+docs/              -- complete documentation suite
+use_case.blueprint.json, workflow.mmd, workflow.bpmn
+```
+
+**Note on customization:** the stock RAG template doesn't cover role-based access control or your exact CLI/output contract, so `poc/run_poc.py` was hand-wired (not left as scaffolder boilerplate). It:
+- Drives `RAGWorkflow`'s own parser/embedder/vector-store/retriever directly so every chunk can be tagged with `role_<role>` metadata from `access_manifest.json`, and applies that as a pre-retrieval filter (`Retriever.search(filters=...)`) — unauthorized chunks never enter the model context.
+- Runs an internal-only unfiltered check (never exposed as content) to tell a genuine access **denial** apart from an honest **not-found**.
+- Calls the LLM client directly for answer generation, since `AnswerGenerator.generate()` hardcodes `temperature=0.0` and would have silently ignored your requested `temperature=1.0` / `reasoning_effort=medium`.
+- Builds citations from the actual retrieved chunks (never parsed from the model's text), so a citation can't be fabricated.
+
+To run it:
+1. Install dependencies: `pip install -r poc/requirements.txt`
+2. Set up your environment: `cp poc/.env.example poc/.env` — fill in your Azure OpenAI key/endpoint
+3. A sample input bundle is already included: `poc/sample_input/poc_input_bundle.json` (3 PDFs, access manifest, 4 role-tagged queries)
+4. Run it: `python poc/run_poc.py --input poc/sample_input/poc_input_bundle.json`
+5. Inspect `poc/output/answer_records.json`, and optionally run `python poc/evals/run_basic_eval.py` for an automated pass/fail check against the four acceptance queries
+
+When you're ready, paste the output here (or the eval script's result) and I'll help interpret it and refine anything that's off (Gate 3).

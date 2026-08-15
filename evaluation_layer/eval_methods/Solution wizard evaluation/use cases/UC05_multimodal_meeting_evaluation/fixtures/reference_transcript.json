@@ -1,0 +1,143 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UC05",
+  "meeting_id": "NIMBUS-PRR-2026-09-17",
+  "audio_file": "project_nimbus_meeting.wav",
+  "duration_seconds": 250.342,
+  "note": "Evaluator-only reference. Do not provide this transcript to the wizard.",
+  "segments": [
+    {
+      "segment_id": "S01",
+      "speaker": "Elena Markovic",
+      "start_timestamp": "00:00:00",
+      "end_timestamp": "00:00:20",
+      "text": "Good morning. My name is Elena Markovic. I am the Project Manager for Project Nimbus. I chair this readiness review, coordinate the final go or no go recommendation, and review the meeting record before approval. I am opening the Project Nimbus pilot readiness review on September seventeenth, twenty twenty six at nine o'clock."
+    },
+    {
+      "segment_id": "S02",
+      "speaker": "Liam Chen",
+      "start_timestamp": "00:00:20",
+      "end_timestamp": "00:00:33",
+      "text": "My name is Liam Chen. I am the Technical Lead for Project Nimbus. I am responsible for the pilot sandbox, technical readiness, and coordination of the single sign on question with the architecture board."
+    },
+    {
+      "segment_id": "S03",
+      "speaker": "Sofia Niemi",
+      "start_timestamp": "00:00:33",
+      "end_timestamp": "00:00:46",
+      "text": "My name is Sofia Niemi. I am the Data Protection Specialist for Project Nimbus. I advise the team on permitted pilot data, privacy controls, and the data protection impact assessment."
+    },
+    {
+      "segment_id": "S04",
+      "speaker": "Arjun Patel",
+      "start_timestamp": "00:00:47",
+      "end_timestamp": "00:01:00",
+      "text": "My name is Arjun Patel. I am the Project Coordinator for Project Nimbus. I organize the meeting, coordinate training and follow up activities, and prepare the meeting record for the Project Manager's review."
+    },
+    {
+      "segment_id": "S05",
+      "speaker": "Mia Roberts",
+      "start_timestamp": "00:01:01",
+      "end_timestamp": "00:01:12",
+      "text": "My name is Mia Roberts. I am the Procurement Specialist supporting Project Nimbus. I coordinate supplier quotations and report the procurement and budget position to the project team."
+    },
+    {
+      "segment_id": "S06",
+      "speaker": "Arjun Patel",
+      "start_timestamp": "00:01:13",
+      "end_timestamp": "00:01:20",
+      "text": "Thank you. Attendance is complete and all five expected participants are present. We can proceed with the readiness review."
+    },
+    {
+      "segment_id": "S07",
+      "speaker": "Elena Markovic",
+      "start_timestamp": "00:01:21",
+      "end_timestamp": "00:01:41",
+      "text": "Today we need to confirm the pilot scope, data protection conditions, procurement actions, training, and open technical risks. The agenda proposes October fifteenth as the launch date, but that date was drafted before the latest readiness review. We need an explicit decision today rather than copying the proposal into the meeting record."
+    },
+    {
+      "segment_id": "S08",
+      "speaker": "Liam Chen",
+      "start_timestamp": "00:01:42",
+      "end_timestamp": "00:01:56",
+      "text": "My recommendation is to limit the pilot to the Helsinki customer service team, with thirty users, for two weeks. The sandbox will not be ready for the proposed October fifteenth date. A start on October twentieth is realistic."
+    },
+    {
+      "segment_id": "S09",
+      "speaker": "Elena Markovic",
+      "start_timestamp": "00:01:56",
+      "end_timestamp": "00:02:08",
+      "text": "Decision: the pilot will cover only the Helsinki customer service team, with thirty users, for a two week period starting October twentieth. This replaces the proposed October fifteenth date in the agenda."
+    },
+    {
+      "segment_id": "S10",
+      "speaker": "Sofia Niemi",
+      "start_timestamp": "00:02:09",
+      "end_timestamp": "00:02:24",
+      "text": "For data protection, the pilot should use synthetic or anonymized records only. Production customer data must not enter the pilot environment. I can complete the data protection impact assessment by September twenty ninth."
+    },
+    {
+      "segment_id": "S11",
+      "speaker": "Elena Markovic",
+      "start_timestamp": "00:02:25",
+      "end_timestamp": "00:02:34",
+      "text": "Decision: no production customer data will be used in the pilot. Sofia owns the data protection impact assessment and the due date is September twenty ninth."
+    },
+    {
+      "segment_id": "S12",
+      "speaker": "Mia Roberts",
+      "start_timestamp": "00:02:34",
+      "end_timestamp": "00:02:48",
+      "text": "We expect three supplier quotations. I can compare them by September twenty fourth. The agenda mentions an eighteen thousand euro ceiling, but finance has not confirmed it. We are not approving a budget in this meeting."
+    },
+    {
+      "segment_id": "S13",
+      "speaker": "Elena Markovic",
+      "start_timestamp": "00:02:48",
+      "end_timestamp": "00:02:58",
+      "text": "Action: Mia will compare the three supplier quotations by September twenty fourth. The final budget approval and confirmed ceiling remain unresolved until finance responds."
+    },
+    {
+      "segment_id": "S14",
+      "speaker": "Liam Chen",
+      "start_timestamp": "00:02:59",
+      "end_timestamp": "00:03:11",
+      "text": "The single sign on approach is still with the architecture board. The board meets on September twenty second. There is no single sign on decision today, and no project team owner should be inferred for that decision."
+    },
+    {
+      "segment_id": "S15",
+      "speaker": "Elena Markovic",
+      "start_timestamp": "00:03:12",
+      "end_timestamp": "00:03:21",
+      "text": "Action: Arjun will schedule the pilot training session by October third. The training itself should take place before the October twentieth pilot start."
+    },
+    {
+      "segment_id": "S16",
+      "speaker": "Elena Markovic",
+      "start_timestamp": "00:03:22",
+      "end_timestamp": "00:03:28",
+      "text": "Action: Liam will configure and test the sandbox by September twenty fifth, using synthetic test data only."
+    },
+    {
+      "segment_id": "S17",
+      "speaker": "Elena Markovic",
+      "start_timestamp": "00:03:29",
+      "end_timestamp": "00:03:42",
+      "text": "We also need a short support frequently asked questions document before training. Someone from support should draft it, but no owner or exact due date has been agreed. Record both values as unknown rather than assigning them."
+    },
+    {
+      "segment_id": "S18",
+      "speaker": "Elena Markovic",
+      "start_timestamp": "00:03:42",
+      "end_timestamp": "00:03:54",
+      "text": "Action: I will send the consolidated go or no go summary to the steering group by October sixth, after the data protection, procurement, training, and sandbox updates are available."
+    },
+    {
+      "segment_id": "S19",
+      "speaker": "Elena Markovic",
+      "start_timestamp": "00:03:54",
+      "end_timestamp": "00:04:10",
+      "text": "To recap, we approved the limited thirty user Helsinki pilot beginning October twentieth and the use of synthetic or anonymized data only. The budget and single sign on approach remain open. The named actions and dates should be recorded exactly. The meeting closes at nine eighteen."
+    }
+  ]
+}

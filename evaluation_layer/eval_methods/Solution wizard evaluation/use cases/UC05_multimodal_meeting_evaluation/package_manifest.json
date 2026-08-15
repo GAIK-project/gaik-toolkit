@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "template_name": "GAIK Solution Configuration Wizard evaluation package",
+  "scenario_id": "UC05",
+  "fixture_revision": "4.1-string-citations",
+  "number_of_independent_runs": 2,
+  "baseline_attempt": 0,
+  "maximum_refinement_attempts": 3,
+  "confirmation_policy": "Yes. Proceed without changes.",
+  "headline_metrics": ["EQ1", "EQ2", "EQ3", "EQ4"],
+  "unscored_diagnostics": ["unsupported assumptions", "PoC recovery"],
+  "fixture_sha256": {
+    "fixtures/input/project_nimbus_meeting.wav": "d56c07bc369ee98d349636ce5102d005b0df622c81b7c46f5b9863f7d3a2d9ec",
+    "fixtures/input/project_nimbus_agenda.pdf": "c90b9b144ec867f9ff31a0204ae16a3ad3edab530f656637db205a1292e87242",
+    "fixtures/input/project_nimbus_participants.json": "011cea3a6a2ad06eb904c8864378a24dcddbe286bfb390c07fce43872af8f688",
+    "fixtures/poc_input_bundle.json": "99d68881d1a1deaba67a8cd26745bcbaeb12082c5a7e109781bd40d3aa15f19a",
+    "fixtures/expected_meeting_record.json": "5ebf2fd714357c877314395b9c4014c6359a1d2f2d98fd4641187a06ba7cad9f",
+    "fixtures/expected_meeting_record.schema.json": "30ca5c1b38658145148c23e7ffcaf98df3c4c84e9628da9c6a804a2464b832b3",
+    "fixtures/reference_transcript.json": "a8e7139cd79e4b49b676da4f0cb43526e2a486763ced1e1904d5c067e021fd81"
+  }
+}

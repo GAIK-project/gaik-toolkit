@@ -1,0 +1,280 @@
+--- setup command ---
+'C:\Users\h02317\AppData\Local\Programs\Python\Python312\python.exe' -m pip install -r requirements.txt
+
+exit code: 0
+
+--- setup stdout ---
+Requirement already satisfied: pydantic>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 1)) (2.12.5)
+Requirement already satisfied: python-dotenv in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 2)) (1.2.1)
+Requirement already satisfied: pyyaml in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 7)) (6.0.3)
+Requirement already satisfied: gaik[extract] in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 3)) (0.5.18)
+Requirement already satisfied: annotated-types>=0.6.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.7.0)
+Requirement already satisfied: pydantic-core==2.41.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (2.41.5)
+Requirement already satisfied: typing-extensions>=4.14.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (4.15.0)
+Requirement already satisfied: typing-inspection>=0.4.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.4.2)
+Requirement already satisfied: openai>=2.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (2.8.1)
+Requirement already satisfied: PyMuPDF>=1.26.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[parser-cpu]->-r requirements.txt (line 5)) (1.27.2.2)
+Requirement already satisfied: python-docx>=1.2.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[parser-cpu]->-r requirements.txt (line 5)) (1.2.0)
+Requirement already satisfied: pydub>=0.25.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[transcriber]->-r requirements.txt (line 6)) (0.25.1)
+Requirement already satisfied: requests>=2.31.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[transcriber]->-r requirements.txt (line 6)) (2.32.5)
+Requirement already satisfied: anyio<5,>=3.5.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (4.12.0)
+Requirement already satisfied: distro<2,>=1.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (1.9.0)
+Requirement already satisfied: httpx<1,>=0.23.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.28.1)
+Requirement already satisfied: jiter<1,>=0.10.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.12.0)
+Requirement already satisfied: sniffio in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (1.3.1)
+Requirement already satisfied: tqdm>4 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (4.67.1)
+Requirement already satisfied: lxml>=3.1.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from python-docx>=1.2.0->gaik[parser-cpu]->-r requirements.txt (line 5)) (6.0.2)
+Requirement already satisfied: charset_normalizer<4,>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (3.4.4)
+Requirement already satisfied: idna<4,>=2.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (3.11)
+Requirement already satisfied: urllib3<3,>=1.21.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (2.6.2)
+Requirement already satisfied: certifi>=2017.4.17 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (2025.11.12)
+Requirement already satisfied: anthropic>=0.43.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (0.96.0)
+Requirement already satisfied: google-genai>=0.3.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (1.74.0)
+Requirement already satisfied: google-auth>=2.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (2.50.0)
+Requirement already satisfied: docstring-parser<1,>=0.15 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[extract]->-r requirements.txt (line 3)) (0.18.0)
+Requirement already satisfied: pyasn1-modules>=0.2.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (0.4.2)
+Requirement already satisfied: cryptography>=38.0.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (46.0.3)
+Requirement already satisfied: tenacity<9.2.0,>=8.2.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[extract]->-r requirements.txt (line 3)) (9.1.2)
+Requirement already satisfied: websockets<17.0,>=13.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[extract]->-r requirements.txt (line 3)) (15.0.1)
+Requirement already satisfied: httpcore==1.* in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpx<1,>=0.23.0->openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (1.0.9)
+Requirement already satisfied: h11>=0.16 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpcore==1.*->httpx<1,>=0.23.0->openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.16.0)
+Requirement already satisfied: colorama in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from tqdm>4->openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.4.6)
+Requirement already satisfied: cffi>=2.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from cryptography>=38.0.3->google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (2.0.0)
+Requirement already satisfied: pyasn1<0.7.0,>=0.6.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pyasn1-modules>=0.2.1->google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (0.6.1)
+Requirement already satisfied: pycparser in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from cffi>=2.0.0->cryptography>=38.0.3->google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (2.23)
+
+
+--- setup stderr ---
+
+[notice] A new release of pip is available: 25.0.1 -> 26.2.1
+[notice] To update, run: python.exe -m pip install --upgrade pip
+
+
+--- run command ---
+'C:\Users\h02317\AppData\Local\Programs\Python\Python312\python.exe' run_poc.py --input 'C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\poc_input_bundle.json'
+
+exit code: 0
+
+--- run stdout ---
+Warning: Additional format options not available. Only PDF will be supported.
+meeting_audio:    C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_meeting.wav
+agenda_document:  C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_agenda.pdf
+participant_list: C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_participants.json
+================================================================================
+Transcribing file: C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_meeting.wav
+================================================================================
+Transcribing prompt: Detect the language and extract transcript in the same language. The audio could be in any language, such as English, Finnish, Swedish, etc.
+Sending: project_nimbus_meeting.wav ...
+Server OK - {'CUDA_status': True, 'torch_version': '2.8.0+cu126'}
+Transcribing... (this may take a while)
+Time taken for transcription: 15.83 seconds
+Transcript error fixing disabled; returning raw text only.
+Transcription complete. Use TranscriptionResult.save(...) to persist output.
+Using approved schema (requirements unchanged).
+
+================================================================================
+EXTRACTION PHASE
+================================================================================
+
+Processing document 1/1...
+  [extraction] tokens=7991
+
+OK Completed extraction from 1 document(s)
+
+Result written to: C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\runs\run_01\generated_package\poc\output\meeting_record.json
+{
+  "meeting_id": "NIMBUS-PRR-2026-09-17",
+  "title": "Project Nimbus Pilot Readiness Review",
+  "meeting_date": "2026-09-17",
+  "start_time": "09:00",
+  "end_time": "09:18",
+  "review_status": "pending_review",
+  "participants": [
+    {
+      "name": "Elena Markovic",
+      "role": "Project Manager"
+    },
+    {
+      "name": "Liam Chen",
+      "role": "Technical Lead"
+    },
+    {
+      "name": "Sofia Niemi",
+      "role": "Data Protection Specialist"
+    },
+    {
+      "name": "Arjun Patel",
+      "role": "Project Coordinator"
+    },
+    {
+      "name": "Mia Roberts",
+      "role": "Procurement Specialist"
+    }
+  ],
+  "topics": [
+    {
+      "title": "Opening and attendance",
+      "discussion_summary": "The chair opened the Project Nimbus pilot readiness review, confirmed the date and time, and stated that all five expected participants were present."
+    },
+    {
+      "title": "Pilot scope",
+      "discussion_summary": "The team discussed confirming the pilot scope and launch timing. A recommendation was made to limit the pilot to the Helsinki customer service team with 30 users for two weeks, and it was stated that the sandbox would not be ready for the agenda's proposed October 15 date."
+    },
+    {
+      "title": "Data protection",
+      "discussion_summary": "The meeting discussed permitted pilot data and the need for a data protection impact assessment. It was stated that only synthetic or anonymized records should be used and that production customer data must not enter the pilot environment."
+    },
+    {
+      "title": "Procurement and budget",
+      "discussion_summary": "The team discussed the expected three supplier quotations, a comparison task, and the budget position. It was stated that the agenda's 18,000 euro ceiling had not been confirmed by finance and that no budget would be approved in this meeting."
+    },
+    {
+      "title": "Training and readiness",
+      "discussion_summary": "The meeting assigned readiness actions for training, sandbox configuration and testing, and preparation of a go/no-go summary. A support FAQ document was also identified as needed before training, but no explicit owner or exact due date was agreed."
+    },
+    {
+      "title": "Open technical risks",
+      "discussion_summary": "The single sign-on approach was discussed as still pending with the architecture board, which was said to meet on September 22. It was explicitly stated that there would be no SSO decision in this meeting and that no project team owner should be inferred for that decision."
+    },
+    {
+      "title": "Recap and close",
+      "discussion_summary": "The meeting recap restated the approved limited Helsinki pilot, the restriction to synthetic or anonymized data, and that budget and single sign-on remained open. The chair also stated that named actions and dates should be recorded exactly before closing the meeting."
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "decision_1",
+      "statement": "The pilot will cover only the Helsinki customer service team with 30 users for a two-week period starting on 2026-10-20.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:01:57|00:02:08"
+      ]
+    },
+    {
+      "decision_id": "decision_2",
+      "statement": "No production customer data will be used in the pilot; only synthetic or anonymized records are permitted in the pilot environment.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:09|00:02:29"
+      ]
+    }
+  ],
+  "action_items": [
+    {
+      "action_id": "action_1",
+      "description": "Complete the data protection impact assessment.",
+      "owner": "Sofia Niemi",
+      "due_date": "2026-09-29",
+      "uncertainty_reason": null,
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:18|00:02:33"
+      ]
+    },
+    {
+      "action_id": "action_2",
+      "description": "Compare the three supplier quotations.",
+      "owner": "Mia Roberts",
+      "due_date": "2026-09-24",
+      "uncertainty_reason": null,
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:49|00:02:53"
+      ]
+    },
+    {
+      "action_id": "action_3",
+      "description": "Schedule the pilot training session.",
+      "owner": "Arjun Patel",
+      "due_date": "2026-10-03",
+      "uncertainty_reason": null,
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:12|00:03:16"
+      ]
+    },
+    {
+      "action_id": "action_4",
+      "description": "Configure and test the sandbox using synthetic test data only.",
+      "owner": "Liam Chen",
+      "due_date": "2026-09-25",
+      "uncertainty_reason": null,
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:22|00:03:28"
+      ]
+    },
+    {
+      "action_id": "action_5",
+      "description": "Draft a short support frequently asked questions document before training.",
+      "owner": null,
+      "due_date": null,
+      "uncertainty_reason": "no explicit owner or exact due date agreed in transcript",
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:29|00:03:41"
+      ]
+    },
+    {
+      "action_id": "action_6",
+      "description": "Send the consolidated go or no go summary to the steering group after the data protection, procurement, training, and sandbox updates are available.",
+      "owner": "Elena Markovic",
+      "due_date": "2026-10-06",
+      "uncertainty_reason": null,
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:42|00:03:54"
+      ]
+    }
+  ],
+  "unresolved_issues": [
+    {
+      "description": "The final budget approval and confirmed budget ceiling remain unresolved pending a response from finance.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:39|00:02:58"
+      ]
+    },
+    {
+      "description": "The single sign-on approach remains unresolved pending architecture board input; no SSO decision was made in this meeting.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:59|00:03:11"
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "description": "The agenda proposed a pilot launch date of 2026-10-15, but the meeting decided on a start date of 2026-10-20 for the limited Helsinki pilot.",
+      "citations": [
+        "project_nimbus_agenda.pdf|2",
+        "project_nimbus_meeting.wav|00:01:29|00:02:08"
+      ]
+    }
+  ]
+}
+
+Running LLMJudge hallucination detection...
+WARNING: 11 hallucination flag(s) detected:
+  field=end_time  value=09:18  reason=Source says the meeting closes at 9.18, but never states the end time as 09:18 explicitly.
+  field=review_status  value=pending_review  reason=Source says the record remains pending review until approval, but does not label a review_status field.
+  field=participants[2].name  value=Sofia Niemi  reason=Transcript names the participant Sophia Nimi, not Sofia Niemi.
+  field=topics[0].discussion_summary  value=The chair opened the Project Nimbus pilot readiness review, confirmed the date and time, and stated that all five expected participants were present.  reason=Source mentions opening, date/time, and attendance complete, but not this full combined summary verbatim.
+  field=topics[6].discussion_summary  value=The meeting recap restated the approved limited Helsinki pilot, the restriction to synthetic or anonymized data, and that budget and single sign-on remained open. The chair also stated that named actions and dates should be recorded exactly before closing the meeting.  reason=Source supports recap points, but 'chair' and the full combined summary are not stated as one explicit recap.
+  field=decisions[0].statement  value=The pilot will cover only the Helsinki customer service team with 30 users for a two-week period starting on 2026-10-20.  reason=Source says the pilot starts October 20th for two weeks, but not the ISO date format or exact wording.
+  field=decisions[1].statement  value=No production customer data will be used in the pilot; only synthetic or anonymized records are permitted in the pilot environment.  reason=Source separately states no production data and synthetic/anonymized records, but not this merged statement verbatim.
+  field=action_items[5].description  value=Send the consolidated go or no go summary to the steering group after the data protection, procurement, training, and sandbox updates are available.  reason=Source states the action and dependencies, but not the exact merged description wording.
+  field=action_items[5].owner  value=Elena Markovic  reason=Transcript says 'I will send' but never explicitly names Elena Markovic as the owner for that action.
+  field=action_items[5].due_date  value=2026-10-06  reason=Source gives October 6th, but not the ISO-formatted date.
+  field=conflicts[0].description  value=The agenda proposed a pilot launch date of 2026-10-15, but the meeting decided on a start date of 2026-10-20 for the limited Helsinki pilot.  reason=Source mentions proposed October 15th and decided October 20th, but not this exact combined conflict wording.
+
+
+--- run stderr ---
+INFO:gaik.software_components.parsers.pymypdf:Parsing document: project_nimbus_agenda.pdf (format: structured)
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/openai/deployments/gpt-5.4-mini/chat/completions?api-version=2025-03-01-preview "HTTP/1.1 200 OK"
+
+
+--- outputs ---
+[
+  {
+    "path": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC05_multimodal_meeting_evaluation\\runs\\run_01\\generated_package\\poc\\output\\meeting_record.json",
+    "size_bytes": 6431,
+    "parseable_json": true
+  },
+  {
+    "path": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC05_multimodal_meeting_evaluation\\runs\\run_01\\generated_package\\poc\\output\\validation.json",
+    "size_bytes": 3493,
+    "parseable_json": true
+  }
+]

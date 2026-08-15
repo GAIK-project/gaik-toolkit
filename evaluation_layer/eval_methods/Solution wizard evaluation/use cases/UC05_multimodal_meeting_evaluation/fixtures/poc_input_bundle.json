@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UC05",
+  "meeting_id": "NIMBUS-PRR-2026-09-17",
+  "inputs": {
+    "meeting_audio": "input/project_nimbus_meeting.wav",
+    "agenda_pdf": "input/project_nimbus_agenda.pdf",
+    "participant_list": "input/project_nimbus_participants.json"
+  },
+  "output": {
+    "directory": "output",
+    "filename": "meeting_record.json",
+    "format": "json"
+  },
+  "citation_formats": {
+    "audio": "file_name|start_timestamp|end_timestamp",
+    "document": "file_name|page_number",
+    "notes": "Each citation is a single pipe-delimited string. Timestamps use HH:MM:SS."
+  }
+}

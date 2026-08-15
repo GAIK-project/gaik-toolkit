@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UC05",
+  "source_workbook": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC05_multimodal_meeting_evaluation\\results\\UC05_comparison.xlsx",
+  "complete": true,
+  "metrics": {
+    "EQ1": {
+      "complete": true,
+      "scored_checks_per_run": 42,
+      "run_01": 0.9761904761904762,
+      "run_02": 0.9761904761904762,
+      "combined": 0.9761904761904762
+    },
+    "EQ2": {
+      "complete": true,
+      "scored_checks_per_run": 9,
+      "run_01": 1.0,
+      "run_02": 1.0,
+      "combined": 1.0
+    },
+    "EQ3": {
+      "complete": true,
+      "scored_checks_per_run": 8,
+      "run_01": 1,
+      "run_02": 1,
+      "combined": 1.0
+    },
+    "EQ4": {
+      "complete": true,
+      "scored_checks_per_run": 4,
+      "run_01": 1,
+      "run_02": 1,
+      "combined": 1.0
+    }
+  },
+  "diagnostics": {
+    "poc_recovery": {
+      "scored_under_EQ4": false,
+      "maximum_refinement_attempts": 3,
+      "run_01": {
+        "initial_execution_successful": "Yes",
+        "refinement_attempts_to_success": "0",
+        "final_execution_successful": "Yes",
+        "status": "successful_original"
+      },
+      "run_02": {
+        "initial_execution_successful": "Yes",
+        "refinement_attempts_to_success": "0",
+        "final_execution_successful": "Yes",
+        "status": "successful_original"
+      }
+    }
+  }
+}

@@ -1,0 +1,644 @@
+{
+  "blueprint_version": "1.0",
+  "metadata": {
+    "blueprint_id": "meeting_record_generation_v1",
+    "created_by": "solution_configuration_wizard",
+    "created_at": "2026-08-15T06:20:48Z",
+    "last_updated_at": "2026-08-15T09:30:00Z",
+    "status": "poc"
+  },
+  "use_case": {
+    "id": "meeting_record_generation",
+    "name": "AI-Assisted Meeting Record Generator",
+    "description": "Combine meeting audio recordings, agenda documents, and participant lists into a structured, evidence-cited meeting record capturing decisions, actions, and unresolved issues.",
+    "domain": "project_management",
+    "knowledge_processes": [
+      "knowledge_capture"
+    ]
+  },
+  "business_spec": {
+    "current_process": "A project coordinator listens to the meeting recording, checks the agenda and participant list, and manually prepares the meeting record.",
+    "pain_points": [
+      "Manual preparation takes considerable time",
+      "Action tracking is inconsistent across meetings",
+      "Decisions are difficult to trace back to their source (recording or agenda)"
+    ],
+    "proposed_solution": "An AI-supported pipeline that combines the meeting recording, agenda document, and participant list to produce a reviewable, structured meeting record that separates agenda topics, discussion summaries, decisions, assigned actions, unresolved issues, and conflicts, each backed by source citations.",
+    "intended_users": [
+      "project_team_member"
+    ],
+    "reviewers": [
+      "project_manager"
+    ],
+    "stakeholders": "unknown",
+    "input_artifacts": [
+      "meeting_audio_recording",
+      "agenda_document",
+      "participant_list"
+    ],
+    "target_outputs": [
+      "structured_meeting_record_with_citations"
+    ],
+    "success_criteria": "Supported decisions and actions are captured accurately with evidence; missing owners, dates, or decisions are not invented.",
+    "expected_value": "unknown",
+    "risks": "unknown",
+    "poc_goal": "Process fixtures/poc_input_bundle.json (referencing the meeting WAV, agenda PDF, and participant JSON) via a CLI accepting --input <bundle_path>. The run must exit successfully and save non-empty, parseable JSON to poc/output/ capturing the frozen meeting decisions, actions, unresolved issues, and the known date conflict, with audio citations as file_name|start_timestamp|end_timestamp (HH:MM:SS) and agenda citations as file_name|page_number. Unsupported owners, dates, budget approval, and SSO decisions must be left unset, and review_status must be pending_review. Output is compared semantically against fixtures/expected_meeting_record.json."
+  },
+  "technical_spec": {
+    "input_types": [
+      "audio",
+      "pdf",
+      "json"
+    ],
+    "input_formats": [
+      "wav",
+      "pdf",
+      "json"
+    ],
+    "output_types": [
+      "structured_json"
+    ],
+    "language": "en",
+    "domain_vocabulary": "none",
+    "data_sources": "Per-meeting bundle (fixtures/poc_input_bundle.json) referencing one WAV recording, one PDF agenda, and one JSON participant list. No live system integration in this PoC.",
+    "model_provider": "azure_openai",
+    "model_preferences": {
+      "transcription_model": "whisper_local",
+      "extraction_model": "gpt-5.4",
+      "judge_model_provider": "azure_openai",
+      "temperature": 0.0,
+      "notes": "Self-hosted Whisper endpoint is available for transcription (local_api_base/local_api_key). Extraction uses Azure OpenAI."
+    },
+    "security_constraints": "Meeting material is internal. Access limited to the project team and the designated reviewer. No connection to calendar, project-management, document-management, or identity systems is required.",
+    "integration_targets": [],
+    "human_review": "yes",
+    "human_review_required": true,
+    "evaluation_requirements": "CLI run must exit successfully and save non-empty, parseable JSON to poc/output/. Compare output semantically against fixtures/expected_meeting_record.json, focusing on correctness of decisions, actions, unresolved issues, conflicts, and citation validity/format.",
+    "runtime_interface": "cli (python poc/run_poc.py --input <bundle_path>)"
+  },
+  "target_output_spec": {
+    "schema_name": "MeetingRecord",
+    "fields": [
+      "meeting_id",
+      "title",
+      "meeting_date",
+      "start_time",
+      "end_time",
+      "participants",
+      "topics",
+      "decisions",
+      "action_items",
+      "unresolved_issues",
+      "conflicts",
+      "review_status"
+    ],
+    "field_types": {
+      "meeting_id": "str",
+      "title": "str",
+      "meeting_date": "date",
+      "start_time": "str",
+      "end_time": "str",
+      "participants": "list[dict]",
+      "topics": "list[dict]",
+      "decisions": "list[dict]",
+      "action_items": "list[dict]",
+      "unresolved_issues": "list[dict]",
+      "conflicts": "list[dict]",
+      "review_status": "str"
+    },
+    "required_fields": [
+      "meeting_id",
+      "title",
+      "meeting_date",
+      "start_time",
+      "end_time",
+      "participants",
+      "topics",
+      "decisions",
+      "action_items",
+      "unresolved_issues",
+      "conflicts",
+      "review_status"
+    ],
+    "optional_fields": [
+      "action_items.owner",
+      "action_items.due_date",
+      "action_items.uncertainty_reason"
+    ],
+    "field_descriptions": {
+      "meeting_id": "Identifier for the meeting instance",
+      "title": "Meeting title",
+      "meeting_date": "Date the meeting was held (subject to conflict detection against the agenda)",
+      "start_time": "Meeting start time",
+      "end_time": "Meeting end time",
+      "participants": "List of {name, role}, normalized against the supplied participant list",
+      "topics": "List of {title, discussion_summary} -- one per agenda topic actually discussed",
+      "decisions": "List of {decision_id, statement, citations} -- decisions explicitly made in the spoken meeting",
+      "action_items": "List of {action_id, description, owner, due_date, uncertainty_reason, citations}",
+      "unresolved_issues": "List of {description, citations} -- topics raised but not resolved",
+      "conflicts": "List of {description, citations} -- contradictions between agenda and spoken content, or within the spoken content",
+      "review_status": "Approval state of the record; starts as pending_review"
+    },
+    "allowed_values": {
+      "review_status": [
+        "pending_review",
+        "approved",
+        "rejected"
+      ]
+    },
+    "confidence_required": false,
+    "missing_value_policy": "Do not infer unsupported facts (owners, dates, budget approvals, SSO decisions, or any other fact not explicitly stated). For action_items, set owner/due_date to null and provide uncertainty_reason when not explicitly stated in a source.",
+    "validation_rules": [
+      "Every decision, action_item, unresolved_issue, and conflict must carry at least one citation.",
+      "Audio citations use a single string: file_name|start_timestamp|end_timestamp, with HH:MM:SS timestamps.",
+      "Agenda citations use a single string: file_name|page_number.",
+      "An agenda item alone is not a decision -- only the spoken meeting content determines what was actually decided.",
+      "When the agenda and spoken content conflict, record the conflict and follow the explicit spoken decision.",
+      "review_status starts as 'pending_review'."
+    ]
+  },
+  "assumptions": [
+    {
+      "id": "assumption_001",
+      "text": "Other stakeholders beyond the project team and approving project manager, and the expected quantified value (e.g. hours saved), were not specified and are recorded as unknown pending user confirmation.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-15T06:20:48Z"
+    },
+    {
+      "id": "assumption_002",
+      "text": "Risks were not specified and are recorded as unknown pending user confirmation.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-15T06:20:48Z"
+    },
+    {
+      "id": "assumption_003",
+      "text": "No formatted PDF report was requested; the initial PoC produces JSON output only.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-15T06:20:48Z"
+    },
+    {
+      "id": "assumption_004",
+      "text": "No domain-specific vocabulary, codes, or controlled lists were specified; assumed none are required for extraction.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-15T06:20:48Z"
+    },
+    {
+      "id": "assumption_005",
+      "text": "Deployment platform, authentication method, and retention period were not specified; these are out of scope for the local PoC and must be defined before any production packaging.",
+      "status": "unconfirmed",
+      "impact": "security_constraint",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-15T06:20:48Z"
+    },
+    {
+      "id": "assumption_006",
+      "text": "Business-process elicitation (swimlanes/roles, external parties, manual steps, rejection path) was not specified. Assumed roles are limited to project_coordinator (uploads input), the GAIK AI pipeline, and project_manager (reviewer); no external parties; no additional manual steps.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-15T06:20:48Z"
+    },
+    {
+      "id": "assumption_007",
+      "text": "Rejection path was not specified; assumed default behaviour is a clean discard (BPMN 'Rejected' end event) rather than a rework loop back to the coordinator.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-15T06:20:48Z"
+    },
+    {
+      "id": "assumption_008",
+      "text": "LLMJudge is run on the same provider/family as extraction (azure_openai) for credential simplicity in the PoC. Using a different model family for the judge would reduce shared-model bias but was not specified by the user.",
+      "status": "unconfirmed",
+      "impact": "component_selection",
+      "recorded_by": "ComponentSelector",
+      "recorded_at": "2026-08-15T06:20:48Z"
+    }
+  ],
+  "artifacts": {
+    "meeting_audio": {
+      "type": "audio",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "agenda_document": {
+      "type": "pdf",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "participant_list": {
+      "type": "text",
+      "source": "user_upload",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": null,
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "audio_transcript": {
+      "type": "transcript",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "transcribe_audio",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "parsed_agenda": {
+      "type": "text",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "parse_agenda",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "meeting_record_json": {
+      "type": "structured_json",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "extract_meeting_record",
+      "schema_ref": "schemas/output_schema.py",
+      "overwrite": false
+    },
+    "validation_report": {
+      "type": "validation_report",
+      "source": "generated",
+      "optional": false,
+      "final_output": false,
+      "externally_visible": false,
+      "produced_by": "validate_extraction",
+      "schema_ref": null,
+      "overwrite": false
+    },
+    "approved_meeting_record": {
+      "type": "structured_json",
+      "source": "generated",
+      "optional": false,
+      "final_output": true,
+      "externally_visible": false,
+      "produced_by": "human_review",
+      "schema_ref": "schemas/output_schema.py",
+      "overwrite": false
+    }
+  },
+  "inputs": {},
+  "outputs": {},
+  "schemas": {},
+  "components": {
+    "selected_modules": [],
+    "selected_building_blocks": [
+      "Transcriber",
+      "PyMuPDFParser",
+      "Extractor",
+      "LLMJudge"
+    ],
+    "custom_components": []
+  },
+  "workflow": {
+    "steps": [
+      {
+        "id": "provide_meeting_bundle",
+        "name": "Provide meeting recording, agenda, and participant list",
+        "type": "user_task",
+        "component": null,
+        "inputs": [],
+        "outputs": [
+          "meeting_audio",
+          "agenda_document",
+          "participant_list"
+        ],
+        "parameters": {},
+        "depends_on": [],
+        "loop": null
+      },
+      {
+        "id": "transcribe_audio",
+        "name": "Transcribe meeting recording (self-hosted Whisper, timestamped)",
+        "type": "automated_task",
+        "component": "Transcriber",
+        "inputs": [
+          "meeting_audio"
+        ],
+        "outputs": [
+          "audio_transcript"
+        ],
+        "parameters": {
+          "transcription_model": "whisper_local",
+          "language": "en",
+          "diarization": false
+        },
+        "depends_on": [
+          "provide_meeting_bundle"
+        ],
+        "loop": null
+      },
+      {
+        "id": "parse_agenda",
+        "name": "Parse agenda PDF with page-level citations",
+        "type": "automated_task",
+        "component": "PyMuPDFParser",
+        "inputs": [
+          "agenda_document"
+        ],
+        "outputs": [
+          "parsed_agenda"
+        ],
+        "parameters": {
+          "use_markdown": false
+        },
+        "depends_on": [
+          "provide_meeting_bundle"
+        ],
+        "loop": null
+      },
+      {
+        "id": "extract_meeting_record",
+        "name": "Extract structured meeting record",
+        "type": "automated_task",
+        "component": "Extractor",
+        "inputs": [
+          "audio_transcript",
+          "parsed_agenda",
+          "participant_list"
+        ],
+        "outputs": [
+          "meeting_record_json"
+        ],
+        "parameters": {
+          "schema_ref": "schemas/output_schema.py",
+          "requirements_ref": "schemas/output_schema_requirements.json"
+        },
+        "depends_on": [
+          "transcribe_audio",
+          "parse_agenda"
+        ],
+        "loop": null
+      },
+      {
+        "id": "validate_extraction",
+        "name": "Validate extracted record against sources",
+        "type": "automated_task",
+        "component": "LLMJudge",
+        "inputs": [
+          "audio_transcript",
+          "parsed_agenda",
+          "meeting_record_json"
+        ],
+        "outputs": [
+          "validation_report"
+        ],
+        "parameters": {},
+        "depends_on": [
+          "extract_meeting_record"
+        ],
+        "loop": null
+      },
+      {
+        "id": "human_review",
+        "name": "Project manager reviews and approves the meeting record",
+        "type": "human_review",
+        "component": null,
+        "inputs": [
+          "meeting_record_json",
+          "validation_report"
+        ],
+        "outputs": [
+          "approved_meeting_record"
+        ],
+        "parameters": {},
+        "depends_on": [
+          "validate_extraction"
+        ],
+        "loop": null
+      }
+    ]
+  },
+  "business_process": {
+    "participants": [],
+    "manual_steps": [],
+    "external_parties": [],
+    "message_flows": [],
+    "exceptions": [],
+    "decision_points": []
+  },
+  "prompts": {},
+  "models": {
+    "provider": "azure_openai",
+    "transcription_model": "whisper_local",
+    "extraction_model": "gpt-5.4",
+    "judge_model_provider": "azure_openai",
+    "temperature": 0.0
+  },
+  "validation": {
+    "human_review_required": true,
+    "completeness_check": true,
+    "hallucination_check": true
+  },
+  "evaluation": {
+    "metrics": [
+      "semantic_match",
+      "completeness",
+      "citation_validity",
+      "hallucination_rate"
+    ],
+    "eval_framework": "extraction_eval",
+    "sample_data_dir": "fixtures",
+    "ground_truth_dir": "fixtures"
+  },
+  "governance": {
+    "data_handling": {
+      "external_model_api_allowed": true,
+      "local_processing_required": false,
+      "stores_input_data": false,
+      "stores_outputs": true,
+      "retention_policy": "not_specified",
+      "contains_personal_data": "yes",
+      "output_sensitivity": "internal",
+      "audit_log_required": false
+    }
+  },
+  "runtime": {
+    "interface": "cli",
+    "entrypoint": "poc/run_poc.py",
+    "env_file": ".env.example"
+  },
+  "package": {
+    "name": "meeting_record_generation_use_case",
+    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\040e0ce8f7b5",
+    "include_tests": true,
+    "include_evals": true,
+    "include_docs": true
+  },
+  "visualizations": {
+    "bpmn_mapping": {
+      "Lane_users": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.intended_users"
+      },
+      "Activity_provide_meeting_bundle": {
+        "kind": "user_task",
+        "blueprint_path": "workflow.steps[0]"
+      },
+      "Lane_gaik_ai": {
+        "kind": "lane",
+        "blueprint_path": "derived:system"
+      },
+      "Activity_transcribe_audio": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[1]"
+      },
+      "Activity_parse_agenda": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[2]"
+      },
+      "Activity_extract_meeting_record": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[3]"
+      },
+      "Activity_validate_extraction": {
+        "kind": "automated_task",
+        "blueprint_path": "workflow.steps[4]"
+      },
+      "Lane_reviewers": {
+        "kind": "lane",
+        "blueprint_path": "derived:business_spec.reviewers"
+      },
+      "Activity_human_review": {
+        "kind": "human_review",
+        "blueprint_path": "workflow.steps[5]"
+      },
+      "StartEvent_1": {
+        "kind": "start_event",
+        "blueprint_path": "derived:start"
+      },
+      "Gateway_fork_provide_meeting_bundle": {
+        "kind": "parallel_fork",
+        "blueprint_path": "derived:fork_after:provide_meeting_bundle"
+      },
+      "Gateway_join_extract_meeting_record": {
+        "kind": "parallel_join",
+        "blueprint_path": "derived:join_before:extract_meeting_record"
+      },
+      "EndEvent_success": {
+        "kind": "end_event",
+        "blueprint_path": "derived:end"
+      },
+      "Gateway_approve_human_review": {
+        "kind": "approval_gateway",
+        "blueprint_path": "derived:approval_after:human_review"
+      },
+      "EndEvent_rejected_human_review": {
+        "kind": "end_event",
+        "blueprint_path": "derived:rejection_after:human_review"
+      },
+      "DataObjectRef_meeting_audio": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.meeting_audio"
+      },
+      "DataObjectRef_agenda_document": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.agenda_document"
+      },
+      "DataObjectRef_participant_list": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.participant_list"
+      },
+      "DataObjectRef_audio_transcript": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.audio_transcript"
+      },
+      "DataObjectRef_parsed_agenda": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.parsed_agenda"
+      },
+      "DataObjectRef_meeting_record_json": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.meeting_record_json"
+      },
+      "DataObjectRef_validation_report": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.validation_report"
+      },
+      "DataObjectRef_approved_meeting_record": {
+        "kind": "data_object",
+        "blueprint_path": "artifacts.approved_meeting_record"
+      },
+      "TextAnnotation_1": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      },
+      "TextAnnotation_2": {
+        "kind": "annotation",
+        "blueprint_path": "derived:governance.data_handling"
+      }
+    }
+  },
+  "traceability": [
+    {
+      "component": "Transcriber",
+      "required_by": "technical_spec.input_types contains audio; citations require file|start|end timestamps -> transcription_model=whisper_local"
+    },
+    {
+      "component": "PyMuPDFParser",
+      "required_by": "technical_spec.input_types contains pdf (agenda); citations require file_name|page_number -> use_markdown=False"
+    },
+    {
+      "component": "Extractor",
+      "required_by": "output_type=structured_json; multi-source field extraction into MeetingRecord schema"
+    },
+    {
+      "component": "LLMJudge",
+      "required_by": "technical_spec.human_review=yes; pre-screens extraction before project manager review"
+    }
+  ],
+  "change_log": [
+    {
+      "version": "0.1-draft",
+      "date": "2026-08-15",
+      "change": "Business/technical/target-output specs collected and confirmed (Gate 1 passed 13/13).",
+      "changed_by": "solution_configuration_wizard"
+    },
+    {
+      "version": "0.2-draft",
+      "date": "2026-08-15",
+      "change": "MeetingRecord extraction schema generated via GAIK SchemaGenerator, reviewed, corrected (nested-class import bug; uncertainty_reason field_type date->str), and approved by user.",
+      "changed_by": "solution_configuration_wizard"
+    },
+    {
+      "version": "0.3-draft",
+      "date": "2026-08-15",
+      "change": "Component selection confirmed (Transcriber whisper_local, PyMuPDFParser, Extractor, LLMJudge); artifacts and workflow assembled.",
+      "changed_by": "solution_configuration_wizard"
+    },
+    {
+      "version": "1.0-poc",
+      "date": "2026-08-15",
+      "change": "Blueprint validated (0 errors); workflow.mmd and workflow.bpmn generated and confirmed by user. PoC scaffolded (custom/hybrid _generic pattern) and fully wired for bundle-manifest CLI input (--input). Fixed a scaffolder bug in output_schema.py (unimportable qualified class references) and a syntax bug in evals/run_basic_eval.py. Refined extraction_requirements.md (ISO-8601 date normalization; complete decision statements) after a real end-to-end run against fixtures/poc_input_bundle.json showed natural-language due_date values and one incomplete decision statement; schema hash updated to avoid unnecessary regeneration. Re-ran successfully: output matched fixtures/expected_meeting_record.json on all scalar fields, participants, and per-item counts, with correct owners/due_dates/citations, and avoided every fixture must_not_assert claim. Documentation suite generated and narrative sections authored.",
+      "changed_by": "solution_configuration_wizard"
+    }
+  ]
+}

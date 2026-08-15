@@ -1,67 +1,43 @@
-# Evaluation Plan — Manufacturing Knowledge Base RAG Assistant
+# Evaluation Plan — Manufacturing Knowledge Assistant
 
 > How the quality of this solution is measured. Generated from the blueprint.
 
 ## Goal
-Demonstrate: Demonstrate role-aware, citation-grounded question answering over three PDF documents using a local vector store and trusted role metadata. CLI: python run_poc.py --input <path-to-poc_input_bundle.json>. Execute all four role-tagged queries (Q01-Q04) and save non-empty parseable JSON results to output/results.json.
+Demonstrate: Demonstrate role-aware, citation-grounded question answering over three sample PDFs (employee travel policy, MX-200 maintenance manual, Project Aurora pricing strategy) using a supplied access manifest and query set. Run `python run_poc.py --input <path-to-poc_input_bundle.json>`, resolve the other supplied files relative to that bundle, execute the four role-tagged queries, and save non-empty parseable JSON results demonstrating correct access decisions and citations. Out of scope for this first PoC: a web interface, a live document-repository connector, enterprise sign-in/identity integration, a full audit-log service, and a numerical RAG-quality threshold.
 
 Success criteria:
-- Q01 (employee, Helsinki hotel limit): answers EUR 180 per night with Finance Director approval required when exceeded, citing [employee_travel_policy.pdf, 3]
-- Q02 (employee, MX-200 filter): answers inspection every 250 operating hours and replacement after 1,000 operating hours or 1.8 bar, citing mx200_maintenance_manual.pdf pages 3 and 4
-- Q03 (employee, Project Aurora ceiling): access_decision=denied, empty citations list, no restricted facts disclosed
-- Q04 (manager, Project Aurora ceiling and approver): answers 12 percent ceiling with written CFO approval required above the ceiling, citing [project_aurora_pricing_strategy.pdf, 3]
-- All four results returned as separate non-empty parseable JSON objects in output/results.json
+- Employees find reliable answers faster, can verify answers through citations, and never receive content outside their role. No numerical time-saving, accuracy, cost, or adoption target was specified.
 
 ## Stated evaluation requirements
-method: deterministic query testing, queries: ['Q01', 'Q02', 'Q03', 'Q04'], expected_outputs: defined in poc_input_bundle.json and query_set.json, numerical_threshold: not_specified, eval_framework: RAG_eval
+Deterministic acceptance test using the four supplied role-tagged queries (Q01-Q04), checked against required facts, the exact access decision (allowed/denied), and required citation pairs per query. No numerical RAG-quality threshold (e.g. a fixed recall/precision score) was specified for the first PoC.
 
-The PoC is evaluated by running all four predefined queries and checking each `RAGAnswerRecord` against the expected outputs below. All four checks must pass; there is no numerical accuracy threshold beyond the pass/fail criteria stated in the blueprint.
-
-| Query | Check | Pass condition |
-|---|---|---|
-| Q01 | access_decision | `allowed` |
-| Q01 | answer content | contains "EUR 180" and "Finance Director" |
-| Q01 | citations | includes `["employee_travel_policy.pdf", 3]` |
-| Q02 | access_decision | `allowed` |
-| Q02 | answer content | contains "250 operating hours" and ("1,000 operating hours" or "1000 operating hours") and "1.8 bar" |
-| Q02 | citations | includes page 3 and page 4 of `mx200_maintenance_manual.pdf` |
-| Q03 | access_decision | `denied` |
-| Q03 | citations | `[]` (empty list) |
-| Q03 | answer text | does NOT contain "12 percent", "12%", "22 percent", "22%", or "Chief Financial Officer" |
-| Q03 | refusal_reason | non-null string |
-| Q04 | access_decision | `allowed` |
-| Q04 | answer content | contains "12 percent" (or "12%") and "Chief Financial Officer" (or "CFO") |
-| Q04 | citations | includes `["project_aurora_pricing_strategy.pdf", 3]` |
+Concretely, `evals/run_basic_eval.py` checks each of the four queries against `evals/ground_truth/expected_results.json` on four axes: (1) `access_decision` matches exactly, (2) every `required_fact` string appears (case-insensitive) in `answer`, (3) no `forbidden_fact` appears anywhere in `answer`, and (4) every `required_citation` is present in `citations`. All four axes must pass for all four queries for the PoC to be considered accepted at this stage — there is no partial-credit threshold, since the acceptance criteria were given as exact per-query expectations rather than an aggregate score.
 
 ## Recommended metrics
-- **Output type:** structured_json (schema: `RAGAnswerRecord`)
-- **Primary framework:** `RAG_eval` — faithfulness (answer grounded in retrieved context), answer relevance, and citation precision (citations map to actually retrieved chunks, not fabricated references). Use `RAGEvaluator` from the GAIK toolkit.
-- **Access-control correctness:** binary pass/fail per query — did the system produce the correct `access_decision` and respect the denied-content rules?
-- **Value preservation:** spot-check that exact quantities (EUR 180, 250 h, 1,000 h, 1.8 bar, 12%, 22%) appear verbatim in allowed answers.
+- **Output type:** answer_with_citations, structured_json (schema: `RAGAnswerRecord`)
+- This PoC's acceptance gate is the deterministic 4-query check above (`evals/run_basic_eval.py`), not a generic aggregate score.
+- If broader RAG-quality measurement is wanted later (beyond these 4 fixture queries), GAIK's `RAGEvaluator` (faithfulness, answer relevance, context precision/recall) is the applicable framework — this was intentionally deferred, per assumption_004, since no numerical RAG-quality threshold was specified for the first PoC.
 
 ## Test data
-- **Data sources:** local file bundle resolved relative to poc_input_bundle.json at runtime
-- Place ground-truth examples under `evals/ground_truth/` and predictions under `evals/predictions/`.
-
-The PoC evaluation set consists of 4 queries (Q01–Q04) defined in `query_set.json` and `poc_input_bundle.json`. Expected outputs (correct access decision, answer content, and citation pairs) are specified in the blueprint's `success_criteria`. Ground truth was authored by the use-case owner and is not LLM-generated. No additional test set exists at this stage; expanding to a larger query set is recommended before production.
+- **Data sources:** PoC uses a local fixture bundle: three sample PDFs (employee_travel_policy.pdf, mx200_maintenance_manual.pdf, project_aurora_pricing_strategy.pdf) plus access_manifest.json and query_set.json, all resolved relative to poc_input_bundle.json. Connection to a live enterprise document repository is out of scope for this PoC.
+- Test data is exactly 4 queries (`Q01`-`Q04`) across the 2 roles (`employee`, `manager`) supplied in `poc/sample_input/poc_input/query_set.json`. Ground truth (`evals/ground_truth/expected_results.json`) was authored by the wizard agent directly from the acceptance criteria the user stated in the requirements conversation — required facts, forbidden facts, and required citations per query — not from any external answer key.
 
 ## Thresholds and acceptance
-- access_decision must be 'allowed' or 'denied'
-- citations must be an empty list when access_decision=denied
-- refusal_reason must be non-null when access_decision=denied
-- each citation must be exactly [str, int] (filename, 1-based page number)
-- answer must not reveal restricted content when access_decision=denied
-- allowed factual answers must include at least one citation to a document permitted for that role
-- exact values must be preserved: EUR 180, 250 operating hours, 1,000 operating hours, 1.8 bar, 12 percent, 22 percent
+- An allowed factual answer requires at least one citation to a document permitted for that role
+- A denied answer requires an empty citations list, a non-null refusal_reason, and must not reveal restricted facts
+- Each citation is a two-element list [file_name (str), page_number (1-based int)], in that order
+- query_id and role must be preserved unchanged from the input query
+- Cite every material factual claim using [file_name, page_number]
+- Do not answer from model memory when authorized evidence is absent
 
-All 13 checks in the query-level table above must pass (4/4 queries). No partial pass is accepted for RBAC correctness — a single citation leaking into a denied record or restricted content appearing in an answer text is a failure. No numerical faithfulness threshold is specified for this first PoC; qualitative review of the answer text is sufficient.
+Pass/fail is binary per query, per the four checks in `run_basic_eval.py`: all four queries must pass all four checks (`access_decision` match, required facts present, forbidden facts absent, required citations present) for the PoC to be accepted at Gate 3. There is no partial/aggregate threshold (e.g. no "3 of 4 queries correct is acceptable") because the source requirement specified exact expected behavior per query, not a statistical target.
 
 ## Human review
 - **Required:** no
 - **Reviewers:** _none_
 
 ## Limitations
-- **Small sample:** 4 queries cover the critical RBAC and citation scenarios but do not constitute a statistically representative test set. Edge cases (ambiguous queries, cross-document answers, borderline similarity scores near the RBAC threshold) are not tested.
-- **No adversarial queries:** The test set does not include prompt-injection attempts, queries designed to extract restricted content through indirect phrasing, or queries for which no document contains an answer.
-- **LLM-judged faithfulness not implemented:** Citation validation is regex-based; answer faithfulness is not scored automatically in this PoC. Manual review of the answer text is required.
-- **Static ground truth:** Expected outputs were authored ahead of running the pipeline; any paraphrase of the correct answer that differs in wording but not meaning may be flagged as incorrect by an automated string-match check.
+- Only 4 queries across 3 documents are covered — this validates the RBAC and citation *mechanism*, not broad retrieval quality or recall across a larger, more varied corpus.
+- `temperature=1.0` (as explicitly requested) introduces run-to-run variability in the exact wording of `answer`; the eval checks for required substrings rather than exact string match to tolerate this, but a failing run should be re-run once before treating it as a real regression.
+- The "not found" vs "denied" classification (`NOT_FOUND_FLOOR` and the restricted-topic score comparison in `run_poc.py`) is a heuristic tuned against this fixture's score distribution and has not been validated against a larger, more diverse set of documents/roles.
+- No numerical RAG-quality threshold (recall/precision/faithfulness score) was specified or is measured in this first PoC (assumption_004) — only the deterministic per-query acceptance check above.

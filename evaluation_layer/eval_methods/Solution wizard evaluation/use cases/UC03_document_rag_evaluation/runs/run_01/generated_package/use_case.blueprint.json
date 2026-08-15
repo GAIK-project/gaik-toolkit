@@ -1,122 +1,91 @@
 {
   "blueprint_version": "1.0",
   "metadata": {
-    "blueprint_id": "manufacturing_knowledge_rag_v1",
+    "blueprint_id": "manufacturing_knowledge_assistant_v1",
     "created_by": "solution_configuration_wizard",
-    "created_at": "2026-08-05T00:00:00Z",
-    "last_updated_at": "2026-08-05T00:00:00Z",
+    "created_at": "2026-08-15T00:00:00Z",
+    "last_updated_at": "2026-08-15T00:00:00Z",
     "status": "draft"
   },
   "use_case": {
-    "id": "manufacturing_knowledge_rag",
-    "name": "Manufacturing Knowledge Base RAG Assistant",
-    "description": "Role-aware question-answering assistant that retrieves cited answers from internal manufacturing policies, equipment manuals, and management documents, with pre-retrieval RBAC to enforce document access boundaries.",
+    "id": "manufacturing_knowledge_assistant",
+    "name": "Manufacturing Knowledge Assistant",
+    "description": "Role-aware assistant that answers employee questions from internal policies, equipment manuals, and management documents with citations, enforcing role-based access control so restricted documents are never retrieved or disclosed to unauthorized employees.",
     "domain": "manufacturing",
     "knowledge_processes": [
       "knowledge_access"
     ]
   },
   "business_spec": {
-    "current_process": "Employees manually search internal policies, equipment manuals, and management documents to find answers; the process is slow and may result in incomplete or unsupported responses.",
+    "current_process": "Employees manually search across internal policies, equipment manuals, and management documents to find answers to their questions, with no systematic way to verify which source supports an answer.",
     "pain_points": [
-      "Manual document search is time-consuming",
-      "Employees may miss the most relevant or applicable source",
-      "No enforcement of document access controls during informal searches",
-      "Answers are not traceable to a verified source"
+      "Manual search across the document collection is slow",
+      "Answers can be incomplete or unsupported because employees may overlook the applicable source"
     ],
-    "proposed_solution": "A RAG-based assistant that accepts natural-language questions, applies pre-retrieval RBAC based on the requestor role, retrieves semantically relevant chunks from allowed documents only, and generates cited answers in a structured RAGAnswerRecord format.",
+    "proposed_solution": "An AI assistant that answers employee questions using the document collection, provides citations to the supporting source, and enforces role-based access so restricted documents are never retrieved or disclosed to unauthorized employees.",
     "intended_users": [
       "employee",
-      "manager",
-      "knowledge_owner"
+      "manager"
     ],
     "reviewers": [],
     "stakeholders": [
-      "knowledge_owners",
-      "managers",
-      "IT"
+      "knowledge owners (maintain and classify the source documents)",
+      "managers (authorized to access management-confidential material)",
+      "employees (primary users of the assistant)"
     ],
     "input_artifacts": [
-      "employee_travel_policy.pdf",
-      "mx200_maintenance_manual.pdf",
-      "project_aurora_pricing_strategy.pdf",
-      "access_manifest.json",
-      "query_set.json",
-      "poc_input_bundle.json"
+      "internal policies",
+      "equipment manuals",
+      "commercially sensitive management documents"
     ],
     "target_outputs": [
-      "RAGAnswerRecord JSON list (query_id, role, question, access_decision, answer, citations, refusal_reason)"
+      "role-aware answer to an employee question, grounded with citations to the supporting source"
     ],
-    "success_criteria": [
-      "Q01 (employee, Helsinki hotel limit): answers EUR 180 per night with Finance Director approval required when exceeded, citing [employee_travel_policy.pdf, 3]",
-      "Q02 (employee, MX-200 filter): answers inspection every 250 operating hours and replacement after 1,000 operating hours or 1.8 bar, citing mx200_maintenance_manual.pdf pages 3 and 4",
-      "Q03 (employee, Project Aurora ceiling): access_decision=denied, empty citations list, no restricted facts disclosed",
-      "Q04 (manager, Project Aurora ceiling and approver): answers 12 percent ceiling with written CFO approval required above the ceiling, citing [project_aurora_pricing_strategy.pdf, 3]",
-      "All four results returned as separate non-empty parseable JSON objects in output/results.json"
-    ],
+    "success_criteria": "Employees find reliable answers faster, can verify answers through citations, and never receive content outside their role. No numerical time-saving, accuracy, cost, or adoption target was specified.",
     "expected_value": [
-      "Employees find reliable answers faster",
-      "Every factual answer is traceable to a verified source via citations",
-      "Restricted documents are never disclosed to unauthorized roles",
-      "Reduced risk of incomplete or unsupported answers"
+      "faster access to reliable internal knowledge",
+      "traceable answers via citations",
+      "enforced access boundaries that prevent unauthorized disclosure"
     ],
     "risks": [
-      "Hallucinated or speculative answers not grounded in retrieved content",
-      "Fabricated or incorrect citations",
-      "Unauthorized chunk leakage into model context via pre-filter bypass",
-      "Restricted facts disclosed in answer text on a denied query",
-      "Stale documents producing outdated answers",
-      "Answer returned when no authorized source supports the claim"
+      "hallucinated answers",
+      "fabricated or incorrect citations",
+      "retrieval of restricted chunks into the model context",
+      "leakage of restricted content through answer text or citations",
+      "stale or outdated source documents",
+      "returning an answer when the authorized collection contains no support"
     ],
-    "poc_goal": "Demonstrate role-aware, citation-grounded question answering over three PDF documents using a local vector store and trusted role metadata. CLI: python run_poc.py --input <path-to-poc_input_bundle.json>. Execute all four role-tagged queries (Q01-Q04) and save non-empty parseable JSON results to output/results.json."
+    "poc_goal": "Demonstrate role-aware, citation-grounded question answering over three sample PDFs (employee travel policy, MX-200 maintenance manual, Project Aurora pricing strategy) using a supplied access manifest and query set. Run `python run_poc.py --input <path-to-poc_input_bundle.json>`, resolve the other supplied files relative to that bundle, execute the four role-tagged queries, and save non-empty parseable JSON results demonstrating correct access decisions and citations. Out of scope for this first PoC: a web interface, a live document-repository connector, enterprise sign-in/identity integration, a full audit-log service, and a numerical RAG-quality threshold."
   },
   "technical_spec": {
     "input_types": [
-      "pdf",
-      "json"
+      "document_collection",
+      "pdf"
     ],
     "input_formats": [
-      "PDF (text-based, 1-based page numbers)",
-      "JSON (access_manifest, query_set, poc_input_bundle)"
+      "pdf (text-based, English)",
+      "json (access manifest, query set, input bundle)"
     ],
     "output_types": [
+      "answer_with_citations",
       "structured_json"
     ],
     "language": "en",
-    "domain_vocabulary": "none",
-    "data_sources": [
-      "local file bundle resolved relative to poc_input_bundle.json at runtime"
-    ],
+    "domain_vocabulary": "No controlled term list required. Exact values and units must be preserved verbatim as they appear in the source documents (e.g. EUR amounts, operating hours, bar pressure, percentages).",
+    "data_sources": "PoC uses a local fixture bundle: three sample PDFs (employee_travel_policy.pdf, mx200_maintenance_manual.pdf, project_aurora_pricing_strategy.pdf) plus access_manifest.json and query_set.json, all resolved relative to poc_input_bundle.json. Connection to a live enterprise document repository is out of scope for this PoC.",
     "model_provider": "azure_openai",
     "model_preferences": {
-      "answer_model": "gpt-5.4",
-      "temperature": 0.0,
+      "generation_model": "gpt-5.4",
+      "temperature": 1.0,
       "reasoning_effort": "medium",
-      "embedding_model": "from_env_AZURE_EMBEDDING_DEPLOYMENT"
+      "embedding_model": "Azure OpenAI embedding deployment supported by RAGWorkflow; exact deployment name is an environment setting"
     },
-    "security_constraints": [
-      "RBAC pre-filter: role from trusted request metadata (not inferred from question); access_manifest.json maps documents to allowed_roles; unauthorized chunks must never enter model context",
-      "Cloud LLM API calls to Azure OpenAI are permitted",
-      "No personal data in synthetic PoC fixtures",
-      "No audit-log service required for PoC; enterprise identity integration is out of PoC scope"
-    ],
+    "security_constraints": "Role-based access filtering must occur before retrieval, so unauthorized chunks never enter the model's context window. The requesting role is trusted request metadata and must not be inferred from the question text. Denied answers must not reveal restricted facts or citations. External model APIs are allowed. The synthetic PoC fixtures contain no personal data. Enterprise identity integration and a full audit-log service are out of scope for the PoC (simulated role values, local vector store only). No exact data-retention period was specified.",
     "integration_targets": [],
-    "human_review": false,
+    "human_review": "no",
     "human_review_required": false,
-    "evaluation_requirements": {
-      "method": "deterministic query testing",
-      "queries": [
-        "Q01",
-        "Q02",
-        "Q03",
-        "Q04"
-      ],
-      "expected_outputs": "defined in poc_input_bundle.json and query_set.json",
-      "numerical_threshold": "not_specified",
-      "eval_framework": "RAG_eval"
-    },
-    "runtime_interface": "cli",
-    "runtime_entrypoint": "python run_poc.py --input <path-to-poc_input_bundle.json>"
+    "evaluation_requirements": "Deterministic acceptance test using the four supplied role-tagged queries (Q01-Q04), checked against required facts, the exact access decision (allowed/denied), and required citation pairs per query. No numerical RAG-quality threshold (e.g. a fixed recall/precision score) was specified for the first PoC.",
+    "runtime_interface": "CLI: `python run_poc.py --input <path-to-poc_input_bundle.json>`, resolving access_manifest.json, query_set.json, and the documents directory relative to that bundle file."
   },
   "target_output_spec": {
     "schema_name": "RAGAnswerRecord",
@@ -131,12 +100,12 @@
     ],
     "field_types": {
       "query_id": "str",
-      "role": "str",
+      "role": "str (enum: employee, manager)",
       "question": "str",
-      "access_decision": "str",
+      "access_decision": "str (enum: allowed, denied)",
       "answer": "str",
-      "citations": "list",
-      "refusal_reason": "str"
+      "citations": "list of [file_name: str, page_number: int (1-based)]",
+      "refusal_reason": "str | null"
     },
     "required_fields": [
       "query_id",
@@ -150,106 +119,103 @@
       "refusal_reason"
     ],
     "field_descriptions": {
-      "query_id": "Unique query identifier from query_set.json",
-      "role": "Requestor role from trusted request metadata; must not be inferred from question content",
-      "question": "The natural-language question as supplied in query_set.json",
-      "access_decision": "allowed if the role has access to documents that answer the query; denied otherwise",
-      "answer": "Cited factual answer grounded only in retrieved content; refusal message when access_decision=denied",
-      "citations": "List of [file_name, page_number] pairs (1-based integer); empty list when access_decision=denied",
-      "refusal_reason": "Required (non-null) when access_decision=denied; must not reveal restricted facts; null otherwise"
+      "query_id": "Identifier of the incoming query, preserved unchanged from the input.",
+      "role": "Requesting role, preserved unchanged from the input; trusted metadata, never inferred from the question.",
+      "question": "The employee's question, preserved unchanged from the input.",
+      "access_decision": "Whether the role was authorized to receive a factual answer to this question.",
+      "answer": "The grounded answer text, or a refusal message when denied or when the authorized sources do not support an answer.",
+      "citations": "Supporting citations as [file_name, page_number] pairs; empty when denied.",
+      "refusal_reason": "Explanation for a denied or not-found answer; null when access_decision is allowed and the answer is fully supported."
     },
     "allowed_values": {
-      "access_decision": [
-        "allowed",
-        "denied"
-      ],
       "role": [
         "employee",
         "manager"
+      ],
+      "access_decision": [
+        "allowed",
+        "denied"
       ]
     },
     "confidence_required": false,
-    "missing_value_policy": "If authorized sources do not support an answer, state the information was not found and do not speculate. Do not fabricate citations.",
+    "missing_value_policy": "If the authorized sources do not support an answer, state that the information was not found and do not speculate. If sources conflict, identify the conflict and cite both sources. Never fabricate a citation.",
     "validation_rules": [
-      "access_decision must be 'allowed' or 'denied'",
-      "citations must be an empty list when access_decision=denied",
-      "refusal_reason must be non-null when access_decision=denied",
-      "each citation must be exactly [str, int] (filename, 1-based page number)",
-      "answer must not reveal restricted content when access_decision=denied",
-      "allowed factual answers must include at least one citation to a document permitted for that role",
-      "exact values must be preserved: EUR 180, 250 operating hours, 1,000 operating hours, 1.8 bar, 12 percent, 22 percent"
+      "An allowed factual answer requires at least one citation to a document permitted for that role",
+      "A denied answer requires an empty citations list, a non-null refusal_reason, and must not reveal restricted facts",
+      "Each citation is a two-element list [file_name (str), page_number (1-based int)], in that order",
+      "query_id and role must be preserved unchanged from the input query",
+      "Cite every material factual claim using [file_name, page_number]",
+      "Do not answer from model memory when authorized evidence is absent"
     ]
   },
   "assumptions": [
     {
       "id": "assumption_001",
-      "text": "A local in-memory vector store (numpy cosine similarity or equivalent) is used for the PoC instead of PostgreSQL+pgvector, as the user explicitly requested a local vector store. The standard RAGWorkflow module is not selected.",
-      "status": "confirmed",
-      "impact": "component_selection",
+      "text": "No numerical success/adoption/time-saving target was specified; success is defined qualitatively (faster reliable answers, verifiable citations, no out-of-role disclosure).",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
       "recorded_by": "SpecificationBuilder",
-      "recorded_at": "2026-08-05T00:00:00Z"
+      "recorded_at": "2026-08-15T00:00:00Z"
     },
     {
       "id": "assumption_002",
-      "text": "The knowledge_owner role is treated as having the same document access as manager (all three documents). The user specified employee and manager access tiers; knowledge_owner was described functionally but not mapped to an access tier.",
+      "text": "The exact Azure OpenAI embedding deployment name was not specified; the PoC will read it from an environment variable and default to a model compatible with RAGWorkflow (text-embedding-3-large).",
       "status": "unconfirmed",
-      "impact": "security_constraint",
+      "impact": "component_selection",
       "recorded_by": "SpecificationBuilder",
-      "recorded_at": "2026-08-05T00:00:00Z"
+      "recorded_at": "2026-08-15T00:00:00Z"
     },
     {
       "id": "assumption_003",
-      "text": "Structure-aware chunking uses paragraph or section boundaries with moderate overlap (approximately 10-20% of chunk size). Exact chunk size defaults to approximately 512 tokens.",
+      "text": "No exact data-retention period was specified for PoC outputs; recorded as not_specified.",
       "status": "unconfirmed",
-      "impact": "component_selection",
+      "impact": "security_constraint",
       "recorded_by": "SpecificationBuilder",
-      "recorded_at": "2026-08-05T00:00:00Z"
+      "recorded_at": "2026-08-15T00:00:00Z"
     },
     {
       "id": "assumption_004",
-      "text": "The Azure OpenAI embedding deployment name is provided via environment variable AZURE_EMBEDDING_DEPLOYMENT. The specific model name is not user-confirmed.",
+      "text": "No numerical RAG-quality threshold (e.g. recall/precision score) was specified; evaluation for the first PoC is the four-query deterministic acceptance test only.",
       "status": "unconfirmed",
-      "impact": "component_selection",
+      "impact": "workflow_design",
       "recorded_by": "SpecificationBuilder",
-      "recorded_at": "2026-08-05T00:00:00Z"
+      "recorded_at": "2026-08-15T00:00:00Z"
     },
     {
       "id": "assumption_005",
-      "text": "RBAC pre-filtering reads allowed_roles from access_manifest.json at index time, attaches them as chunk metadata, and filters the candidate pool to role-permitted chunks before any similarity search. The role value is taken from the query request metadata and trusted as-is.",
-      "status": "confirmed",
+      "text": "Whether real production documents (beyond the synthetic PoC fixtures) contain personal data is unknown; this is recorded as 'unknown' in governance.data_handling and will block production packaging until confirmed.",
+      "status": "unconfirmed",
       "impact": "security_constraint",
       "recorded_by": "SpecificationBuilder",
-      "recorded_at": "2026-08-05T00:00:00Z"
+      "recorded_at": "2026-08-15T00:00:00Z"
     },
     {
       "id": "assumption_006",
-      "text": "BPMN swimlane structure: Requestor lane (employee or manager submits query via CLI), GAIK AI System lane (ingests, filters, retrieves, generates), Knowledge Owner shown as a collapsed pool (document maintenance, out of PoC scope). Not specified by the user.",
+      "text": "Business-process participants were not specified; defaulted to a single 'Employee / Manager' requesting-user lane for the query-submission step, with no separate Knowledge Owner lane since document classification is treated as static input.",
       "status": "unconfirmed",
       "impact": "workflow_design",
       "recorded_by": "SpecificationBuilder",
-      "recorded_at": "2026-08-05T00:00:00Z"
+      "recorded_at": "2026-08-15T00:00:00Z"
     },
     {
       "id": "assumption_007",
-      "text": "Denied-query exception path terminates with a clean 'Access Denied' end event and returns the denied RAGAnswerRecord to the caller. No additional notification, escalation, or logging step is modelled. Not specified by the user.",
+      "text": "Document classification and allowed-role tagging (as in access_manifest.json) is treated as static input data, not a modeled manual business step performed by knowledge owners.",
       "status": "unconfirmed",
       "impact": "workflow_design",
       "recorded_by": "SpecificationBuilder",
-      "recorded_at": "2026-08-05T00:00:00Z"
+      "recorded_at": "2026-08-15T00:00:00Z"
+    },
+    {
+      "id": "assumption_008",
+      "text": "A denied query ends the process cleanly with a refusal; no escalation/appeal path to a knowledge owner was requested.",
+      "status": "unconfirmed",
+      "impact": "workflow_design",
+      "recorded_by": "SpecificationBuilder",
+      "recorded_at": "2026-08-15T00:00:00Z"
     }
   ],
   "artifacts": {
-    "poc_input_bundle": {
-      "type": "json",
-      "source": "user_upload",
-      "optional": false,
-      "final_output": false,
-      "externally_visible": false,
-      "produced_by": null,
-      "schema_ref": null,
-      "overwrite": false
-    },
-    "document_collection": {
+    "source_documents": {
       "type": "document_collection",
       "source": "user_upload",
       "optional": false,
@@ -260,7 +226,7 @@
       "overwrite": false
     },
     "access_manifest": {
-      "type": "json",
+      "type": "text",
       "source": "user_upload",
       "optional": false,
       "final_output": false,
@@ -269,8 +235,8 @@
       "schema_ref": null,
       "overwrite": false
     },
-    "query_set": {
-      "type": "json",
+    "query_batch": {
+      "type": "text",
       "source": "user_upload",
       "optional": false,
       "final_output": false,
@@ -279,44 +245,14 @@
       "schema_ref": null,
       "overwrite": false
     },
-    "chunked_documents": {
-      "type": "text_chunks",
-      "source": "generated",
-      "optional": false,
-      "final_output": false,
-      "externally_visible": false,
-      "produced_by": "ingest_and_index",
-      "schema_ref": null,
-      "overwrite": false
-    },
-    "local_vector_index": {
-      "type": "vector_index",
-      "source": "generated",
-      "optional": false,
-      "final_output": false,
-      "externally_visible": false,
-      "produced_by": "ingest_and_index",
-      "schema_ref": null,
-      "overwrite": false
-    },
-    "retrieved_chunks_per_query": {
-      "type": "text_chunks",
-      "source": "generated",
-      "optional": false,
-      "final_output": false,
-      "externally_visible": false,
-      "produced_by": "apply_rbac_and_retrieve",
-      "schema_ref": null,
-      "overwrite": false
-    },
-    "rag_answer_records": {
-      "type": "structured_json",
+    "answer_records": {
+      "type": "answer_with_citations",
       "source": "generated",
       "optional": false,
       "final_output": true,
       "externally_visible": false,
-      "produced_by": "generate_answers",
-      "schema_ref": null,
+      "produced_by": "generate_role_aware_answers",
+      "schema_ref": "schemas/output_schema.py",
       "overwrite": false
     }
   },
@@ -324,159 +260,164 @@
   "outputs": {},
   "schemas": {},
   "components": {
-    "selected_modules": [],
+    "selected_modules": [
+      {
+        "id": "rag_workflow",
+        "name": "RAGWorkflow",
+        "reason": "Document collection to cited answer -- RAGWorkflow covers indexing, retrieval, and cited-answer generation end-to-end, using a local persistent vector store (Chroma) and supports query-time metadata filters (ask(filters=...)) which are the mechanism used for pre-retrieval RBAC enforcement."
+      }
+    ],
     "selected_building_blocks": [],
     "custom_components": [
-      "RBACPreFilter",
-      "LocalVectorIndexer",
-      "CitedRAGPipeline"
+      "RoleScopedIngestion -- attaches role_<role> boolean metadata flags to each chunk (derived from access_manifest.json allowed_roles) before embedding, using RAGWorkflow's own embedder/vector_store attributes instead of its index_documents() convenience wrapper (which has no metadata-injection hook)",
+      "AccessDecisionClassifier -- an internal-only unfiltered relevance check, never exposed as content, used solely to distinguish a restricted-topic denial from an honest not-found"
     ]
   },
   "workflow": {
     "steps": [
       {
-        "id": "load_input",
-        "name": "Load PoC input bundle via CLI",
+        "id": "upload_documents",
+        "name": "Upload internal document collection",
         "type": "user_task",
         "component": null,
         "inputs": [],
         "outputs": [
-          "poc_input_bundle",
-          "document_collection",
-          "access_manifest",
-          "query_set"
+          "source_documents"
         ],
-        "parameters": {
-          "cli_arg": "--input <path-to-poc_input_bundle.json>",
-          "path_resolution": "all other files resolved relative to poc_input_bundle.json"
-        },
+        "parameters": {},
         "depends_on": [],
         "loop": null
       },
       {
-        "id": "ingest_and_index",
-        "name": "Parse PDFs, chunk with metadata, embed, build local vector index",
-        "type": "automated_task",
-        "component": "custom",
-        "inputs": [
-          "document_collection",
+        "id": "provide_access_manifest",
+        "name": "Provide document classification and allowed-roles manifest",
+        "type": "user_task",
+        "component": null,
+        "inputs": [],
+        "outputs": [
           "access_manifest"
         ],
-        "outputs": [
-          "chunked_documents",
-          "local_vector_index"
-        ],
-        "parameters": {
-          "chunking_strategy": "structure_aware",
-          "chunk_overlap": "moderate",
-          "metadata_fields": [
-            "file_name",
-            "page_number",
-            "classification",
-            "allowed_roles"
-          ],
-          "embedding_model": "from_env_AZURE_EMBEDDING_DEPLOYMENT",
-          "provider": "azure_openai"
-        },
-        "depends_on": [
-          "load_input"
-        ],
+        "parameters": {},
+        "depends_on": [],
         "loop": null
       },
       {
-        "id": "apply_rbac_and_retrieve",
-        "name": "Apply RBAC pre-filter and retrieve top-4 eligible chunks per query",
-        "type": "automated_task",
-        "component": "custom",
-        "inputs": [
-          "local_vector_index",
-          "query_set"
-        ],
+        "id": "submit_queries",
+        "name": "Employee/manager submits role-tagged question(s)",
+        "type": "user_task",
+        "component": null,
+        "inputs": [],
         "outputs": [
-          "retrieved_chunks_per_query"
+          "query_batch"
         ],
-        "parameters": {
-          "role_source": "trusted_request_metadata",
-          "filter_timing": "pre_retrieval",
-          "top_k": 4,
-          "similarity_metric": "cosine",
-          "denied_handling": "return_denied_record_immediately"
-        },
-        "depends_on": [
-          "ingest_and_index"
-        ],
+        "parameters": {},
+        "depends_on": [],
         "loop": null
       },
       {
-        "id": "generate_answers",
-        "name": "Generate cited answers and format as RAGAnswerRecord list",
+        "id": "generate_role_aware_answers",
+        "name": "Index documents with role metadata, retrieve role-filtered context, generate cited answer per query",
         "type": "automated_task",
-        "component": "custom",
+        "component": "RAGWorkflow",
         "inputs": [
-          "retrieved_chunks_per_query",
-          "query_set"
+          "source_documents",
+          "access_manifest",
+          "query_batch"
         ],
         "outputs": [
-          "rag_answer_records"
+          "answer_records"
         ],
         "parameters": {
-          "model": "gpt-5.4",
-          "temperature": 0.0,
-          "reasoning_effort": "medium",
-          "provider": "azure_openai",
-          "citation_format": "[file_name, page_number]",
-          "grounding_policy": "retrieved_content_only",
-          "no_support_policy": "state_not_found_do_not_speculate",
-          "output_path": "output/results.json"
+          "persist": true,
+          "persist_path": "poc/chroma_store",
+          "collection_name": "gaik_rag_manufacturing_kb",
+          "citations": true,
+          "retriever_top_k": 4,
+          "retriever_hybrid": false,
+          "retriever_rerank": false,
+          "conversation_history": false,
+          "stream": false,
+          "use_azure": true,
+          "embedding_model": "env:RAG_EMBEDDING_DEPLOYMENT (default text-embedding-3-large)",
+          "access_control": "Pre-retrieval RBAC: each indexed chunk is tagged with boolean role_<role> metadata flags derived from access_manifest.json's allowed_roles; ask() is called with filters={'role_<requesting_role>': true} so unauthorized chunks are excluded from the similarity search itself (Chroma 'where' clause / in-memory pre-filter), never entering the model context.",
+          "denial_classification": "An additional internal-only unfiltered search (never exposed as content) checks whether the best-matching chunk for the query belongs to a role-restricted document; if so, and no strong authorized match exists, access_decision is 'denied' with a generic refusal_reason; if no strong match exists anywhere, the answer states the information was not found."
         },
         "depends_on": [
-          "apply_rbac_and_retrieve"
+          "upload_documents",
+          "provide_access_manifest",
+          "submit_queries"
         ],
         "loop": null
       }
     ]
   },
   "business_process": {
-    "participants": [],
+    "participants": [
+      {
+        "id": "requesting_user",
+        "name": "Employee / Manager",
+        "kind": "human_role",
+        "default_lane_for": [
+          "user_task"
+        ]
+      }
+    ],
     "manual_steps": [],
     "external_parties": [],
     "message_flows": [],
     "exceptions": [],
-    "decision_points": []
+    "decision_points": [
+      {
+        "id": "access_decision_gateway",
+        "name": "Is the requesting role authorized for this content?",
+        "after": "generate_role_aware_answers",
+        "branches": [
+          {
+            "condition": "allowed",
+            "target": "end"
+          },
+          {
+            "condition": "denied",
+            "target": "end"
+          }
+        ]
+      }
+    ]
   },
   "prompts": {},
   "models": {
     "provider": "azure_openai",
     "answer_model": "gpt-5.4",
-    "embedding_model": "from_env",
-    "temperature": 0.0,
-    "reasoning_effort": "medium"
+    "temperature": 1.0,
+    "reasoning_effort": "medium",
+    "embedding_model": "text-embedding-3-large (env-overridable via RAG_EMBEDDING_DEPLOYMENT)"
   },
   "validation": {
     "human_review_required": false,
     "completeness_check": true,
-    "hallucination_check": false
+    "hallucination_check": true
   },
   "evaluation": {
     "metrics": [
-      "access_control_correctness",
-      "citation_accuracy",
-      "answer_grounding"
+      "access_decision_accuracy",
+      "citation_correctness",
+      "required_fact_coverage",
+      "forbidden_fact_absence"
     ],
     "eval_framework": "RAG_eval",
-    "sample_data_dir": "data/samples",
+    "sample_data_dir": "poc/sample_input",
     "ground_truth_dir": "evals/ground_truth"
   },
   "governance": {
     "data_handling": {
       "external_model_api_allowed": true,
       "local_processing_required": false,
-      "stores_input_data": false,
+      "stores_input_data": true,
       "stores_outputs": true,
       "retention_policy": "not_specified",
-      "contains_personal_data": "false",
-      "output_sensitivity": "mixed",
-      "audit_log_required": false
+      "contains_personal_data": "unknown",
+      "output_sensitivity": "high",
+      "audit_log_required": true
     }
   },
   "runtime": {
@@ -485,35 +426,35 @@
     "env_file": ".env.example"
   },
   "package": {
-    "name": "manufacturing_knowledge_rag_use_case",
-    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\08e611fdcc41",
+    "name": "manufacturing_knowledge_assistant_use_case",
+    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\772370966e9e",
     "include_tests": true,
     "include_evals": true,
     "include_docs": true
   },
   "visualizations": {
     "bpmn_mapping": {
-      "Lane_users": {
+      "Lane_requesting_user": {
         "kind": "lane",
-        "blueprint_path": "derived:business_spec.intended_users"
+        "blueprint_path": "business_process.participants[0]"
       },
-      "Activity_load_input": {
+      "Activity_upload_documents": {
         "kind": "user_task",
         "blueprint_path": "workflow.steps[0]"
+      },
+      "Activity_provide_access_manifest": {
+        "kind": "user_task",
+        "blueprint_path": "workflow.steps[1]"
+      },
+      "Activity_submit_queries": {
+        "kind": "user_task",
+        "blueprint_path": "workflow.steps[2]"
       },
       "Lane_gaik_ai": {
         "kind": "lane",
         "blueprint_path": "derived:system"
       },
-      "Activity_ingest_and_index": {
-        "kind": "automated_task",
-        "blueprint_path": "workflow.steps[1]"
-      },
-      "Activity_apply_rbac_and_retrieve": {
-        "kind": "automated_task",
-        "blueprint_path": "workflow.steps[2]"
-      },
-      "Activity_generate_answers": {
+      "Activity_generate_role_aware_answers": {
         "kind": "automated_task",
         "blueprint_path": "workflow.steps[3]"
       },
@@ -521,41 +462,33 @@
         "kind": "start_event",
         "blueprint_path": "derived:start"
       },
+      "Gateway_join_generate_role_aware_answers": {
+        "kind": "parallel_join",
+        "blueprint_path": "derived:join_before:generate_role_aware_answers"
+      },
       "EndEvent_success": {
         "kind": "end_event",
         "blueprint_path": "derived:end"
       },
-      "DataObjectRef_poc_input_bundle": {
-        "kind": "data_object",
-        "blueprint_path": "artifacts.poc_input_bundle"
+      "Gateway_decision_access_decision_gateway": {
+        "kind": "decision_point",
+        "blueprint_path": "business_process.decision_points[0]"
       },
-      "DataObjectRef_document_collection": {
+      "DataObjectRef_source_documents": {
         "kind": "data_object",
-        "blueprint_path": "artifacts.document_collection"
+        "blueprint_path": "artifacts.source_documents"
       },
       "DataObjectRef_access_manifest": {
         "kind": "data_object",
         "blueprint_path": "artifacts.access_manifest"
       },
-      "DataObjectRef_query_set": {
+      "DataObjectRef_query_batch": {
         "kind": "data_object",
-        "blueprint_path": "artifacts.query_set"
+        "blueprint_path": "artifacts.query_batch"
       },
-      "DataObjectRef_chunked_documents": {
+      "DataObjectRef_answer_records": {
         "kind": "data_object",
-        "blueprint_path": "artifacts.chunked_documents"
-      },
-      "DataObjectRef_local_vector_index": {
-        "kind": "data_object",
-        "blueprint_path": "artifacts.local_vector_index"
-      },
-      "DataObjectRef_retrieved_chunks_per_query": {
-        "kind": "data_object",
-        "blueprint_path": "artifacts.retrieved_chunks_per_query"
-      },
-      "DataObjectRef_rag_answer_records": {
-        "kind": "data_object",
-        "blueprint_path": "artifacts.rag_answer_records"
+        "blueprint_path": "artifacts.answer_records"
       },
       "TextAnnotation_1": {
         "kind": "annotation",
@@ -569,23 +502,29 @@
   },
   "traceability": [
     {
-      "component": "RBACPreFilter",
-      "required_by": "security_constraints: pre-retrieval role-based access control from access_manifest.json"
+      "component": "RAGWorkflow",
+      "required_by": "input_type=document_collection, output_type=answer_with_citations, citation requirement"
     },
     {
-      "component": "LocalVectorIndexer",
-      "required_by": "technical_spec: local vector store required; PostgreSQL+pgvector is out of PoC scope"
+      "component": "RoleScopedIngestion",
+      "required_by": "security_constraints: role-based access filtering must occur before retrieval"
     },
     {
-      "component": "CitedRAGPipeline",
-      "required_by": "output_types: RAGAnswerRecord with [file_name, page_number] citations; gpt-5.4 at temperature=0.0 with reasoning_effort=medium"
+      "component": "AccessDecisionClassifier",
+      "required_by": "target_output_spec: access_decision=denied vs not-found distinction"
     }
   ],
   "change_log": [
     {
       "version": "1.0",
-      "date": "2026-08-05",
-      "change": "Initial draft blueprint generated by solution_configuration_wizard V1",
+      "date": "2026-08-15",
+      "change": "Initial blueprint generated by solution_configuration_wizard V1",
+      "changed_by": "solution_configuration_wizard"
+    },
+    {
+      "version": "1.1",
+      "date": "2026-08-15",
+      "change": "PoC scaffolded and hand-wired: RAGWorkflow's own parser/embedder/vector-store/retriever driven directly (instead of index_documents()/ask()) to attach role_<role> metadata at ingestion and apply pre-retrieval filters at query time; answer generation calls the underlying chat client directly (not AnswerGenerator.generate(), which hardcodes temperature=0.0) to honor the user's explicit temperature=1.0 and reasoning_effort=medium; hand-authored schemas/output_schema.py (RAGAnswerRecord) since SchemaGenerator is not invoked for the rag pattern; replaced the generic scaffolded evals/run_basic_eval.py (which had a syntax error and did not model RBAC) with a deterministic 4-query acceptance check against evals/ground_truth/expected_results.json.",
       "changed_by": "solution_configuration_wizard"
     }
   ]

@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0.0",
+  "queries": [
+    {
+      "query_id": "Q01",
+      "role": "employee",
+      "question": "What is the maximum reimbursable hotel rate in Helsinki, and what happens if it is exceeded?"
+    },
+    {
+      "query_id": "Q02",
+      "role": "employee",
+      "question": "How often should the MX-200 main process filter be inspected and when must it be replaced?"
+    },
+    {
+      "query_id": "Q03",
+      "role": "employee",
+      "question": "What discount ceiling applies to Project Aurora?"
+    },
+    {
+      "query_id": "Q04",
+      "role": "manager",
+      "question": "What discount ceiling applies to Project Aurora and who approves an exception?"
+    }
+  ]
+}

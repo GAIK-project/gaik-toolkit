@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UC05",
+  "run_id": "UC05_run_01",
+  "poc": {
+    "working_directory": "poc",
+    "setup_command": ["python", "-m", "pip", "install", "-r", "requirements.txt"],
+    "run_command": ["python", "run_poc.py", "--input", "{fixture}"],
+    "fixture": "fixtures/poc_input_bundle.json",
+    "output_globs": ["output/**/*.json", "output/*.json"]
+  },
+  "commands": {
+    "blueprint_validator": []
+  }
+}

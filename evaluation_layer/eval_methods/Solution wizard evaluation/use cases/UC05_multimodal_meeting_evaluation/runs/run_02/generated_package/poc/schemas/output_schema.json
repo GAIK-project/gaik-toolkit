@@ -1,0 +1,255 @@
+{
+  "$defs": {
+    "meetingrecord_action_items_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for meetingrecord_action_items_record",
+      "properties": {
+        "owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Name of the action item owner, only when explicitly stated together with the action; otherwise null.",
+          "title": "Owner"
+        },
+        "due_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Due date or deadline for the action item, only when explicitly stated together with the action; otherwise null.",
+          "title": "Due Date"
+        },
+        "uncertainty_reason": {
+          "description": "Explanation of why owner or due date is null when missing or ambiguous.",
+          "title": "Uncertainty Reason",
+          "type": "string"
+        },
+        "citations": {
+          "description": "Citation strings supporting the action item; at least one citation is required.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Citations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "uncertainty_reason"
+      ],
+      "title": "meetingrecord_action_items_record_Extraction",
+      "type": "object"
+    },
+    "meetingrecord_conflicts_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for meetingrecord_conflicts_record",
+      "properties": {
+        "citations": {
+          "description": "Citation strings supporting the agenda-vs-meeting disagreement, citing both the agenda page and the audio segment.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Citations",
+          "type": "array"
+        }
+      },
+      "title": "meetingrecord_conflicts_record_Extraction",
+      "type": "object"
+    },
+    "meetingrecord_decisions_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for meetingrecord_decisions_record",
+      "properties": {
+        "statement": {
+          "description": "Clear, self-contained description of what was decided",
+          "title": "Statement",
+          "type": "string"
+        },
+        "citations": {
+          "description": "Citation strings pointing at the audio segment where the decision was stated",
+          "items": {
+            "type": "string"
+          },
+          "title": "Citations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "statement"
+      ],
+      "title": "meetingrecord_decisions_record_Extraction",
+      "type": "object"
+    },
+    "meetingrecord_participants_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for meetingrecord_participants_record",
+      "properties": {
+        "name": {
+          "description": "Participant name from the supplied participant list",
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "description": "Participant role from the supplied participant list",
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "role"
+      ],
+      "title": "meetingrecord_participants_record_Extraction",
+      "type": "object"
+    },
+    "meetingrecord_topics_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for meetingrecord_topics_record",
+      "properties": {
+        "discussion_summary": {
+          "description": "Concise summary of what was actually said for the topic, not the agenda's proposed framing.",
+          "title": "Discussion Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "discussion_summary"
+      ],
+      "title": "meetingrecord_topics_record_Extraction",
+      "type": "object"
+    },
+    "unresolved_issues_record_Extraction": {
+      "additionalProperties": false,
+      "description": "Extraction model for unresolved_issues_record",
+      "properties": {
+        "citations": {
+          "description": "Citation strings supporting the unresolved issue",
+          "items": {
+            "type": "string"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "uncertainty_reason": {
+          "description": "Explanation of uncertainty when applicable",
+          "title": "Uncertainty Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uncertainty_reason"
+      ],
+      "title": "unresolved_issues_record_Extraction",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Extraction model for MeetingRecord with repeated topics, decisions, action_items, unresolved_issues, conflicts, participants",
+  "properties": {
+    "meeting_id": {
+      "description": "Read directly from the meeting metadata available in the transcript/agenda.",
+      "title": "Meeting Id",
+      "type": "string"
+    },
+    "title": {
+      "description": "Read directly from the meeting metadata available in the transcript/agenda.",
+      "title": "Title",
+      "type": "string"
+    },
+    "meeting_date": {
+      "description": "Read directly from the meeting metadata available in the transcript/agenda.",
+      "title": "Meeting Date",
+      "type": "string"
+    },
+    "start_time": {
+      "description": "Read directly from the meeting metadata available in the transcript/agenda.",
+      "title": "Start Time",
+      "type": "string"
+    },
+    "end_time": {
+      "description": "Read directly from the meeting metadata available in the transcript/agenda.",
+      "title": "End Time",
+      "type": "string"
+    },
+    "review_status": {
+      "const": "pending_review",
+      "default": "pending_review",
+      "description": "Always set to the fixed literal pending_review.",
+      "title": "Review Status",
+      "type": "string"
+    },
+    "topics": {
+      "description": "One entry per agenda or discussion topic actually covered in the meeting, including discussion summary.",
+      "items": {
+        "$ref": "#/$defs/meetingrecord_topics_record_Extraction"
+      },
+      "title": "Topics",
+      "type": "array"
+    },
+    "decisions": {
+      "description": "One entry per explicit spoken decision confirmed in the meeting transcript, with citations.",
+      "items": {
+        "$ref": "#/$defs/meetingrecord_decisions_record_Extraction"
+      },
+      "title": "Decisions",
+      "type": "array"
+    },
+    "action_items": {
+      "description": "Concrete follow-up tasks discussed in the meeting, with owner and due date only when explicitly stated, plus citations and uncertainty reason when needed.",
+      "items": {
+        "$ref": "#/$defs/meetingrecord_action_items_record_Extraction"
+      },
+      "title": "Action Items",
+      "type": "array"
+    },
+    "unresolved_issues": {
+      "description": "Items explicitly left open, pending, or deferred, each with at least one citation.",
+      "items": {
+        "$ref": "#/$defs/unresolved_issues_record_Extraction"
+      },
+      "title": "Unresolved Issues",
+      "type": "array"
+    },
+    "conflicts": {
+      "description": "Agenda-versus-meeting disagreements, citing both agenda page evidence and audio evidence.",
+      "items": {
+        "$ref": "#/$defs/meetingrecord_conflicts_record_Extraction"
+      },
+      "title": "Conflicts",
+      "type": "array"
+    },
+    "participants": {
+      "description": "Use the supplied participant list as the authoritative source of participant names and roles.",
+      "items": {
+        "$ref": "#/$defs/meetingrecord_participants_record_Extraction"
+      },
+      "title": "Participants",
+      "type": "array"
+    }
+  },
+  "required": [
+    "meeting_id",
+    "title",
+    "meeting_date",
+    "start_time",
+    "end_time",
+    "topics",
+    "decisions",
+    "action_items",
+    "unresolved_issues",
+    "conflicts",
+    "participants"
+  ],
+  "title": "MeetingRecord_Extraction",
+  "type": "object"
+}

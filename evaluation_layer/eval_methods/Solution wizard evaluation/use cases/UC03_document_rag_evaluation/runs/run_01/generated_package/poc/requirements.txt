@@ -1,6 +1,4 @@
 pydantic>=2
 python-dotenv
+gaik[rag-workflow]
 pyyaml
-openai>=1.30
-numpy>=1.26
-pymupdf>=1.24

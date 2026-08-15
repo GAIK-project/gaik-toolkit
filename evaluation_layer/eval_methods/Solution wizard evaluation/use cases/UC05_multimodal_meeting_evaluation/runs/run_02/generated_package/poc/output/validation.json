@@ -1,0 +1,17 @@
+{
+  "hallucination_flags": [
+    {
+      "field": "meeting_id",
+      "value": "NIMBUS-PRR-2026-09-17",
+      "severity": "wrong",
+      "reason": "Source names the meeting but never gives a meeting ID."
+    },
+    {
+      "field": "participants[2].name",
+      "value": "Sofia Niemi",
+      "severity": "wrong",
+      "reason": "Source transcript says the name is Sophia Nimi, not Sofia Niemi."
+    }
+  ],
+  "passed": false
+}

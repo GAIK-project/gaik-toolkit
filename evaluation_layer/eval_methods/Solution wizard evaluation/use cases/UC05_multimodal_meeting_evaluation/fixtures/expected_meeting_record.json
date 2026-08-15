@@ -1,0 +1,161 @@
+{
+  "schema_version": "1.0.0",
+  "scenario_id": "UC05",
+  "meeting_id": "NIMBUS-PRR-2026-09-17",
+  "title": "Project Nimbus Pilot Readiness Review",
+  "meeting_date": "2026-09-17",
+  "start_time": "09:00",
+  "end_time": "09:18",
+  "participants": [
+    {
+      "name": "Elena Markovic",
+      "role": "Project Manager"
+    },
+    {
+      "name": "Liam Chen",
+      "role": "Technical Lead"
+    },
+    {
+      "name": "Sofia Niemi",
+      "role": "Data Protection Specialist"
+    },
+    {
+      "name": "Arjun Patel",
+      "role": "Project Coordinator"
+    },
+    {
+      "name": "Mia Roberts",
+      "role": "Procurement Specialist"
+    }
+  ],
+  "topics": [
+    {
+      "title": "Pilot scope and timing",
+      "discussion_summary": "The team replaced the proposed 15 October date with a limited 30-user Helsinki customer-service pilot starting 20 October for two weeks."
+    },
+    {
+      "title": "Data protection",
+      "discussion_summary": "The pilot will use synthetic or anonymized data only; a DPIA is required."
+    },
+    {
+      "title": "Procurement and budget",
+      "discussion_summary": "Three quotations will be compared; budget approval remains pending."
+    },
+    {
+      "title": "Training and readiness",
+      "discussion_summary": "Training, sandbox preparation, FAQ preparation, and a go/no-go summary are required before the pilot."
+    },
+    {
+      "title": "Open technical risks",
+      "discussion_summary": "The SSO approach remains with the architecture board."
+    }
+  ],
+  "decisions": [
+    {
+      "decision_id": "D01",
+      "statement": "Run a two-week pilot for 30 users in the Helsinki customer service team starting 2026-10-20.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:01:56|00:02:08"
+      ]
+    },
+    {
+      "decision_id": "D02",
+      "statement": "Use only synthetic or anonymized data; do not use production customer data.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:25|00:02:34"
+      ]
+    }
+  ],
+  "action_items": [
+    {
+      "action_id": "A01",
+      "description": "Complete the data protection impact assessment.",
+      "owner": "Sofia Niemi",
+      "due_date": "2026-09-29",
+      "uncertainty_reason": null,
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:25|00:02:34"
+      ]
+    },
+    {
+      "action_id": "A02",
+      "description": "Compare the three supplier quotations.",
+      "owner": "Mia Roberts",
+      "due_date": "2026-09-24",
+      "uncertainty_reason": null,
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:48|00:02:58"
+      ]
+    },
+    {
+      "action_id": "A03",
+      "description": "Schedule the pilot training session.",
+      "owner": "Arjun Patel",
+      "due_date": "2026-10-03",
+      "uncertainty_reason": null,
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:12|00:03:21"
+      ]
+    },
+    {
+      "action_id": "A04",
+      "description": "Configure and test the sandbox using synthetic data.",
+      "owner": "Liam Chen",
+      "due_date": "2026-09-25",
+      "uncertainty_reason": null,
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:22|00:03:28"
+      ]
+    },
+    {
+      "action_id": "A05",
+      "description": "Draft a short support FAQ before training.",
+      "owner": null,
+      "due_date": null,
+      "uncertainty_reason": "No owner or exact due date was agreed.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:29|00:03:42"
+      ]
+    },
+    {
+      "action_id": "A06",
+      "description": "Send the consolidated go/no-go summary to the steering group.",
+      "owner": "Elena Markovic",
+      "due_date": "2026-10-06",
+      "uncertainty_reason": null,
+      "citations": [
+        "project_nimbus_meeting.wav|00:03:42|00:03:54"
+      ]
+    }
+  ],
+  "unresolved_issues": [
+    {
+      "description": "Final pilot budget approval and the confirmed budget ceiling are pending finance confirmation.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:48|00:02:58"
+      ]
+    },
+    {
+      "description": "The SSO approach remains undecided pending the architecture board meeting on 2026-09-22.",
+      "citations": [
+        "project_nimbus_meeting.wav|00:02:59|00:03:11"
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "description": "The agenda proposed a 2026-10-15 launch, but the meeting explicitly decided on 2026-10-20.",
+      "citations": [
+        "project_nimbus_agenda.pdf|2",
+        "project_nimbus_meeting.wav|00:01:56|00:02:08"
+      ]
+    }
+  ],
+  "review_status": "pending_review",
+  "must_not_assert": [
+    "The 18,000 euro budget ceiling was approved.",
+    "An SSO approach was selected.",
+    "The support FAQ has a named owner or exact due date.",
+    "The pilot starts on 2026-10-15."
+  ]
+}

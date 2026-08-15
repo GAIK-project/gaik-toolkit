@@ -1,0 +1,89 @@
+{
+  "hallucination_flags": [
+    {
+      "field": "participants[2].name",
+      "value": "Sofia Niemi",
+      "severity": "suspect",
+      "reason": "Transcript says 'Sophia Nimi'; participant list says 'Sofia Niemi'. Spelling differs from spoken source."
+    },
+    {
+      "field": "review_status",
+      "value": "pending_review",
+      "severity": "wrong",
+      "reason": "Source says the generated record remains pending review until project manager approves it; no extracted status field is stated."
+    },
+    {
+      "field": "participants[2].role",
+      "value": "Data Protection Specialist",
+      "severity": "wrong",
+      "reason": "Role is supported, but exact participant name/identity differs from the transcript spelling."
+    },
+    {
+      "field": "topics[0].discussion_summary",
+      "value": "Elena Markovic opened the Project Nimbus pilot readiness review, the participants introduced themselves, and Arjun Patel confirmed that all five expected participants were present.",
+      "severity": "suspect",
+      "reason": "Summary adds 'all five expected participants were present,' which is stated, but combines extra narrative not directly quoted."
+    },
+    {
+      "field": "topics[5].discussion_summary",
+      "value": "Elena Markovic assigned actions for scheduling the pilot training session, configuring and testing the sandbox, preparing a support FAQ document, and sending the consolidated go or no-go summary to the steering group. She also stated that the training should take place before the 20 October pilot start.",
+      "severity": "wrong",
+      "reason": "Source says support FAQ owner and exact due date were not assigned, but summary implies assigned actions for it."
+    },
+    {
+      "field": "decisions[0].statement",
+      "value": "The pilot scope was limited to the Helsinki customer service team with 30 users for a two-week period starting on October 20, 2026.",
+      "severity": "suspect",
+      "reason": "Source supports the scope and start date, but not the formatted full date '2026' in the statement."
+    },
+    {
+      "field": "decisions[1].statement",
+      "value": "The pilot was restricted to synthetic or anonymized data, and no production customer data was to be used.",
+      "severity": "suspect",
+      "reason": "Source says synthetic or anonymized data only and no production customer data, but wording 'restricted to' is an inference."
+    },
+    {
+      "field": "action_items[1].description",
+      "value": "Compare the three supplier quotations.",
+      "severity": "suspect",
+      "reason": "Source says Mia will compare them; 'the three supplier quotations' is implied from context, not explicitly assigned as a task label."
+    },
+    {
+      "field": "action_items[4].owner",
+      "value": "null",
+      "severity": "wrong",
+      "reason": "Source says someone from support should draft it, but no explicit owner was agreed; null is okay only if preserved, not assigned as a literal value."
+    },
+    {
+      "field": "action_items[5].owner",
+      "value": "Elena Markovic",
+      "severity": "wrong",
+      "reason": "Source says Elena will send the summary, but the action sentence begins 'I will'; owner is not explicitly named there."
+    },
+    {
+      "field": "action_items[5].description",
+      "value": "Send the consolidated go or no-go summary to the steering group after the data protection, procurement, training, and sandbox updates are available.",
+      "severity": "wrong",
+      "reason": "Source says Elena will send it by October 6th; 'after the updates are available' is extra phrasing not stated as description."
+    },
+    {
+      "field": "unresolved_issues[0].description",
+      "value": "The final budget approval and confirmed budget ceiling remained unresolved pending a response from finance.",
+      "severity": "suspect",
+      "reason": "Source says budget approval and confirmed ceiling remain unresolved until finance responds; 'pending a response' is paraphrase but slightly altered."
+    },
+    {
+      "field": "unresolved_issues[1].description",
+      "value": "The single sign-on approach remained unresolved pending architecture board input, and no project team owner was assigned for that decision.",
+      "severity": "suspect",
+      "reason": "Source says no project team owner should be inferred; 'was assigned' is stronger than the transcript."
+    },
+    {
+      "field": "conflicts[0].description",
+      "value": "The agenda proposed a pilot launch date of 15 October 2026, but the meeting explicitly decided that the pilot would start on 20 October 2026.",
+      "severity": "suspect",
+      "reason": "Source supports the date change, but 'explicitly decided' and full 2026 formatting are not stated verbatim."
+    }
+  ],
+  "passed": false
+}

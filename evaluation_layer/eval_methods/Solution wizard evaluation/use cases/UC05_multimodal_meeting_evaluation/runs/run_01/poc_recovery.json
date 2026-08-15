@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "UC05_run_01",
+  "maximum_refinement_attempts": 3,
+  "baseline_execution_file": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC05_multimodal_meeting_evaluation\\runs\\run_01\\poc_execution.json",
+  "initial_execution_successful": true,
+  "refinement_attempts_to_success": 0,
+  "final_execution_successful": true,
+  "status": "successful_original",
+  "attempts": [],
+  "eq4_uses_baseline_only": true,
+  "interpretation": "0=original success; 1-3=success after that many refinements; N/A=never successful after three refinements."
+}
