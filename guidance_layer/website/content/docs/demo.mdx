@@ -107,6 +107,56 @@ Upload document collections and build an intelligent Q&A system. The RAG Builder
 
 ![RAG Demo](/demo-images/rag.png)
 
+---
+
+### Vision Extractor
+
+Upload a PDF or image and get structured data in a single pass — no intermediate parsing step. The vision model reads the document directly, making it well suited for scanned documents and visually complex layouts.
+
+**Key capability:** One-call PDF/image → structured data with OpenAI, Claude, or Gemini.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/vision-extractor)
+
+---
+
+### Text-to-Speech
+
+Convert text into downloadable speech audio in Finnish or English. Choose a voice and get production-quality audio for accessibility, training material, or content narration.
+
+**Key capability:** Text → natural speech audio with selectable voices.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/text-to-speech)
+
+---
+
+### PostgreSQL Agent
+
+Ask a database questions in plain language. The agent introspects the schema, generates a validated read-only SQL query, runs it, and explains the result — showing the SQL it used so every answer can be checked.
+
+**Key capability:** Natural language → safe, read-only SQL → verifiable answer.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/postgres-agent)
+
+---
+
+### Tabular Agent
+
+Upload your own CSV or Excel file and ask it questions in plain language. The agent loads the file into an in-memory database, cleans up report-style sheets (title rows, subtotals, notes), profiles every column, and answers with validated read-only SQL — shown alongside the answer.
+
+**Key capability:** Spreadsheet upload → cleaned tables → natural-language Q&A with visible SQL.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/tabular-agent)
+
+---
+
+### LLM-as-Judge
+
+Score extraction output against a rubric, detect hallucinations by comparing output to its source, or run a multi-model judge panel with majority voting. Useful for pre-screening AI output before human review.
+
+**Key capability:** Automated quality scoring and hallucination detection for LLM outputs.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/llm-judge)
+
 For local setup instructions and deployment options, see the [toolkit_demo_app README](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/toolkit_demo_app).
 
 ---
@@ -145,7 +195,7 @@ Upload a lecture, podcast, or training video and receive accurate transcripts wi
 
 **Business value:** Accessible video content, searchable transcripts, compliance with captioning requirements.
 
-[Try it live →](https://gaig-demo.2.rahtiapp.fi/dental-transcription) · [Read more →](/docs/use-cases/transcription-captioning-translation)
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/dental-transcription) · [Read more →](/use-cases/transcription-captioning-translation)
 
 ![Transcription Demo](/demo-images/dental-transcription.png)
 
@@ -157,9 +207,29 @@ Search across an entire video library by describing what you're looking for in p
 
 **Business value:** Instant access to specific knowledge within video libraries, improved learning efficiency.
 
-[Try it live →](https://gaik-demo.2.rahtiapp.fi/video-search) · [Read more →](/docs/use-cases/semantic-video-search)
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/video-search) · [Read more →](/use-cases/semantic-video-search)
 
 ![Video Search Demo](/demo-images/video-search.png)
+
+---
+
+### Purchase Order Processing
+
+Upload a purchase order PDF together with BOM files and a price list. The system extracts the order, matches it against the bill of materials, prices each line item, and produces an order draft ready for review.
+
+**Business value:** Hours of manual order entry and cross-referencing reduced to minutes.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/luvata-order) · [Read more →](/use-cases/purchase-order-processing)
+
+---
+
+### Report Writing
+
+Upload a mixed set of source files — PDFs, Word documents, spreadsheets, audio, images — define the report structure, and receive a sectioned Markdown report grounded in the sources.
+
+**Business value:** Consistent, source-grounded reports from heterogeneous materials without manual compilation.
+
+[Try it live →](https://gaik-demo.2.rahtiapp.fi/report-writer) · [Read more →](/use-cases/report-writing)
 
 <Callout type="info">
 To test the software demos, visit the [GAIK demo link](https://gaik-demo.2.rahtiapp.fi/). Access is available upon registration request.
