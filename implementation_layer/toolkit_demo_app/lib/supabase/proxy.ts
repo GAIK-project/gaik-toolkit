@@ -17,6 +17,7 @@ const PROTECTED_ROUTES = [
   "/luvata-order",
   "/parser",
   "/postgres-agent",
+  "/tabular-agent",
   "/rag",
   "/report-writer",
   "/text-to-speech",

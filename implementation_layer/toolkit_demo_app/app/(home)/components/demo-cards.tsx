@@ -37,6 +37,7 @@ import {
   Search,
   Volume2,
   Sparkles,
+  Table2,
   Users,
   Video,
 } from "lucide-react";
@@ -217,6 +218,13 @@ const buildingBlocks: Demo[] = [
       "Ask a database questions in plain language — the agent writes and runs read-only SQL",
     href: "/postgres-agent",
     icon: Database,
+  },
+  {
+    title: "Tabular Agent",
+    description:
+      "Upload a CSV or Excel file and ask it questions — even messy report-style sheets",
+    href: "/tabular-agent",
+    icon: Table2,
   },
   {
     title: "LLM-as-Judge",

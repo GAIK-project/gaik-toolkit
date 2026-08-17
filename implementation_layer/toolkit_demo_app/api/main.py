@@ -42,6 +42,7 @@ try:
         postgres_agent,
         rag,
         report_writer,
+        tabular_agent,
         text_to_speech,
         transcriber,
         video_search,
@@ -61,6 +62,7 @@ except ImportError:
         postgres_agent,
         rag,
         report_writer,
+        tabular_agent,
         text_to_speech,
         transcriber,
         video_search,
@@ -143,6 +145,7 @@ app.include_router(text_to_speech.router, prefix="/text-to-speech", tags=["Text-
 app.include_router(pipeline.router, prefix="/pipeline", tags=["Pipeline"])
 app.include_router(rag.router, prefix="/rag", tags=["RAG"])
 app.include_router(postgres_agent.router, prefix="/postgres-agent", tags=["Postgres Agent"])
+app.include_router(tabular_agent.router, prefix="/tabular-agent", tags=["Tabular Agent"])
 app.include_router(diary.router, prefix="/diary", tags=["Diary"])
 app.include_router(
     dental_transcription.router,
@@ -182,6 +185,7 @@ async def root():
             "pipeline": "/pipeline - End-to-end pipelines (audio/document to structured data)",
             "rag": "/rag - RAG pipeline (document indexing and Q&A with citations)",
             "postgres-agent": "/postgres-agent - PostgreSQL text-to-SQL query agent",
+            "tabular-agent": "/tabular-agent - CSV/Excel text-to-SQL query agent (DuckDB)",
             "diary": "/diary - Construction diary (Työmaapäiväkirja) workflow",
             "dental-transcribe": "/dental-transcribe - Dental transcription with SRT/VTT subtitles",
             "video-search": "/video-search - Semantic dental video search (pgvector)",
