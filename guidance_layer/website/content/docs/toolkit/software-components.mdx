@@ -603,3 +603,51 @@ flowchart LR
 
 - **Implementation code**: [software_components/postgres_agent](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/postgres_agent)
 - **Usage examples**: [examples/postgres_agent](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/postgres_agent)
+
+### Tabular Agent
+
+The Tabular Agent is the file-shaped sibling of the Postgres Agent: upload a CSV or Excel file, ask a question in plain language, and get an answer backed by a validated, read-only SQL query. It loads your files into an in-memory DuckDB database, profiles every column, asks an LLM for a query, validates it, runs it, and — if the query fails — feeds the error back and retries. Real spreadsheets are rarely tidy, so report-style sheets with title rows, blank spacers, interleaved subtotals and trailing note blocks are cleaned up before anything is queried: the header row and subtotal rows are found deterministically at no token cost, and only sheets that still look messy trigger a single extra LLM call to locate the real table.
+
+<Mermaid chart={`
+flowchart LR
+    F[("📊 CSV / Excel / Parquet")] --> B
+    Q("❓ Natural-language Question") --> B
+
+    subgraph B["Tabular Agent"]
+        direction TB
+        LOAD["Load + Clean-up"]
+        PROF["Column Profiling"]
+        GEN["LLM SQL Generation"]
+        VAL["Read-only Validation"]
+        RUN["Execute (locked DuckDB)"]
+        LOAD --> PROF --> GEN --> VAL --> RUN
+        RUN -.->|"error → retry"| GEN
+    end
+
+    B --> A("💬 Natural-language Answer")
+    B --> S("🧾 Validated SQL + Rows")
+
+    style F fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style Q fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style A fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style S fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- Ask your own CSV, Excel, Parquet or JSON files questions — no database required
+- Messy-spreadsheet clean-up: title rows, blank spacers, subtotals and note blocks are removed; a subtotal is recognised by structure rather than by the word "total", so it works in any language
+- Nordic number formats (`1 234,56`) become real numbers, so `SUM()` works on Finnish and Swedish exports
+- Column profiling puts each column's type, null share, range and actual values in the prompt — the single biggest accuracy lever, and it costs no tokens
+- Each Excel sheet becomes its own table, so a question can join across sheets
+- Two security layers: `sqlglot` validation that rejects file-reading table functions and any unrecognised function (an allowlist, not a denylist), plus a DuckDB connection locked with `enable_external_access = false` before a single generated query runs
+- Multi-provider LLM (OpenAI / Azure / Anthropic / Google); `get_schema()` and `run_sql()` work without LLM credentials, so they double as tools for an external agent framework
+
+**Potential applications:**
+- Self-service analytics over spreadsheets people already email around
+- Answering questions about an uploaded file in a chatbot or support tool
+- Ad-hoc exploration of survey results, exports and finance reports without writing SQL
+- Turning a monthly report workbook into something queryable
+
+- **Implementation code**: [software_components/tabular_agent](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/tabular_agent)
+- **Usage examples**: [examples/tabular_agent](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/tabular_agent)
