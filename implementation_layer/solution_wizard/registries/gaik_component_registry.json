@@ -1470,6 +1470,88 @@
     "install_extra": "postgres-agent"
   },
   {
+    "id": "tabular_agent",
+    "name": "TabularAgent",
+    "type": "software_component",
+    "input_artifact_types": [
+      "tabular",
+      "text"
+    ],
+    "output_artifact_types": [
+      "answer",
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "source"
+    ],
+    "optional_parameters": [
+      "config",
+      "model",
+      "max_retries",
+      "max_rows",
+      "query_timeout_s",
+      "memory_limit",
+      "layout_inference",
+      "profile_samples",
+      "extra_instructions",
+      "answer_language",
+      "temperature"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai",
+      "anthropic",
+      "google"
+    ],
+    "cost_relevant_parameters": [
+      "model",
+      "layout_inference"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Column profiling is free (plain SQL) and is the main accuracy lever. layout_inference='auto' spends one extra LLM call only on messy sheets",
+      "cost_sensitivity": "low-medium -- one to three LLM calls per question, plus one per messy sheet at load",
+      "degrades_on": [
+        "opaque_column_names_without_extra_instructions",
+        "very_wide_or_very_large_files",
+        "questions_needing_charts_or_statistical_modelling"
+      ]
+    },
+    "known_limitations": [
+      "Read-only SELECT queries only; source files are never modified",
+      "No charts, regression, or forecasting -- SQL only, no Python execution",
+      "Whole profiled schema goes in the LLM prompt; best for small/medium files",
+      "In a messy sheet, a data row missing a descriptive field can be dropped as a subtotal"
+    ],
+    "best_for": [
+      "csv_excel_question_answering",
+      "spreadsheet_data_exploration",
+      "nl_to_sql_over_files",
+      "ad_hoc_reporting_from_uploads"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "ask_spreadsheet",
+        "component": "TabularAgent",
+        "inputs": [
+          "user_question",
+          "tabular_file"
+        ],
+        "outputs": [
+          "natural_language_answer"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/tabular_agent/",
+    "import_path": "gaik.software_components.tabular_agent",
+    "example_script_path": "implementation_layer/examples/software_components/tabular_agent/",
+    "readme_path": "implementation_layer/src/gaik/software_components/tabular_agent/README.md",
+    "install_extra": "tabular-agent"
+  },
+  {
     "id": "form_understander",
     "name": "FormUnderstander",
     "type": "software_component",

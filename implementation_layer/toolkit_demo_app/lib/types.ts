@@ -21,6 +21,7 @@ export type DemoType =
   | "luvata-order"
   | "text-to-speech"
   | "postgres-agent"
+  | "tabular-agent"
   | "report-writer";
 
 /**

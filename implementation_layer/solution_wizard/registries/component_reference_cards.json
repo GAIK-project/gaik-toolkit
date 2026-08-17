@@ -1864,5 +1864,101 @@
         "infer_from": "leave at default unless the service is known to be slow to wake"
       }
     ]
+  },
+  "TabularAgent": {
+    "import": "from gaik.software_components.tabular_agent import TabularAgent",
+    "construct": "agent = TabularAgent(source=file_path)",
+    "call": "with agent:\n        ar = agent.ask(user_query)\n    answer = ar.answer",
+    "returns": "AnswerResult(.question, .answer, .query_result)",
+    "returns_note": "query_result carries .sql, .rows, .row_count, .attempts, .succeeded and .error -- surface .sql so the answer can be checked against the query that produced it.",
+    "install_extra": "tabular-agent",
+    "note": "source accepts a path, a list of paths, or a {table_name: path} mapping. An Excel workbook contributes one table per non-empty sheet, so cross-sheet joins work. Use PostgresAgent instead when the data already lives in a database.",
+    "options": [
+      {
+        "name": "layout_inference",
+        "type": "str",
+        "values": [
+          "auto",
+          "always",
+          "never"
+        ],
+        "default": "auto",
+        "effect": "When the LLM may be asked to locate the real table inside a messy spreadsheet. 'auto' asks only for sheets that look messy, so tidy files cost no extra tokens. Deterministic clean-up (header detection, subtotal removal) always runs regardless.",
+        "selection_relevant": true,
+        "infer_from": "source files are human-facing reports with title rows / subtotals -> 'auto' or 'always'; clean machine exports -> 'never'"
+      },
+      {
+        "name": "extra_instructions",
+        "type": "str",
+        "default": null,
+        "effect": "Free-form text appended to the SQL-generation prompt. Use for a domain glossary, unit conventions, or example question-to-SQL pairs when column names are opaque.",
+        "selection_relevant": true,
+        "infer_from": "domain_context / glossary; needed when columns use internal codes or generic names"
+      },
+      {
+        "name": "temperature",
+        "type": "float | None",
+        "default": 0.0,
+        "effect": "Sampling temperature. Defaults to 0.0 so the same question yields the same SQL. Pass None for reasoning deployments (o-series, gpt-5.x reasoning tiers), which reject an explicit temperature.",
+        "selection_relevant": true,
+        "infer_from": "model is a reasoning deployment -> None; otherwise leave 0.0"
+      },
+      {
+        "name": "answer_language",
+        "type": "str",
+        "default": "en",
+        "effect": "ISO 639-1 language of the natural-language answer. Does not affect the SQL.",
+        "selection_relevant": false,
+        "infer_from": "technical_spec.language"
+      },
+      {
+        "name": "max_rows",
+        "type": "int",
+        "default": 100,
+        "effect": "Hard cap on rows returned by run_sql, so a large result cannot flood the context.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave default; reduce for token-budget-sensitive setups"
+      },
+      {
+        "name": "max_retries",
+        "type": "int",
+        "default": 3,
+        "effect": "Attempts the agentic loop makes when SQL generation or execution fails. Set to 1 for fail-fast behaviour.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave default"
+      },
+      {
+        "name": "query_timeout_s",
+        "type": "float",
+        "default": 10.0,
+        "effect": "Wall-clock limit for a single query (0 disables). Guards against a runaway aggregation on a large file.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave default; reduce for interactive apps"
+      },
+      {
+        "name": "memory_limit",
+        "type": "str",
+        "default": "1GB",
+        "effect": "DuckDB memory cap. Raise for large files, lower for constrained containers.",
+        "selection_relevant": false,
+        "infer_from": "deployment memory budget - leave default unless files are large"
+      },
+      {
+        "name": "profile_samples",
+        "type": "int",
+        "default": 3,
+        "effect": "Example values shown per non-categorical column in the schema prompt. More values improve accuracy on opaque data at a small token cost.",
+        "selection_relevant": false,
+        "infer_from": "technical plumbing - leave default"
+      },
+      {
+        "name": "model",
+        "type": "str",
+        "default": null,
+        "effect": "Overrides the model from the LLM config.",
+        "selection_relevant": false,
+        "infer_from": "technical_spec.model"
+      }
+    ]
   }
 }

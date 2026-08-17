@@ -16,4 +16,5 @@ __all__ = [
     "agents",
     "vision_extractor",
     "postgres_agent",
+    "tabular_agent",
 ]

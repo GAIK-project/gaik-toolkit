@@ -68,6 +68,15 @@ postgres-agent = [
     "sqlglot>=25.0",
 ]
 
+# Tabular query agent: CSV/Excel/Parquet -> DuckDB -> validated read-only SQL.
+# DuckDB is the query engine, sqlglot validates the LLM's SQL before it runs,
+# and openpyxl reads .xlsx/.xls sheets (DuckDB has no native Excel reader).
+tabular-agent = [
+    "duckdb>=1.1",
+    "sqlglot>=25.0",
+    "openpyxl>=3.1",
+]
+
 retriever = [
     "gaik[embedder]",
     "gaik[vector-store]",
@@ -233,6 +242,7 @@ all = [
     "gaik[vector-store]",
     "gaik[pg-vector-store]",
     "gaik[postgres-agent]",
+    "gaik[tabular-agent]",
     "gaik[retriever]",
     "gaik[answer-generator]",
     "gaik[rag-workflow]",
@@ -302,6 +312,7 @@ all-cpu = [
     "gaik[documents-to-structured-data-cpu]",
     "gaik[pg-vector-store]",
     "gaik[postgres-agent]",
+    "gaik[tabular-agent]",
     "gaik[rag-workflow]",
     "gaik[finnish-rag]",
     "gaik[evaluators]",
