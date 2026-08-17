@@ -25,6 +25,9 @@ Individual examples for each of the five RAG components: Parser, Embedder, Vecto
 ### [PostgreSQL Agent](./postgres_agent)
 Read-only text-to-SQL query agent. Ask a PostgreSQL database questions in natural language; the agent introspects the schema, generates validated read-only SQL, runs it, and answers.
 
+### [Tabular Agent](./tabular_agent)
+The same idea for files. Ask CSV, Excel, Parquet or JSON files questions in natural language; the agent loads them into DuckDB, profiles the columns, generates validated read-only SQL, runs it, and answers. Handles report-style spreadsheets with title rows, subtotals and trailing notes.
+
 ## Getting Started
 
 1. Choose the component you want to explore
