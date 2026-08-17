@@ -86,11 +86,7 @@ async def _evict_stale() -> None:
     """Drop expired sessions, then the oldest ones over the cap."""
     now = time.time()
     async with _SESSIONS_LOCK:
-        expired = [
-            sid
-            for sid, s in _SESSIONS.items()
-            if now - s["created"] > SESSION_TTL_SECONDS
-        ]
+        expired = [sid for sid, s in _SESSIONS.items() if now - s["created"] > SESSION_TTL_SECONDS]
         for sid in expired:
             _discard(_SESSIONS.pop(sid))
         while len(_SESSIONS) >= MAX_SESSIONS:
@@ -210,9 +206,7 @@ async def upload_file(
     stored.write_bytes(content)
 
     try:
-        agent, tables, schema_text = await asyncio.to_thread(
-            _load_agent, stored, layout_inference
-        )
+        agent, tables, schema_text = await asyncio.to_thread(_load_agent, stored, layout_inference)
     except ImportError as e:
         shutil.rmtree(session_dir, ignore_errors=True)
         raise HTTPException(
@@ -259,9 +253,7 @@ async def ask_question(req: AskRequest):
         )
 
     if not (os.getenv("AZURE_API_KEY") or os.getenv("OPENAI_API_KEY")):
-        raise HTTPException(
-            status_code=503, detail="No LLM API key configured on the server."
-        )
+        raise HTTPException(status_code=503, detail="No LLM API key configured on the server.")
 
     try:
         return await asyncio.to_thread(_run_ask, session["agent"], question)
