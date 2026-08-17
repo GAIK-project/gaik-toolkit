@@ -113,10 +113,14 @@ All under `app/(demos)/`:
 | Route | Feature | Toolkit Components |
 |-------|---------|-------------------|
 | `/extractor` | Schema-free structured extraction | SchemaGenerator, DataExtractor |
+| `/vision-extractor` | Single-pass PDF/image -> structured data | VisionExtractor |
 | `/parser` | Multi-backend PDF/DOCX parsing | VisionParser, PyMuPDFParser, DoclingParser, DocxParser |
 | `/classifier` | Zero-shot document classification | DocumentClassifier |
 | `/transcriber` | Whisper + GPT enhancement | Transcriber |
 | `/rag` | Document upload, indexing, Q&A with citations | RAGWorkflow |
+| `/postgres-agent` | Plain-language questions -> read-only SQL over the demo DB | PostgresAgent |
+| `/tabular-agent` | Upload CSV/Excel, ask questions -> read-only SQL (DuckDB) | TabularAgent |
+| `/llm-judge` | Text-pair judging, hallucination detection, judge panel | LLMJudge, LLMJudgePanel |
 | `/audio-structured` | Audio -> structured data pipeline | AudioToStructuredData |
 | `/document-structured` | Document -> structured data pipeline | DocumentsToStructuredData |
 | `/incident-report` | Voice -> structured incident report | AudioToStructuredData |
@@ -125,6 +129,8 @@ All under `app/(demos)/`:
 | `/video-search` | Semantic video search (pgvector) | Embedder, PgVectorStore, video_search_helpers |
 | `/text-to-speech` | Text to downloadable speech audio | TextToSpeech |
 | `/luvata-order` | PDF order -> structured Luvata data | DocumentsToStructuredData |
+| `/report-writer` | Mixed source files -> sectioned Markdown report | MultiSourceReportGenerator |
+| `/solution-wizard` | Use-case description -> validated blueprint + PoC | (Claude Agent SDK, wizard skill) |
 
 ## API Routes
 
@@ -135,12 +141,19 @@ FastAPI backend at `api/main.py`, routers in `api/routers/`:
 | `/parse` | `parser.py` | Document parsing (PDF, DOCX) |
 | `/classify` | `classifier.py` | Document classification |
 | `/extract` | `extractor.py` | Structured data extraction |
+| `/extract-vision` | `vision_extractor.py` | Single-pass vision extraction (PDF/image -> structured data) |
 | `/transcribe` | `transcriber.py` | Audio/video transcription |
 | `/pipeline` | `pipeline.py` | End-to-end pipelines (audio/document -> structured data) |
 | `/rag` | `rag.py` | RAG pipeline (indexing, Q&A with SSE, debug endpoint) |
+| `/postgres-agent` | `postgres_agent.py` | Text-to-SQL agent against the fixed demo DB |
+| `/tabular-agent` | `tabular_agent.py` | CSV/Excel upload -> session -> text-to-SQL over DuckDB |
+| `/llm-judge` | `llm_judge.py` | LLM-as-judge: text-pair, hallucinations, validate, panel |
 | `/diary` | `diary.py` | Construction diary workflow |
 | `/dental-transcribe` | `dental_transcription.py` | Dental transcription with SRT/VTT subtitles |
 | `/video-search` | `video_search.py` | Semantic dental video search (pgvector) |
+| `/luvata-order` | `luvata_order.py` | Purchase order processing with BOM matching |
+| `/report-writer` | `report_writer.py` | Mixed-source report generation |
+| `/wizard` | `solution_wizard.py` | Solution Configuration Wizard (needs Azure Foundry env vars) |
 | `/text-to-speech` | `text_to_speech.py` | Text-to-speech audio generation |
 | `/health` | (in main.py) | Health check |
 

@@ -8,8 +8,9 @@ description: >-
   (guidance_layer/docs/), update the Fumadocs website (guidance_layer/website/content/docs/),
   expose the feature in the demo app (toolkit_demo_app/api/routers + UI), and push
   a PyPI release tag. Covers software_components (extractor, parsers, transcriber,
-  RAG, classifier, TTS, enhance_transcript, validators (LLMJudge / panel /
-  pairwise / calibration), evaluators (ExtractionEvaluator, RAGEvaluator,
+  RAG, classifier, TTS, enhance_transcript, postgres_agent, tabular_agent,
+  validators (LLMJudge / panel / pairwise / calibration), evaluators
+  (ExtractionEvaluator, RAGEvaluator,
   BatchEvaluationRunner), form_understander, observability) and software_modules
   (AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow,
   MultiSourceReportGenerator). Not for creating a brand-new component

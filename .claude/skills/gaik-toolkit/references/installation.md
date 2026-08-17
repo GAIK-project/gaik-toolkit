@@ -33,9 +33,28 @@ pip install "gaik[text-to-speech]"
 # Document classification
 pip install "gaik[classifier]"
 
+# Multi-provider PDF-to-markdown parsing (OpenAI / Claude / Gemini)
+pip install "gaik[multimodal-parser]"
+
+# Text-to-SQL agents
+pip install "gaik[postgres-agent]"   # PostgreSQL: NL question -> validated read-only SQL
+pip install "gaik[tabular-agent]"    # CSV/Excel/Parquet files via DuckDB (same pattern)
+
+# LLM-as-judge validation and dataset evaluators
+pip install "gaik[llm-judge]"
+pip install "gaik[evaluators]"
+
+# Multi-provider LLM client adapters (opt-in per provider)
+pip install "gaik[llm-anthropic]"
+pip install "gaik[llm-google]"
+
+# Finnish RAG text processing (lemmatization + compound splitting)
+pip install "gaik[finnish-rag]"
+
 # Software components (pipelines)
 pip install "gaik[audio-to-structured-data]"
 pip install "gaik[documents-to-structured-data]"
+pip install "gaik[multi-source-report-generator]"   # + -agentic / -docx variants
 
 # RAG building blocks
 pip install "gaik[embedder]"
@@ -74,6 +93,10 @@ pip install "gaik[all-cpu]"
 | Fix transcript errors (LLM) | `enhance-transcript` |
 | Text-to-speech | `text-to-speech` |
 | Classify documents | `classifier` |
+| Ask a PostgreSQL database questions in plain language | `postgres-agent` |
+| Ask CSV/Excel/Parquet files questions in plain language | `tabular-agent` |
+| Score/validate LLM outputs (judge, panel, hallucination check) | `llm-judge` |
+| Generate reports from mixed source files | `multi-source-report-generator` |
 | Build RAG pipeline | `rag-workflow` |
 | Just embeddings | `embedder` |
 | PostgreSQL vector store | `pg-vector-store` |

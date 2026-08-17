@@ -13,6 +13,7 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 - **Transcriber** - Transcribe audio/video with Whisper and GPT enhancement
 - **Text-to-Speech** - Text to downloadable speech audio
 - **PostgreSQL Agent** - Plain-language → read-only SQL with a sandboxed demo DB
+- **Tabular Agent** - Upload a CSV/Excel file and ask it questions — read-only SQL over DuckDB, messy report sheets cleaned up automatically
 - **LLM-as-Judge** - Score extractor output, detect hallucinations, run a multi-model judge panel
 
 ### Software Modules
@@ -122,6 +123,7 @@ toolkit_demo_app/
 | `/pipeline` | End-to-end pipelines (audio/document to structured data) |
 | `/rag` | RAG pipeline (indexing, Q&A with SSE, debug) |
 | `/postgres-agent` | Natural-language SQL agent against the demo DB |
+| `/tabular-agent` | CSV/Excel upload → session → natural-language SQL over DuckDB |
 | `/llm-judge` | LLM-as-judge: text-pair, hallucination, validate, multi-model panel |
 | `/diary` | Construction diary workflow |
 | `/dental-transcribe` | Dental transcription with SRT/VTT |

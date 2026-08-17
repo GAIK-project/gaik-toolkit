@@ -10,7 +10,8 @@ description: >-
   publish flow (docs → demo app → PyPI tag) use gaik-add-examples. Covers:
   structured data extraction, document parsing, audio transcription
   (Whisper/local), transcript enhancement, text-to-speech, RAG pipelines
-  (pgvector/Chroma), document classification, end-to-end pipelines.
+  (pgvector/Chroma), document classification, text-to-SQL agents (PostgreSQL,
+  CSV/Excel via DuckDB), end-to-end pipelines.
 argument-hint: "[component-name]"
 ---
 
@@ -28,7 +29,7 @@ Python toolkit for knowledge extraction, capture, and generation. Use when worki
 - Parallel transcription with FFmpeg chunking
 - Text-to-speech generation
 - Document classification
-- Text-to-SQL: natural-language querying of PostgreSQL databases
+- Text-to-SQL: natural-language querying of PostgreSQL databases and CSV/Excel/Parquet files (DuckDB)
 - RAG pipelines: embedder, vector store (Chroma / PostgreSQL), retriever, answer generator
 - End-to-end pipelines: AudioToStructuredData, DocumentsToStructuredData, RAGWorkflow
 
@@ -149,6 +150,7 @@ Core classes in `gaik.software_components.*`. For detailed API and constructor p
 | DocumentClassifier | `from gaik.software_components.doc_classifier import DocumentClassifier` | `classify(file_or_dir, classes)` |
 | FormUnderstander | `from gaik.software_components.form_understander import FormUnderstander` | `clean_labels(fields, language_hint="fi")` → `dict[str, str]` (cryptic ASP.NET / generated form ids → readable labels) |
 | PostgresAgent | `from gaik.software_components.postgres_agent import PostgresAgent` | `ask(question)` → AnswerResult (text-to-SQL agent: introspects schema, generates validated read-only SQL, runs it, answers; also `get_schema()` / `generate_sql()` / `query()` / `run_sql()`; install `gaik[postgres-agent]`) |
+| TabularAgent | `from gaik.software_components.tabular_agent import TabularAgent` | `ask(question)` → AnswerResult (text-to-SQL agent for files: loads CSV/Excel/Parquet/JSON into DuckDB, profiles columns, generates validated read-only SQL, answers; cleans up messy report sheets — title rows, subtotals, Nordic comma-decimals; one table per Excel sheet so cross-sheet joins work; same `get_schema()` / `run_sql()` tool surface as PostgresAgent; install `gaik[tabular-agent]`) |
 | LLMJudge | `from gaik.software_components.validators import LLMJudge` | `validate(source_pages, extracted, rubric)` → ValidationResult (rubric scoring; Likert 1-5 via `rubric.scoring_mode="likert_1_5"`) / `detect_hallucinations(source, extracted)` → schema-agnostic post-validator / `judge_text_pair(a, b)` → text-vs-text equivalence (multi-provider) |
 | LLMJudgePanel | `from gaik.software_components.validators import LLMJudgePanel` | `validate(source_pages, extracted, rubric)` → JudgePanelResult (3+ judges, majority vote, agreement metric) |
 | compare_pairwise | `from gaik.software_components.validators import compare_pairwise` | `compare_pairwise(judge, pages, a, b, swap_and_average=True)` → PairwiseResult (A/B with position-bias mitigation) |

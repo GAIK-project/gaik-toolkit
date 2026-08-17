@@ -379,6 +379,7 @@ If no module covers the full chain, or the user needs to skip/add/reorder steps,
 - Text/transcript → structured JSON → `Extractor`
 - Image or visually complex PDF → `VisionExtractor` (note: could be more expensive; flag cost tradeoff — see accuracy override above)
 - Document type detection needed → `DocumentClassifier`
+- Natural-language questions over already-structured data → a text-to-SQL agent, **not** a parser/extractor/RAG chain: data in a PostgreSQL database → `PostgresAgent`; data in CSV/Excel/Parquet/JSON files → `TabularAgent` (loads files into DuckDB, one table per Excel sheet, handles messy report layouts). Both answer read-only analytical questions (aggregation, filtering, joins) and expose the SQL used; neither produces charts or statistical models.
 - Output validation required → `LLMJudge` (extraction patterns only — see Step 3)
 
 **Step 3 -- Add `LLMJudge` when appropriate**
@@ -400,6 +401,7 @@ Every selected component exposes behaviour-changing options. Read each selected 
   - citation/traceability requirement → `AnswerGenerator.citations = True` (or `RAGWorkflow.citations = True`)
   - scanned/image PDFs → `DoclingParser.enable_ocr = True`, or `DocumentsToStructuredData.parser_choice = "docling"` (the accepted literals are `vision_parser`, `docling`, `pymupdf`, `docx` — only the first carries the `_parser` suffix; the registry component *ids* `docling_parser`/`pymupdf_parser`/`docx_parser` are a different namespace and raise `ValueError` if passed here)
   - access controls on a database → `PostgresAgent.table_allowlist = [...]`
+  - source spreadsheets are human-facing reports (title rows, subtotals) → `TabularAgent.layout_inference = "auto"` (default; clean machine exports → `"never"` to skip the layout LLM call)
 - **Ask the user** when an option is `selection_relevant` but cannot be inferred from the requirements.
 - **Conditional options**: when an option's `infer_from` field encodes a condition (e.g. `"diarization_required → ask for speaker count"`), only surface that option — either by inferring or asking — when the condition holds. If the condition does not hold, leave the option at its default silently.
 - **Record** every chosen non-default option in the corresponding `workflow.steps[].parameters` so the PoC scaffolder and BPMN reflect it.
