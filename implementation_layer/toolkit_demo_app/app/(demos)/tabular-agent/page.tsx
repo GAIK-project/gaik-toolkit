@@ -272,6 +272,28 @@ export default function TabularAgentPage() {
                 disabled={isUploading || isAsking}
               />
 
+              {!upload && (
+                <p className="text-muted-foreground text-xs">
+                  No spreadsheet handy? Try{" "}
+                  <a
+                    href="/gaik_tabular_demo_sales.csv"
+                    download
+                    className="underline underline-offset-2"
+                  >
+                    a tidy sales CSV
+                  </a>{" "}
+                  or{" "}
+                  <a
+                    href="/gaik_tabular_demo_report.xlsx"
+                    download
+                    className="underline underline-offset-2"
+                  >
+                    a messy Excel report
+                  </a>{" "}
+                  — both are synthetic sample data.
+                </p>
+              )}
+
               {upload && (
                 <div className="flex flex-wrap gap-2">
                   {upload.tables.map((t) => (
