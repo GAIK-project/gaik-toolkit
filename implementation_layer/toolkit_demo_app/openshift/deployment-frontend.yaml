@@ -56,13 +56,16 @@ spec:
                   name: gaik-demo-redis
                   key: UPSTASH_REDIS_REST_TOKEN
                   optional: true
+          # Sized against observed usage: the pod sits at ~440Mi steady state,
+          # which overran both the 256Mi request and, on 2026-08-21, the 512Mi
+          # limit - the container was OOMKilled (exit 137) after four days up.
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
+              memory: 384Mi
             limits:
               cpu: 500m
-              memory: 512Mi
+              memory: 1Gi
           # Probes tolerate transient backend slowness (Next.js /api/health
           # hits the API pod). Kept loose enough that a hanging upstream
           # call does not kill the frontend before Kubernetes can recover.
