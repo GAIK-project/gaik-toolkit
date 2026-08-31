@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from collections import Counter
+from typing import Any
 
 try:
     from langchain_core.documents import Document
@@ -11,6 +13,8 @@ except ImportError as exc:
     raise ImportError(
         "Retriever requires 'langchain-core'. Install extras with 'pip install gaik[retriever]'"
     ) from exc
+
+logger = logging.getLogger(__name__)
 
 
 class Retriever:
@@ -26,7 +30,31 @@ class Retriever:
         rerank_model: str = "cross-encoder/ms-marco-MiniLM-L-12-v2",
         top_k: int = 5,
         score_threshold: float | None = None,
+        candidate_multiplier: int = 4,
     ) -> None:
+        """Initialise the retriever.
+
+        Args:
+            embedder: Object with ``embed_query(str) -> list[float]``.
+            vector_store: Object with
+                ``search(embedding, *, top_k, filters) -> list[(Document, float)]``.
+            hybrid_search: Blend a BM25 score over the retrieved candidates into
+                the vector score.
+            re_rank: Rescore candidates with a cross-encoder. Rerankers can
+                *regress* quality on multilingual or domain-specific corpora --
+                measure before enabling.
+            rerank_model: Cross-encoder model name. Loaded once and reused.
+            top_k: Number of documents to return.
+            score_threshold: Minimum score to keep. Note the score scale depends
+                on which stages ran: cosine similarity in [0, 1] for plain
+                semantic search, an unbounded BM25 blend when ``hybrid_search``
+                is on, and unbounded cross-encoder logits (often negative) when
+                ``re_rank`` is on. A threshold tuned for one is meaningless for
+                the others.
+            candidate_multiplier: How much wider than ``top_k`` to fetch when
+                hybrid scoring or reranking is enabled, so those stages have
+                something to reorder. Ignored for plain semantic search.
+        """
         self.embedder = embedder
         self.vector_store = vector_store
         self.hybrid_search = hybrid_search
@@ -34,6 +62,8 @@ class Retriever:
         self.rerank_model = rerank_model
         self.top_k = top_k
         self.score_threshold = score_threshold
+        self.candidate_multiplier = candidate_multiplier
+        self._cross_encoder: Any | None = None
 
     def search(
         self,
@@ -52,10 +82,15 @@ class Retriever:
         use_hybrid = hybrid_search if hybrid_search is not None else self.hybrid_search
         use_rerank = re_rank if re_rank is not None else self.re_rank
 
+        # Hybrid scoring and reranking can only reorder what they are given, so
+        # fetch a wider candidate pool when either is on. Plain semantic search
+        # keeps its original behaviour exactly.
+        candidate_k = k * self.candidate_multiplier if (use_hybrid or use_rerank) else k
+
         query_embedding = self.embedder.embed_query(query)
         results = self.vector_store.search(
             query_embedding,
-            top_k=k,
+            top_k=candidate_k,
             filters=filters,
         )
 
@@ -65,7 +100,8 @@ class Retriever:
 
         if use_rerank:
             scored = self._rerank(query, scored)
-        if use_hybrid:
+
+        if use_hybrid or use_rerank:
             scored = sorted(scored, key=lambda item: item[1], reverse=True)
 
         if threshold is not None:
@@ -74,8 +110,13 @@ class Retriever:
         documents: list[Document] = []
         for doc, score in scored[:k]:
             if include_scores:
-                doc.metadata = dict(doc.metadata)
-                doc.metadata["relevance_score"] = score
+                # Build a new Document: the vector store may have handed us the
+                # object it stores, and writing the score into it would leak a
+                # stale value into every later search.
+                doc = Document(
+                    page_content=doc.page_content,
+                    metadata={**(doc.metadata or {}), "relevance_score": score},
+                )
             documents.append(doc)
 
         return documents
@@ -94,9 +135,10 @@ class Retriever:
 
         return combined
 
-    def _rerank(
-        self, query: str, results: list[tuple[Document, float]]
-    ) -> list[tuple[Document, float]]:
+    def _load_cross_encoder(self) -> Any:
+        """Load the cross-encoder once and reuse it across searches."""
+        if self._cross_encoder is not None:
+            return self._cross_encoder
         try:
             from sentence_transformers import CrossEncoder
         except ImportError as exc:
@@ -105,10 +147,42 @@ class Retriever:
                 "Install extras with 'pip install gaik[retriever]'"
             ) from exc
 
-        cross_encoder = CrossEncoder(self.rerank_model)
-        pairs = [(query, doc.page_content) for doc, _ in results]
-        scores = cross_encoder.predict(pairs).tolist()
-        return [(doc, float(score)) for (doc, _), score in zip(results, scores)]
+        self._cross_encoder = CrossEncoder(self.rerank_model)
+        return self._cross_encoder
+
+    def _rerank(
+        self, query: str, results: list[tuple[Document, float]]
+    ) -> list[tuple[Document, float]]:
+        """Rescore candidates with a cross-encoder.
+
+        Reranking is an enhancement, not a requirement: a runtime failure is
+        logged and the retrieval scores are returned unchanged. A missing
+        ``sentence-transformers`` install is a misconfiguration and still
+        raises.
+        """
+        if not results:
+            return results
+
+        try:
+            cross_encoder = self._load_cross_encoder()
+            pairs = [(query, doc.page_content) for doc, _ in results]
+            raw_scores = cross_encoder.predict(pairs)
+            scores = [float(score) for score in raw_scores]
+            if len(scores) != len(results):
+                raise ValueError(
+                    f"reranker returned {len(scores)} scores for {len(results)} pairs"
+                )
+        except ImportError:
+            raise
+        except Exception as exc:
+            logger.warning(
+                "Re-ranking failed (%s: %s); keeping the retrieval order.",
+                type(exc).__name__,
+                exc,
+            )
+            return results
+
+        return [(doc, score) for (doc, _), score in zip(results, scores)]
 
     @staticmethod
     def _tokenize(text: str) -> list[str]:
