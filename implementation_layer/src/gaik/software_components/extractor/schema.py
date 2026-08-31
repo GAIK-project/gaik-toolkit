@@ -192,7 +192,7 @@ class FieldSpec(BaseModel):
         default=True, description="Must this key appear in every output object?"
     )
     nullable: bool = Field(default=False, description="Is None an allowed value?")
-    enum: list[str] | None = Field(default=None, description="Allowed values (if enumerated)")
+    enum: list[str] | None = Field(default=None, min_length=1, description="Allowed values (if enumerated)")
     default: str | None = Field(default=None, description="Fallback value from the task")
     has_explicit_default: bool = Field(
         default=False, description="True when the task explicitly stated a default"
@@ -1240,6 +1240,9 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
 
         if f.has_explicit_default:
             default_val = f.default
+            if default_val == "" and py_type is not str:
+                default_val = None
+                annotated = annotated | None
         elif f.nullable:
             default_val = None
         elif uses_numeric_fallback:
