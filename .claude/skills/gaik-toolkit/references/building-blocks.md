@@ -351,10 +351,13 @@ Advanced multi-format parsing with OCR. Requires `gaik[parser]` (not parser-cpu)
 from gaik.software_components.parsers import DoclingParser, parse_document
 
 parser = DoclingParser()
-text = parse_document("complex_document.pdf")
+result = parser.parse_document("complex_document.pdf")   # -> dict
+text = result["text_content"]
 ```
 
-**Returns:** `str` - Extracted text content
+**Returns:** `dict` — text under `text_content`, plus chunks and per-element metadata.
+The class method and the module-level `parse_document()` both return a dict; there is
+no `parse()` method.
 
 **Supported formats:** PDF, images (.png, .jpg, .jpeg), Word docs
 
@@ -366,10 +369,13 @@ Requires `gaik[parser]` + OpenAI-compatible credentials.
 ```python
 from gaik.software_components.parsers import VisionPlusParser, parse_document_with_vision_plus
 
+parser = VisionPlusParser()
+result = parser.parse_document("document.pdf")           # -> dict
+# or the module-level convenience wrapper:
 result = parse_document_with_vision_plus("document.pdf")
 ```
 
-**Returns:** markdown string + metadata for downstream RAG pipelines.
+**Returns:** `dict` — markdown plus per-element metadata for downstream RAG pipelines.
 
 ### DoclingApiClientParser
 
@@ -379,8 +385,13 @@ Use when you want Docling-quality parsing without the local install overhead.
 ```python
 from gaik.software_components.parsers import DoclingApiClientParser, parse_document_via_api
 
-result = parse_document_via_api("document.pdf", api_url=...)
+parser = DoclingApiClientParser()
+result = parser.parse_document("document.pdf")           # -> dict
+# or the module-level convenience wrapper:
+result = parse_document_via_api("document.pdf")
 ```
+
+**Returns:** `dict`. Needs `API_BASE` + `PASSWORD` for the remote service.
 
 ### MultimodalParser
 
@@ -389,15 +400,22 @@ raw markdown with layout metadata, cleaned markdown, and optional styled HTML.
 Requires `gaik[multimodal-parser]`.
 
 ```python
+from pathlib import Path
+
 from gaik.software_components.parsers import MultimodalParser, ParseResult
 
-parser = MultimodalParser(config=config, model_provider="openai", create_html=True)
+parser = MultimodalParser(model_provider="openai", create_html=True)
 result: ParseResult = parser.parse("document.pdf")
-result.save("output/")
+Path("out.md").write_text(result.clean_markdown, encoding="utf-8")
 ```
 
-**Returns:** `ParseResult` with `raw_markdown`, `clean_markdown`, and optional `html`.
-Tracks token usage and cost per run.
+Keyword arguments only, and there is **no `config` parameter** — credentials come from the
+environment. Other options: `model`, `reasoning_effort`, `merge_table` (stitches tables
+split across a page break), `use_azure`, `vertex_ai`, `additional_instructions`.
+
+**Returns:** `ParseResult` — a dataclass with `raw_markdown`, `clean_markdown`, `html`
+(only when `create_html=True`) and `usage`. It has **no `save()` method**; write the file
+yourself.
 
 ---
 
