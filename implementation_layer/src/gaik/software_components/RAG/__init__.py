@@ -7,5 +7,7 @@ __all__ = [
     "vector_store",
     "pg_vector_store",
     "retriever",
+    "ranker",
     "answer_generator",
+    "finnish_text_processor",
 ]

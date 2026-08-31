@@ -84,6 +84,20 @@ retriever = [
     "sentence-transformers>=2.6.0",
 ]
 
+# Result fusion (RRF) and reordering. Pure Python -- no model download, no
+# database. Deliberately kept apart from `retriever`, whose sentence-transformers
+# dependency pulls in torch.
+ranker = [
+    "langchain-core>=0.2.0",
+]
+
+# Optional cross-encoder reranking for Ranker. Downloads model weights on first
+# use; Ranker's other methods do not need this.
+ranker-rerank = [
+    "gaik[ranker]",
+    "sentence-transformers>=2.6.0",
+]
+
 answer-generator = [
     "openai>=1.58.0",
     "langchain-core>=0.2.0",
@@ -244,6 +258,8 @@ all = [
     "gaik[postgres-agent]",
     "gaik[tabular-agent]",
     "gaik[retriever]",
+    "gaik[ranker]",
+    "gaik[ranker-rerank]",
     "gaik[answer-generator]",
     "gaik[rag-workflow]",
     "gaik[audio-to-structured-data]",
@@ -313,6 +329,7 @@ all-cpu = [
     "gaik[pg-vector-store]",
     "gaik[postgres-agent]",
     "gaik[tabular-agent]",
+    "gaik[ranker]",
     "gaik[rag-workflow]",
     "gaik[finnish-rag]",
     "gaik[evaluators]",

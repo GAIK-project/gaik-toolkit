@@ -67,6 +67,13 @@ def test_retriever_import():
     assert retriever is not None
 
 
+def test_ranker_import():
+    """Test that ranker module can be imported."""
+    from gaik.software_components.RAG import ranker
+
+    assert ranker is not None
+
+
 def test_answer_generator_import():
     """Test that answer_generator module can be imported."""
     from gaik.software_components.RAG import answer_generator
