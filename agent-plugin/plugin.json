@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "gaik-toolkit",
+  "version": "0.1.0",
+  "description": "Skills for building document-understanding pipelines with the gaik Python toolkit: choosing a document parser that preserves table structure, and designing extraction schemas that stay inside provider limits.",
+  "homepage": "https://gaik-project.github.io/gaik-toolkit/",
+  "repository": "https://github.com/GAIK-project/gaik-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "document-parsing",
+    "structured-extraction",
+    "pdf",
+    "ocr",
+    "rag",
+    "gaik"
+  ]
+}

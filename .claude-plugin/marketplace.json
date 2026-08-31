@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "gaik-toolkit",
+  "description": "Skills for building document-understanding pipelines with the gaik Python toolkit",
+  "owner": {
+    "name": "GAIK project",
+    "url": "https://github.com/GAIK-project/gaik-toolkit"
+  },
+  "plugins": [
+    {
+      "name": "gaik-toolkit",
+      "description": "Choosing a document parser that preserves table structure, and designing extraction schemas that stay inside provider limits and produce checkable evidence. Use when parsing PDFs or DOCX, pulling fields and line items into a schema, or when a parse or extraction succeeded on paper but the output is wrong.",
+      "source": "./agent-plugin",
+      "category": "data",
+      "homepage": "https://gaik-project.github.io/gaik-toolkit/"
+    }
+  ]
+}

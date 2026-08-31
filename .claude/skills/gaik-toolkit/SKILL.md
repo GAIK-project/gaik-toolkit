@@ -137,11 +137,11 @@ Core classes in `gaik.software_components.*`. For detailed API and constructor p
 | DataExtractor | `from gaik.software_components.extractor import DataExtractor` | `extract(extraction_model, requirements, ...)` |
 | VisionExtractor | `from gaik.software_components.vision_extractor import VisionExtractor` | `extract(file_paths, user_requirements, extraction_model=None, requirements=None, schema_dir=None)` → VisionExtractionResult (single-pass PDF/image → structured data; OpenAI / Claude / Google) |
 | VisionParser | `from gaik.software_components.parsers import VisionParser` | `convert_pdf(path)` → list[str] per page |
-| PyMuPDFParser | `from gaik.software_components.parsers import PyMuPDFParser` | `parse_pdf(path)` → str |
-| DocxParser | `from gaik.software_components.parsers import DocxParser` | `parse_docx(path)` → str |
-| DoclingParser | `from gaik.software_components.parsers import DoclingParser` | `parse(path)` → str |
-| VisionPlusParser | `from gaik.software_components.parsers import VisionPlusParser` | `parse_document_with_vision_plus(path)` → markdown + metadata |
-| DoclingApiClientParser | `from gaik.software_components.parsers import DoclingApiClientParser` | `parse_document_via_api(path)` → remote Docling result |
+| PyMuPDFParser | `from gaik.software_components.parsers import PyMuPDFParser` | `parse_pdf(path)` → str · `parse_document(path)` → dict |
+| DocxParser | `from gaik.software_components.parsers import DocxParser` | `parse_docx(path)` → str · `parse_document(path)` → dict |
+| DoclingParser | `from gaik.software_components.parsers import DoclingParser` | `parse_document(path)` → dict |
+| VisionPlusParser | `from gaik.software_components.parsers import VisionPlusParser` | `parse_document(path)` → dict (markdown + per-element metadata) |
+| DoclingApiClientParser | `from gaik.software_components.parsers import DoclingApiClientParser` | `parse_document(path)` → dict (remote Docling result) |
 | MultimodalParser | `from gaik.software_components.parsers import MultimodalParser` | `parse(pdf_path)` → `ParseResult` (OpenAI / Claude / Gemini) |
 | Transcriber | `from gaik.software_components.transcriber import Transcriber` | `transcribe(path)` → TranscriptionResult |
 | TranscriptEnhancer | `from gaik.software_components.enhance_transcript import TranscriptEnhancer` | `enhance_text(text)` / `enhance_file(path)` |
@@ -159,6 +159,21 @@ Core classes in `gaik.software_components.*`. For detailed API and constructor p
 | ExtractionEvaluator | `from gaik.software_components.evaluators import ExtractionEvaluator` | `evaluate_dataset(dataset, extracted_outputs)` → ExtractionEvaluationResult (field-level P/R/F1 + hallucination rate; optional semantic mode via LLMJudge) |
 | RAGEvaluator | `from gaik.software_components.evaluators import RAGEvaluator` | `evaluate_dataset(items)` → RAGEvaluationResult (RAGAS-style faithfulness / answer_relevance / context_precision / context_recall via LLMJudge) |
 | BatchEvaluationRunner | `from gaik.software_components.evaluators import BatchEvaluationRunner` | `run(dataset)` → RunnerResult (applies a pipeline callable over a dataset; on_error="skip" tolerates failures) |
+
+### Parser notes
+
+Every parser ships a class *and* a module-level convenience function, and the two do
+not agree on return type — the class method gives you the text, the function gives you
+a metadata dict. Reaching for the shorter name is the easy mistake:
+
+```python
+parser = PyMuPDFParser()
+text = parser.parse_pdf("doc.pdf")        # -> str
+result = parse_pdf("doc.pdf")             # -> dict, text lives under result["text_content"]
+```
+
+The same split applies to `DocxParser.parse_docx` / `parse_docx`, and every
+`parse_document` variant returns a dict on both the class and the function.
 
 ### Transcriber notes
 
