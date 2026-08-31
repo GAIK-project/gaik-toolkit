@@ -107,7 +107,7 @@ flowchart LR
 
 ### Document Parser
 
-The Document Parser converts PDF, DOCX, and other file types into clean, structured markdown text. The package ships **six parser variants** so you can match accuracy, cost, and infrastructure needs: vision-based parsing (GPT, Claude, or Gemini), local parsing (PyMuPDF, Docling), a Docling + vision hybrid that returns markdown plus metadata, and a remote Docling API client. The parsed markdown output preserves tables, headings, and multi-page structure, making it a reliable input for downstream extraction or indexing.
+The Document Parser converts PDF, DOCX, and other file types into clean, structured markdown text. The package ships **seven parser variants** so you can match accuracy, cost, and infrastructure needs: vision-based parsing (GPT, Claude, or Gemini), local parsing (PyMuPDF, Docling), a Docling + vision hybrid that returns markdown plus metadata, and a remote Docling API client. How much structure survives depends on the variant: the local parsers are the fastest and cheapest route to prose and simple grids, while tables with merged cells or stacked headers need a vision parser, because a markdown pipe table cannot express a merged cell.
 
 <Mermaid chart={`
 flowchart LR
@@ -120,7 +120,7 @@ flowchart LR
         H["Hybrid / Remote<br/>VisionPlusParser · DoclingApiClient"]
     end
 
-    B --> C("📝 Markdown Text<br/>Tables & structure preserved")
+    B --> C("📝 Markdown Text<br/>Headings & multi-page structure")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style C fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -140,8 +140,9 @@ flowchart LR
 | `DoclingApiClientParser` | Remote client for a hosted Docling parsing service |
 
 **Key features:**
-- Six parsers covering local, vision, hybrid, and remote-service strategies
-- Preserves tables, headings, and document structure in markdown output
+- Seven parsers covering local, vision, hybrid, and remote-service strategies
+- Headings and multi-page structure preserved across every variant
+- Complex tables preserved by the vision parsers, which can emit HTML
 - Multi-page processing with consistent formatting
 - Suitable for both simple forms and complex, visually rich documents
 
