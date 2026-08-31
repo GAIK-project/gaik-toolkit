@@ -659,7 +659,11 @@ class PgVectorStore:
             ),
         ).fetchall()
 
-        return self._rows_to_results(rows, score_key="rrf_score")
+        return self._rows_to_results(
+            rows,
+            score_key="rrf_score",
+            extra_keys=("semantic_rank", "keyword_rank"),
+        )
 
     def search_hybrid_weighted(
         self,
@@ -711,7 +715,11 @@ class PgVectorStore:
             ),
         ).fetchall()
 
-        return self._rows_to_results(rows, score_key="combined_score")
+        return self._rows_to_results(
+            rows,
+            score_key="combined_score",
+            extra_keys=("semantic_score", "keyword_score"),
+        )
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -729,15 +737,35 @@ class PgVectorStore:
         rows: list[dict[str, Any]],
         *,
         score_key: str,
+        extra_keys: tuple[str, ...] = (),
     ) -> list[tuple[Document, float]]:
-        """Convert database rows to (Document, score) pairs."""
+        """Convert database rows to (Document, score) pairs.
+
+        ``id`` and ``title`` are reserved metadata keys: they are taken from the
+        table columns and overwrite any same-named key in the row's JSONB
+        metadata. ``id`` gives callers a stable identity, which is what lets
+        ``Ranker`` fuse two result lists that returned the same row.
+
+        ``extra_keys`` surfaces per-arm columns the hybrid SQL functions already
+        return (ranks and per-branch scores). Keys whose value is NULL are
+        omitted rather than set to ``None``, so ``"semantic_rank" in metadata``
+        answers "did the semantic arm find this row at all".
+        """
         results: list[tuple[Document, float]] = []
         for row in rows:
             metadata = row.get("metadata") or {}
             if isinstance(metadata, str):
                 metadata = json.loads(metadata)
+            else:
+                metadata = dict(metadata)  # never alias the caller's row dict
             if row.get("title"):
                 metadata["title"] = row["title"]
+            if row.get("id") is not None:
+                metadata["id"] = row["id"]
+            for extra_key in extra_keys:
+                value = row.get(extra_key)
+                if value is not None:
+                    metadata[extra_key] = value
 
             doc = Document(page_content=row["content"], metadata=metadata)
             score = float(row[score_key])

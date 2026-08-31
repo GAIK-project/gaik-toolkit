@@ -88,6 +88,30 @@ PgVectorStore(
 All search methods return `list[tuple[Document, float]]` -- a list of
 (Document, score) pairs sorted by score descending.
 
+#### Reserved metadata keys
+
+Two keys are taken from table columns and **overwrite** any same-named key in
+the row's JSONB metadata:
+
+| Key | Source |
+|-----|--------|
+| `id` | The row's primary key |
+| `title` | The `title` column |
+
+`id` is what lets `Ranker.fuse()` recognise the same row across two result
+lists, so keep it if you fuse `search_semantic` with `search_keyword`.
+
+The hybrid methods additionally surface each arm's contribution:
+
+| Method | Extra keys |
+|--------|-----------|
+| `search_hybrid` | `semantic_rank`, `keyword_rank` |
+| `search_hybrid_weighted` | `semantic_score`, `keyword_score` |
+
+A key is **omitted** (not set to `None`) when that arm did not return the row,
+so `"keyword_rank" in doc.metadata` answers "did the keyword arm find this at
+all".
+
 ## Configuration
 
 ### Connection String
