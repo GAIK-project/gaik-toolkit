@@ -14,16 +14,25 @@ pip install gaik[parser]
 
 ## Available Parsers
 
-GAIK provides four different parsers, each optimized for different use cases:
+GAIK provides seven parsers, each optimized for different use cases:
 
 | Parser | Use Case | Speed | Requirements |
 |--------|----------|-------|--------------|
-| `VisionParser` | High-quality PDF/image parsing with table extraction | Slow | OpenAI/Azure API |
+| `MultimodalParser` | Premium PDF parsing with layout-aware table extraction across multiple LLM providers | Slow | OpenAI/Azure, Anthropic, or Google API |
+| `VisionParser` | High-quality PDF/image parsing with table extraction | Medium | OpenAI/Azure API |
 | `PyMuPDFParser` | Fast PDF text extraction | Fast | None (local) |
 | `DocxParser` | Word document parsing | Fast | None (local) |
 | `DoclingParser` | Advanced OCR with multi-format support | Medium | Optional GPU |
+| `VisionPlusParser` | Docling + vision parsing returning markdown plus metadata | Medium | OpenAI/Azure + Docling |
+| `DoclingApiClientParser` | Remote client for a hosted Docling parsing service | Fast | `API_BASE` + `PASSWORD` |
 
 ### Quick Comparison
+
+**Use MultimodalParser when:**
+- Documents contain messy, irregular, or complex tables that span multiple pages
+- You need the highest accuracy for layout preservation and table extraction
+- You want to choose between providers (OpenAI, Claude, Google Gemini)
+- Install separately: `pip install "gaik[multimodal-parser]"`
 
 **Use VisionParser when:**
 - You need accurate table extraction
@@ -46,13 +55,32 @@ GAIK provides four different parsers, each optimized for different use cases:
 - OCR is required for scanned documents
 - Multi-format support needed (PDF, images, etc.)
 - Advanced table extraction with OCR
-- GPU acceleration available
+- GPU acceleration available (otherwise slow -- roughly 20-30 s/page on CPU)
+
+**Use VisionPlusParser when:**
+- You need Docling parsing plus interpretation of images at their correct position
+- Downstream RAG chunks need per-element metadata
+
+**Use DoclingApiClientParser when:**
+- You want Docling-quality parsing without the local install overhead
+- You have credentials for a hosted Docling service
 
 ---
 
 ## Environment Variables
 
-For VisionParser only:
+For MultimodalParser (the variable depends on provider and hosting flag):
+
+| Variable | When |
+|----------|------|
+| `AZURE_API_KEY` | `openai` or `claude` with `use_azure=True` (the default) |
+| `AZURE_ENDPOINT` | `openai` with `use_azure=True` |
+| `ANTHROPIC_FOUNDRY_RESOURCE` | `claude` with `use_azure=True` |
+| `ANTHROPIC_API_KEY` | `claude` with `use_azure=False` |
+| `GOOGLE_PROJECT_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON` | `google` with `vertex_ai=True` (the default) |
+| `GOOGLE_API_KEY` | `google` with `vertex_ai=False` |
+
+For VisionParser and VisionPlusParser:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -61,6 +89,8 @@ For VisionParser only:
 | `AZURE_DEPLOYMENT` | Azure only | Azure deployment name |
 | `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
 | `AZURE_API_VERSION` | Optional | API version (default: 2024-02-15-preview) |
+
+For DoclingApiClientParser: `API_BASE` and `PASSWORD` for the hosted service.
 
 **Note:** PyMuPDFParser, DocxParser, and DoclingParser do not require API keys.
 
