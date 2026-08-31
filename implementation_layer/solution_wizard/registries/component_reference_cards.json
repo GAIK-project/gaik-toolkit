@@ -725,9 +725,9 @@
         "name": "re_rank",
         "type": "bool",
         "default": false,
-        "effect": "Cross-encoder re-ranking of retrieved results.",
+        "effect": "Rescores the candidate pool with a cross-encoder and REORDERS the results by that score. (Earlier versions computed the cross-encoder scores without reordering, so re_rank=True changed the numbers but not the ranking; that is fixed -- reranking now actually reorders, and the reordered pool is what score_threshold and the top_k cut then see.) The cross-encoder is loaded ONCE per Retriever instance and reused across searches, so only the first search pays the model load; the weights still download on that first use. Rerankers can REGRESS quality on multilingual or heavily domain-specific corpora -- measure on your own eval set before enabling. A runtime failure (model download, HTTP error, wrong number of scores) is logged at warning level and the retrieval order is returned unchanged, so a reranker outage degrades quality instead of breaking search; a missing sentence-transformers install is a misconfiguration and still raises.",
         "selection_relevant": true,
-        "infer_from": "retrieval precision is critical"
+        "infer_from": "retrieval precision is critical AND the corpus is English (or a multilingual cross-encoder is chosen via rerank_model) -> true; multilingual/domain-specific corpus without an eval set, or an air-gapped deployment that cannot download weights -> leave false"
       },
       {
         "name": "top_k",
@@ -741,7 +741,7 @@
         "name": "score_threshold",
         "type": "float | None",
         "default": null,
-        "effect": "Drops any chunk scoring below the threshold, so search() can return FEWER than top_k results (or none at all). This is the precision/recall lever: raise it to suppress weak, off-topic context that would otherwise pad the prompt and invite hallucination; leave it null when recall matters more than precision. CRITICAL -- the threshold is applied AFTER hybrid scoring and re-ranking, so the score scale it compares against changes with the other options: plain semantic search yields cosine similarity (~0..1), hybrid_search yields 0.7*vector + 0.3*BM25, and re_rank yields raw cross-encoder logits which are unbounded and frequently NEGATIVE. A value tuned for one mode will silently discard everything (or nothing) in another -- retune whenever hybrid_search or re_rank changes.",
+        "effect": "Drops any chunk scoring below the threshold, so search() can return FEWER than top_k results (or none at all). This is the precision/recall lever: raise it to suppress weak, off-topic context that would otherwise pad the prompt and invite hallucination; leave it null when recall matters more than precision. CRITICAL -- the threshold is applied AFTER hybrid scoring and re-ranking have rescored and reordered the candidate pool, and before the final top_k cut, so the score scale it compares against DIFFERS PER STAGE: plain semantic search yields cosine similarity (~0..1), hybrid_search yields 0.7*vector + 0.3*BM25 which is unbounded because BM25 is, and re_rank yields raw cross-encoder logits which are unbounded and frequently NEGATIVE. A value tuned for one mode will silently discard everything (or nothing) in another -- retune whenever hybrid_search or re_rank changes.",
         "selection_relevant": true,
         "infer_from": "answer must be grounded / 'do not answer if the documents do not cover it' / precision-critical domains (legal, medical, compliance) -> set a threshold and tune it against the chosen scoring mode; exploratory or broad-recall search -> leave null"
       },
@@ -768,9 +768,17 @@
         "effect": "Cross-encoder used when re_rank=True; ignored otherwise. Loaded via sentence-transformers, so the first call downloads the weights and it runs locally on CPU/GPU rather than via the API. The default is English-trained -- on Finnish or other non-English corpora, either swap in a multilingual cross-encoder or leave re_rank off, since an English-only re-ranker can score worse than no re-ranking at all.",
         "selection_relevant": true,
         "infer_from": "re_rank is true AND the corpus language is not English -> pick a multilingual cross-encoder; offline/air-gapped deployment -> note the model download requirement"
+      },
+      {
+        "name": "candidate_multiplier",
+        "type": "int",
+        "default": 4,
+        "effect": "How much wider than top_k the vector search fetches before the second stage runs: candidate_k = top_k * candidate_multiplier. Applied ONLY when hybrid_search or re_rank is on; plain semantic search still fetches exactly top_k and is unchanged. This is what makes two-stage retrieval work at all -- hybrid scoring and a cross-encoder can only reorder what they were handed, so with a pool of exactly top_k the reranker can never surface a document the vector search ranked just outside it. Raising it improves what the second stage has to work with and costs a linear amount of extra work (every candidate becomes a cross-encoder pair when re_rank is on).",
+        "selection_relevant": false,
+        "infer_from": "leave at 4; raise it only when reranking must rescue documents the vector search ranks well outside top_k, and budget the extra cross-encoder passes that implies"
       }
     ],
-    "note": "top_k, hybrid_search, re_rank and score_threshold can each be set on the constructor as a default and then overridden per call in search(), so one Retriever can serve both a broad-recall and a precision-first query path. filters and include_scores are search()-only."
+    "note": "top_k, hybrid_search, re_rank and score_threshold can each be set on the constructor as a default and then overridden per call in search(), so one Retriever can serve both a broad-recall and a precision-first query path. filters and include_scores are search()-only. candidate_multiplier only bites when hybrid_search or re_rank is on."
   },
   "AnswerGenerator": {
     "import": "from gaik.software_components.RAG.answer_generator import AnswerGenerator",
@@ -1960,5 +1968,74 @@
         "infer_from": "technical_spec.model"
       }
     ]
+  },
+  "Ranker": {
+    "import": "from gaik.software_components.RAG.ranker import Ranker",
+    "construct": "ranker = Ranker(rrf_k=60)",
+    "call": "fused = ranker.fuse(semantic_results, keyword_results, weights=(0.7, 0.3), top_k=10)",
+    "returns": "list[tuple(Document, float)]",
+    "install_extra": "ranker",
+    "call_order_by": "newest_first = ranker.order_by(fused, field='published_at', direction='desc', missing='last')",
+    "call_rerank": "best = ranker.rerank(user_query, fused, top_k=5)",
+    "call_to_documents": "chunks = Ranker.to_documents(fused, include_scores=True, score_key='relevance_score')",
+    "options": [
+      {
+        "name": "rrf_k",
+        "type": "int",
+        "default": 60,
+        "effect": "RRF constant in score(d) = sum(weight_i / (k + rank_i(d))), ranks 1-based. Higher values flatten the difference between adjacent ranks, so a document must appear in several arms to climb; lower values let one arm's top hit dominate the fused order. 60 is the published default and the right starting point unless a fusion eval says otherwise.",
+        "selection_relevant": false,
+        "infer_from": "leave at 60; only tune it when a retrieval eval shows the fusion over- or under-rewarding agreement between arms"
+      },
+      {
+        "name": "weights",
+        "type": "Sequence[float] | None",
+        "default": null,
+        "effect": "A fuse() argument, one multiplier per ranked list: fuse(semantic, keyword, weights=(0.7, 0.3)). Defaults to 1.0 for every arm. This is the main quality lever AND the main risk -- a badly weighted hybrid can rank worse than either arm alone. Because RRF fuses by RANK rather than score, arms on incompatible scales (cosine similarity in [0,1] vs unbounded BM25 or cross-encoder logits) can be combined safely; feed each arm its top 20-100 candidates rather than whole result sets. Fusion is not limited to two arms -- any ranked signal works, including a non-search one such as recency.",
+        "selection_relevant": true,
+        "infer_from": "queries dominated by exact identifiers, codes or names -> raise the keyword arm; conceptual or paraphrased questions -> raise the semantic arm; a third business signal (recency, popularity) -> add it as a third list with a small weight. Always A/B against each arm alone."
+      },
+      {
+        "name": "expose_ranks",
+        "type": "bool",
+        "default": false,
+        "effect": "Writes each arm's 1-based rank into the fused documents' metadata as rank_<name>, plus the fused score as rrf_score. A document an arm never returned has NO key for it, so `'rank_keyword' in doc.metadata` answers 'did the keyword arm find this at all'. Input documents are never mutated -- new Document objects are built. Settable as a constructor default and overridable per fuse() call.",
+        "selection_relevant": true,
+        "infer_from": "the UI shows retrieval provenance, or a human has to explain/debug why a weighting changed the ranking -> true; plain answer generation -> false"
+      },
+      {
+        "name": "names",
+        "type": "Sequence[str] | None",
+        "default": null,
+        "effect": "A fuse() argument: per-arm labels used for the rank_<name> metadata keys written by expose_ranks. Defaults to the list index, so provenance reads as rank_0 / rank_1. Pass names=('semantic', 'keyword') whenever expose_ranks is on.",
+        "selection_relevant": false,
+        "infer_from": "set alongside expose_ranks; otherwise irrelevant"
+      },
+      {
+        "name": "top_k",
+        "type": "int | None",
+        "default": null,
+        "effect": "Truncation. Settable on the constructor as a default for every method and overridable per call on fuse(), rerank(), order_by() and rank(). Truncate at the fusion/rerank step, not at each arm: cutting an arm too early loses documents the other arm would have rescued, while fusing whole result sets just wastes work. 20-100 candidates per arm into fuse(), then top_k=5-10 out, is the usual shape.",
+        "selection_relevant": false,
+        "infer_from": "the prompt budget of the downstream AnswerGenerator, or the number of results the UI shows"
+      },
+      {
+        "name": "rerank_model",
+        "type": "str",
+        "default": "cross-encoder/ms-marco-MiniLM-L-12-v2",
+        "effect": "Cross-encoder used by rerank(); ignored by fuse() and order_by(). Requires the SEPARATE gaik[ranker-rerank] extra (sentence-transformers + torch), and the first call downloads the weights and runs locally on CPU/GPU. Loaded once per Ranker instance and reused across calls. The default is English-trained: on Finnish or other non-English corpora either swap in a multilingual cross-encoder or skip reranking, since an English-only reranker can score worse than no reranking at all. A runtime failure is logged at warning level and rerank() returns the input order unchanged (on_error='fallback', the default); pass on_error='raise' to surface it instead.",
+        "selection_relevant": true,
+        "infer_from": "reranking is wanted AND the corpus language is not English -> pick a multilingual cross-encoder; offline/air-gapped deployment -> flag the model download; no torch allowed in the runtime -> use model_loader or skip rerank() entirely"
+      },
+      {
+        "name": "model_loader",
+        "type": "Callable[[str], Any] | None",
+        "default": null,
+        "effect": "Callable taking the model name and returning any object with predict(pairs, batch_size=...). Use it to plug a HOSTED reranker (Cohere, Voyage, Jina) in place of the local cross-encoder, which also removes the sentence-transformers/torch dependency and the weight download. Defaults to sentence_transformers.CrossEncoder.",
+        "selection_relevant": true,
+        "infer_from": "a hosted reranking contract already exists, or the deployment cannot ship torch / cannot download model weights -> supply model_loader; otherwise leave null"
+      }
+    ],
+    "note": "Ranker performs no IO. It consumes exactly the list[tuple(Document, float)] that PgVectorStore.search_semantic() / search_keyword() (and VectorStore) already return and reorders it, so it composes without adapters. Four ways in: fuse() for N weighted ranked lists (the primary use -- one semantic arm + one keyword arm), rerank() for cross-encoder rescoring of a single list, order_by(field=..., direction='asc'|'desc', missing='last'|'first'|'drop') to reorder by a business field such as a date or a price (field=None orders by the relevance score; 'asc' on the score surfaces the weakest matches, which is useful for eval), and rank(strategy='score'|'rerank'|'field') as a single-list facade over the other two. Documents are matched across lists by metadata['id'] (PgVectorStore sets it) falling back to full page content; override with key=lambda d: d.metadata['chunk_uid']. Nothing is mutated -- every method builds new Document objects. Ranker returns list[tuple(Document, float)] whereas Retriever returns list[Document]: call the static Ranker.to_documents(results) to flatten before handing chunks to AnswerGenerator. Choose Retriever for query-in/documents-out convenience; choose Ranker when you already hold the ranked lists, need more than two signals, need weighting, or need asc/desc ordering by metadata."
   }
 }

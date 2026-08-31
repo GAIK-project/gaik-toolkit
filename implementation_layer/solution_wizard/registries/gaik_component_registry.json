@@ -2177,7 +2177,8 @@
       "top_k",
       "score_threshold",
       "filters",
-      "include_scores"
+      "include_scores",
+      "candidate_multiplier"
     ],
     "supported_providers": [
       "openai",
@@ -2185,7 +2186,8 @@
     ],
     "cost_relevant_parameters": [
       "top_k",
-      "re_rank"
+      "re_rank",
+      "candidate_multiplier"
     ],
     "quality_tradeoffs": {
       "speed_vs_accuracy": "hybrid_search and re_rank raise recall and precision at the cost of extra computation per query",
@@ -2296,5 +2298,86 @@
     "example_script_path": "implementation_layer/examples/software_components/RAG/answer_generator_example.py",
     "readme_path": "implementation_layer/src/gaik/software_components/RAG/answer_generator/README.md",
     "install_extra": "answer-generator"
+  },
+  {
+    "id": "ranker",
+    "name": "Ranker",
+    "type": "software_component",
+    "input_artifact_types": [
+      "retrieved_chunks"
+    ],
+    "output_artifact_types": [
+      "retrieved_chunks"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "rrf_k",
+      "key",
+      "top_k",
+      "expose_ranks",
+      "rerank_model",
+      "rerank_batch_size",
+      "model_loader"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [
+      "rerank_model",
+      "rerank_batch_size"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "fuse() and order_by() are pure Python over lists you already hold and are effectively free; rerank() runs a cross-encoder over every candidate on CPU/GPU and will dominate query latency",
+      "cost_sensitivity": "none -- no LLM, embedding or database calls; rerank() runs a local model, so the cost is compute and a one-off weight download, not API spend",
+      "degrades_on": [
+        "multilingual_or_domain_specific_corpora_when_reranking",
+        "badly_weighted_fusion_arms",
+        "documents_without_a_stable_metadata_id_across_lists"
+      ]
+    },
+    "known_limitations": [
+      "Retrieves nothing on its own -- it only reorders ranked lists you already hold. It performs no IO: no database, no embedding API. Pair it with PgVectorStore/VectorStore (search_semantic + search_keyword) or any other ranked source.",
+      "Cross-encoder reranking needs the SEPARATE `ranker-rerank` extra (`pip install gaik[ranker-rerank]`, downloads model weights on first use). `gaik[ranker]` alone is pure Python and gives fuse(), order_by(), to_documents() and rank(strategy='score'|'field').",
+      "Reranking can REGRESS retrieval quality on multilingual or heavily domain-specific corpora (double-digit Hit@5 losses have been measured). Measure on your own eval set before adopting -- it is opt-in by design.",
+      "A badly weighted hybrid fusion can score BELOW either arm alone. weights is a tuning parameter, not a free win; use names=(...) with expose_ranks=True so a bad weighting is debuggable rather than mysteriously worse.",
+      "Reranked scores are not retrieval scores: cross-encoder logits are unbounded and frequently negative, so a score_threshold tuned against cosine similarity is meaningless after rerank().",
+      "rerank() has no timeout parameter -- a wall-clock deadline around a synchronous, CPU-bound predict() cannot be honoured in-process. Wrap the call, e.g. asyncio.wait_for(asyncio.to_thread(ranker.rerank, ...), timeout=4).",
+      "PgVectorStore.search_hybrid() already fuses semantic + keyword with RRF server-side. Select Ranker when you must fuse across backends, weight the arms, combine more than two signals, inspect the fusion, or reorder by a business field."
+    ],
+    "best_for": [
+      "hybrid_search_result_fusion",
+      "weighted_multi_signal_ranking",
+      "reordering_results_by_business_field",
+      "cross_encoder_reranking"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "fuse_search_arms",
+        "component": "Ranker",
+        "inputs": [
+          "retrieved_chunks"
+        ],
+        "outputs": [
+          "retrieved_chunks"
+        ]
+      },
+      {
+        "id": "order_results_by_field",
+        "component": "Ranker",
+        "inputs": [
+          "retrieved_chunks"
+        ],
+        "outputs": [
+          "retrieved_chunks"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/RAG/ranker/",
+    "import_path": "gaik.software_components.RAG.ranker",
+    "example_script_path": "implementation_layer/examples/software_components/RAG/ranker_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/RAG/ranker/README.md",
+    "install_extra": "ranker"
   }
 ]

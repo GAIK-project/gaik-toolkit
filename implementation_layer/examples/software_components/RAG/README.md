@@ -1,6 +1,6 @@
 # RAG Component Examples
 
-This folder contains examples for each of the five RAG (Retrieval-Augmented Generation) components used to build question-answering systems over document collections.
+This folder contains examples for each of the six RAG (Retrieval-Augmented Generation) components used to build question-answering systems over document collections.
 
 ## Files
 
@@ -10,6 +10,7 @@ This folder contains examples for each of the five RAG (Retrieval-Augmented Gene
 - `vector_store_example.py` - Store and manage document embeddings in ChromaDB
 - `pg_vector_store_example.py` - PostgreSQL vector store with semantic, keyword, and hybrid search
 - `retriever_example.py` - Search and retrieve relevant document chunks (with optional reranking)
+- `ranker_example.py` - Fuse, rerank and reorder result lists (weighted RRF, asc/desc ordering) -- runs with no database, API key or model download
 - `answer_generator_example.py` - Generate contextual answers with citations from retrieved chunks
 
 ## What These Examples Show
@@ -18,6 +19,7 @@ This folder contains examples for each of the five RAG (Retrieval-Augmented Gene
 - How to generate embeddings and store them in a vector database
 - How to use PostgreSQL with pgvector for semantic and hybrid search
 - How to retrieve relevant document chunks using semantic search
+- How to fuse several ranked lists into one ranking and reorder by a business field
 - How to generate answers with source citations
 - How each RAG component works independently before combining them in a full pipeline
 
@@ -31,6 +33,7 @@ python embedder_example.py
 python vector_store_example.py
 python pg_vector_store_example.py  # requires PostgreSQL with pgvector
 python retriever_example.py
+python ranker_example.py           # no external services needed
 python answer_generator_example.py
 ```
 

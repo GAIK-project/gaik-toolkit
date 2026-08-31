@@ -204,6 +204,7 @@ Core RAG classes in `gaik.software_components.RAG.*`. For full API, see [RAG Ref
 | VectorStore | `from gaik.software_components.RAG.vector_store import VectorStore` | `add(docs, embeddings)`, `search(vec, top_k)` |
 | PgVectorStore | `from gaik.software_components.RAG.pg_vector_store import PgVectorStore` | `search_hybrid(vec, text, top_k)` |
 | Retriever | `from gaik.software_components.RAG.retriever import Retriever` | `search(query, top_k, hybrid_search, re_rank)` |
+| Ranker | `from gaik.software_components.RAG.ranker import Ranker` | `fuse(*lists, weights)` → weighted RRF; also `rerank(query, results)`, `order_by(results, field, direction)` for asc/desc, `to_documents(results)`; reorders lists you already have, no IO; install `gaik[ranker]` (cross-encoder needs `gaik[ranker-rerank]`) |
 | AnswerGenerator | `from gaik.software_components.RAG.answer_generator import AnswerGenerator` | `generate(query, documents, stream)` |
 | VisionRagParser | `from gaik.software_components.RAG.rag_parser_vision import VisionRagParser` | `convert_doc_to_chunks_with_vision(path)` |
 | DoclingRagParser | `from gaik.software_components.RAG.rag_parser_docling import DoclingRagParser` | `convert_pdf_to_chunks_with_metadata(path)` |

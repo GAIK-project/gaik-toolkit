@@ -8,7 +8,7 @@ The agent loads your files into an in-memory DuckDB database, profiles every
 column, asks an LLM for a SQL query, validates it, runs it, and — if the query
 fails — feeds the error back to the LLM and retries.
 
-It is the file-shaped sibling of [`postgres_agent`](./postgres_agent.md): same
+It is the file-shaped sibling of [`postgres_agent`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/postgres_agent): same
 architecture, but the data source is spreadsheets rather than a database.
 
 ## Installation

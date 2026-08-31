@@ -398,6 +398,7 @@ Every selected component exposes behaviour-changing options. Read each selected 
   - multiple speakers / meeting / interview **and** whisper_local selected → `Transcriber.diarization = True`, then ask for `speaker_count` (exact) or `min_speakers` + `max_speakers` (range)
   - `human_review == yes` or `confidence_required` → `VisionExtractor.include_verification = True`
   - queries mix exact terms with concepts → `Retriever.hybrid_search = True`
+  - results must be re-sortable by a business field (date, price, priority), or several ranked lists must be merged into one → add `Ranker` (`order_by(field=..., direction="asc"|"desc")`, `fuse(*lists, weights=...)`). Note `Ranker` returns `list[tuple(Document, float)]` while `Retriever` returns `list[Document]` — use `Ranker.to_documents()` when handing results to `AnswerGenerator`. Do **not** add `Ranker` merely to rank one list from `PgVectorStore.search_hybrid()`, which already fuses with RRF server-side
   - citation/traceability requirement → `AnswerGenerator.citations = True` (or `RAGWorkflow.citations = True`)
   - scanned/image PDFs → `DoclingParser.enable_ocr = True`, or `DocumentsToStructuredData.parser_choice = "docling"` (the accepted literals are `vision_parser`, `docling`, `pymupdf`, `docx` — only the first carries the `_parser` suffix; the registry component *ids* `docling_parser`/`pymupdf_parser`/`docx_parser` are a different namespace and raise `ValueError` if passed here)
   - access controls on a database → `PostgresAgent.table_allowlist = [...]`

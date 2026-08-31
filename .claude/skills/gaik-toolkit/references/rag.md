@@ -11,6 +11,7 @@ Detailed API documentation for GAIK RAG building blocks.
 - [PgVectorStore](#pgvectorstore-postgresql--pgvector) (PostgreSQL, hybrid search, RRF)
 - [FinnishTextProcessor](#finnishtextprocessor) (Finnish lemmatization + compound splitting for hybrid search)
 - [Retriever](#retriever) (semantic + hybrid search, reranking)
+- [Ranker](#ranker) (weighted RRF fusion, cross-encoder reranking, asc/desc ordering)
 - [AnswerGenerator](#answergenerator) (LLM response, citations, streaming)
 - [RAG Parsers](#rag-parsers) (VisionRagParser, DoclingRagParser)
 - [Import Patterns](#import-patterns)
@@ -173,6 +174,14 @@ results = store.search_hybrid_weighted(
     top_k=10, semantic_weight=0.5, keyword_weight=0.5, filters=None,
 )
 # Returns: list[tuple[Document, combined_score]]
+
+# Reserved metadata keys set from table columns (they overwrite same-named JSONB keys):
+#   doc.metadata["id"]     -- the row's primary key; this is what lets Ranker.fuse()
+#                             match the same row across two result lists
+#   doc.metadata["title"]  -- the title column
+# search_hybrid also sets metadata["semantic_rank"] / ["keyword_rank"],
+# search_hybrid_weighted sets metadata["semantic_score"] / ["keyword_score"].
+# A key is OMITTED (not None) when that arm did not return the row.
 ```
 
 **`search()`** - VectorStore-compatible interface (drop-in for `Retriever`)
@@ -245,10 +254,11 @@ retriever = Retriever(
 | `embedder` | Embedder | required | Embedder instance |
 | `vector_store` | VectorStore\|PgVectorStore | required | Any store with `search()` method |
 | `hybrid_search` | bool | False | Combine vector + BM25 scoring |
-| `re_rank` | bool | False | Cross-encoder reranking (requires `sentence-transformers`) |
+| `re_rank` | bool | False | Cross-encoder reranking (requires `sentence-transformers`). Model is loaded once per instance. A runtime failure logs a warning and keeps the retrieval order; a missing install raises |
 | `rerank_model` | str | `"cross-encoder/ms-marco-MiniLM-L-12-v2"` | Reranking model |
 | `top_k` | int | 5 | Default number of results |
-| `score_threshold` | float\|None | None | Minimum relevance score |
+| `score_threshold` | float\|None | None | Minimum score. **The scale depends on which stages ran**: cosine similarity in [0, 1] for plain semantic search, an unbounded BM25 blend with `hybrid_search`, unbounded (often negative) cross-encoder logits with `re_rank`. A threshold tuned for one is meaningless for the others |
+| `candidate_multiplier` | int | 4 | How much wider than `top_k` to fetch when hybrid scoring or reranking is on, so those stages have something to reorder. Ignored for plain semantic search |
 
 **search() method:**
 
@@ -258,12 +268,98 @@ documents = retriever.search(
     top_k=5,
     score_threshold=0.5,
     filters={"document_name": "report"},
-    include_scores=True,     # Sets doc.metadata["relevance_score"]
+    include_scores=True,     # Sets doc.metadata["relevance_score"] on a copy
     hybrid_search=True,      # Override constructor default
     re_rank=True,            # Override constructor default
 )
 # Returns: list[Document]
 ```
+
+---
+
+## Ranker
+
+**Source:** `gaik.software_components.RAG.ranker`
+**Install:** `pip install "gaik[ranker]"` (cross-encoder: `pip install "gaik[ranker-rerank]"`)
+
+Reorders result lists you already have. Consumes and returns the
+`list[tuple[Document, float]]` shape that every gaik store produces. Performs no
+IO — no database, no embedding API.
+
+```python
+from gaik.software_components.RAG.ranker import Ranker
+
+ranker = Ranker(
+    rrf_k=60,                # RRF constant; higher flattens rank differences
+    key=None,                # identity fn; defaults to metadata["id"] then content
+    top_k=None,              # default truncation for every method
+    expose_ranks=False,      # write per-arm ranks into fused metadata
+    rerank_model="cross-encoder/ms-marco-MiniLM-L-12-v2",
+    rerank_batch_size=32,
+    model_loader=None,       # swap in a hosted reranker
+)
+```
+
+**Weighted Reciprocal Rank Fusion — the main entry point:**
+
+```python
+semantic = store.search_semantic(query_embedding, top_k=50)
+keyword = store.search_keyword(query_text, top_k=50)
+
+hits = ranker.fuse(semantic, keyword, weights=(0.7, 0.3), top_k=10)
+```
+
+`score(d) = Σ weightᵢ / (k + rankᵢ(d))`. Fuses by **rank**, not score — cosine
+similarity in [0, 1] and unbounded `ts_rank_cd` cannot be added directly. Takes
+N lists, so non-search signals (recency, popularity) are just more arms.
+
+**Provenance — why a document ranked where it did:**
+
+```python
+ranker.fuse(semantic, keyword, names=("semantic", "keyword"), expose_ranks=True)
+# doc.metadata["rank_semantic"], ["rank_keyword"], ["rrf_score"]
+# an arm that never returned the doc leaves NO key, so `"rank_keyword" in meta` works
+```
+
+**Ordering — the asc/desc surface:**
+
+```python
+ranker.order_by(hits, field="published_at", direction="desc")  # newest first
+ranker.order_by(hits, field="price", direction="asc")          # cheapest first
+ranker.order_by(hits, direction="asc")                         # weakest matches first
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `field` | str\|None | None | Metadata key to sort on; `None` sorts on the relevance score |
+| `direction` | `"asc"`\|`"desc"` | `"desc"` | Anything else raises `ValueError` |
+| `missing` | `"last"`\|`"first"`\|`"drop"` | `"last"` | Rows lacking `field`. `None` counts as missing |
+| `top_k` | int\|None | None | Truncate |
+
+**Reranking:**
+
+```python
+best = ranker.rerank("tooth implant recovery", candidates, top_k=5)
+```
+
+Model loaded once per instance. A runtime failure logs a warning and returns the
+input order unchanged (`on_error="raise"` opts out); a missing
+`sentence-transformers` install raises. No timeout parameter — wrap in
+`asyncio.wait_for(asyncio.to_thread(...))` if you need a deadline.
+
+**Other methods:**
+
+```python
+ranker.rank(results, strategy="score"|"rerank"|"field", query=..., field=..., direction=...)
+Ranker.to_documents(results, include_scores=True)   # -> list[Document], never mutates input
+```
+
+**Returns:** every method returns `list[tuple[Document, float]]` except
+`to_documents`, which returns `list[Document]`.
+
+**Caveats:** rerankers and hybrid fusion can *regress* quality on multilingual or
+domain-specific corpora — A/B on your own eval set. Reranked scores are not
+comparable to retrieval scores.
 
 ---
 
@@ -409,6 +505,9 @@ from gaik.software_components.RAG.pg_vector_store import PgVectorStore
 
 # Retriever
 from gaik.software_components.RAG.retriever import Retriever
+
+# Ranker (fusion / reordering)
+from gaik.software_components.RAG.ranker import Ranker, reciprocal_rank_fusion
 
 # Answer Generator
 from gaik.software_components.RAG.answer_generator import AnswerGenerator

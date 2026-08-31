@@ -61,6 +61,8 @@ pip install "gaik[embedder]"
 pip install "gaik[vector-store]"
 pip install "gaik[pg-vector-store]"
 pip install "gaik[retriever]"
+pip install "gaik[ranker]"                # fusion/reordering; pure Python
+pip install "gaik[ranker-rerank]"         # + cross-encoder reranking (torch)
 pip install "gaik[answer-generator]"
 pip install "gaik[rag-parser-docling]"
 pip install "gaik[rag-parser-vision]"
@@ -100,5 +102,6 @@ pip install "gaik[all-cpu]"
 | Build RAG pipeline | `rag-workflow` |
 | Just embeddings | `embedder` |
 | PostgreSQL vector store | `pg-vector-store` |
+| Fuse or reorder search results (RRF, asc/desc) | `ranker` |
 | Full toolkit (cloud/CPU) | `all-cpu` |
 | Full toolkit (GPU) | `all` |

@@ -379,7 +379,7 @@ flowchart LR
 
 ### RAG Components
 
-The RAG (Retrieval-Augmented Generation) components provide a modular pipeline for building document-grounded question answering systems. Rather than a single monolithic tool, the RAG pipeline is split into five composable blocks — each with a clear responsibility. You can use individual blocks where needed or assemble the full pipeline for a complete Q&A system grounded in your own documents.
+The RAG (Retrieval-Augmented Generation) components provide a modular pipeline for building document-grounded question answering systems. Rather than a single monolithic tool, the RAG pipeline is split into six composable blocks — each with a clear responsibility. You can use individual blocks where needed or assemble the full pipeline for a complete Q&A system grounded in your own documents.
 
 **Pipeline overview:**
 
@@ -390,7 +390,8 @@ flowchart LR
     C -->|"vectors"| D["Vector Store"]
     D -->|"indexed knowledge"| E["Retriever"]
     F("❓ User Question") --> E
-    E -->|"relevant chunks"| G["Answer Generator"]
+    E -->|"candidates"| R["Ranker"]
+    R -->|"relevant chunks"| G["Answer Generator"]
     G --> H("💬 Grounded Answer")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -400,6 +401,7 @@ flowchart LR
     style C fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
     style D fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
     style E fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+    style R fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
     style G fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 `} />
 
@@ -512,7 +514,42 @@ flowchart LR
 
 ---
 
-#### 5 · Answer Generator
+#### 5 · Ranker
+
+Takes the ranked lists a search step produced and decides the final order. It can fuse several rankings into one, rescore candidates with a cross-encoder, or reorder by a business field such as a date or a price. It performs no search of its own — it reorders results you already have.
+
+Fusion works on **ranks**, not raw scores. A semantic score and a keyword score sit on incompatible scales, so combining them arithmetically lets one signal dominate for reasons unrelated to relevance. Reciprocal Rank Fusion sidesteps this, and extends naturally to non-search signals like recency.
+
+<Mermaid chart={`
+flowchart LR
+    A("🧭 Semantic Results") --> B
+    K("🔤 Keyword Results") --> B
+    T("🕒 Recency / Business Signal") --> B
+
+    subgraph B["Ranker"]
+        direction TB
+        F["Rank Fusion<br/>Weighted RRF"]
+        R["Reranking<br/>(optional cross-encoder)"]
+        O["Ordering<br/>by score or field, asc / desc"]
+        F --> R --> O
+    end
+
+    B --> OUT("📋 Final Ranking<br/>+ per-signal provenance")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style K fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style T fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style OUT fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+Each result carries the rank it held in every contributing signal, so it is possible to see *why* a document ended up where it did — and a document missing from one signal is visibly missing rather than silently scored zero.
+
+> **Example:** A product search fuses semantic relevance with keyword matching, weighted 70/30, then lets the user re-sort the same result set by price ascending without running the search again.
+
+---
+
+#### 6 · Answer Generator
 
 Takes the retrieved chunks and the original question and uses an LLM to compose a coherent, factual answer. The response is grounded strictly in the retrieved content, and source citations are included so the answer can be verified.
 
@@ -543,7 +580,9 @@ flowchart LR
 **Key features:**
 - Fully modular — use individual blocks or assemble the full pipeline
 - Metadata-preserving chunking for accurate source attribution
+- Rank fusion across semantic, keyword and business signals, with per-signal provenance
 - Optional reranking to improve retrieval precision
+- Re-sortable results — order by relevance or by any metadata field, ascending or descending
 - Citation-aware answer generation for trustworthy, verifiable outputs
 
 **Potential applications:**
