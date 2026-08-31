@@ -44,11 +44,7 @@ def make_results(*entries: tuple[int, str, float]) -> list[tuple[Document, float
 def show(title: str, results: list[tuple[Document, float]]) -> None:
     print(f"--- {title} ---")
     for position, (doc, score) in enumerate(results, start=1):
-        ranks = {
-            key: value
-            for key, value in doc.metadata.items()
-            if key.startswith("rank_")
-        }
+        ranks = {key: value for key, value in doc.metadata.items() if key.startswith("rank_")}
         provenance = f"   {ranks}" if ranks else ""
         print(f"  {position}. [{score:.6f}] {doc.page_content}{provenance}")
     print()

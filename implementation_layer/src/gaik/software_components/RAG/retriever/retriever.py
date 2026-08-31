@@ -169,9 +169,7 @@ class Retriever:
             raw_scores = cross_encoder.predict(pairs)
             scores = [float(score) for score in raw_scores]
             if len(scores) != len(results):
-                raise ValueError(
-                    f"reranker returned {len(scores)} scores for {len(results)} pairs"
-                )
+                raise ValueError(f"reranker returned {len(scores)} scores for {len(results)} pairs")
         except ImportError:
             raise
         except Exception as exc:

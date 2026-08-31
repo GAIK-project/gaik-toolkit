@@ -85,9 +85,7 @@ def reciprocal_rank_fusion(
             f"weights has {len(weights)} entries but {len(lists)} result lists were given"
         )
     if names is not None and len(names) != len(lists):
-        raise ValueError(
-            f"names has {len(names)} entries but {len(lists)} result lists were given"
-        )
+        raise ValueError(f"names has {len(names)} entries but {len(lists)} result lists were given")
 
     if not any(lists):
         return []
@@ -261,8 +259,7 @@ class Ranker:
             scores = [float(score) for score in raw_scores]
             if len(scores) != len(candidates):
                 raise ValueError(
-                    f"reranker returned {len(scores)} scores "
-                    f"for {len(candidates)} candidates"
+                    f"reranker returned {len(scores)} scores for {len(candidates)} candidates"
                 )
         except ImportError:
             raise  # a missing dependency is actionable; never swallow it
@@ -333,9 +330,7 @@ class Ranker:
         if direction not in ("asc", "desc"):
             raise ValueError(f"direction must be 'asc' or 'desc', got {direction!r}")
         if missing not in ("last", "first", "drop"):
-            raise ValueError(
-                f"missing must be 'last', 'first' or 'drop', got {missing!r}"
-            )
+            raise ValueError(f"missing must be 'last', 'first' or 'drop', got {missing!r}")
 
         candidates = list(results)
         limit = self._limit(top_k)
@@ -405,12 +400,8 @@ class Ranker:
         if strategy == "field":
             if not field:
                 raise ValueError("strategy='field' requires a field name")
-            return self.order_by(
-                results, field=field, direction=direction, top_k=top_k
-            )
-        raise ValueError(
-            f"strategy must be 'score', 'rerank' or 'field', got {strategy!r}"
-        )
+            return self.order_by(results, field=field, direction=direction, top_k=top_k)
+        raise ValueError(f"strategy must be 'score', 'rerank' or 'field', got {strategy!r}")
 
     @staticmethod
     def to_documents(

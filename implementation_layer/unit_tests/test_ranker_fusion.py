@@ -117,9 +117,7 @@ def test_custom_key_callable():
     a = Document(page_content="alpha", metadata={"uid": "u1"})
     b = Document(page_content="beta", metadata={"uid": "u1"})
 
-    fused = reciprocal_rank_fusion(
-        [[(a, 0.9)], [(b, 3.0)]], k=K, key=lambda d: d.metadata["uid"]
-    )
+    fused = reciprocal_rank_fusion([[(a, 0.9)], [(b, 3.0)]], k=K, key=lambda d: d.metadata["uid"])
 
     assert len(fused) == 1
 

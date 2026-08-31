@@ -74,9 +74,7 @@ def test_hybrid_extra_keys_surface_per_arm_ranks():
             "keyword_rank": 2,
         }
     ]
-    doc, _ = convert(
-        rows, score_key="rrf_score", extra_keys=("semantic_rank", "keyword_rank")
-    )[0]
+    doc, _ = convert(rows, score_key="rrf_score", extra_keys=("semantic_rank", "keyword_rank"))[0]
 
     assert doc.metadata["semantic_rank"] == 1
     assert doc.metadata["keyword_rank"] == 2
@@ -95,9 +93,7 @@ def test_null_valued_extra_keys_are_omitted_not_none():
             "keyword_rank": 1,
         }
     ]
-    doc, _ = convert(
-        rows, score_key="rrf_score", extra_keys=("semantic_rank", "keyword_rank")
-    )[0]
+    doc, _ = convert(rows, score_key="rrf_score", extra_keys=("semantic_rank", "keyword_rank"))[0]
 
     assert "semantic_rank" not in doc.metadata
     assert doc.metadata["keyword_rank"] == 1

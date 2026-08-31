@@ -77,9 +77,7 @@ def names_of(documents):
 def test_rerank_without_hybrid_reorders_results():
     store = FakeStore()
     # Retrieval order is d1, d2, d3. The cross-encoder says d2 is best.
-    retriever = make_retriever(
-        store, FakeCrossEncoder([0.1, 0.9, 0.5]), re_rank=True, top_k=3
-    )
+    retriever = make_retriever(store, FakeCrossEncoder([0.1, 0.9, 0.5]), re_rank=True, top_k=3)
 
     assert names_of(retriever.search("query")) == ["d2", "d3", "d1"]
 
@@ -99,9 +97,7 @@ def test_rerank_with_hybrid_still_reorders():
 
 def test_reranked_scores_match_the_returned_order():
     store = FakeStore()
-    retriever = make_retriever(
-        store, FakeCrossEncoder([0.1, 0.9, 0.5]), re_rank=True, top_k=3
-    )
+    retriever = make_retriever(store, FakeCrossEncoder([0.1, 0.9, 0.5]), re_rank=True, top_k=3)
 
     docs = retriever.search("query", include_scores=True)
     scores = [d.metadata["relevance_score"] for d in docs]
@@ -134,9 +130,7 @@ def test_cross_encoder_is_reused_across_searches():
 
 def test_candidate_pool_widens_when_reranking():
     store = FakeStore()
-    retriever = make_retriever(
-        store, FakeCrossEncoder([0.1, 0.9, 0.5]), re_rank=True, top_k=5
-    )
+    retriever = make_retriever(store, FakeCrossEncoder([0.1, 0.9, 0.5]), re_rank=True, top_k=5)
     docs = retriever.search("query")
 
     assert store.requested_top_k == 20  # 5 * candidate_multiplier
@@ -163,7 +157,10 @@ def test_plain_semantic_search_pool_is_unchanged():
 def test_candidate_multiplier_is_configurable():
     store = FakeStore()
     retriever = make_retriever(
-        store, FakeCrossEncoder([0.1, 0.9, 0.5]), re_rank=True, top_k=3,
+        store,
+        FakeCrossEncoder([0.1, 0.9, 0.5]),
+        re_rank=True,
+        top_k=3,
         candidate_multiplier=10,
     )
     retriever.search("query")
@@ -180,9 +177,7 @@ def test_rerank_failure_falls_back_to_retrieval_order(caplog):
     store = FakeStore()
     retriever = make_retriever(store, ExplodingCrossEncoder(), re_rank=True, top_k=3)
 
-    with caplog.at_level(
-        logging.WARNING, logger="gaik.software_components.RAG.retriever"
-    ):
+    with caplog.at_level(logging.WARNING, logger="gaik.software_components.RAG.retriever"):
         docs = retriever.search("query")
 
     assert names_of(docs) == ["d1", "d2", "d3"]
