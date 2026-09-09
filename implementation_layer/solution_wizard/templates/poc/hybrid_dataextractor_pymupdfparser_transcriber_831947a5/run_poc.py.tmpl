@@ -60,7 +60,7 @@ def _find_optional_input(sample_dir: Path, exts: tuple) -> Path | None:
 
 
 def _load_approved_schema(schema_dir: Path):
-    """Load the wizard-approved Pydantic class and ExtractionRequirements from disk.
+    """Load the wizard-approved Pydantic class and requirements from disk.
 
     Uses the pre-generated output_schema.py and output_schema_requirements.json
     so that DataExtractor reuses the reviewed schema without calling SchemaGenerator again.
@@ -74,8 +74,19 @@ def _load_approved_schema(schema_dir: Path):
     req_data = json.loads((schema_dir / "output_schema_requirements.json").read_text(encoding="utf-8"))
     schema_class = getattr(module, req_data["model_name"])
 
-    from gaik.software_components.extractor.schema import ExtractionRequirements
-    requirements = ExtractionRequirements(**req_data["requirements"])
+    from gaik.software_components.extractor.schema import (
+        CompositeExtractionRequirements,
+        ExtractionRequirements,
+    )
+
+    raw_requirements = req_data["requirements"]
+    requirements_type = req_data.get(
+        "requirements_type", raw_requirements.get("structure_type", "extraction")
+    )
+    if requirements_type == "parent_with_nested_list":
+        requirements = CompositeExtractionRequirements(**raw_requirements)
+    else:
+        requirements = ExtractionRequirements(**raw_requirements)
 
     return schema_class, requirements
 

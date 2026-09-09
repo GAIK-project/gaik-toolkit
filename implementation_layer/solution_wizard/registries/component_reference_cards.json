@@ -211,7 +211,7 @@
     "import": "from gaik.software_components.extractor import SchemaGenerator, get_openai_config",
     "construct": "schema_gen = SchemaGenerator(config=get_openai_config(use_azure=use_azure))",
     "call": "schema, requirements = _load_output_schema(schema_dir)\n    if schema is None:\n        schema = schema_gen.generate_schema(user_requirements=user_requirements)\n        requirements = schema_gen.item_requirements\n        schema_dir.mkdir(parents=True, exist_ok=True)\n        _save_output_schema(schema_gen, schema, requirements, schema_dir)",
-    "returns": "Pydantic model class; .item_requirements = ExtractionRequirements",
+    "returns": "Pydantic model class; .item_requirements = ExtractionRequirements or CompositeExtractionRequirements for parent-with-repeated-record schemas",
     "install_extra": "extract",
     "note": "Use _load_output_schema() first -- the wizard pre-generates the schema; only call generate_schema() when _load_output_schema() returns None. Schema files are always named output_schema.* regardless of the class name.",
     "options": [
@@ -506,11 +506,19 @@
       },
       {
         "name": "temperature",
-        "type": "float",
+        "type": "float | None",
         "default": 0.0,
-        "effect": "Sampling temperature, sent unconditionally on every call (type is float, not float | None -- there is no way to omit it through this constructor). VisionParser has no reasoning_effort parameter at all, so on gpt-5.4 the default 0.0 works (gpt-5.4 accepts a custom temperature only while no reasoning_effort is active, and this component never sends one). On models ABOVE gpt-5.4 (gpt-5.5, gpt-5.6-sol, ...), which have no temperature parameter at all, this component has NO working configuration -- the value is always forwarded literally and fails with \"Unsupported value: 'temperature' does not support 0 with this model\". There is no kwarg workaround; use a different parser or a different model for vision conversion above gpt-5.4.",
+        "effect": "Sampling temperature for every page-conversion and cleanup call (Chat Completions API). None omits the parameter from the request entirely instead of sending it. MODEL RULES (same pairing as SchemaGenerator/DataExtractor): an active reasoning_effort (low/medium/high/etc.) requires temperature=None; models above gpt-5.4 (gpt-5.5, gpt-5.6-sol, ...) require temperature=None regardless of reasoning_effort. The 0.0 default is correct for conventional models and for gpt-5.4 with no reasoning_effort set.",
         "selection_relevant": true,
-        "infer_from": "technical_spec.model above gpt-5.4 -> this component cannot be used, pick MultimodalParser or another vision path instead; gpt-5.4 or conventional models -> leave 0.0 for deterministic markdown conversion"
+        "infer_from": "technical_spec.model above gpt-5.4 -> temperature=None; gpt-5.4 with an active reasoning_effort -> temperature=None; gpt-5.4 with no reasoning_effort, or conventional models -> leave 0.0 for deterministic markdown conversion"
+      },
+      {
+        "name": "reasoning_effort",
+        "type": "str | None",
+        "default": null,
+        "effect": "Reasoning effort for every page-conversion and cleanup call (Chat Completions API). None omits the parameter entirely. Passed through to the provider without local validation -- OpenAI documents model-dependent values that can include none, minimal, low, medium, high, xhigh, and max. Not every model or provider endpoint supports every value; verify compatibility for the selected deployment. Pair with temperature: an active effort requires temperature=None (see temperature option).",
+        "selection_relevant": true,
+        "infer_from": "source pages are dense, ambiguous, or table-heavy and default markdown quality is insufficient -> try an active effort, paired with temperature=None; otherwise leave null (omitted) and rely on temperature for determinism"
       }
     ]
   },
@@ -1843,6 +1851,22 @@
         "effect": "Print per-stage progress to stdout.",
         "selection_relevant": false,
         "infer_from": "set False for non-interactive or service deployments"
+      },
+      {
+        "name": "temperature",
+        "type": "float | None",
+        "default": 0.0,
+        "effect": "Sampling temperature for the vision model's per-image description calls ONLY -- has no effect on Docling's local OCR/layout/table/formula processing, which has no sampling concept. None omits the parameter entirely instead of sending it. MODEL RULES (same pairing as SchemaGenerator/DataExtractor): an active reasoning_effort requires temperature=None; models above gpt-5.4 require temperature=None regardless of reasoning_effort.",
+        "selection_relevant": true,
+        "infer_from": "technical_spec.model above gpt-5.4 -> temperature=None; an active reasoning_effort is set -> temperature=None; otherwise leave 0.0 for deterministic image descriptions"
+      },
+      {
+        "name": "reasoning_effort",
+        "type": "str | None",
+        "default": null,
+        "effect": "Reasoning effort for the vision model's per-image description calls ONLY -- does not affect Docling's local OCR/layout/table/formula processing. None omits the parameter entirely. Passed through to the provider without local validation -- OpenAI documents model-dependent values that can include none, minimal, low, medium, high, xhigh, and max. Not every model or provider endpoint supports every value; verify compatibility for the selected deployment. Pair with temperature: an active effort requires temperature=None.",
+        "selection_relevant": true,
+        "infer_from": "figures require more careful interpretation than the default pass produces -> try an active effort, paired with temperature=None; otherwise leave null (omitted)"
       }
     ]
   },

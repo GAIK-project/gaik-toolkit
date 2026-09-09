@@ -12,6 +12,15 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 # Vision parser page limit (CPU environment in CSC Rahti)
 MAX_VISION_PAGES = 10
 
+# Shared OpenAI settings for the demo website. Passing ``temperature=None``
+# omits that unsupported parameter for newer models while ``reasoning_effort``
+# remains available to models that accept it.
+MODEL = "gpt-5.4"
+MODEL_OPTIONS = {
+    "temperature": None,
+    "reasoning_effort": "medium",
+}
+
 
 async def validate_file_size(file: UploadFile) -> bytes:
     """Validate file size and return content if valid."""
@@ -48,7 +57,9 @@ def get_api_config():
 
     from gaik.software_components.config import get_openai_config
 
-    return get_openai_config(use_azure=use_azure)
+    config = get_openai_config(use_azure=use_azure)
+    config["model"] = MODEL
+    return config
 
 
 def validate_vision_page_limit(file_path: str, suffix: str, parser_type: str) -> None:

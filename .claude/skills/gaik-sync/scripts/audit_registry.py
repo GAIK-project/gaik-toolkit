@@ -76,6 +76,20 @@ TRACKED_GAIK_PACKAGES = (
     "gaik.software_modules",
 )
 
+# Subpackages confirmed to be internal implementation helpers, not user-facing
+# components -- excluded from `check_new` so `--strict` can be clean without
+# adding a fake reference card for something the wizard should never select
+# directly. Each entry needs a one-line reason; add new ones only after
+# confirming (README/consumers) they are genuinely internal, not a component
+# that slipped through undocumented.
+INTERNAL_ONLY_SUBPACKAGES: dict[str, str] = {
+    # Multi-provider LLM client abstraction (ProviderClient / build_compat_client)
+    # consumed internally by doc_classifier, enhance_transcript, evaluators,
+    # extractor, parallel_transcriber, postgres_agent, RAG, text_to_speech,
+    # transcriber. No README, no example script, no public component identity.
+    "gaik.software_components.llm": "internal multi-provider LLM client abstraction",
+}
+
 # Methods that belong to result objects / helpers, not the component class.
 _SKIP_METHODS = {"load_schema", "save", "save_schema", "get", "model_dump"}
 
@@ -442,6 +456,8 @@ def check_new(reg, cards) -> list[dict]:
     referenced = _card_module_paths(cards)
     out = []
     for sub_path in sorted(_gaik_subpackages()):
+        if sub_path in INTERNAL_ONLY_SUBPACKAGES:
+            continue
         if any(ref == sub_path or ref.startswith(sub_path + ".") for ref in referenced):
             continue
         out.append(

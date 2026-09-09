@@ -83,3 +83,4 @@ implementation_layer/src/gaik/_version.py
 
 # Superpowers scratch (specs/plans) — local working notes, not committed
 **/docs/superpowers/
+tmp/pdfs/

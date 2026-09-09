@@ -1,0 +1,153 @@
+{
+  "model_name": "purchase_order_header_extraction_Extraction",
+  "requirements_type": "parent_with_nested_list",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "purchase_order_header_extraction",
+      "fields": [
+        {
+          "field_name": "purchase_order_date",
+          "field_type": "date",
+          "description": "Purchase order date (DD/MM/YYYY format when unambiguous)",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": "%d/%m/%Y"
+        },
+        {
+          "field_name": "delivery_date",
+          "field_type": "date",
+          "description": "Delivery date (DD/MM/YYYY format when unambiguous)",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": "%d/%m/%Y"
+        },
+        {
+          "field_name": "purchase_order_number",
+          "field_type": "str",
+          "description": "Purchase order number (separated by a dash after every 4 digits)",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "supplier_number",
+          "field_type": "str",
+          "description": "Supplier number",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "shipping_address",
+          "field_type": "str",
+          "description": "Shipping address (Format: company name, street number, postal code, city, country)",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "line_items",
+        "container_description": "Repeated structured line items in the purchase order.",
+        "requirements": {
+          "use_case_name": "purchase_order_line_item",
+          "fields": [
+            {
+              "field_name": "item_number",
+              "field_type": "str",
+              "description": "Item number (e.g., 010, 020)",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "complete_description",
+              "field_type": "str",
+              "description": "Complete description",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "quantity",
+              "field_type": "str",
+              "description": "Quantity (text string including the unit, e.g., \"8.600 LB\")",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "price_per_currency",
+              "field_type": "decimal",
+              "description": "Price per currency",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "material_number",
+              "field_type": "str",
+              "description": "Material number",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -20,14 +20,21 @@ from gaik.software_components.extractor import SchemaGenerator, DataExtractor, g
 # Configure
 config = get_openai_config(use_azure=True)
 
+# Use settings compatible with models that support reasoning effort.
+MODEL = 'gpt-5.6-sol'
+MODEL_OPTIONS = {
+    'temperature': None,  # Omit temperature from the API request
+    'reasoning_effort': 'low',
+}
+
 # Generate schema from natural language
-generator = SchemaGenerator(config=config)
+generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
 schema = generator.generate_schema(
     user_requirements="Extract: project title (string), budget (decimal), status (enum: active, completed)"
 )
 
 # Extract data
-extractor = DataExtractor(config=config)
+extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
 results = extractor.extract(
     extraction_model=schema,
     requirements=generator.item_requirements,
@@ -58,8 +65,10 @@ print(results)  # [{'project_title': 'AI Initiative', 'budget': 2500000.0, 'stat
 from gaik.software_components.extractor import SchemaGenerator
 
 generator = SchemaGenerator(
-    config: dict,              # From get_openai_config()
-    model: str | None = None   # Optional model override
+    config: dict,                         # From get_openai_config()
+    model: str | None = None,             # Optional model override
+    temperature: float | None = 0.0,      # None omits the parameter
+    reasoning_effort: str | None = None,  # e.g. low, medium, or high
 )
 
 # Generate schema
@@ -77,8 +86,10 @@ generator.structure_analysis    # Structure type analysis
 from gaik.software_components.extractor import DataExtractor
 
 extractor = DataExtractor(
-    config: dict,              # From get_openai_config()
-    model: str | None = None   # Optional model override
+    config: dict,                         # From get_openai_config()
+    model: str | None = None,             # Optional model override
+    temperature: float | None = 0.0,      # None omits the parameter
+    reasoning_effort: str | None = None,  # e.g. low, medium, or high
 )
 
 # Extract data
@@ -104,6 +115,28 @@ config = get_openai_config(use_azure=True)
 config = get_openai_config(use_azure=False)
 ```
 
+### Sampling and reasoning compatibility
+
+For reasoning models, pass an active `reasoning_effort` and set
+`temperature=None`. This omits `temperature` from the API request instead of
+sending JSON `null`. Use the same options for `SchemaGenerator` and
+`DataExtractor`:
+
+```python
+MODEL = 'gpt-5.6-sol'
+MODEL_OPTIONS = {
+    'temperature': None,
+    'reasoning_effort': 'low',
+}
+
+generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
+extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
+```
+
+Do not combine an active reasoning effort (`low`, `medium`, or `high`) with
+a custom temperature. Supported reasoning-effort values are model-specific;
+check the selected model's OpenAI documentation.
+
 ---
 
 ## Environment Variables
@@ -120,7 +153,7 @@ config = get_openai_config(use_azure=False)
 
 ## Examples
 
-See [implementation_layer/examples/software_components/extractor/](../implementation_layer/examples/software_components/extractor/) for complete examples:
+See [implementation_layer/examples/software_components/extractor/](../../../../examples/software_components/extractor/) for complete examples:
 - `extraction_example_1.py` - Basic extraction
 - `extraction_example_2.py` - Nested/hierarchical extraction
 - `extraction_example_3.py` - Manual schema definition
@@ -131,16 +164,11 @@ See [implementation_layer/examples/software_components/extractor/](../implementa
 ## Resources
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
-- **Examples**: [implementation_layer/examples/software_components/](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components)
+- **Examples**: [implementation_layer/examples/software_components/extractor/](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/extractor)
 - **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 
 ## License
 
 MIT - see [LICENSE](../LICENSE)
-
-
-
-
-
 

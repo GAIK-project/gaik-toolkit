@@ -6,9 +6,14 @@ from pathlib import Path
 from typing import Literal
 
 try:
-    from utils import validate_file_size, validate_vision_page_limit
+    from utils import MODEL_OPTIONS, get_api_config, validate_file_size, validate_vision_page_limit
 except ImportError:
-    from api.utils import validate_file_size, validate_vision_page_limit
+    from api.utils import (
+        MODEL_OPTIONS,
+        get_api_config,
+        validate_file_size,
+        validate_vision_page_limit,
+    )
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 router = APIRouter()
@@ -73,11 +78,9 @@ async def parse_document(
             parser = PyMuPDFParser()
             result = parser.parse_document(tmp_path)
         elif parser_type == "vision":
-            from gaik.software_components.config import get_openai_config
             from gaik.software_components.parsers import VisionParser
 
-            openai_config = get_openai_config(use_azure=bool(os.getenv("AZURE_API_KEY")))
-            parser = VisionParser(openai_config=openai_config)
+            parser = VisionParser(openai_config=get_api_config(), **MODEL_OPTIONS)
             # VisionParser uses convert_pdf() which returns list of markdown pages
             markdown_pages = parser.convert_pdf(tmp_path)
             result = {"text_content": "\n\n".join(markdown_pages), "metadata": {}}

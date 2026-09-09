@@ -26,8 +26,10 @@ from .extractor import DataExtractor, ExtractionResult, save_to_json
 from .schema import (
     ChildRequirements,
     CompositeExtractionRequirements,
+    DecimalField,
     ExtractionRequirements,
     FieldSpec,
+    OptionalDecimalField,
     SchemaGenerationResult,
     SchemaGenerator,
     StructureAnalysis,
@@ -50,6 +52,8 @@ __all__ = [
     "ExtractionRequirements",
     "ChildRequirements",
     "CompositeExtractionRequirements",
+    "DecimalField",
+    "OptionalDecimalField",
     "StructureAnalysis",
     "create_extraction_model",
     # Utilities

@@ -36,9 +36,9 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 try:
-    from utils import sse_event
+    from utils import MODEL_OPTIONS, get_api_config, sse_event
 except ImportError:
-    from api.utils import sse_event
+    from api.utils import MODEL_OPTIONS, get_api_config, sse_event
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -221,11 +221,9 @@ def _extract_text_from_attachment(attachment: FileAttachment) -> str:
             wb.close()
             return "\n\n".join(blocks) if blocks else "_(no tabular data found)_"
         elif ext in (".jpg", ".jpeg", ".png", ".webp", ".tiff", ".gif"):
-            from gaik.software_components.config import get_openai_config
             from gaik.software_components.parsers import VisionParser
 
-            config = get_openai_config(use_azure=bool(os.getenv("AZURE_API_KEY")))
-            parser = VisionParser(openai_config=config)
+            parser = VisionParser(openai_config=get_api_config(), **MODEL_OPTIONS)
             return parser.convert_image(tmp_path)
         elif ext in (".mp3", ".mp4", ".wav", ".m4a", ".ogg", ".webm", ".flac", ".mpeg", ".mpga"):
             try:

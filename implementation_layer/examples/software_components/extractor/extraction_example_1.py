@@ -21,6 +21,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.extractor import DataExtractor, SchemaGenerator, get_openai_config
 
+MODEL = "gpt-5.6-sol"
+MODEL_OPTIONS = {
+    "temperature": None,
+    "reasoning_effort": "low",
+}
+
 if __name__ == "__main__":
     # Simple example showing how to use the SchemaGenerator class
     print("=" * 80)
@@ -69,7 +75,7 @@ if __name__ == "__main__":
     ]
 
     # Step 1: Generate schema
-    generator = SchemaGenerator(config=config)
+    generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
 
     print("\nStep 1: Generating schema...")
     print("-" * 80)
@@ -83,7 +89,7 @@ if __name__ == "__main__":
     print("\nStep 2: Extracting data...")
     print("-" * 80)
 
-    extractor = DataExtractor(config=config)
+    extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
     results = extractor.extract(
         extraction_model=schema,
         requirements=generator.item_requirements,

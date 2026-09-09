@@ -1,8 +1,6 @@
 """Diary router - Construction diary (Työmaapäiväkirja) workflow endpoints."""
 
-import importlib.util
 import io
-import json
 import logging
 import tempfile
 import uuid
@@ -12,9 +10,27 @@ from datetime import datetime
 from pathlib import Path
 
 try:
-    from utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, get_api_config, sse_event
+    from utils import (
+        MAX_FILE_SIZE_BYTES,
+        MAX_FILE_SIZE_MB,
+        MODEL,
+        MODEL_OPTIONS,
+        get_api_config,
+        load_schema,
+        save_schema,
+        sse_event,
+    )
 except ImportError:
-    from api.utils import MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB, get_api_config, sse_event
+    from api.utils import (
+        MAX_FILE_SIZE_BYTES,
+        MAX_FILE_SIZE_MB,
+        MODEL,
+        MODEL_OPTIONS,
+        get_api_config,
+        load_schema,
+        save_schema,
+        sse_event,
+    )
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
@@ -25,94 +41,22 @@ router = APIRouter()
 PDF_STORAGE: dict[str, Path] = {}
 PDF_TIMESTAMPS: dict[str, datetime] = {}
 
-SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
-SCHEMA_DIR.mkdir(exist_ok=True)
-
-
-def _clean_schema_dump(raw_dump: str) -> str:
-    lines = raw_dump.splitlines()
-    start_idx = 0
-    for i, line in enumerate(lines):
-        if line.startswith("class "):
-            start_idx = i
-            break
-    body = lines[start_idx:]
-    while body and (set(body[-1].strip()) == {"="} or not body[-1].strip()):
-        body.pop()
-    return "\n".join(body).strip()
-
-
-def _schema_paths(schema_key: str) -> tuple[Path, Path]:
-    return SCHEMA_DIR / f"{schema_key}_schema.py", SCHEMA_DIR / f"{schema_key}_requirements.json"
-
-
-def _save_schema(schema: type, requirements, schema_key: str, user_requirements: str) -> None:
-    from gaik.software_components.extractor.schema import print_pydantic_schema
-
-    schema_path, req_path = _schema_paths(schema_key)
-    buffer = io.StringIO()
-    with redirect_stdout(buffer):
-        print_pydantic_schema(schema, title="Saved Schema")
-    schema_code = _clean_schema_dump(buffer.getvalue())
-    template = "\n".join(
-        [
-            '"""',
-            "Auto-generated schema module (do not edit manually).",
-            '"""',
-            "",
-            "import decimal",
-            "from decimal import Decimal",
-            "from typing import List, Literal, Optional",
-            "",
-            "from pydantic import BaseModel, Field, ConfigDict",
-            "",
-            schema_code,
-            "",
-        ]
-    )
-    schema_path.write_text(template, encoding="utf-8")
-    payload = {
-        "model_name": schema.__name__,
-        "requirements": requirements.model_dump(),
-        "user_requirements": user_requirements,
-    }
-    req_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-
-
-def _load_schema(schema_key: str, user_requirements: str):
-    from gaik.software_components.extractor import ExtractionRequirements
-
-    schema_path, req_path = _schema_paths(schema_key)
-    if not (schema_path.exists() and req_path.exists()):
-        return None
-    data = json.loads(req_path.read_text(encoding="utf-8"))
-    if data.get("user_requirements") != user_requirements:
-        return None
-    model_name = data["model_name"]
-    requirements = ExtractionRequirements(**data["requirements"])
-    spec = importlib.util.spec_from_file_location(model_name, schema_path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec and spec.loader is not None
-    spec.loader.exec_module(module)  # type: ignore[attr-defined]
-    schema = getattr(module, model_name)
-    return schema, requirements
-
 
 def _get_or_create_schema(config, user_requirements: str, schema_key: str, regenerate_schema: bool):
     from gaik.software_components.extractor import SchemaGenerator
 
-    loaded = _load_schema(schema_key, user_requirements)
+    loaded = load_schema(schema_key, user_requirements)
     if loaded is not None and not regenerate_schema:
         logger.info("Loaded existing diary schema for key %s", schema_key)
         schema, requirements = loaded
         return schema, requirements, False
 
-    schema_generator = SchemaGenerator(config=config)
+    schema_generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
     extraction_model = schema_generator.generate_schema(user_requirements)
     requirements = schema_generator.item_requirements
 
     if loaded is None and not regenerate_schema:
-        _save_schema(extraction_model, requirements, schema_key, user_requirements)
+        save_schema(extraction_model, requirements, schema_key, user_requirements)
         logger.info("Saved diary schema for key %s", schema_key)
 
     return extraction_model, requirements, True
@@ -245,7 +189,7 @@ async def diary_audio_pipeline_stream(
             yield sse_event("step_update", steps[2])
 
             documents = [transcription.enhanced_transcript or transcription.raw_transcript]
-            extractor = DataExtractor(config=config)
+            extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
                 requirements=requirements,
@@ -418,7 +362,7 @@ async def diary_text_pipeline_stream(
             steps[2]["status"] = "in_progress"
             yield sse_event("step_update", steps[2])
 
-            extractor = DataExtractor(config=config)
+            extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
                 requirements=requirements,

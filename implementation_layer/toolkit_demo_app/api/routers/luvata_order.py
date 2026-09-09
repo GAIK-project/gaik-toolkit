@@ -22,21 +22,32 @@ from openpyxl import load_workbook
 from pydantic import BaseModel, Field
 
 try:
-    from utils.config import get_api_config
-    from utils.sse import sse_event
+    from utils import (
+        MODEL,
+        MODEL_OPTIONS,
+        get_api_config,
+        load_saved_requirements,
+        load_saved_schema,
+        save_requirements,
+        save_schema_to_python,
+        sse_event,
+    )
 except ImportError:
-    from api.utils.config import get_api_config
-    from api.utils.sse import sse_event
-import importlib.util
-import json
-from contextlib import redirect_stdout
+    from api.utils import (
+        MODEL,
+        MODEL_OPTIONS,
+        get_api_config,
+        load_saved_requirements,
+        load_saved_schema,
+        save_requirements,
+        save_schema_to_python,
+        sse_event,
+    )
 
 from gaik.software_components.extractor import (
     DataExtractor,
-    ExtractionRequirements,
     SchemaGenerator,
 )
-from gaik.software_components.extractor.schema import print_pydantic_schema
 from gaik.software_components.parsers import PyMuPDFParser
 from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
 
@@ -45,88 +56,6 @@ router = APIRouter(prefix="/luvata-order", tags=["luvata-order"])
 # Schema directory
 SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
 SCHEMA_DIR.mkdir(exist_ok=True)
-
-
-def _clean_schema_dump(raw_dump: str) -> str:
-    """Strip header/footer lines from print_pydantic_schema output."""
-    lines = raw_dump.splitlines()
-    start_idx = 0
-    for i, line in enumerate(lines):
-        if line.startswith("class "):
-            start_idx = i
-            break
-    body = lines[start_idx:]
-    while body and (set(body[-1].strip()) == {"="} or not body[-1].strip()):
-        body.pop()
-    return "\n".join(body).strip()
-
-
-def _sanitize_schema_code(schema_code: str) -> str:
-    """
-    Normalize generated schema code so cached modules are self-contained.
-    `print_pydantic_schema()` may emit fully qualified references back into
-    `gaik.software_components.extractor.schema`. Those names are not available
-    inside the cached module unless the whole package path is imported, and the
-    referenced classes are already emitted in the same file anyway.
-    """
-    schema_code = schema_code.replace("gaik.software_components.extractor.schema.", "")
-    return schema_code
-
-
-def save_schema_to_python(model: type, path: Path) -> None:
-    """Dump the generated Pydantic model into a valid Python file."""
-    buffer = io.StringIO()
-    with redirect_stdout(buffer):
-        print_pydantic_schema(model, title="Generated Schema")
-    schema_code = _sanitize_schema_code(_clean_schema_dump(buffer.getvalue()))
-    template = f'''"""
-Auto-generated schema module (do not edit manually).
-"""
-import decimal
-from decimal import Decimal
-from typing import List, Literal, Optional
-from pydantic import BaseModel, Field, ConfigDict
-{schema_code}
-'''
-    path.write_text(template, encoding="utf-8")
-    logger.info(f"Schema saved to {path}")
-
-
-def save_requirements(requirements: ExtractionRequirements, model_name: str, path: Path) -> None:
-    """Save extraction requirements to JSON."""
-    payload = {
-        "model_name": model_name,
-        "requirements": requirements.model_dump(),
-    }
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    logger.info(f"Requirements saved to {path}")
-
-
-def load_saved_schema(path: Path, model_name: str):
-    """Load the previously saved schema module and return the model class."""
-    source = path.read_text(encoding="utf-8")
-    sanitized = _sanitize_schema_code(source)
-    if sanitized != source:
-        path.write_text(sanitized, encoding="utf-8")
-        logger.info(f"Sanitized cached schema module: {path}")
-    spec = importlib.util.spec_from_file_location("saved_schema", path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    try:
-        spec.loader.exec_module(module)
-    except Exception:
-        logger.exception(f"Failed to load cached schema module: {path}")
-        raise
-    model_cls = getattr(module, model_name)
-    return model_cls
-
-
-def load_saved_requirements(path: Path) -> tuple[str, ExtractionRequirements]:
-    """Load extraction requirements from JSON."""
-    data = json.loads(path.read_text(encoding="utf-8"))
-    model_name = data["model_name"]
-    requirements = ExtractionRequirements(**data["requirements"])
-    return model_name, requirements
 
 
 # In-memory storage for generated PDFs with TTL cleanup
@@ -586,14 +515,18 @@ async def extract_po_data(po_file: UploadFile) -> PurchaseOrder:
             "Each item should include material number, description, "
             "quantity as integer, and delivery date if available."
         )
-        # Check if schema exists
-        if schema_path.exists() and requirements_path.exists():
+        saved_requirements = (
+            load_saved_requirements(requirements_path)
+            if schema_path.exists() and requirements_path.exists()
+            else None
+        )
+        if saved_requirements is not None:
             logger.info("Loading existing PO schema...")
-            model_name, requirements = load_saved_requirements(requirements_path)
+            model_name, requirements = saved_requirements
             po_model = load_saved_schema(schema_path, model_name)
         else:
             logger.info("Generating new PO schema...")
-            generator = SchemaGenerator(config=config)
+            generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
             po_model = generator.generate_schema(user_requirements=user_requirements)
 
             # Save schema and requirements
@@ -601,7 +534,7 @@ async def extract_po_data(po_file: UploadFile) -> PurchaseOrder:
             save_requirements(generator.item_requirements, po_model.__name__, requirements_path)
             requirements = generator.item_requirements
         # Extract data
-        extractor = DataExtractor(config)
+        extractor = DataExtractor(config, model=MODEL, **MODEL_OPTIONS)
         result = extractor.extract(
             extraction_model=po_model,
             requirements=requirements,
@@ -710,21 +643,25 @@ async def extract_bom_data(bom_file: UploadFile) -> BOMData:
             "and do not mix testing, cutting, and "
             "certificate values with each other."
         )
-        # Check if schema exists
-        if schema_path.exists() and requirements_path.exists():
+        saved_requirements = (
+            load_saved_requirements(requirements_path)
+            if schema_path.exists() and requirements_path.exists()
+            else None
+        )
+        if saved_requirements is not None:
             logger.info("Loading existing BOM schema...")
-            model_name, requirements = load_saved_requirements(requirements_path)
+            model_name, requirements = saved_requirements
             bom_model = load_saved_schema(schema_path, model_name)
         else:
             logger.info("Generating new BOM schema...")
-            generator = SchemaGenerator(config=config)
+            generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
             bom_model = generator.generate_schema(user_requirements=user_requirements)
             # Save schema and requirements
             save_schema_to_python(bom_model, schema_path)
             save_requirements(generator.item_requirements, bom_model.__name__, requirements_path)
             requirements = generator.item_requirements
         # Extract data
-        extractor = DataExtractor(config)
+        extractor = DataExtractor(config, model=MODEL, **MODEL_OPTIONS)
         result = extractor.extract(
             extraction_model=bom_model,
             requirements=requirements,

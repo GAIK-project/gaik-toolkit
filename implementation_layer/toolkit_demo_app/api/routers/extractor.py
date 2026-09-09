@@ -2,6 +2,8 @@
 
 try:
     from utils import (
+        MODEL,
+        MODEL_OPTIONS,
         get_api_config,
         load_schema,
         save_schema,
@@ -10,6 +12,8 @@ try:
     )
 except ImportError:
     from api.utils import (
+        MODEL,
+        MODEL_OPTIONS,
         get_api_config,
         load_schema,
         save_schema,
@@ -127,7 +131,7 @@ async def generate_schema(request: GenerateSchemaRequest):
         elif sid in _schema_cache:
             schema, requirements = _schema_cache[sid]
         else:
-            generator = SchemaGenerator(config)
+            generator = SchemaGenerator(config, model=MODEL, **MODEL_OPTIONS)
             schema = wrap_schema_with_numeric_normalizers(
                 generator.generate_schema(user_requirements=request.user_requirements)
             )
@@ -184,7 +188,7 @@ async def extract_data_plain_language(request: PlainLanguageExtractRequest):
             if loaded is not None:
                 schema, item_requirements = loaded
             else:
-                generator = SchemaGenerator(config)
+                generator = SchemaGenerator(config, model=MODEL, **MODEL_OPTIONS)
                 schema = wrap_schema_with_numeric_normalizers(
                     generator.generate_schema(user_requirements=request.user_requirements)
                 )
@@ -195,7 +199,7 @@ async def extract_data_plain_language(request: PlainLanguageExtractRequest):
                     schema_id_from_requirements(request.user_requirements),
                 )
 
-        extractor = DataExtractor(config)
+        extractor = DataExtractor(config, model=MODEL, **MODEL_OPTIONS)
         results = extractor.extract(
             extraction_model=schema,
             requirements=item_requirements,
@@ -238,7 +242,7 @@ async def extract_data(request: ExtractRequest):
         from pydantic import create_model
 
         config = get_api_config()
-        extractor = DataExtractor(config)
+        extractor = DataExtractor(config, model=MODEL, **MODEL_OPTIONS)
 
         if request.fields:
             field_definitions = {name: (str | None, None) for name in request.fields.keys()}

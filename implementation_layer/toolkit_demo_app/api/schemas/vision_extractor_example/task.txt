@@ -1,0 +1,5 @@
+Extract key fields from a Purchase Order (PO) and align each PO item with the matching Bill of Materials (BOM) via Material Number.
+
+For every PO item, extract: Material Number, Quantity, Description, Delivery Date (DD/MM/YYYY). Then look up the matching BOM (where ID = Material Number) and add: Type Part Designation, Dimensions.
+
+Also extract from the PO header: Order Date, Buyer, Sales Person, Shipping Address, Payment Terms.

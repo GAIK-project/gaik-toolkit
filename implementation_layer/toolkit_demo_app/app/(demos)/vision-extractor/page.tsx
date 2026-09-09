@@ -33,6 +33,11 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { formatFieldName, formatFileSize } from "@/lib/utils";
 import {
@@ -40,6 +45,7 @@ import {
   File as FileIcon,
   FileCode2,
   FileStack,
+  Info,
   Loader2,
   ScanEye,
   Sparkles,
@@ -70,13 +76,11 @@ const EXAMPLE_FILES = [
   "/vision-extractor-example/BOM3.pdf",
 ];
 
-const EXAMPLE_REQUIREMENTS = `Extract key fields from a Purchase Order (PO) and align each PO item with the matching Bill of Materials (BOM) via Material Number.
-
-For every PO item, extract: Material Number, Quantity, Description, Delivery Date (DD/MM/YYYY). Then look up the matching BOM (where ID = Material Number) and add: Type Part Designation, Dimensions.
-
-Also extract from the PO header: Order Date, Buyer, Sales Person, Shipping Address, Payment Terms.`;
-
-const REQUIREMENT_PRESETS: { label: string; description: string; text: string }[] = [
+const REQUIREMENT_PRESETS: {
+  label: string;
+  description: string;
+  text: string;
+}[] = [
   {
     label: "Invoice / receipt",
     description: "Sender, totals, line items",
@@ -104,6 +108,8 @@ interface GeneratedSchema {
   schema_name: string;
   structure_type: string;
   schema_id: string;
+  schema_source: "example" | "temporary";
+  user_requirements: string;
   fields: Array<{
     name: string;
     type: string;
@@ -112,7 +118,20 @@ interface GeneratedSchema {
   }>;
 }
 
-type Provider = "azure" | "claude" | "google";
+type Provider = "openai" | "claude" | "google";
+type ReasoningEffort = "low" | "medium" | "high";
+
+const PROVIDER_MODELS: Record<Provider, readonly string[]> = {
+  openai: ["gpt-5.4-mini", "gpt-5.4", "gpt-5.5-deployment", "gpt-5.6-sol"],
+  claude: ["claude-sonnet-4.6", "claude-sonnet-5"],
+  google: ["gemini-3.1-flash-lite"],
+};
+
+const DEFAULT_MODELS: Record<Provider, string> = {
+  openai: "gpt-5.4",
+  claude: "claude-sonnet-4.6",
+  google: "gemini-3.1-flash-lite",
+};
 
 interface VerificationEntry {
   value: unknown;
@@ -154,8 +173,31 @@ function formatNumeric(value: unknown): string {
   return String(value);
 }
 
-function pluralize(count: number, singular: string, plural = `${singular}s`): string {
+function pluralize(
+  count: number,
+  singular: string,
+  plural = `${singular}s`,
+): string {
   return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function HelpTooltip({ text }: { text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label="More information"
+          className="text-muted-foreground hover:text-foreground inline-flex"
+        >
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-72">
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 interface FileListRowProps {
@@ -171,7 +213,9 @@ function FileListRow({ file, disabled, onRemove }: FileListRowProps) {
       <FileIcon className="text-muted-foreground h-4 w-4 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{file.name}</p>
-        <p className="text-muted-foreground text-xs">{formatFileSize(file.size)}</p>
+        <p className="text-muted-foreground text-xs">
+          {formatFileSize(file.size)}
+        </p>
       </div>
       <button
         onClick={onRemove}
@@ -190,7 +234,12 @@ interface UsageStatsProps {
 }
 
 function UsageStats({ usage }: UsageStatsProps) {
-  const stats: Array<{ label: string; value: string; mono?: boolean; bold?: boolean }> = [];
+  const stats: Array<{
+    label: string;
+    value: string;
+    mono?: boolean;
+    bold?: boolean;
+  }> = [];
   if (usage.total_tokens != null) {
     stats.push({
       label: "Tokens",
@@ -202,10 +251,17 @@ function UsageStats({ usage }: UsageStatsProps) {
     stats.push({ label: "Input", value: usage.input_tokens.toLocaleString() });
   }
   if (usage.output_tokens != null) {
-    stats.push({ label: "Output", value: usage.output_tokens.toLocaleString() });
+    stats.push({
+      label: "Output",
+      value: usage.output_tokens.toLocaleString(),
+    });
   }
   if (usage.cost_usd != null) {
-    stats.push({ label: "Cost", value: `$${usage.cost_usd.toFixed(4)}`, bold: true });
+    stats.push({
+      label: "Cost",
+      value: `$${usage.cost_usd.toFixed(4)}`,
+      bold: true,
+    });
   }
 
   if (stats.length === 0) return null;
@@ -215,7 +271,9 @@ function UsageStats({ usage }: UsageStatsProps) {
       {stats.map((stat) => (
         <div key={stat.label}>
           <p className="text-muted-foreground">{stat.label}</p>
-          <p className={`font-mono ${stat.bold ? "font-medium" : ""}`}>{stat.value}</p>
+          <p className={`font-mono ${stat.bold ? "font-medium" : ""}`}>
+            {stat.value}
+          </p>
         </div>
       ))}
     </div>
@@ -228,7 +286,11 @@ interface ExtractedFieldRowProps {
   verification?: VerificationEntry | VerificationEntry[];
 }
 
-function ExtractedFieldRow({ fieldKey, value, verification }: ExtractedFieldRowProps) {
+function ExtractedFieldRow({
+  fieldKey,
+  value,
+  verification,
+}: ExtractedFieldRowProps) {
   const isList = Array.isArray(value);
   const scalarVerification =
     verification && !Array.isArray(verification) ? verification : null;
@@ -236,7 +298,9 @@ function ExtractedFieldRow({ fieldKey, value, verification }: ExtractedFieldRowP
   return (
     <div className="space-y-2 p-3">
       <div className="flex items-start gap-4">
-        <span className="min-w-32 text-sm font-medium">{formatFieldName(fieldKey)}</span>
+        <span className="min-w-32 text-sm font-medium">
+          {formatFieldName(fieldKey)}
+        </span>
         <span className="text-muted-foreground flex-1 text-sm whitespace-pre-wrap">
           {isList
             ? `${(value as unknown[]).length} item(s)`
@@ -268,11 +332,13 @@ interface SchemaPreviewProps {
 
 function SchemaPreview({ schema }: SchemaPreviewProps) {
   return (
-    <Accordion type="single" collapsible defaultValue="schema" className="w-full">
+    <Accordion type="single" collapsible className="w-full">
       <AccordionItem value="schema" className="border-none">
         <AccordionTrigger className="text-sm">
-          Generated schema · {schema.schema_name} ·{" "}
-          {pluralize(schema.fields.length, "field")}
+          {schema.schema_source === "example"
+            ? "Built-in example schema"
+            : "Temporary schema"}{" "}
+          · {schema.schema_name} · {pluralize(schema.fields.length, "field")}
         </AccordionTrigger>
         <AccordionContent>
           <div className="bg-muted/50 space-y-3 rounded-md border p-3">
@@ -283,7 +349,10 @@ function SchemaPreview({ schema }: SchemaPreviewProps) {
               <p className="mb-1 text-xs font-medium">Fields</p>
               <div className="space-y-0.5">
                 {schema.fields.map((field) => (
-                  <div key={field.name} className="text-muted-foreground text-xs">
+                  <div
+                    key={field.name}
+                    className="text-muted-foreground text-xs"
+                  >
                     <span className="font-mono">{field.name}</span>
                     <span className="mx-1">:</span>
                     <span>{field.type}</span>
@@ -309,14 +378,18 @@ function SchemaPreview({ schema }: SchemaPreviewProps) {
 export default function VisionExtractorPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [userRequirements, setUserRequirements] = useState("");
-  const [provider, setProvider] = useState<Provider>("azure");
+  const [provider, setProvider] = useState<Provider>("openai");
+  const [model, setModel] = useState(DEFAULT_MODELS.openai);
+  const [reasoningEffort, setReasoningEffort] =
+    useState<ReasoningEffort>("medium");
+  const [mergeTable, setMergeTable] = useState(false);
+  const [additionalInstructions, setAdditionalInstructions] = useState("");
   const [includeVerification, setIncludeVerification] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingExample, setIsLoadingExample] = useState(false);
   const [isGeneratingSchema, setIsGeneratingSchema] = useState(false);
-  const [generatedSchema, setGeneratedSchema] = useState<GeneratedSchema | null>(
-    null,
-  );
+  const [generatedSchema, setGeneratedSchema] =
+    useState<GeneratedSchema | null>(null);
   const [result, setResult] = useState<VisionExtractResult | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -325,6 +398,11 @@ export default function VisionExtractorPage() {
   function handleRequirementsChange(value: string): void {
     setUserRequirements(value);
     setGeneratedSchema(null);
+  }
+
+  function handleProviderChange(value: Provider): void {
+    setProvider(value);
+    setModel(DEFAULT_MODELS[value]);
   }
 
   async function handlePreviewSchema(): Promise<void> {
@@ -349,7 +427,9 @@ export default function VisionExtractorPage() {
       toast.success("Schema generated — review before extracting");
     } catch (err) {
       if (err instanceof RateLimitError) return;
-      toast.error(err instanceof Error ? err.message : "Failed to generate schema");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to generate schema",
+      );
     } finally {
       setIsGeneratingSchema(false);
     }
@@ -391,21 +471,34 @@ export default function VisionExtractorPage() {
     if (isLoadingExample || isLoading) return;
     setIsLoadingExample(true);
     try {
-      const fetched = await Promise.all(
-        EXAMPLE_FILES.map(async (url) => {
-          const res = await fetch(url);
-          if (!res.ok) throw new Error(`Failed to load ${url}`);
-          const blob = await res.blob();
-          const name = url.split("/").pop() ?? "example.pdf";
-          return new File([blob], name, { type: blob.type || "application/pdf" });
-        }),
-      );
+      const [fetched, schemaResponse] = await Promise.all([
+        Promise.all(
+          EXAMPLE_FILES.map(async (url) => {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Failed to load ${url}`);
+            const blob = await res.blob();
+            const name = url.split("/").pop() ?? "example.pdf";
+            return new File([blob], name, {
+              type: blob.type || "application/pdf",
+            });
+          }),
+        ),
+        apiFetch("/api/extract-vision/example-schema"),
+      ]);
+      if (!schemaResponse.ok) {
+        const error = await schemaResponse.json().catch(() => null);
+        throw new Error(error?.detail ?? "Failed to load the example schema");
+      }
+      const exampleSchema = (await schemaResponse.json()) as GeneratedSchema;
       setFiles(fetched);
-      setUserRequirements(EXAMPLE_REQUIREMENTS);
+      setUserRequirements(exampleSchema.user_requirements);
+      setGeneratedSchema(exampleSchema);
       setResult(null);
       toast.success("Example loaded — PO + 3 BOMs ready to extract");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load example");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to load example",
+      );
     } finally {
       setIsLoadingExample(false);
     }
@@ -421,6 +514,12 @@ export default function VisionExtractorPage() {
       toast.error("Please describe what to extract");
       return;
     }
+    if (!generatedSchema) {
+      toast.error(
+        "Generate and preview a schema for this extraction task first",
+      );
+      return;
+    }
 
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
@@ -434,8 +533,16 @@ export default function VisionExtractorPage() {
         formData.append("files", file);
       }
       formData.append("user_requirements", userRequirements);
+      formData.append("schema_id", generatedSchema.schema_id);
       formData.append("model_provider", provider);
-      formData.append("include_verification", includeVerification ? "true" : "false");
+      formData.append("model", model);
+      formData.append("reasoning_effort", reasoningEffort);
+      formData.append("merge_table", mergeTable ? "true" : "false");
+      formData.append("additional_instructions", additionalInstructions);
+      formData.append(
+        "include_verification",
+        includeVerification ? "true" : "false",
+      );
 
       const response = await apiFetch("/api/extract-vision", {
         method: "POST",
@@ -476,7 +583,7 @@ export default function VisionExtractorPage() {
       <DemoPageHeader
         icon={ScanEye}
         title="Vision Extractor"
-        description="Extract structured data from PDFs and images in a single LLM call — multi-document, no intermediate parse step."
+        description="Turn PDFs and images—such as purchase orders, invoices, forms, reports, and related document sets—into validated, structured business data ready for downstream systems."
         className="mb-8"
       />
 
@@ -490,8 +597,8 @@ export default function VisionExtractorPage() {
                   <CardTitle>Documents</CardTitle>
                   <CardDescription>
                     Upload one or more PDF or image files. The model sees them
-                    all together — useful for cross-document tasks like
-                    matching a purchase order with its bills of materials.
+                    all together — useful for cross-document tasks like matching
+                    a purchase order with its bills of materials.
                   </CardDescription>
                 </div>
                 <Button
@@ -543,7 +650,8 @@ export default function VisionExtractorPage() {
                       : "Drag & drop or click to add files"}
                   </p>
                   <p className="text-muted-foreground mt-1 text-xs">
-                    PDF, PNG, JPG, GIF, WEBP, TIFF, BMP — up to {MAX_FILE_MB}MB each
+                    PDF, PNG, JPG, GIF, WEBP, TIFF, BMP — up to {MAX_FILE_MB}MB
+                    each
                   </p>
                 </div>
                 <input
@@ -587,8 +695,8 @@ export default function VisionExtractorPage() {
               <CardDescription>
                 Describe in plain language what fields you want — the toolkit
                 turns your description into a typed Pydantic schema and the
-                model fills it in. Preview the schema below before extracting
-                if you want to see exactly what will be returned.
+                model fills it in. Preview the schema below before extracting if
+                you want to see exactly what will be returned.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -604,7 +712,7 @@ export default function VisionExtractorPage() {
                       onClick={() => handleRequirementsChange(preset.text)}
                       disabled={isLoading || isGeneratingSchema}
                       title={preset.description}
-                      className="h-auto whitespace-normal text-left"
+                      className="h-auto text-left whitespace-normal"
                     >
                       <span className="font-medium">{preset.label}</span>
                       <span className="text-muted-foreground ml-2 hidden text-xs sm:inline">
@@ -633,29 +741,114 @@ export default function VisionExtractorPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="provider">Model Provider</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="provider">Model Provider</Label>
+                    <HelpTooltip text="Selects the service used for the document extraction call. OpenAI / Azure automatically uses Azure when Azure credentials are configured; Claude and Google use their configured provider credentials." />
+                  </div>
                   <Select
                     value={provider}
-                    onValueChange={(v) => setProvider(v as Provider)}
+                    onValueChange={(v) => handleProviderChange(v as Provider)}
                     disabled={isLoading}
                   >
                     <SelectTrigger id="provider">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="azure">OpenAI / Azure</SelectItem>
-                      <SelectItem value="claude">
-                        Claude (Anthropic Foundry)
-                      </SelectItem>
-                      <SelectItem value="google">
-                        Google (Vertex AI)
-                      </SelectItem>
+                      <SelectItem value="openai">OpenAI / Azure</SelectItem>
+                      <SelectItem value="claude">Claude</SelectItem>
+                      <SelectItem value="google">Google</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="verification">Per-field verification</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="model">Extraction Model</Label>
+                    <HelpTooltip text="Selects the model or deployment used to read the uploaded documents. Available choices are limited to the selected provider." />
+                  </div>
+                  <Select
+                    value={model}
+                    onValueChange={setModel}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger id="model">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROVIDER_MODELS[provider].map((modelName) => (
+                        <SelectItem key={modelName} value={modelName}>
+                          {modelName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="reasoning-effort">Reasoning Effort</Label>
+                    <HelpTooltip text="Controls how much reasoning the model uses. Higher effort can improve difficult cross-document matching but usually increases latency and token usage." />
+                  </div>
+                  <Select
+                    value={reasoningEffort}
+                    onValueChange={(value) =>
+                      setReasoningEffort(value as ReasoningEffort)
+                    }
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger id="reasoning-effort">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="merge-table">Merge Split Tables</Label>
+                    <HelpTooltip text="Adds an instruction to combine a table that continues across pages into one logical table." />
+                  </div>
+                  <div className="flex h-9 items-center gap-3 rounded-md border px-3">
+                    <Switch
+                      id="merge-table"
+                      checked={mergeTable}
+                      onCheckedChange={setMergeTable}
+                      disabled={isLoading}
+                    />
+                    <span className="text-muted-foreground text-sm">
+                      {mergeTable ? "Merge tables" : "Off"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="additional-instructions">
+                      Additional Instructions
+                    </Label>
+                    <HelpTooltip text="Appended to the extraction prompt to guide how values are read. To add or remove output fields, edit the extraction task and generate a new schema instead." />
+                  </div>
+                  <Textarea
+                    id="additional-instructions"
+                    value={additionalInstructions}
+                    onChange={(event) =>
+                      setAdditionalInstructions(event.target.value)
+                    }
+                    placeholder="Optional guidance, e.g. prefer the value in the final totals table."
+                    disabled={isLoading}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="verification">Per-field Verification</Label>
+                    <HelpTooltip text="Adds a confidence score and explanation for each scalar field. This improves reviewability but uses more output tokens and may take longer." />
+                  </div>
                   <div className="flex h-9 items-center gap-3 rounded-md border px-3">
                     <Switch
                       id="verification"
@@ -668,6 +861,13 @@ export default function VisionExtractorPage() {
                     </span>
                   </div>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-center gap-1.5">
+                <span className="text-muted-foreground text-xs">
+                  Schema guidance
+                </span>
+                <HelpTooltip text="Generate a new temporary schema whenever you enter a new or different extraction task. The built-in example schema is never overwritten." />
               </div>
 
               <Button
@@ -687,7 +887,7 @@ export default function VisionExtractorPage() {
                 ) : (
                   <>
                     <FileCode2 className="mr-2 h-4 w-4" />
-                    Preview schema
+                    Regenerate schema
                   </>
                 )}
               </Button>
@@ -698,7 +898,12 @@ export default function VisionExtractorPage() {
 
           <Button
             onClick={handleSubmit}
-            disabled={isLoading || files.length === 0 || !userRequirements.trim()}
+            disabled={
+              isLoading ||
+              files.length === 0 ||
+              !userRequirements.trim() ||
+              !generatedSchema
+            }
             className="w-full"
             size="lg"
           >
@@ -723,26 +928,25 @@ export default function VisionExtractorPage() {
             </p>
             <p>
               <strong>2. Describe what you want.</strong> Use a quick-start
-              preset or write your own prompt — list the field names, types,
-              and any constraints. A short, specific description gives a
-              cleaner schema than a vague one.
+              preset or write your own prompt — list the field names, types, and
+              any constraints. A short, specific description gives a cleaner
+              schema than a vague one.
             </p>
             <p>
-              <strong>3. (Optional) Preview the schema.</strong> Click{" "}
-              <em>Preview schema</em> to see the exact Pydantic class that will
-              be returned. If the fields look wrong for your document, edit the
-              prompt and regenerate — no LLM document call is made yet.
+              <strong>3. Select the schema.</strong> The built-in example uses
+              its committed schema. For a new or changed task, click{" "}
+              <em>Regenerate schema</em>. The temporary schema you review is
+              passed directly to VisionExtractor and is never saved.
             </p>
             <p>
-              <strong>4. Pick a provider.</strong> OpenAI / Azure works out of
-              the box (whichever key the deployment has). Claude (Anthropic
-              Foundry) and Google (Vertex AI) need their respective credentials
-              configured.
+              <strong>4. Configure extraction.</strong> Pick the provider,
+              model, reasoning effort, table merging, and any extra prompt
+              instructions. Each control has a tooltip explaining its effect.
             </p>
             <p>
               <strong>5. Optional verification.</strong> When enabled, every
-              scalar field carries a confidence score and a short reason — useful
-              for QA and human-in-the-loop workflows.
+              scalar field carries a confidence score and a short reason —
+              useful for QA and human-in-the-loop workflows.
             </p>
           </HowItWorksCard>
         </div>

@@ -18,7 +18,10 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.extractor import SchemaGenerator, get_openai_config
-
+from gaik.software_components.extractor.schema import (
+    DECIMAL_PERSISTED_HELPER_SOURCE,
+    decimal_field_repr,
+)
 
 BASE_DIR = Path(__file__).parent
 SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
@@ -30,24 +33,69 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 # Several extraction task descriptions to test
 
 
-TASK = """
-Extract purchase order data.
 
-The output will include the following top-level fields:
-- date (DD/MM/YYYY format when unambiguous)
-- purchase order number
-- supplier number
-- contact
 
-Also, the output will include the data for each line item.
+# TASK = """
+# Extract contact information from a business card. Return the person’s full name, 
+# job title, company name, email address, telephone number, website, and postal 
+# address. All fields should be text. The job title, website, and postal address 
+# can be left null if they are not present. 
+# Only fill fields that are explicitly and clearly stated in the text. 
+# Do not guess or infer. If the value of a field is not found, return null.
+# """
 
-For each line item, extract these scalar fields:
-- item number
-- complete description
-- quantity
-- price 
-- material number
-"""
+# TASK = """
+# Extract every inventory item mentioned in the document and return them as a list. 
+# For each item, return the product name, product code, category, quantity, unit, 
+# unit price, and stock status. Quantity should be an integer and unit price should be 
+# numeric. Stock status must be available, low_stock, out_of_stock, or unknown. 
+# Product code and unit price can be null if they are not present. 
+# Create a separate list entry for every distinct product.
+# """
+
+
+
+# TASK = """
+# Extract the following information from a Finnish construction site diary
+# (työmaapäiväkirja) text:
+# - kohde: the site/project name or address
+# - laatija: name of the person who wrote the diary entry
+# - saa: weather conditions (temperature, wind, humidity)
+# - paivamaara: the diary entry date should be extrated in DD/MM/YYYY format
+# - resurssit_henkilosto: personnel/staffing resources on site
+# - tyoviikko: the calendar week number (integer)
+# - paivan_tyot: a list of work tasks performed that day
+# - paivan_tapahtumat: notable events, deliveries, or descriptions of the day
+# - liitteet: mentioned attachments or photos
+# - valvojan_huomiot: general observations made by the supervisor
+# - paivan_poikkeamat: any deviations or disruptions that day
+# - aloitetut_tyovaiheet: work phases started that day
+# - kaynnissa_olevat_tyovai: work phases currently in progress
+# - paattyneet_tyovai: work phases completed
+# - keskeytyneet_tyovai: work phases interrupted/paused
+# - pyydetyt_lisaajat: requested schedule extensions or changes
+# - tehdyt_katselmukset: inspections/reviews performed
+# - valvojan_huomautukset: formal remarks or correction requirements from the supervisor
+# - valvojan_allekirjoitus: whether the supervisor signed off
+# - vastaavan_allekirjoitus: whether the responsible site manager signed off
+# Only fill fields that are explicitly and clearly stated in the text. Do not guess or infer. If the value of a field is not found, return null.
+# """
+
+
+
+# TASK = """
+# Extract the patient and report information from a laboratory report. 
+# Return the patient name, patient identifier, date of birth, sample collection date, 
+# report date, laboratory name, and requesting physician. 
+# The requesting physician can be null if not provided.
+# Also return a list of laboratory test results. 
+# For each result, extract the test name, measured value, unit, 
+# reference-range minimum, reference-range maximum, and interpretation. 
+# The measured value and reference limits should be numeric when possible. 
+# Interpretation must be low, normal, high, abnormal, or unknown. 
+# The unit and reference limits can be null if they are not shown. 
+# Do not provide a medical interpretation beyond what the report states.
+# """
 
 
 # TASK = """
@@ -74,6 +122,7 @@ For each line item, extract these scalar fields:
 # - Applicable standard (e.g. "ASTM B221", "EN 755-2", if stated, else null)
 # - Special flags (any remaining codes, e.g. "XK", "chamfered edges", else null)
 # - Quantity (text string including the unit, e.g. "4.200 kg")
+# Only fill fields that are explicitly and clearly stated in the text. Do not guess or infer. If the value of a field is not found, return null.
 # """
 
 
@@ -94,6 +143,7 @@ For each line item, extract these scalar fields:
 
 # Also extract the following header information from the PO: Order Date, Buyer, Sales Person,
 # Shipping Address, Payment Terms.
+#Only fill fields that are explicitly and clearly stated in the text. Do not guess or infer. If the value of a field is not found, return null.
 # """
 
 
@@ -120,6 +170,7 @@ For each line item, extract these scalar fields:
 # - If a field is not mentioned, output an empty string.
 # - Preserve dates exactly if the required format cannot be inferred.
 # - For symptoms, medical history, and examination description, output short keyword phrases separated by semicolons.
+# - Only fill fields that are explicitly and clearly stated in the text. Do not guess or infer. If the value of a field is not found, return null.
 # """
 
 
@@ -143,6 +194,8 @@ For each line item, extract these scalar fields:
 # - Service level (Standard, Express, or Overnight)
 # - Fragile (yes/no)
 # - Delivery instructions (if stated, else null)
+
+# Only fill fields that are explicitly and clearly stated in the document. Do not guess or infer. If the value of a field is not found, return null.
 # """
 
 # TASK = """
@@ -157,6 +210,8 @@ For each line item, extract these scalar fields:
 # - Patched version (if stated, else null)
 # - Published date (Format: DD/MM/YYYY)
 # - Summary (in a few keywords separated by semicolons)
+# Only fill fields that are explicitly and clearly stated in the text. Do not guess or infer. If the value of a field is not found, return null.
+
 # """
 
 # TASK = """
@@ -185,6 +240,8 @@ For each line item, extract these scalar fields:
 # Rules:
 # - Extract only explicitly visible information.
 # - Preserve original wording, dimensions, dates, and labels.
+# - Only fill fields that are explicitly and clearly stated in the text. Do not guess or infer. If the value of a field is not found, return null.
+
 # """
 
 # TASK = """
@@ -197,8 +254,7 @@ For each line item, extract these scalar fields:
 # - Sheet number
 # - Project number
 # - Scale
-# - Drawing date
-# - Owner
+# - Drawing date 
 # - Architect
 # - General contractor
 # - Surveyor
@@ -239,12 +295,30 @@ For each line item, extract these scalar fields:
 # - Extract only explicitly visible information.
 # - Do not infer compliance decisions.
 # - Preserve original wording, dimensions, dates, and labels.
-# - Use an empty string for missing or unreadable values.
+# - Do not guess or infer. If the value of a field is not found, return null.
+
 # """
+
+
+TASK = """
+Extract structured information from meeting minutes. Return the meeting title, date,
+start time, end time, location or online platform, chairperson, and summary. 
+The end time, location or platform, and chairperson can be null.
+Return a list of participants containing each participant’s name, organization, 
+and role in the meeting. Also return a separate list of action items. For each 
+action item, extract the task, responsible person, deadline, priority, and status. 
+Priority must be low, medium, or high. Status must be not_started, in_progress, 
+completed, or unknown. The organization, participant role, responsible person, 
+and deadline can be null.
+"""
 
 
 def _annotation_repr(annotation) -> str:
     """Return a Python source representation for common Pydantic field types."""
+    decimal_repr = decimal_field_repr(annotation)
+    if decimal_repr is not None:
+        return decimal_repr
+
     origin = get_origin(annotation)
 
     if origin is list:
@@ -309,6 +383,7 @@ def _collect_models(model: type[BaseModel]) -> list[type[BaseModel]]:
 def save_schema_to_python(model: type[BaseModel], path: Path) -> None:
     """Save a generated Pydantic model as importable Python source."""
     class_blocks: list[str] = []
+    needs_decimal_helper = False
 
     for current_model in _collect_models(model):
         lines = [f"class {current_model.__name__}(BaseModel):"]
@@ -335,6 +410,8 @@ def save_schema_to_python(model: type[BaseModel], path: Path) -> None:
             elif not field.is_required():
                 field_args.append(f"default={field.default!r}")
 
+            if decimal_field_repr(field.annotation) is not None:
+                needs_decimal_helper = True
             annotation = _annotation_repr(field.annotation)
             if field_args:
                 lines.append(f"    {field_name}: {annotation} = Field({', '.join(field_args)})")
@@ -349,6 +426,8 @@ def save_schema_to_python(model: type[BaseModel], path: Path) -> None:
         "from typing import Literal, Optional, Union\n\n"
         "from pydantic import BaseModel, ConfigDict, Field\n\n"
     )
+    if needs_decimal_helper:
+        header += DECIMAL_PERSISTED_HELPER_SOURCE.strip() + "\n\n\n"
     path.write_text(header + "\n\n".join(class_blocks) + "\n", encoding="utf-8")
 
 
@@ -370,10 +449,27 @@ def save_requirements(requirements, model_name: str, path: Path) -> None:
 def main() -> None:
     # Schema generation uses the same OpenAI/Azure OpenAI config helper as the
     # extractor component. Set use_azure=False for direct OpenAI.
+
+
+
+    MODEL = "gpt-5.4" # Temperature parameter only exists upto gpt-5.4
+    MODEL_OPTIONS = {
+        "temperature": 0.0,
+        "reasoning_effort": None,
+    }
+
+
+    # ##If we want to use reasoning for gpt-5.4 and above. Disable temperature. 
+    # MODEL = "gpt-5.6-sol"
+    # MODEL_OPTIONS = {
+    #     "temperature": None,
+    #     "reasoning_effort": "medium",
+    # }
+
     config = get_openai_config(use_azure=True)
 
     # Generate the Pydantic model and keep the parsed requirements metadata.
-    generator = SchemaGenerator(config=config)
+    generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
     schema = generator.generate_schema(TASK)
     requirements = generator.item_requirements
 

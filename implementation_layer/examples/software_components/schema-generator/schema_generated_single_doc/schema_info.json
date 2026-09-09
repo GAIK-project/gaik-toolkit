@@ -1,20 +1,28 @@
 {
-  "model_name": "purchase_order_header_extraction_Extraction",
+  "model_name": "meeting_minutes_header_fields_Extraction",
   "structure_type": "parent_with_nested_list",
   "fields": {
     "parent": [
+      "meeting_title",
       "date",
-      "purchase_order_number",
-      "supplier_number",
-      "contact"
+      "start_time",
+      "end_time",
+      "location_or_online_platform",
+      "chairperson",
+      "summary"
     ],
-    "line_items": [
-      "item_number",
-      "complete_description",
-      "quantity",
-      "price",
-      "material_number"
+    "participants": [
+      "name",
+      "organization",
+      "role"
+    ],
+    "action_items": [
+      "task",
+      "responsible_person",
+      "deadline",
+      "priority",
+      "status"
     ]
   },
-  "field_count": 9
+  "field_count": 15
 }

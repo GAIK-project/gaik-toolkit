@@ -49,7 +49,64 @@ _TYPE_MAP: dict[str, str] = {
     "object": "str",
     "dict": "str",
     "enum": "str",
+    # "Decimal" is a marker _py_type() can return like any other type name;
+    # build_pydantic_model() special-cases it below to emit the safe
+    # DecimalField/OptionalDecimalField aliases instead of bare Decimal --
+    # see _DECIMAL_HELPER_SOURCE for why a bare Decimal field is unsafe
+    # (regex-lookaround JSON schema some providers reject, and a crash when
+    # the model writes "12.40 EUR" instead of a bare number).
+    "decimal": "Decimal",
+    "money": "Decimal",
+    "currency": "Decimal",
 }
+
+# This module is deliberately gaik-independent ("All generation is
+# deterministic (no API calls)" -- see module docstring), so the Decimal
+# safety net is inlined here rather than imported from
+# gaik.software_components.extractor.schema.decimal_field_repr /
+# DECIMAL_PERSISTED_HELPER_SOURCE, which this module's own callers cannot
+# assume is installed. Keep this text in sync with schema.py's copy if that
+# logic ever changes.
+_DECIMAL_HELPER_SOURCE = r'''
+import re as _re
+from decimal import Decimal
+from typing import Annotated
+
+from pydantic import BeforeValidator, WithJsonSchema
+
+_CURRENCY_NOISE_RE = _re.compile(
+    r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]"
+)
+_SINGLE_AMOUNT_RE = _re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
+
+
+def _clean_decimal_string(v):
+    """Strip currency/unit noise before Decimal parsing; reject (return None)
+    ambiguous or multi-number input rather than fabricating a value. See
+    gaik.software_components.extractor.schema._clean_decimal_string for the
+    full policy this mirrors."""
+    if not isinstance(v, str):
+        return v
+    s = v.strip()
+    if not s:
+        return None
+    s = _CURRENCY_NOISE_RE.sub("", s).strip()
+    if not s:
+        return None
+    if not _SINGLE_AMOUNT_RE.match(s):
+        return None
+    return s.replace(",", "")
+
+
+DecimalField = Annotated[
+    Decimal, WithJsonSchema({"type": "string"}), BeforeValidator(_clean_decimal_string)
+]
+OptionalDecimalField = Annotated[
+    Decimal | None,
+    WithJsonSchema({"anyOf": [{"type": "string"}, {"type": "null"}]}),
+    BeforeValidator(_clean_decimal_string),
+]
+'''
 
 
 def _py_type(type_name: str) -> str:
@@ -189,6 +246,7 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
             enum_blocks.append(f"class {enum_name}(str, Enum):\n{members}\n")
 
     field_lines = []
+    needs_decimal_helper = False
     for field in fields:
         py_type = _py_type(field_types.get(field, "string"))
         vals = allowed_values.get(field, [])
@@ -199,9 +257,23 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
         desc = field_descriptions.get(field, "")
         # Use Field(description=...) so the description propagates into JSON Schema
         field_arg = f'Field(description="{desc}")' if desc else "..."
+        is_decimal = py_type == "Decimal"
 
         if field in required_fields:
-            field_lines.append(f"    {field}: {py_type} = {field_arg}")
+            if is_decimal:
+                needs_decimal_helper = True
+                field_lines.append(f"    {field}: DecimalField = {field_arg}")
+            else:
+                field_lines.append(f"    {field}: {py_type} = {field_arg}")
+        elif is_decimal:
+            # OptionalDecimalField already includes `| None` -- wrapping it
+            # again in Optional[...] would double-wrap into
+            # Optional[Annotated[Decimal | None, ...]], which pydantic still
+            # validates correctly but which introspection-based schema
+            # writers (generate_schema.py, run_poc.py.tmpl) cannot unwrap.
+            needs_decimal_helper = True
+            default_arg = f'Field(default=None, description="{desc}")' if desc else "None"
+            field_lines.append(f"    {field}: OptionalDecimalField = {default_arg}")
         else:
             default_arg = f'Field(default=None, description="{desc}")' if desc else "None"
             field_lines.append(f"    {field}: Optional[{py_type}] = {default_arg}")
@@ -217,6 +289,8 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
         "\n".join(imports),
         "",
     ]
+    if needs_decimal_helper:
+        parts += ["", _DECIMAL_HELPER_SOURCE.strip(), ""]
     # Enum definitions must come before the model class so Pydantic can resolve them
     if enum_blocks:
         parts += [""] + enum_blocks
@@ -227,8 +301,12 @@ def build_pydantic_model(target_output_spec: dict[str, Any], schema_name: str | 
         "",
     ]
     # Pydantic v2 requires model_rebuild() when the model references
-    # types (e.g. Enums) defined in the same module / exec block.
-    if enum_blocks:
+    # types (e.g. Enums, or the Decimal safety aliases) defined in the same
+    # module / exec block -- callers that exec() this source into a bare
+    # dict namespace (see write_schema_files()'s JSON Schema export below)
+    # otherwise raise "class is not fully defined" for DecimalField /
+    # OptionalDecimalField.
+    if enum_blocks or needs_decimal_helper:
         parts += [f"{name}.model_rebuild()", ""]
     return "\n".join(parts)
 

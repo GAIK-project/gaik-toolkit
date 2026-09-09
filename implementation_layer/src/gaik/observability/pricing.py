@@ -20,6 +20,7 @@ from typing import Literal
 Provider = Literal["openai", "claude", "google"]
 
 OPENAI_PRICING_PER_M: dict[str, tuple[float, float]] = {
+    "gpt-5.6-sol": (4.00, 20.00),
     "gpt-5.5-deployment": (5.00, 30.00),
     "gpt-5.5": (5.00, 30.00),
     "gpt-5-mini": (0.75, 4.50),
@@ -37,6 +38,7 @@ OPENAI_PRICING_PER_M: dict[str, tuple[float, float]] = {
 }
 
 ANTHROPIC_PRICING_PER_M: dict[str, tuple[float, float]] = {
+    "claude-sonnet-5": (3.00, 15.00),
     "claude-haiku-4-5": (1.00, 5.00),
     "claude-haiku-3-5": (0.80, 4.00),
     "claude-haiku-3": (0.25, 1.25),
