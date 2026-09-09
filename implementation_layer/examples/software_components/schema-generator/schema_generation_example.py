@@ -33,26 +33,23 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 # Several extraction task descriptions to test
 
 
-
-
 # TASK = """
-# Extract contact information from a business card. Return the person’s full name, 
-# job title, company name, email address, telephone number, website, and postal 
-# address. All fields should be text. The job title, website, and postal address 
-# can be left null if they are not present. 
-# Only fill fields that are explicitly and clearly stated in the text. 
+# Extract contact information from a business card. Return the person’s full name,
+# job title, company name, email address, telephone number, website, and postal
+# address. All fields should be text. The job title, website, and postal address
+# can be left null if they are not present.
+# Only fill fields that are explicitly and clearly stated in the text.
 # Do not guess or infer. If the value of a field is not found, return null.
 # """
 
 # TASK = """
-# Extract every inventory item mentioned in the document and return them as a list. 
-# For each item, return the product name, product code, category, quantity, unit, 
-# unit price, and stock status. Quantity should be an integer and unit price should be 
-# numeric. Stock status must be available, low_stock, out_of_stock, or unknown. 
-# Product code and unit price can be null if they are not present. 
+# Extract every inventory item mentioned in the document and return them as a list.
+# For each item, return the product name, product code, category, quantity, unit,
+# unit price, and stock status. Quantity should be an integer and unit price should be
+# numeric. Stock status must be available, low_stock, out_of_stock, or unknown.
+# Product code and unit price can be null if they are not present.
 # Create a separate list entry for every distinct product.
 # """
-
 
 
 # TASK = """
@@ -82,18 +79,17 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 # """
 
 
-
 # TASK = """
-# Extract the patient and report information from a laboratory report. 
-# Return the patient name, patient identifier, date of birth, sample collection date, 
-# report date, laboratory name, and requesting physician. 
+# Extract the patient and report information from a laboratory report.
+# Return the patient name, patient identifier, date of birth, sample collection date,
+# report date, laboratory name, and requesting physician.
 # The requesting physician can be null if not provided.
-# Also return a list of laboratory test results. 
-# For each result, extract the test name, measured value, unit, 
-# reference-range minimum, reference-range maximum, and interpretation. 
-# The measured value and reference limits should be numeric when possible. 
-# Interpretation must be low, normal, high, abnormal, or unknown. 
-# The unit and reference limits can be null if they are not shown. 
+# Also return a list of laboratory test results.
+# For each result, extract the test name, measured value, unit,
+# reference-range minimum, reference-range maximum, and interpretation.
+# The measured value and reference limits should be numeric when possible.
+# Interpretation must be low, normal, high, abnormal, or unknown.
+# The unit and reference limits can be null if they are not shown.
 # Do not provide a medical interpretation beyond what the report states.
 # """
 
@@ -143,7 +139,7 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 
 # Also extract the following header information from the PO: Order Date, Buyer, Sales Person,
 # Shipping Address, Payment Terms.
-#Only fill fields that are explicitly and clearly stated in the text. Do not guess or infer. If the value of a field is not found, return null.
+# Only fill fields that are explicitly and clearly stated in the text. Do not guess or infer. If the value of a field is not found, return null.
 # """
 
 
@@ -254,7 +250,7 @@ SCHEMA_DIR = BASE_DIR / "schema_generated_single_doc"
 # - Sheet number
 # - Project number
 # - Scale
-# - Drawing date 
+# - Drawing date
 # - Architect
 # - General contractor
 # - Surveyor
@@ -450,16 +446,13 @@ def main() -> None:
     # Schema generation uses the same OpenAI/Azure OpenAI config helper as the
     # extractor component. Set use_azure=False for direct OpenAI.
 
-
-
-    MODEL = "gpt-5.4" # Temperature parameter only exists upto gpt-5.4
+    MODEL = "gpt-5.4"  # Temperature parameter only exists upto gpt-5.4
     MODEL_OPTIONS = {
         "temperature": 0.0,
         "reasoning_effort": None,
     }
 
-
-    # ##If we want to use reasoning for gpt-5.4 and above. Disable temperature. 
+    # ##If we want to use reasoning for gpt-5.4 and above. Disable temperature.
     # MODEL = "gpt-5.6-sol"
     # MODEL_OPTIONS = {
     #     "temperature": None,

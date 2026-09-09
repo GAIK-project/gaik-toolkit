@@ -227,8 +227,7 @@ def extract_po_bom_data(combined_file_path: str = "./combined_classified_output.
     #     "reasoning_effort": None,
     # }
 
-
-    ##If we want to use reasoning for gpt-5.4 and above. Disable temperature. 
+    ##If we want to use reasoning for gpt-5.4 and above. Disable temperature.
     MODEL = "gpt-5.6-sol"
     MODEL_OPTIONS = {
         "temperature": None,

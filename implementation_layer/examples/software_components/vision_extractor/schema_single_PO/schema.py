@@ -12,9 +12,7 @@ from typing import Annotated
 
 from pydantic import BeforeValidator, WithJsonSchema
 
-_CURRENCY_NOISE_RE = _re.compile(
-    r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]"
-)
+_CURRENCY_NOISE_RE = _re.compile(r"(?i)\b(EUR|USD|GBP|JPY|CHF|SEK|NOK|DKK|CAD|AUD|INR)\b|[€$£¥₹]")
 _SINGLE_AMOUNT_RE = _re.compile(r"^[-+]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$")
 
 
@@ -48,21 +46,32 @@ OptionalDecimalField = Annotated[
 
 class purchase_order_line_item_Extraction(BaseModel):
     """Extraction model for purchase_order_line_item"""
-    model_config = ConfigDict(extra='forbid')
 
-    item_number: str = Field(description='Item number (e.g., 010, 020)')
-    complete_description: str = Field(description='Complete description')
+    model_config = ConfigDict(extra="forbid")
+
+    item_number: str = Field(description="Item number (e.g., 010, 020)")
+    complete_description: str = Field(description="Complete description")
     quantity: str = Field(description='Quantity (text string including the unit, e.g., "8.600 LB")')
-    price_per_currency: OptionalDecimalField = Field(description='Price per currency', default=None)
-    material_number: str = Field(description='Material number')
+    price_per_currency: OptionalDecimalField = Field(description="Price per currency", default=None)
+    material_number: str = Field(description="Material number")
+
 
 class purchase_order_header_extraction_Extraction(BaseModel):
     """Extraction model for purchase_order_header_extraction with repeated line_items"""
-    model_config = ConfigDict(extra='forbid')
 
-    purchase_order_date: str = Field(description='Purchase order date (DD/MM/YYYY format when unambiguous)')
-    delivery_date: str = Field(description='Delivery date (DD/MM/YYYY format when unambiguous)')
-    purchase_order_number: str = Field(description='Purchase order number (separated by a dash after every 4 digits)')
-    supplier_number: str = Field(description='Supplier number')
-    shipping_address: str = Field(description='Shipping address (Format: company name, street number, postal code, city, country)')
-    line_items: list[purchase_order_line_item_Extraction] = Field(description='Repeated structured line items in the purchase order.')
+    model_config = ConfigDict(extra="forbid")
+
+    purchase_order_date: str = Field(
+        description="Purchase order date (DD/MM/YYYY format when unambiguous)"
+    )
+    delivery_date: str = Field(description="Delivery date (DD/MM/YYYY format when unambiguous)")
+    purchase_order_number: str = Field(
+        description="Purchase order number (separated by a dash after every 4 digits)"
+    )
+    supplier_number: str = Field(description="Supplier number")
+    shipping_address: str = Field(
+        description="Shipping address (Format: company name, street number, postal code, city, country)"
+    )
+    line_items: list[purchase_order_line_item_Extraction] = Field(
+        description="Repeated structured line items in the purchase order."
+    )
