@@ -90,6 +90,13 @@ INTERNAL_ONLY_SUBPACKAGES: dict[str, str] = {
     "gaik.software_components.llm": "internal multi-provider LLM client abstraction",
 }
 
+# Public namespace aliases for components that already have one canonical
+# registry/card entry. These packages must not be proposed as new components:
+# they re-export an existing implementation without adding new behaviour.
+ALIAS_SUBPACKAGES: dict[str, str] = {
+    "gaik.software_components.schema_generator": "gaik.software_components.extractor",
+}
+
 # Methods that belong to result objects / helpers, not the component class.
 _SKIP_METHODS = {"load_schema", "save", "save_schema", "get", "model_dump"}
 
@@ -457,6 +464,8 @@ def check_new(reg, cards) -> list[dict]:
     out = []
     for sub_path in sorted(_gaik_subpackages()):
         if sub_path in INTERNAL_ONLY_SUBPACKAGES:
+            continue
+        if sub_path in ALIAS_SUBPACKAGES:
             continue
         if any(ref == sub_path or ref.startswith(sub_path + ".") for ref in referenced):
             continue

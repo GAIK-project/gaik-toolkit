@@ -103,6 +103,57 @@ results = extractor.extract(
 )
 ```
 
+### How Schema Artifacts Are Used
+
+The schema generator produces two complementary artifacts. They overlap in
+some field metadata, but serve different runtime purposes:
+
+| Artifact | Main purpose | When used |
+|----------|--------------|-----------|
+| Generated Pydantic model (`.py`) | Defines the structured-output contract: field names, types, nesting, enums, defaults, descriptions, and whether extra fields are forbidden. | During the LLM call and initial response parsing. |
+| `requirements.json` | Preserves field policies such as required-key behavior, nullability, explicit defaults, enum values, formats, and list metadata. | After parsing, for deterministic field-policy processing and normalization. |
+
+```mermaid
+flowchart TD
+    A["Document + extraction prompt"] --> C["One LLM structured-output call"]
+    B["Generated Pydantic model (.py)"] --> C
+    C --> D["Parsed Pydantic object"]
+    D --> E["model_dump()"]
+    E --> G["Field-policy processing"]
+    F["requirements.json<br/>loaded as requirements object"] --> G
+    G --> H["Date and list normalization"]
+    H --> I["Final extraction result"]
+
+    classDef input fill:#e6f3ff,stroke:#7ab8e6,color:#003b66,stroke-width:1px;
+    classDef process fill:#eef7ff,stroke:#91b9d6,color:#003b66,stroke-width:1px;
+    classDef output fill:#e8f7ef,stroke:#79bd98,color:#174d30,stroke-width:1px;
+    class A,B,F input;
+    class C,D,E,G,H process;
+    class I output;
+```
+
+For each document, `DataExtractor` sends the original extraction requirements
+and document text in one extraction request, with the Pydantic model as the
+structured response format. The model constrains the response shape, while its
+field descriptions also provide semantic guidance. A format mentioned only in
+a description guides the LLM; strict rejection requires that constraint to be
+encoded in the Pydantic type, pattern, or validator.
+
+The provider response is parsed and validated against the Pydantic model before
+post-processing. If this initial parsing fails, requirements-based processing
+is not reached. Otherwise, `model_dump()` produces a dictionary and the loaded
+requirements are applied locally:
+
+- `apply_field_policies()` fills required keys and handles nullability,
+  explicit defaults, invalid enum values, and type-appropriate fallbacks.
+- `normalize_extracted_data()` normalizes supported values, including requested
+  date formats and scalar lists.
+
+This post-processing does not make another LLM call. It generally repairs or
+standardizes values rather than raising validation errors. It also does not
+verify that a valid-looking value is factually supported by the source; that
+requires a separate grounding or evidence-validation stage.
+
 ### Configuration
 
 ```python

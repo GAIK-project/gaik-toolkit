@@ -12,6 +12,7 @@ from .config import (
 )
 from .s3 import create_s3_client, ensure_object_exists, generate_presigned_url
 from .schema import (
+    SCHEMA_FORMAT_VERSION,
     load_saved_requirements,
     load_saved_schema,
     load_schema,
@@ -31,6 +32,7 @@ __all__ = [
     "MAX_VISION_PAGES",
     "MODEL",
     "MODEL_OPTIONS",
+    "SCHEMA_FORMAT_VERSION",
     "create_s3_client",
     "ensure_object_exists",
     "generate_presigned_url",

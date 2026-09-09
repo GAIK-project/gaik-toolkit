@@ -13,6 +13,7 @@ from api.utils.schema import (
     load_saved_schema,
     save_requirements,
     save_schema_to_python,
+    schema_to_python_source,
     wrap_schema_with_numeric_normalizers,
 )
 from gaik.software_components.extractor import ExtractionRequirements, FieldSpec
@@ -57,6 +58,31 @@ def test_decimal_schema_round_trip_is_provider_safe(tmp_path: Path):
     assert '"pattern"' not in json.dumps(loaded.model_json_schema())
     assert loaded.model_validate({"price": "12.40 EUR"}).price == Decimal("12.40")
     assert loaded.model_validate({"price": "1 234,56 EUR"}).price is None
+
+
+def test_nullable_enum_schema_imports_required_typing_names(tmp_path: Path):
+    requirements = ExtractionRequirements(
+        use_case_name="nullable_enum",
+        fields=[
+            FieldSpec(
+                field_name="status",
+                field_type="str",
+                description="Status",
+                nullable=True,
+                enum=["open", "closed"],
+            )
+        ],
+    )
+    model = create_extraction_model(requirements)
+    schema_path = tmp_path / "schema.py"
+
+    source = schema_to_python_source(model)
+    save_schema_to_python(model, schema_path)
+    loaded = load_saved_schema(schema_path, model.__name__)
+
+    assert "from typing import Literal, Optional" in source
+    assert loaded.model_validate({"status": None}).status is None
+    assert loaded.model_validate({"status": "open"}).status == "open"
 
 
 def test_legacy_requirements_invalidate_cache(tmp_path: Path):

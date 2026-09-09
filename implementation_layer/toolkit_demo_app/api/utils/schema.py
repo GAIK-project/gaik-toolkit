@@ -249,8 +249,11 @@ def schema_to_python_source(model: type[BaseModel]) -> str:
     standard_imports: list[str] = []
     if "decimal." in schema_code:
         standard_imports.append("import decimal")
-    if "Literal[" in schema_code:
-        standard_imports.append("from typing import Literal")
+    typing_imports = [
+        name for name in ("Literal", "Optional", "Union") if f"{name}[" in schema_code
+    ]
+    if typing_imports:
+        standard_imports.append(f"from typing import {', '.join(typing_imports)}")
 
     third_party_imports: list[str] = []
     if decimal_aliases:

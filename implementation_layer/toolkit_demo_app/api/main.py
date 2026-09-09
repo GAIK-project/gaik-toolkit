@@ -42,6 +42,7 @@ try:
         postgres_agent,
         rag,
         report_writer,
+        schema_generator,
         tabular_agent,
         text_to_speech,
         transcriber,
@@ -62,6 +63,7 @@ except ImportError:
         postgres_agent,
         rag,
         report_writer,
+        schema_generator,
         tabular_agent,
         text_to_speech,
         transcriber,
@@ -136,6 +138,11 @@ app.include_router(parser.router, prefix="/parse", tags=["Parser"])
 app.include_router(classifier.router, prefix="/classify", tags=["Classifier"])
 app.include_router(extractor.router, prefix="/extract", tags=["Extractor"])
 app.include_router(
+    schema_generator.router,
+    prefix="/schema-generator",
+    tags=["Schema Generator"],
+)
+app.include_router(
     vision_extractor.router,
     prefix="/extract-vision",
     tags=["Vision Extractor"],
@@ -177,6 +184,9 @@ async def root():
             "parse": "/parse - Document parsing (PDF, DOCX)",
             "classify": "/classify - Document classification",
             "extract": "/extract - Data extraction",
+            "schema-generator": (
+                "/schema-generator - Generate Pydantic extraction schemas from natural language"
+            ),
             "extract-vision": (
                 "/extract-vision - Single-pass vision extraction (PDF/image → structured data)"
             ),
