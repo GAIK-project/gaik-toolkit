@@ -99,7 +99,7 @@ transcriber = Transcriber(
     compress_audio: bool = True,               # Enable compression
     enhanced_transcript: bool = True,          # Enable GPT enhancement
     max_size_mb: int = 25,                     # Chunk size limit
-    max_duration_seconds: int = 1500,          # Duration limit
+    max_duration_seconds: int = 1200,          # Duration limit (API ceiling is 1400 s)
     default_prompt: str = DEFAULT_PROMPT       # Custom Whisper prompt
 )
 

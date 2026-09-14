@@ -134,10 +134,10 @@
       {
         "name": "max_duration_seconds",
         "type": "int",
-        "default": 1500,
-        "effect": "REMOTE TRANSCRIPTION MODELS ONLY (whisper, whisper-1, gpt-4o-transcribe) -- Duration threshold in seconds above which _transcribe_input_remote chunks the audio before transcription. Ignored entirely when transcription_model='whisper_local': that path has no duration check of its own, so a very long recording is sent to the self-hosted endpoint whole -- if that matters for a whisper_local deployment, the limit needs to be enforced on the endpoint side, not here.",
+        "default": 1200,
+        "effect": "REMOTE TRANSCRIPTION MODELS ONLY (whisper, whisper-1, gpt-4o-transcribe) -- Duration threshold in seconds above which _transcribe_input_remote chunks the audio before transcription. OpenAI refuses any request longer than 1400 s ('audio duration ... is longer than 1400 seconds which is the maximum for this model'), so both the single-pass guard and the chunk length are capped at 1400 -- passing a larger value has no effect. Ignored entirely when transcription_model='whisper_local': that path has no duration check of its own, so a very long recording is sent to the self-hosted endpoint whole -- if that matters for a whisper_local deployment, the limit needs to be enforced on the endpoint side, not here.",
         "selection_relevant": false,
-        "infer_from": "technical plumbing - leave default unless the API provider has a different duration limit. Not applicable to whisper_local."
+        "infer_from": "technical plumbing - leave default unless the API provider has a lower duration limit. Not applicable to whisper_local."
       }
     ]
   },

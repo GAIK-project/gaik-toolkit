@@ -39,28 +39,34 @@ print(result.enhanced_transcript)
 
 `transcription_model` supports only:
 - `"whisper"`
+- `"whisper-1"`
 - `"gpt-4o-transcribe"`
 - `"whisper_local"`
 
 Resolution policy:
 - If `transcription_model` is not provided:
-  - Azure config value is used, typically `whisper-1` or `gpt-4o-transcribe`
-  - OpenAI config value is used, typically `whisper` or `gpt-4o-transcribe`
-- If `transcription_model="whisper"`:
-  - Azure resolves to the configured Azure transcription deployment, typically `whisper-1`
-  - OpenAI resolves to `whisper`
+  - Azure uses the config value, typically `whisper` or `gpt-4o-transcribe`
+  - OpenAI uses the config value, falling back to `whisper-1`
+- If `transcription_model="whisper"` or `"whisper-1"`:
+  - Azure resolves to the configured Azure transcription deployment, typically `whisper`
+  - OpenAI resolves to `whisper-1` — plain `whisper` is not a valid OpenAI model id and returns a 404
 - If `transcription_model="gpt-4o-transcribe"`:
   - Azure/OpenAI both use `gpt-4o-transcribe`
 - If `transcription_model="whisper_local"`:
   - ignores `use_azure`
   - uses the local transcription endpoint through `whisper_local.py`
 
+An explicit `transcription_model` always wins over the one in `api_config`.
+
 ## Chunking Behavior
 
-- Chunking is used only for Whisper models:
-  - `whisper`
-  - `whisper-1`
-- `gpt-4o-transcribe` is sent without chunking.
+- Every remote model (`whisper`, `whisper-1`, `gpt-4o-transcribe`) goes through the same
+  guard: the file is sent in a single request when it is within both `max_size_mb` and
+  `max_duration_seconds`, and split with PyDub otherwise.
+- OpenAI refuses any request longer than **1400 s** (`audio duration ... is longer than
+  1400 seconds which is the maximum for this model`), so `max_duration_seconds` defaults
+  to `1200` and is capped at 1400 even if you pass a larger value. Lower it freely; raising
+  it above the ceiling has no effect.
 - `whisper_local` uses the local transcription server path and does not use PyDub chunking.
 
 ## Transcript Error Fixing
@@ -132,7 +138,7 @@ transcriber = Transcriber(
     compress_audio=True,            # backward-compatible, currently not used
     enhanced_transcript=True,
     max_size_mb=25,
-    max_duration_seconds=1500,
+    max_duration_seconds=1200,
     default_prompt="...",
     transcription_model=None,
     enhanced_transcript_instructions=None,
