@@ -11,8 +11,8 @@ from pathlib import Path
 
 try:
     from utils import (
-        MAX_FILE_SIZE_BYTES,
-        MAX_FILE_SIZE_MB,
+        AUDIO_TOO_LARGE_DETAIL,
+        MAX_AUDIO_FILE_SIZE_BYTES,
         MODEL,
         MODEL_OPTIONS,
         get_api_config,
@@ -22,8 +22,8 @@ try:
     )
 except ImportError:
     from api.utils import (
-        MAX_FILE_SIZE_BYTES,
-        MAX_FILE_SIZE_MB,
+        AUDIO_TOO_LARGE_DETAIL,
+        MAX_AUDIO_FILE_SIZE_BYTES,
         MODEL,
         MODEL_OPTIONS,
         get_api_config,
@@ -119,11 +119,8 @@ async def diary_audio_pipeline_stream(
 
     # Save uploaded file temporarily and validate size
     content = await file.read()
-    if len(content) > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB",
-        )
+    if len(content) > MAX_AUDIO_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail=AUDIO_TOO_LARGE_DETAIL)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
