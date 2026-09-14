@@ -9,7 +9,7 @@ openpyxl>=3.1.0
 # git tags; the API installs the published wheel instead of building gaik from
 # source. 0.6.0 adds the tabular_agent component (CSV/Excel text-to-SQL over
 # DuckDB) that routers/tabular_agent.py needs.
-gaik[all-cpu,multimodal-parser,postgres-agent,tabular-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]>=0.7.0
+gaik[all-cpu,multimodal-parser,postgres-agent,tabular-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]>=0.7.1
 # Solution Wizard (routers/solution_wizard.py): Claude Agent SDK session per user.
 # Also requires CLAUDE_CODE_USE_FOUNDRY, ANTHROPIC_FOUNDRY_API_KEY and
 # ANTHROPIC_FOUNDRY_RESOURCE in .env.local (or the deployment secret).

@@ -10,14 +10,14 @@ class material_extraction_Extraction(BaseModel):  # noqa: N801
 
     model_config = ConfigDict(extra="forbid")
 
-    material_id: str | None = Field(None, description="Identifier of the material")
+    material_id: str | None = Field(default=None, description="Identifier of the material")
     product_type_designation: str | None = Field(
-        None, description="Product type designation of the material"
+        default=None, description="Product type designation of the material"
     )
-    dimensions: str | None = Field(None, description="Dimensions of the material")
-    material_grade: str | None = Field(None, description="Material grade specification")
-    cutting_required: bool | None = Field(None, description="Whether cutting is required")
-    testing_required: bool | None = Field(None, description="Whether testing is required")
+    dimensions: str | None = Field(default=None, description="Dimensions of the material")
+    material_grade: str | None = Field(default=None, description="Material grade specification")
+    cutting_required: bool | None = Field(default=None, description="Whether cutting is required")
+    testing_required: bool | None = Field(default=None, description="Whether testing is required")
     certificates_required: bool | None = Field(
-        None, description="Whether certificates are required"
+        default=None, description="Whether certificates are required"
     )
