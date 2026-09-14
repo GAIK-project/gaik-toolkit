@@ -39,8 +39,14 @@ from .srt import combine_srt_chunks, extract_text_from_srt, seconds_to_time
 
 logger = logging.getLogger(__name__)
 
-# GPT-4o Transcribe has a 25-minute (1500 s) per-request limit
-_MAX_GPT4O_DURATION_SECONDS = 1500
+# GPT-4o Transcribe refuses any request whose audio is longer than 1400 s
+# ("audio duration ... is longer than 1400 seconds which is the maximum for
+# this model") — not the 25 min (1500 s) the limit is often quoted as.
+_GPT4O_API_DURATION_LIMIT_SECONDS = 1400
+
+# Single-pass ceiling, with margin: our duration probe and the API's own
+# decoder need not agree to the last fraction of a second.
+_MAX_GPT4O_DURATION_SECONDS = 1380
 
 
 class ParallelTranscriber:
@@ -195,7 +201,13 @@ class ParallelTranscriber:
 
             # ── Stage 4: choose model-specific chunk parameters ────────
             if model == TranscriptionModel.GPT4O_DIARIZE:
-                chunk_minutes = cfg.gpt4o_chunk_duration_minutes
+                # A middle chunk is padded with the overlap on *both* sides, so
+                # the audio the API actually receives is chunk + 2 × overlap.
+                # That sum is what has to clear the 1400 s limit.
+                budget_seconds = _GPT4O_API_DURATION_LIMIT_SECONDS - 2 * cfg.chunk_overlap_seconds
+                chunk_minutes = max(
+                    1, min(cfg.gpt4o_chunk_duration_minutes, int(budget_seconds // 60))
+                )
                 parallelism = cfg.gpt4o_chunk_parallelism
                 force_duration = True
             elif model == TranscriptionModel.WHISPER_LOCAL:

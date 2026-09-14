@@ -436,7 +436,7 @@ transcriber = Transcriber(
     enhanced_transcript=True,                   # Run TranscriptEnhancer on raw output
     enhanced_transcript_instructions=None,      # Optional domain instructions for enhancement
     max_size_mb=25,                             # Chunk threshold
-    max_duration_seconds=1500,                  # Max chunk duration
+    max_duration_seconds=1200,                  # Max chunk duration (API ceiling is 1400 s)
     default_prompt="",                          # Whisper language hint
     transcription_model=None,                   # "whisper", "gpt-4o-transcribe", or "whisper_local"
     language="auto",                            # Language code ("fi", "en", "auto")
@@ -460,10 +460,10 @@ result.save("output/")
 
 ### Transcription Models
 
-`transcription_model` accepts: `"whisper"`, `"gpt-4o-transcribe"`, `"whisper_local"`.
+`transcription_model` accepts: `"whisper"`, `"whisper-1"`, `"gpt-4o-transcribe"`, `"whisper_local"`.
 
 - Not provided: uses the model from `api_config` (default `gpt-4o-transcribe` for both Azure and OpenAI)
-- `"whisper"`: Azure resolves to configured deployment (typically `whisper-1`), OpenAI uses `whisper`
+- `"whisper"` / `"whisper-1"`: Azure resolves to the configured deployment (typically `whisper`), OpenAI uses `whisper-1` (plain `whisper` is not a valid OpenAI model id)
 - `"gpt-4o-transcribe"`: both Azure/OpenAI use `gpt-4o-transcribe`
 - `"whisper_local"`: routes to local Whisper server via `local_api_base`/`local_api_key`
 

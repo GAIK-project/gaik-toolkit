@@ -28,6 +28,17 @@ DEFAULT_PROMPT = (
 )
 ALLOWED_TRANSCRIPTION_MODELS = {"whisper", "whisper-1", "gpt-4o-transcribe", "whisper_local"}
 
+# OpenAI's transcription API refuses audio longer than 1400 s:
+#   "audio duration 1433.728 seconds is longer than 1400 seconds which is the
+#    maximum for this model"
+# Both the single-pass guard and the chunker stay under this ceiling, so a file
+# can never land in a gap where our own duration check passes but the API says
+# no. Not applicable to `whisper_local`, which does not go through this path.
+REMOTE_MAX_DURATION_SECONDS = 1400
+
+# Default chunking threshold, with margin below the API ceiling.
+DEFAULT_MAX_DURATION_SECONDS = 1200
+
 
 @dataclass
 class TranscriptionResult:
@@ -92,7 +103,7 @@ class Transcriber:
         compress_audio: bool = True,  # kept for backward compatibility; no longer used
         enhanced_transcript: bool = False,
         max_size_mb: int = 25,
-        max_duration_seconds: int = 1500,
+        max_duration_seconds: int = DEFAULT_MAX_DURATION_SECONDS,
         default_prompt: str = DEFAULT_PROMPT,
         transcription_model: str | None = None,
         enhanced_transcript_instructions: str | None = None,
@@ -219,27 +230,34 @@ class Transcriber:
         return hashlib.md5(f"{file_path.stem}_{timestamp}".encode()).hexdigest()[:10]
 
     def _resolve_transcription_model(self) -> str:
-        if self.transcription_model is None:
-            # Use config value (e.g. "whisper" from AZURE_TRANSCRIPTION_MODEL),
-            # falling back to "whisper" which works as both Azure deployment name
-            # and OpenAI model name.
-            return self.api_config.get("transcription_model", "whisper")
+        if self.transcription_model is not None:
+            if self.transcription_model not in ALLOWED_TRANSCRIPTION_MODELS:
+                allowed = ", ".join(sorted(ALLOWED_TRANSCRIPTION_MODELS))
+                raise ValueError(
+                    f"Invalid transcription_model '{self.transcription_model}'. "
+                    f"Allowed values: {allowed}"
+                )
 
-        if self.transcription_model not in ALLOWED_TRANSCRIPTION_MODELS:
-            allowed = ", ".join(sorted(ALLOWED_TRANSCRIPTION_MODELS))
-            raise ValueError(
-                f"Invalid transcription_model '{self.transcription_model}'. "
-                f"Allowed values: {allowed}"
-            )
+            # An explicit choice wins over the config, so asking for Whisper on a
+            # config that names gpt-4o (or the other way round) is honoured.
+            if self.transcription_model in ("whisper_local", "gpt-4o-transcribe"):
+                return self.transcription_model
 
-        if self.transcription_model == "whisper_local":
-            return "whisper_local"
+            if not self.api_config.get("use_azure", False):
+                return "whisper-1"
 
-        if self.transcription_model == "gpt-4o-transcribe":
-            return "gpt-4o-transcribe"
+            return self.api_config.get("transcription_model") or "whisper"
 
-        # explicit transcription_model == "whisper" -> use config or "whisper"
-        return self.api_config.get("transcription_model", "whisper")
+        configured = self.api_config.get("transcription_model")
+
+        # On Azure the model is a deployment name, so whatever the config says
+        # is authoritative and "whisper" is the conventional fallback. On
+        # OpenAI the only valid Whisper model id is "whisper-1" — plain
+        # "whisper" is a 404 there.
+        if self.api_config.get("use_azure", False):
+            return configured or "whisper"
+
+        return "whisper-1" if configured in (None, "", "whisper") else configured
 
     def _warn_ignored_local_options(self, effective_model: str) -> None:
         if effective_model == "whisper_local":
@@ -330,7 +348,9 @@ class Transcriber:
             print(f"Could not read audio duration for chunking check: {exc}")
             return False
 
-        return duration_seconds > self.max_duration_seconds
+        # A caller-supplied value above the API ceiling would only produce a
+        # request the API rejects, so cap it here rather than pass it through.
+        return duration_seconds > min(self.max_duration_seconds, REMOTE_MAX_DURATION_SECONDS)
 
     def _single_pass_transcription(
         self, file_path: Path, prompt: str, transcription_model: str
@@ -379,7 +399,7 @@ def split_and_transcribe_with_context(
     audio_path,
     api_config,
     max_size_mb=25,
-    max_duration_seconds=1500,
+    max_duration_seconds=DEFAULT_MAX_DURATION_SECONDS,
     audio=None,
     base_prompt: str = DEFAULT_PROMPT,
     transcription_model: str | None = None,
@@ -397,8 +417,13 @@ def split_and_transcribe_with_context(
     duration_seconds = len(audio) / 1000
     file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
 
+    # Cap the per-chunk budget at the API ceiling: splitting on a larger value
+    # would just hand the API chunks it refuses (e.g. 2850 s at a budget of
+    # 1500 s yields two 1425 s chunks, both over the 1400 s limit).
+    duration_budget = min(max_duration_seconds, REMOTE_MAX_DURATION_SECONDS)
+
     chunks_by_size = math.ceil(file_size_mb / (max_size_mb * 0.9))
-    chunks_by_duration = math.ceil(duration_seconds / (max_duration_seconds * 0.95))
+    chunks_by_duration = math.ceil(duration_seconds / (duration_budget * 0.95))
     num_chunks = max(1, max(chunks_by_size, chunks_by_duration))
 
     print(f"Splitting into {num_chunks} chunks based on size and duration")
@@ -487,7 +512,7 @@ def split_and_transcribe(
     audio_path,
     api_config,
     max_size_mb=25,
-    max_duration_seconds=1500,
+    max_duration_seconds=DEFAULT_MAX_DURATION_SECONDS,
     audio=None,
 ):
     """Backward-compatible wrapper without explicit context parameter."""

@@ -27,7 +27,11 @@ class TranscriptionConfig:
     max_single_file_mb: float = 24.0
 
     # --- GPT-4o specific ---
-    gpt4o_chunk_duration_minutes: int = 23  # 25 min API limit minus 2 min safety margin
+    # The API limit is 1400 s per request, not the 25 min it is often quoted as,
+    # and ``chunk_overlap_seconds`` is added to both sides of a middle chunk.
+    # The pipeline caps this value against 1400 s - 2 × overlap, so raising it
+    # beyond what the overlap leaves room for has no effect.
+    gpt4o_chunk_duration_minutes: int = 22
 
     # --- Whisper Local (on-prem) specific ---
     # On-prem servers typically run Whisper on a single GPU and process one
@@ -47,7 +51,7 @@ class TranscriptionConfig:
     # --- Timeouts ---
     ffmpeg_chunk_timeout_seconds: int = 3600
     # Per single Azure OpenAI call. Must comfortably fit a full chunk: a dense
-    # ``gpt4o_chunk_duration_minutes`` (23 min) chunk exceeds 180s, so GPT-4o diarize
+    # ``gpt4o_chunk_duration_minutes`` (22 min) chunk exceeds 180s, so GPT-4o diarize
     # would time out (``RuntimeError("GPT-4o transcription timed out")``) after retries.
     # 600 s matches the QAdental Rahti production value. Rule of thumb: keep this
     # >= ~25 s × gpt4o_chunk_duration_minutes.
