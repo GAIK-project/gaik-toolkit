@@ -1,12 +1,16 @@
 """Demo API utilities."""
 
 from .config import (
+    AUDIO_TOO_LARGE_DETAIL,
+    MAX_AUDIO_FILE_SIZE_BYTES,
+    MAX_AUDIO_FILE_SIZE_MB,
     MAX_FILE_SIZE_BYTES,
     MAX_FILE_SIZE_MB,
     MAX_VISION_PAGES,
     MODEL,
     MODEL_OPTIONS,
     get_api_config,
+    validate_audio_file_size,
     validate_file_size,
     validate_vision_page_limit,
 )
@@ -27,6 +31,9 @@ from .schema import (
 from .sse import sse_error_response, sse_event
 
 __all__ = [
+    "AUDIO_TOO_LARGE_DETAIL",
+    "MAX_AUDIO_FILE_SIZE_BYTES",
+    "MAX_AUDIO_FILE_SIZE_MB",
     "MAX_FILE_SIZE_BYTES",
     "MAX_FILE_SIZE_MB",
     "MAX_VISION_PAGES",
@@ -48,6 +55,7 @@ __all__ = [
     "schema_paths",
     "sse_error_response",
     "sse_event",
+    "validate_audio_file_size",
     "validate_file_size",
     "validate_vision_page_limit",
     "wrap_schema_with_numeric_normalizers",

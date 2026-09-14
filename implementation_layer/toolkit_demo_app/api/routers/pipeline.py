@@ -12,6 +12,8 @@ from typing import Literal
 
 try:
     from utils import (
+        AUDIO_TOO_LARGE_DETAIL,
+        MAX_AUDIO_FILE_SIZE_BYTES,
         MAX_FILE_SIZE_BYTES,
         MAX_FILE_SIZE_MB,
         MODEL,
@@ -20,12 +22,15 @@ try:
         load_schema,
         save_schema,
         sse_event,
+        validate_audio_file_size,
         validate_file_size,
         validate_vision_page_limit,
         wrap_schema_with_numeric_normalizers,
     )
 except ImportError:
     from api.utils import (
+        AUDIO_TOO_LARGE_DETAIL,
+        MAX_AUDIO_FILE_SIZE_BYTES,
         MAX_FILE_SIZE_BYTES,
         MAX_FILE_SIZE_MB,
         MODEL,
@@ -34,6 +39,7 @@ except ImportError:
         load_schema,
         save_schema,
         sse_event,
+        validate_audio_file_size,
         validate_file_size,
         validate_vision_page_limit,
         wrap_schema_with_numeric_normalizers,
@@ -243,7 +249,7 @@ async def audio_pipeline(
         )
 
     # Validate file size and save temporarily
-    content = await validate_file_size(file)
+    content = await validate_audio_file_size(file)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
@@ -650,12 +656,10 @@ async def audio_pipeline_stream(
 
     # Validate file size
     content = await file.read()
-    if len(content) > MAX_FILE_SIZE_BYTES:
+    if len(content) > MAX_AUDIO_FILE_SIZE_BYTES:
 
         async def error_gen() -> AsyncGenerator[str, None]:
-            yield sse_event(
-                "error", {"message": f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB"}
-            )
+            yield sse_event("error", {"message": AUDIO_TOO_LARGE_DETAIL})
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
