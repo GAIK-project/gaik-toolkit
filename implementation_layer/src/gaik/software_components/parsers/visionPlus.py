@@ -41,6 +41,8 @@ class VisionPlusParser:
         num_threads: int = 4,
         verbose: bool = True,
         vision_prompt: str | None = None,
+        temperature: float | None = 0.0,
+        reasoning_effort: str | None = None,
     ) -> None:
         self.verbose = verbose
 
@@ -97,7 +99,8 @@ class VisionPlusParser:
             custom_prompt=vision_prompt or self._default_vision_prompt(),
             use_context=False,
             max_tokens=2048,
-            temperature=0.0,
+            temperature=temperature,
+            reasoning_effort=reasoning_effort,
         )
 
     def parse_document(self, file_path: str) -> dict[str, Any]:

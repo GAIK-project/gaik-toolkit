@@ -106,14 +106,14 @@ For DoclingApiClientParser (Haaga-Helia service):
 
 ## Examples
 
-See [implementation_layer/examples/software_components/parsers/](../../implementation_layer/examples/software_components/parsers/) for complete examples.
+See [implementation_layer/examples/software_components/parsers/](../../../../examples/software_components/parsers/) for complete examples.
 
 ---
 
 ## Resources
 
 - **Repository**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)
-- **Examples**: [implementation_layer/examples/software_components/](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components)
+- **Examples**: [implementation_layer/examples/software_components/parsers/](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/parsers)
 - **Contributing**: [CONTRIBUTING.md](../../CONTRIBUTING.md)
 - **Issues**: [github.com/GAIK-project/gaik-toolkit/issues](https://github.com/GAIK-project/gaik-toolkit/issues)
 

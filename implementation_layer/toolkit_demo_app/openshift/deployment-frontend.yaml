@@ -56,13 +56,17 @@ spec:
                   name: gaik-demo-redis
                   key: UPSTASH_REDIS_REST_TOKEN
                   optional: true
+          # proxy.ts buffers each upload body in memory before forwarding it
+          # (streaming truncates data in Bun/standalone), so a 50MB audio upload
+          # costs roughly 100MB here on top of the Next.js baseline. 512Mi left
+          # too little headroom for two of those at once.
           resources:
             requests:
               cpu: 100m
-              memory: 256Mi
+              memory: 384Mi
             limits:
               cpu: 500m
-              memory: 512Mi
+              memory: 1Gi
           # Probes tolerate transient backend slowness (Next.js /api/health
           # hits the API pod). Kept loose enough that a hanging upstream
           # call does not kill the frontend before Kubernetes can recover.

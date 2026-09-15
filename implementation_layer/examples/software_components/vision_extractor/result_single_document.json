@@ -1,0 +1,218 @@
+{
+  "purchase_order_date": {
+    "value": "15/02/2026",
+    "confidence_score": 0.94,
+    "confidence_reason": "Date appears explicitly next to the DATE label; it was interpreted as MM/DD/YYYY because 02/15/2026 cannot be DD/MM/YYYY and reformatted."
+  },
+  "delivery_date": {
+    "value": "11/07/2026",
+    "confidence_score": 0.89,
+    "confidence_reason": "Delivery Date is explicitly stated; the MM/DD/YYYY convention established by the purchase order date was applied and the value reformatted."
+  },
+  "purchase_order_number": {
+    "value": "7200-4453-21",
+    "confidence_score": 0.99,
+    "confidence_reason": "Value appears explicitly next to PURCHASE NO on both pages and was normalized with a dash after every four digits."
+  },
+  "supplier_number": {
+    "value": "5019300",
+    "confidence_score": 0.99,
+    "confidence_reason": "Value appears explicitly next to SUPPLIER NO on both pages."
+  },
+  "shipping_address": {
+    "value": "Nordvik Depot OST, Lagerweg 12, 8600 Dubendorf, Switzerland",
+    "confidence_score": 0.98,
+    "confidence_reason": "The same address appears explicitly under Shipping Address multiple times in the document."
+  },
+  "line_items": [
+    {
+      "item_number": {
+        "value": "010",
+        "confidence_score": 0.99,
+        "confidence_reason": "Item number is explicitly shown at the start of the line-item row."
+      },
+      "complete_description": {
+        "value": "6061-T6 Aluminium Alloy Round Bar; O 12.700 (+/- 0.038) x 3658 mm Mill Length; EN 755-2 / ASTM B 221; Actual Chem. / Act. Physical",
+        "confidence_score": 0.98,
+        "confidence_reason": "Description and specifications are explicitly listed together under the DESCRIPTION column."
+      },
+      "quantity": {
+        "value": "6,000 LB",
+        "confidence_score": 0.98,
+        "confidence_reason": "Quantity and unit are explicitly shown in the line-item row."
+      },
+      "price_per_currency": {
+        "value": "8.53",
+        "confidence_score": 0.98,
+        "confidence_reason": "Price and currency are explicitly shown in the corresponding table columns."
+      },
+      "material_number": {
+        "value": "ALRD00882",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly after Mat.No. for this item."
+      }
+    },
+    {
+      "item_number": {
+        "value": "020",
+        "confidence_score": 0.99,
+        "confidence_reason": "Item number is explicitly shown at the start of the line-item row."
+      },
+      "complete_description": {
+        "value": "6061-T6 Aluminium Alloy Round Bar; O 19.050 (+/- 0.038) x 3658 mm Length; EN 755-2 / ASTM B 221; Actual Chem. / Act. Physical",
+        "confidence_score": 0.98,
+        "confidence_reason": "Description and specifications are explicitly listed together under the DESCRIPTION column."
+      },
+      "quantity": {
+        "value": "3,100 LB",
+        "confidence_score": 0.98,
+        "confidence_reason": "Quantity and unit are explicitly shown in the line-item row."
+      },
+      "price_per_currency": {
+        "value": "6.50",
+        "confidence_score": 0.98,
+        "confidence_reason": "Price and currency are explicitly shown in the corresponding table columns."
+      },
+      "material_number": {
+        "value": "ALRD00913",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly after Mat.No. for this item."
+      }
+    },
+    {
+      "item_number": {
+        "value": "030",
+        "confidence_score": 0.99,
+        "confidence_reason": "Item number is explicitly shown at the start of the line item on page 1."
+      },
+      "complete_description": {
+        "value": "6082-T651 Aluminium Alloy Flat Bar; 25.400 (+/- 0.127) x 76.200 (+/- 0.381) x 3048 mm Mill Length; EN 755-3 / ASTM B 221; Actual Chem. / Act. Physical",
+        "confidence_score": 0.94,
+        "confidence_reason": "The description begins on page 1 and continues on page 2; the split table row was combined."
+      },
+      "quantity": {
+        "value": "4,000 LB",
+        "confidence_score": 0.98,
+        "confidence_reason": "Quantity and unit are explicitly shown with the item on page 1."
+      },
+      "price_per_currency": {
+        "value": "8.54",
+        "confidence_score": 0.98,
+        "confidence_reason": "Price and currency are explicitly shown with the item on page 1."
+      },
+      "material_number": {
+        "value": "ALFL01054",
+        "confidence_score": 0.96,
+        "confidence_reason": "Material number appears in the continuation of this split line item on page 2."
+      }
+    },
+    {
+      "item_number": {
+        "value": "040",
+        "confidence_score": 0.99,
+        "confidence_reason": "Item number is explicitly shown at the start of the line-item row."
+      },
+      "complete_description": {
+        "value": "6082-T651 Aluminium Alloy Flat Bar; 38.100 (+/- 0.127) x 101.600 (+/- 0.508) x 3048 mm Mill Length; EN 755-3 / ASTM B 221; Actual Chem. / Act. Physical",
+        "confidence_score": 0.98,
+        "confidence_reason": "Description and specifications are explicitly listed together under the DESCRIPTION column."
+      },
+      "quantity": {
+        "value": "5,000 LB",
+        "confidence_score": 0.98,
+        "confidence_reason": "Quantity and unit are explicitly shown in the line-item row."
+      },
+      "price_per_currency": {
+        "value": "8.43",
+        "confidence_score": 0.98,
+        "confidence_reason": "Price and currency are explicitly shown in the corresponding table columns."
+      },
+      "material_number": {
+        "value": "ALFL01087",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly after Mat.No. for this item."
+      }
+    },
+    {
+      "item_number": {
+        "value": "050",
+        "confidence_score": 0.99,
+        "confidence_reason": "Item number is explicitly shown at the start of the line-item row."
+      },
+      "complete_description": {
+        "value": "7075-T651 Aluminium Alloy Round Bar; O 50.800 (+/- 0.102) x 3658 mm Mill Length; EN 755-2 / AMS 2770; Actual Chem. / Act. Physical",
+        "confidence_score": 0.98,
+        "confidence_reason": "Description and specifications are explicitly listed together under the DESCRIPTION column."
+      },
+      "quantity": {
+        "value": "7,000 LB",
+        "confidence_score": 0.98,
+        "confidence_reason": "Quantity and unit are explicitly shown in the line-item row."
+      },
+      "price_per_currency": {
+        "value": "8.43",
+        "confidence_score": 0.98,
+        "confidence_reason": "Price and currency are explicitly shown in the corresponding table columns."
+      },
+      "material_number": {
+        "value": "ALRD01240",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly after Mat.No. for this item."
+      }
+    },
+    {
+      "item_number": {
+        "value": "060",
+        "confidence_score": 0.99,
+        "confidence_reason": "Item number is explicitly shown at the start of the line-item row."
+      },
+      "complete_description": {
+        "value": "7075-T651 Aluminium Alloy Square Bar; 50.800 (+/- 0.102) x 50.800 (+/- 0.102) x 3048 mm Mill Length; EN 755-4 / AMS 2770; Actual Chem. / Act. Physical",
+        "confidence_score": 0.98,
+        "confidence_reason": "Description and specifications are explicitly listed together under the DESCRIPTION column."
+      },
+      "quantity": {
+        "value": "3,000 LB",
+        "confidence_score": 0.98,
+        "confidence_reason": "Quantity and unit are explicitly shown in the line-item row."
+      },
+      "price_per_currency": {
+        "value": "7.89",
+        "confidence_score": 0.98,
+        "confidence_reason": "Price and currency are explicitly shown in the corresponding table columns."
+      },
+      "material_number": {
+        "value": "ALSQ00716",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly after Mat.No. for this item."
+      }
+    },
+    {
+      "item_number": {
+        "value": "070",
+        "confidence_score": 0.99,
+        "confidence_reason": "Item number is explicitly shown at the start of the line-item row."
+      },
+      "complete_description": {
+        "value": "2024-T351 Aluminium Alloy Plate; 12.700 (+/- 0.178) x 609.6 x 1219.2 mm; EN 485-2 / ASTM B 209; Actual Chem. / Act. Physical",
+        "confidence_score": 0.98,
+        "confidence_reason": "Description and specifications are explicitly listed together under the DESCRIPTION column."
+      },
+      "quantity": {
+        "value": "2,000 LB",
+        "confidence_score": 0.98,
+        "confidence_reason": "Quantity and unit are explicitly shown in the line-item row."
+      },
+      "price_per_currency": {
+        "value": "9.84",
+        "confidence_score": 0.98,
+        "confidence_reason": "Price and currency are explicitly shown in the corresponding table columns."
+      },
+      "material_number": {
+        "value": "ALPL00534",
+        "confidence_score": 0.99,
+        "confidence_reason": "Value appears explicitly after Mat.No. for this item."
+      }
+    }
+  ]
+}

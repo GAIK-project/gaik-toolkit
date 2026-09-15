@@ -1,4 +1,5 @@
 {
+  "schema_format_version": 2,
   "model_name": "medical_audio_extraction_Extraction",
   "requirements": {
     "use_case_name": "medical_audio_extraction",

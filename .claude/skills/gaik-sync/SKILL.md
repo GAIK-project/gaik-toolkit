@@ -55,7 +55,7 @@ This introspects the *installed* gaik and returns structured findings. Categorie
 - `api_drift` — a `construct` kwarg or `call` method no longer exists on the gaik class.
 - `options` — a card `option` name is not a real constructor parameter (often it moved to a method argument, or was renamed/removed).
 - `parity` — a registry component has no reference card.
-- `new` — a gaik subpackage no card references (a new component family, or an internal helper to ignore).
+- `new` — a gaik subpackage no card references (a new component family, an internal helper to ignore, or an unrecognized public alias).
 
 Read the human-readable report too for a quick overview:
 
@@ -101,7 +101,7 @@ Map every finding to a concrete edit and present a **change table** for approval
 
 Rules for the table:
 - One row per finding. Group obviously-related rows (a rename usually touches `construct` + `call` + an `option` + SKILL.md).
-- For `new` findings, **always ask** whether it is a user-facing component to add or an internal helper to ignore — do not assume. `llm`-style provider layers are usually internal.
+- For `new` findings, **always ask** whether it is a user-facing component to add, an internal helper to ignore, or a public alias of an already-registered component — do not assume. `llm`-style provider layers are usually internal. Approved aliases belong in `ALIAS_SUBPACKAGES`, mapped to their canonical package, and must not receive duplicate registry or card entries.
 - For `options` findings, check whether the option moved to a *method* argument before deleting it from the card; the wizard may still need to document it, just not as a constructor option.
 - Mark confidence. Anything below "high" gets an explicit question to the user before Phase 4.
 - If a finding is an intentional gaik deprecation with no wizard-side equivalent, say so and propose removing the registry/card entry (and any SKILL.md reference).

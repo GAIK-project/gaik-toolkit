@@ -161,7 +161,7 @@
       "id": "SA10",
       "topic": "report_module_and_options",
       "trigger": "Which report-writing approach, module options, parsing mode, review mode, sample, source-reference, or output options should apply?",
-      "answer": "Use MultiSourceReportGenerator as the single primary end-to-end module. Do not create duplicate standalone PDF, spreadsheet, or text parsing stages that the module already subsumes. Set parser_choice='auto', agentic=true, strict_review=true, include_source_references=true, include_evidence_index=true, sample_report_path to the bundle's report_template.md, report_language='English', report_title='Q2 2026 Supplier Performance Report', output_docx=false, curate_evidence=false, polish=false, verbose=true, and writer/reviewer model gpt-5.4. Configure the six section specifications and their depends_on relationships from report_spec.json.",
+      "answer": "Do not create duplicate standalone PDF, spreadsheet, or text parsing stages that the module already subsumes. Set parser_choice='auto', agentic=true, strict_review=true, include_source_references=true, include_evidence_index=true, sample_report_path to the bundle's report_template.md, report_language='English', report_title='Q2 2026 Supplier Performance Report', output_docx=false, curate_evidence=false, polish=false, verbose=true, and writer/reviewer model gpt-5.4. Configure the six section specifications and their depends_on relationships from report_spec.json.",
       "supports": [
         "EQ1-R41",
         "EQ2-C02",

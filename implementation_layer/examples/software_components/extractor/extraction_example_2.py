@@ -38,12 +38,12 @@ def _make_llm_client(cfg: dict):
             api_version=cfg["api_version"],
             azure_endpoint=cfg["azure_endpoint"].split("/openai/")[0],  # robust to full path input
         )
-        model = cfg.get("model", "gpt-4.1")
+        model = cfg.get("model", "gpt-5.4")
     else:
         if OpenAI is None:
             raise RuntimeError("OpenAI SDK not available. Please install `openai` >= 1.0")
         client = OpenAI(api_key=cfg["api_key"])
-        model = cfg.get("model", "gpt-4.1-2025-04-14")
+        model = cfg.get("model", "gpt-5.4")
 
     return client, model, use_azure
 
@@ -121,10 +121,10 @@ def main():
 
     # 3) PDFs to process
     pdf_paths = [
-        "input/PO.pdf",
-        "input/BOM1.pdf",
-        "input/BOM2.pdf",
-        "input/BOM3.pdf",
+        "input/example_data1/PO.pdf",
+        "input/example_data1/BOM1.pdf",
+        "input/example_data1/BOM2.pdf",
+        "input/example_data1/BOM3.pdf",
     ]
 
     # 4) Optional: build a combined output too
@@ -190,23 +190,22 @@ def extract_po_bom_data(combined_file_path: str = "./combined_classified_output.
 
     # Define extraction requirements
     user_requirements = """
-    The task is to extract key fields from customer documents (Purchase Order (PO) and Bill of Material (BOM),
-    and align them so that each PO item is enriched with the correct technical details.
-    Begin with the customer's purchase order, which may include multiple items.
-    The item is linked to its BOM via a Material Number. For every item in the PO,
-    extract the Material Number along with the basic item details, such as Quantity, Description,
-    and Delivery Date. Use the item's Material Number from the PO to find the BOM having the same Material Number (represented as 'ID').
-    From the matching BOM, extract the part's 'Type/Part Designation' and Dimensions.
-    The final output should contain as many lines as the number of items in the PO.
-    Each line should have:
-    - Material Number
-    - Quantity
-    - Description
-    - Delivery Date (from PO)
-    - Type/Part Designation
-    - Dimensions (from BOM).
-    **IMPORTANT**: There could be multiple items in the PO (hence multiple Material Numbers). For each Material Number,
-    the above mentioned fields have to be extracted and matched with the corresponding BOM.
+    The task is to extract key fields from customer documents (Purchase Order (PO) and Bill of
+    Material (BOM)), and align them so that each PO item is enriched with the correct technical
+    details. Begin with the customer's purchase order, which may include multiple items. Each item
+    is linked to its BOM via a Material Number.
+
+    For every item in the PO, extract the Material Number along with the basic item details:
+    Quantity, Description, and Delivery Date. Use the item's Material Number from the PO to find the BOM having the same Material Number (represented as 'ID'). From the matching BOM, extract
+    the part's 'Part Designation' and part dimension (length followed by unit, e.g., 1487mm).
+
+    The final output should contain as many lines as the number of items in the PO. Each line
+    should have: Material Number, Quantity, Description, Delivery Date (from PO), Part
+    Designation, part dimension (from BOM).
+
+    Also, extract the following header information from the PO: Order Date, Buyer, Sales Person,
+    Shipping Address, Payment Terms.
+    Note: All date formats should be MM/DD/YYYY.
     """
 
     # Read the combined file
@@ -222,15 +221,28 @@ def extract_po_bom_data(combined_file_path: str = "./combined_classified_output.
 
     config = get_openai_config(use_azure=True)  # Set to False for standard OpenAI
 
+    # MODEL = "gpt-5.4" # Temperature parameter only exists upto gpt-5.4
+    # MODEL_OPTIONS = {
+    #     "temperature": 0.0,
+    #     "reasoning_effort": None,
+    # }
+
+    ##If we want to use reasoning for gpt-5.4 and above. Disable temperature.
+    MODEL = "gpt-5.6-sol"
+    MODEL_OPTIONS = {
+        "temperature": None,
+        "reasoning_effort": "medium",
+    }
+
     # Step 1: Generate schema
-    generator = SchemaGenerator(config=config)
+    generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
     schema = generator.generate_schema(user_requirements=user_requirements)
 
     print(f"\nOK Generated schema: {schema.__name__}")
     print(f"  Structure: {generator.structure_analysis.structure_type}")
 
     # Step 2: Extract data
-    extractor = DataExtractor(config=config)
+    extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
     results = extractor.extract(
         extraction_model=schema,
         requirements=generator.item_requirements,

@@ -8,6 +8,7 @@ __all__ = [
     "config",
     "llm",
     "extractor",
+    "schema_generator",
     "vision_extractor",
     "transcriber",
     "enhance_transcript",

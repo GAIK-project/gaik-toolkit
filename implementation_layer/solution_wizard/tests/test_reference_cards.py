@@ -22,6 +22,13 @@ def test_every_registry_component_has_a_card():
     assert not missing, f"Registry components without a reference card: {missing}"
 
 
+def test_data_extractor_example_provides_its_required_blueprint_parameters():
+    entry = get_registry().lookup_by_name("DataExtractor")
+    example = entry["example_blueprint_steps"][0]
+
+    assert set(entry["required_parameters"]) <= set(example.get("parameters", {}))
+
+
 def test_card_required_keys_present():
     cards = get_reference_cards()
     for name in cards.names():

@@ -1,0 +1,168 @@
+{
+  "schema_format_version": 2,
+  "model_name": "purchase_order_header_extraction_Extraction",
+  "requirements_type": "parent_with_nested_list",
+  "user_requirements": "Extract key fields from a Purchase Order (PO) and align each PO item with the matching Bill of Materials (BOM) via Material Number.\n\nFor every PO item, extract: Material Number, Quantity, Description, Delivery Date (DD/MM/YYYY). Then look up the matching BOM (where ID = Material Number) and add: Type Part Designation, Dimensions.\n\nAlso extract from the PO header: Order Date, Buyer, Sales Person, Shipping Address, Payment Terms.",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "purchase_order_header_extraction",
+      "fields": [
+        {
+          "field_name": "order_date",
+          "field_type": "date",
+          "description": "Order date from the PO header",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "buyer",
+          "field_type": "str",
+          "description": "Buyer from the PO header",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "sales_person",
+          "field_type": "str",
+          "description": "Sales person from the PO header",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "shipping_address",
+          "field_type": "str",
+          "description": "Shipping address from the PO header",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "payment_terms",
+          "field_type": "str",
+          "description": "Payment terms from the PO header",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "po_items",
+        "container_description": "Repeated PO items enriched with matching BOM information",
+        "requirements": {
+          "use_case_name": "purchase_order_item",
+          "fields": [
+            {
+              "field_name": "material_number",
+              "field_type": "str",
+              "description": "Material Number for the PO item, used to match the BOM ID",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "quantity",
+              "field_type": "int",
+              "description": "Quantity for the PO item",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "description",
+              "field_type": "str",
+              "description": "Description of the PO item",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "delivery_date",
+              "field_type": "date",
+              "description": "Delivery Date for the PO item in DD/MM/YYYY format",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": "%d/%m/%Y"
+            },
+            {
+              "field_name": "type_part_designation",
+              "field_type": "str",
+              "description": "Type Part Designation from the matching BOM record",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "dimensions",
+              "field_type": "str",
+              "description": "Dimensions from the matching BOM record",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

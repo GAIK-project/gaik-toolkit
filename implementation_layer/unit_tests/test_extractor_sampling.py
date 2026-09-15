@@ -153,6 +153,45 @@ class TestComponentsForwardTheirSettings:
         assert captured["temperature"] is None
         assert captured["reasoning_effort"] == "medium"
 
+    def test_nested_list_parser_passes_settings_to_item_parser(self, monkeypatch):
+        from gaik.software_components.extractor import schema as schema_module
+
+        captured: dict = {}
+        analysis = schema_module.StructureAnalysis(
+            structure_type="nested_list",
+            parent_container_name="inventory_items",
+            parent_description="Inventory items",
+            item_description="One inventory item",
+            reasoning="The document contains repeated structured items.",
+        )
+
+        monkeypatch.setattr(
+            schema_module,
+            "detect_structure_type",
+            lambda *args, **kwargs: analysis,
+        )
+
+        def fake_parse_user_requirements(*args, **kwargs):
+            captured.update(kwargs)
+            return _flat_requirements()
+
+        monkeypatch.setattr(
+            schema_module,
+            "parse_user_requirements",
+            fake_parse_user_requirements,
+        )
+
+        schema_module.parse_nested_requirements(
+            "For each inventory item, extract the answer.",
+            client=object(),
+            model="gpt-5.6-sol",
+            temperature=None,
+            reasoning_effort="low",
+        )
+
+        assert captured["temperature"] is None
+        assert captured["reasoning_effort"] == "low"
+
 
 def _signature_default(cls, name: str):
     import inspect

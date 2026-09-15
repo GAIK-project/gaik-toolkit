@@ -13,7 +13,13 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 # Add src directory to path to import modules (works without pip install)
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from gaik.software_components.parsers import VisionPlusParser, get_openai_config
+from gaik.software_components.parsers import VisionPlusParser, get_openai_config  # noqa: E402
+
+MODEL = "gpt-5.6-sol"
+MODEL_OPTIONS = {
+    "temperature": None,  # omitted from API request
+    "reasoning_effort": "low",
+}
 
 
 def main() -> None:
@@ -26,8 +32,10 @@ def main() -> None:
         return
 
     config = get_openai_config(use_azure=False)
+    config.model = MODEL
     parser = VisionPlusParser(
         vision_config=config,
+        **MODEL_OPTIONS,
         enable_ocr=False,
         enable_table_structure=True,
         enable_formula_enrichment=False,

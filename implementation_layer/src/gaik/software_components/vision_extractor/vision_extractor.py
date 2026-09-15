@@ -22,8 +22,10 @@ from gaik.software_components.extractor import (
     SchemaGenerator,
 )
 from gaik.software_components.extractor.schema import (
+    DECIMAL_PERSISTED_HELPER_SOURCE,
     NUMERIC_FIELD_TYPES,
     apply_field_policies,
+    decimal_field_repr,
     normalize_extracted_data,
 )
 from gaik.software_components.parsers.multimodal_parser.config import (
@@ -100,7 +102,10 @@ def _wrap_model_for_verification(model: type[BaseModel]) -> type[BaseModel]:
     """
     wrapped_fields: dict = {}
     for fname, finfo in model.model_fields.items():
-        annotation = finfo.annotation
+        # ``FieldInfo.annotation`` omits top-level ``Annotated`` metadata.
+        # Rebuild it so provider-facing schema overrides and validators (for
+        # example the safe Decimal schema/cleaner) survive verification wrapping.
+        annotation = finfo.rebuild_annotation()
         outer_field = Field(description=finfo.description)
         if get_origin(annotation) is list:
             args = get_args(annotation)
@@ -408,6 +413,10 @@ def _save_schema_to_python(model: type[BaseModel], path: Path) -> None:
     """
 
     def ann_repr(ann) -> str:
+        decimal_repr = decimal_field_repr(ann)
+        if decimal_repr is not None:
+            return decimal_repr
+
         origin = get_origin(ann)
         if origin is list:
             args = get_args(ann)
@@ -456,6 +465,7 @@ def _save_schema_to_python(model: type[BaseModel], path: Path) -> None:
     collect(model)
 
     class_blocks: list[str] = []
+    needs_decimal_helper = False
     for m in ordered:
         lines: list[str] = [f"class {m.__name__}(BaseModel):"]
         doc = (m.__doc__ or "").strip()
@@ -476,6 +486,8 @@ def _save_schema_to_python(model: type[BaseModel], path: Path) -> None:
                     field_args.append(f"default={repr(factory())}")
             elif not finfo.is_required():
                 field_args.append(f"default={repr(finfo.default)}")
+            if decimal_field_repr(finfo.annotation) is not None:
+                needs_decimal_helper = True
             if field_args:
                 lines.append(
                     f"    {fname}: {ann_repr(finfo.annotation)} = Field({', '.join(field_args)})"
@@ -491,6 +503,8 @@ def _save_schema_to_python(model: type[BaseModel], path: Path) -> None:
         "from typing import List, Literal, Optional, Union\n\n"
         "from pydantic import BaseModel, ConfigDict, Field\n\n"
     )
+    if needs_decimal_helper:
+        header += DECIMAL_PERSISTED_HELPER_SOURCE.strip() + "\n\n\n"
     path.write_text(header + "\n\n".join(class_blocks) + "\n", encoding="utf-8")
 
 

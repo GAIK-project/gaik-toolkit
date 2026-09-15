@@ -8,7 +8,6 @@ This demo shows how to:
 """
 
 import sys
-from decimal import Decimal
 from pathlib import Path
 from typing import Literal
 
@@ -19,10 +18,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.extractor import (  # noqa: E402  # noqa: E402
     DataExtractor,
+    DecimalField,
     ExtractionRequirements,
     FieldSpec,
     get_openai_config,
 )
+
+MODEL = "gpt-5.6-sol"
+MODEL_OPTIONS = {
+    "temperature": None,
+    "reasoning_effort": "low",
+}
 
 
 class ProjectInfo(BaseModel):
@@ -33,7 +39,7 @@ class ProjectInfo(BaseModel):
     project_title: str = Field(description="Project title")
     project_acronym: str = Field(description="Project acronym")
     lead_institution: str = Field(description="Lead institution")
-    total_funding_eur: Decimal = Field(description="Total funding in EUR")
+    total_funding_eur: DecimalField = Field(description="Total funding in EUR")
     start_date: str = Field(description="Start date")
     project_status: Literal["ongoing", "completed"] = Field(description="Project status")
 
@@ -90,7 +96,7 @@ if __name__ == "__main__":
     print("=" * 80)
 
     config = get_openai_config(use_azure=True)
-    extractor = DataExtractor(config=config)
+    extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
 
     results = extractor.extract(
         extraction_model=ProjectInfo,

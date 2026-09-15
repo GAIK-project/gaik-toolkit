@@ -25,7 +25,21 @@ from gaik.software_components.extractor import (
     SchemaGenerator,
     get_openai_config,
 )
-from gaik.software_components.extractor.schema import print_pydantic_schema
+from gaik.software_components.extractor.schema import decimal_field_repr, print_pydantic_schema
+
+
+# MODEL = "gpt-5.4" # Temperature parameter only exists upto gpt-5.4
+# MODEL_OPTIONS = {
+#     "temperature": 0.0,
+#     "reasoning_effort": None,
+# }
+
+
+MODEL = "gpt-5.6-sol"
+MODEL_OPTIONS = {
+    "temperature": None,
+    "reasoning_effort": "low",
+}
 
 # ---------------------------------------------------------------------------
 # Shared sample data (same as extraction_example_1.py)
@@ -99,15 +113,28 @@ def save_schema_to_python(model: type, path: Path) -> None:
         print_pydantic_schema(model, title="Saved Schema")
 
     schema_code = _clean_schema_dump(buffer.getvalue())
+    schema_lines = schema_code.splitlines()
+    for field_name, field_info in model.model_fields.items():
+        decimal_repr = decimal_field_repr(field_info.annotation)
+        if decimal_repr is None:
+            continue
+
+        prefix = f"    {field_name}: "
+        for index, line in enumerate(schema_lines):
+            if line.startswith(prefix) and " = Field" in line:
+                field_call = line.index(" = Field")
+                schema_lines[index] = f"{prefix}{decimal_repr}{line[field_call:]}"
+                break
+    schema_code = "\n".join(schema_lines)
+
     template = f'''"""
 Auto-generated schema module (do not edit manually).
 """
 
-import decimal
-from decimal import Decimal
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, ConfigDict
+from gaik.software_components.extractor import DecimalField, OptionalDecimalField
 
 {schema_code}
 '''
@@ -155,7 +182,7 @@ def generate_and_persist_assets():
     """Generate schema + requirements, then write them to disk."""
     print("\n=== Generating schema and requirements ===")
     config = get_openai_config(use_azure=True)
-    generator = SchemaGenerator(config=config)
+    generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
     schema = generator.generate_schema(user_requirements=USER_REQUIREMENTS)
 
     save_schema_to_python(schema, SCHEMA_PATH)
@@ -170,7 +197,7 @@ def load_assets_and_extract():
 
     print("\n=== Running extraction with saved schema ===")
     config = get_openai_config(use_azure=True)
-    extractor = DataExtractor(config=config)
+    extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
     results = extractor.extract(
         extraction_model=SavedModel,
         requirements=requirements,

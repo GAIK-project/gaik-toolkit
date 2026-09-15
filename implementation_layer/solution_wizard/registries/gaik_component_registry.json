@@ -505,6 +505,85 @@
     "install_extra": "extract"
   },
   {
+    "id": "data_extractor",
+    "name": "DataExtractor",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text",
+      "transcript",
+      "enhanced_transcript",
+      "parsed_text"
+    ],
+    "output_artifact_types": [
+      "structured_json"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture",
+      "knowledge_synthesis"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "schema_ref",
+      "requirements_ref"
+    ],
+    "optional_parameters": [
+      "model",
+      "temperature",
+      "reasoning_effort",
+      "save_json",
+      "json_path"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure_openai",
+      "anthropic",
+      "google"
+    ],
+    "cost_relevant_parameters": [
+      "model",
+      "reasoning_effort"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Runs one extraction call per document against an already-built schema -- no schema-generation call, unlike Extractor",
+      "cost_sensitivity": "medium -- one extraction call per document; cost scales with document count, not with schema complexity",
+      "degrades_on": [
+        "very_long_inputs_exceeding_context_window"
+      ]
+    },
+    "known_limitations": [
+      "Requires a pre-built extraction_model and requirements -- unlike Extractor, it does not fall back to generating a schema when one is missing",
+      "When provider=azure_openai: bare dict and list[dict] Pydantic field types cause a 400 error -- Azure OpenAI structured output requires additionalProperties:false on every object. Replace with named sub-models using ConfigDict(extra='forbid').",
+      "ExtractionRequirements field_type enum does not include plain 'dict'. For nested objects use field_type 'str'; for arrays of objects use 'list[dict]'."
+    ],
+    "best_for": [
+      "extraction_reusing_an_already_approved_schema",
+      "form_field_extraction",
+      "structured_report_generation",
+      "data_capture_from_text"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "extract_fields",
+        "component": "DataExtractor",
+        "inputs": [
+          "source_text"
+        ],
+        "outputs": [
+          "structured_json"
+        ],
+        "parameters": {
+          "schema_ref": "schemas/output_schema.py",
+          "requirements_ref": "schemas/output_schema_requirements.json"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/extractor/extractor.py",
+    "import_path": "gaik.software_components.extractor",
+    "example_script_path": "implementation_layer/examples/software_components/extractor/extraction_example_3.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/extractor/README.md",
+    "install_extra": "extract"
+  },
+  {
     "id": "vision_extractor",
     "name": "VisionExtractor",
     "type": "software_component",
@@ -1639,6 +1718,7 @@
       "use_context",
       "max_tokens",
       "temperature",
+      "reasoning_effort",
       "dpi",
       "clean_output"
     ],
@@ -1648,7 +1728,8 @@
     ],
     "cost_relevant_parameters": [
       "dpi",
-      "max_tokens"
+      "max_tokens",
+      "reasoning_effort"
     ],
     "quality_tradeoffs": {
       "speed_vs_accuracy": "One vision call per page -- slower and costlier than local parsers, but preserves layout, tables, and page boundaries",
@@ -1859,7 +1940,9 @@
       "enable_formula_enrichment",
       "num_threads",
       "verbose",
-      "vision_prompt"
+      "vision_prompt",
+      "temperature",
+      "reasoning_effort"
     ],
     "supported_providers": [
       "openai",
@@ -1868,7 +1951,8 @@
     "cost_relevant_parameters": [
       "enable_ocr",
       "enable_formula_enrichment",
-      "vision_prompt"
+      "vision_prompt",
+      "reasoning_effort"
     ],
     "quality_tradeoffs": {
       "speed_vs_accuracy": "Docling layout analysis plus a vision model per detected image -- the most accurate option for documents whose figures carry meaning, and the slowest",

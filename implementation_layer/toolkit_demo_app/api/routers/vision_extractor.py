@@ -1,26 +1,37 @@
-"""Vision Extractor router — single-pass PDF/image → structured data."""
+"""Vision Extractor router - single-pass PDF/image to structured data."""
+
+from __future__ import annotations
 
 import logging
 import os
 import tempfile
+import time
+import uuid
+from collections import OrderedDict
+from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
 try:
     from utils import (
+        MODEL,
+        MODEL_OPTIONS,
         get_api_config,
-        load_schema,
-        schema_id_from_requirements,
+        load_saved_requirements,
+        load_saved_schema,
+        schema_to_python_source,
         validate_file_size,
-        wrap_schema_with_numeric_normalizers,
     )
 except ImportError:
     from api.utils import (
+        MODEL,
+        MODEL_OPTIONS,
         get_api_config,
-        load_schema,
-        schema_id_from_requirements,
+        load_saved_requirements,
+        load_saved_schema,
+        schema_to_python_source,
         validate_file_size,
-        wrap_schema_with_numeric_normalizers,
     )
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -28,9 +39,6 @@ from pydantic import BaseModel
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# In-memory cache for generated schemas (keyed by hash of user_requirements).
-_schema_cache: dict[str, tuple[Any, Any]] = {}
 
 SUPPORTED_SUFFIXES = {
     ".pdf",
@@ -44,12 +52,51 @@ SUPPORTED_SUFFIXES = {
     ".bmp",
 }
 
-_KNOWN_TYPES = {"decimal.Decimal", "int", "float", "bool"}
+Provider = Literal["openai", "azure", "claude", "google"]
+ReasoningEffort = Literal["low", "medium", "high"]
+
+PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
+    "openai": (
+        "gpt-5.4-mini",
+        "gpt-5.4",
+        "gpt-5.5-deployment",
+        "gpt-5.6-sol",
+    ),
+    # ``azure`` remains an accepted alias for older clients.
+    "azure": (
+        "gpt-5.4-mini",
+        "gpt-5.4",
+        "gpt-5.5-deployment",
+        "gpt-5.6-sol",
+    ),
+    "claude": ("claude-sonnet-4.6", "claude-sonnet-5"),
+    "google": ("gemini-3.1-flash-lite",),
+}
+
+EXAMPLE_SCHEMA_ID = "example"
+EXAMPLE_SCHEMA_DIR = Path(__file__).parent.parent / "schemas" / "vision_extractor_example"
+EXAMPLE_TASK_PATH = EXAMPLE_SCHEMA_DIR / "task.txt"
+EXAMPLE_SCHEMA_PATH = EXAMPLE_SCHEMA_DIR / "schema.py"
+EXAMPLE_REQUIREMENTS_PATH = EXAMPLE_SCHEMA_DIR / "requirements.json"
+
+TEMPORARY_SCHEMA_LIMIT = 32
 
 
-def _schema_key_for(user_requirements: str) -> str:
-    """Schema key prefixed for the vision extractor (separate namespace)."""
-    return f"vision_extractor_{schema_id_from_requirements(user_requirements)}"
+@dataclass(frozen=True)
+class TemporarySchema:
+    user_requirements: str
+    schema: type[BaseModel]
+    requirements: Any
+    created_at: float
+
+
+# Temporary custom schemas are intentionally process-local and never persisted.
+_temporary_schemas: OrderedDict[str, TemporarySchema] = OrderedDict()
+
+
+def _normalize_task_text(value: str) -> str:
+    """Normalize transport-specific newlines before task identity checks."""
+    return value.replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
 def _validate_suffix(filename: str | None) -> None:
@@ -67,101 +114,27 @@ def _validate_suffix(filename: str | None) -> None:
         )
 
 
-def _has_use_case_name(requirements) -> bool:
-    """Distinguish ExtractionRequirements (has fields) from CompositeExtractionRequirements."""
-    return hasattr(requirements, "fields") and hasattr(requirements, "use_case_name")
-
-
-def _field_descriptors(requirements) -> list[dict]:
-    """Flatten requirements (flat OR composite parent+child) into a display list."""
-    if _has_use_case_name(requirements):
-        return [
-            {
-                "name": field.field_name,
-                "type": field.field_type,
-                "description": field.description,
-                "required": field.required,
-            }
-            for field in requirements.fields
-        ]
-
-    # CompositeExtractionRequirements: parent scalar fields + one repeated child collection.
-    parent = requirements.parent_requirements
-    child = requirements.child_requirements
-    container = requirements.child_container_name
-    descriptors = [
-        {
-            "name": field.field_name,
-            "type": field.field_type,
-            "description": field.description,
-            "required": field.required,
-        }
-        for field in parent.fields
-    ]
-    descriptors.append(
-        {
-            "name": container,
-            "type": f"list[{child.use_case_name}]",
-            "description": f"Repeated {container} (one entry per row in the source)",
-            "required": True,
-        }
+def _annotation_name(annotation: Any) -> str:
+    return (
+        str(annotation)
+        .replace("typing.", "")
+        .replace("<class '", "")
+        .replace("'>", "")
+        .replace("gaik.software_components.extractor.schema.", "")
     )
-    return descriptors
 
 
-def _format_field_line(field) -> str:
-    field_type = field.field_type
-    if field_type not in _KNOWN_TYPES and not field_type.startswith("Literal["):
-        field_type = "str"
-    if not field.required:
-        field_type = f"{field_type} | None"
-    default_value = "None" if not field.required else "..."
-    desc = field.description.replace('"', '\\"')
-    return f'    {field.field_name}: {field_type} = Field({default_value}, description="{desc}")'
-
-
-def _flat_schema_lines(schema_name: str, use_case_name: str, requirements) -> list[str]:
-    lines = [
-        f"class {schema_name}(BaseModel):",
-        f'    """Extraction model for {use_case_name}"""',
-        "",
+def _field_descriptors(schema: type[BaseModel]) -> list[dict]:
+    """Describe the actual runtime model rather than intermediate LLM fields."""
+    return [
+        {
+            "name": name,
+            "type": _annotation_name(field.annotation),
+            "description": field.description or "",
+            "required": field.is_required(),
+        }
+        for name, field in schema.model_fields.items()
     ]
-    lines.extend(_format_field_line(field) for field in requirements.fields)
-    return lines
-
-
-def _schema_code_from_requirements(schema: type[BaseModel], requirements) -> str:
-    """Render Pydantic schema source — supports both flat and composite layouts."""
-    header = [
-        "from pydantic import BaseModel, Field",
-        "from typing import Literal",
-        "import decimal",
-        "",
-    ]
-
-    if _has_use_case_name(requirements):
-        return "\n".join(
-            header + _flat_schema_lines(schema.__name__, requirements.use_case_name, requirements)
-        )
-
-    # Composite: emit child model first, then parent model with the list[Child] container.
-    parent = requirements.parent_requirements
-    child = requirements.child_requirements
-    container = requirements.child_container_name
-    child_class = child.use_case_name
-
-    body: list[str] = []
-    body.extend(_flat_schema_lines(child_class, child.use_case_name, child))
-    body.append("")
-    body.append(f"class {schema.__name__}(BaseModel):")
-    body.append(f'    """Extraction model for {parent.use_case_name}"""')
-    body.append("")
-    body.extend(_format_field_line(field) for field in parent.fields)
-    body.append(
-        f"    {container}: list[{child_class}] = Field("
-        f'..., description="Repeated {container} (one entry per row in the source)")'
-    )
-    return "\n".join(header + body)
 
 
 class GenerateSchemaRequest(BaseModel):
@@ -174,6 +147,8 @@ class GenerateSchemaResponse(BaseModel):
     structure_type: str
     fields: list[dict]
     schema_id: str
+    schema_source: Literal["example", "temporary"]
+    user_requirements: str
 
 
 class UsageMetadata(BaseModel):
@@ -197,12 +172,6 @@ _USAGE_FIELDS = (
 )
 
 
-def _usage_from(usage: Any) -> "UsageMetadata | None":
-    if usage is None:
-        return None
-    return UsageMetadata(**{name: getattr(usage, name, None) for name in _USAGE_FIELDS})
-
-
 class VisionExtractResponse(BaseModel):
     data: dict
     verification: dict | None = None
@@ -212,128 +181,244 @@ class VisionExtractResponse(BaseModel):
     usage: UsageMetadata | None = None
 
 
+def _usage_from(usage: Any) -> UsageMetadata | None:
+    if usage is None:
+        return None
+    return UsageMetadata(**{name: getattr(usage, name, None) for name in _USAGE_FIELDS})
+
+
+def _structure_type(requirements: Any) -> str:
+    return getattr(requirements, "structure_type", "object")
+
+
+def _schema_response(
+    schema: type[BaseModel],
+    requirements: Any,
+    schema_id: str,
+    schema_source: Literal["example", "temporary"],
+    user_requirements: str,
+) -> GenerateSchemaResponse:
+    return GenerateSchemaResponse(
+        schema_code=schema_to_python_source(schema),
+        schema_name=schema.__name__,
+        structure_type=_structure_type(requirements),
+        fields=_field_descriptors(schema),
+        schema_id=schema_id,
+        schema_source=schema_source,
+        user_requirements=user_requirements,
+    )
+
+
+@lru_cache(maxsize=1)
+def _load_example_schema() -> tuple[str, type[BaseModel], Any]:
+    """Load the immutable schema committed for the built-in PO/BOM example."""
+    if not all(
+        path.is_file()
+        for path in (EXAMPLE_TASK_PATH, EXAMPLE_SCHEMA_PATH, EXAMPLE_REQUIREMENTS_PATH)
+    ):
+        raise RuntimeError("The built-in Vision Extractor example schema is incomplete")
+
+    user_requirements = _normalize_task_text(EXAMPLE_TASK_PATH.read_text(encoding="utf-8"))
+    loaded = load_saved_requirements(
+        EXAMPLE_REQUIREMENTS_PATH,
+        expected_user_requirements=user_requirements,
+    )
+    if loaded is None:
+        raise RuntimeError("The built-in Vision Extractor example schema is stale")
+
+    model_name, requirements = loaded
+    schema = load_saved_schema(EXAMPLE_SCHEMA_PATH, model_name)
+    return user_requirements, schema, requirements
+
+
+def _remember_temporary_schema(
+    user_requirements: str,
+    schema: type[BaseModel],
+    requirements: Any,
+) -> str:
+    schema_id = uuid.uuid4().hex
+    _temporary_schemas[schema_id] = TemporarySchema(
+        user_requirements=_normalize_task_text(user_requirements),
+        schema=schema,
+        requirements=requirements,
+        created_at=time.monotonic(),
+    )
+    _temporary_schemas.move_to_end(schema_id)
+    while len(_temporary_schemas) > TEMPORARY_SCHEMA_LIMIT:
+        _temporary_schemas.popitem(last=False)
+    return schema_id
+
+
+def _resolve_requested_schema(schema_id: str, user_requirements: str):
+    normalized_requirements = _normalize_task_text(user_requirements)
+    if schema_id == EXAMPLE_SCHEMA_ID:
+        example_task, schema, requirements = _load_example_schema()
+        if normalized_requirements != example_task:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "The extraction task no longer matches the built-in example schema. "
+                    "Generate and preview a new schema first."
+                ),
+            )
+        return schema, requirements
+
+    cached = _temporary_schemas.get(schema_id)
+    if cached is None:
+        raise HTTPException(
+            status_code=410,
+            detail="The temporary schema is unavailable. Generate and preview it again.",
+        )
+    if _normalize_task_text(cached.user_requirements) != normalized_requirements:
+        raise HTTPException(
+            status_code=409,
+            detail="The extraction task changed. Generate and preview a new schema first.",
+        )
+    _temporary_schemas.move_to_end(schema_id)
+    return cached.schema, cached.requirements
+
+
+def _provider_settings(provider: Provider, model: str) -> tuple[str, bool, bool]:
+    if model not in PROVIDER_MODELS[provider]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Model '{model}' is not available for provider '{provider}'.",
+        )
+
+    if provider in {"openai", "azure"}:
+        return "openai", bool(os.getenv("AZURE_API_KEY")), False
+    if provider == "claude":
+        use_foundry = bool(os.getenv("AZURE_API_KEY") and os.getenv("ANTHROPIC_FOUNDRY_RESOURCE"))
+        return "claude", use_foundry, False
+
+    use_vertex = bool(os.getenv("GOOGLE_PROJECT_ID"))
+    return "google", False, use_vertex
+
+
+@router.get("/example-schema", response_model=GenerateSchemaResponse)
+async def get_example_schema():
+    """Return the immutable schema bundled with the PO/BOM demo."""
+    try:
+        user_requirements, schema, requirements = _load_example_schema()
+        return _schema_response(
+            schema,
+            requirements,
+            EXAMPLE_SCHEMA_ID,
+            "example",
+            user_requirements,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 @router.post("/generate-schema", response_model=GenerateSchemaResponse)
 async def generate_schema(request: GenerateSchemaRequest):
-    """Generate a Pydantic schema from natural language requirements.
-
-    Same logic as the regular extractor's /generate-schema, but keyed under
-    a separate `vision_extractor_*` namespace so vision and text extractors
-    can persist different schemas for the same prompt.
-    """
-    if not request.user_requirements:
+    """Generate an in-memory schema that will never replace the example schema."""
+    user_requirements = _normalize_task_text(request.user_requirements)
+    if not user_requirements:
         raise HTTPException(status_code=400, detail="No requirements provided")
 
     try:
         from gaik.software_components.extractor import SchemaGenerator
 
-        config = get_api_config()
-        sid = schema_id_from_requirements(request.user_requirements)
-        schema_key = _schema_key_for(request.user_requirements)
-
-        loaded = load_schema(schema_key, request.user_requirements)
-        if loaded is not None:
-            schema, requirements = loaded
-            logger.info("Loaded persisted vision-extractor schema for hash %s", sid)
-        elif sid in _schema_cache:
-            schema, requirements = _schema_cache[sid]
-        else:
-            generator = SchemaGenerator(config)
-            schema = wrap_schema_with_numeric_normalizers(
-                generator.generate_schema(user_requirements=request.user_requirements)
-            )
-            requirements = generator.item_requirements
-            _schema_cache[sid] = (schema, requirements)
-            logger.info("Generated temporary vision-extractor schema for hash %s", sid)
-
-        structure_type = (
-            "object"
-            if _has_use_case_name(requirements)
-            else getattr(requirements, "structure_type", "parent_with_nested_list")
+        generator = SchemaGenerator(get_api_config(), model=MODEL, **MODEL_OPTIONS)
+        schema = generator.generate_schema(user_requirements=user_requirements)
+        requirements = generator.item_requirements
+        schema_id = _remember_temporary_schema(user_requirements, schema, requirements)
+        logger.info("Generated temporary vision-extractor schema %s", schema_id)
+        return _schema_response(
+            schema,
+            requirements,
+            schema_id,
+            "temporary",
+            user_requirements,
         )
-        return GenerateSchemaResponse(
-            schema_code=_schema_code_from_requirements(schema, requirements),
-            schema_name=schema.__name__,
-            structure_type=structure_type,
-            fields=_field_descriptors(requirements),
-            schema_id=sid,
-        )
-
-    except ImportError as e:
-        raise HTTPException(status_code=500, detail=f"Extractor not installed: {e}") from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    except HTTPException:
+        raise
+    except ImportError as exc:
+        raise HTTPException(status_code=500, detail=f"Extractor not installed: {exc}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("", response_model=VisionExtractResponse)
 async def extract_vision(
     files: list[UploadFile] = File(..., description="PDF/image files (multi-doc supported)"),
     user_requirements: str = Form(..., description="Natural-language extraction task"),
-    model_provider: Literal["azure", "claude", "google"] = Form("azure"),
+    schema_id: str = Form(..., description="Reviewed example or temporary schema ID"),
+    model_provider: Provider = Form("openai"),
+    model: str = Form("gpt-5.4"),
+    reasoning_effort: ReasoningEffort = Form("medium"),
+    merge_table: bool = Form(False),
+    additional_instructions: str | None = Form(None),
     include_verification: bool = Form(False),
 ):
-    """Extract structured data from PDFs/images in a single LLM call.
-
-    Accepts multiple files in one request — the model sees them together,
-    enabling cross-document reasoning (e.g. PO + multiple BOMs).
-    """
+    """Extract with the exact pre-built schema selected in the demo UI."""
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
-    if not user_requirements:
+    normalized_user_requirements = _normalize_task_text(user_requirements)
+    if not normalized_user_requirements:
         raise HTTPException(status_code=400, detail="No requirements provided")
 
-    for f in files:
-        _validate_suffix(f.filename)
+    extraction_model, requirements = _resolve_requested_schema(
+        schema_id, normalized_user_requirements
+    )
+    lib_provider, use_azure, vertex_ai = _provider_settings(model_provider, model)
+
+    for uploaded_file in files:
+        _validate_suffix(uploaded_file.filename)
 
     temp_paths: list[Path] = []
     try:
-        for f in files:
-            content = await validate_file_size(f)
-            suffix = Path(f.filename or "").suffix.lower()
+        for uploaded_file in files:
+            content = await validate_file_size(uploaded_file)
+            suffix = Path(uploaded_file.filename or "").suffix.lower()
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(content)
                 temp_paths.append(Path(tmp.name))
 
         try:
             from gaik.software_components.vision_extractor import VisionExtractor
-        except ImportError as e:
+        except ImportError as exc:
             raise HTTPException(
                 status_code=500,
                 detail=(
                     "VisionExtractor not available. "
                     "Update to gaik>=0.5.10 or install the toolkit from source. "
-                    f"({e})"
+                    f"({exc})"
                 ),
-            ) from e
-
-        # "azure" is the demo-UI label for the OpenAI family — map it to the
-        # library's "openai" provider and auto-detect Azure vs plain OpenAI from
-        # the environment (Azure when AZURE_API_KEY is set, otherwise OPENAI_API_KEY).
-        lib_provider = "openai" if model_provider == "azure" else model_provider
-        use_azure = model_provider == "azure" and bool(os.getenv("AZURE_API_KEY"))
+            ) from exc
 
         try:
             extractor = VisionExtractor(
                 model_provider=lib_provider,
+                model=model,
+                reasoning_effort=reasoning_effort,
+                merge_table=merge_table,
                 use_azure=use_azure,
+                vertex_ai=vertex_ai,
+                additional_instructions=(additional_instructions or "").strip() or None,
                 include_verification=include_verification,
             )
-        except Exception as e:
+        except Exception as exc:
             raise HTTPException(
                 status_code=400,
                 detail=(
                     f"Failed to initialize VisionExtractor for provider "
-                    f"'{model_provider}': {e}. "
-                    "Check that the relevant API key environment variables are set."
+                    f"'{model_provider}': {exc}. "
+                    "Check that the relevant provider credentials are configured."
                 ),
-            ) from e
+            ) from exc
 
         try:
             result = extractor.extract(
                 file_paths=temp_paths,
-                user_requirements=user_requirements,
+                user_requirements=normalized_user_requirements,
+                extraction_model=extraction_model,
+                requirements=requirements,
             )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Vision extraction failed: {e}") from e
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Vision extraction failed: {exc}") from exc
 
         return VisionExtractResponse(
             data=result.data,
@@ -343,7 +428,6 @@ async def extract_vision(
             duration_s=result.duration_s,
             usage=_usage_from(result.usage),
         )
-
     finally:
         for path in temp_paths:
             path.unlink(missing_ok=True)

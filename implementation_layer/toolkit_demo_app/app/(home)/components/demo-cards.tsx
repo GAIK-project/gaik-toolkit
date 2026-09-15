@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   AudioWaveform,
   Bot,
+  Braces,
   Cpu,
   Database,
   Download,
@@ -172,6 +173,13 @@ const moduleDemos: Demo[] = [
 
 // Building Blocks (software components)
 const buildingBlocks: Demo[] = [
+  {
+    title: "Schema Generator",
+    description:
+      "Turn extraction requirements into reusable Pydantic models and field policies",
+    href: "/schema-generator",
+    icon: Braces,
+  },
   {
     title: "Extractor",
     description:

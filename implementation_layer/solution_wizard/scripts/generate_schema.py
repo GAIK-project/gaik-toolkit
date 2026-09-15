@@ -26,12 +26,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import importlib
-import io
 import json
 import sys
-from contextlib import redirect_stdout
 from pathlib import Path
+from typing import Literal, Union, get_args, get_origin
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -39,75 +37,185 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 try:
     from gaik.software_components.config import get_openai_config
     from gaik.software_components.extractor.schema import (
+        DECIMAL_PERSISTED_HELPER_SOURCE,
+        CompositeExtractionRequirements,
         ExtractionRequirements,
         SchemaGenerator,
-        print_pydantic_schema,
+        decimal_field_repr,
     )
+
     _GAIK_AVAILABLE = True
 except ImportError as _import_err:
     _GAIK_AVAILABLE = False
     _IMPORT_ERR = _import_err
 
 
-def _clean_schema_dump(raw: str) -> str:
-    """Remove the header/footer separator lines print_pydantic_schema adds.
+def _annotation_repr(annotation) -> str:
+    """Return a Python source representation for common Pydantic field types.
 
-    The output format is:
-        ================...  (header separator)
-        Schema Title
-        ================...  (header separator)
-        <blank>
-        class ClassName(...):
-            ...
-        ================...  (footer separator)   <-- must also be stripped
+    Routes Decimal fields to the safe DecimalField/OptionalDecimalField
+    aliases instead of the plain type -- see decimal_field_repr's docstring
+    (gaik.software_components.extractor.schema) for why field.annotation
+    alone can no longer tell a "made safe" Decimal field apart from a plain
+    one, and _DECIMAL_HELPER_SOURCE below for what those aliases need.
     """
-    import re
-    _sep = re.compile(r"^=+\s*$")
-    lines = raw.splitlines()
-    cleaned = []
-    in_class = False
-    for line in lines:
-        if not in_class and line.startswith("class "):
-            in_class = True
-        if in_class:
-            if _sep.match(line):
-                continue  # skip footer separator
-            cleaned.append(line)
-    return "\n".join(cleaned).rstrip()
+    decimal_repr = decimal_field_repr(annotation)
+    if decimal_repr is not None:
+        return decimal_repr
+
+    origin = get_origin(annotation)
+
+    if origin is list:
+        args = get_args(annotation)
+        return f"list[{_annotation_repr(args[0])}]" if args else "list"
+
+    if origin is Literal:
+        args = get_args(annotation)
+        return f"Literal[{', '.join(repr(arg) for arg in args)}]"
+
+    if origin is Union:
+        args = get_args(annotation)
+        non_none = [arg for arg in args if arg is not type(None)]
+        if len(non_none) == 1 and type(None) in args:
+            return f"Optional[{_annotation_repr(non_none[0])}]"
+        return f"Union[{', '.join(_annotation_repr(arg) for arg in args)}]"
+
+    # Python 3.10+ union syntax, e.g. str | None.
+    try:
+        import types as _types
+
+        if isinstance(annotation, _types.UnionType):
+            args = get_args(annotation)
+            non_none = [arg for arg in args if arg is not type(None)]
+            if len(non_none) == 1 and type(None) in args:
+                return f"Optional[{_annotation_repr(non_none[0])}]"
+            return f"Union[{', '.join(_annotation_repr(arg) for arg in args)}]"
+    except AttributeError:
+        pass
+
+    if annotation is type(None):
+        return "None"
+
+    if hasattr(annotation, "__name__"):
+        return annotation.__name__
+
+    return repr(annotation)
+
+
+def _collect_models(model: type) -> list[type]:
+    """Collect nested Pydantic models before the parent model."""
+    seen: set[type] = set()
+    ordered: list[type] = []
+
+    def collect(current: type) -> None:
+        if current in seen:
+            return
+        seen.add(current)
+        for field in current.model_fields.values():
+            if get_origin(field.annotation) is list:
+                args = get_args(field.annotation)
+                if args and isinstance(args[0], type) and hasattr(args[0], "model_fields"):
+                    collect(args[0])
+        ordered.append(current)
+
+    collect(model)
+    return ordered
 
 
 def _schema_to_py(schema_class: type, schema_name: str) -> str:
-    """Render the generated Pydantic class to a .py file string."""
-    buffer = io.StringIO()
-    with redirect_stdout(buffer):
-        print_pydantic_schema(schema_class, title="Saved Schema")
-    schema_code = _clean_schema_dump(buffer.getvalue())
+    """Render the generated Pydantic model (and any nested child models) to a
+    .py file string.
 
-    # Determine the actual class name from the generated model
-    actual_class_name = schema_class.__name__
+    Builds source directly from model_fields rather than via
+    print_pydantic_schema(): that helper reads field.annotation, which
+    strips the Annotated/WithJsonSchema/BeforeValidator wrapping
+    create_extraction_model() applies to Decimal fields (see
+    decimal_field_repr's docstring) -- regenerating from the bare
+    annotation would silently drop the safe Decimal representation,
+    restoring both the regex-lookaround schema-rejection failure and the
+    "12.40 EUR"-crashes-Decimal-parsing failure on the next PoC run.
+    """
+    class_blocks: list[str] = []
+    needs_decimal_helper = False
 
-    return (
+    for current_model in _collect_models(schema_class):
+        lines = [f"class {current_model.__name__}(BaseModel):"]
+
+        docstring = (current_model.__doc__ or "").strip()
+        if docstring:
+            lines.append(f'    """{docstring}"""')
+
+        lines.append("    model_config = ConfigDict(extra='forbid')")
+        lines.append("")
+
+        for field_name, field in current_model.model_fields.items():
+            field_args: list[str] = []
+
+            if field.description:
+                field_args.append(f"description={field.description!r}")
+
+            if field.default_factory is not None:
+                factory_name = getattr(field.default_factory, "__name__", None)
+                if factory_name in {"list", "dict", "set"}:
+                    field_args.append(f"default_factory={factory_name}")
+                else:
+                    field_args.append(f"default={field.default_factory()!r}")
+            elif not field.is_required():
+                field_args.append(f"default={field.default!r}")
+
+            if decimal_field_repr(field.annotation) is not None:
+                needs_decimal_helper = True
+            annotation = _annotation_repr(field.annotation)
+            if field_args:
+                lines.append(f"    {field_name}: {annotation} = Field({', '.join(field_args)})")
+            else:
+                lines.append(f"    {field_name}: {annotation}")
+
+        class_blocks.append("\n".join(lines))
+
+    header = (
         '"""Output schema for this use case.\n\n'
         "Generated by GAIK SchemaGenerator via the Solution Configuration Wizard.\n"
         "Reviewed and approved by the user during Phase 5 (Schema Design).\n"
         'Do not hand-edit -- re-run generate_schema.py if the requirements change.\n"""\n\n'
-        "import decimal\n"
         "from decimal import Decimal\n"
-        "from typing import List, Literal, Optional\n\n"
+        "from typing import List, Literal, Optional, Union\n\n"
         "from pydantic import BaseModel, Field, ConfigDict\n\n"
-        f"{schema_code}\n"
     )
+    if needs_decimal_helper:
+        header += DECIMAL_PERSISTED_HELPER_SOURCE.strip() + "\n\n\n"
+    return header + "\n\n".join(class_blocks) + "\n"
 
 
 def _requirements_to_json(
     schema_class: type,
-    requirements: ExtractionRequirements,
+    requirements: ExtractionRequirements | CompositeExtractionRequirements,
 ) -> dict:
     """Produce the payload that load_schema() expects."""
     return {
         "model_name": schema_class.__name__,
+        "requirements_type": (
+            "parent_with_nested_list"
+            if isinstance(requirements, CompositeExtractionRequirements)
+            else "extraction"
+        ),
         "requirements": requirements.model_dump(),
     }
+
+
+def _requirements_field_summary(
+    requirements: ExtractionRequirements | CompositeExtractionRequirements,
+) -> list[str] | dict[str, list[str]]:
+    """Return printable field names for flat and repeated-record schemas."""
+    if isinstance(requirements, CompositeExtractionRequirements):
+        return {
+            "parent": [field.field_name for field in requirements.parent_requirements.fields],
+            **{
+                child.container_name: [field.field_name for field in child.requirements.fields]
+                for child in requirements.children
+            },
+        }
+    return [field.field_name for field in requirements.fields]
 
 
 def main() -> int:
@@ -176,7 +284,9 @@ def main() -> int:
     config = get_openai_config(use_azure=args.use_azure)
     generator = SchemaGenerator(config=config, model=args.model)
     schema_class = generator.generate_schema(user_requirements=user_requirements)
-    requirements: ExtractionRequirements = generator.item_requirements
+    requirements: ExtractionRequirements | CompositeExtractionRequirements = (
+        generator.item_requirements
+    )
 
     # -- Write output_schema.py --
     py_content = _schema_to_py(schema_class, args.schema_name or schema_class.__name__)
@@ -203,6 +313,7 @@ def main() -> int:
     # If extraction_requirements.md is later edited, the hash mismatch will
     # trigger regeneration on the next run_poc.py invocation.
     import hashlib
+
     req_hash = hashlib.sha256(req_path.read_bytes()).hexdigest()
     # All schema files are always named output_schema.* regardless of the class
     # name. The hash file is therefore always output_schema.hash so that every
@@ -213,7 +324,7 @@ def main() -> int:
 
     print(
         f"\nGenerated class name: {schema_class.__name__}"
-        f"\nFields: {[f.field_name for f in requirements.fields]}"
+        f"\nFields: {_requirements_field_summary(requirements)}"
         f"\n\nPresent {py_path} to the user for review."
         "\nIf the user requests changes, edit output_schema.py and"
         "\noutput_schema_requirements.json directly -- do NOT re-run this script."

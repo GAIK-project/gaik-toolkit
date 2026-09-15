@@ -10,17 +10,21 @@ class incident_details_extraction_Extraction(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    date: str | None = Field(None, description="Date of the incident")
-    time: str | None = Field(None, description="Time of the incident")
-    location: str | None = Field(None, description="Location where the incident occurred")
-    description: str | None = Field(None, description="Narrative description of the incident")
-    people_involved: list[str] | None = Field(None, description="People involved in the incident")
+    date: str | None = Field(default=None, description="Date of the incident")
+    time: str | None = Field(default=None, description="Time of the incident")
+    location: str | None = Field(default=None, description="Location where the incident occurred")
+    description: str | None = Field(
+        default=None, description="Narrative description of the incident"
+    )
+    people_involved: list[str] | None = Field(
+        default=None, description="People involved in the incident"
+    )
     injuries: str | None = Field(
-        None, description="Details of any injuries resulting from the incident"
+        default=None, description="Details of any injuries resulting from the incident"
     )
     damages: str | None = Field(
-        None, description="Details of any damages resulting from the incident"
+        default=None, description="Details of any damages resulting from the incident"
     )
     actions_taken: list[str] | None = Field(
-        None, description="Actions taken in response to the incident"
+        default=None, description="Actions taken in response to the incident"
     )

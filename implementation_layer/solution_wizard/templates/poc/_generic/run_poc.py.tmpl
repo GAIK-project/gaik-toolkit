@@ -95,8 +95,19 @@ def _load_output_schema(schema_dir: Path):
 
     try:
         data = _json.loads(req_path.read_text(encoding="utf-8"))
-        from gaik.software_components.extractor.schema import ExtractionRequirements
-        requirements = ExtractionRequirements(**data["requirements"])
+        from gaik.software_components.extractor.schema import (
+            CompositeExtractionRequirements,
+            ExtractionRequirements,
+        )
+
+        raw_requirements = data["requirements"]
+        requirements_type = data.get(
+            "requirements_type", raw_requirements.get("structure_type", "extraction")
+        )
+        if requirements_type == "parent_with_nested_list":
+            requirements = CompositeExtractionRequirements(**raw_requirements)
+        else:
+            requirements = ExtractionRequirements(**raw_requirements)
         spec = importlib.util.spec_from_file_location(data["model_name"], schema_path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -108,16 +119,137 @@ def _load_output_schema(schema_dir: Path):
         return None, None
 
 
+def _schema_to_py_source(schema_class) -> str:
+    """Render a dynamically created Pydantic model (and any nested child
+    models) to importable Python source.
+
+    inspect.getsource() cannot be used here: schema_class is built at
+    runtime via pydantic's create_model(), which has no retrievable source
+    file, so getsource() always raises OSError for it. This mirrors
+    generate_schema.py's _schema_to_py() (same fix, same reason -- see that
+    file's docstring): building source from model_fields also lets it
+    detect Decimal fields via decimal_field_repr and re-embed the safe
+    DecimalField/OptionalDecimalField representation, which a naive
+    source-reflection approach would lose.
+    """
+    from typing import Literal, Union, get_args, get_origin
+
+    from gaik.software_components.extractor.schema import (
+        DECIMAL_PERSISTED_HELPER_SOURCE,
+        decimal_field_repr,
+    )
+
+    def annotation_repr(annotation) -> str:
+        decimal_repr = decimal_field_repr(annotation)
+        if decimal_repr is not None:
+            return decimal_repr
+
+        origin = get_origin(annotation)
+        if origin is list:
+            args = get_args(annotation)
+            return f"list[{annotation_repr(args[0])}]" if args else "list"
+        if origin is Literal:
+            args = get_args(annotation)
+            return f"Literal[{', '.join(repr(arg) for arg in args)}]"
+        if origin is Union:
+            args = get_args(annotation)
+            non_none = [arg for arg in args if arg is not type(None)]
+            if len(non_none) == 1 and type(None) in args:
+                return f"Optional[{annotation_repr(non_none[0])}]"
+            return f"Union[{', '.join(annotation_repr(arg) for arg in args)}]"
+        try:
+            import types as _types
+
+            if isinstance(annotation, _types.UnionType):
+                args = get_args(annotation)
+                non_none = [arg for arg in args if arg is not type(None)]
+                if len(non_none) == 1 and type(None) in args:
+                    return f"Optional[{annotation_repr(non_none[0])}]"
+                return f"Union[{', '.join(annotation_repr(arg) for arg in args)}]"
+        except AttributeError:
+            pass
+        if annotation is type(None):
+            return "None"
+        if hasattr(annotation, "__name__"):
+            return annotation.__name__
+        return repr(annotation)
+
+    def collect_models(model):
+        seen, ordered = set(), []
+
+        def collect(current):
+            if current in seen:
+                return
+            seen.add(current)
+            for field in current.model_fields.values():
+                if get_origin(field.annotation) is list:
+                    args = get_args(field.annotation)
+                    if args and isinstance(args[0], type) and hasattr(args[0], "model_fields"):
+                        collect(args[0])
+            ordered.append(current)
+
+        collect(model)
+        return ordered
+
+    class_blocks = []
+    needs_decimal_helper = False
+    for current_model in collect_models(schema_class):
+        lines = [f"class {current_model.__name__}(BaseModel):"]
+        docstring = (current_model.__doc__ or "").strip()
+        if docstring:
+            lines.append(f'    """{docstring}"""')
+        lines.append("    model_config = ConfigDict(extra='forbid')")
+        lines.append("")
+        for field_name, field in current_model.model_fields.items():
+            field_args = []
+            if field.description:
+                field_args.append(f"description={field.description!r}")
+            if field.default_factory is not None:
+                factory_name = getattr(field.default_factory, "__name__", None)
+                if factory_name in {"list", "dict", "set"}:
+                    field_args.append(f"default_factory={factory_name}")
+                else:
+                    field_args.append(f"default={field.default_factory()!r}")
+            elif not field.is_required():
+                field_args.append(f"default={field.default!r}")
+            if decimal_field_repr(field.annotation) is not None:
+                needs_decimal_helper = True
+            annotation = annotation_repr(field.annotation)
+            if field_args:
+                lines.append(f"    {field_name}: {annotation} = Field({', '.join(field_args)})")
+            else:
+                lines.append(f"    {field_name}: {annotation}")
+        class_blocks.append("\n".join(lines))
+
+    header = (
+        '"""Output schema for this use case -- generated at PoC runtime.\n\n'
+        'Do not hand-edit -- delete schemas/output_schema.* to force regeneration.\n"""\n\n'
+        "from decimal import Decimal\n"
+        "from typing import List, Literal, Optional, Union\n\n"
+        "from pydantic import BaseModel, Field, ConfigDict\n\n"
+    )
+    if needs_decimal_helper:
+        header += DECIMAL_PERSISTED_HELPER_SOURCE.strip() + "\n\n\n"
+    return header + "\n\n".join(class_blocks) + "\n"
+
+
 def _save_output_schema(schema_gen, schema, requirements, schema_dir: Path) -> None:
     """Persist a freshly generated schema to schemas/output_schema.* and update the hash."""
-    import json as _json, inspect as _inspect
+    import json as _json
+    from gaik.software_components.extractor.schema import CompositeExtractionRequirements
+
     schema_dir.mkdir(parents=True, exist_ok=True)
     # Write the Pydantic model source (mirrors generate_schema.py output format).
-    src = _inspect.getsource(schema)
+    src = _schema_to_py_source(schema)
     (schema_dir / "output_schema.py").write_text(src, encoding="utf-8")
     # Write the requirements payload.
     req_payload = {
         "model_name": schema.__name__,
+        "requirements_type": (
+            "parent_with_nested_list"
+            if isinstance(requirements, CompositeExtractionRequirements)
+            else "extraction"
+        ),
         "requirements": requirements.model_dump() if hasattr(requirements, "model_dump") else vars(requirements),
     }
     (schema_dir / "output_schema_requirements.json").write_text(

@@ -17,7 +17,13 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 # Add src directory to path to import modules (works without pip install)
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from gaik.software_components.parsers import VisionParser, get_openai_config
+from gaik.software_components.parsers import VisionParser, get_openai_config  # noqa: E402
+
+MODEL = "gpt-5.4"
+MODEL_OPTIONS = {
+    "temperature": None,  # omitted from API request
+    "reasoning_effort": "medium",
+}
 
 
 def main() -> None:
@@ -44,7 +50,8 @@ def main() -> None:
     # Initialize parser (defaults to Azure OpenAI, or set use_azure=False for OpenAI)
     print("[SETUP] Initializing VisionParser...")
     config = get_openai_config(use_azure=True)  # or use_azure=False for OpenAI
-    parser = VisionParser(openai_config=config)
+    config.model = MODEL
+    parser = VisionParser(openai_config=config, **MODEL_OPTIONS)
 
     # Convert PDF to Markdown
     print(f"[DOC] Converting PDF: {pdf_path.name}")

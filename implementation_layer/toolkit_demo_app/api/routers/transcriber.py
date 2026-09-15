@@ -6,9 +6,9 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 try:
-    from utils import validate_file_size
+    from utils import validate_audio_file_size
 except ImportError:
-    from api.utils import validate_file_size
+    from api.utils import validate_audio_file_size
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
@@ -85,7 +85,7 @@ async def transcribe_audio(
             detail=f"Unsupported file type: {suffix}. Supported: {', '.join(supported)}",
         )
 
-    content = await validate_file_size(file)
+    content = await validate_audio_file_size(file)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name

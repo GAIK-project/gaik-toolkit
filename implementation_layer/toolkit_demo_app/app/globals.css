@@ -258,6 +258,29 @@
 }
 
 @layer components {
+  .code-block-scrollbar {
+    scrollbar-color: #71717a #27272a;
+    scrollbar-width: auto;
+  }
+
+  .code-block-scrollbar::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .code-block-scrollbar::-webkit-scrollbar-track {
+    background: #27272a;
+  }
+
+  .code-block-scrollbar::-webkit-scrollbar-thumb {
+    background: #71717a;
+    border: 2px solid #27272a;
+    border-radius: 9999px;
+  }
+
+  .code-block-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #a1a1aa;
+  }
+
   .pl {
     --pl-size: 9rem;
     position: relative;

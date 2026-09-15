@@ -1,136 +1,232 @@
 {
-  "model_name": "purchase_order_header_extraction_Extraction",
+  "model_name": "meeting_minutes_header_fields_Extraction",
   "requirements_type": "parent_with_nested_list",
   "requirements": {
     "structure_type": "parent_with_nested_list",
     "parent_requirements": {
-      "use_case_name": "purchase_order_header_extraction",
+      "use_case_name": "meeting_minutes_header_fields",
       "fields": [
+        {
+          "field_name": "meeting_title",
+          "field_type": "str",
+          "description": "Meeting title.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
         {
           "field_name": "date",
           "field_type": "date",
-          "description": "date (DD/MM/YYYY format when unambiguous)",
+          "description": "Date of the meeting.",
           "required_in_output": true,
           "nullable": false,
           "enum": null,
           "default": "",
           "has_explicit_default": false,
           "required": true,
-          "pattern": "",
-          "format": "%d/%m/%Y"
+          "pattern": null,
+          "format": null
         },
         {
-          "field_name": "purchase_order_number",
+          "field_name": "start_time",
           "field_type": "str",
-          "description": "purchase order number",
+          "description": "Start time of the meeting.",
           "required_in_output": true,
           "nullable": false,
           "enum": null,
           "default": "",
           "has_explicit_default": false,
           "required": true,
-          "pattern": "",
-          "format": ""
+          "pattern": null,
+          "format": null
         },
         {
-          "field_name": "supplier_number",
+          "field_name": "end_time",
           "field_type": "str",
-          "description": "supplier number",
+          "description": "End time of the meeting.",
           "required_in_output": true,
-          "nullable": false,
+          "nullable": true,
           "enum": null,
           "default": "",
           "has_explicit_default": false,
-          "required": true,
-          "pattern": "",
-          "format": ""
+          "required": false,
+          "pattern": null,
+          "format": null
         },
         {
-          "field_name": "contact",
+          "field_name": "location_or_online_platform",
           "field_type": "str",
-          "description": "contact",
+          "description": "Location or online platform of the meeting.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "chairperson",
+          "field_type": "str",
+          "description": "Chairperson of the meeting.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "summary",
+          "field_type": "str",
+          "description": "Summary of the meeting.",
           "required_in_output": true,
           "nullable": false,
           "enum": null,
           "default": "",
           "has_explicit_default": false,
           "required": true,
-          "pattern": "",
-          "format": ""
+          "pattern": null,
+          "format": null
         }
       ]
     },
     "children": [
       {
-        "container_name": "line_items",
-        "container_description": "Line items listed in the purchase order.",
+        "container_name": "participants",
+        "container_description": "List of structured participant records mentioned in the meeting minutes",
         "requirements": {
-          "use_case_name": "purchase_order_line_item",
+          "use_case_name": "participants_record",
           "fields": [
             {
-              "field_name": "item_number",
+              "field_name": "name",
               "field_type": "str",
-              "description": "item number",
+              "description": "Participant’s name.",
               "required_in_output": true,
               "nullable": false,
               "enum": null,
               "default": "",
               "has_explicit_default": false,
               "required": true,
-              "pattern": "",
-              "format": ""
+              "pattern": null,
+              "format": null
             },
             {
-              "field_name": "complete_description",
+              "field_name": "organization",
               "field_type": "str",
-              "description": "complete description",
+              "description": "Participant’s organization. Can be null.",
               "required_in_output": true,
-              "nullable": false,
+              "nullable": true,
               "enum": null,
               "default": "",
               "has_explicit_default": false,
-              "required": true,
-              "pattern": "",
-              "format": ""
+              "required": false,
+              "pattern": null,
+              "format": null
             },
             {
-              "field_name": "quantity",
-              "field_type": "int",
-              "description": "quantity",
-              "required_in_output": true,
-              "nullable": false,
-              "enum": null,
-              "default": "",
-              "has_explicit_default": false,
-              "required": true,
-              "pattern": "",
-              "format": ""
-            },
-            {
-              "field_name": "price",
-              "field_type": "decimal",
-              "description": "price",
-              "required_in_output": true,
-              "nullable": false,
-              "enum": null,
-              "default": "",
-              "has_explicit_default": false,
-              "required": true,
-              "pattern": "",
-              "format": ""
-            },
-            {
-              "field_name": "material_number",
+              "field_name": "role",
               "field_type": "str",
-              "description": "material number",
+              "description": "Participant’s role in the meeting. Can be null.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "action_items",
+        "container_description": "List of structured action item records from the meeting minutes",
+        "requirements": {
+          "use_case_name": "action_items_record",
+          "fields": [
+            {
+              "field_name": "task",
+              "field_type": "str",
+              "description": "Task for the action item.",
               "required_in_output": true,
               "nullable": false,
               "enum": null,
               "default": "",
               "has_explicit_default": false,
               "required": true,
-              "pattern": "",
-              "format": ""
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "responsible_person",
+              "field_type": "str",
+              "description": "Responsible person for the action item; can be null.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "deadline",
+              "field_type": "date",
+              "description": "Deadline for the action item; can be null.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "priority",
+              "field_type": "str",
+              "description": "Priority for the action item; must be low, medium, or high.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "status",
+              "field_type": "str",
+              "description": "Status for the action item; must be not_started, in_progress, completed, or unknown.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": [
+                "not_started",
+                "in_progress",
+                "completed",
+                "unknown"
+              ],
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
             }
           ]
         }

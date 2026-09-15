@@ -137,13 +137,15 @@ class VisionParser:
         custom_prompt: str | None = None,
         use_context: bool = True,
         max_tokens: int = 16_000,
-        temperature: float = 0.0,
+        temperature: float | None = 0.0,
+        reasoning_effort: str | None = None,
     ) -> None:
         self.config = self._coerce_config(openai_config)
         self.custom_prompt = custom_prompt or self._default_prompt()
         self.use_context = use_context
         self.max_tokens = max_tokens
         self.temperature = temperature
+        self.reasoning_effort = reasoning_effort
         self._client = self._initialize_client()
 
     # ---------------------------------------------------------------------
@@ -305,6 +307,15 @@ class VisionParser:
         """Convert PNG image bytes to base64 string."""
         return base64.b64encode(image_bytes).decode("utf-8")
 
+    def _sampling_kwargs(self) -> dict[str, float | str]:
+        """Return only sampling options explicitly configured by the caller."""
+        kwargs: dict[str, float | str] = {}
+        if self.temperature is not None:
+            kwargs["temperature"] = self.temperature
+        if self.reasoning_effort is not None:
+            kwargs["reasoning_effort"] = self.reasoning_effort
+        return kwargs
+
     def _parse_image(
         self,
         image_bytes: bytes,
@@ -329,7 +340,7 @@ class VisionParser:
             model=self.config.model,
             messages=[{"role": "user", "content": payload}],
             max_completion_tokens=self.max_tokens,
-            temperature=self.temperature,
+            **self._sampling_kwargs(),
         )
 
         content = response.choices[0].message.content
@@ -347,7 +358,7 @@ class VisionParser:
             model=self.config.model,
             messages=[{"role": "user", "content": cleanup_prompt}],
             max_completion_tokens=self.max_tokens,
-            temperature=self.temperature,
+            **self._sampling_kwargs(),
         )
 
         content = response.choices[0].message.content

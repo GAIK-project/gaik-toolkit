@@ -16,6 +16,7 @@ type CodeBlockProps = {
   language: string;
   filename?: string;
   highlightLines?: number[];
+  contentHeight?: number | string;
 } & ({ code: string; tabs?: never } | { code?: never; tabs: Tab[] });
 
 export function CodeBlock({
@@ -23,6 +24,7 @@ export function CodeBlock({
   filename,
   code,
   highlightLines = [],
+  contentHeight,
   tabs = [],
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
@@ -84,11 +86,19 @@ export function CodeBlock({
       <SyntaxHighlighter
         language={activeLanguage}
         style={oneDark}
+        className={contentHeight ? "code-block-scrollbar" : undefined}
         customStyle={{
           margin: 0,
           padding: "1rem",
           background: "transparent",
           fontSize: "0.875rem",
+          ...(contentHeight
+            ? {
+                height: contentHeight,
+                overflowY: "scroll",
+                scrollbarGutter: "stable",
+              }
+            : {}),
         }}
         wrapLines
         showLineNumbers
