@@ -1718,11 +1718,8 @@ def create_extraction_model(requirements: ExtractionRequirements) -> type[BaseMo
         elif f.nullable or uses_none_fallback:
             annotated = annotated | None
 
-        if f.has_explicit_default:
-            default_val = f.default
-            if default_val == "" and py_type is not str:
-                default_val = None
-                annotated = annotated | None
+        if has_default:
+            default_val = default
         elif f.nullable:
             default_val = None
         elif uses_none_fallback:
