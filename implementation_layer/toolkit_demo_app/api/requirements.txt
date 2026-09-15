@@ -15,4 +15,4 @@ gaik[all-cpu,multimodal-parser,postgres-agent,tabular-agent,multi-source-report-
 # ANTHROPIC_FOUNDRY_RESOURCE in .env.local (or the deployment secret).
 claude-agent-sdk>=0.2.97
 boto3>=1.35.0
-yt-dlp>=2024.0.0
+yt-dlp>=2026.8.19

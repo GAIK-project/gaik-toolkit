@@ -12,7 +12,7 @@ dependencies = [
     "fpdf2>=2.8.5",
     "openpyxl>=3.1.0",            # Excel/CSV parsing for the luvata-order demo
     "boto3>=1.35.0",              # S3 presigned URLs for the video-search demo
-    "yt-dlp>=2024.0.0",           # video download in api/scripts/seed_dental_demo.py
+    "yt-dlp>=2026.8.19",          # video download in api/scripts/seed_dental_demo.py — YouTube changes break older releases
     "gaik[all-cpu,multimodal-parser,postgres-agent,tabular-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]>=0.7.1",
     # Solution Configuration Wizard (drives the wizard skill via Claude Agent SDK).
     # NOTE: claude-agent-sdk spawns the `claude` Code CLI binary, which must be
