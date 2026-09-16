@@ -152,3 +152,32 @@ def test_ids_let_ranker_fuse_two_lists_of_the_same_rows():
 
     fused = Ranker().fuse(semantic, keyword)
     assert len(fused) == 1
+
+
+class TestTsQueryMode:
+    """The mode is validated in the constructor, not at query time.
+
+    An invalid mode reaching SQL would fall through `gaik_tsquery`'s ELSE branch
+    and silently run `websearch` instead -- the behaviour the caller was trying
+    to move away from, with no error to say so.
+    """
+
+    def test_an_unknown_mode_is_refused_at_construction(self):
+        import pytest
+        from gaik.software_components.RAG.pg_vector_store import PgVectorStore
+
+        with pytest.raises(ValueError, match="Invalid tsquery_mode"):
+            PgVectorStore("postgresql://localhost/x", tsquery_mode="fuzzy")
+
+    def test_the_documented_modes_are_accepted(self):
+        from gaik.software_components.RAG.pg_vector_store import PgVectorStore
+
+        for mode in ("websearch", "or", "prefix"):
+            store = PgVectorStore("postgresql://localhost/x", tsquery_mode=mode)
+            assert store.tsquery_mode == mode
+
+    def test_the_default_preserves_existing_behaviour(self):
+        from gaik.software_components.RAG.pg_vector_store import PgVectorStore
+
+        assert PgVectorStore("postgresql://localhost/x").tsquery_mode == "websearch"
+        assert PgVectorStore("postgresql://localhost/x").hnsw_ef_search is None

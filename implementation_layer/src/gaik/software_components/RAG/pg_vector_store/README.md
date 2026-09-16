@@ -65,8 +65,60 @@ PgVectorStore(
     table_name: str = "documents",
     embedding_dim: int = 1536,
     fts_language: str = "simple",
+    text_processor: FinnishTextProcessor | None = None,
+    tsquery_mode: str = "websearch",
+    hnsw_ef_search: int | None = None,
 )
 ```
+
+### `tsquery_mode` — how a query becomes a tsquery
+
+**`"websearch"` (default) conjoins every term.** That is right for short keyword
+input and wrong for a sentence: a nine-word question only matches a passage
+containing all nine stems, which on real prose is never, so the keyword arm
+contributes nothing and does so silently.
+
+| Mode | Behaviour | Use when |
+| --- | --- | --- |
+| `"websearch"` | Postgres' parser as-is (implicit AND) | short keyword queries |
+| `"or"` | same parse, `&` rewritten to `\|` | natural-language questions |
+| `"prefix"` | each term prefix-matched, OR-ed | agglutinative suffixing on an **unstemmed** index |
+
+`"or"` keeps stemming, stop-word removal and quoted phrases — only the operator
+changes — and lets `ts_rank_cd` discriminate, which it already does by how many
+distinct terms matched and how close together they are.
+
+Measured on four Finnish sentences plus one long natural question:
+
+| Configuration | Queries that found their document |
+| --- | --- |
+| `finnish` + `"websearch"` | 2 / 5 |
+| `finnish` + `"or"` | 3 / 5 |
+| lemmatized both sides (`simple` + `text_processor`) + `"or"` | **5 / 5** |
+
+`"prefix"` is a poor fit for Finnish specifically — consonant gradation means a
+lemma is often not a prefix of its own inflected forms. See the
+[Finnish Text Processor README](../finnish_text_processor/README.md).
+
+> Changing `tsquery_mode` after the first `setup()` needs `setup()` re-run: the
+> two hybrid search functions take the mode as an argument, and `setup()` is what
+> installs the version that accepts it. It drops the older signature first, since
+> `CREATE OR REPLACE` cannot change one and would leave an overload behind.
+
+### `hnsw_ef_search`
+
+pgvector defaults `hnsw.ef_search` to 40, trading recall for a latency saving
+most RAG workloads would rather not take. Measured on one 1536-dimension corpus,
+raising it to 100 moved recall@20 against an exact scan from **96.2% to 99.2%
+for +0.7 ms median**.
+
+```python
+PgVectorStore(dsn, hnsw_ef_search=100)
+```
+
+Applied per connection. The GUC only exists once pgvector's library has loaded
+into the session, so a failure to set it is logged at debug level rather than
+allowed to break connecting.
 
 ### Methods
 

@@ -209,17 +209,27 @@ llm-judge = [
 ]
 
 # Finnish RAG — Python-side morphological lemmatization + compound splitting.
-# Plugs into PgVectorStore via FinnishTextProcessor. The 'finnish-rag' extra
-# pulls pure-pip backends (spaCy + UralicNLP); the 'finnish-rag-voikko' extra
-# adds the optional libvoikko-backed wheel for best morphological accuracy
-# (also requires libvoikko system library — apt install libvoikko1 / brew
-# install libvoikko).
+# Plugs into PgVectorStore via FinnishTextProcessor.
+#
+# 'finnish-rag' is pure pip and needs no system library. pyvoikko carries the
+# Voikko transducer in the wheel (~1 MB + kfst) and measures identical to native
+# libvoikko on inflected domain compounds, so it leads; spaCy and UralicNLP stay
+# for callers who already run them. That matters because libvoikko is packaged
+# in neither Red Hat UBI 9 nor EPEL 9, so on those images pyvoikko is the only
+# real Finnish morphology available at all.
+#
+# 'finnish-rag-voikko' adds the native binding for speed. The PyPI package is
+# 'libvoikko', NOT 'voikko': the latter installs a `voikko` package exposing
+# `voikko.libvoikko`, so `import libvoikko` fails and VoikkoBackend silently
+# never loads. It also needs the system library and dictionary
+# (apt install libvoikko1 voikko-fi / brew install libvoikko).
 finnish-rag = [
+    "pyvoikko>=0.6",
     "spacy>=3.7",
     "uralicNLP>=1.4",
 ]
 finnish-rag-voikko = [
-    "voikko>=0.5",
+    "libvoikko>=4.3",
 ]
 
 # Evaluators — RAG-style and extraction-style metrics built on LLMJudge v2.

@@ -2061,5 +2061,84 @@
       }
     ],
     "note": "Ranker performs no IO. It consumes exactly the list[tuple(Document, float)] that PgVectorStore.search_semantic() / search_keyword() (and VectorStore) already return and reorders it, so it composes without adapters. Four ways in: fuse() for N weighted ranked lists (the primary use -- one semantic arm + one keyword arm), rerank() for cross-encoder rescoring of a single list, order_by(field=..., direction='asc'|'desc', missing='last'|'first'|'drop') to reorder by a business field such as a date or a price (field=None orders by the relevance score; 'asc' on the score surfaces the weakest matches, which is useful for eval), and rank(strategy='score'|'rerank'|'field') as a single-list facade over the other two. Documents are matched across lists by metadata['id'] (PgVectorStore sets it) falling back to full page content; override with key=lambda d: d.metadata['chunk_uid']. Nothing is mutated -- every method builds new Document objects. Ranker returns list[tuple(Document, float)] whereas Retriever returns list[Document]: call the static Ranker.to_documents(results) to flatten before handing chunks to AnswerGenerator. Choose Retriever for query-in/documents-out convenience; choose Ranker when you already hold the ranked lists, need more than two signals, need weighting, or need asc/desc ordering by metadata."
+  },
+  "FinnishTextProcessor": {
+    "import": "from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor",
+    "construct": "processor = FinnishTextProcessor(backend='auto', decompound=False)",
+    "call": "lemmas = processor.lemmatize('vahvistetun tilinpaatoksen korjaaminen')",
+    "returns": "list[str]",
+    "install_extra": "finnish-rag",
+    "call_index_side": "indexed = processor.to_tsvector_text(chunk)   # -> to_tsvector('simple', indexed)",
+    "call_query_side": "tsq = processor.to_tsquery(user_query)        # -> to_tsquery('simple', tsq)",
+    "check_backend": "assert processor.backend_name != 'simple', 'no Finnish morphology installed'",
+    "options": [
+      {
+        "name": "backend",
+        "type": "str",
+        "default": "auto",
+        "effect": "Which morphological analyser to use: 'auto' tries voikko -> pyvoikko -> spacy -> uralic -> simple and takes the first that imports cleanly. 'voikko' is native and fastest but needs the libvoikko system library plus the voikko-fi dictionary and the PyPI package 'libvoikko' (not 'voikko'). 'pyvoikko' is a pure-Python FST shipping in the wheel (~1 MB + kfst) that measures identical lemmas to native voikko. 'spacy' needs a separate fi_core_news_md download and is measurably weaker on long compounds. 'simple' is a regex tokenizer plus lowercase and does NOT lemmatize.",
+        "selection_relevant": true,
+        "infer_from": "container images where no package manager offers libvoikko (Red Hat UBI 9, EPEL 9) -> 'pyvoikko'; a host where libvoikko is installable and ingest throughput matters -> 'voikko'; a project already running spaCy that only needs inflection -> 'spacy'. Always assert backend_name afterwards, because 'auto' degrades silently."
+      },
+      {
+        "name": "decompound",
+        "type": "bool",
+        "default": true,
+        "effect": "Split compound words into their parts ('vahennysoikeus' -> ['vahennys', 'oikeus']) on the two Voikko backends. Parts come from the analyser's compound STRUCTURE, not from BASEFORM (which never contains a '+' separator) and not from WORDBASES (which gives derivational roots -- a verb and an adjective nobody searches for).",
+        "selection_relevant": true,
+        "infer_from": "leave False unless an eval set says otherwise: when both sides are lemmatized, whole-compound matching already works, and splitting widens noise because a short first part like 'arvo' reaches 'arvopaperi' and 'arvostus'. Turn it on for recall-first search over a small corpus."
+      },
+      {
+        "name": "operator",
+        "type": "str",
+        "default": "|",
+        "effect": "A to_tsquery() argument joining the lemmas. '|' (OR) is the default because conjoining every term means a nine-word question only matches a passage containing all nine, which on real prose is never -- the keyword arm then contributes nothing and does so silently. ts_rank_cd discriminates instead, scoring by how many distinct terms matched and how close together they are. '&' suits short, deliberately narrow lookups.",
+        "selection_relevant": true,
+        "infer_from": "natural-language questions -> '|'; a two-word filter where every term must appear -> '&'"
+      },
+      {
+        "name": "prefix",
+        "type": "bool",
+        "default": false,
+        "effect": "A to_tsquery() argument appending ':*' to every lemma. Standard advice for agglutinative languages and a TRAP for Finnish: consonant gradation and stem alternation mean a lemma is frequently not a prefix of its own inflected forms -- 'kolmikantakauppa' does not reach 'kolmikantakaupassa', 'kirjanpitovelvollisuus' does not reach 'kirjanpitovelvollisuutta'.",
+        "selection_relevant": false,
+        "infer_from": "leave False for lemma-indexed Finnish; consider True only against an UNSTEMMED index where pure suffixing is the dominant variation"
+      }
+    ]
+  },
+  "RelevanceGate": {
+    "import": "from gaik.software_components.RAG.relevance_gate import RelevanceGate",
+    "construct": "gate = RelevanceGate(floor=0.60)",
+    "call": "answerable = gate.is_answerable(hits, key=lambda hit: hit[1])",
+    "returns": "bool",
+    "install_extra": "",
+    "call_calibrate": "reading = RelevanceGate.calibrate(answerable=real_scores, unanswerable=offtopic_scores)",
+    "call_best": "closest = gate.best(hits, key=lambda hit: hit[1])   # None means 'no opinion'",
+    "options": [
+      {
+        "name": "floor",
+        "type": "float",
+        "default": null,
+        "effect": "The threshold a best-match score must be on the relevant side of. This is the whole component: a vector index answers EVERY query with its nearest neighbours, so result count proves nothing -- measured on one corpus, a gibberish string returned 24 results while a real domain question returned 12. Distance to the closest match is what discriminates.",
+        "selection_relevant": true,
+        "infer_from": "never guess and never copy one from another project. Run RelevanceGate.calibrate() over labelled queries from YOUR corpus with YOUR embedding model; it returns floor=None when the populations overlap, which means there is no threshold to set."
+      },
+      {
+        "name": "lower_is_better",
+        "type": "bool",
+        "default": true,
+        "effect": "Whether a SMALLER score is closer. True for distances (cosine distance, L2), False for similarities (cosine similarity, ts_rank_cd). Setting it backwards inverts the gate silently -- every unanswerable query passes and every real one is refused.",
+        "selection_relevant": true,
+        "infer_from": "read it off the retriever: pgvector '<=>' and raw distances -> True; PgVectorStore search_semantic 'similarity' and ts_rank_cd scores -> False"
+      },
+      {
+        "name": "key",
+        "type": "Callable | None",
+        "default": null,
+        "effect": "Extracts the score from each result, so the gate works on whatever shape your retriever returns -- (Document, score) tuples, your own result objects, or a bare list of floats when omitted.",
+        "selection_relevant": false,
+        "infer_from": "gaik vector stores return (Document, score) pairs -> key=lambda hit: hit[1]"
+      }
+    ]
   }
 }

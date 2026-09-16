@@ -7,15 +7,30 @@ tries them in order and uses the first one that imports cleanly.
 
 Order chosen for accuracy vs. install cost:
 
-1. ``VoikkoBackend`` — best Finnish morphology + compound splitting; requires
-   ``libvoikko`` system library + ``voikko`` Python wheel.
-2. ``SpacyBackend`` — good lemmatization via ``fi_core_news_md`` / ``lg``;
-   ~100-700 MB model download but pure-pip otherwise.
-3. ``UralicNLPBackend`` — pure-Python, no system deps; morphology smaller but
+1. ``VoikkoBackend`` — Finnish morphology + compound splitting via the
+   ``libvoikko`` system library and the ``libvoikko`` Python binding.
+2. ``PyVoikkoBackend`` — the same morphology as a pure-Python FST, no system
+   library at all. Measured identical to :class:`VoikkoBackend` on inflected
+   domain compounds, so it sits second only because it is slower per token.
+3. ``SpacyBackend`` — lemmatization via ``fi_core_news_md`` / ``lg``;
+   ~100-700 MB model download but pure-pip otherwise. Weaker than either Voikko
+   on long compounds: measured leaving ``kirjanpitovelvollisuutta`` and
+   ``kolmikantakaupassa`` uninflected, and rendering ``kirjanpitolaissa`` as
+   ``kirjanpitolati``.
+4. ``UralicNLPBackend`` — pure-Python, no system deps; morphology smaller but
    handles inflection.
-4. ``SimpleBackend`` — last-resort regex-tokenizer + lowercase. No real
+5. ``SimpleBackend`` — last-resort regex-tokenizer + lowercase. No real
    lemmatization; ensures the pipeline never crashes when nothing else is
    installed.
+
+**Compound splitting comes from the analyser's compound structure, never from
+``BASEFORM``.** Voikko does not join compound parts with ``+`` in ``BASEFORM`` —
+it returns the whole baseform — so splitting that string finds nothing to split,
+whatever the word. ``WORDBASES`` is not the answer either: its bases are
+*derivational* roots, so ``vähennysoikeus`` comes back as ``vähetä`` + ``oikea``
+and ``arvonlisäverotus`` as ``arvo`` + ``lisä`` + ``verottaa`` — verbs and
+adjectives nobody searches for. ``STRUCTURE`` marks the real boundaries and
+yields ``vähennys`` + ``oikeus``, which is what a searcher means.
 """
 
 from __future__ import annotations
@@ -142,12 +157,39 @@ class SpacyBackend(LemmatizationBackend):
         return out
 
 
+def _split_on_structure(baseform: str, structure: str | None) -> list[str]:
+    """Slice *baseform* into compound parts on the ``=`` boundaries in *structure*.
+
+    Voikko's ``STRUCTURE`` is a per-character map of the analysed word where ``=``
+    opens each compound part, so ``=ppppp=pppp=pppppppppp`` over ``arvonlisäverotus``
+    gives ``arvon`` / ``lisä`` / ``verotus``. Returns ``[]`` when the word is not a
+    compound, so the caller can fall back to the baseform.
+    """
+    if not structure or structure.count("=") < 2:
+        return []
+    parts: list[str] = []
+    position = 0
+    for segment in structure.split("=")[1:]:
+        length = len(segment)
+        piece = baseform[position : position + length]
+        position += length
+        if piece:
+            parts.append(piece)
+    # A structure that does not line up with the baseform (derived forms shift the
+    # character count) would silently produce truncated nonsense.
+    return parts if position == len(baseform) else []
+
+
 class VoikkoBackend(LemmatizationBackend):
     """Voikko-based lemmatizer with compound splitting.
 
-    Requires ``libvoikko`` system library AND the ``voikko`` Python wheel.
+    Requires the ``libvoikko`` system library AND the ``libvoikko`` Python
+    binding. Note the binding is the PyPI package ``libvoikko``, not ``voikko``:
+    the latter installs a ``voikko`` package exposing ``voikko.libvoikko``, so
+    ``import libvoikko`` fails and this backend silently never loads.
+
     Returns base forms of compound parts when ``decompound=True``
-    (e.g. "kerrostalon" → ["kerros", "talo"]).
+    (e.g. "vähennysoikeus" → ["vähennys", "oikeus"]).
     """
 
     name = "voikko"
@@ -159,9 +201,11 @@ class VoikkoBackend(LemmatizationBackend):
         except ImportError as exc:  # pragma: no cover - import error path
             raise ImportError(
                 "VoikkoBackend requires libvoikko (system library) and the "
-                "voikko Python package. Install with: "
+                "libvoikko Python package. Install with: "
                 "pip install gaik[finnish-rag-voikko] (and apt install "
-                "libvoikko1 / brew install libvoikko)"
+                "libvoikko1 voikko-fi / brew install libvoikko). For a "
+                "pure-Python alternative with no system library, install "
+                "gaik[finnish-rag] and use backend='pyvoikko'."
             ) from exc
         try:
             self._voikko = libvoikko.Voikko(language)
@@ -183,13 +227,75 @@ class VoikkoBackend(LemmatizationBackend):
                 if lower not in self._stopwords:
                     out.append(lower)
                 continue
-            base = analyses[0].get("BASEFORM", token).lower()
-            if self._decompound and "+" in base:
-                # libvoikko returns compound parts joined by "+".
-                parts = [p.strip().lower() for p in base.split("+") if p.strip()]
-                out.extend(p for p in parts if p and p not in self._stopwords)
-            elif base not in self._stopwords:
-                out.append(base)
+            analysis = analyses[0]
+            base = analysis.get("BASEFORM", token).lower()
+            parts = (
+                _split_on_structure(base, analysis.get("STRUCTURE"))
+                if self._decompound
+                else []
+            )
+            for word in parts or [base]:
+                if word and word not in self._stopwords:
+                    out.append(word)
+        return out
+
+
+class PyVoikkoBackend(LemmatizationBackend):
+    """Voikko morphology as a pure-Python FST — no system library, no model download.
+
+    ``pyvoikko`` ships the transducer in the wheel (~1 MB plus ``kfst``), so this
+    is the only backend here that gives real Finnish morphology on an image where
+    no package manager offers libvoikko. That is not hypothetical: libvoikko is in
+    neither the Red Hat UBI 9 repositories nor EPEL 9.
+
+    Measured against :class:`VoikkoBackend` on inflected domain compounds, the
+    lemmas are identical. The cost is speed — roughly 2 ms per token against a
+    native call's microseconds — so ``lemmatize`` memoises per token, which pays
+    for itself immediately on prose, where vocabulary repeats.
+    """
+
+    name = "pyvoikko"
+    supports_compound_splitting = True
+
+    def __init__(self, decompound: bool = True) -> None:
+        try:
+            import pyvoikko  # type: ignore[import-not-found]
+        except ImportError as exc:  # pragma: no cover - import error path
+            raise ImportError(
+                "PyVoikkoBackend requires pyvoikko. Install with: "
+                "pip install gaik[finnish-rag]"
+            ) from exc
+        self._pyvoikko = pyvoikko
+        self._decompound = decompound
+        self._stopwords = DEFAULT_FINNISH_STOPWORDS
+        self._cache: dict[str, list[str]] = {}
+
+    def _analyse_token(self, token: str) -> list[str]:
+        cached = self._cache.get(token)
+        if cached is not None:
+            return cached
+        try:
+            analyses = self._pyvoikko.analyse(token)
+        except Exception:  # pragma: no cover - tokenizer rejects odd input
+            analyses = []
+        if not analyses:
+            words = [token]
+        else:
+            analysis = analyses[0]
+            parts = analysis.COMPOUND_PARTS if self._decompound else None
+            if parts:
+                words = [(part.BASEFORM or part.FORM).lower() for part in parts]
+            else:
+                words = [(analysis.BASEFORM or token).lower()]
+        self._cache[token] = words
+        return words
+
+    def lemmatize(self, text: str) -> list[str]:
+        out: list[str] = []
+        for token in tokenize(normalize_unicode(text)):
+            for word in self._analyse_token(token.lower()):
+                if word and word not in self._stopwords:
+                    out.append(word)
         return out
 
 
@@ -197,6 +303,7 @@ def discover_auto_backend() -> LemmatizationBackend:
     """Try backends in best-to-worst order; return the first that imports cleanly."""
     candidates: list[type[LemmatizationBackend]] = [
         VoikkoBackend,
+        PyVoikkoBackend,
         SpacyBackend,
         UralicNLPBackend,
     ]

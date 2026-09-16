@@ -2463,5 +2463,144 @@
     "example_script_path": "implementation_layer/examples/software_components/RAG/ranker_example.py",
     "readme_path": "implementation_layer/src/gaik/software_components/RAG/ranker/README.md",
     "install_extra": "ranker"
+  },
+  {
+    "id": "finnish_text_processor",
+    "name": "FinnishTextProcessor",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text"
+    ],
+    "output_artifact_types": [
+      "text"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "backend",
+      "spacy_model",
+      "decompound",
+      "operator",
+      "prefix"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "voikko is native and fastest; pyvoikko gives identical lemmas in pure Python at roughly 2 ms per token, memoised per token so prose amortises well; spacy is faster than pyvoikko but measurably weaker on long compounds; simple is instant and does no lemmatization at all",
+      "cost_sensitivity": "none -- no LLM, embedding or database calls",
+      "degrades_on": [
+        "non_finnish_text",
+        "simple_backend_fallback_when_no_morphology_is_installed",
+        "lemmatizing_only_the_query_and_not_the_index"
+      ]
+    },
+    "known_limitations": [
+      "Finnish only. Running Finnish morphology over English or Swedish text produces noise, so route by language before calling it.",
+      "USE IT ON BOTH SIDES OR NEITHER. The gain comes from the index and the query agreeing on a form. Postgres' 'finnish' snowball stems 'tilinpaatos' and 'tilinpaatoksen' to DIFFERENT lexemes, so one does not find the other; lemmatizing only the query leaves that mismatch in place. Measured on four corpus-shaped Finnish sentences queried with a different inflection: 1/4 with snowball alone, 4/4 with lemmas on both sides.",
+      "backend='auto' silently falls back to 'simple', which is a regex tokenizer plus lowercase and NOT a lemmatizer. Content indexed through it is LESS searchable than snowball-stemmed content. Check backend_name before relying on the processor and refuse 'simple' if morphology is required.",
+      "Prefix matching (to_tsquery(prefix=True)) is a poor fit for Finnish despite being standard advice for agglutinative languages: consonant gradation means a lemma is often not a prefix of its own inflected forms ('kolmikantakauppa' does not reach 'kolmikantakaupassa'). It is off by default.",
+      "The native voikko backend needs the PyPI package 'libvoikko' (NOT 'voikko') plus the libvoikko system library and voikko-fi dictionary. libvoikko is packaged in neither Red Hat UBI 9 nor EPEL 9 -- on those images pyvoikko is the only real Finnish morphology available.",
+      "to_tsquery returns '' when nothing usable survives, which is NOT the same as empty input: a query made entirely of stopwords has content and still yields nothing. Treat '' as 'no keyword arm'; passing it to Postgres to_tsquery() raises.",
+      "decompound widens recall and also widens noise -- a short first part like 'arvo' reaches 'arvopaperi' and 'arvostus'. Whole-compound matching already works with decompound=False when both sides are lemmatized."
+    ],
+    "best_for": [
+      "finnish_full_text_search_recall",
+      "lemmatized_fts_indexing",
+      "inflected_and_compound_term_matching"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "lemmatize_chunks_for_indexing",
+        "component": "FinnishTextProcessor",
+        "inputs": [
+          "text"
+        ],
+        "outputs": [
+          "text"
+        ]
+      },
+      {
+        "id": "lemmatize_search_query",
+        "component": "FinnishTextProcessor",
+        "inputs": [
+          "text"
+        ],
+        "outputs": [
+          "text"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/",
+    "import_path": "gaik.software_components.RAG.finnish_text_processor",
+    "example_script_path": "",
+    "readme_path": "implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/README.md",
+    "install_extra": "finnish-rag"
+  },
+  {
+    "id": "relevance_gate",
+    "name": "RelevanceGate",
+    "type": "software_component",
+    "input_artifact_types": [
+      "retrieved_chunks"
+    ],
+    "output_artifact_types": [
+      "retrieved_chunks"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "floor"
+    ],
+    "optional_parameters": [
+      "lower_is_better",
+      "key"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "a min/max over the scores you already hold; effectively free",
+      "cost_sensitivity": "none -- no LLM, embedding or database calls",
+      "degrades_on": [
+        "a floor copied from another corpus or embedding model",
+        "populations that overlap, where no threshold separates them",
+        "calibration sets made only of gibberish rather than real off-topic questions"
+      ]
+    },
+    "known_limitations": [
+      "The floor is NOT a constant. It is a reading off one embedding model against one corpus; change either and re-run calibrate(). A copied number is not a measurement.",
+      "When the answerable and unanswerable populations overlap, calibrate() returns floor=None and separated=False rather than splitting the difference. That is the answer -- a compromise threshold looks like a measurement and rejects real queries.",
+      "Calibrate against ordinary off-topic questions, not only gibberish. Gibberish separates easily; a well-formed question about a subject the corpus has never heard of is what users actually type and is the case that decides whether the floor is worth anything.",
+      "A None score means 'nothing was searched by vector' and PASSES the gate. Treating it as 'far away' turns a keyword-only search into a permanent refusal. An empty result list is different and is never answerable.",
+      "lower_is_better has no default that suits both distances and similarities; setting it backwards inverts the gate silently.",
+      "filter() trims individual results and must not be used to decide whether the corpus answered at all -- a trimmed list that happens to be non-empty is a different question from is_answerable().",
+      "It judges retrieval, not generation. Passing the gate says the corpus holds something close to the query; it does not say a retrieved passage supports any generated claim."
+    ],
+    "best_for": [
+      "honest_no_answer_responses",
+      "grounding_gate_before_generation",
+      "retrieval_threshold_calibration"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "gate_retrieval_before_generation",
+        "component": "RelevanceGate",
+        "inputs": [
+          "retrieved_chunks"
+        ],
+        "outputs": [
+          "retrieved_chunks"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/RAG/relevance_gate/",
+    "import_path": "gaik.software_components.RAG.relevance_gate",
+    "example_script_path": "",
+    "readme_path": "implementation_layer/src/gaik/software_components/RAG/relevance_gate/README.md",
+    "install_extra": ""
   }
 ]
