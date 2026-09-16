@@ -229,11 +229,7 @@ class VoikkoBackend(LemmatizationBackend):
                 continue
             analysis = analyses[0]
             base = analysis.get("BASEFORM", token).lower()
-            parts = (
-                _split_on_structure(base, analysis.get("STRUCTURE"))
-                if self._decompound
-                else []
-            )
+            parts = _split_on_structure(base, analysis.get("STRUCTURE")) if self._decompound else []
             for word in parts or [base]:
                 if word and word not in self._stopwords:
                     out.append(word)
@@ -262,8 +258,7 @@ class PyVoikkoBackend(LemmatizationBackend):
             import pyvoikko  # type: ignore[import-not-found]
         except ImportError as exc:  # pragma: no cover - import error path
             raise ImportError(
-                "PyVoikkoBackend requires pyvoikko. Install with: "
-                "pip install gaik[finnish-rag]"
+                "PyVoikkoBackend requires pyvoikko. Install with: pip install gaik[finnish-rag]"
             ) from exc
         self._pyvoikko = pyvoikko
         self._decompound = decompound

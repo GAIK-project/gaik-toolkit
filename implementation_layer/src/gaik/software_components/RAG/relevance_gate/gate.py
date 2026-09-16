@@ -105,11 +105,7 @@ class RelevanceGate:
         "irrelevant", and a caller that conflates the two turns a keyword-only
         search into a permanent "no material matches this request".
         """
-        scores = [
-            float(s)
-            for s in ((key(r) if key else r) for r in results)
-            if s is not None
-        ]
+        scores = [float(s) for s in ((key(r) if key else r) for r in results) if s is not None]
         if not scores:
             return None
         return min(scores) if self.lower_is_better else max(scores)
@@ -146,9 +142,7 @@ class RelevanceGate:
         return [
             r
             for r in results
-            if self.passes(
-                (lambda s: float(s) if s is not None else None)(key(r) if key else r)
-            )
+            if self.passes((lambda s: float(s) if s is not None else None)(key(r) if key else r))
         ]
 
     # ── Calibration ───────────────────────────────────────────────
