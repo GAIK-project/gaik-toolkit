@@ -52,7 +52,9 @@ The defaults are `use_azure=True` and `vertex_ai=True`, so a plain
 `ANTHROPIC_API_KEY`. Passing a direct API key without also passing the flag is the usual
 cause of an auth error that looks like a wrong key.
 
-**`DoclingApiClientParser`** — `API_BASE` and `PASSWORD` for the remote service.
+**`DoclingApiClientParser`** — the remote Docling service's address and password, passed as
+the required keyword arguments `api_base=` and `password=`. It reads no environment
+variables itself, so load them in your own code.
 
 ## Choosing a provider for vision parsing
 

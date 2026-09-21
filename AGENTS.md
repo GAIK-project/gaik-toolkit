@@ -23,6 +23,19 @@ uv sync --all-extras
 
 The audit and the wizard's `tests/test_reference_cards.py` both work by importing gaik classes. Several components swallow a missing optional dependency in `__init__.py` (`try: from .x import Y / except ImportError: pass`), so an environment missing an extra makes a class silently absent. The audit then reports it as `removed` drift that is not real, and the tests skip checks they appear to be running. Missing `pydub` alone produced two false `removed` findings and hid 12 assertions on 2026-08-03. Run the audit with `uv run` so it uses the project environment rather than a system Python.
 
+## agent-plugin (the published agent skills)
+
+`agent-plugin/` is an Agent Plugins v1 package that Claude Code, Codex, Copilot and VS Code
+install through `.claude-plugin/marketplace.json`. Its skills quote gaik's API.
+
+- Bump `version` in both `agent-plugin/plugin.json` (Agent Plugins, read by Codex and
+  Copilot) and `agent-plugin/.claude-plugin/plugin.json` (Claude Code) with any change under
+  `agent-plugin/`. Each client caches an install under the version it read, so an unbumped
+  edit never reaches anyone who already installed the plugin.
+- `implementation_layer/unit_tests/test_agent_plugin.py` fails when gaik renames or drops a
+  name a skill quotes; fix the skill in the same change. It checks names only — a gaik
+  change in *behaviour* also needs a read of the skill that describes it.
+
 ## graphify (optional — only when the tooling is present)
 
 This repo has a committed knowledge graph in graphify-out/ (god nodes, community

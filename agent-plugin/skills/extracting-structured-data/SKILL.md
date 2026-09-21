@@ -17,6 +17,7 @@ description: >-
 
 ```bash
 pip install "gaik[extract]"
+pip install "gaik[vision-extract]"   # VisionExtractor with Claude or Gemini models
 ```
 
 Two entry points, and the choice is about where the document is in its lifecycle:
@@ -29,7 +30,7 @@ Two entry points, and the choice is about where the document is in its lifecycle
 ```python
 from gaik.software_components.vision_extractor import VisionExtractor
 
-result = VisionExtractor(model_provider="openai").extract(
+result = VisionExtractor(model_provider="openai").extract(  # Azure unless use_azure=False
     file_paths=["invoice.pdf"],
     user_requirements="Supplier name, invoice number, and every line item with quantity and unit price.",
 )

@@ -32,10 +32,11 @@ task needed. Decide first what has to still be true afterwards, then pick:
 | Text on scans / no text layer | `DoclingParser` (OCR) | slow on CPU, free |
 | **Table structure — merged cells, multi-row headers** | `MultimodalParser` or `VisionParser` | API call per page |
 | Images explained in place, for RAG chunks | `VisionPlusParser` | Docling + API call |
-| Docling quality without the local install | `DoclingApiClientParser` | needs `API_BASE` + `PASSWORD` |
+| Docling quality without the local install | `DoclingApiClientParser` | a Docling service (`api_base=`, `password=`) |
 
 Escalate only when a check fails — start at the cheapest row that could plausibly work,
-verify (below), and move down one row if it did not.
+verify (below), and move down one row if it did not. When the text is headed for a search
+index, the `searching-documents` skill picks up from here.
 
 ## Why the cheap path scores zero on tables
 
@@ -95,14 +96,19 @@ Every `parse_document` returns a dict, and the key differs by parser:
 
 ```python
 from gaik.software_components.parsers import (
-    DocxParser, DoclingParser, VisionPlusParser, MultimodalParser,
+    DocxParser, DoclingParser, VisionPlusParser, MultimodalParser, get_openai_config,
 )
 
-DocxParser().parse_docx("doc.docx")                        # -> str
+DocxParser().parse_docx("doc.docx")                             # -> str
 DoclingParser().parse_document("scan.pdf")["text_content"]      # OCR
-VisionPlusParser().parse_document("doc.pdf")["parsed_markdown"] # note: different key
+VisionPlusParser(vision_config=get_openai_config(use_azure=True)).parse_document(
+    "doc.pdf"
+)["parsed_markdown"]                                            # note: different key
 MultimodalParser(model_provider="openai").parse("doc.pdf")      # -> ParseResult
 ```
+
+`VisionPlusParser` and `DoclingApiClientParser` take required keyword arguments —
+`vision_config=`, and `api_base=` plus `password=` — and a bare constructor call fails.
 
 `MultimodalParser` takes **keyword arguments only** and has no `config` parameter — it
 reads credentials from the environment. `ParseResult` is a plain dataclass with

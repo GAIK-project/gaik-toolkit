@@ -8,6 +8,8 @@ on:
     paths:
       - 'src/**'
       - 'implementation_layer/**'
+      - 'agent-plugin/**'
+      - '.claude-plugin/**'
       - 'pyproject.toml'
       - '.github/workflows/test.yml'
       - '.github/workflows/publish.yml'
@@ -18,6 +20,8 @@ on:
     paths:
       - 'src/**'
       - 'implementation_layer/**'
+      - 'agent-plugin/**'
+      - '.claude-plugin/**'
       - 'pyproject.toml'
       - '.github/workflows/test.yml'
       - '.github/workflows/publish.yml'
