@@ -97,14 +97,24 @@ ALTER DATABASE search SET hnsw.iterative_scan = 'relaxed_order';   -- pgvector 0
 
 ```sql
 -- websearch parsing keeps stemming, stop words and quoted phrases; then OR the terms.
+-- A leading '-' is dropped first (see below); a dash inside a word is kept.
 CREATE OR REPLACE FUNCTION or_tsquery(cfg regconfig, q text)
 RETURNS tsquery LANGUAGE sql IMMUTABLE AS $$
-  SELECT NULLIF(replace(websearch_to_tsquery(cfg, q)::text, ' & ', ' | '), '')::tsquery
+  SELECT NULLIF(replace(
+    websearch_to_tsquery(cfg, regexp_replace(q, '(^|\s)-+', '\1', 'g'))::text,
+    ' & ', ' | '
+  ), '')::tsquery
 $$;
 ```
 
 A query of pure stopwords yields NULL here, which matches nothing without raising. Rank
 with `ts_rank_cd`: it scores by how many distinct terms matched and how close together.
+
+Drop the minus signs before parsing. `websearch_to_tsquery` reads a leading `-` as NOT, and
+so does a spaced dash: `Kela - asumistuki` parses as `'kela' & !'asumistuki'`. Rewriting
+that `&` to `|` gives `'kela' | !'asumistuki'`, which matches nearly every row in the table.
+Nobody typing a sentence into a search box meant an exclusion; if the app needs one,
+apply it as a separate `AND NOT fts @@ …` condition.
 
 ## The hybrid query
 

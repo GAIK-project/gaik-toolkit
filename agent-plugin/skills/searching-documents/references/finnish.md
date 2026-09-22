@@ -68,8 +68,10 @@ Pin the backend by name. `backend="auto"` tries voikko first, so it picks the na
 library on a machine that has it and something else in a container that does not —
 libvoikko is packaged in neither Red Hat UBI 9 nor EPEL 9 — and the index and the query end
 up lemmatized differently. The arm then matches nothing, which reads exactly like a corpus
-without an answer. Check `processor.backend_name` at startup and refuse `simple`: content
-indexed through it is less searchable than the snowball column it would replace.
+without an answer. A named backend raises `ImportError` when it is missing instead of
+falling back. If you keep `auto` anyway, check `processor.backend_name` at startup and
+refuse `simple`: content indexed through it is less searchable than the snowball column it
+would replace.
 
 ## Prefix matching and compounds
 

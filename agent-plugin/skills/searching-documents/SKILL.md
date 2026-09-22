@@ -79,8 +79,9 @@ Fuse the two lists yourself instead of calling `store.search_hybrid()`:
   `search_hybrid()` returns only RRF scores;
 - `expose_ranks=True` writes `rank_semantic` and `rank_keyword` into every hit's metadata,
   so an arm that contributes nothing shows up per result;
-- in gaik 0.7.2 `search_hybrid()` and `search_hybrid_weighted()` ignore `tsquery_mode` and
-  always parse in `websearch` mode, which ANDs every term.
+- through gaik 0.7.2 `search_hybrid()` ignores `tsquery_mode` and always parses in
+  `websearch` mode, which ANDs every term, and `search_hybrid_weighted()` fails on every
+  call with `column reference "id" is ambiguous`.
 
 **Tune the weights and the RRF constant, do not assume them.** Where the keyword arm alone
 reached 33.7% recall@15, equal weights at k=60 scored 8.7 points below vectors weighted 3×
@@ -133,9 +134,9 @@ inflection than the document used: snowball matched 1 of 4, every prefix strateg
 ```python
 from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor
 
+# A named backend raises ImportError when it is missing; only "auto" falls back
+# silently, to "simple", a tokenizer rather than a lemmatizer.
 processor = FinnishTextProcessor(backend="pyvoikko", decompound=False)
-if processor.backend_name == "simple":  # a tokenizer, not a lemmatizer
-    raise RuntimeError("No Finnish morphology installed: pip install 'gaik[finnish-rag]'")
 
 store = PgVectorStore(dsn, embedding_dim=1536, fts_language="simple",
                       text_processor=processor, tsquery_mode="or")
@@ -218,9 +219,10 @@ The rules that matter most:
 ## Rerankers
 
 A cross-encoder reorders only the pool it is handed. On one set it raised hit@1 from 0.757
-to 0.843 on full questions, did nothing for short domain terms, and made some of them worse. `Ranker().rerank(query, hits,
-on_error="fallback")` returns the input order when the model fails, but has no timeout —
-wrap it: `asyncio.wait_for(asyncio.to_thread(ranker.rerank, query, hits), timeout=4)`.
+to 0.843 on full questions, did nothing for short domain terms, and made some of them
+worse. `Ranker().rerank(query, hits, on_error="fallback")` returns the input order when
+the model fails, but has no timeout — wrap it:
+`asyncio.wait_for(asyncio.to_thread(ranker.rerank, query, hits), timeout=4)`.
 Hosted rerankers often ship with tight rate limits; check the quota before designing
 around one.
 
