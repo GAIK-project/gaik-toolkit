@@ -13,8 +13,9 @@ Example::
 
     from gaik.software_components.RAG.relevance_gate import RelevanceGate
 
-    gate = RelevanceGate(floor=0.60)              # cosine distance
-    hits = store.search_semantic(query_embedding, top_k=20)
+    # PgVectorStore.search_semantic returns cosine similarity, higher is closer
+    gate = RelevanceGate(floor=0.40, lower_is_better=False)
+    hits = store.search_semantic(query_embedding, top_k=20, threshold=0.0)
     if not gate.is_answerable(hits, key=lambda hit: hit[1]):
         return "Nothing in the library covers this."
 """

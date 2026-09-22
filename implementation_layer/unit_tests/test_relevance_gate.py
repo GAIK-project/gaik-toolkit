@@ -110,6 +110,17 @@ class TestCalibration:
         assert reading.separated is True
         assert reading.floor == pytest.approx(0.525)
 
+    def test_the_summary_points_the_right_way_for_similarities(self):
+        """The skill tells users to print() the reading; with similarities the
+        comparisons used to point the distance way and contradict the numbers."""
+        reading = RelevanceGate.calibrate(
+            answerable=[0.80, 0.65],
+            unanswerable=[0.40, 0.22],
+            lower_is_better=False,
+        )
+        assert "answerable ≥ 0.650" in str(reading)
+        assert "unanswerable ≤ 0.400" in str(reading)
+
     def test_an_empty_population_is_refused(self):
         with pytest.raises(ValueError, match="both populations"):
             RelevanceGate.calibrate(answerable=[0.3], unanswerable=[])

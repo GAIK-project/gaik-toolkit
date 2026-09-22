@@ -56,10 +56,17 @@ AS $$
         -- stemming, stop-word removal and quoted phrases while letting partial
         -- matches through. ts_rank_cd then discriminates: it already scores by
         -- how many distinct terms matched and how close together they are.
+        --
+        -- A leading '-' is dropped first. websearch reads it as NOT, also in a
+        -- spaced dash ('Kela - asumistuki'), and '!x' OR-ed with the rest
+        -- matches nearly every row that lacks x. A dash inside a word is kept.
         WHEN mode = 'or' THEN
             NULLIF(
                 replace(
-                    websearch_to_tsquery(search_language, query_text)::text,
+                    websearch_to_tsquery(
+                        search_language,
+                        regexp_replace(query_text, '(^|\\s)-+', '\\1', 'g')
+                    )::text,
                     ' & ', ' | '
                 ),
                 ''
@@ -74,7 +81,10 @@ AS $$
             NULLIF(
                 replace(
                     regexp_replace(
-                        websearch_to_tsquery(search_language, query_text)::text,
+                        websearch_to_tsquery(
+                            search_language,
+                            regexp_replace(query_text, '(^|\\s)-+', '\\1', 'g')
+                        )::text,
                         '''(\\s|$)', ''':*\\1', 'g'
                     ),
                     ' & ', ' | '
@@ -498,15 +508,17 @@ class PgVectorStore:
                     WHERE t.text_search @@ gaik_tsquery(search_language, query_text, tsquery_mode)
                       AND (filter_metadata IS NULL OR t.metadata @> filter_metadata)
                 ),
+                -- Qualified: RETURNS TABLE makes `id` a PL/pgSQL variable too, and
+                -- a bare `id` here fails every call as ambiguous.
                 keyword_normalized AS (
                     SELECT
-                        id,
+                        kw.id,
                         CASE
-                            WHEN MAX(score) OVER () > 0
-                            THEN score / MAX(score) OVER ()
+                            WHEN MAX(kw.score) OVER () > 0
+                            THEN kw.score / MAX(kw.score) OVER ()
                             ELSE 0
                         END AS score
-                    FROM keyword
+                    FROM keyword kw
                 )
                 SELECT
                     s.id, s.title, s.content, s.metadata,
@@ -750,7 +762,8 @@ class PgVectorStore:
                 %s::vector({self.embedding_dim}),
                 %s, %s, %s, %s, %s,
                 '{self.fts_language}'::regconfig,
-                %s::jsonb
+                %s::jsonb,
+                %s
             )
             """,
             (
@@ -761,6 +774,7 @@ class PgVectorStore:
                 semantic_weight,
                 keyword_weight,
                 filter_json,
+                self.tsquery_mode,
             ),
         ).fetchall()
 
@@ -807,7 +821,8 @@ class PgVectorStore:
                 %s::vector({self.embedding_dim}),
                 %s, %s, %s, %s,
                 '{self.fts_language}'::regconfig,
-                %s::jsonb
+                %s::jsonb,
+                %s
             )
             """,
             (
@@ -817,6 +832,7 @@ class PgVectorStore:
                 semantic_weight,
                 keyword_weight,
                 filter_json,
+                self.tsquery_mode,
             ),
         ).fetchall()
 

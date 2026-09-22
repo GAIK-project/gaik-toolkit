@@ -39,6 +39,8 @@ class Calibration:
         best_unanswerable: The unanswerable score closest to its query.
         margin: Size of the gap. Negative when they overlap, and the magnitude is
             then how far into each other they reach.
+        lower_is_better: The direction the scores were read in, so the summary
+            points its comparisons the right way.
     """
 
     floor: float | None
@@ -46,12 +48,14 @@ class Calibration:
     worst_answerable: float
     best_unanswerable: float
     margin: float
+    lower_is_better: bool = True
 
     def __str__(self) -> str:
         if self.separated:
+            closer, further = ("≤", "≥") if self.lower_is_better else ("≥", "≤")
             return (
-                f"separated: answerable ≤ {self.worst_answerable:.3f}, "
-                f"unanswerable ≥ {self.best_unanswerable:.3f}, "
+                f"separated: answerable {closer} {self.worst_answerable:.3f}, "
+                f"unanswerable {further} {self.best_unanswerable:.3f}, "
                 f"margin {self.margin:.3f} → floor {self.floor:.3f}"
             )
         return (
@@ -77,8 +81,9 @@ class RelevanceGate:
 
     Example::
 
-        gate = RelevanceGate(floor=0.60)          # cosine distance
-        hits = store.search_semantic(embedding, top_k=20)
+        # PgVectorStore.search_semantic returns cosine similarity, higher is closer
+        gate = RelevanceGate(floor=0.40, lower_is_better=False)
+        hits = store.search_semantic(embedding, top_k=20, threshold=0.0)
         if not gate.is_answerable(hits, key=lambda h: h[1]):
             return "Nothing in the library covers this."
 
@@ -187,4 +192,5 @@ class RelevanceGate:
             worst_answerable=worst_answerable,
             best_unanswerable=best_unanswerable,
             margin=margin,
+            lower_is_better=lower_is_better,
         )

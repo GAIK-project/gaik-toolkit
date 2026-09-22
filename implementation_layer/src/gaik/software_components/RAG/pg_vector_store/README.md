@@ -88,6 +88,10 @@ contributes nothing and does so silently.
 changes — and lets `ts_rank_cd` discriminate, which it already does by how many
 distinct terms matched and how close together they are.
 
+`"or"` and `"prefix"` drop a leading `-` before parsing. Postgres reads it as NOT,
+also in a spaced dash (`Kela - asumistuki`), and a negated term OR-ed with the
+rest would match nearly every row. A dash inside a word (`sote-uudistus`) is kept.
+
 Measured on four Finnish sentences plus one long natural question:
 
 | Configuration | Queries that found their document |
@@ -100,10 +104,10 @@ Measured on four Finnish sentences plus one long natural question:
 lemma is often not a prefix of its own inflected forms. See the
 [Finnish Text Processor README](../finnish_text_processor/README.md).
 
-> Changing `tsquery_mode` after the first `setup()` needs `setup()` re-run: the
-> two hybrid search functions take the mode as an argument, and `setup()` is what
-> installs the version that accepts it. It drops the older signature first, since
-> `CREATE OR REPLACE` cannot change one and would leave an overload behind.
+> Re-run `setup()` after upgrading gaik. Keyword and hybrid searches pass the
+> store's `tsquery_mode` to the SQL, and `setup()` is what installs the functions that
+> accept it. It drops the older hybrid signatures first, since `CREATE OR REPLACE`
+> cannot change one and would leave an overload behind.
 
 ### `hnsw_ef_search`
 

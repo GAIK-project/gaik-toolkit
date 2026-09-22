@@ -82,7 +82,13 @@ class FinnishTextProcessor:
 
     @property
     def backend_name(self) -> str:
-        """Name of the active backend (``"voikko"``, ``"spacy"``, ``"uralic"``, ``"simple"``)."""
+        """Name of the active backend (``"voikko"``, ``"pyvoikko"``, ``"spacy"``, ``"uralic"``,
+        ``"simple"``).
+
+        A backend named explicitly raises ``ImportError`` when it cannot load; only
+        ``"auto"`` falls back, so ``"simple"`` here means either that it was asked
+        for or that ``"auto"`` found nothing better.
+        """
         return self._backend.name
 
     @property
@@ -179,5 +185,6 @@ class FinnishTextProcessor:
         if backend == "simple":
             return SimpleBackend()
         raise ValueError(
-            f"Unknown backend: {backend!r}. Expected one of auto/voikko/spacy/uralic/simple."
+            f"Unknown backend: {backend!r}. "
+            "Expected one of auto/voikko/pyvoikko/spacy/uralic/simple."
         )
