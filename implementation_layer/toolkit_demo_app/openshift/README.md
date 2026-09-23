@@ -16,7 +16,29 @@ Templates for deploying GAIK Demo to CSC Rahti 2 (OpenShift).
   gaik-demo.2.rahtiapp.fi
 ```
 
-## Quick Deploy
+## Deploy on push
+
+Push to the `deploy/demo-app` branch to release both services:
+
+```bash
+git push origin main:deploy/demo-app
+```
+
+A GitHub webhook starts the two BuildConfigs in `buildconfigs.yaml`, which build the API
+and frontend images in Rahti and push them to the `gaik-demo-api` and `gaik-demo`
+ImageStreams. The deployments carry image triggers, so they roll out when a build
+finishes. Follow a release with `oc get builds -n gaik -w`; roll back with
+`oc rollout undo deployment/<name> -n gaik`.
+
+One-time setup, already done for namespace `gaik`: create the `gaik-demo-webhook` secret
+(a random `WebHookSecretKey`), `oc apply -f buildconfigs.yaml`, set the triggers with
+`oc set triggers deployment/<name> --from-image=<name>:latest -c <name>`, and add each
+BuildConfig's GitHub webhook URL (`oc describe bc/<name>`) to the repository.
+
+## Quick Deploy (first install only)
+
+The live deployments carry env vars set with `oc set env` that these manifests lack;
+re-applying `deployment-*.yaml` to a running environment drops them.
 
 ```bash
 # 1. Login to Rahti

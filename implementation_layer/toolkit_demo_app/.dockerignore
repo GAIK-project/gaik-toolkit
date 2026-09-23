@@ -61,4 +61,3 @@ transcriber_workspace/
 .DS_Store
 Thumbs.db
 *.log
-bun.lock
