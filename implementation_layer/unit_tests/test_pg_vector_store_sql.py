@@ -68,7 +68,7 @@ def test_weighted_function_qualifies_the_id_column():
     store, recorder = _store("websearch")
     store._create_hybrid_weighted_function(recorder)
 
-    body = recorder.calls[-1][0]
+    body = next(sql for sql, _ in recorder.calls if "keyword_normalized AS" in sql)
     normalized = body[body.index("keyword_normalized AS") :]
     assert re.search(r"SELECT\s+kw\.id,", normalized)
     assert not re.search(r"SELECT\s+id,", normalized)
@@ -104,8 +104,13 @@ def stores():
     for store in made.values():
         conn = store._get_conn()
         conn.execute(f"DROP TABLE IF EXISTS {store.table_name} CASCADE")
-        for fn in ("match", "hybrid_search_fts", "hybrid_search_weighted"):
-            conn.execute(f"DROP FUNCTION IF EXISTS {fn}_{store.table_name}")
+        # By full signature: the hybrid functions have two overloads each.
+        signatures = conn.execute(
+            "SELECT oid::regprocedure::text AS sig FROM pg_proc WHERE proname LIKE %s",
+            (f"%\\_{store.table_name}",),
+        ).fetchall()
+        for row in signatures:
+            conn.execute(f"DROP FUNCTION IF EXISTS {row['sig']}")
         conn.commit()
         store.close()
 
@@ -143,6 +148,34 @@ def test_hybrid_keyword_arm_follows_the_mode(stores):
     keyword_found = [(d, s) for d, s in or_hits if "keyword_rank" in d.metadata]
     assert _first_words(keyword_found) == ["junat", "kissa"]
     assert not [d for d, _ in websearch_hits if "keyword_rank" in d.metadata]
+
+
+@live
+@pytest.mark.parametrize("fn", ["hybrid_search_fts", "hybrid_search_weighted"])
+def test_an_older_gaik_sharing_the_database_is_never_ambiguous(stores, fn):
+    """gaik before the tsquery_mode argument calls, and its setup() re-creates,
+    the signature without it. A defaulted trailing argument made that call
+    match two functions ("is not unique"): a rollback, or a second app on an
+    older release, took hybrid search down."""
+    store = stores["or"]
+    conn = store._get_conn()
+    name = f"{fn}_{store.table_name}"
+    defaults = conn.execute(
+        "SELECT pronargs, pronargdefaults FROM pg_proc WHERE proname = %s", (name,)
+    ).fetchall()
+    assert sorted((r["pronargs"], r["pronargdefaults"]) for r in defaults) == (
+        [(8, 6), (9, 0)] if fn == "hybrid_search_fts" else [(7, 5), (8, 0)]
+    )
+
+    # What an older release sends: every legacy argument, positionally.
+    legacy = (
+        "%s::vector(3), %s, 10, 60, 0.5, 0.5, 'simple'::regconfig, NULL::jsonb"
+        if fn == "hybrid_search_fts"
+        else "%s::vector(3), %s, 10, 0.5, 0.5, 'simple'::regconfig, NULL::jsonb"
+    )
+    rows = conn.execute(f"SELECT * FROM {name}({legacy})", ("[1,0,0]", "kissa")).fetchall()
+    conn.commit()
+    assert rows
 
 
 @live

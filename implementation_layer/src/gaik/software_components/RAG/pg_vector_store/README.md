@@ -106,8 +106,14 @@ lemma is often not a prefix of its own inflected forms. See the
 
 > Re-run `setup()` after upgrading gaik. Keyword and hybrid searches pass the
 > store's `tsquery_mode` to the SQL, and `setup()` is what installs the functions that
-> accept it. It drops the older hybrid signatures first, since `CREATE OR REPLACE`
-> cannot change one and would leave an overload behind.
+> accept it.
+>
+> Older gaik releases may share the database — a rollback, a rolling update, a
+> second app — so `setup()` also keeps the hybrid signatures without
+> `tsquery_mode`, forwarding them in `websearch` mode. Through gaik 0.7.2 the new
+> argument had a default instead, and an older release's `setup()` then made every
+> hybrid call fail as `function ... is not unique`; the current `setup()` repairs a
+> database left in that state.
 
 ### `hnsw_ef_search`
 

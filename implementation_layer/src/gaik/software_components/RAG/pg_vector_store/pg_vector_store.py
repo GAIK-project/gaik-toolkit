@@ -310,20 +310,25 @@ class PgVectorStore:
         # 4. SQL functions
         conn.execute(_TSQUERY_FUNCTION_SQL)
         # The two hybrid functions gained a trailing `tsquery_mode` argument.
-        # `CREATE OR REPLACE` cannot change a signature -- it would leave the old
-        # arity in place as an overload, and a three-argument call would keep
-        # resolving to the version that ignores the mode.
-        for name, old_args in (
+        # Older gaik releases call, and their setup() re-creates, the signature
+        # without it, and one database can meet both: a rollback, a rolling
+        # update, two apps sharing a table. So the mode-aware function takes no
+        # defaults and the old signature stays as a shim that forwards in
+        # websearch mode. Were the new argument defaulted, an old call would
+        # match both functions and fail as "not unique" -- and gaik 0.7.2 did
+        # default it, so drop that version first: `CREATE OR REPLACE` cannot
+        # remove a default.
+        for name, mode_args in (
             (
                 f"hybrid_search_fts_{table}",
-                f"vector({dim}), TEXT, INTEGER, INTEGER, FLOAT, FLOAT, regconfig, JSONB",
+                f"vector({dim}), TEXT, INTEGER, INTEGER, FLOAT, FLOAT, regconfig, JSONB, TEXT",
             ),
             (
                 f"hybrid_search_weighted_{table}",
-                f"vector({dim}), TEXT, INTEGER, FLOAT, FLOAT, regconfig, JSONB",
+                f"vector({dim}), TEXT, INTEGER, FLOAT, FLOAT, regconfig, JSONB, TEXT",
             ),
         ):
-            conn.execute(f"DROP FUNCTION IF EXISTS {name}({old_args})")
+            conn.execute(f"DROP FUNCTION IF EXISTS {name}({mode_args})")
         self._create_match_function(conn)
         self._create_hybrid_fts_function(conn)
         self._create_hybrid_weighted_function(conn)
@@ -375,13 +380,13 @@ class PgVectorStore:
             CREATE OR REPLACE FUNCTION hybrid_search_fts_{table}(
                 query_embedding vector({dim}),
                 query_text TEXT,
-                result_limit INTEGER DEFAULT 20,
-                rrf_k INTEGER DEFAULT 60,
-                sem_weight FLOAT DEFAULT 0.5,
-                kw_weight FLOAT DEFAULT 0.5,
-                search_language regconfig DEFAULT '{lang}',
-                filter_metadata JSONB DEFAULT NULL,
-                tsquery_mode TEXT DEFAULT 'websearch'
+                result_limit INTEGER,
+                rrf_k INTEGER,
+                sem_weight FLOAT,
+                kw_weight FLOAT,
+                search_language regconfig,
+                filter_metadata JSONB,
+                tsquery_mode TEXT
             )
             RETURNS TABLE (
                 id INTEGER,
@@ -457,6 +462,38 @@ class PgVectorStore:
             END;
             $$
         """)
+        # The pre-tsquery_mode signature, for older gaik releases (see setup()).
+        # Names, defaults and return columns must match theirs exactly, or their
+        # setup() fails to `CREATE OR REPLACE` it.
+        conn.execute(f"""
+            CREATE OR REPLACE FUNCTION hybrid_search_fts_{table}(
+                query_embedding vector({dim}),
+                query_text TEXT,
+                result_limit INTEGER DEFAULT 20,
+                rrf_k INTEGER DEFAULT 60,
+                sem_weight FLOAT DEFAULT 0.5,
+                kw_weight FLOAT DEFAULT 0.5,
+                search_language regconfig DEFAULT '{lang}',
+                filter_metadata JSONB DEFAULT NULL
+            )
+            RETURNS TABLE (
+                id INTEGER,
+                title TEXT,
+                content TEXT,
+                metadata JSONB,
+                semantic_rank BIGINT,
+                keyword_rank BIGINT,
+                rrf_score FLOAT
+            )
+            LANGUAGE sql STABLE
+            AS $$
+                SELECT * FROM hybrid_search_fts_{table}(
+                    query_embedding, query_text, result_limit, rrf_k,
+                    sem_weight, kw_weight, search_language, filter_metadata,
+                    'websearch'::TEXT
+                );
+            $$
+        """)
 
     def _create_hybrid_weighted_function(self, conn: psycopg.Connection) -> None:
         """Create the weighted linear combination hybrid search SQL function."""
@@ -467,12 +504,12 @@ class PgVectorStore:
             CREATE OR REPLACE FUNCTION hybrid_search_weighted_{table}(
                 query_embedding vector({dim}),
                 query_text TEXT,
-                result_limit INTEGER DEFAULT 20,
-                sem_weight FLOAT DEFAULT 0.5,
-                kw_weight FLOAT DEFAULT 0.5,
-                search_language regconfig DEFAULT '{lang}',
-                filter_metadata JSONB DEFAULT NULL,
-                tsquery_mode TEXT DEFAULT 'websearch'
+                result_limit INTEGER,
+                sem_weight FLOAT,
+                kw_weight FLOAT,
+                search_language regconfig,
+                filter_metadata JSONB,
+                tsquery_mode TEXT
             )
             RETURNS TABLE (
                 id INTEGER,
@@ -531,6 +568,34 @@ class PgVectorStore:
                 ORDER BY (sem_weight * s.score + kw_weight * COALESCE(k.score, 0)) DESC
                 LIMIT result_limit;
             END;
+            $$
+        """)
+        # The pre-tsquery_mode signature, for older gaik releases (see setup()).
+        conn.execute(f"""
+            CREATE OR REPLACE FUNCTION hybrid_search_weighted_{table}(
+                query_embedding vector({dim}),
+                query_text TEXT,
+                result_limit INTEGER DEFAULT 20,
+                sem_weight FLOAT DEFAULT 0.5,
+                kw_weight FLOAT DEFAULT 0.5,
+                search_language regconfig DEFAULT '{lang}',
+                filter_metadata JSONB DEFAULT NULL
+            )
+            RETURNS TABLE (
+                id INTEGER,
+                title TEXT,
+                content TEXT,
+                metadata JSONB,
+                semantic_score FLOAT,
+                keyword_score FLOAT,
+                combined_score FLOAT
+            )
+            LANGUAGE sql STABLE
+            AS $$
+                SELECT * FROM hybrid_search_weighted_{table}(
+                    query_embedding, query_text, result_limit, sem_weight,
+                    kw_weight, search_language, filter_metadata, 'websearch'::TEXT
+                );
             $$
         """)
 
