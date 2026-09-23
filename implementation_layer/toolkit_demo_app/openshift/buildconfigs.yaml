@@ -1,0 +1,84 @@
+# In-cluster builds for the demo app: pushing to the deploy/demo-app branch
+# rebuilds both images from GitHub and rolls both deployments out.
+#
+#   git push origin main:deploy/demo-app
+#
+# One-time setup (see README.md, "Deploy on push"):
+#   oc create secret generic gaik-demo-webhook \
+#     --from-literal=WebHookSecretKey="$(openssl rand -hex 20)" -n gaik
+#   oc apply -f buildconfigs.yaml -n gaik
+#   then add the GitHub webhook URL each BuildConfig prints in `oc describe bc`.
+#
+# The builds push to the gaik-demo and gaik-demo-api ImageStreams that
+# deploy.sh also pushes to, and the deployments carry an image trigger, so a
+# finished build rolls out on its own. Only apply this file: the deployment
+# manifests in this directory lack env vars that were set on the live
+# deployments with `oc set env`, and applying them would drop those.
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: gaik-demo-api-git
+  labels:
+    app: gaik-demo-api
+spec:
+  runPolicy: SerialLatestOnly
+  source:
+    type: Git
+    git:
+      uri: https://github.com/GAIK-project/gaik-toolkit.git
+      ref: deploy/demo-app
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: implementation_layer/toolkit_demo_app/api/Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: gaik-demo-api:latest
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "4"
+      memory: 6Gi
+  triggers:
+    - type: GitHub
+      github:
+        secretReference:
+          name: gaik-demo-webhook
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: gaik-demo-git
+  labels:
+    app: gaik-demo
+spec:
+  runPolicy: SerialLatestOnly
+  source:
+    type: Git
+    git:
+      uri: https://github.com/GAIK-project/gaik-toolkit.git
+      ref: deploy/demo-app
+    contextDir: implementation_layer/toolkit_demo_app
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: gaik-demo:latest
+  resources:
+    requests:
+      cpu: "1"
+      memory: 3Gi
+    limits:
+      cpu: "4"
+      memory: 8Gi
+  triggers:
+    - type: GitHub
+      github:
+        secretReference:
+          name: gaik-demo-webhook
