@@ -165,11 +165,23 @@ async def parse_document(
                         }
                     else:
                         raise ValueError("HH Parser returned empty markdown")
-                except Exception:
+                except Exception as exc:
+                    # PyMuPDF reads PDFs only. Falling back for a DOCX replaced
+                    # the service's error with a misleading "PDF only" 500.
+                    if suffix != ".pdf":
+                        raise HTTPException(
+                            status_code=502,
+                            detail=f"HH Parser could not parse this {suffix} file: {exc}",
+                        ) from exc
                     parser = PyMuPDFParser()
                     result = parser.parse_document(tmp_path)
                     result.setdefault("metadata", {})["parser"] = "pymupdf"
             else:
+                if suffix != ".pdf":
+                    raise HTTPException(
+                        status_code=503,
+                        detail="HH Parser is not configured; only PDF files can be parsed.",
+                    )
                 parser = PyMuPDFParser()
                 result = parser.parse_document(tmp_path)
                 result.setdefault("metadata", {})["parser"] = "pymupdf"
@@ -183,6 +195,10 @@ async def parse_document(
             "metadata": result.get("metadata", {}),
         }
 
+    except HTTPException:
+        # Keep the status this router chose; the catch-all below would turn a
+        # 400 (wrong file type, too many pages) into a 500.
+        raise
     except ImportError as e:
         raise HTTPException(status_code=500, detail=f"Parser not installed: {e}") from e
     except Exception as e:
