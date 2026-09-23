@@ -1,3 +1,4 @@
+import { isStateChanging, needsApprovedUser } from "@/lib/api-access";
 import { ratelimit } from "@/lib/rate-limit";
 import { getAccessState, updateSession } from "@/lib/supabase/proxy";
 import { NextRequest, NextResponse } from "next/server";
@@ -77,8 +78,8 @@ export default async function proxy(request: NextRequest) {
     pathname.startsWith("/api/admin") ||
     pathname === "/api/report-writer/run"; // owned by its route handler
   if (pathname.startsWith("/api") && !isNextApiRoute) {
-    // Rate limit only POST requests (heavy processing endpoints)
-    if (ratelimit && request.method === "POST") {
+    // Rate limit requests that change state (heavy processing, deletes)
+    if (ratelimit && isStateChanging(request.method)) {
       try {
         const ip =
           request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
@@ -108,9 +109,9 @@ export default async function proxy(request: NextRequest) {
       }
     }
 
-    // Require login + approval for heavy backend POSTs. (The wizard API is
-    // already gated above, incl. the team-key path, so skip it here.)
-    if (request.method === "POST" && !pathname.startsWith("/api/wizard")) {
+    // Require login + approval for every backend request that changes state,
+    // not just POST: DELETE /video-search/clear empties a table.
+    if (needsApprovedUser(request.method, pathname)) {
       const { loggedIn, approved } = await getAccessState(request);
       if (!loggedIn) {
         return NextResponse.json(
