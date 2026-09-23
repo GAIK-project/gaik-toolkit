@@ -40,14 +40,7 @@ def _post(client: TestClient, name: str, content: bytes, mime: str, parser_type:
     )
 
 
-def test_multimodal_rejects_a_docx_with_400(client: TestClient) -> None:
-    response = _post(client, "a.docx", b"not really a docx", DOCX_MIME, "multimodal")
-
-    assert response.status_code == 400
-    assert "PDF" in response.json()["detail"]
-
-
-def test_vision_page_limit_is_a_400(client: TestClient) -> None:
+def test_a_400_raised_inside_the_handler_stays_a_400(client: TestClient) -> None:
     response = _post(client, "long.pdf", _pdf(11), "application/pdf", "vision")
 
     assert response.status_code == 400

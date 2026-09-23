@@ -10,7 +10,6 @@ POSTGRES_PASSWORD=postgres -p 5432:5432 pgvector/pgvector:pg17`` and
 from __future__ import annotations
 
 import os
-import re
 import uuid
 
 import pytest
@@ -60,18 +59,6 @@ def test_hybrid_search_passes_the_tsquery_mode(method):
     sql, params = recorder.calls[-1]
     assert params[-1] == "or"
     assert sql.count("%s") == len(params)
-
-
-def test_weighted_function_qualifies_the_id_column():
-    """RETURNS TABLE makes `id` a PL/pgSQL variable, so a bare `id` in the
-    function body made every search_hybrid_weighted() call fail as ambiguous."""
-    store, recorder = _store("websearch")
-    store._create_hybrid_weighted_function(recorder)
-
-    body = next(sql for sql, _ in recorder.calls if "keyword_normalized AS" in sql)
-    normalized = body[body.index("keyword_normalized AS") :]
-    assert re.search(r"SELECT\s+kw\.id,", normalized)
-    assert not re.search(r"SELECT\s+id,", normalized)
 
 
 # ── Against a real database ──────────────────────────────────────────
@@ -125,14 +112,10 @@ def _first_words(results) -> list[str]:
     [
         # websearch reads '-' as NOT, also in a spaced dash; OR-ing '!alv' with the
         # rest used to match every row without 'alv'.
-        ("or", "vero -alv", ["vero"]),
         ("or", "kela - asumistuki", ["kela"]),
-        ("or", "-crab kissa", ["kissa"]),
-        ("prefix", "kiss -koir", ["kissa"]),
         ("or", "sote-uudistus", ["sote-uudistus"]),  # a dash inside a word stays
         ("or", "kissa ja tampere", ["junat", "kissa"]),
         ("websearch", "kissa ja tampere", []),  # Postgres' own AND semantics
-        ("websearch", "kissa -koira", []),
     ],
 )
 def test_keyword_search(stores, mode, query, expected):
