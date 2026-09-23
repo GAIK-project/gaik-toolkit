@@ -768,6 +768,8 @@
       "embedding_dim",
       "fts_language",
       "text_processor",
+      "tsquery_mode",
+      "hnsw_ef_search",
       "create_extensions"
     ],
     "supported_providers": [
@@ -2482,9 +2484,7 @@
     "optional_parameters": [
       "backend",
       "spacy_model",
-      "decompound",
-      "operator",
-      "prefix"
+      "decompound"
     ],
     "supported_providers": [],
     "cost_relevant_parameters": [],

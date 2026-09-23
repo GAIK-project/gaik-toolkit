@@ -686,7 +686,15 @@
         "default": "simple",
         "effect": "PostgreSQL text-search stemmer used by the keyword half of hybrid/keyword search. 'simple' does NO stemming; 'finnish' and 'english' enable the respective stemmers. Leaving it at 'simple' for single-language content silently weakens keyword recall rather than raising an error.",
         "selection_relevant": true,
-        "infer_from": "technical_spec.language == 'fi' -> 'finnish'; == 'en' -> 'english'; mixed or multilingual corpora -> leave 'simple'"
+        "infer_from": "technical_spec.language == 'fi' -> 'finnish', but 'simple' when a text_processor supplies lemmas (stemming lemmas again brings back the inconsistency they remove); == 'en' -> 'english'; mixed or multilingual corpora -> leave 'simple'"
+      },
+      {
+        "name": "tsquery_mode",
+        "type": "str",
+        "default": "websearch",
+        "effect": "How the keyword arm turns query text into a tsquery, for search_keyword and both hybrid searches. 'websearch' is Postgres' own parser and ANDs every term, so a sentence query only matches a passage containing every stem -- on real prose none, and hybrid silently degrades to vector-only. 'or' keeps the same parse (stemming, stop words, quoted phrases) but ORs the terms and lets ts_rank_cd rank; a leading '-' is read as text, not NOT. 'prefix' ORs prefix matches and suits only an UNSTEMMED index.",
+        "selection_relevant": true,
+        "infer_from": "users type natural-language questions -> 'or'; short keyword or code lookups where every term must appear -> 'websearch'; 'prefix' only for an unstemmed, suffix-heavy corpus, never lemmatized Finnish"
       },
       {
         "name": "table_name",
@@ -711,6 +719,14 @@
         "effect": "Passed to setup(), not the constructor. When True, setup() issues CREATE EXTENSION for pgvector. Requires database privileges the application role may not hold on a managed instance; set False when a DBA has pre-provisioned the extension.",
         "selection_relevant": true,
         "infer_from": "managed/locked-down PostgreSQL where the app role cannot create extensions -> setup(create_extensions=False); self-hosted or dev -> leave True"
+      },
+      {
+        "name": "hnsw_ef_search",
+        "type": "int | None",
+        "default": null,
+        "effect": "Per-connection hnsw.ef_search for the vector arm. None keeps pgvector's default of 40, which trades recall for latency: on one 1,500-dimension corpus, 100 raised recall@20 against an exact scan from 96.2% to 99.2% for +0.7 ms. On a few thousand rows it changes nothing.",
+        "selection_relevant": false,
+        "infer_from": "a corpus beyond tens of thousands of chunks, or recall mattering more than a millisecond -> 100; otherwise leave None"
       }
     ]
   },
@@ -2069,7 +2085,7 @@
     "returns": "list[str]",
     "install_extra": "finnish-rag",
     "call_index_side": "indexed = processor.to_tsvector_text(chunk)   # -> to_tsvector('simple', indexed)",
-    "call_query_side": "tsq = processor.to_tsquery(user_query)        # -> to_tsquery('simple', tsq)",
+    "call_query_side": "tsq = processor.to_tsquery(user_query)        # -> to_tsquery('simple', tsq). operator='|' (default) ORs the lemmas so a sentence still matches -- '&' only for narrow filters where every term must appear; keep prefix=False, a Finnish lemma is often not a prefix of its own inflected forms ('kolmikantakauppa' vs 'kolmikantakaupassa')",
     "check_backend": "assert processor.backend_name != 'simple', 'no Finnish morphology installed'",
     "options": [
       {
@@ -2087,32 +2103,16 @@
         "effect": "Split compound words into their parts ('vahennysoikeus' -> ['vahennys', 'oikeus']) on the two Voikko backends. Parts come from the analyser's compound STRUCTURE, not from BASEFORM (which never contains a '+' separator) and not from WORDBASES (which gives derivational roots -- a verb and an adjective nobody searches for).",
         "selection_relevant": true,
         "infer_from": "leave False unless an eval set says otherwise: when both sides are lemmatized, whole-compound matching already works, and splitting widens noise because a short first part like 'arvo' reaches 'arvopaperi' and 'arvostus'. Turn it on for recall-first search over a small corpus."
-      },
-      {
-        "name": "operator",
-        "type": "str",
-        "default": "|",
-        "effect": "A to_tsquery() argument joining the lemmas. '|' (OR) is the default because conjoining every term means a nine-word question only matches a passage containing all nine, which on real prose is never -- the keyword arm then contributes nothing and does so silently. ts_rank_cd discriminates instead, scoring by how many distinct terms matched and how close together they are. '&' suits short, deliberately narrow lookups.",
-        "selection_relevant": true,
-        "infer_from": "natural-language questions -> '|'; a two-word filter where every term must appear -> '&'"
-      },
-      {
-        "name": "prefix",
-        "type": "bool",
-        "default": false,
-        "effect": "A to_tsquery() argument appending ':*' to every lemma. Standard advice for agglutinative languages and a TRAP for Finnish: consonant gradation and stem alternation mean a lemma is frequently not a prefix of its own inflected forms -- 'kolmikantakauppa' does not reach 'kolmikantakaupassa', 'kirjanpitovelvollisuus' does not reach 'kirjanpitovelvollisuutta'.",
-        "selection_relevant": false,
-        "infer_from": "leave False for lemma-indexed Finnish; consider True only against an UNSTEMMED index where pure suffixing is the dominant variation"
       }
     ]
   },
   "RelevanceGate": {
     "import": "from gaik.software_components.RAG.relevance_gate import RelevanceGate",
-    "construct": "gate = RelevanceGate(floor=0.60)",
+    "construct": "gate = RelevanceGate(floor=0.40, lower_is_better=False)   # search_semantic() returns cosine similarity; take the floor from calibrate()",
     "call": "answerable = gate.is_answerable(hits, key=lambda hit: hit[1])",
     "returns": "bool",
     "install_extra": "",
-    "call_calibrate": "reading = RelevanceGate.calibrate(answerable=real_scores, unanswerable=offtopic_scores)",
+    "call_calibrate": "reading = RelevanceGate.calibrate(answerable=real_scores, unanswerable=offtopic_scores, lower_is_better=False)",
     "call_best": "closest = gate.best(hits, key=lambda hit: hit[1])   # None means 'no opinion'",
     "options": [
       {
