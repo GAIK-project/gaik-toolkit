@@ -43,6 +43,9 @@ def _get_store():
         table_name=TABLE_NAME,
         embedding_dim=EMBEDDING_DIM,
         fts_language=FTS_LANGUAGE,
+        # Users type questions; websearch mode ANDs every word, so a sentence
+        # query got no keyword hits at all. Needs gaik >= 0.7.3 for hybrid.
+        tsquery_mode="or",
     )
     _store.setup()
     logger.info("PgVectorStore initialised for table '%s'", TABLE_NAME)
