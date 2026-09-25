@@ -17,6 +17,7 @@ except ImportError:
 
 import fitz
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 try:
@@ -148,7 +149,8 @@ async def text_pair(request: TextPairRequest):
 
     judge = _make_judge(request.provider, request.model)
     try:
-        verdict = judge.judge_text_pair(
+        verdict = await run_in_threadpool(
+            judge.judge_text_pair,
             extracted_text=request.extracted_text,
             expected_text=request.expected_text,
             field_name=request.field_name,
@@ -189,7 +191,8 @@ async def hallucinations(request: HallucinationRequest):
 
     judge = _make_judge(request.provider, request.model)
     try:
-        report = judge.detect_hallucinations(
+        report = await run_in_threadpool(
+            judge.detect_hallucinations,
             source_text=request.source_text,
             extracted=request.extracted,
             field_descriptions=request.field_descriptions,
@@ -268,7 +271,7 @@ async def validate_pdf(
 
         judge = _make_judge(provider, model)
         try:
-            result = judge.validate(pages, extracted_payload, rubric_obj)
+            result = await run_in_threadpool(judge.validate, pages, extracted_payload, rubric_obj)
         except Exception as e:
             raise HTTPException(
                 status_code=500, detail=f"Judge call failed: {provider_error_detail(e)}"

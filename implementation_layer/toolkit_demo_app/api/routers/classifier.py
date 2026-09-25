@@ -9,6 +9,7 @@ try:
 except ImportError:
     from api.utils import get_api_config, validate_file_size
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 try:
     from utils.model_settings import provider_error_detail
@@ -63,7 +64,8 @@ async def classify_document(
         elif suffix == ".docx":
             parser_to_use = "docx"
 
-        results = classifier.classify(
+        results = await run_in_threadpool(
+            classifier.classify,
             file_or_dir=tmp_path,
             classes=class_list,
             parser=parser_to_use,

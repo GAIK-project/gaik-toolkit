@@ -14,6 +14,7 @@ except ImportError:
         validate_vision_page_limit,
     )
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 try:
     from utils.model_settings import provider_error_detail
@@ -93,12 +94,12 @@ async def parse_document(
 
             vision_config = get_api_config()
             parser = VisionParser(openai_config=vision_config, **get_model_options(vision_config))
-            # VisionParser uses convert_pdf() which returns list of markdown pages
-            markdown_pages = (
-                parser.convert_pdf(tmp_path)
-                if suffix == ".pdf"
-                else [parser.convert_image(tmp_path)]
-            )
+            # VisionParser uses convert_pdf() which returns list of markdown pages.
+            # Model calls run in a worker thread so a slow provider cannot stall the loop.
+            if suffix == ".pdf":
+                markdown_pages = await run_in_threadpool(parser.convert_pdf, tmp_path)
+            else:
+                markdown_pages = [await run_in_threadpool(parser.convert_image, tmp_path)]
             result = {"text_content": "\n\n".join(markdown_pages), "metadata": {}}
         elif parser_type == "vision_plus":
             from gaik.software_components.RAG.rag_parser_vision import VisionRagParser
@@ -113,8 +114,8 @@ async def parse_document(
                 enable_formula_enrichment=False,
             )
             # Convert to markdown (we don't need the chunks)
-            markdown, _chunks = parser.convert_doc_to_chunks_with_vision(
-                tmp_path, return_markdown=True
+            markdown, _chunks = await run_in_threadpool(
+                parser.convert_doc_to_chunks_with_vision, tmp_path, return_markdown=True
             )
             result = {"text_content": markdown, "metadata": {"parser": "vision_plus"}}
         elif parser_type == "multimodal":
@@ -132,14 +133,15 @@ async def parse_document(
             config = request_config or get_api_config()
             if request_config is None and os.getenv("AZURE_MULTIMODAL_DEPLOYMENT"):
                 config = {**config, "model": os.environ["AZURE_MULTIMODAL_DEPLOYMENT"]}
+            # With api_config the parser reads reasoning_effort from that config.
+            effort = get_model_options(config)["reasoning_effort"]
             parser = MultimodalParser(
-                api_config=config,
+                api_config={**config, "reasoning_effort": effort} if effort else config,
                 model=config["model"],
-                reasoning_effort=get_model_options(config)["reasoning_effort"],
                 merge_table=True,
                 create_html=False,
             )
-            parse_result = parser.parse(tmp_path)
+            parse_result = await run_in_threadpool(parser.parse, tmp_path)
             usage = parse_result.usage
             metadata: dict = {"parser": "multimodal"}
             if usage is not None:

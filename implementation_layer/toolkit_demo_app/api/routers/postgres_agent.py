@@ -23,8 +23,10 @@ except ImportError:
     from api.utils.model_settings import provider_error_detail
 
 try:
+    from utils.config import get_model_options
     from utils.model_settings import get_request_api_config
 except ImportError:
+    from api.utils.config import get_model_options
     from api.utils.model_settings import get_request_api_config
 
 router = APIRouter()
@@ -124,11 +126,14 @@ def _make_agent():
 
     from gaik.software_components.postgres_agent import PostgresAgent
 
+    config = _llm_config()
     return PostgresAgent(
         db_url,
-        config=_llm_config(),
+        config=config,
         schema_name=DEMO_SCHEMA,
         table_allowlist=DEMO_TABLES,
+        # The agent sends temperature 0.0 by default, which GPT-6 models reject.
+        temperature=get_model_options(config, schema=True)["temperature"] if config else None,
     )
 
 

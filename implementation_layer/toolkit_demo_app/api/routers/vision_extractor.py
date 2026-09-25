@@ -35,6 +35,7 @@ except ImportError:
     )
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 try:
@@ -327,7 +328,9 @@ async def generate_schema(request: GenerateSchemaRequest):
 
         config = get_api_config()
         generator = SchemaGenerator(config, model=config["model"], **get_model_options(config))
-        schema = generator.generate_schema(user_requirements=user_requirements)
+        schema = await run_in_threadpool(
+            generator.generate_schema, user_requirements=user_requirements
+        )
         requirements = generator.item_requirements
         schema_id = _remember_temporary_schema(user_requirements, schema, requirements)
         logger.info("Generated temporary vision-extractor schema %s", schema_id)
@@ -426,7 +429,8 @@ async def extract_vision(
             ) from exc
 
         try:
-            result = extractor.extract(
+            result = await run_in_threadpool(
+                extractor.extract,
                 file_paths=temp_paths,
                 user_requirements=normalized_user_requirements,
                 extraction_model=extraction_model,

@@ -22,9 +22,9 @@ import uuid
 from pathlib import Path
 
 try:
-    from utils import validate_file_size
+    from utils import get_model_options, validate_file_size
 except ImportError:
-    from api.utils import validate_file_size
+    from api.utils import get_model_options, validate_file_size
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
@@ -280,10 +280,13 @@ def _load_agent(path: Path, layout_inference: str):
     """Build an agent for ``path`` and profile it (blocking)."""
     from gaik.software_components.tabular_agent import TabularAgent
 
+    config = _llm_config()
     agent = TabularAgent(
         path,
-        config=_llm_config(),
+        config=config,
         layout_inference=layout_inference,
+        # The agent sends temperature 0.0 by default, which GPT-6 models reject.
+        temperature=get_model_options(config, schema=True)["temperature"] if config else None,
     )
     try:
         schema = agent.get_schema()

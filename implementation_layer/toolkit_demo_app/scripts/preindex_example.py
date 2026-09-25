@@ -80,7 +80,8 @@ def main():
     ):
         chunks_data.append({
             "page_content": doc.page_content,
-            "metadata": doc.metadata,
+            # The index is served publicly; keep the file name, not the local path.
+            "metadata": {**doc.metadata, "source": EXAMPLE_PDF.name},
             "embedding": embedding,
         })
 

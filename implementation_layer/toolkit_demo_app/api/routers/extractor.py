@@ -23,6 +23,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 try:
@@ -135,8 +136,12 @@ async def generate_schema(request: GenerateSchemaRequest):
             schema, requirements = _schema_cache[sid]
         else:
             generator = SchemaGenerator(config, model=config["model"], **get_model_options(config))
+            # Provider calls run in a worker thread: an own Aitta key may wait minutes
+            # for a cold start, which must not stall the event loop and health probe.
             schema = wrap_schema_with_numeric_normalizers(
-                generator.generate_schema(user_requirements=request.user_requirements)
+                await run_in_threadpool(
+                    generator.generate_schema, user_requirements=request.user_requirements
+                )
             )
             requirements = generator.item_requirements
             _schema_cache[sid] = (schema, requirements)
@@ -195,7 +200,9 @@ async def extract_data_plain_language(request: PlainLanguageExtractRequest):
                     config, model=config["model"], **get_model_options(config)
                 )
                 schema = wrap_schema_with_numeric_normalizers(
-                    generator.generate_schema(user_requirements=request.user_requirements)
+                    await run_in_threadpool(
+                        generator.generate_schema, user_requirements=request.user_requirements
+                    )
                 )
                 item_requirements = generator.item_requirements
                 save_schema(schema, item_requirements, schema_key, request.user_requirements)
@@ -205,7 +212,8 @@ async def extract_data_plain_language(request: PlainLanguageExtractRequest):
                 )
 
         extractor = DataExtractor(config, model=config["model"], **get_model_options(config))
-        results = extractor.extract(
+        results = await run_in_threadpool(
+            extractor.extract,
             extraction_model=schema,
             requirements=item_requirements,
             user_requirements=request.user_requirements,
@@ -283,7 +291,8 @@ async def extract_data(request: ExtractRequest):
                 ],
             )
 
-        results = extractor.extract(
+        results = await run_in_threadpool(
+            extractor.extract,
             extraction_model=extraction_model,
             requirements=requirements,
             user_requirements=request.user_requirements,

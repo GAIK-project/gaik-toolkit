@@ -10,7 +10,7 @@
     {
       "page_content": "Document Type:, 1 = Annual Report. Document Number:, 1 = DOC-2024-Q4-00847. Date:, 1 = December 15, 2024. Classification:, 1 = Internal Use Only. Prepared By:, 1 = Michael Stevens, CFO",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 1,
         "heading": "Annual Report 2024 - Q4 Summary",
@@ -1046,7 +1046,7 @@
     {
       "page_content": "Aurora Digital Solutions Inc. has achieved significant growth in the fourth quarter of 2024. Tot revenue increased to $13.5 million, representing a 23% growth compared to the previous year. The digital services segment in particular has shown strong development, and customer satisfaction has risen to 94%. Our workforce has grown to 127 employees, and new offices have been opened in Boston and Seattle. The company continues to invest heavily in R&D; to maintain its competitive edge.",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 1,
         "heading": "1. EXECUTIVE SUMMARY",
@@ -2082,7 +2082,7 @@
     {
       "page_content": "Revenue, Q4 2024 = $13,500,000. Revenue, Q4 2023 = $10,975,000. Revenue, Change % = +23.0%. EBITDA, Q4 2024 = $2,700,000. EBITDA, Q4 2023 = $2,085,000. EBITDA, Change % = +29.5%. Operating Income, Q4 2024 = $2,025,000. Operating Income, Q4 2023 = $1,536,000. Operating Income, Change % = +31.8%. Net Income, Q4 2024 = $1,620,000. Net Income, Q4 2023 = $1,230,000. Net Income, Change % = +31.7%. Personnel Costs, Q4 2024 = $5,400,000. Personnel Costs, Q4 2023 = $4,390,000. Personnel Costs, Change % = +23.0%. Research & Development, Q4 2024 = $1,350,000. Research & Development, Q4 2023 = $988,000. Research & Development, Change % = +36.6%",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 1,
         "heading": "2. FINANCIAL HIGHLIGHTS",
@@ -3118,7 +3118,7 @@
     {
       "page_content": "- Active Customers: 2,847 businesses (+18% YoY)",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Customers & Markets:",
@@ -4154,7 +4154,7 @@
     {
       "page_content": "- New Customers in Q4: 312 businesses",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Customers & Markets:",
@@ -5190,7 +5190,7 @@
     {
       "page_content": "- Customer Retention Rate: 96.2%",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Customers & Markets:",
@@ -6226,7 +6226,7 @@
     {
       "page_content": "- Net Promoter Score (NPS): 72",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Customers & Markets:",
@@ -7262,7 +7262,7 @@
     {
       "page_content": "- SaaS Subscriptions: 1,923 units",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Products & Services:",
@@ -8298,7 +8298,7 @@
     {
       "page_content": "- API Calls/Month: 45.6 million",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Products & Services:",
@@ -9334,7 +9334,7 @@
     {
       "page_content": "- System Uptime: 99.97%",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Products & Services:",
@@ -10370,7 +10370,7 @@
     {
       "page_content": "- Average Response Time: 124 ms",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Products & Services:",
@@ -11406,7 +11406,7 @@
     {
       "page_content": "- Total Employees: 127 people",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Workforce:",
@@ -12442,7 +12442,7 @@
     {
       "page_content": "- New Hires in Q4: 14 people",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Workforce:",
@@ -13478,7 +13478,7 @@
     {
       "page_content": "- Employee Turnover: 8.3%",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Workforce:",
@@ -14514,7 +14514,7 @@
     {
       "page_content": "- Employee Satisfaction Index: 4.2/5.0",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 2,
         "heading": "Workforce:",
@@ -15550,7 +15550,7 @@
     {
       "page_content": "SELLER, 1 = BUYER. Aurora Digital Solutions 123 Innovation Drive San Francisco, CA 94105 EIN: 12-3456789 VAT: US123456789, 1 = TechCorp Industries LLC 456 Enterprise Avenue Boston, MA 02101 EIN: 98-7654321 VAT: US987654321",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -16586,7 +16586,7 @@
     {
       "page_content": "Invoice Number:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -17622,7 +17622,7 @@
     {
       "page_content": "INV-2024-08472",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -18658,7 +18658,7 @@
     {
       "page_content": "Invoice Date:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -19694,7 +19694,7 @@
     {
       "page_content": "December 15, 2024",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -20730,7 +20730,7 @@
     {
       "page_content": "Due Date:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -21766,7 +21766,7 @@
     {
       "page_content": "January 14, 2025",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -22802,7 +22802,7 @@
     {
       "page_content": "Payment Terms:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -23838,7 +23838,7 @@
     {
       "page_content": "Net 30",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -24874,7 +24874,7 @@
     {
       "page_content": "Late Payment Interest:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -25910,7 +25910,7 @@
     {
       "page_content": "8.5% APR",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -26946,7 +26946,7 @@
     {
       "page_content": "Reference:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -27982,7 +27982,7 @@
     {
       "page_content": "PROJ-2024-TCH-445",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "INVOICE",
@@ -29018,7 +29018,7 @@
     {
       "page_content": "AI Platform Pro License (Annual), Qty = 1. AI Platform Pro License (Annual), Unit Price = $8,400.00. AI Platform Pro License (Annual), Tax % = 8.25%. AI Platform Pro License (Annual), Total = $9,093.00. API Premium Package, Qty = 1. API Premium Package, Unit Price = $2,400.00. API Premium Package, Tax % = 8.25%. API Premium Package, Total = $2,598.00. Consulting Services, Qty = 24 hrs. Consulting Services, Unit Price = $150.00. Consulting Services, Tax % = 8.25%. Consulting Services, Total = $3,897.00. Training Session, Qty = 2 days. Training Session, Unit Price = $1,200.00. Training Session, Tax % = 8.25%. Training Session, Total = $2,598.00. Technical Support (12 months), Qty = 1. Technical Support (12 months), Unit Price = $1,800.00. Technical Support (12 months), Tax % = 8.25%. Technical Support (12 months), Total = $1,948.50",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "Invoice Details:",
@@ -30055,7 +30055,7 @@
     {
       "page_content": "Subtotal:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "Invoice Details:",
@@ -31091,7 +31091,7 @@
     {
       "page_content": "$18,600.00",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "Invoice Details:",
@@ -32127,7 +32127,7 @@
     {
       "page_content": "Sales Tax (8.25%):",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "Invoice Details:",
@@ -33163,7 +33163,7 @@
     {
       "page_content": "$1,534.50",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "Invoice Details:",
@@ -34199,7 +34199,7 @@
     {
       "page_content": "TOTAL DUE:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "Invoice Details:",
@@ -35235,7 +35235,7 @@
     {
       "page_content": "$20,134.50",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 3,
         "heading": "Invoice Details:",
@@ -36271,7 +36271,7 @@
     {
       "page_content": "Please include the reference number when making your payment.",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 4,
         "heading": "Bank Name: First National Bank Account Name: Aurora Digital Solutions Inc. Account Number: 1234567890 Routing Number: 021000021 SWIFT Code: FNBKUS33 Reference Number: INV-2024-08472",
@@ -37307,7 +37307,7 @@
     {
       "page_content": "Contract Number: AGR-2024-NTS-00234",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "SERVICE AGREEMENT",
@@ -38343,7 +38343,7 @@
     {
       "page_content": "Aurora Digital Solutions Inc. (EIN: 12-3456789)",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "Service Provider:",
@@ -39379,7 +39379,7 @@
     {
       "page_content": "123 Innovation Drive, San Francisco, CA 94105",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "Service Provider:",
@@ -40415,7 +40415,7 @@
     {
       "page_content": "Contact Person: Anna Richardson, Account Manager",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "Service Provider:",
@@ -41451,7 +41451,7 @@
     {
       "page_content": "Phone: +1 (415) 555-1234",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "Service Provider:",
@@ -42487,7 +42487,7 @@
     {
       "page_content": "Email: anna.richardson@nordictechsolutions.com",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "Service Provider:",
@@ -43523,7 +43523,7 @@
     {
       "page_content": "TechCorp Industries LLC (EIN: 98-7654321)",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "Client:",
@@ -44559,7 +44559,7 @@
     {
       "page_content": "456 Enterprise Avenue, Boston, MA 02101",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "Client:",
@@ -45595,7 +45595,7 @@
     {
       "page_content": "Contact Person: Peter Mitchell, IT Director",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "Client:",
@@ -46631,7 +46631,7 @@
     {
       "page_content": "Phone: +1 (617) 555-9876",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "Client:",
@@ -47667,7 +47667,7 @@
     {
       "page_content": "Email: peter.mitchell@techcorpindustries.com",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "Client:",
@@ -48703,7 +48703,7 @@
     {
       "page_content": "This agreement covers the following services:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "2. SCOPE OF SERVICES",
@@ -49739,7 +49739,7 @@
     {
       "page_content": "- AI Platform Pro software license and access\n- API Premium interface services\n- Technical support and maintenance 24/7\n- User training and documentation\n- Data backup and disaster recovery",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "2. SCOPE OF SERVICES",
@@ -50775,7 +50775,7 @@
     {
       "page_content": "Services are delivered on a SaaS (Software as a Service) model and are accessible via internet connection through the service provider's managed cloud infrastructure.",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "2. SCOPE OF SERVICES",
@@ -51811,7 +51811,7 @@
     {
       "page_content": "Contract Term: January 1, 2025 - December 31, 2025 (12 months)",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "3. TERM AND PRICING",
@@ -52847,7 +52847,7 @@
     {
       "page_content": "Renewal: This agreement will automatically renew for successive 12-month periods unless terminated in writing by either party with 90 days prior notice before the end of the current te",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "3. TERM AND PRICING",
@@ -53883,7 +53883,7 @@
     {
       "page_content": "Annual Fee:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "3. TERM AND PRICING",
@@ -54919,7 +54919,7 @@
     {
       "page_content": "$20,134.50 (including applicable taxes)",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 5,
         "heading": "3. TERM AND PRICING",
@@ -55955,7 +55955,7 @@
     {
       "page_content": "Payment Terms:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "3. TERM AND PRICING",
@@ -56991,7 +56991,7 @@
     {
       "page_content": "Net 30",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "3. TERM AND PRICING",
@@ -58027,7 +58027,7 @@
     {
       "page_content": "Billing Frequency:",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "3. TERM AND PRICING",
@@ -59063,7 +59063,7 @@
     {
       "page_content": "Annually in advance",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "3. TERM AND PRICING",
@@ -60099,7 +60099,7 @@
     {
       "page_content": "Prices may be adjusted annually based on the Consumer Price Index (CPI) changes.",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "3. TERM AND PRICING",
@@ -61135,7 +61135,7 @@
     {
       "page_content": "System Uptime, Target = 99.9%. System Uptime, Credit = 5% monthly fee per 0.1% below target. API Response Time, Target = < 200 ms. API Response Time, Credit = 2% monthly fee per 50 ms over target. Support Ticket Response, Target = < 4 hours. Support Ticket Response, Credit = 1% monthly fee per 2 hours over target. Critical Incident Resolution, Target = < 1 hour. Critical Incident Resolution, Credit = 10% monthly fee per 30 min over target",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "4. SERVICE LEVEL AGREEMENT (SLA)",
@@ -62171,7 +62171,7 @@
     {
       "page_content": "_______________________",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "Client",
@@ -63207,7 +63207,7 @@
     {
       "page_content": "_______________________",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "Client",
@@ -64243,7 +64243,7 @@
     {
       "page_content": "Michael Stevens",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "Client",
@@ -65279,7 +65279,7 @@
     {
       "page_content": "Peter Mitchell",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "Client",
@@ -66315,7 +66315,7 @@
     {
       "page_content": "Chief Executive Officer",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "Client",
@@ -67351,7 +67351,7 @@
     {
       "page_content": "IT Director",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "Client",
@@ -68387,7 +68387,7 @@
     {
       "page_content": "Aurora Digital Solutions Inc.",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "Client",
@@ -69423,7 +69423,7 @@
     {
       "page_content": "TechCorp Industries LLC",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "Client",
@@ -70459,7 +70459,7 @@
     {
       "page_content": "Date: _______________",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "Client",
@@ -71495,7 +71495,7 @@
     {
       "page_content": "Date: _______________",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "Client",
@@ -72531,7 +72531,7 @@
     {
       "page_content": "This document was created for AI tool testing purposes. It contains fictitious information and does not represent any real company or agreement. Available for GAIK.ai demo purposes.",
       "metadata": {
-        "source": "C:\\hh-tyo\\gaik\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\public\\GAIK_Test_Document_Demo.pdf",
+        "source": "GAIK_Test_Document_Demo.pdf",
         "document_name": "GAIK_Test_Document_Demo",
         "page_number": 6,
         "heading": "Client",

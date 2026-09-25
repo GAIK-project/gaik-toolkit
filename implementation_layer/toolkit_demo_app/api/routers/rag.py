@@ -87,6 +87,9 @@ EXAMPLE_INDEX_PATH = _public_path / "example-index.json"
 EXAMPLE_COLLECTION_PREFIX = "example-demo"
 EXAMPLE_FILENAME = "GAIK_Test_Document_Demo.pdf"
 EXAMPLE_DOCUMENT_NAME = "GAIK_Test_Document_Demo"
+# example-index.json holds text-embedding-3-large vectors, so queries must use the
+# same model. gaik 0.8 OpenAI/Azure configs default to text-embedding-3-small.
+EXAMPLE_EMBEDDING_MODEL = "text-embedding-3-large"
 
 
 def extract_page_filter(query: str) -> dict | None:
@@ -193,7 +196,12 @@ class DemoRagWorkflow:
         from gaik.software_components.RAG.vector_store import VectorStore
 
         self.api_config = config
-        self.embedder = Embedder(config=config)
+        self.embedder = Embedder(
+            config=config,
+            model=(
+                EXAMPLE_EMBEDDING_MODEL if config.get("provider") in {"openai", "azure"} else None
+            ),
+        )
         self.vector_store = VectorStore(
             persist=False,
             collection_name=collection_name,

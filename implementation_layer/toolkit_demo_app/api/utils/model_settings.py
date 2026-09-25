@@ -180,6 +180,10 @@ class _CredentialRedactionFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         settings = _settings.get()
         if settings is not None:
+            # httpx logs every request URL at INFO, which names the user's own
+            # Azure resource and deployment.
+            if record.name.split(".")[0] in {"httpx", "httpcore"}:
+                return False
             if record.exc_info:
                 # Provider exceptions can include remote response bodies. Keep only
                 # their type in BYOK logs rather than serializing an exception body.

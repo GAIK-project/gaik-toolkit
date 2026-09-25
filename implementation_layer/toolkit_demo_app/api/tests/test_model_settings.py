@@ -227,6 +227,58 @@ def test_provider_exception_log_arguments_are_not_serialized():
         settings._settings.reset(token)
 
 
+def test_own_key_request_urls_are_not_logged():
+    record = logging.LogRecord(
+        "httpx",
+        logging.INFO,
+        "httpx",
+        1,
+        "HTTP Request: %s %s",
+        ("POST", "https://own-resource.openai.azure.com/openai/deployments/own-model"),
+        None,
+    )
+    log_filter = settings._CredentialRedactionFilter()
+    assert log_filter.filter(record)
+    token = settings._settings.set(settings.parse_model_settings(header()))
+    try:
+        assert not log_filter.filter(record)
+    finally:
+        settings._settings.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_own_key_provider_calls_do_not_block_the_event_loop(monkeypatch):
+    import threading
+
+    import gaik.software_components.extractor as component
+    from api.routers import extractor
+
+    released = threading.Event()
+    observed = {}
+
+    class FakeExtractor:
+        def __init__(self, config, **kwargs):
+            pass
+
+        def extract(self, **kwargs):
+            # A cold Aitta model can take minutes; the loop must keep serving meanwhile.
+            observed["api_key"] = get_api_config()["api_key"]
+            observed["loop_ran"] = released.wait(timeout=2)
+            return [{"extracted_data": "ok"}]
+
+    monkeypatch.setattr(component, "DataExtractor", FakeExtractor)
+    asyncio.get_running_loop().call_later(0.05, released.set)
+    token = settings._settings.set(settings.parse_model_settings(header()))
+    try:
+        result = await extractor.extract_data(
+            extractor.ExtractRequest(documents=["Total 5 EUR"], user_requirements="Find the total")
+        )
+    finally:
+        settings._settings.reset(token)
+    assert observed == {"api_key": "test-secret", "loop_ran": True}
+    assert result.document_count == 1
+
+
 @pytest.mark.asyncio
 async def test_classifier_result_error_does_not_bypass_sanitizer(monkeypatch):
     import gaik.software_components.doc_classifier as component

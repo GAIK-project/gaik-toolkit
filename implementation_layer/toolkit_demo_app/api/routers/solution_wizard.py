@@ -32,6 +32,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -584,7 +585,7 @@ async def send_message(session_id: str, body: MessageRequest) -> StreamingRespon
                 file_sections = []
                 for f in body.files[:5]:
                     try:
-                        content = _extract_text_from_attachment(f)
+                        content = await run_in_threadpool(_extract_text_from_attachment, f)
                     except Exception as exc:  # noqa: BLE001
                         content = f"[Could not extract text: {provider_error_detail(exc)}]"
                     file_sections.append(
