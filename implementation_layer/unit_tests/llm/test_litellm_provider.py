@@ -46,15 +46,69 @@ def test_requests_scope_credentials_translate_sampling_and_validate_schema(monke
         ).count
         == 7
     )
+    assert calls[0]["model"] == "azure/gpt-6-luna"
     assert calls[0]["api_key"] == "private-key"
     assert calls[0]["api_base"] == "https://resource.openai.azure.com"
+    assert calls[0]["api_version"] == "version"
+    assert calls[0]["reasoning_effort"] == "low"
     assert calls[0]["max_completion_tokens"] == 128
+    assert "max_tokens" not in calls[0]
     assert "temperature" not in calls[0]
     assert calls[0]["response_format"] is Answer
     second = create_llm_client({"provider": "litellm", "model": "openai/gpt-6-luna"})
     second.chat([{"role": "user", "content": "Hello"}])
     assert "api_key" not in calls[1]
     assert "api_base" not in calls[1]
+
+
+def test_client_options_use_litellm_names_for_chat_and_embeddings(monkeypatch):
+    calls = []
+
+    def completion(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(
+            model=kwargs["model"],
+            usage=None,
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))],
+        )
+
+    def embedding(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(data=[{"index": 0, "embedding": [1.0]}])
+
+    monkeypatch.setattr(litellm_provider.litellm, "completion", completion)
+    monkeypatch.setattr(litellm_provider.litellm, "embedding", embedding)
+    client = create_llm_client(
+        {
+            "provider": "litellm",
+            "model": "vertex_ai/gemini-2.5-flash",
+            "embedding_model": "vertex_ai/gemini-embedding-001",
+            "timeout": 30.0,
+            "max_retries": 2,
+            "vertex_project": "project",
+            "vertex_location": "europe-north1",
+        }
+    )
+    client.chat([{"role": "user", "content": "Hello"}])
+    client.embed(["Hello"])
+    client.chat([{"role": "user", "content": "Hello"}], timeout=5.0)
+
+    for call in calls[:2]:
+        assert call["timeout"] == 30.0
+        assert call["num_retries"] == 2
+        assert "max_retries" not in call
+        assert call["vertex_project"] == "project"
+        assert call["vertex_location"] == "europe-north1"
+    assert calls[0]["model"] == "vertex_ai/gemini-2.5-flash"
+    assert calls[1]["model"] == "vertex_ai/gemini-embedding-001"
+    assert calls[1]["input"] == ["Hello"]
+    assert calls[2]["timeout"] == 5.0
+
+
+@pytest.mark.parametrize("model", ["", "gpt-6-luna"])
+def test_model_must_name_its_litellm_provider(model):
+    with pytest.raises(ValueError, match="provider-prefixed"):
+        create_llm_client({"provider": "litellm", "model": model})
 
 
 def test_invalid_structured_response_is_not_silently_accepted(monkeypatch):

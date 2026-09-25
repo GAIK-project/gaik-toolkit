@@ -8,7 +8,11 @@ dense 23-min chunk exceeds the timeout and diarize raises
 
 from __future__ import annotations
 
-from gaik.software_components.parallel_transcriber import TranscriptionConfig
+import pytest
+from gaik.software_components.parallel_transcriber import (
+    ParallelTranscriber,
+    TranscriptionConfig,
+)
 
 
 def test_default_api_timeout_is_600():
@@ -33,3 +37,13 @@ def test_from_env_azure_alias_override(monkeypatch):
     monkeypatch.delenv("API_TIMEOUT_SECONDS", raising=False)
     monkeypatch.setenv("AZURE_OPENAI_TIMEOUT_SECONDS", "450")
     assert TranscriptionConfig.from_env().api_timeout_seconds == 450
+
+
+def test_bare_legacy_config_is_openai_whatever_llm_provider_says(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "aitta")
+    ParallelTranscriber({"api_key": "test"})
+
+
+def test_explicit_non_audio_provider_is_rejected():
+    with pytest.raises(NotImplementedError, match="only supports OpenAI/Azure"):
+        ParallelTranscriber({"provider": "aitta", "api_key": "test"})

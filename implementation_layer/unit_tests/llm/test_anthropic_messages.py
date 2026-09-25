@@ -9,7 +9,7 @@ from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import create_llm_client
 from pydantic import BaseModel
 
-pytest.importorskip("anthropic")
+anthropic = pytest.importorskip("anthropic")
 
 
 class Receipt(BaseModel):
@@ -39,6 +39,41 @@ def _client(handler):
             http_client=httpx.Client(transport=httpx.MockTransport(handler)),
         )
     )
+
+
+def test_foundry_client_forwards_resource_key_and_transport_options(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_FOUNDRY_BASE_URL", raising=False)
+    requests = []
+
+    def handle(request):
+        requests.append(request)
+        return httpx.Response(200, json=_response([{"type": "text", "text": "OK"}]))
+
+    client = create_llm_client(
+        get_llm_config(
+            "anthropic_foundry",
+            api_key="test-key",
+            resource="example-resource",
+            model="claude-test",
+            timeout=12.5,
+            max_retries=0,
+            http_client=httpx.Client(transport=httpx.MockTransport(handle)),
+        )
+    )
+    try:
+        assert isinstance(client.raw, anthropic.AnthropicFoundry)
+        assert client.raw.timeout == 12.5
+        assert client.raw.max_retries == 0
+        result = client.chat([{"role": "user", "content": "Hi"}])
+    finally:
+        client.raw.close()
+
+    assert result.text == "OK"
+    assert result.provider == "anthropic_foundry"
+    assert str(requests[0].url) == (
+        "https://example-resource.services.ai.azure.com/anthropic/v1/messages"
+    )
+    assert requests[0].headers["api-key"] == "test-key"
 
 
 @pytest.mark.parametrize("token_key", ["max_tokens", "max_completion_tokens", "max_output_tokens"])

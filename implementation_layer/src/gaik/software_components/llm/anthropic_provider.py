@@ -92,6 +92,9 @@ class AnthropicProvider:
 
     def _options(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         options = dict(kwargs)
+        # OpenAI's reasoning option; components document it as ignored elsewhere,
+        # and the Messages API rejects the unknown keyword.
+        options.pop("reasoning_effort", None)
         token_keys = [
             key
             for key in ("max_tokens", "max_completion_tokens", "max_output_tokens")

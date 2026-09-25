@@ -65,7 +65,8 @@ def assert_openai_or_azure(config: dict, *, component: str) -> None:
     served through different APIs. An OpenAI-compatible chat endpoint does not
     imply support for OpenAI's transcription or speech endpoints.
     """
-    provider = resolve_provider(config=config)
+    # A bare legacy config means standard OpenAI, as in create_openai_client().
+    provider = resolve_provider(config={"use_azure": False, **config})
     if provider not in {Provider.OPENAI.value, Provider.AZURE.value}:
         raise NotImplementedError(
             f"{component} only supports OpenAI/Azure (got provider='{provider}'). "

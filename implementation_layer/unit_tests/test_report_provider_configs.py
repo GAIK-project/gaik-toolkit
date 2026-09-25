@@ -151,3 +151,35 @@ def test_saved_report_config_rejects_credentials_before_writing(tmp_path):
             writer_options={"api_config": BASE},
         )
     assert not target.exists()
+
+
+@pytest.mark.parametrize(
+    "ctor, expected",
+    [
+        # A legacy backend selector keeps the parser on its own backend, as in 0.7.x.
+        (
+            {"use_azure": False, "reasoning_effort": "high"},
+            {"use_azure": False, "reasoning_effort": "high"},
+        ),
+        # Otherwise the report config is shared and the effort travels inside it.
+        ({"reasoning_effort": "high"}, {"api_config": {**BASE, "reasoning_effort": "high"}}),
+    ],
+)
+def test_multimodal_ctor_keeps_legacy_backend_and_effort(monkeypatch, ctor, expected):
+    from gaik.software_components import parsers
+
+    captured = {}
+
+    def parser(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(parse=lambda path: SimpleNamespace(clean_markdown="md"))
+
+    monkeypatch.setattr(parsers, "MultimodalParser", parser)
+    generator = report.MultiSourceReportGenerator(api_config=BASE)
+    options = {"ctor": ctor}
+    assert (
+        generator._parse_pdf(Path("source.pdf"), parser_choice="multimodal", parser_options=options)
+        == "md"
+    )
+    assert captured == expected
+    assert options == {"ctor": ctor}

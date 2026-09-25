@@ -47,7 +47,9 @@ class Embedder:
     ) -> None:
         self.config = config
         self.batch_size = batch_size
-        provider = resolve_provider(config=config)
+        # Resolve like build_compat_client: a bare legacy config (neither
+        # ``provider`` nor ``use_azure``) means standard OpenAI, whatever LLM_PROVIDER says.
+        provider = resolve_provider(config={"use_azure": False, **config})
         if provider in {"aitta", "openai_compatible"} and not (
             model or config.get("embedding_model")
         ):

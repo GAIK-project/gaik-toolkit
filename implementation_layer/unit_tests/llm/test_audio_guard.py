@@ -30,10 +30,12 @@ def test_provider_names_are_normalized():
     assert_openai_or_azure({"provider": " AZURE "}, component="X")
 
 
-def test_audio_guard_resolves_default_provider(monkeypatch):
+def test_bare_legacy_config_means_openai_whatever_the_default(monkeypatch):
+    # Same rule as create_openai_client(): no provider and no use_azure is standard OpenAI.
     monkeypatch.setenv("LLM_PROVIDER", "aitta")
+    assert_openai_or_azure({"api_key": "x"}, component="Transcriber")
     with pytest.raises(NotImplementedError, match="provider='aitta'"):
-        assert_openai_or_azure({}, component="Transcriber")
+        assert_openai_or_azure({"provider": "aitta"}, component="Transcriber")
 
 
 def test_audio_error_does_not_recommend_unsupported_gemini_endpoint():

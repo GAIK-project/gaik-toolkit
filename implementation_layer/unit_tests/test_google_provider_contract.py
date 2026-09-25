@@ -94,6 +94,19 @@ def test_common_token_limit_is_translated_to_google_config(client, method, token
     assert client.raw.models.calls[0]["config"].max_output_tokens == 123
 
 
+@pytest.mark.parametrize("method", ["chat", "chat_parsed", "chat_stream"])
+def test_openai_reasoning_effort_is_ignored(client, method):
+    # LLMJudge, VisionParser and TranscriptEnhancer forward an explicit effort to any provider.
+    kwargs = {"reasoning_effort": "high", "max_tokens": 50}
+    if method == "chat_parsed":
+        kwargs["response_format"] = _Answer
+    result = getattr(client, method)([{"role": "user", "content": "Hello"}], **kwargs)
+    if method == "chat_stream":
+        assert list(result) == ["ok"]
+
+    assert client.raw.models.calls[0]["config"].max_output_tokens == 50
+
+
 def test_conflicting_token_limits_are_rejected_before_request(client):
     with pytest.raises(ValueError, match="Use only one token limit"):
         client.chat([{"role": "user", "content": "Hello"}], max_tokens=20, max_output_tokens=30)

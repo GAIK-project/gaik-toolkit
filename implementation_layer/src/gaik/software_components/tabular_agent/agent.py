@@ -33,6 +33,7 @@ except ImportError as exc:
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import build_compat_client
+from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 from .loader import load_sources, lock_down, normalize_sources
 from .models import (
@@ -179,7 +180,8 @@ class TabularAgent:
             ``0.0`` so the same question yields the same SQL. Pass ``None`` to
             omit the parameter entirely: reasoning deployments (OpenAI's
             o-series, gpt-5.x reasoning tiers) reject an explicit temperature
-            and run at their own fixed setting.
+            and run at their own fixed setting. GPT-6 and GPT-5.6 drop it
+            automatically unless ``reasoning_effort="none"``.
     """
 
     def __init__(
@@ -276,6 +278,14 @@ class TabularAgent:
         """``{"temperature": x}``, or nothing at all when it is ``None``."""
         return {} if self.temperature is None else {"temperature": self.temperature}
 
+    def _openai_kwargs(self) -> dict[str, Any]:
+        """Temperature for the raw OpenAI/Azure client, adapted to the model family.
+
+        GPT-6 and GPT-5.6 accept a temperature only with ``reasoning_effort="none"``,
+        so the default ``0.0`` is dropped for them rather than rejected with a 400.
+        """
+        return normalize_chat_kwargs(self._model, self._temperature_kwargs(), config=self._config)
+
     def _parse_structured(self, messages: list[dict], schema: type) -> Any:
         """Run one structured-output LLM call, whichever client type is in use."""
         client = self._get_llm_client()
@@ -290,7 +300,7 @@ class TabularAgent:
                 model=self._model,
                 messages=messages,
                 response_format=schema,
-                **self._temperature_kwargs(),
+                **self._openai_kwargs(),
                 timeout=30,
             )
         )
@@ -508,7 +518,7 @@ class TabularAgent:
 
         response = _with_retries(
             lambda: client.chat.completions.create(
-                model=self._model, messages=messages, **self._temperature_kwargs()
+                model=self._model, messages=messages, **self._openai_kwargs()
             )
         )
         if not response or not response.choices:

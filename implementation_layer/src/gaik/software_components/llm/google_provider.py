@@ -132,6 +132,9 @@ class GoogleProvider:
             kwargs["system_instruction"] = system
         if extra:
             normalized = dict(extra)
+            # OpenAI's reasoning option; components document it as ignored elsewhere,
+            # and GenerateContentConfig rejects unknown fields.
+            normalized.pop("reasoning_effort", None)
             token_keys = [
                 key
                 for key in ("max_tokens", "max_completion_tokens", "max_output_tokens")

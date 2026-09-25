@@ -6,6 +6,9 @@ import base64
 import mimetypes
 from pathlib import Path
 
+# mimetypes maps .webp only from Python 3.13 on (or via the OS type table).
+_IMAGE_MIME_TYPES = {".webp": "image/webp"}
+
 
 def build_chat_document_content(file_paths: list[Path], prompt: str) -> list[dict]:
     """Render PDFs as page images and retain native image bytes for vision models.
@@ -29,7 +32,7 @@ def build_chat_document_content(file_paths: list[Path], prompt: str) -> list[dic
                     image = page.get_pixmap(dpi=150, alpha=False).tobytes("png")
                     content.append(_image_part(image, "image/png"))
         else:
-            mime = mimetypes.guess_type(path.name)[0]
+            mime = _IMAGE_MIME_TYPES.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0]
             if not mime or not mime.startswith("image/"):
                 raise ValueError(f"Unsupported vision input type: {path.suffix}")
             content.append({"type": "text", "text": path.name})

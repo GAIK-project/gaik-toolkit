@@ -51,6 +51,9 @@ __all__ = ["OpenAIConfig", "VisionParser", "get_openai_config"]
 
 logger = logging.getLogger(__name__)
 
+# mimetypes maps .webp only from Python 3.13 on (or via the OS type table).
+_IMAGE_MIME_TYPES = {".webp": "image/webp"}
+
 
 def _load_env() -> None:
     """Load environment variables from ``.env`` if python-dotenv is available."""
@@ -219,8 +222,15 @@ class VisionParser:
         """
 
         image_path = Path(image_path)
-        mime_type = mimetypes.guess_type(image_path.name)[0]
-        if not mime_type or not mime_type.startswith("image/"):
+        mime_type = (
+            _IMAGE_MIME_TYPES.get(image_path.suffix.lower())
+            or mimetypes.guess_type(image_path.name)[0]
+        )
+        if mime_type is None:
+            # An unknown or missing suffix (e.g. a temporary upload) was sent as
+            # PNG before 0.8.0; keep that. Known non-image types still fail.
+            mime_type = "image/png"
+        if not mime_type.startswith("image/"):
             raise ValueError(f"Unsupported image type: {image_path.suffix}")
         image_bytes = image_path.read_bytes()
         return self._parse_image(image_bytes, page=1, previous_context=None, mime_type=mime_type)

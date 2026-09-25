@@ -209,6 +209,30 @@ def test_jpeg_image_uses_matching_media_type(monkeypatch, tmp_path):
     assert image.startswith("data:image/jpeg;base64,")
 
 
+def test_webp_image_is_accepted_without_platform_mapping(monkeypatch, tmp_path):
+    import mimetypes
+
+    # Python < 3.13 has no built-in .webp mapping.
+    monkeypatch.setattr(mimetypes, "guess_type", lambda *args, **kwargs: (None, None))
+    parser, completions = _parser(monkeypatch, temperature=None, reasoning_effort=None)
+    path = tmp_path / "picture.webp"
+    path.write_bytes(b"synthetic-webp")
+    assert parser.convert_image(path) == "parsed markdown"
+    image = completions.kwargs["messages"][0]["content"][1]["image_url"]["url"]
+    assert image.startswith("data:image/webp;base64,")
+
+
+def test_image_without_suffix_is_sent_as_png_and_non_images_fail(monkeypatch, tmp_path):
+    parser, completions = _parser(monkeypatch, temperature=None, reasoning_effort=None)
+    upload = tmp_path / "upload"
+    upload.write_bytes(b"synthetic-png")
+    assert parser.convert_image(upload) == "parsed markdown"
+    image = completions.kwargs["messages"][0]["content"][1]["image_url"]["url"]
+    assert image.startswith("data:image/png;base64,")
+    with pytest.raises(ValueError, match="Unsupported image type"):
+        parser.convert_image(tmp_path / "notes.txt")
+
+
 def test_aitta_vision_defaults_to_aitta_endpoint(monkeypatch):
     from gaik.software_components.parsers import vision
 

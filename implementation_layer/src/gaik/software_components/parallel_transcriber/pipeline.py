@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Literal
 
 from gaik.software_components.llm.factory import assert_openai_or_azure
+from gaik.software_components.llm.providers import resolve_provider
 
 from .config import TranscriptionConfig
 from .ffmpeg import (
@@ -87,7 +88,10 @@ class ParallelTranscriber:
                     "(e.g. 'http://whisper.example.com:8080')"
                 )
         else:
-            assert_openai_or_azure(api_config, component="ParallelTranscriber")
+            # Resolve like create_openai_client: a bare legacy config (neither
+            # ``provider`` nor ``use_azure``) means standard OpenAI, whatever LLM_PROVIDER says.
+            provider = resolve_provider(config={"use_azure": False, **api_config})
+            assert_openai_or_azure({"provider": provider}, component="ParallelTranscriber")
         self._api_config = dict(api_config)
         self._config = cfg
 

@@ -125,3 +125,47 @@ def test_structured_output_path_never_sent_a_temperature():
     agent.generate_sql("how many customers?")
 
     assert "temperature" not in captured
+
+
+class _RawOpenAIClient:
+    """Stands in for ``OpenAI``/``AzureOpenAI``: not a ``ProviderClient``."""
+
+    def __init__(self) -> None:
+        from types import SimpleNamespace
+
+        from gaik.software_components.postgres_agent.models import GeneratedSQL
+
+        self.calls: list[dict] = []
+        message = SimpleNamespace(
+            content="an answer", parsed=GeneratedSQL(sql="SELECT 1", reasoning="stub")
+        )
+        response = SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+        def record(**kwargs):
+            self.calls.append(kwargs)
+            return response
+
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=record))
+        self.beta = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(parse=record)))
+
+
+@pytest.mark.parametrize(
+    ("model", "config", "expected"),
+    [
+        ("gpt-6-luna", None, {}),
+        ("gpt-6-sol", {"reasoning_effort": "none"}, {"temperature": 0.0}),
+        ("my-deployment", {"model_family": "gpt-6-luna", "use_azure": True}, {}),
+        ("gpt-5.4", None, {"temperature": 0.0}),
+    ],
+)
+def test_raw_openai_path_adapts_default_temperature_to_the_model(model, config, expected):
+    """GPT-6 with reasoning rejects temperature=0; the default must not 400 there."""
+    agent = _make_agent(model=model, config=config)
+    agent._llm_client = client = _RawOpenAIClient()
+
+    agent.generate_sql("how many?")
+    agent._synthesize_answer("how many?", _result())
+
+    assert len(client.calls) == 2
+    for call in client.calls:
+        assert {k: v for k, v in call.items() if k == "temperature"} == expected

@@ -32,6 +32,7 @@ except ImportError as exc:
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import build_compat_client
+from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 from .introspection import introspect_schema
 from .models import AnswerResult, GeneratedSQL, QueryResult, SchemaInfo
@@ -156,7 +157,8 @@ class PostgresAgent:
             reject an explicit temperature with *"Unsupported value:
             'temperature' does not support 0 with this model"* and run at their
             own fixed setting. Without this, using one of those models meant
-            catching that specific rejection downstream and retrying.
+            catching that specific rejection downstream and retrying. GPT-6 and
+            GPT-5.6 drop it automatically unless ``reasoning_effort="none"``.
     """
 
     def __init__(
@@ -257,6 +259,14 @@ class PostgresAgent:
         """
         return {} if self.temperature is None else {"temperature": self.temperature}
 
+    def _openai_kwargs(self) -> dict[str, Any]:
+        """Temperature for the raw OpenAI/Azure client, adapted to the model family.
+
+        GPT-6 and GPT-5.6 accept a temperature only with ``reasoning_effort="none"``,
+        so the default ``0.0`` is dropped for them rather than rejected with a 400.
+        """
+        return normalize_chat_kwargs(self._model, self._temperature_kwargs(), config=self._config)
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -327,7 +337,7 @@ class PostgresAgent:
                     model=self._model,
                     messages=messages,
                     response_format=GeneratedSQL,
-                    **self._temperature_kwargs(),
+                    **self._openai_kwargs(),
                     timeout=30,
                 )
             )
@@ -480,7 +490,7 @@ class PostgresAgent:
 
         response = _with_retries(
             lambda: client.chat.completions.create(
-                model=self._model, messages=messages, **self._temperature_kwargs()
+                model=self._model, messages=messages, **self._openai_kwargs()
             )
         )
         if not response or not response.choices:

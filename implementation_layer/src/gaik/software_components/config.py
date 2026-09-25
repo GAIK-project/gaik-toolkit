@@ -72,7 +72,9 @@ def create_openai_client(config: dict):
     # factories resolve their defaults first and pass an explicit provider here.
     name = resolve_provider(config={"use_azure": False, **config})
     options = {
-        key: config[key] for key in ("timeout", "max_retries", "http_client") if key in config
+        key: config[key]
+        for key in ("timeout", "max_retries", "http_client")
+        if config.get(key) is not None
     }
     if name == Provider.AZURE.value:
         options["api_version"] = config["api_version"]

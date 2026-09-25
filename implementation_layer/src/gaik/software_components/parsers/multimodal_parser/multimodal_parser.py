@@ -147,7 +147,10 @@ class ParseResult:
 
 
 ModelProvider = Literal["openai", "claude", "google"]
-ReasoningEffort = Literal["low", "medium", "high"]
+ReasoningEffort = Literal["none", "low", "medium", "high"]
+# Non-streaming Anthropic calls with a large max_tokens need an explicit timeout.
+_ANTHROPIC_PROVIDERS = ("anthropic", "anthropic_foundry")
+_ANTHROPIC_TIMEOUT_S = 900.0
 
 
 class MultimodalParser:
@@ -158,7 +161,7 @@ class MultimodalParser:
         *,
         model_provider: ModelProvider = "openai",
         model: str | None = None,
-        reasoning_effort: ReasoningEffort = "low",
+        reasoning_effort: ReasoningEffort | None = "low",
         merge_table: bool = False,
         use_azure: bool = True,
         vertex_ai: bool = True,
@@ -170,7 +173,9 @@ class MultimodalParser:
         Args:
             model_provider: Which LLM provider to use.
             model: Model name to use. If None, uses the default from config/env vars.
-            reasoning_effort: Thinking/reasoning effort level.
+            reasoning_effort: Thinking/reasoning effort level for the legacy
+                provider paths ("none" is OpenAI only). Ignored with
+                ``api_config``; set ``reasoning_effort`` in that config instead.
             merge_table: If True, instructs the model to combine tables
                          split across multiple pages.
             use_azure: Whether to use Azure/Foundry (for openai and claude providers).
@@ -180,10 +185,14 @@ class MultimodalParser:
             api_config: Shared provider config. Uses chat with rendered PDF page
                 images, so the selected model must support image input.
         """
-        if api_config is None and model_provider not in ("openai", "claude", "google"):
-            raise ValueError(f"Unsupported model_provider: {model_provider}")
-        if reasoning_effort not in ("low", "medium", "high"):
-            raise ValueError(f"Unsupported reasoning_effort: {reasoning_effort}")
+        if api_config is None:
+            if model_provider not in ("openai", "claude", "google"):
+                raise ValueError(f"Unsupported model_provider: {model_provider}")
+            efforts = ("low", "medium", "high")
+            if model_provider == "openai":
+                efforts = ("none", *efforts)
+            if reasoning_effort not in efforts:
+                raise ValueError(f"Unsupported reasoning_effort: {reasoning_effort}")
 
         self.model_provider = model_provider
         self.reasoning_effort = reasoning_effort
@@ -298,6 +307,8 @@ class MultimodalParser:
         options = {"max_tokens": 32768}
         if self.config.get("reasoning_effort") is not None:
             options["reasoning_effort"] = self.config["reasoning_effort"]
+        if self.model_provider in _ANTHROPIC_PROVIDERS:
+            options["timeout"] = self.config.get("timeout") or _ANTHROPIC_TIMEOUT_S
         try:
             response = client.chat(
                 [
@@ -309,7 +320,7 @@ class MultimodalParser:
                 ],
                 **options,
             )
-            return response.text, response.usage
+            return response.text, _extract_shared_usage(response.usage)
         finally:
             close = getattr(client.raw, "close", None)
             # Injected transports belong to the caller and may serve later stages.
@@ -427,6 +438,19 @@ def _extract_openai_usage(response) -> dict[str, int]:
         "output_tokens": int(output_tok),
         "thinking_tokens": int(thinking_tok),
         "total_tokens": int(total_tok),
+    }
+
+
+def _extract_shared_usage(usage: dict | None) -> dict[str, int]:
+    """Map ProviderClient (Chat Completions style) token names to usage-record names."""
+    usage = usage or {}
+    details = usage.get("completion_tokens_details")
+    thinking_tok = details.get("reasoning_tokens") if isinstance(details, dict) else 0
+    return {
+        "input_tokens": int(usage.get("input_tokens") or usage.get("prompt_tokens") or 0),
+        "output_tokens": int(usage.get("output_tokens") or usage.get("completion_tokens") or 0),
+        "thinking_tokens": int(thinking_tok or 0),
+        "total_tokens": int(usage.get("total_tokens") or 0),
     }
 
 

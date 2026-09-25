@@ -35,6 +35,8 @@ from gaik.software_components.parsers.multimodal_parser.config import (
     get_openai_config,
 )
 from gaik.software_components.parsers.multimodal_parser.multimodal_parser import (
+    _ANTHROPIC_PROVIDERS,
+    _ANTHROPIC_TIMEOUT_S,
     _encode_pdf_base64,
     _extract_claude_usage,
     _extract_google_usage,
@@ -912,6 +914,8 @@ class VisionExtractor:
         options = {"max_tokens": 32768}
         if self.config.get("reasoning_effort") is not None:
             options["reasoning_effort"] = self.config["reasoning_effort"]
+        if self.model_provider in _ANTHROPIC_PROVIDERS:
+            options["timeout"] = self.config.get("timeout") or _ANTHROPIC_TIMEOUT_S
         try:
             result = client.chat_parsed(
                 [

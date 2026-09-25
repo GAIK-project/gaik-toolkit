@@ -79,6 +79,9 @@ def _write_sample_invoice_pdf(path: Path) -> None:
     doc.close()
 
 
+# Real model call: keep it out of the offline gate (`-m "not llm"`), which the
+# release check runs with Azure credentials set.
+@pytest.mark.llm
 @pytest.mark.skipif(not HAS_AZURE, reason="Azure OpenAI credentials not configured")
 def test_suggest_requirements_live(tmp_path: Path):
     """One vision pass over a sample invoice returns usable requirements text."""

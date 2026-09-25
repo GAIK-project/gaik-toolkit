@@ -37,3 +37,32 @@ def test_legacy_openai_default_is_preserved():
         assert embedder.model == "text-embedding-3-large"
     finally:
         embedder.client.close()
+
+
+@pytest.mark.parametrize("use_azure", [True, False])
+def test_legacy_openai_config_keeps_large_default(monkeypatch, use_azure):
+    # pgvector indexes built before 0.8.0 depend on text-embedding-3-large (3072 dims).
+    from gaik.software_components.config import get_openai_config
+
+    for name, value in {
+        "AZURE_API_KEY": "test",
+        "AZURE_ENDPOINT": "https://example.test",
+        "OPENAI_API_KEY": "test",
+    }.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("EMBEDDING_MODEL", "text-embedding-3-small")
+    embedder = Embedder(get_openai_config(use_azure=use_azure))
+    try:
+        assert embedder.model == "text-embedding-3-large"
+    finally:
+        embedder.client.close()
+
+
+def test_bare_legacy_config_is_openai_whatever_llm_provider_says(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "aitta")
+    embedder = Embedder({"api_key": "test"})
+    try:
+        assert type(embedder.client).__name__ == "OpenAI"
+        assert embedder.model == "text-embedding-3-large"
+    finally:
+        embedder.client.close()

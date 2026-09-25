@@ -861,11 +861,7 @@ class MultiSourceReportGenerator:
         if choice == "multimodal":
             from gaik.software_components.parsers import MultimodalParser
 
-            ctor = dict(parser_options.get("ctor", {}))
-            if parser_options.get("api_config") is not None:
-                ctor.setdefault("api_config", parser_options["api_config"])
-            elif "model_provider" not in ctor:
-                ctor.setdefault("api_config", self.api_config)
+            ctor = self._shared_ctor(parser_options)
             result = MultimodalParser(**ctor).parse(str(path))
             return result.clean_markdown or result.raw_markdown
         if choice == "docling":
@@ -892,17 +888,30 @@ class MultiSourceReportGenerator:
         result = transcriber.transcribe(str(path), **transcriber_options.get("call", {}))
         return result.enhanced_transcript or result.raw_transcript
 
+    def _shared_ctor(self, options: dict) -> dict:
+        """Constructor kwargs for MultimodalParser/VisionExtractor.
+
+        A ctor that selects its own legacy backend (model_provider, use_azure,
+        vertex_ai) keeps it, as before 0.8.0. Otherwise the stage or report config
+        is shared, and a ctor reasoning_effort travels inside that config.
+        """
+        ctor = dict(options.get("ctor", {}))
+        if options.get("api_config") is not None:
+            ctor.setdefault("api_config", options["api_config"])
+        elif not {"model_provider", "use_azure", "vertex_ai"} & ctor.keys():
+            effort = ctor.pop("reasoning_effort", None)
+            config = self.api_config
+            if effort is not None:
+                config = {**config, "reasoning_effort": effort}
+            ctor.setdefault("api_config", config)
+        return ctor
+
     def _parse_image(self, path: Path, *, image_options: dict) -> str:
         mode = image_options.get("mode", "parse")  # "parse" | "structured"
         if mode == "structured":
             from gaik.software_components.vision_extractor import VisionExtractor
 
-            ctor = dict(image_options.get("ctor", {}))
-            if image_options.get("api_config") is not None:
-                ctor.setdefault("api_config", image_options["api_config"])
-            elif "model_provider" not in ctor:
-                ctor.setdefault("api_config", self.api_config)
-            extractor = VisionExtractor(**ctor)
+            extractor = VisionExtractor(**self._shared_ctor(image_options))
             user_requirements = image_options.get(
                 "user_requirements",
                 "Extract all visible text, tables, figures, and structured content from the image.",
