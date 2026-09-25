@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { KeyRound, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,19 +40,41 @@ export function ModelSettingsButton() {
   const [draft, setDraft] = useState<ModelSettings>(EMPTY);
   const [message, setMessage] = useState("");
   const [testing, setTesting] = useState(false);
+  const requestNumber = useRef(0);
+  const activeRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const clear = () => {
+      requestNumber.current += 1;
+      activeRequest.current?.abort();
+      activeRequest.current = null;
+      setTesting(false);
+      setMessage("");
       setModelSettings(null);
       setDraft(EMPTY);
     };
     window.addEventListener("pagehide", clear);
-    return () => window.removeEventListener("pagehide", clear);
+    return () => {
+      window.removeEventListener("pagehide", clear);
+      requestNumber.current += 1;
+      activeRequest.current?.abort();
+    };
   }, []);
 
   function changeOpen(next: boolean) {
+    // Closing remains possible during an Aitta cold start. Its eventual result
+    // must not update a fresh draft if the dialog is opened again.
+    requestNumber.current += 1;
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    setTesting(false);
     setOpen(next);
     setDraft(next && settings ? { ...settings } : EMPTY);
+    setMessage("");
+  }
+
+  function updateDraft(changes: Partial<ModelSettings>) {
+    setDraft((previous) => ({ ...previous, ...changes }));
     setMessage("");
   }
 
@@ -66,6 +88,10 @@ export function ModelSettingsButton() {
   }
 
   async function testConnection() {
+    const currentRequest = ++requestNumber.current;
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
     setMessage("");
     try {
       const header = encodeModelSettings(draft);
@@ -73,9 +99,12 @@ export function ModelSettingsButton() {
       const response = await apiFetch("/api/model-settings/test", {
         method: "POST",
         headers: { [MODEL_SETTINGS_HEADER]: header },
+        signal: controller.signal,
       });
+      if (currentRequest !== requestNumber.current) return;
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
+        if (currentRequest !== requestNumber.current) return;
         setMessage(
           result.detail ||
             result.error ||
@@ -87,9 +116,14 @@ export function ModelSettingsButton() {
         "Connection works. Use these settings to apply them to this tab.",
       );
     } catch (error) {
+      if (currentRequest !== requestNumber.current || controller.signal.aborted)
+        return;
       setMessage(error instanceof Error ? error.message : "Connection failed.");
     } finally {
-      setTesting(false);
+      if (currentRequest === requestNumber.current) {
+        activeRequest.current = null;
+        setTesting(false);
+      }
     }
   }
 
@@ -136,6 +170,7 @@ export function ModelSettingsButton() {
               <Label htmlFor="model-provider">Provider</Label>
               <Select
                 value={draft.provider}
+                disabled={testing}
                 onValueChange={(value) =>
                   selectProvider(value as ModelProvider)
                 }
@@ -157,7 +192,8 @@ export function ModelSettingsButton() {
               <Input
                 id="model-id"
                 value={draft.model}
-                onChange={(e) => setDraft({ ...draft, model: e.target.value })}
+                disabled={testing}
+                onChange={(e) => updateDraft({ model: e.target.value })}
                 placeholder={
                   draft.provider === "azure"
                     ? "Your Azure deployment name"
@@ -172,8 +208,9 @@ export function ModelSettingsButton() {
                 <Input
                   id="model-endpoint"
                   value={draft.azureEndpoint ?? ""}
+                  disabled={testing}
                   onChange={(e) =>
-                    setDraft({ ...draft, azureEndpoint: e.target.value })
+                    updateDraft({ azureEndpoint: e.target.value })
                   }
                   placeholder="https://your-resource.openai.azure.com"
                   autoComplete="off"
@@ -193,7 +230,8 @@ export function ModelSettingsButton() {
                 type="password"
                 className="ph-no-capture ph-mask"
                 value={draft.apiKey}
-                onChange={(e) => setDraft({ ...draft, apiKey: e.target.value })}
+                disabled={testing}
+                onChange={(e) => updateDraft({ apiKey: e.target.value })}
                 autoComplete="off"
                 spellCheck={false}
                 data-private

@@ -93,7 +93,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/react-syntax-highlighter": "^15.5.13",
     "concurrently": "^10.0.3",
-    "eslint": "^10.5.0",
+    "eslint": "9.39.5",
     "eslint-config-next": "16.2.9",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4.3.1",
