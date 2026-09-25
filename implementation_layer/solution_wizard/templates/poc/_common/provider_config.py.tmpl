@@ -1,0 +1,34 @@
+"""Load independent provider credentials and settings for each PoC stage."""
+
+from gaik.software_components.llm import get_llm_config
+from gaik.software_components.llm.providers import resolve_provider
+
+
+def get_stage_config(config: dict, stage: str) -> dict:
+    settings = dict((config.get("stages") or {}).get(stage) or {})
+    provider = settings.pop("provider", None) or config.get("provider")
+    if not provider:
+        provider = "azure" if config.get("use_azure", True) else "openai"
+    provider = "azure" if str(provider).strip().lower() == "azure_openai" else provider
+    provider = resolve_provider(provider)
+    if stage == "transcription" and provider not in {"openai", "azure"}:
+        raise ValueError("Audio requires an OpenAI/Azure provider in stages.transcription.")
+    if stage == "transcription" and provider == "azure" and settings.get("base_url") and not (
+        settings.get("azure_audio_endpoint") or settings.get("azure_endpoint")
+    ):
+        raise ValueError("Set azure_endpoint or azure_audio_endpoint explicitly for Azure audio.")
+    if stage == "embedding" and provider in {"anthropic", "anthropic_foundry"}:
+        raise ValueError("Native Anthropic has no embeddings; configure stages.embedding.")
+    if stage not in (config.get("stages") or {}):
+        models = config.get("models") or {}
+        if stage == "transcription":
+            settings["transcription_model"] = models.get("transcription")
+        elif stage == "embedding":
+            settings["embedding_model"] = models.get("embedding")
+        else:
+            settings["model"] = models.get(stage) or models.get("extraction")
+    settings = {key: value for key, value in settings.items() if value is not None}
+    result = get_llm_config(provider, **settings)
+    if stage == "embedding" and not result.get("embedding_model"):
+        raise ValueError("Configure an embedding model served by stages.embedding.provider.")
+    return result

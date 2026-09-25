@@ -24,6 +24,8 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
 from gaik.software_modules.RAG_workflow import RAGWorkflow  # noqa: E402
+sys.path.insert(0, str(Path(__file__).parent))
+from provider_config import get_stage_config  # noqa: E402
 
 
 def load_config() -> dict:
@@ -108,6 +110,9 @@ def main() -> None:
 
     persist_path = str(Path(__file__).parent / "output" / "chroma_store")
     workflow = RAGWorkflow(
+        parser_config=get_stage_config(config, "parser"),
+        embedding_config=get_stage_config(config, "embedding"),
+        answer_config=get_stage_config(config, "answer"),
         persist=True,
         persist_path=persist_path,
         citations=True,

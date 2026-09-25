@@ -78,7 +78,7 @@
         "reason": "Use case is document Q&A with citations -- RAGWorkflow covers the full indexing and retrieval pipeline."
       }
     ],
-    "selected_building_blocks": ["PgVectorStore"],
+    "selected_building_blocks": [],
     "custom_components": []
   },
   "workflow": {
@@ -116,7 +116,7 @@
   "models": {
     "provider": "azure_openai",
     "embedding_model": "text-embedding-3-large",
-    "answer_model": "gpt-5.4",
+    "answer_model": "gpt-6-luna",
     "temperature": 0.0
   },
   "validation": {
@@ -156,8 +156,7 @@
   },
   "visualizations": {},
   "traceability": [
-    {"component": "RAGWorkflow", "required_by": "input_type=document_collection, output_type=answer"},
-    {"component": "PgVectorStore", "required_by": "vector storage required for semantic retrieval"}
+    {"component": "RAGWorkflow", "required_by": "input_type=document_collection, output_type=answer; includes its Chroma vector store"}
   ],
   "change_log": [
     {

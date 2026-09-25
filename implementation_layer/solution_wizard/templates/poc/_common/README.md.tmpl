@@ -26,7 +26,7 @@ pip install -r requirements.txt
 
 # 2. Set up credentials
 cp .env.example .env
-# Edit .env and fill in your Azure OpenAI / OpenAI API key
+# Edit .env and fill in the credentials for your config.yaml providers
 ```
 
 ---
@@ -63,9 +63,32 @@ ${output_instructions}
 | What to change | Which file |
 |----------------|-----------|
 | Output fields to extract | `prompts/extraction_requirements.md` |
-| Model or temperature | `config.yaml` |
+| Provider, model, or endpoint per stage | `config.yaml` → `stages` |
 | Schema definition | `schemas/output_schema.py` |
 | Evaluation metrics | `evals/run_basic_eval.py` |
+
+Each `stages` entry is independent: `parser`, `extraction`, `transcription`,
+`embedding`, `answer`, and `judge`. `provider_config.py` loads the selected provider's
+credentials from `.env`. Set the model and optional base URL in that stage's entry.
+Explicit stages take precedence over the legacy top-level provider/model settings.
+Azure deployment names belong in `model`; LiteLLM models need a provider prefix.
+Azure transcription deployment names belong in `transcription_model`. Set
+`azure_endpoint` (or `azure_audio_endpoint` for a separate audio resource) when
+overriding the Azure resource URL; an SDK `base_url` alone does not select an
+audio resource.
+
+Audio stages support OpenAI/Azure. For example, an Aitta extraction stage can use
+`transcription: {provider: azure}` alongside
+`extraction: {provider: aitta, model: google/gemma-4-31b-it}`. Vision needs a model
+that accepts images. Embeddings need a model served by their own provider; native
+Anthropic does not provide embeddings. Provider SDK extras are included in
+`requirements.txt` for the selected blueprint stages; add the corresponding
+`llm-google`, `llm-anthropic`, or `llm-litellm` extra if changing providers later.
+
+Custom templates must call `get_stage_config(config, "stage")` when constructing
+model components. The wizard rejects an older promoted template that lacks this
+contract, preserving its pipeline for an explicit migration. A newly generated
+generic skeleton still needs its labelled component calls wired before use.
 
 ---
 

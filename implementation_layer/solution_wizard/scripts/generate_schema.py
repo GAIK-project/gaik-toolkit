@@ -19,8 +19,14 @@ Usage:
         --requirements poc/prompts/extraction_requirements.md \\
         --schema-name MaintenanceTicket \\
         --output-dir poc/
+        [--provider azure|openai|google|aitta|litellm|...]
         [--use-azure / --no-azure]
-        [--model gpt-5.4]
+        [--model gpt-6-luna]
+        [--base-url https://your-inference-server.example/v1]
+
+An explicit --provider overrides the legacy Azure flags. Without --provider,
+Azure remains the default and --no-azure selects OpenAI. Credentials come from
+the selected provider's environment variables, never command-line arguments.
 """
 
 from __future__ import annotations
@@ -35,7 +41,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # GAIK imports -- only needed at runtime, not at scaffold time
 try:
-    from gaik.software_components.config import get_openai_config
     from gaik.software_components.extractor.schema import (
         DECIMAL_PERSISTED_HELPER_SOURCE,
         CompositeExtractionRequirements,
@@ -43,6 +48,7 @@ try:
         SchemaGenerator,
         decimal_field_repr,
     )
+    from gaik.software_components.llm import Provider, get_llm_config
 
     _GAIK_AVAILABLE = True
 except ImportError as _import_err:
@@ -238,22 +244,33 @@ def main() -> int:
         help="PoC root directory -- schema files written to <output-dir>/schemas/",
     )
     parser.add_argument(
+        "--provider",
+        choices=[provider.value for provider in Provider] if _GAIK_AVAILABLE else None,
+        default=None,
+        help="Shared LLM provider; overrides --use-azure/--no-azure. Credentials come from env.",
+    )
+    parser.add_argument(
         "--use-azure",
         dest="use_azure",
         action="store_true",
         default=True,
-        help="Use Azure OpenAI (default)",
+        help="Use Azure OpenAI (default when --provider is omitted)",
     )
     parser.add_argument(
         "--no-azure",
         dest="use_azure",
         action="store_false",
-        help="Use OpenAI directly instead of Azure",
+        help="Use OpenAI directly when --provider is omitted",
     )
     parser.add_argument(
         "--model",
         default=None,
         help="Override the model used for schema generation",
+    )
+    parser.add_argument(
+        "--base-url",
+        default=None,
+        help="Override the API base URL for compatible endpoints or LiteLLM",
     )
     args = parser.parse_args()
 
@@ -271,18 +288,32 @@ def main() -> int:
         return 1
 
     user_requirements = req_path.read_text(encoding="utf-8")
+    provider = args.provider or ("azure" if args.use_azure else "openai")
+    overrides = {}
+    if args.model is not None:
+        overrides["model"] = args.model
+    if args.base_url is not None:
+        overrides["base_url"] = args.base_url
+    try:
+        # Overrides must reach the factory before it validates required fields
+        # (e.g. an OpenAI-compatible server's model and endpoint).
+        config = get_llm_config(provider, **overrides)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
     output_dir = Path(args.output_dir).expanduser().resolve()
     schemas_dir = output_dir / "schemas"
     schemas_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Generating schema from: {req_path}")
     print(f"Output directory:       {schemas_dir}")
-    print(f"Provider:               {'Azure OpenAI' if args.use_azure else 'OpenAI'}")
+    print(f"Provider:               {provider}")
+    print(f"Model:                  {config['model']}")
     print()
 
-    # -- Call SchemaGenerator (one API call) --
-    config = get_openai_config(use_azure=args.use_azure)
-    generator = SchemaGenerator(config=config, model=args.model)
+    # -- Call SchemaGenerator --
+    generator = SchemaGenerator(config=config)
     schema_class = generator.generate_schema(user_requirements=user_requirements)
     requirements: ExtractionRequirements | CompositeExtractionRequirements = (
         generator.item_requirements

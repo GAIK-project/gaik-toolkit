@@ -18,23 +18,169 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import json
 import string
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .blueprint import Blueprint
 from .registry import get_registry
 from .schema_designer import write_extraction_requirements, write_schema_files
-from .selector import module_for_pattern
 
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "poc"
+
+_PROVIDERS = {
+    "azure",
+    "openai",
+    "google",
+    "vertex",
+    "anthropic",
+    "anthropic_foundry",
+    "aitta",
+    "openai_compatible",
+    "litellm",
+}
+_PROVIDER_EXTRAS = {
+    "google": "llm-google",
+    "vertex": "llm-google",
+    "anthropic": "llm-anthropic",
+    "anthropic_foundry": "llm-anthropic",
+    "litellm": "llm-litellm",
+}
+_STAGES = ("transcription", "parser", "extraction", "embedding", "answer", "judge")
+_CONFIG_OPTIONS = {
+    "model",
+    "embedding_model",
+    "transcription_model",
+    "base_url",
+    "api_version",
+    "timeout",
+    "max_retries",
+    "model_family",
+    "reasoning_effort",
+    "project_id",
+    "location",
+    "resource",
+    "vertex_project",
+    "vertex_location",
+    "azure_endpoint",
+    "azure_audio_endpoint",
+}
+
+
+def _provider_name(value: str) -> str:
+    provider = str(value).strip().lower()
+    provider = "azure" if provider == "azure_openai" else provider
+    if provider not in _PROVIDERS:
+        raise ValueError(f"Unsupported provider {value!r}; choose one of {sorted(_PROVIDERS)}")
+    return provider
+
+
+def _stage_settings(blueprint: Blueprint) -> dict[str, dict]:
+    """Resolve nonsecret, deterministic settings without loading credentials."""
+    models = blueprint.models or {}
+    provider = _provider_name(models.get("provider", "azure"))
+    shared = {key: models[key] for key in _CONFIG_OPTIONS if models.get(key) is not None}
+    if not shared.get("model") and (models.get("extraction_model") or models.get("answer_model")):
+        shared["model"] = models.get("extraction_model") or models["answer_model"]
+    stages = {}
+    for stage in _STAGES:
+        override = models.get(f"{stage}_config") or {}
+        if not isinstance(override, dict):
+            raise ValueError(f"models.{stage}_config must be a dictionary")
+        unknown = set(override) - (_CONFIG_OPTIONS | {"provider"})
+        if unknown:
+            raise ValueError(
+                f"Unsupported settings in models.{stage}_config: {sorted(unknown)}. "
+                "Keep credentials in provider environment variables, not the blueprint."
+            )
+        selected = _provider_name(override.get("provider", provider))
+        settings = dict(shared) if selected == provider else {}
+        model = models.get(f"{stage}_model")
+        if stage in {"parser", "judge"} and model is None:
+            model = models.get("extraction_model") or models.get("answer_model")
+        if stage == "extraction" and model is None:
+            model = models.get("answer_model")
+        if selected == provider and model:
+            settings[
+                "embedding_model"
+                if stage == "embedding"
+                else "transcription_model"
+                if stage == "transcription"
+                else "model"
+            ] = model
+        settings.update(override)
+        settings["provider"] = selected
+        stages[stage] = settings
+    return stages
+
+
+def _needed_stages(blueprint: Blueprint, pattern: str) -> set[str]:
+    stages = {
+        "audio_to_structured": {"transcription", "extraction"},
+        "document_to_structured": {"parser", "extraction"},
+        "rag": {"parser", "embedding", "answer"},
+    }.get(pattern, {"extraction"}).copy()
+    names = set(blueprint.components.selected_building_blocks)
+    names.update(step.component for step in blueprint.workflow.steps)
+    if names & {"Transcriber", "ParallelTranscriber", "TextToSpeech", "AudioToStructuredData"}:
+        stages.add("transcription")
+    if names & {
+        "VisionParser",
+        "VisionPlusParser",
+        "VisionRagParser",
+        "MultimodalParser",
+        "VisionExtractor",
+    }:
+        stages.add("parser")
+    if "Embedder" in names:
+        stages.add("embedding")
+    if "AnswerGenerator" in names:
+        stages.add("answer")
+    if "LLMJudge" in names:
+        stages.add("judge")
+    return stages
+
+
+def _validate_stage_settings(stages: dict[str, dict], needed: set[str]) -> None:
+    if "transcription" in needed and stages["transcription"]["provider"] not in {"openai", "azure"}:
+        raise ValueError(
+            "Audio requires an OpenAI/Azure transcription_config. Set "
+            "models.transcription_config explicitly when using another text provider."
+        )
+    if "transcription" in needed:
+        audio = stages["transcription"]
+        if (
+            audio["provider"] == "azure"
+            and audio.get("base_url")
+            and not (audio.get("azure_audio_endpoint") or audio.get("azure_endpoint"))
+        ):
+            raise ValueError(
+                "Azure transcription_config with base_url also needs an explicit "
+                "azure_endpoint or azure_audio_endpoint resource URL for audio."
+            )
+    if "embedding" in needed:
+        embedding = stages["embedding"]
+        if embedding["provider"] in {"anthropic", "anthropic_foundry"}:
+            raise ValueError("Native Anthropic has no embeddings; select models.embedding_config.")
+        if embedding["provider"] in {"aitta", "openai_compatible", "litellm"} and not embedding.get(
+            "embedding_model"
+        ):
+            raise ValueError(
+                "Set an explicit models.embedding_config.embedding_model for this provider."
+            )
+    for stage in needed:
+        settings = stages[stage]
+        if settings["provider"] == "litellm" and (
+            not settings.get("model") or "/" not in str(settings["model"])
+        ):
+            raise ValueError(f"models.{stage}_config needs a provider-prefixed LiteLLM model.")
+
 
 # ---------------------------------------------------------------------------
 # Eval framework bodies injected into run_basic_eval.py
 # ---------------------------------------------------------------------------
 
-_EVAL_BODIES: Dict[str, str] = {
+_EVAL_BODIES: dict[str, str] = {
     "extraction_eval": """\
     total_exact = total_semantic = total_present = 0
     n = 0
@@ -93,19 +239,19 @@ _DEFAULT_EVAL_BODY = """\
 # ---------------------------------------------------------------------------
 
 
-def _fill(template_text: str, variables: Dict[str, Any]) -> str:
+def _fill(template_text: str, variables: dict[str, Any]) -> str:
     """Fill a template using string.Template safe_substitute."""
     return string.Template(template_text).safe_substitute(variables)
 
 
-def _read_template(subdir: str, filename: str) -> Optional[str]:
+def _read_template(subdir: str, filename: str) -> str | None:
     path = TEMPLATES_DIR / subdir / filename
     if path.exists():
         return path.read_text(encoding="utf-8")
     return None
 
 
-def _topo_order(steps: List) -> List:
+def _topo_order(steps: list) -> list:
     """Return steps sorted in topological order from the depends_on graph.
 
     Two blueprints with the same dependency graph but different step-list
@@ -115,8 +261,8 @@ def _topo_order(steps: List) -> List:
     from collections import deque
 
     step_by_id = {s.id: s for s in steps}
-    dependents: Dict[str, List[str]] = {s.id: [] for s in steps}
-    in_degree: Dict[str, int] = {s.id: 0 for s in steps}
+    dependents: dict[str, list[str]] = {s.id: [] for s in steps}
+    in_degree: dict[str, int] = {s.id: 0 for s in steps}
 
     for s in steps:
         for dep in s.depends_on or []:
@@ -126,7 +272,7 @@ def _topo_order(steps: List) -> List:
 
     # Kahn's algorithm: start from nodes with no dependencies
     queue: deque = deque(s.id for s in steps if not (s.depends_on or []))
-    ordered: List = []
+    ordered: list = []
     while queue:
         nid = queue.popleft()
         if nid in step_by_id:
@@ -165,7 +311,8 @@ def _derive_pattern_key(blueprint: Blueprint) -> str:
             continue
         # Canonical edge: component + sorted inputs + sorted outputs + sorted deps
         edge_parts.append(
-            f"{comp}(in={sorted(step.inputs)},out={sorted(step.outputs)},deps={sorted(step.depends_on or [])})"
+            f"{comp}(in={sorted(step.inputs)},out={sorted(step.outputs)},"
+            f"deps={sorted(step.depends_on or [])})"
         )
         name_parts.append(comp.lower())
 
@@ -257,6 +404,12 @@ def _determine_pattern(blueprint: Blueprint) -> str:
     if pattern_key != "_generic":
         candidate = TEMPLATES_DIR / pattern_key / "run_poc.py.tmpl"
         if candidate.exists():
+            if "get_stage_config(" not in candidate.read_text(encoding="utf-8"):
+                raise ValueError(
+                    f"Promoted template {pattern_key!r} needs a provider migration: "
+                    "use provider_config.get_stage_config(config, stage) in each model stage. "
+                    "Its existing pipeline has not been replaced."
+                )
             return pattern_key
 
     return "_generic"
@@ -273,7 +426,7 @@ def _build_generic_pipeline_skeleton(blueprint: Blueprint) -> str:
     from .registry import get_reference_cards
 
     cards = get_reference_cards()
-    lines: List[str] = []
+    lines: list[str] = []
 
     for step in blueprint.workflow.steps:
         comp = step.component or ""
@@ -328,7 +481,7 @@ def _build_input_loaders(blueprint: Blueprint) -> str:
     audio_exts = '(".wav", ".mp3", ".m4a", ".ogg", ".flac", ".webm", ".mp4")'
     doc_exts = '(".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".txt", ".md")'
 
-    lines: List[str] = []
+    lines: list[str] = []
     for art_id, art in blueprint.artifacts.items():
         if art.source != ArtifactSource.USER_UPLOAD:
             continue
@@ -370,12 +523,14 @@ def _build_generic_judge_section(has_llm_judge: bool) -> str:
     else:
         print("\\nRunning LLMJudge hallucination detection...")
         try:
-            from gaik.software_components.validators.llm_judge.llm_judge import LLMJudge as _LLMJudge
-            judge = _LLMJudge(model_provider="openai", use_azure=use_azure)
+            from gaik.software_components.validators.llm_judge import LLMJudge as _LLMJudge
+            judge = _LLMJudge(config=get_stage_config(config, "judge"))
             extracted_for_judge = extracted_fields
             if isinstance(extracted_for_judge, list) and len(extracted_for_judge) == 1:
                 extracted_for_judge = extracted_for_judge[0]
-            report = judge.detect_hallucinations(source_text=source_text, extracted=extracted_for_judge)
+            report = judge.detect_hallucinations(
+                source_text=source_text, extracted=extracted_for_judge,
+            )
             if report.flags:
                 print(f"WARNING: {len(report.flags)} hallucination flag(s) detected:")
                 for flag in report.flags:
@@ -384,7 +539,8 @@ def _build_generic_judge_section(has_llm_judge: bool) -> str:
                 print("Hallucination check passed -- all fields are grounded in the source.")
             validation_result = {
                 "hallucination_flags": [
-                    {"field": f.field, "value": f.value, "severity": str(f.severity), "reason": f.reason}
+                    {"field": f.field, "value": f.value,
+                     "severity": str(f.severity), "reason": f.reason}
                     for f in report.flags
                 ],
                 "passed": len(report.flags) == 0,
@@ -426,7 +582,8 @@ def _build_pdf_report_section(blueprint: Blueprint, schema_name: str) -> str:
         "        try:\n"
         "            from pdf_report import write_pdf_report\n"
         '            _pdf_path = output_dir / "result_report.pdf"\n'
-        f'            write_pdf_report(_pdf_source, _pdf_path, title="{title}", subtitle="{schema_name}",\n'
+        f'            write_pdf_report(_pdf_source, _pdf_path, title="{title}",\n'
+        f'                             subtitle="{schema_name}",\n'
         f'                             metadata={{"Schema": "{schema_name}"}})\n'
         '            print(f"PDF report written to: {_pdf_path}")\n'
         "        except Exception as _pdf_exc:  # noqa: BLE001\n"
@@ -434,16 +591,18 @@ def _build_pdf_report_section(blueprint: Blueprint, schema_name: str) -> str:
     )
 
 
-def _build_variables(blueprint: Blueprint, pattern: str) -> Dict[str, Any]:
+def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
     """Build the substitution variables dict from the blueprint."""
     bc = blueprint
     models = bc.models or {}
-    provider = models.get("provider", "azure_openai")
-    use_azure = str(provider in ("azure_openai",)).lower()  # python bool as string
+    provider = _provider_name(models.get("provider", "azure"))
+    stages = _stage_settings(blueprint)
+    _validate_stage_settings(stages, _needed_stages(blueprint, pattern))
+    use_azure = str(provider == "azure")
 
     # Determine model names
     transcription_model = models.get("transcription_model", "gpt-4o-transcribe")
-    extraction_model = models.get("extraction_model", "gpt-5.4")
+    extraction_model = stages["extraction"].get("model")
     temperature = models.get("temperature", 0.0)
 
     schema_name = (
@@ -491,13 +650,13 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> Dict[str, Any]:
     # -- LLMJudge hallucination detection (from blueprint) --
     # detect_hallucinations() checks each extracted field against the grounding
     # source text and flags any value not supported by it.
-    # Uses OpenAI provider; use_azure is read from config (True for Azure OpenAI).
+    # Uses the explicitly configured judge provider.
     print("\\nRunning LLMJudge hallucination detection...")
     try:
         from gaik.software_components.validators.llm_judge.llm_judge import LLMJudge as _LLMJudge
-        judge = _LLMJudge(model_provider="openai", use_azure=use_azure)
+        judge = _LLMJudge(config=get_stage_config(config, "judge"))
 
-        # Resolve source text: transcript for audio pipelines, parsed document for document pipelines
+        # Ground against the transcript or parsed document text.
         source_text = ""
         if hasattr(result, "transcription") and result.transcription:
             source_text = (
@@ -527,7 +686,8 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> Dict[str, Any]:
                 print("Hallucination check passed -- all fields are grounded in the source.")
             validation_result = {
                 "hallucination_flags": [
-                    {"field": f.field, "value": f.value, "severity": str(f.severity), "reason": f.reason}
+                    {"field": f.field, "value": f.value,
+                     "severity": str(f.severity), "reason": f.reason}
                     for f in report.flags
                 ],
                 "passed": len(report.flags) == 0,
@@ -562,6 +722,7 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> Dict[str, Any]:
         "transcription_model": transcription_model,
         "extraction_model": extraction_model,
         "temperature": temperature,
+        "stage_settings": stages,
         "language": language,
         "llm_judge_section": llm_judge_section,
         "eval_framework": bc.evaluation.get("eval_framework", "extraction_eval")
@@ -605,7 +766,10 @@ def _input_instructions(bp: Blueprint) -> str:
     if any(t in input_types for t in ("pdf", "docx", "document", "image")):
         return "Place a document (.pdf or .docx) in `sample_input/`."
     if "document_collection" in input_types:
-        return "Place one or more documents (.pdf or .txt) in `sample_input/`. They will be indexed before you can query them."
+        return (
+            "Place one or more PDF documents in `sample_input/`. "
+            "They will be indexed before you can query them."
+        )
     return f"Place your input file in `sample_input/`. Expected types: {input_types}."
 
 
@@ -647,6 +811,12 @@ def _write_requirements_txt(blueprint: Blueprint, poc_dir: Path) -> None:
         for m in blueprint.components.selected_modules
     ] + blueprint.components.selected_building_blocks
     lines = registry.pip_requirements(all_components)
+    stages = _stage_settings(blueprint)
+    for stage in sorted(_needed_stages(blueprint, _determine_pattern(blueprint))):
+        extra = _PROVIDER_EXTRAS.get(stages[stage]["provider"])
+        requirement = f"gaik[{extra}]"
+        if extra and requirement not in lines:
+            lines.append(requirement)
     lines.append("pyyaml")
     if _wants_pdf(blueprint):
         lines.append("reportlab>=4.0")
@@ -663,17 +833,41 @@ def _write_pdf_report_helper(blueprint: Blueprint, poc_dir: Path) -> Path | None
     return path
 
 
-def _write_env_example(variables: Dict[str, Any], poc_dir: Path) -> None:
+def _write_env_example(variables: dict[str, Any], poc_dir: Path) -> None:
     tmpl = _read_template("_common", "env.example.tmpl") or ""
     (poc_dir / ".env.example").write_text(_fill(tmpl, variables), encoding="utf-8")
 
 
-def _write_config_yaml(variables: Dict[str, Any], poc_dir: Path) -> None:
-    tmpl = _read_template("_common", "config.yaml.tmpl") or ""
-    (poc_dir / "config.yaml").write_text(_fill(tmpl, variables), encoding="utf-8")
+def _write_config_yaml(variables: dict[str, Any], poc_dir: Path) -> None:
+    import yaml
+
+    config = {
+        "provider": variables["provider"],
+        "use_azure": variables["provider"] == "azure",
+        "models": {
+            "transcription": variables["transcription_model"],
+            "extraction": variables["extraction_model"],
+            "temperature": variables["temperature"],
+        },
+        "stages": variables["stage_settings"],
+        "language": variables["language"],
+        "paths": {
+            "sample_input": "sample_input/",
+            "output": "output/",
+            "schemas": "schemas/",
+            "prompts": "prompts/",
+        },
+    }
+    (poc_dir / "config.yaml").write_text(
+        _fill(
+            _read_template("_common", "config.yaml.tmpl") or "${settings_yaml}",
+            {"settings_yaml": yaml.safe_dump(config, sort_keys=False, allow_unicode=True)},
+        ),
+        encoding="utf-8",
+    )
 
 
-def _write_run_poc(variables: Dict[str, Any], pattern: str, poc_dir: Path) -> bool:
+def _write_run_poc(variables: dict[str, Any], pattern: str, poc_dir: Path) -> bool:
     """Write run_poc.py from pattern template. Returns True if a fully-wired template was used."""
     tmpl = _read_template(pattern, "run_poc.py.tmpl")
     if not tmpl:
@@ -682,7 +876,7 @@ def _write_run_poc(variables: Dict[str, Any], pattern: str, poc_dir: Path) -> bo
     return pattern != "_generic"
 
 
-def _write_eval_script(variables: Dict[str, Any], poc_dir: Path) -> None:
+def _write_eval_script(variables: dict[str, Any], poc_dir: Path) -> None:
     tmpl = _read_template("_common", "run_basic_eval.py.tmpl") or ""
     evals_dir = poc_dir / "evals"
     evals_dir.mkdir(parents=True, exist_ok=True)
@@ -691,7 +885,7 @@ def _write_eval_script(variables: Dict[str, Any], poc_dir: Path) -> None:
     (evals_dir / "ground_truth" / ".gitkeep").touch()
 
 
-def _write_readme(variables: Dict[str, Any], poc_dir: Path) -> None:
+def _write_readme(variables: dict[str, Any], poc_dir: Path) -> None:
     tmpl = _read_template("_common", "README.md.tmpl") or ""
     (poc_dir / "README.md").write_text(_fill(tmpl, variables), encoding="utf-8")
 
@@ -705,7 +899,7 @@ def scaffold_poc(
     blueprint: Blueprint,
     output_dir: Path,
     synthetic: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Scaffold the complete poc/ folder for a validated blueprint.
 
     Args:
@@ -741,6 +935,12 @@ def scaffold_poc(
 
     _write_config_yaml(variables, poc_dir)
     files_created.append(poc_dir / "config.yaml")
+
+    provider_helper = poc_dir / "provider_config.py"
+    provider_helper.write_text(
+        _read_template("_common", "provider_config.py.tmpl") or "", encoding="utf-8"
+    )
+    files_created.append(provider_helper)
 
     # Schema files
     # Primary path: if generate_schema.py was already run during Phase 5 of the
@@ -853,7 +1053,7 @@ def scaffold_poc(
     }
 
 
-def validate_generated_python(poc_dir: Path) -> Optional[str]:
+def validate_generated_python(poc_dir: Path) -> str | None:
     """Try to parse run_poc.py -- returns error string or None if valid."""
     run_poc = poc_dir / "run_poc.py"
     if not run_poc.exists():

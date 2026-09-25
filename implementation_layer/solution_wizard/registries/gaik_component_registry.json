@@ -27,11 +27,22 @@
       "language",
       "transcription_model",
       "extraction_model",
-      "enhanced_transcript"
+      "enhanced_transcript",
+      "transcription_config",
+      "extraction_config",
+      "extractor_ctor"
     ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "transcription_model",
@@ -48,7 +59,9 @@
     "known_limitations": [
       "Requires audio/video input; cannot process text-only input without bypassing Transcriber",
       "TranscriptEnhancer is tuned for Finnish; other languages require prompt customisation",
-      "Drives Transcriber on the hosted path, so the transcript it extracts from carries no timestamps and no speaker labels. Use cases needing time-coded citations, subtitles, or speaker attribution must not use this module -- decompose into an explicit transcription step (Transcriber with whisper_local for speakers, ParallelTranscriber with response_format='srt' for timestamps only) + SchemaGenerator + DataExtractor."
+      "Drives Transcriber on the hosted path, so the transcript it extracts from carries no timestamps and no speaker labels. Use cases needing time-coded citations, subtitles, or speaker attribution must not use this module -- decompose into an explicit transcription step (Transcriber with whisper_local for speakers, ParallelTranscriber with response_format='srt' for timestamps only) + SchemaGenerator + DataExtractor.",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
+      "Audio stages require a separate native OpenAI/Azure configuration when the extraction or writing provider is Aitta, Anthropic, Google/Vertex, LiteLLM or a generic compatible endpoint. Chat support does not imply audio support."
     ],
     "best_for": [
       "spoken_report_to_structured_form",
@@ -123,11 +136,22 @@
     ],
     "optional_parameters": [
       "parser_type",
-      "extraction_model"
+      "extraction_model",
+      "parser_config",
+      "extraction_config",
+      "extractor_ctor"
     ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "extraction_model",
@@ -145,7 +169,8 @@
     },
     "known_limitations": [
       "Complex scanned documents or accuracy-critical complex layouts should use VisionExtractor instead",
-      "Multi-page extraction may lose cross-page context"
+      "Multi-page extraction may lose cross-page context",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "pdf_form_extraction",
@@ -202,7 +227,6 @@
     ],
     "uses_components": [
       "Embedder",
-      "PgVectorStore",
       "Retriever",
       "AnswerGenerator"
     ],
@@ -220,11 +244,22 @@
       "retriever_threshold",
       "collection_name",
       "citations",
-      "use_azure"
+      "use_azure",
+      "parser_config",
+      "embedding_config",
+      "answer_config"
     ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "embedding_model"
@@ -238,8 +273,10 @@
       ]
     },
     "known_limitations": [
-      "Requires PostgreSQL with pgvector extension",
-      "Initial indexing required before querying"
+      "Uses an internal Chroma VectorStore; persist/persist_path control local index persistence",
+      "Initial indexing required before querying",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
+      "Select an available embedding model/deployment separately from the chat model. Anthropic/Foundry has no native embeddings API; Aitta, compatible endpoints and LiteLLM require an explicit embedding model. Rebuild the index after changing provider, model or vector dimensions."
     ],
     "best_for": [
       "document_qa",
@@ -318,10 +355,12 @@
       "local_api_key",
       "enhanced_transcript_instructions",
       "default_prompt",
-      "initial_prompt"
+      "initial_prompt",
+      "api_config"
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai"
     ],
     "cost_relevant_parameters": [
@@ -389,11 +428,23 @@
       "generate_summary",
       "diff_chunks",
       "additional_instructions",
-      "domain_rules"
+      "domain_rules",
+      "api_config",
+      "model",
+      "reasoning_effort",
+      "use_azure"
     ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [],
     "quality_tradeoffs": {
@@ -405,7 +456,8 @@
     },
     "known_limitations": [
       "Tuned for Finnish; other languages require prompt customisation",
-      "Should not be used when transcript faithfulness is more important than correctness"
+      "Should not be used when transcript faithfulness is more important than correctness",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "finnish_transcript_repair",
@@ -459,9 +511,15 @@
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai",
       "anthropic",
-      "google"
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "extraction_model"
@@ -476,7 +534,8 @@
     "known_limitations": [
       "Requires schema or field requirements to extract against",
       "When provider=azure_openai: bare dict and list[dict] Pydantic field types cause a 400 error â€” Azure OpenAI structured output requires additionalProperties:false on every object. Replace with named sub-models using ConfigDict(extra='forbid'). E.g. define class Medication(BaseModel) with model_config=ConfigDict(extra='forbid') and use list[Medication] instead of list[dict].",
-      "ExtractionRequirements field_type enum does not include plain 'dict'. For nested objects use field_type 'str' in requirements JSON; for arrays of objects use 'list[dict]'. Never write field_type: 'dict' directly."
+      "ExtractionRequirements field_type enum does not include plain 'dict'. For nested objects use field_type 'str' in requirements JSON; for arrays of objects use 'list[dict]'. Never write field_type: 'dict' directly.",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "form_field_extraction",
@@ -531,13 +590,20 @@
       "temperature",
       "reasoning_effort",
       "save_json",
-      "json_path"
+      "json_path",
+      "config"
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai",
       "anthropic",
-      "google"
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "model",
@@ -553,7 +619,8 @@
     "known_limitations": [
       "Requires a pre-built extraction_model and requirements -- unlike Extractor, it does not fall back to generating a schema when one is missing",
       "When provider=azure_openai: bare dict and list[dict] Pydantic field types cause a 400 error -- Azure OpenAI structured output requires additionalProperties:false on every object. Replace with named sub-models using ConfigDict(extra='forbid').",
-      "ExtractionRequirements field_type enum does not include plain 'dict'. For nested objects use field_type 'str'; for arrays of objects use 'list[dict]'."
+      "ExtractionRequirements field_type enum does not include plain 'dict'. For nested objects use field_type 'str'; for arrays of objects use 'list[dict]'.",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "extraction_reusing_an_already_approved_schema",
@@ -610,13 +677,20 @@
       "vertex_ai",
       "additional_instructions",
       "reasoning_effort",
-      "include_verification"
+      "include_verification",
+      "api_config"
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai",
       "anthropic",
-      "google"
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "model_provider",
@@ -634,7 +708,9 @@
     "known_limitations": [
       "Max ~20MB per file",
       "Not suitable for audio input",
-      "Could be more expensive for large document batches -- prefer DocumentsToStructuredData for plain text PDFs"
+      "Could be more expensive for large document batches -- prefer DocumentsToStructuredData for plain text PDFs",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
+      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support."
     ],
     "best_for": [
       "scanned_forms",
@@ -690,12 +766,20 @@
     ],
     "optional_parameters": [
       "model",
-      "parser"
+      "parser",
+      "config"
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai",
-      "anthropic"
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "model"
@@ -710,7 +794,8 @@
     },
     "known_limitations": [
       "Categories must be clearly defined; ambiguous categories reduce accuracy",
-      "Does not produce structured field extraction -- combine with Extractor for full pipeline"
+      "Does not produce structured field extraction -- combine with Extractor for full pipeline",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "document_routing",
@@ -772,10 +857,7 @@
       "hnsw_ef_search",
       "create_extensions"
     ],
-    "supported_providers": [
-      "openai",
-      "azure_openai"
-    ],
+    "supported_providers": [],
     "cost_relevant_parameters": [],
     "quality_tradeoffs": {
       "speed_vs_accuracy": "Larger top_k improves recall at cost of generation context",
@@ -848,13 +930,20 @@
       "use_azure",
       "use_vertexai",
       "max_tokens",
-      "reasoning_effort"
+      "reasoning_effort",
+      "config"
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai",
       "anthropic",
-      "google"
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "model"
@@ -868,7 +957,8 @@
     },
     "known_limitations": [
       "LLM judges can be inconsistent; use LLMJudgePanel for critical decisions",
-      "Not a substitute for human review in safety-critical workflows"
+      "Not a substitute for human review in safety-critical workflows",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "hallucination_detection",
@@ -926,10 +1016,12 @@
       "gpt4o_chunk_duration_minutes",
       "whisper_local_chunk_parallelism",
       "whisper_local_chunk_duration_minutes",
-      "whisper_local_max_audio_minutes"
+      "whisper_local_max_audio_minutes",
+      "api_config"
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai"
     ],
     "cost_relevant_parameters": [
@@ -1029,11 +1121,20 @@
       "curate_evidence",
       "polish",
       "verbose",
-      "additional_instructions"
+      "additional_instructions",
+      "api_config"
     ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "parser_choice",
@@ -1052,7 +1153,9 @@
       "Orchestrates existing GAIK parsers/transcriber/extractor; no new parsing logic -- inherits each sub-component's limits",
       "Long-form synthesis cost grows with sources x sections; agentic mode is significantly more expensive than single-call",
       "Report content is drawn only from supplied evidence; it does not browse or fetch external sources",
-      "Agentic mode requires the multi-source-report-generator-agentic extra (langgraph); DOCX export requires multi-source-report-generator-docx extra and Pandoc system binary"
+      "Agentic mode requires the multi-source-report-generator-agentic extra (langgraph); DOCX export requires multi-source-report-generator-docx extra and Pandoc system binary",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
+      "Audio stages require a separate native OpenAI/Azure configuration when the extraction or writing provider is Aitta, Anthropic, Google/Vertex, LiteLLM or a generic compatible endpoint. Chat support does not imply audio support."
     ],
     "best_for": [
       "multi_source_report_writing",
@@ -1117,9 +1220,15 @@
     "optional_parameters": [],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai",
       "anthropic",
-      "google"
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "judges"
@@ -1133,7 +1242,8 @@
     },
     "known_limitations": [
       "Requires at least 2 LLMJudge instances; diverse providers give strongest debiasing",
-      "Not a substitute for human review in safety-critical workflows"
+      "Not a substitute for human review in safety-critical workflows",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "high_stakes_validation",
@@ -1187,9 +1297,15 @@
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai",
       "anthropic",
-      "google"
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "match_mode"
@@ -1203,7 +1319,8 @@
     },
     "known_limitations": [
       "match_mode='semantic' requires a judge instance",
-      "Does not handle nested/list field comparison -- flatten before evaluating"
+      "Does not handle nested/list field comparison -- flatten before evaluating",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "extraction_quality_benchmarking",
@@ -1253,9 +1370,15 @@
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai",
       "anthropic",
-      "google"
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "judge"
@@ -1269,7 +1392,8 @@
     },
     "known_limitations": [
       "context_recall requires ground_truth; skipped otherwise (skip_context_recall=True by default)",
-      "Scores are Likert 1-5 normalized to 0-1; not calibrated against human raters"
+      "Scores are Likert 1-5 normalized to 0-1; not calibrated against human raters",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "rag_pipeline_quality_measurement",
@@ -1367,10 +1491,22 @@
     "required_parameters": [
       "config"
     ],
-    "optional_parameters": [],
+    "optional_parameters": [
+      "config",
+      "temperature",
+      "reasoning_effort"
+    ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [],
     "quality_tradeoffs": {
@@ -1383,7 +1519,8 @@
     "known_limitations": [
       "Supports Azure OpenAI and OpenAI only; no Anthropic/Google for structured output",
       "field_type enum is limited: str/int/float/bool/list[str]/date/decimal/list[dict] -- 'dict' is not valid",
-      "Azure OpenAI structured output rejects bare dict/list[dict] field types -- replace with named Pydantic sub-models"
+      "Azure OpenAI structured output rejects bare dict/list[dict] field types -- replace with named Pydantic sub-models",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "dynamic_schema_generation",
@@ -1431,10 +1568,12 @@
       "response_format",
       "speed",
       "default_instructions",
-      "instructions"
+      "instructions",
+      "api_config"
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai"
     ],
     "cost_relevant_parameters": [
@@ -1501,13 +1640,20 @@
       "table_allowlist",
       "schema_name",
       "extra_instructions",
-      "answer_language"
+      "answer_language",
+      "temperature"
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai",
       "anthropic",
-      "google"
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "model"
@@ -1523,7 +1669,8 @@
     "known_limitations": [
       "Read-only SELECT queries only; no writes, DDL, or data import",
       "Full schema placed in LLM prompt; very large databases need table_allowlist",
-      "Requires a live PostgreSQL connection at runtime"
+      "Requires a live PostgreSQL connection at runtime",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "natural_language_db_query",
@@ -1584,9 +1731,15 @@
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai",
       "anthropic",
-      "google"
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "model",
@@ -1605,7 +1758,8 @@
       "Read-only SELECT queries only; source files are never modified",
       "No charts, regression, or forecasting -- SQL only, no Python execution",
       "Whole profiled schema goes in the LLM prompt; best for small/medium files",
-      "In a messy sheet, a data row missing a descriptive field can be dropped as a subtotal"
+      "In a messy sheet, a data row missing a descriptive field can be dropped as a subtotal",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "csv_excel_question_answering",
@@ -1651,11 +1805,20 @@
     ],
     "optional_parameters": [
       "model",
-      "language_hint"
+      "language_hint",
+      "config"
     ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "model"
@@ -1670,7 +1833,8 @@
       "No README available -- sourced from module docstring and source inspection",
       "No example script available",
       "LLM-based labelling; ambiguous field IDs may need parent HTML snippet for context",
-      "No extra pip install needed; bundled with base gaik install"
+      "No extra pip install needed; bundled with base gaik install",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "form_field_label_cleanup",
@@ -1722,11 +1886,20 @@
       "temperature",
       "reasoning_effort",
       "dpi",
-      "clean_output"
+      "clean_output",
+      "openai_config"
     ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "dpi",
@@ -1744,7 +1917,9 @@
     "known_limitations": [
       "One vision-model call per page -- cost and latency scale linearly with page count",
       "Requires OpenAI or Azure OpenAI access; there is no local-only mode",
-      "convert_image (image input) returns a single markdown string, not a page list -- page provenance applies to PDF input only"
+      "convert_image (image input) returns a single markdown string, not a page list -- page provenance applies to PDF input only",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
+      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support."
     ],
     "best_for": [
       "page_attributed_parsing",
@@ -1797,13 +1972,20 @@
       "use_azure",
       "vertex_ai",
       "additional_instructions",
-      "create_html"
+      "create_html",
+      "api_config"
     ],
     "supported_providers": [
       "openai",
+      "azure",
       "azure_openai",
       "anthropic",
-      "google"
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "model_provider",
@@ -1821,7 +2003,9 @@
     "known_limitations": [
       "Parses the whole PDF in a single model call and returns flat markdown (ParseResult.clean_markdown) -- page boundaries are NOT preserved, so it cannot support 'file_name|page_number' citations. Use VisionParser when page provenance is required.",
       "PDF input only -- use DocxParser for Word documents",
-      "Requires a premium multimodal model from OpenAI/Azure, Anthropic, or Google (pip install gaik[multimodal-parser])"
+      "Requires a premium multimodal model from OpenAI/Azure, Anthropic, or Google (pip install gaik[multimodal-parser])",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
+      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support."
     ],
     "best_for": [
       "complex_tables_spanning_pages",
@@ -1944,11 +2128,20 @@
       "verbose",
       "vision_prompt",
       "temperature",
-      "reasoning_effort"
+      "reasoning_effort",
+      "vision_config"
     ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "enable_ocr",
@@ -1967,7 +2160,9 @@
     "known_limitations": [
       "Runs Docling locally AND calls a vision model -- combines both cost profiles",
       "Requires the 'parser' extra plus OpenAI/Azure access",
-      "Returns one flat parsed_markdown string -- no page-level provenance"
+      "Returns one flat parsed_markdown string -- no page-level provenance",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
+      "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support."
     ],
     "best_for": [
       "documents_with_meaningful_images",
@@ -2192,11 +2387,18 @@
     ],
     "optional_parameters": [
       "model",
-      "batch_size"
+      "batch_size",
+      "config"
     ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "model",
@@ -2212,7 +2414,8 @@
     "known_limitations": [
       "RAGWorkflow already performs embedding -- select this directly only when building a custom pipeline that needs to skip or reorder steps",
       "Requires OpenAI or Azure OpenAI access",
-      "Accepts LangChain Documents or plain strings; metadata is preserved only for Documents"
+      "Accepts LangChain Documents or plain strings; metadata is preserved only for Documents",
+      "Select an available embedding model/deployment separately from the chat model. Anthropic/Foundry has no native embeddings API; Aitta, compatible endpoints and LiteLLM require an explicit embedding model. Rebuild the index after changing provider, model or vector dimensions."
     ],
     "best_for": [
       "custom_rag_pipelines",
@@ -2268,7 +2471,13 @@
     ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "top_k",
@@ -2286,7 +2495,8 @@
     "known_limitations": [
       "Requires an already-constructed Embedder and vector store -- not usable standalone",
       "RAGWorkflow already performs retrieval -- select this directly only for custom pipelines",
-      "re_rank downloads a cross-encoder model on first use"
+      "re_rank downloads a cross-encoder model on first use",
+      "Select an available embedding model/deployment separately from the chat model. Anthropic/Foundry has no native embeddings API; Aitta, compatible endpoints and LiteLLM require an explicit embedding model. Rebuild the index after changing provider, model or vector dimensions."
     ],
     "best_for": [
       "custom_rag_pipelines",
@@ -2341,7 +2551,15 @@
     ],
     "supported_providers": [
       "openai",
-      "azure_openai"
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
     ],
     "cost_relevant_parameters": [
       "model",
@@ -2359,7 +2577,8 @@
     "known_limitations": [
       "RAGWorkflow already performs answer generation -- select this directly only for custom pipelines",
       "Streams by default (stream=True); set stream=False to receive a single string",
-      "Citation quality depends entirely on the retrieved context -- it formats citations, it does not verify sources"
+      "Citation quality depends entirely on the retrieved context -- it formats citations, it does not verify sources",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
       "custom_rag_pipelines",

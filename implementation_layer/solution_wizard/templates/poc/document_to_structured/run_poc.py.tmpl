@@ -24,6 +24,8 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
 from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData  # noqa: E402
+sys.path.insert(0, str(Path(__file__).parent))
+from provider_config import get_stage_config  # noqa: E402
 
 
 def load_config() -> dict:
@@ -154,9 +156,9 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config()
-    use_azure = config.get("use_azure", True)
-    models = config.get("models", {})
-    extraction_model = models.get("extraction")
+    parser_config = get_stage_config(config, "parser")
+    extraction_config = get_stage_config(config, "extraction")
+    extraction_model = extraction_config["model"]
     user_requirements = load_requirements()
 
     sample_dir = Path(__file__).parent / config.get("paths", {}).get("sample_input", "sample_input")
@@ -169,8 +171,10 @@ def main() -> None:
     else:
         input_file = find_input_file(config, args.input)
 
-    print(f"Loading pipeline: DocumentsToStructuredData (use_azure={use_azure})")
-    pipeline = DocumentsToStructuredData(use_azure=use_azure)
+    print(f"Loading pipeline: DocumentsToStructuredData ({parser_config['provider']} parser, {extraction_config['provider']} extraction)")
+    pipeline = DocumentsToStructuredData(
+        parser_config=parser_config, extraction_config=extraction_config,
+    )
 
     schema_dir = Path(__file__).parent / config.get("paths", {}).get("schemas", "schemas")
     schema_name = "output_schema"
@@ -215,10 +219,10 @@ def main() -> None:
     except Exception as exc:
         print(f"WARNING: Could not write schema hash: {exc}")
 
-${llm_judge_section}
-
     output_dir = Path(__file__).parent / config.get("paths", {}).get("output", "output")
     output_dir.mkdir(parents=True, exist_ok=True)
+${llm_judge_section}
+
     output_path = output_dir / f"{input_file.stem}_result.json"
     output_path.write_text(
         json.dumps(result.extracted_fields, indent=2, ensure_ascii=False, default=str),

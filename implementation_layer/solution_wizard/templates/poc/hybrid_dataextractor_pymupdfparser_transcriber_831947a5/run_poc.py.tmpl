@@ -29,6 +29,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent))
+from provider_config import get_stage_config  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +105,6 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config()
-    use_azure = config.get("use_azure", ${use_azure})
     language = config.get("language", "${language}")
     user_requirements = load_requirements()
 
@@ -137,9 +138,8 @@ def main() -> None:
     # ----- Step: transcribe_audio (Transcriber) -----
     print("\n[1/4] Transcribing audio input...")
     from gaik.software_components.transcriber import Transcriber
-    from gaik.software_components.transcriber import get_openai_config as get_transcriber_config
     transcriber = Transcriber(
-        api_config=get_transcriber_config(use_azure=use_azure),
+        api_config=get_stage_config(config, "transcription"),
         language=language,
         enhanced_transcript=True,
     )
@@ -174,9 +174,8 @@ def main() -> None:
     # ----- Step: extract_fields (DataExtractor) -----
     print("\n[4/4] Extracting structured output...")
     from gaik.software_components.extractor import DataExtractor
-    from gaik.software_components.extractor import get_openai_config as get_extractor_config
     schema_class, requirements = _load_approved_schema(schema_dir)
-    extractor = DataExtractor(config=get_extractor_config(use_azure=use_azure))
+    extractor = DataExtractor(config=get_stage_config(config, "extraction"))
     results = extractor.extract(
         extraction_model=schema_class,
         requirements=requirements,
@@ -207,7 +206,7 @@ def main() -> None:
         print("\nRunning LLMJudge hallucination detection...")
         try:
             from gaik.software_components.validators.llm_judge.llm_judge import LLMJudge as _LLMJudge
-            judge = _LLMJudge(model_provider="openai", use_azure=use_azure)
+            judge = _LLMJudge(config=get_stage_config(config, "judge"))
             extracted_for_judge = extracted_fields
             if isinstance(extracted_for_judge, list) and len(extracted_for_judge) == 1:
                 extracted_for_judge = extracted_for_judge[0]

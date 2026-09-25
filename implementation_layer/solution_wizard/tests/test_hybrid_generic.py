@@ -1,4 +1,4 @@
-"""Tests for the enhanced _generic template + pattern key + dynamic discovery (Parts 1b-1d, 2a-2b)."""
+"""Tests for generic templates, pattern keys, and dynamic discovery."""
 
 import ast
 import json
@@ -306,7 +306,6 @@ def test_pip_requirements_falls_back_to_card_install_extra(card_only_component):
 
 def test_same_graph_different_order_same_key():
     """Blueprints with the same dependency graph but different step list order → same key."""
-    import copy
 
     bp1 = _hybrid_blueprint()
     bp2 = _hybrid_blueprint()
@@ -440,7 +439,24 @@ def test_dynamic_discovery_finds_promoted_template(tmp_path, monkeypatch):
     # Point TEMPLATES_DIR at a temp dir containing a fake promoted template
     fake_templates = tmp_path / "poc"
     (fake_templates / key).mkdir(parents=True)
-    (fake_templates / key / "run_poc.py.tmpl").write_text("# promoted template\n")
+    (fake_templates / key / "run_poc.py.tmpl").write_text(
+        "from provider_config import get_stage_config\n"
+        "stage = get_stage_config(config, 'extraction')\n"
+    )
     monkeypatch.setattr(scaffolder_mod, "TEMPLATES_DIR", fake_templates)
 
     assert scaffolder_mod._determine_pattern(bp) == key
+
+
+def test_legacy_promoted_template_requires_explicit_provider_migration(tmp_path, monkeypatch):
+    import solution_wizard.scaffolder as scaffolder_mod
+
+    bp = _hybrid_blueprint()
+    key = _derive_pattern_key(bp)
+    candidate = tmp_path / key / "run_poc.py.tmpl"
+    candidate.parent.mkdir()
+    candidate.write_text("# existing specialized pipeline\n", encoding="utf-8")
+    monkeypatch.setattr(scaffolder_mod, "TEMPLATES_DIR", tmp_path)
+    with pytest.raises(ValueError, match="needs a provider migration"):
+        scaffolder_mod._determine_pattern(bp)
+    assert candidate.read_text() == "# existing specialized pipeline\n"

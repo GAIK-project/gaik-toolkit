@@ -12,7 +12,6 @@
   ],
   "variables_used": [
     "language",
-    "use_azure",
     "use_case_name"
   ],
   "validated_by": [

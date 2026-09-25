@@ -32,6 +32,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent))
+from provider_config import get_stage_config  # noqa: E402
 
 # Component imports for this pipeline (uncomment / adjust as you wire each step):
 # ${component_imports_placeholder}

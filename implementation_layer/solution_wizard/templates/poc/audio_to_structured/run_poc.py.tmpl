@@ -24,6 +24,8 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent / "src"))
 
 from gaik.software_modules.audio_to_structured_data import AudioToStructuredData  # noqa: E402
+sys.path.insert(0, str(Path(__file__).parent))
+from provider_config import get_stage_config  # noqa: E402
 
 
 def load_config() -> dict:
@@ -130,17 +132,19 @@ def main() -> None:
 
     config = load_config()
     user_requirements = load_requirements()
-    use_azure = config.get("use_azure", True)
-    models = config.get("models", {})
+    audio_config = get_stage_config(config, "transcription")
+    extraction_config = get_stage_config(config, "extraction")
     language = config.get("language", "fi")
-    transcription_model = models.get("transcription", "gpt-4o-transcribe")
-    extraction_model = models.get("extraction")
+    transcription_model = audio_config["transcription_model"]
+    extraction_model = extraction_config["model"]
 
-    print(f"Loading pipeline: AudioToStructuredData (use_azure={use_azure})")
+    print(f"Loading pipeline: AudioToStructuredData ({audio_config['provider']} audio, {extraction_config['provider']} extraction)")
     print(f"  Transcription model : {transcription_model}")
     print(f"  Extraction model    : {extraction_model or 'provider default'}")
     print(f"  Language            : {language}")
-    pipeline = AudioToStructuredData(use_azure=use_azure)
+    pipeline = AudioToStructuredData(
+        transcription_config=audio_config, extraction_config=extraction_config,
+    )
 
     input_file = find_input_file(config, args.input)
     print(f"Input file: {input_file}")
@@ -154,7 +158,6 @@ def main() -> None:
         "output_dir": str(Path(__file__).parent / "output"),
         "compress_audio": True,
         "enhanced_transcript": True,
-        "transcription_model": transcription_model,
         "language": language,
     }
     extractor_ctor = {}
@@ -187,11 +190,11 @@ def main() -> None:
     except Exception as exc:
         print(f"WARNING: Could not write schema hash: {exc}")
 
-${llm_judge_section}
-
     # Save output
     output_dir = Path(__file__).parent / config.get("paths", {}).get("output", "output")
     output_dir.mkdir(parents=True, exist_ok=True)
+${llm_judge_section}
+
     output_path = output_dir / f"{input_file.stem}_ticket.json"
     output_path.write_text(
         json.dumps(result.extracted_fields, indent=2, ensure_ascii=False, default=str),
