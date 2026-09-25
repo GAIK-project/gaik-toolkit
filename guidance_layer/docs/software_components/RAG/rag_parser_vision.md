@@ -9,7 +9,7 @@ models for concise image interpretation.
 pip install gaik[rag-parser-vision]
 ```
 
-**Note:** Requires Docling, FFmpeg, and OpenAI/Azure OpenAI access.
+**Note:** Requires Docling, FFmpeg, and a vision-capable model (any `get_llm_config()` provider or a legacy OpenAI/Azure config).
 
 ---
 
@@ -130,7 +130,9 @@ chunks = parser.convert_doc_to_chunks_with_vision(
 
 ## Configuration
 
-This software component uses the OpenAI/Azure configuration from `gaik.software_components.config`.
+`vision_config` accepts a legacy `get_openai_config()` config or a shared
+`get_llm_config(...)` config, as `VisionParser` does. See the
+[multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolkit/multi-provider-llm/).
 
 ---
 

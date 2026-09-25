@@ -1,6 +1,6 @@
 # Answer Generator
 
-Generate answers from retrieved context using OpenAI or Azure OpenAI.
+Generate answers from retrieved context with any configured chat model.
 
 ## Installation
 
@@ -8,7 +8,10 @@ Generate answers from retrieved context using OpenAI or Azure OpenAI.
 pip install gaik[answer-generator]
 ```
 
-**Note:** Requires OpenAI or Azure OpenAI API access.
+**Note:** Works with any provider configured with `get_llm_config()` (OpenAI, Azure
+OpenAI, Google, Anthropic, CSC Aitta, other OpenAI-compatible servers or optional
+LiteLLM); `stream=True` needs streaming support. See the
+[multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolkit/multi-provider-llm/).
 
 ---
 
@@ -68,7 +71,8 @@ answer = generator.generate(
 
 ## Configuration
 
-This software component uses `gaik.software_components.config` for OpenAI/Azure configuration.
+Without `config`, the generator uses `get_openai_config(use_azure)`. Pass
+`config=get_llm_config("aitta")` (or another provider) to use a different chat model.
 
 ---
 

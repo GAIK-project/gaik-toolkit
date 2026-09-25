@@ -43,7 +43,7 @@ Add new functionality to existing components (e.g., `software_components/extract
    ]
    ```
 
-4. **Add tests** _(recommended)_ → `implementation_layer/src/gaik/software_components/parsers/tests/test_your_parser.py`
+4. **Add tests** _(recommended)_ → `implementation_layer/unit_tests/test_your_parser.py`
 
 5. **Add example** _(recommended)_ → `implementation_layer/examples/software_components/parsers/demo_your_parser.py`
 
@@ -88,48 +88,57 @@ Create entirely new module for capabilities that don't fit existing modules.
    ]
    ```
 
-4. **Add tests** _(recommended)_ → `implementation_layer/src/gaik/software_components/analysis/tests/`
+4. **Add tests** _(recommended)_ → `implementation_layer/unit_tests/test_analysis.py`
 
 5. **Add examples** _(recommended)_ → `implementation_layer/examples/software_components/analysis/` with README
 
-## Testing (Optional, but Recommended)
+## Testing and Formatting
 
-Tests are automatically run by GitHub Actions on every push. Local testing and linting are optional but help catch issues early.
+GitHub Actions runs on every push and pull request. It first checks formatting with a pinned
+ruff version and fails before any test runs if a file is not formatted; `ruff check` is
+reported but not blocking. It then runs the deterministic tests with `pytest -m "not llm"`.
 
-**Tests go in:** `implementation_layer/src/gaik/software_components/<module>/tests/` (or the shared suite at `implementation_layer/unit_tests/`)
+**Tests go in:** `implementation_layer/unit_tests/` (CI collects only this suite)
 
 ```bash
-# Option 1: Using activated venv
-pip install -e .[all,dev]
-pytest                      # Run all tests
-ruff check --fix .          # Lint
-ruff format .               # Format
-
-# Option 2: Using uv (creates project-local .venv)
-uv run pytest
-uv run ruff check .
-uv run ruff format .
+uv sync --all-extras                                  # Missing extras make components silently absent
+uv run pytest -m "not llm"                            # Offline tests, as in CI
+uvx ruff@0.14.10 format implementation_layer/         # Same pinned formatter as CI
+uvx ruff@0.14.10 check implementation_layer/src/gaik/
 ```
+
+Tests marked `llm` call a real model and need provider credentials; CI runs them nightly.
 
 ## Release Process
 
+Every tag and PyPI release requires the authenticated release gate described in
+[docs/releasing.md](../docs/releasing.md). Commit the intended release, set
+`implementation_layer/solution_wizard/gaik_validated_version.txt` to the planned version,
+then run:
+
 ```bash
-git commit -m "Changes"
+uv run python scripts/release_check.py --live --version X.Y.Z
+```
+
+Tag only after it passes for that exact commit, and rerun it after any tracked change.
+
+```bash
 git push origin main
-git tag v0.3.0              # Must be vX.Y.Z format
-git push origin v0.3.0      # Triggers GitHub Actions
+git tag vX.Y.Z              # Must be vX.Y.Z format; the version comes from the tag
+git push origin vX.Y.Z      # Triggers GitHub Actions
 ```
 
 **GitHub Actions automatically:**
 
-- Runs all tests (pytest)
+- Runs the format check and offline tests, then the same live release gate on the tag commit
 - Builds the package
 - **Validates version matches tag** (fails early if mismatch)
-- Validates package (twine check)
+- Validates package (twine check and distribution contents)
 - Publishes to PyPI
 - Creates GitHub Release
 
-**Note:** Linting (ruff) is not enforced by CI. Run locally if needed.
+Publishing depends on the release gate. Missing credentials, timeouts and skipped checks
+fail it; do not bypass it to publish.
 
 ### Fixing Version Mismatch
 
@@ -140,7 +149,7 @@ If the pipeline fails with "Version mismatch" error, it means commits were added
 git tag -d v0.3.0
 git push origin :refs/tags/v0.3.0
 
-# 2. Create new tag on current HEAD
+# 2. Rerun the release gate for current HEAD, then create the new tag there
 git tag v0.3.0
 git push origin v0.3.0
 ```
@@ -165,10 +174,11 @@ gaik-toolkit/
 ```mermaid
 flowchart LR
     A[Code Changes] --> B[git commit & push]
-    B --> C[git tag v0.X.Y]
+    B --> R[release_check.py --live passes]
+    R --> C[git tag v0.X.Y]
     C --> D[git push tag]
     D --> E[GitHub Actions]
-    E --> F[Run Tests]
+    E --> F[Format Check, Tests + Live Release Gate]
     F --> G[Build Package]
     G --> H[Validate Version]
     H --> I[Validate with Twine]

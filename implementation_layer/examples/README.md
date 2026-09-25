@@ -24,9 +24,14 @@ export OPENAI_API_KEY='sk-...'
 # For Azure OpenAI (default in examples)
 export AZURE_API_KEY='...'
 export AZURE_ENDPOINT='https://your-resource.openai.azure.com/'
-export AZURE_DEPLOYMENT='gpt-4o'
-export AZURE_API_VERSION='2024-02-15-preview'  # optional
+export AZURE_DEPLOYMENT='gpt-6-luna'            # your deployment name; this is the default
+export AZURE_API_VERSION='2025-03-01-preview'   # optional; this is the default
 ```
+
+Extraction and classification need a deployment that supports structured outputs.
+Other providers (Google, Anthropic, CSC Aitta, OpenAI-compatible servers, LiteLLM) are
+configured with `get_llm_config()`; see `software_components/llm/` and the
+[multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolkit/multi-provider-llm/).
 
 ## Usage
 

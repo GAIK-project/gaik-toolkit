@@ -5,9 +5,13 @@ description: One configuration shape for OpenAI, Azure, Anthropic, Google, CSC A
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-The `gaik.software_components.llm` package lets text components use OpenAI, Azure OpenAI, Anthropic Claude, Google Gemini, CSC Aitta, or another OpenAI-compatible server. Choose a configuration and pass it to `DataExtractor`, `DocumentClassifier`, `TranscriptEnhancer`, `AnswerGenerator`, or `Embedder`. Each component keeps the same public interface; the chosen model must support the capabilities it uses.
+The `gaik.software_components.llm` package lets text components use OpenAI, Azure OpenAI, Anthropic Claude, Google Gemini, CSC Aitta, or another OpenAI-compatible server. Choose a configuration and pass it to `DataExtractor`, `SchemaGenerator`, `DocumentClassifier`, `TranscriptEnhancer`, `AnswerGenerator`, `Embedder`, `PostgresAgent`, or `TabularAgent`. Each component keeps the same public interface; the chosen model must support the capabilities it uses.
 
 `create_llm_client()` exposes a common `ProviderClient` interface for direct calls. OpenAI, Azure, Aitta, and compatible servers share the OpenAI SDK adapter; Anthropic, Google and Vertex use native SDKs. LiteLLM is an optional backend for additional provider integrations. Existing `get_openai_config()` configurations still use the legacy OpenAI/Azure component paths.
+
+<Callout type="info" title="Upgrading from 0.7">
+`get_openai_config(use_azure=...)`, `create_openai_client(config)` and dicts with `use_azure` work unchanged. The OpenAI/Azure default model is now `gpt-6-luna` (previously `gpt-5.4`), a reasoning family: components omit their default temperature unless `reasoning_effort="none"`. To keep your previous model, set `AZURE_DEPLOYMENT` or `OPENAI_MODEL`, or pass `model=...` to `get_llm_config()` or the component. If an Azure deployment name does not show its model family, set `model_family` (for example `"gpt-6-luna"`) in the config.
+</Callout>
 
 <Callout type="info">
 This interface covers text and image chat, structured output, streaming, and embeddings. Vision components also accept shared configs in gaik 0.8.0. Audio support remains limited to the toolkit's OpenAI/Azure audio paths.
@@ -72,6 +76,8 @@ When resolving an existing config, the priority is:
 5. Azure by default
 
 `get_llm_config()` without an argument uses `LLM_PROVIDER`, then Azure. An existing legacy config with `use_azure` keeps its provider even if `LLM_PROVIDER` is set elsewhere.
+
+A legacy dict with neither `provider` nor `use_azure`, such as `{"api_key": key, "model": "gpt-5.4"}`, keeps its earlier meaning in `create_openai_client()` and in components: it selects standard OpenAI whatever `LLM_PROVIDER` says (`VisionParser` keeps its own legacy Azure default). `create_llm_client()`, `MultimodalParser(api_config=...)` and `LLMJudge(config=...)` apply the order above instead, so the same dict selects `LLM_PROVIDER` or Azure. Add `provider` or `use_azure` to make the choice explicit.
 
 | Provider | Required environment variables | Model selection |
 |---|---|---|
@@ -147,15 +153,16 @@ For embeddings, also set `embedding_model` or `EMBEDDING_MODEL` to a model serve
 
 | Component | OpenAI / Azure | Anthropic native | Google native | Aitta / other compatible server |
 |---|:---:|:---:|:---:|:---:|
-| DataExtractor | Yes | Yes | Yes | Requires structured output |
+| DataExtractor, SchemaGenerator | Yes | Yes | Yes | Requires structured output |
 | DocumentClassifier (locally parsed text) | Yes | Yes | Yes | Requires structured output |
 | TranscriptEnhancer | Yes | Yes | Yes | Requires chat |
 | AnswerGenerator, including streaming | Yes | Yes | Yes | Requires chat / streaming |
+| PostgresAgent, TabularAgent | Yes | Yes | Yes | Requires structured output |
 | Embedder | Yes | No | Yes | Requires an embedding model |
 | VisionParser | Yes | Requires vision model | Requires vision model | Requires a vision model and image input support |
 | Transcriber, ParallelTranscriber, TextToSpeech | Yes | No | No | Not supported by this provider path |
 
-Every “Yes” also requires a model or Azure deployment that supports the operation. For Google embeddings, the default is `gemini-embedding-001`; match your vector store dimensions to the returned vectors. Use the same embedding model for documents and queries.
+Every “Yes” also requires a model or Azure deployment that supports the operation. With the optional LiteLLM backend, support follows the model it routes to. For Google embeddings, the default is `gemini-embedding-001`; match your vector store dimensions to the returned vectors. Use the same embedding model for documents and queries.
 
 `DocumentClassifier` uses local parsing for PDF/DOCX text by default; classifying images or explicitly selecting its vision parser also requires vision support. `VisionParser` accepts all shared provider configs, and the endpoint must serve a vision model before sending images. `MultimodalParser(api_config=config)`, `VisionExtractor(api_config=config)`, `FormUnderstander(config=config)`, and `LLMJudge(config=config)` also use the shared interface. Their legacy provider arguments remain available.
 

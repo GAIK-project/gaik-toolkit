@@ -272,7 +272,7 @@ accuracy lever in the component.
 |----------|-------------|
 | `AZURE_API_KEY` / `AZURE_ENDPOINT` | Azure OpenAI for SQL generation |
 | `OPENAI_API_KEY` | Standard OpenAI as an alternative |
-| `LLM_PROVIDER` | `openai`, `azure`, `anthropic`, `google` |
+| `LLM_PROVIDER` | Provider used when `config` is omitted: any `get_llm_config()` provider (`azure` by default, or e.g. `openai`, `aitta`, `google`, `anthropic`) |
 
 ## Examples
 

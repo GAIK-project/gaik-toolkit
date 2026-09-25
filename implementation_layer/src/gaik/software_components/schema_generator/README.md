@@ -51,6 +51,12 @@ generator = SchemaGenerator(
 )
 ```
 
+`config` can also come from `get_llm_config()` for Google, Anthropic, CSC Aitta,
+other OpenAI-compatible servers or optional LiteLLM, e.g.
+`SchemaGenerator(config=get_llm_config("aitta"))`. The model must support
+structured output. See the
+[multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolkit/multi-provider-llm/).
+
 ## API
 
 ### `SchemaGenerator`

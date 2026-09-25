@@ -14,7 +14,7 @@ Use software components when you need fine-grained control over each processing 
 </Callout>
 
 <Callout type="info">
-Most chat-based components (Extractor, Classifier, TranscriptEnhancer, AnswerGenerator, Embedder) accept the same configuration interface for OpenAI, Azure OpenAI, Anthropic, Google, CSC Aitta, and other OpenAI-compatible servers. Available operations depend on the provider and model; see [Multi-Provider LLM Client](/toolkit/multi-provider-llm) for the `gaik.software_components.llm` package and the capability matrix.
+Most chat-based components (Extractor and SchemaGenerator, Classifier, TranscriptEnhancer, AnswerGenerator, Embedder, Postgres and Tabular Agents) accept the same configuration interface for OpenAI, Azure OpenAI, Anthropic, Google, CSC Aitta, other OpenAI-compatible servers, and the optional LiteLLM backend. Available operations depend on the provider and model; see [Multi-Provider LLM Client](/toolkit/multi-provider-llm) for the `gaik.software_components.llm` package and the capability matrix.
 </Callout>
 
 ---
@@ -132,7 +132,7 @@ flowchart LR
 | Parser | When to use |
 |--------|-------------|
 | `VisionParser` | Shared provider configs with a vision model — OpenAI/Azure, Google/Vertex, Anthropic, Aitta, compatible servers or optional LiteLLM; page images → markdown |
-| `MultimodalParser` | Multi-provider PDF → markdown (OpenAI · Anthropic Claude · Google Gemini) with one API |
+| `MultimodalParser` | Multi-provider PDF → markdown (OpenAI · Anthropic Claude · Google Gemini, or Aitta, compatible servers and LiteLLM via a shared config) with one API |
 | `PyMuPDFParser` | Fast local PDF text extraction, no API calls, lowest cost |
 | `DocxParser` | Local Word document (`.docx` / `.doc`) extraction via `python-docx` |
 | `DoclingParser` | Advanced local parsing with OCR, table extraction, multi-format support |
@@ -235,7 +235,7 @@ flowchart TD
 **Key features:**
 - Single-pass PDF/image → structured data — no parse-then-extract round-trip
 - Multi-document calls: align line items in a PO with quantities in a BOM in one request
-- Multi-provider: OpenAI / Azure, Anthropic Claude (Foundry), Google Gemini (Vertex AI or direct)
+- Multi-provider: OpenAI / Azure, Anthropic Claude (Foundry), Google Gemini (Vertex AI or direct), plus CSC Aitta, OpenAI-compatible servers or optional LiteLLM through a shared `get_llm_config()` config
 - Reuses generated Pydantic schemas across runs via `schema_dir` persistence
 - Optional per-field verification: confidence score + reasoning for every scalar field
 
@@ -318,7 +318,7 @@ flowchart LR
 `} />
 
 **Key features:**
-- Same code talks to OpenAI / Azure OpenAI / Anthropic Foundry / Google Vertex via the toolkit's existing config helpers
+- Same code talks to OpenAI / Azure OpenAI / Anthropic Foundry / Google Vertex via the toolkit's existing config helpers, or to CSC Aitta, OpenAI-compatible servers and optional LiteLLM via `LLMJudge(config=get_llm_config(...))`
 - Returns per-field flags (`ok`, `suspect`, `wrong`) plus a document-level slot for structural observations like "items missing from the extractor output"
 - Domain-agnostic by default; pass an optional `ValidationRubric` with vendor-specific check sentences when you want targeted guidance
 - Cost tracking with longest-prefix model lookup so rotated model ids still resolve to a known rate
@@ -633,7 +633,7 @@ flowchart LR
 - Defense in depth: `sqlglot` validation rejecting non-`SELECT`, multi-statement, DDL/DML, and cross-schema queries, plus a read-only transaction, `statement_timeout`, and row cap — backed by a read-only DB role
 - `table_allowlist` narrows the agent to specific tables; queries touching anything else are rejected before running
 - `extra_instructions` injects a domain glossary or example question→SQL pairs; `answer_language` localises the answer (en, fi, sv, de, fr, es, no, da)
-- Multi-provider LLM (OpenAI / Azure / Anthropic / Google); `get_schema()` and `run_sql()` work without LLM credentials, so they double as tools for an external agent framework
+- Multi-provider LLM (OpenAI / Azure / Anthropic / Google / CSC Aitta / OpenAI-compatible servers / optional LiteLLM, via `get_llm_config()`); `get_schema()` and `run_sql()` work without LLM credentials, so they double as tools for an external agent framework
 
 **Potential applications:**
 - Self-service analytics — let non-technical staff query a database in plain language
@@ -681,7 +681,7 @@ flowchart LR
 - Column profiling puts each column's type, null share, range and actual values in the prompt — the single biggest accuracy lever, and it costs no tokens
 - Each Excel sheet becomes its own table, so a question can join across sheets
 - Two security layers: `sqlglot` validation that rejects file-reading table functions and any unrecognised function (an allowlist, not a denylist), plus a DuckDB connection locked with `enable_external_access = false` before a single generated query runs
-- Multi-provider LLM (OpenAI / Azure / Anthropic / Google); `get_schema()` and `run_sql()` work without LLM credentials, so they double as tools for an external agent framework
+- Multi-provider LLM (OpenAI / Azure / Anthropic / Google / CSC Aitta / OpenAI-compatible servers / optional LiteLLM, via `get_llm_config()`); `get_schema()` and `run_sql()` work without LLM credentials, so they double as tools for an external agent framework
 
 **Potential applications:**
 - Self-service analytics over spreadsheets people already email around

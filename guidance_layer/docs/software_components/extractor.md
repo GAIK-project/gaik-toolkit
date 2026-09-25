@@ -8,7 +8,10 @@ Extract structured data from documents using natural language requirements with 
 pip install "gaik[extract]"
 ```
 
-**Note:** Requires OpenAI or Azure OpenAI API access
+**Note:** Works with any provider configured with `get_llm_config()` (OpenAI, Azure
+OpenAI, Google, Anthropic, CSC Aitta, other OpenAI-compatible servers or optional
+LiteLLM) when the model supports structured output. See the
+[multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolkit/multi-provider-llm/).
 
 ---
 
@@ -45,7 +48,7 @@ print(results)  # [{'project_title': 'AI Initiative', 'budget': 2500000.0, 'stat
 - **Natural Language -> Schema** - Describe extraction needs in plain English, get Pydantic models
 - **Auto Structure Detection** - Automatically detects flat vs nested data patterns
 - **Type-Safe Extraction** - Full Pydantic validation with field types, enums, and patterns
-- **Multi-Provider** - OpenAI and Azure OpenAI support
+- **Multi-Provider** - OpenAI, Azure OpenAI, Google, Anthropic, Aitta and other OpenAI-compatible servers
 - **JSON Export** - Save results to JSON files automatically
 
 ---
@@ -58,7 +61,7 @@ print(results)  # [{'project_title': 'AI Initiative', 'budget': 2500000.0, 'stat
 from gaik.software_components.extractor import SchemaGenerator
 
 generator = SchemaGenerator(
-    config: dict,              # From get_openai_config()
+    config: dict,              # get_llm_config() or get_openai_config()
     model: str | None = None   # Optional model override
 )
 
@@ -77,7 +80,7 @@ generator.structure_analysis    # Structure type analysis
 from gaik.software_components.extractor import DataExtractor
 
 extractor = DataExtractor(
-    config: dict,              # From get_openai_config()
+    config: dict,              # get_llm_config() or get_openai_config()
     model: str | None = None   # Optional model override
 )
 
@@ -96,12 +99,16 @@ results = extractor.extract(
 
 ```python
 from gaik.software_components.extractor import get_openai_config
+from gaik.software_components.llm import get_llm_config
 
 # Azure OpenAI (default)
 config = get_openai_config(use_azure=True)
 
 # Standard OpenAI
 config = get_openai_config(use_azure=False)
+
+# Any supported provider, e.g. CSC Aitta or Google
+config = get_llm_config("aitta")
 ```
 
 ---
@@ -114,7 +121,7 @@ config = get_openai_config(use_azure=False)
 | `AZURE_ENDPOINT` | Azure only | Azure OpenAI endpoint URL |
 | `AZURE_DEPLOYMENT` | Azure only | Azure deployment name |
 | `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
-| `AZURE_API_VERSION` | Optional | API version (default: 2024-02-15-preview) |
+| `AZURE_API_VERSION` | Optional | API version (default: 2025-03-01-preview) |
 
 ---
 

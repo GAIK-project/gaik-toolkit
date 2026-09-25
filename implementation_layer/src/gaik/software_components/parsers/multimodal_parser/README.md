@@ -42,7 +42,7 @@ parser = MultimodalParser(
     api_config=None,                            # Optional shared get_llm_config(...) dictionary
     model_provider="openai",                    # "openai" | "claude" | "google"
     model=None,                                 # Model name (None = default from config)
-    reasoning_effort="low",                     # "low" | "medium" | "high"
+    reasoning_effort="low",                     # "low" | "medium" | "high" ("none": openai only)
     merge_table=False,                          # Combine tables split across pages
     use_azure=True,                             # Azure/Foundry (openai & claude providers)
     vertex_ai=True,                             # Vertex AI (google provider)

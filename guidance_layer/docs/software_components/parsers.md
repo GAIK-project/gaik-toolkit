@@ -8,7 +8,7 @@ Convert PDFs and Word documents to structured text using multiple parsing backen
 pip install gaik[parser]
 ```
 
-**Note:** Requires OpenAI or Azure OpenAI API access for vision-based parsing
+**Note:** Vision parsing requires a provider and model that support image input. Shared configs support OpenAI, Azure, Google, Anthropic, Aitta-compatible models, and optional LiteLLM routes.
 
 ---
 
@@ -18,15 +18,25 @@ GAIK provides seven parsers, each optimized for different use cases:
 
 | Parser | Use Case | Speed | Requirements |
 |--------|----------|-------|--------------|
-| `MultimodalParser` | Premium PDF parsing with layout-aware table extraction across multiple LLM providers | Slow | OpenAI/Azure, Anthropic, or Google API |
-| `VisionParser` | High-quality PDF/image parsing with table extraction | Medium | OpenAI/Azure API |
+| `MultimodalParser` | Premium PDF parsing with layout-aware table extraction across multiple LLM providers | Slow | Image-capable model through shared or legacy provider config |
+| `VisionParser` | High-quality PDF/image parsing with table extraction | Medium | Image-capable model through a shared provider config |
 | `PyMuPDFParser` | Fast PDF text extraction | Fast | None (local) |
 | `DocxParser` | Word document parsing | Fast | None (local) |
 | `DoclingParser` | Advanced OCR with multi-format support | Medium | Optional GPU |
-| `VisionPlusParser` | Docling + vision parsing returning markdown plus metadata | Medium | OpenAI/Azure + Docling |
+| `VisionPlusParser` | Docling + vision parsing returning markdown plus metadata | Medium | Image-capable model + Docling |
 | `DoclingApiClientParser` | Remote client for a hosted Docling parsing service | Fast | `API_BASE` + `PASSWORD` |
 
 ### Quick Comparison
+
+```python
+from gaik.software_components.llm import get_llm_config
+from gaik.software_components.parsers import VisionParser
+
+parser = VisionParser(get_llm_config("openai", model="gpt-6-luna"))
+markdown = parser.convert_image("invoice.jpg")
+```
+
+The same configuration shape works with `VisionPlusParser(vision_config=...)` and `VisionRagParser(vision_config=...)`. Native Google and Anthropic adapters translate the image messages. For Aitta or another compatible server, select a model whose catalog entry supports image input.
 
 **Use MultimodalParser when:**
 - Documents contain messy, irregular, or complex tables that span multiple pages
@@ -88,7 +98,7 @@ For VisionParser and VisionPlusParser:
 | `AZURE_ENDPOINT` | Azure only | Azure OpenAI endpoint URL |
 | `AZURE_DEPLOYMENT` | Azure only | Azure deployment name |
 | `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
-| `AZURE_API_VERSION` | Optional | API version (default: 2024-02-15-preview) |
+| `AZURE_API_VERSION` | Optional | API version (default: 2024-12-01-preview with `parsers.get_openai_config()`, 2025-03-01-preview with `get_llm_config("azure")`) |
 
 For DoclingApiClientParser: `API_BASE` and `PASSWORD` for the hosted service.
 

@@ -9,7 +9,7 @@ vision parser -> embedder -> vector store -> retriever -> answer generator.
 pip install gaik[rag-workflow]
 ```
 
-**Note:** Requires OpenAI/Azure OpenAI access and Chroma for persistence.
+**Note:** Requires a vision model, an embedding provider, a chat model, and Chroma for persistence. These stages can use different providers.
 
 ---
 
@@ -45,6 +45,9 @@ print(result.answer)
 workflow = RAGWorkflow(
     api_config: dict | None = None,
     use_azure: bool = True,
+    parser_config: dict | None = None,
+    embedding_config: dict | None = None,
+    answer_config: dict | None = None,
     persist: bool = True,
     persist_path: str = "chroma_store",
     collection_name: str = "gaik_rag",
@@ -81,7 +84,19 @@ result = workflow.ask(
 
 ## Configuration
 
-This workflow uses `gaik.software_components.config` for OpenAI/Azure configuration.
+Use `get_llm_config` to select separate providers for each stage. Omitted stage configs use the shared `api_config`; the legacy `use_azure` default still works. When all three stage configs are explicit, no default Azure/OpenAI credentials are loaded.
+
+```python
+from gaik.software_components.llm import get_llm_config
+
+workflow = RAGWorkflow(
+    parser_config=get_llm_config("openai", model="gpt-6-luna"),
+    embedding_config=get_llm_config("google", embedding_model="gemini-embedding-001"),
+    answer_config=get_llm_config("aitta"),
+)
+```
+
+Choose a vision-capable model for parsing and a service-supported embedding model. Anthropic has no native embedding API; Aitta and custom compatible servers require an explicit embedding model from their catalog.
 
 ---
 

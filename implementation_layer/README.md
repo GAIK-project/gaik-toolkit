@@ -300,7 +300,7 @@ explicit supported embedding model or use a separate embedding provider in `RAGW
 Legacy `get_openai_config(use_azure=True)` and `create_openai_client` remain supported.
 Provider resolution prioritizes an explicit provider, then `config["provider"]`, then
 legacy `config["use_azure"]`, then `LLM_PROVIDER`, then Azure. See the
-[multi-provider guide](../guidance_layer/website/content/docs/toolkit/multi-provider-llm.mdx)
+[multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolkit/multi-provider-llm/)
 for the capability matrix and component examples.
 
 ---

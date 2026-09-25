@@ -9,7 +9,7 @@ contract based on `langchain_core.documents.Document`.
   with metadata.
 - **rag_parser_vision**: Docling + vision model parsing that adds concise image
   descriptions into chunk text.
-- **embedder**: Generate embeddings from text chunks using OpenAI/Azure models.
+- **embedder**: Generate embeddings from text chunks with OpenAI/Azure, Google, or an embedding model on Aitta or another OpenAI-compatible server.
 - **vector_store**: Store embeddings and metadata (in-memory or Chroma persistent).
 - **pg_vector_store**: PostgreSQL-backed vector store with semantic, keyword and
   hybrid (RRF) search via pgvector + full-text search.

@@ -149,7 +149,7 @@ config = get_openai_config(use_azure=False)
 | `AZURE_API_KEY` | Azure only | Azure OpenAI API key |
 | `AZURE_ENDPOINT` | Azure only | Azure OpenAI endpoint URL |
 | `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
-| `AZURE_API_VERSION` | Optional | API version (default: 2024-12-01-preview) |
+| `AZURE_API_VERSION` | Optional | API version (default: 2025-03-01-preview) |
 
 ---
 

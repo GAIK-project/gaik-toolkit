@@ -17,7 +17,7 @@ Single-pass PDF/image → structured data via a vision LLM. Combines visual docu
 pip install "gaik[vision-extract]"
 ```
 
-Requires credentials for at least one supported provider: OpenAI / Azure OpenAI, Anthropic (Claude / Anthropic Foundry), or Google (Gemini / Vertex AI).
+Requires credentials for at least one supported provider: OpenAI / Azure OpenAI, Anthropic (Claude / Anthropic Foundry), Google (Gemini / Vertex AI), or, through a shared `get_llm_config()` config, CSC Aitta, another OpenAI-compatible server or optional LiteLLM.
 
 ## Quick start
 
@@ -53,7 +53,7 @@ All files are sent in a single LLM call so the model sees them together — usef
 
 ```python
 VisionExtractor(
-    api_config=None,                # Optional provider config dict. Skips env loading.
+    api_config=None,                # Optional get_llm_config() dict. Skips env loading.
     model_provider="openai",        # "openai" | "claude" | "google"
     model=None,                     # Model/deployment name. None = provider default.
     reasoning_effort="medium",      # "low" | "medium" | "high"
@@ -67,7 +67,7 @@ VisionExtractor(
 
 | Option | Type | Default | Notes |
 |---|---|---|---|
-| `api_config` | `dict \| None` | `None` | If set, used directly instead of reading env vars. |
+| `api_config` | `dict \| None` | `None` | Shared `get_llm_config(...)` dictionary. Its explicit `provider` selects the common client and overrides the legacy provider flags. |
 | `model_provider` | `"openai" \| "claude" \| "google"` | `"openai"` | |
 | `model` | `str \| None` | `None` | E.g. `"gpt-5.4-mini"`, `"gemini-3.1-flash-lite"`. |
 | `reasoning_effort` | `"low" \| "medium" \| "high"` | `"medium"` | |
@@ -76,6 +76,8 @@ VisionExtractor(
 | `vertex_ai` | `bool` | `True` | Google only. |
 | `additional_instructions` | `str \| None` | `None` | |
 | `include_verification` | `bool` | `False` | Wraps each scalar field with confidence metadata. |
+
+With `api_config=get_llm_config("aitta")` (or any other provider), schema generation and extraction use that provider and model. Choose a model that supports both images and structured output; PDF pages are sent as PNG images. On this shared path `result.usage` is `None`. Legacy `model_provider` flags remain available when no shared config is supplied.
 
 ## `extract()`
 

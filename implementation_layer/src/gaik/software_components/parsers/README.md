@@ -103,7 +103,7 @@ For VisionParser/VisionPlusParser only:
 | `AZURE_ENDPOINT` | Azure only | Azure OpenAI endpoint URL |
 | `AZURE_DEPLOYMENT` | Azure only | Azure deployment name |
 | `OPENAI_API_KEY` | OpenAI only | Standard OpenAI API key |
-| `AZURE_API_VERSION` | Optional | API version (default: 2024-02-15-preview) |
+| `AZURE_API_VERSION` | Optional | API version (default: 2024-12-01-preview with `parsers.get_openai_config()`, 2025-03-01-preview with `get_llm_config("azure")`) |
 
 For DoclingApiClientParser (Haaga-Helia service):
 

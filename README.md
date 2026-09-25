@@ -16,14 +16,22 @@ https://gaik-project.github.io/gaik-toolkit/
 ## Use different model providers
 
 The Python toolkit provides one `ProviderClient` interface for OpenAI, Azure OpenAI,
-Google Gemini, Anthropic, CSC Aitta, and other OpenAI-compatible servers. Configure the
-provider with `get_llm_config("azure")`, `get_llm_config("google")`, or
-`get_llm_config("aitta")` and pass that config to supported text components. Aitta and
-other compatible servers reuse the OpenAI SDK, so LiteLLM is not required. Capabilities
-such as structured output and embeddings depend on the selected model.
+Google Gemini and Vertex AI, Anthropic, CSC Aitta, and other OpenAI-compatible servers.
+LiteLLM is available as an optional backend (`pip install "gaik[llm-litellm]"`,
+`get_llm_config("litellm", model="azure/...")`); the native adapters stay the default,
+and Aitta and other compatible servers reuse the OpenAI SDK. Configure the provider with
+`get_llm_config("azure")`, `get_llm_config("google")`, or `get_llm_config("aitta")` and
+pass that config to supported components. Capabilities such as structured output and
+embeddings depend on the selected model. Audio components remain OpenAI/Azure only.
 
-See [provider configuration and examples](implementation_layer/README.md#configuration--environment-variables)
-and the [multi-provider guide](guidance_layer/website/content/docs/toolkit/multi-provider-llm.mdx).
+Existing code keeps working: `get_openai_config(use_azure=...)` and
+`create_openai_client(config)` are unchanged. The default OpenAI/Azure model is now
+`gpt-6-luna` (0.7.x used `gpt-5.4`); to keep your previous model, set
+`AZURE_DEPLOYMENT` or `OPENAI_MODEL`, or pass `model=...` to `get_llm_config()` or
+the component.
+
+See [provider configuration and examples](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/README.md#configuration--environment-variables)
+and the [multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolkit/multi-provider-llm/).
 
 # Why the toolkit is needed
 

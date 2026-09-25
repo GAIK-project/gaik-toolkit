@@ -32,8 +32,21 @@ print(result.extracted_fields)
 ## Parameters
 
 ### Constructor
-- `api_config`: Optional OpenAI/Azure config dict. If omitted, `get_openai_config(use_azure)` is used.
+- `api_config`: Shared default config. If a stage needs a fallback and this is omitted, `get_openai_config(use_azure)` is used. No default credentials are loaded when both stage configs are explicit.
 - `use_azure`: Boolean, passed to `get_openai_config` when `api_config` is not supplied.
+- `parser_config`: Optional separate provider config for the vision parser.
+- `extraction_config`: Optional separate provider config for schema generation and text extraction. Omitted stage configs use `api_config`.
+
+```python
+from gaik.software_components.llm import get_llm_config
+
+pipeline = DocumentsToStructuredData(
+    parser_config=get_llm_config("openai", model="gpt-6-luna"),
+    extraction_config=get_llm_config("aitta"),
+)
+```
+
+The configured parsing model must support image input. Text extraction can use any configured provider that supports structured output. Local parsers (`pymupdf`, `docling`, `docx`) do not use `parser_config`.
 
 ### `run(...)`
 - `file_path`: Path to the document to parse (PDF/image/DOCX).

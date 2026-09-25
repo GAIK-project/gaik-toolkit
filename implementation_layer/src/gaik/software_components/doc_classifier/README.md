@@ -8,7 +8,10 @@ Classify documents into predefined categories using LLM analysis. Supports PDFs,
 pip install gaik[classifier]
 ```
 
-**Note:** Requires OpenAI or Azure OpenAI API access
+**Note:** Works with any provider configured with `get_llm_config()` (OpenAI, Azure
+OpenAI, Google, Anthropic, CSC Aitta, other OpenAI-compatible servers or optional
+LiteLLM) when the model supports structured output; images also need a vision model.
+See the [multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolkit/multi-provider-llm/).
 
 ---
 
@@ -56,7 +59,7 @@ print(f"Reasoning: {result['document.pdf']['reasoning']}")
 from gaik.software_components.doc_classifier import DocumentClassifier
 
 classifier = DocumentClassifier(
-    config: dict,              # From get_openai_config()
+    config: dict,              # get_llm_config() or get_openai_config()
     model: str | None = None   # Optional model override
 )
 
@@ -88,12 +91,16 @@ results = classifier.classify(
 
 ```python
 from gaik.software_components.doc_classifier import get_openai_config
+from gaik.software_components.llm import get_llm_config
 
 # Azure OpenAI (default)
 config = get_openai_config(use_azure=True)
 
 # Standard OpenAI
 config = get_openai_config(use_azure=False)
+
+# Any supported provider, e.g. CSC Aitta or Google
+config = get_llm_config("aitta")
 ```
 
 ---

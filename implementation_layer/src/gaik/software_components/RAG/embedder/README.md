@@ -1,6 +1,7 @@
 # Embedder
 
-Generate vector embeddings from text using OpenAI or Azure OpenAI embedding models.
+Generate vector embeddings from text with OpenAI, Azure OpenAI, Google, or an embedding
+model served by CSC Aitta or another OpenAI-compatible server.
 
 ## Installation
 
@@ -8,7 +9,9 @@ Generate vector embeddings from text using OpenAI or Azure OpenAI embedding mode
 pip install gaik[embedder]
 ```
 
-**Note:** Requires OpenAI or Azure OpenAI API access.
+**Note:** Pass a `get_llm_config()` or `get_openai_config()` config. Anthropic has no
+embedding API; Aitta and other compatible servers need an explicit `embedding_model`.
+See the [multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolkit/multi-provider-llm/).
 
 ---
 
@@ -30,7 +33,7 @@ print(len(embeddings), len(documents))
 
 ## Features
 
-- **OpenAI + Azure Support** - Works with both providers
+- **Multi-Provider** - OpenAI, Azure, Google, and compatible embedding endpoints
 - **Batch Processing** - Efficient embedding for large inputs
 - **Metadata Preservation** - Uses LangChain `Document` for metadata
 - **Retries** - Exponential backoff on rate limits/timeouts
@@ -45,8 +48,8 @@ print(len(embeddings), len(documents))
 from gaik.software_components.RAG.embedder import Embedder
 
 embedder = Embedder(
-    config: dict,                 # From get_openai_config()
-    model: str | None = None,     # Default: "text-embedding-3-large"
+    config: dict,                 # get_llm_config() or get_openai_config()
+    model: str | None = None,     # Default: config["embedding_model"]
     batch_size: int = 100
 )
 
@@ -73,7 +76,11 @@ embeddings, documents = embed_texts(
 
 ## Configuration
 
-This software component uses the shared `get_openai_config` from `gaik.software_components.config`.
+`model` falls back to the config's `embedding_model`. `get_llm_config()` sets it from
+`EMBEDDING_MODEL` (default `text-embedding-3-small` for OpenAI/Azure,
+`gemini-embedding-001` for Google/Vertex). A legacy `get_openai_config()` config has
+no `embedding_model` and keeps the `text-embedding-3-large` default. Index documents
+and queries with the same model.
 
 ---
 
