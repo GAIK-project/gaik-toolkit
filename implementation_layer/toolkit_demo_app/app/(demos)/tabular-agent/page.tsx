@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { AlertTriangle, Sparkles, Table2 } from "lucide-react";
 import posthog from "posthog-js";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 interface AskResponse {
@@ -148,6 +148,7 @@ export default function TabularAgentPage() {
   const [result, setResult] = useState<AskResponse | null>(null);
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [sample, setSample] = useState<Sample | null>(null);
+  const uploadRequest = useRef(0);
 
   useEffect(() => {
     async function loadStatus(): Promise<void> {
@@ -161,10 +162,19 @@ export default function TabularAgentPage() {
     void loadStatus();
   }, []);
 
+  function discardSession(sessionId: string): void {
+    void apiFetch(`/api/tabular-agent/session/${sessionId}`, {
+      method: "DELETE",
+    }).catch(() => undefined);
+  }
+
   async function handleUpload(
     selected: File,
     fromSample: Sample | null = null,
   ): Promise<void> {
+    // Only the latest upload may update the page; an older one that finishes
+    // later drops its server session instead of overwriting the newer file.
+    const request = ++uploadRequest.current;
     setFile(selected);
     setSample(fromSample);
     setUpload(null);
@@ -187,6 +197,10 @@ export default function TabularAgentPage() {
       }
 
       const data: UploadResponse = await response.json();
+      if (request !== uploadRequest.current) {
+        discardSession(data.session_id);
+        return;
+      }
       setUpload(data);
       posthog.capture("tabular_agent_upload", {
         tables: data.tables.length,
@@ -198,16 +212,18 @@ export default function TabularAgentPage() {
           : `Loaded ${data.tables.length} tables`,
       );
     } catch (error) {
-      if (error instanceof RateLimitError) return;
+      if (error instanceof RateLimitError || request !== uploadRequest.current)
+        return;
       setFile(null);
       setSample(null);
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
-      setIsUploading(false);
+      if (request === uploadRequest.current) setIsUploading(false);
     }
   }
 
   async function loadSample(next: Sample): Promise<void> {
+    setIsUploading(true); // disables the drop zone and sample buttons during the fetch
     try {
       const response = await fetch(`/${next.file}`);
       if (!response.ok) throw new Error("Could not load the sample file");
@@ -217,16 +233,15 @@ export default function TabularAgentPage() {
         next,
       );
     } catch (error) {
+      setIsUploading(false);
       toast.error(error instanceof Error ? error.message : "An error occurred");
     }
   }
 
   function handleRemove(): void {
-    if (upload) {
-      void apiFetch(`/api/tabular-agent/session/${upload.session_id}`, {
-        method: "DELETE",
-      }).catch(() => undefined);
-    }
+    uploadRequest.current += 1; // an upload still in flight must not reappear
+    if (upload) discardSession(upload.session_id);
+    setIsUploading(false);
     setFile(null);
     setSample(null);
     setUpload(null);

@@ -431,7 +431,7 @@ AZURE_ENDPOINT=https://your-resource.openai.azure.com/  # only for OpenAITextEmb
 ## Related Resources
 
 - **GAIK RAG Components**: [guidance_layer/docs/software_components/](../../../guidance_layer/docs/)
-- **RAG Evaluation — Website**: [guidance_layer/website/content/docs/toolkit/evals/rag-eval.mdx](../../../guidance_layer/website/content/docs/toolkit/evals/rag-eval.mdx)
+- **RAG Evaluation — Website**: [gaik-project.github.io/gaik-toolkit/evaluation-layer/rag-eval](https://gaik-project.github.io/gaik-toolkit/evaluation-layer/rag-eval/)
 - **Extraction Evaluation**: [../extraction_eval/README.md](../extraction_eval/README.md)
 - **Evaluation Methods Overview**: [../README.md](../README.md)
 - **Project Website**: [gaik.ai](https://gaik.ai)

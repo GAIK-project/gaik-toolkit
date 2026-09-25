@@ -20,6 +20,7 @@
   },
   "registries": {
     "@kibo-ui": "https://www.kibo-ui.com/r/{name}.json",
-    "@aceternity": "https://ui.aceternity.com/registry/{name}.json"
+    "@aceternity": "https://ui.aceternity.com/registry/{name}.json",
+    "@svgl": "https://svgl.app/r/{name}.json"
   }
 }

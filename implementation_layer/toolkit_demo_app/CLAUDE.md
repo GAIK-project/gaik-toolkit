@@ -1,4 +1,4 @@
-- Backend API: Use gaik toolkit (https://pypi.org/project/gaik/) - see [main README](../README.md) for full documentation
+- Backend API: Use gaik toolkit (https://pypi.org/project/gaik/) - see the [docs site](https://gaik-project.github.io/gaik-toolkit/) for full documentation
 - Package managers: Use bun and uv, not npm
 - API proxy: `proxy.ts` – Next.js 16 proxy for API requests (replaced middleware.ts)
 - Tailwind v4: Use `globals.css` theme variables

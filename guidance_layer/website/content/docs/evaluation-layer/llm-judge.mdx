@@ -65,7 +65,7 @@ You do not need a calibration dataset, a panel of judges, or a pairwise
 comparison to start. The minimum viable setup is **one judge, one call,
 one rubric** — give it the document, the extractor's output, and a
 short checklist. That is exactly how the
-[Luvata OC Builder](https://github.com/GAIK-project/Luvata) consumes the
+Luvata OC Builder consumes the
 component in production: a single `LLMJudge.validate()` call per
 purchase order, opt-in via a UI toggle.
 
@@ -135,6 +135,26 @@ compares what the first extractor produced (the `extracted` JSON)
 against what it sees in the page images, exactly as a human reviewer
 would.
 </Callout>
+
+### Providers
+
+`model_provider` accepts `"google"` (default, `gemini-3-flash-preview`),
+`"anthropic"` (`claude-haiku-4-5-20251001`), `"openai"` and `"azure"`
+(`gpt-6-luna`). Since gaik 0.8.0 the judge also accepts a shared provider
+configuration, so CSC Aitta, Vertex AI or another OpenAI-compatible server
+can act as the judge:
+
+```python
+from gaik.software_components.llm import get_llm_config
+from gaik.software_components.validators import LLMJudge
+
+judge = LLMJudge(config=get_llm_config("aitta"))
+```
+
+The configured model must accept images for `validate()`. The
+text-only checks `judge_text_pair()` and `detect_hallucinations()` need
+only a chat model. See [Multi-Provider LLM Client](/toolkit/multi-provider-llm)
+for each provider's environment variables.
 
 ## End-to-end synthetic example
 
@@ -326,7 +346,7 @@ evidence you need them.
 | Quoting a tracked numeric KPI (e.g. dashboards) | `scoring_mode="likert_1_5"` so scores are comparable across runs | Severity-only is enough for the UI |
 | Empirical evidence that the research-backed prompt beats naive 1-10 | [Run the JudgeBench prompt-comparison script](/evaluation-layer/llm-judge-benchmark) on the public HF dataset | You trust the cited research and don't need to demo it |
 
-The [Luvata OC Builder](https://github.com/GAIK-project/Luvata) currently
+The Luvata OC Builder currently
 runs only the first row — single judge call, opt-in toggle, no
 calibration yet — and is in production. The advanced features are there
 when the use case justifies the extra complexity.
@@ -353,6 +373,8 @@ For a public, reproducible comparison see the
 - [`demo_panel_jury.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_panel_jury.py) — three-judge majority vote.
 - [`demo_pairwise.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_pairwise.py) — A/B comparison with swap-and-average.
 - [`demo_calibration.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_calibration.py) — Pearson-r calibration vs. a human-labeled dataset.
+- [`demo_llm_judge_text_pair.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_llm_judge_text_pair.py) — text-vs-text equivalence with `judge_text_pair()`, no source document.
+- [`demo_detect_hallucinations.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/validators/demo_detect_hallucinations.py) — flag extracted fields the source text does not support.
 
 ## Research references
 

@@ -80,7 +80,7 @@ extraction and vision checks. Cold starts can take several minutes.
 ```bash
 cd implementation_layer/toolkit_demo_app
 bun install
-uv pip install -r api/requirements.txt
+uv sync    # API dependencies; gaik comes from this repository as an editable install
 ```
 
 **Configure environment:**
@@ -99,15 +99,14 @@ AZURE_API_VERSION=latest
 BYPASS_AUTH=true
 ```
 
-**Run both servers:**
+**Run both servers** (from `implementation_layer/toolkit_demo_app`):
 
 ```bash
-# Terminal 1: Frontend
-bun dev
+bun dev:all        # frontend + API together
 
-# Terminal 2: API
-cd api
-uvicorn main:app --reload
+# or separately
+bun dev            # frontend
+bun dev:api        # API: uv run uvicorn api.main:app --reload
 ```
 
 - Frontend: http://localhost:3000

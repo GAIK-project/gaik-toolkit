@@ -1,11 +1,9 @@
 ﻿import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 
 /**
- * Shared layout configurations
+ * Shared layout configurations: nav title, header links and sidebar footer.
  *
- * you can customise layouts individually from:
- * Home Layout: app/(home)/layout.tsx
- * Docs Layout: app/docs/layout.tsx
+ * Used by the DocsLayout in app/layout.tsx, which renders every page.
  */
 export function baseOptions(): BaseLayoutProps {
   return {

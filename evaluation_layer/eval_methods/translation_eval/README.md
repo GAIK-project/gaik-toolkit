@@ -377,7 +377,7 @@ This is handled automatically on first use if not already downloaded.
 
 - **GAIK Transcriber Component**: [guidance_layer/docs/software_components/transcriber.md](../../../guidance_layer/docs/software_components/transcriber.md)
 - **Transcription Evaluation**: [../transcription_eval/README.md](../transcription_eval/README.md)
-- **Translation Evaluation — Website**: [guidance_layer/website/content/docs/toolkit/evals/translation-eval.mdx](../../../guidance_layer/website/content/docs/toolkit/evals/translation-eval.mdx)
+- **Translation Evaluation — Website**: [gaik-project.github.io/gaik-toolkit/evaluation-layer/translation-eval](https://gaik-project.github.io/gaik-toolkit/evaluation-layer/translation-eval/)
 - **Evaluation Methods Overview**: [../README.md](../README.md)
 - **Project Website**: [gaik.ai](https://gaik.ai)
 - **GitHub**: [github.com/GAIK-project/gaik-toolkit](https://github.com/GAIK-project/gaik-toolkit)

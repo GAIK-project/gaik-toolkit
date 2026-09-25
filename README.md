@@ -16,13 +16,16 @@ https://gaik-project.github.io/gaik-toolkit/
 ## Use different model providers
 
 The Python toolkit provides one `ProviderClient` interface for OpenAI, Azure OpenAI,
-Google Gemini and Vertex AI, Anthropic, CSC Aitta, and other OpenAI-compatible servers.
+Google Gemini and Vertex AI, Anthropic (direct or on Microsoft Foundry), CSC Aitta, and
+other OpenAI-compatible servers.
 LiteLLM is available as an optional backend (`pip install "gaik[llm-litellm]"`,
 `get_llm_config("litellm", model="azure/...")`); the native adapters stay the default,
 and Aitta and other compatible servers reuse the OpenAI SDK. Configure the provider with
 `get_llm_config("azure")`, `get_llm_config("google")`, or `get_llm_config("aitta")` and
-pass that config to supported components. Capabilities such as structured output and
-embeddings depend on the selected model. Audio components remain OpenAI/Azure only.
+pass that config to supported components. Google/Vertex and Anthropic need the
+`gaik[llm-google]` and `gaik[llm-anthropic]` extras. Capabilities such as structured
+output and embeddings depend on the selected model. Audio components remain OpenAI/Azure
+only.
 
 Existing code keeps working: `get_openai_config(use_azure=...)` and
 `create_openai_client(config)` are unchanged. The default OpenAI/Azure model is now
@@ -56,9 +59,9 @@ The knowledge management perspective for structuring GenAI development and imple
 The toolkit focuses on three core **knowledge processes** in organizations:
 | Knowledge process | Description | Illustration |
 |-----------|-------------|--------------|
-| **Knowledge capture** | Extract needed information from business documents, videos, voice recordings, emails, and meeting recordings | ![Knowledge capture](images/Knowledge_capture_image.jpg) |
-| **Knowledge access** | Intelligent access to organizational knowledge (document repositories, databases, wikis, CRMs) | ![Knowledge access](images/Knowledge_access_image.jpg) |
-| **Knowledge synthesis** | Automatic generation of business reports, sales proposals, marketing materials, project proposals | ![Knowledge synthesis](images/Knowledge_synthesis_image.jpg) |
+| **Knowledge capture** | Extract needed information from business documents, videos, voice recordings, emails, and meeting recordings | ![Knowledge capture](https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/images/Knowledge_capture_image.jpg) |
+| **Knowledge access** | Intelligent access to organizational knowledge (document repositories, databases, wikis, CRMs) | ![Knowledge access](https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/images/Knowledge_access_image.jpg) |
+| **Knowledge synthesis** | Automatic generation of business reports, sales proposals, marketing materials, project proposals | ![Knowledge synthesis](https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/images/Knowledge_synthesis_image.jpg) |
 
 The following **generic use cases** are defined as the top priority at the moment:
 | Knowledge process | Generic use cases |
@@ -86,7 +89,7 @@ The GAIK Toolkit is organized into a layer-based architecture that spans from st
 
 This architecture ensures that GenAI solutions are built with proper governance, clear requirements, and comprehensive implementation support.
 
-![GAIK Architecture](images/Toolkit_layers.jpg)
+![GAIK Architecture](https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/images/Toolkit_layers.jpg)
 
 
 
@@ -120,9 +123,9 @@ Type this in a Claude Code session or Claude Desktop chat. The wizard guides you
 
 **Option 2 — Web chat (demo website)**
 
-Open the [live demo](https://gaik-demo.2.rahtiapp.fi/) and navigate to **Solution Configuration Wizard**. Token-by-token streaming, generated files appear in the sidebar, downloadable as a `.zip`.
+Open the [live demo](https://gaik-demo.2.rahtiapp.fi/) and navigate to **Solution Wizard**. The wizard is in beta: sign in and request wizard access first. Token-by-token streaming, generated files appear in the sidebar, downloadable as a `.zip`.
 
-To run the demo locally:
+To run the demo locally, install its dependencies and create `.env.local` as described in the [demo app README](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/toolkit_demo_app/README.md); set `BYPASS_AUTH=true` there to open the wizard without signing in:
 
 ```bash
 cd implementation_layer/toolkit_demo_app
@@ -149,10 +152,10 @@ python scripts/scaffold_poc.py --blueprint ~/my-use-case/use_case.blueprint.json
 
 ### Full documentation
 
-See [`implementation_layer/solution_wizard/README.md`](implementation_layer/solution_wizard/README.md) for the complete walkthrough, output directory layout, component registry, validation rules, and test suite.
+See [`implementation_layer/solution_wizard/README.md`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/solution_wizard/README.md) for the complete walkthrough, output directory layout, component registry, validation rules, and test suite.
 
 ---
 
 ## License
 
-This project is licensed under the MIT License – see `LICENSE` for details.
+This project is licensed under the MIT License – see [`LICENSE`](https://github.com/GAIK-project/gaik-toolkit/blob/main/LICENSE) for details.

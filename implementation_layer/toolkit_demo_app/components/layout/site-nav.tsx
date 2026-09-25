@@ -719,7 +719,7 @@ export function SiteNav({
             <Button
               variant="ghost"
               size="sm"
-              className="text-muted-foreground hover:text-foreground hidden gap-1.5 lg:inline-flex"
+              className="text-muted-foreground hover:text-foreground hidden gap-1.5 md:inline-flex"
               onClick={handleSignOut}
               aria-label="Sign out"
               title="Sign out"

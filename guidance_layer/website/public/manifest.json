@@ -4,12 +4,12 @@
   "icons": [
     {
       "src": "/gaik-toolkit/icon1.png",
-      "sizes": "192x192",
+      "sizes": "96x96",
       "type": "image/png"
     },
     {
       "src": "/gaik-toolkit/logos/gaik_logo_medium.png",
-      "sizes": "512x512",
+      "sizes": "1377x703",
       "type": "image/png"
     }
   ],

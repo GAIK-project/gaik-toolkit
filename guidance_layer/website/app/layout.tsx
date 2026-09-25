@@ -31,6 +31,8 @@ export const metadata: Metadata = {
     'Anthropic',
     'Google AI',
     'Azure',
+    'CSC Aitta',
+    'LiteLLM',
     'Pydantic',
     'structured output',
   ],
@@ -41,26 +43,24 @@ export const metadata: Metadata = {
     },
   ],
   metadataBase: new URL('https://gaik-project.github.io/gaik-toolkit'),
+  // og:title and og:description fall back to each page's title and description,
+  // and each page sets its own canonical URL (generateMetadata in
+  // app/[[...slug]]/page.tsx), so a shared link describes the page it points to.
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://gaik-project.github.io/gaik-toolkit',
     siteName: 'GAIK Documentation',
-    title: 'GAIK - Generative AI-Enhanced Knowledge Management',
-    description: 'Multi-provider AI toolkit for Python with structured data extraction and document parsing. Bridging research, technology and real-world business applications.',
     images: [
       {
         url: '/logos/gaik_logo_medium.png',
-        width: 512,
-        height: 512,
+        width: 1377,
+        height: 703,
         alt: 'GAIK - Generative AI-Enhanced Knowledge Management',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'GAIK - Generative AI-Enhanced Knowledge Management',
-    description: 'Multi-provider AI toolkit for Python with structured data extraction and document parsing.',
     images: ['/logos/gaik_logo_medium.png'],
   },
 };

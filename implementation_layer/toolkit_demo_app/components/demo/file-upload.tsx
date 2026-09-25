@@ -5,6 +5,18 @@ import { motion, AnimatePresence } from "motion/react";
 import { Upload, File, X, CheckCircle } from "lucide-react";
 import { cn, formatFileSize } from "@/lib/utils";
 
+const SAME_FORMAT: Record<string, string> = { JPEG: "JPG", TIF: "TIFF" };
+
+/** ".pdf,.jpg,.jpeg" -> "PDF, JPG" for people rather than for the file picker. */
+function formatAccept(accept: string): string {
+  const names = accept
+    .split(",")
+    .map((type) => type.trim().replace(/^\./, "").toUpperCase())
+    .filter(Boolean)
+    .map((name) => SAME_FORMAT[name] ?? name);
+  return [...new Set(names)].join(", ");
+}
+
 interface FileUploadProps {
   accept?: string;
   maxSize?: number; // in MB
@@ -44,7 +56,7 @@ export function FileUpload({
       );
 
       if (!isValidType) {
-        setError(`Invalid file type. Accepted: ${accept}`);
+        setError(`Unsupported file type. Use ${formatAccept(accept)}.`);
         return false;
       }
 
@@ -186,7 +198,7 @@ export function FileUpload({
                     : "Drag & drop or click to upload"}
                 </p>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  Supports: {accept} (max {maxSize}MB)
+                  {formatAccept(accept)} · up to {maxSize} MB
                 </p>
               </div>
               <input

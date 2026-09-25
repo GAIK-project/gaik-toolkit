@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { usePathname } from "next/navigation";
-import { KeyRound, Loader2 } from "lucide-react";
+import { KeyRound, Loader2, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Azure } from "@/components/ui/svgs/azure";
+import { Openai } from "@/components/ui/svgs/openai";
 import {
   Dialog,
   DialogContent,
@@ -31,17 +34,60 @@ import {
 } from "@/lib/model-settings";
 import { setModelSettings, useModelSettings } from "@/lib/model-settings-store";
 
-const EMPTY: ModelSettings = { provider: "openai", model: "", apiKey: "" };
 const LABELS = { openai: "OpenAI", azure: "Azure OpenAI", aitta: "CSC Aitta" };
+const CUSTOM = "__custom__";
+
+type Preset = { id: string; label: string; note?: string };
+const GPT_PRESETS: Preset[] = [
+  { id: "gpt-6-luna", label: "GPT-6 Luna", note: "default" },
+  { id: "gpt-6-sol", label: "GPT-6 Sol" },
+  { id: "gpt-6-astra", label: "GPT-6 Astra" },
+  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
+];
+// Azure deployment names are chosen per resource; these match the model names.
+const PRESETS: Record<ModelProvider, Preset[]> = {
+  openai: GPT_PRESETS,
+  azure: GPT_PRESETS,
+  aitta: [
+    { id: "google/gemma-4-31b-it", label: "Gemma 4 31B", note: "tested" },
+    {
+      id: "LumiOpen/Llama-Poro-2-70B-Instruct",
+      label: "Poro 2 70B",
+      note: "Finnish, simple schemas",
+    },
+  ],
+};
+
+const PROVIDERS: {
+  id: ModelProvider;
+  label: string;
+  Icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+}[] = [
+  { id: "openai", label: "OpenAI", Icon: Openai },
+  { id: "azure", label: "Azure", Icon: Azure },
+  { id: "aitta", label: "CSC Aitta", Icon: Server },
+];
+
+function emptyDraft(provider: ModelProvider = "openai"): ModelSettings {
+  return { provider, model: PRESETS[provider][0].id, apiKey: "" };
+}
+const EMPTY = emptyDraft();
+
+function isPreset(provider: ModelProvider, model: string): boolean {
+  return PRESETS[provider].some((preset) => preset.id === model);
+}
 
 export function ModelSettingsButton() {
   const settings = useModelSettings();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<ModelSettings>(EMPTY);
+  const [custom, setCustom] = useState(false);
   const [message, setMessage] = useState("");
   const [testing, setTesting] = useState(false);
   const requestNumber = useRef(0);
   const activeRequest = useRef<AbortController | null>(null);
+  const customInput = useRef<HTMLInputElement>(null);
+  const focusCustom = useRef(false);
 
   useEffect(() => {
     const clear = () => {
@@ -52,6 +98,7 @@ export function ModelSettingsButton() {
       setMessage("");
       setModelSettings(null);
       setDraft(EMPTY);
+      setCustom(false);
     };
     window.addEventListener("pagehide", clear);
     return () => {
@@ -70,6 +117,9 @@ export function ModelSettingsButton() {
     setTesting(false);
     setOpen(next);
     setDraft(next && settings ? { ...settings } : EMPTY);
+    setCustom(
+      next && settings ? !isPreset(settings.provider, settings.model) : false,
+    );
     setMessage("");
   }
 
@@ -79,12 +129,20 @@ export function ModelSettingsButton() {
   }
 
   function selectProvider(provider: ModelProvider) {
-    setDraft({
-      provider,
-      model: provider === "aitta" ? "google/gemma-4-31b-it" : "",
-      apiKey: "",
-    });
+    setDraft(emptyDraft(provider));
+    setCustom(false);
     setMessage("");
+  }
+
+  function selectModel(value: string) {
+    if (value === CUSTOM) {
+      focusCustom.current = true;
+      setCustom(true);
+      updateDraft({ model: "" });
+      return;
+    }
+    setCustom(false);
+    updateDraft({ model: value });
   }
 
   async function testConnection() {
@@ -112,9 +170,7 @@ export function ModelSettingsButton() {
         );
         return;
       }
-      setMessage(
-        "Connection works. Use these settings to apply them to this tab.",
-      );
+      setMessage("Connection works.");
     } catch (error) {
       if (currentRequest !== requestNumber.current || controller.signal.aborted)
         return;
@@ -141,17 +197,22 @@ export function ModelSettingsButton() {
   return (
     <>
       <Button
-        variant={settings ? "secondary" : "ghost"}
-        size="sm"
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-foreground relative"
         onClick={() => changeOpen(true)}
-        aria-label="Model settings"
-        title="Model settings"
+        aria-label={
+          settings ? "Model settings (own model in use)" : "Model settings"
+        }
+        title={settings ? "Own model in use" : "Use your own model"}
       >
         <KeyRound className="h-4 w-4" />
-        {/* Icon only while the desktop nav needs the room (md to xl). */}
-        <span className="hidden sm:inline md:hidden xl:inline">
-          {settings ? "Own model" : "Model settings"}
-        </span>
+        {settings && (
+          <span
+            aria-hidden="true"
+            className="bg-primary ring-card absolute top-1.5 right-1.5 size-2 rounded-full ring-2"
+          />
+        )}
       </Button>
       <Dialog open={open} onOpenChange={changeOpen}>
         <DialogContent
@@ -161,48 +222,91 @@ export function ModelSettingsButton() {
           <DialogHeader>
             <DialogTitle>Use your own model</DialogTitle>
             <DialogDescription>
-              Optional. The demo uses its configured models by default. Your key
-              stays in this tab&apos;s memory and is sent to our backend only
-              when running a supported operation. It is cleared on reload or
-              sign-out.
+              Optional. Your key stays in this tab, is sent only with supported
+              requests and is cleared on reload.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="model-provider">Provider</Label>
-              <Select
-                value={draft.provider}
-                disabled={testing}
-                onValueChange={(value) =>
-                  selectProvider(value as ModelProvider)
-                }
-              >
-                <SelectTrigger id="model-provider" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="azure">Azure OpenAI</SelectItem>
-                  <SelectItem value="aitta">CSC Aitta</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              aria-label="Provider"
+              className="grid w-full grid-cols-3"
+              value={draft.provider}
+              disabled={testing}
+              onValueChange={(value) =>
+                value && selectProvider(value as ModelProvider)
+              }
+            >
+              {PROVIDERS.map(({ id, label, Icon }) => (
+                <ToggleGroupItem
+                  key={id}
+                  value={id}
+                  className="gap-1.5 px-2 text-xs sm:gap-2 sm:text-sm"
+                >
+                  <Icon className="size-4" aria-hidden />
+                  {label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
             <div className="space-y-2">
               <Label htmlFor="model-id">
-                {draft.provider === "azure" ? "Deployment name" : "Model ID"}
+                {draft.provider === "azure" ? "Deployment" : "Model"}
               </Label>
-              <Input
-                id="model-id"
-                value={draft.model}
+              <Select
+                value={custom ? CUSTOM : draft.model}
                 disabled={testing}
-                onChange={(e) => updateDraft({ model: e.target.value })}
-                placeholder={
-                  draft.provider === "azure"
-                    ? "Your Azure deployment name"
-                    : "Model available to your account"
-                }
-                autoComplete="off"
-              />
+                onValueChange={selectModel}
+              >
+                <SelectTrigger id="model-id" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent
+                  onCloseAutoFocus={(event) => {
+                    // Radix returns focus to the trigger; after "Other…" the
+                    // user's next step is typing the ID.
+                    if (!focusCustom.current) return;
+                    focusCustom.current = false;
+                    event.preventDefault();
+                    customInput.current?.focus();
+                  }}
+                >
+                  {PRESETS[draft.provider].map((preset) => (
+                    <SelectItem key={preset.id} value={preset.id}>
+                      {preset.label}
+                      {preset.note && (
+                        <span className="text-muted-foreground">
+                          {preset.note}
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={CUSTOM}>
+                    {draft.provider === "azure"
+                      ? "Other deployment…"
+                      : "Other model ID…"}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {custom && (
+                <Input
+                  ref={customInput}
+                  aria-label={
+                    draft.provider === "azure" ? "Deployment name" : "Model ID"
+                  }
+                  value={draft.model}
+                  disabled={testing}
+                  onChange={(e) => updateDraft({ model: e.target.value })}
+                  placeholder={
+                    draft.provider === "azure"
+                      ? "Your deployment name"
+                      : draft.provider === "aitta"
+                        ? "Model ID from the Aitta catalog"
+                        : "e.g. gpt-5.4"
+                  }
+                  autoComplete="off"
+                />
+              )}
             </div>
             {draft.provider === "azure" && (
               <div className="space-y-2">
@@ -239,26 +343,17 @@ export function ModelSettingsButton() {
                 data-private
               />
             </div>
-            <p className="text-muted-foreground text-sm">
-              Applies to Extractor, Vision Extractor, Schema Generator,
-              Classifier, the Parser&apos;s vision options, single-model LLM
-              Judge, PostgreSQL Agent, and Wizard image attachments. Choose a
-              model that supports structured output; images also need a vision
-              model.
-            </p>
-            <p className="text-muted-foreground text-sm">
-              Other demos and the judge panel keep their server settings. The
-              Wizard conversation uses the hosted Claude model; describe your
-              preferred PoC provider in the conversation. Clear your settings
-              before uploading Wizard audio attachments. Keys are never added to
-              its conversation or generated files.
-            </p>
             {draft.provider === "aitta" && (
-              <p className="text-muted-foreground text-sm">
-                Aitta uses a fixed CSC endpoint. Select a model that supports
-                your task; model startup can take several minutes.
+              <p className="text-muted-foreground text-xs">
+                The first request can take a few minutes while Aitta starts the
+                model.
               </p>
             )}
+            <p className="text-muted-foreground text-xs">
+              Used by Extractor, Vision Extractor, Schema Generator, Classifier,
+              Parser (vision), LLM Judge, PostgreSQL Agent and Wizard images.
+              Pick a model with structured output; images need vision.
+            </p>
             {message && (
               <p role="status" className="text-sm">
                 {message}

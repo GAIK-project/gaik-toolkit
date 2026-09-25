@@ -411,7 +411,7 @@ $env:OPENAI_API_KEY = "your-api-key"
 ## Related Resources
 
 - **GAIK Extractor Component**: [guidance_layer/docs/software_components/extractor.md](../../../guidance_layer/docs/software_components/extractor.md)
-- **Extraction Evaluation — Website**: [guidance_layer/website/content/docs/toolkit/evals/extraction-eval.mdx](../../../guidance_layer/website/content/docs/toolkit/evals/extraction-eval.mdx)
+- **Extraction Evaluation — Website**: [gaik-project.github.io/gaik-toolkit/evaluation-layer/extraction-eval](https://gaik-project.github.io/gaik-toolkit/evaluation-layer/extraction-eval/)
 - **Transcription Evaluation**: [../transcription_eval/README.md](../transcription_eval/README.md)
 - **Evaluation Methods Overview**: [../README.md](../README.md)
 - **Project Website**: [gaik.ai](https://gaik.ai)

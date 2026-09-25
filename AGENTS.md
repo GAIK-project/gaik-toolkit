@@ -42,8 +42,19 @@ checks they appear to run.
   the manifests lack, and applying them drops those.
 - The API image installs gaik from PyPI, not from this repository, so a gaik fix reaches
   the demo app only after a release.
+  The demo's local uv environment uses this repository's gaik as an editable install
+  (`[tool.uv.sources]` in its `pyproject.toml`), so a local run can pass on a fix that
+  the deployed demo lacks.
 - `proxy.ts` is the only auth layer in front of the FastAPI backend; every
-  state-changing method needs a signed-in user (`lib/api-access.ts`).
+  state-changing method needs a signed-in, approved user (`lib/api-access.ts`); the
+  wizard routes have their own gate.
+
+## docs site (GitHub Pages)
+
+`.github/workflows/pages.yml` publishes `guidance_layer/website` (Fumadocs, pnpm) to
+https://gaik-project.github.io/gaik-toolkit/ on every push to main that touches it.
+`content/docs/<path>.mdx` is served at `/gaik-toolkit/<path>/`, with no `/docs` segment.
+Link that page, not the MDX file; the old docs host `gaik-toolkit.2.rahtiapp.fi` is gone.
 
 ## graphify (optional)
 

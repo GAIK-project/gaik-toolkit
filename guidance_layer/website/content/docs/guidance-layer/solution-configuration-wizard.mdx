@@ -77,11 +77,11 @@ python run_wizard_interactive.py --output-dir ~/projects/my-use-case
 python run_wizard_interactive.py --preflight
 ```
 
-Requires Azure Foundry credentials (`CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE`) in a `.env` file. See `.env.example` in the same directory for the full list.
+Requires `pip install "gaik[wizard]"` (Claude Agent SDK + python-dotenv), the `claude` CLI on `PATH`, and Azure Foundry credentials (`CLAUDE_CODE_USE_FOUNDRY`, `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE`) in `implementation_layer/.env` (one level above the wizard directory) or the shell environment. Use `--env-file` to read another file; the script's docstring lists the optional variables.
 
 **Web interface — [Demo site](https://gaik-demo.2.rahtiapp.fi/):**
 
-The wizard is not yet open to the public on the demo site (it is shown as "Coming soon"; team access requires a shared access key). Once unlocked, the wizard streams responses live; generated files appear in the sidebar and can be downloaded individually or as a `.zip`.
+The wizard is in private beta on the demo site: it appears as a locked "Beta" item until an administrator grants your signed-in account wizard access (the team can also use a shared access key). Once unlocked, the wizard streams responses live; generated files appear in the sidebar and can be downloaded individually or as a `.zip`.
 
 ![Solution Configuration Wizard web interface — streaming chat with generated files sidebar](/images/wizard_screenshot.png)
 

@@ -369,7 +369,7 @@ wizard = [
 [project.urls]
 Homepage = "https://gaik.ai/"
 Repository = "https://github.com/GAIK-project/gaik-toolkit"
-Documentation = "https://github.com/GAIK-project/gaik-toolkit/tree/main/docs"
+Documentation = "https://gaik-project.github.io/gaik-toolkit/"
 Issues = "https://github.com/GAIK-project/gaik-toolkit/issues"
 
 # Build system configuration (not installed, used during `python -m build`)

@@ -258,7 +258,7 @@ $env:OPENAI_API_KEY = "your-api-key"
 
 ## Related Resources
 
-- **LLM-as-Judge Validation**: [guidance_layer/website/content/docs/toolkit/evals/llm-judge.mdx](../../../guidance_layer/website/content/docs/toolkit/evals/llm-judge.mdx)
+- **LLM-as-Judge Validation**: [gaik-project.github.io/gaik-toolkit/evaluation-layer/llm-judge](https://gaik-project.github.io/gaik-toolkit/evaluation-layer/llm-judge/)
 - **Extraction Evaluation**: [../extraction_eval/README.md](../extraction_eval/README.md)
 - **Evaluation Methods Overview**: [../README.md](../README.md)
 - **Project Website**: [gaik.ai](https://gaik.ai)

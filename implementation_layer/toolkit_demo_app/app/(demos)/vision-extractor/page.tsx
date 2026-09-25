@@ -612,7 +612,7 @@ export default function VisionExtractorPage() {
       <DemoPageHeader
         icon={ScanEye}
         title="Vision Extractor"
-        description="Turn PDFs and images—such as purchase orders, invoices, forms, reports, and related document sets—into validated, structured business data ready for downstream systems."
+        description="Turn PDFs and images into validated, structured data in a single model call"
         className="mb-8"
       />
 
@@ -625,9 +625,8 @@ export default function VisionExtractorPage() {
                 <div className="space-y-1.5">
                   <CardTitle>Documents</CardTitle>
                   <CardDescription>
-                    Upload one or more PDF or image files. The model sees them
-                    all together — useful for cross-document tasks like matching
-                    a purchase order with its bills of materials.
+                    PDFs or images, read together so the model can match across
+                    files, e.g. a purchase order and its bills of materials.
                   </CardDescription>
                 </div>
                 <Button
@@ -722,10 +721,8 @@ export default function VisionExtractorPage() {
             <CardHeader>
               <CardTitle>Extraction</CardTitle>
               <CardDescription>
-                Describe in plain language what fields you want — the toolkit
-                turns your description into a typed Pydantic schema and the
-                model fills it in. Preview the schema below before extracting if
-                you want to see exactly what will be returned.
+                Describe the fields you want in plain language. Preview the
+                generated schema before extracting.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
