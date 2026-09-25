@@ -150,6 +150,43 @@ def test_owned_audio_client_is_closed_on_failure(tmp_path, monkeypatch, capsys, 
     client.close.assert_called_once()
 
 
+def test_bare_legacy_config_transcribes_with_openai(tmp_path, monkeypatch):
+    # No provider and no use_azure has always meant standard OpenAI, whatever
+    # the process-wide default says.
+    monkeypatch.setenv("LLM_PROVIDER", "azure")
+    observed = []
+
+    def respond(request):
+        observed.append(request)
+        return httpx.Response(200, json={"text": "synthetic transcript"})
+
+    audio = tmp_path / "audio.wav"
+    audio.write_bytes(b"synthetic audio")
+    with httpx.Client(transport=httpx.MockTransport(respond)) as transport:
+        config = {"api_key": "openai-test-key", "http_client": transport, "max_retries": 0}
+        transcriber = module.Transcriber(config, output_dir=tmp_path)
+        model = transcriber._resolve_transcription_model()
+        assert model == "whisper-1"
+        assert transcriber._single_pass_transcription(audio, "", model) == "synthetic transcript"
+    assert observed[0].url.host == "api.openai.com"
+    assert observed[0].headers["authorization"] == "Bearer openai-test-key"
+
+
+def test_provider_azure_without_legacy_flag_uses_azure_deployment(tmp_path):
+    config = {
+        "provider": "azure",
+        "api_key": "azure-test-key",
+        "azure_endpoint": "https://audio-resource.openai.azure.com",
+        "api_version": "2025-03-01-preview",
+    }
+    assert module.Transcriber(config, output_dir=tmp_path)._resolve_transcription_model() == (
+        "whisper"
+    )
+    config["transcription_model"] = "gpt-4o-transcribe-deployment"
+    transcriber = module.Transcriber(config, output_dir=tmp_path, transcription_model="whisper")
+    assert transcriber._resolve_transcription_model() == "gpt-4o-transcribe-deployment"
+
+
 def test_chunked_audio_rejects_aitta_before_opening_a_client(monkeypatch):
     factory = MagicMock()
     monkeypatch.setattr(module, "create_openai_client", factory)

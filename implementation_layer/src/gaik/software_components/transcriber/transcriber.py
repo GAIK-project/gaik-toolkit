@@ -41,10 +41,20 @@ REMOTE_MAX_DURATION_SECONDS = 1400
 DEFAULT_MAX_DURATION_SECONDS = 1200
 
 
+def _audio_provider(api_config: dict) -> str:
+    """Resolve the audio backend the way ``create_openai_client`` does.
+
+    A bare legacy config (neither ``provider`` nor ``use_azure``) has always meant
+    standard OpenAI, whatever ``LLM_PROVIDER`` says.
+    """
+    provider = resolve_provider(config={"use_azure": False, **api_config})
+    assert_openai_or_azure({"provider": provider}, component="Transcriber")
+    return provider
+
+
 def _create_audio_client(api_config: dict):
     """Create an isolated SDK client, preserving the caller's HTTP transport."""
-    assert_openai_or_azure(api_config, component="Transcriber")
-    provider = resolve_provider(config=api_config)
+    provider = _audio_provider(api_config)
     audio_config = {**api_config, "provider": provider, "use_azure": provider == "azure"}
     if provider == "azure":
         endpoint = api_config.get("azure_audio_endpoint") or api_config.get("azure_endpoint")
@@ -138,7 +148,7 @@ class Transcriber:
         local_api_base: str | None = None,
         local_api_key: str | None = None,
     ) -> None:
-        assert_openai_or_azure(api_config, component="Transcriber")
+        _audio_provider(api_config)
         self.api_config = api_config
         self.workspace_dir = Path(output_dir)
         self.compress_audio = compress_audio  # backward compat; not used in simplified flow
@@ -252,6 +262,9 @@ class Transcriber:
         return hashlib.md5(f"{file_path.stem}_{timestamp}".encode()).hexdigest()[:10]
 
     def _resolve_transcription_model(self) -> str:
+        # Follow the same provider as the audio client, so {"provider": "azure"}
+        # without the legacy use_azure flag still gets an Azure deployment name.
+        is_azure = _audio_provider(self.api_config) == "azure"
         if self.transcription_model is not None:
             if self.transcription_model not in ALLOWED_TRANSCRIPTION_MODELS:
                 allowed = ", ".join(sorted(ALLOWED_TRANSCRIPTION_MODELS))
@@ -265,7 +278,7 @@ class Transcriber:
             if self.transcription_model in ("whisper_local", "gpt-4o-transcribe"):
                 return self.transcription_model
 
-            if not self.api_config.get("use_azure", False):
+            if not is_azure:
                 return "whisper-1"
 
             return self.api_config.get("transcription_model") or "whisper"
@@ -276,7 +289,7 @@ class Transcriber:
         # is authoritative and "whisper" is the conventional fallback. On
         # OpenAI the only valid Whisper model id is "whisper-1" — plain
         # "whisper" is a 404 there.
-        if self.api_config.get("use_azure", False):
+        if is_azure:
             return configured or "whisper"
 
         return "whisper-1" if configured in (None, "", "whisper") else configured
@@ -407,7 +420,7 @@ def split_and_transcribe_with_context(
 ):
     """Split audio into chunks and transcribe with rolling context."""
 
-    assert_openai_or_azure(api_config, component="Transcriber")
+    _audio_provider(api_config)
     if transcription_model is None:
         transcription_model = api_config.get("transcription_model", "whisper")
 
