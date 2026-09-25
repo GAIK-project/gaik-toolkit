@@ -402,3 +402,82 @@ def test_bundled_promoted_hybrid_keeps_wiring_and_separate_providers(tmp_path, m
     assert json.loads((poc / "output" / "validation.json").read_text())["passed"] is True
     assert seen == [("transcription", "azure"), ("judge", "google")]
     assert extracted[0]["provider"] == "aitta"
+
+
+@pytest.mark.parametrize(
+    "component", ["PostgresAgent", "TabularAgent", "MultiSourceReportGenerator"]
+)
+def test_answer_stage_components_get_the_answer_provider_extra_and_checks(tmp_path, component):
+    # Their reference cards wire get_stage_config(config, "answer").
+    bp = _blueprint(
+        "document_extraction_blueprint.json",
+        {"provider": "azure", "answer_config": {"provider": "google"}},
+    )
+    bp.components.selected_modules = []
+    bp.components.selected_building_blocks = [component]
+    for step in bp.workflow.steps:
+        if step.component:
+            step.component = component
+    poc = scaffold_poc(bp, tmp_path)["poc_dir"]
+    assert "gaik[llm-google]>=0.8.0" in (poc / "requirements.txt").read_text()
+    bp.models["answer_config"] = {"provider": "litellm", "model": "gpt-6-luna"}
+    with pytest.raises(ValueError, match="answer_config needs a provider-prefixed"):
+        scaffold_poc(bp, tmp_path)
+
+
+def test_openai_and_compatible_stages_cannot_share_one_key(tmp_path):
+    bp = _blueprint(
+        "incident_reporting_blueprint.json",
+        {
+            "provider": "openai_compatible",
+            "model": "served-model",
+            "base_url": "https://inference.invalid/v1",
+            "transcription_config": {"provider": "openai"},
+        },
+    )
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        scaffold_poc(bp, tmp_path)
+    bp.models["transcription_config"] = {"provider": "azure"}
+    assert scaffold_poc(bp, tmp_path)["pattern"] == "audio_to_structured"
+
+
+def test_stage_model_is_not_dropped_when_its_config_selects_another_provider(tmp_path):
+    bp = _blueprint(
+        "incident_reporting_blueprint.json",
+        {
+            "provider": "aitta",
+            "transcription_model": "whisper_local",
+            "transcription_config": {"provider": "openai"},
+        },
+    )
+    with pytest.raises(
+        ValueError, match="Set 'transcription_model' in models.transcription_config"
+    ):
+        scaffold_poc(bp, tmp_path)
+    bp.models["transcription_config"]["transcription_model"] = "whisper_local"
+    poc = scaffold_poc(bp, tmp_path)["poc_dir"]
+    config = yaml.safe_load((poc / "config.yaml").read_text())
+    assert config["stages"]["transcription"]["transcription_model"] == "whisper_local"
+
+
+def test_self_hosted_whisper_stage_needs_no_cloud_audio_credentials(tmp_path, monkeypatch):
+    from gaik.software_components.transcriber import Transcriber
+
+    bp = _blueprint(
+        "incident_reporting_blueprint.json",
+        {
+            "provider": "aitta",
+            "transcription_config": {"provider": "openai", "transcription_model": "whisper_local"},
+        },
+    )
+    poc = scaffold_poc(bp, tmp_path)["poc_dir"]
+    runner = _load_runner(poc, monkeypatch)
+    monkeypatch.delenv("OPENAI_API_KEY")
+    config = runner.load_config()
+    stage = runner.get_stage_config(config, "transcription")
+    assert stage["provider"] == "openai" and not stage.get("api_key")
+    transcriber = Transcriber(api_config=stage, output_dir=tmp_path / "workspace")
+    assert transcriber._resolve_transcription_model() == "whisper_local"
+    config["stages"]["transcription"]["transcription_model"] = "gpt-4o-transcribe"
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        runner.get_stage_config(config, "transcription")

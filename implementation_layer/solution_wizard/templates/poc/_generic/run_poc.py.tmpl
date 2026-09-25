@@ -271,8 +271,6 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config()
-    use_azure = config.get("use_azure", True)
-    models = config.get("models", {})
     language = config.get("language", "en")
     user_requirements = load_requirements()
 

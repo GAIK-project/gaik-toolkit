@@ -221,14 +221,18 @@ Do NOT call `generate_schema.py` before the user has approved the extraction pro
 
 **Step 4.3 — Generate schema using GAIK SchemaGenerator (one API call)**
 
-Call `generate_schema.py` with the just-written requirements file:
+Call `generate_schema.py` with the just-written requirements file and the extraction provider and model chosen in Phase 2 (`model_provider`, `model_preferences`):
 
 ```bash
 python scripts/generate_schema.py \
     --requirements <output_dir>/poc/prompts/extraction_requirements.md \
     --schema-name <SchemaClassName> \
-    --output-dir <output_dir>/poc
+    --output-dir <output_dir>/poc \
+    --provider <extraction provider> \
+    --model <extraction model or deployment>
 ```
+
+Add `--base-url` for `openai_compatible` or LiteLLM. Without `--provider` the script uses Azure; if the provider is still `"configurable"` or unknown, ask before this paid call. The model must support structured output (see Phase 6, step 8).
 
 This calls the GAIK `SchemaGenerator` once and writes three files:
 - `poc/schemas/output_schema.py` -- the generated Pydantic model
@@ -465,12 +469,12 @@ Then fill the template in:
 8. **Validate providers, models and capabilities for each stage** before writing `blueprint.models`:
    - Use canonical providers `openai`, `azure`, `anthropic`, `anthropic_foundry`, `google`, `vertex`, `aitta`, `openai_compatible`, or `litellm`. Existing `azure_openai` blueprints remain accepted as an alias for `azure`. Native Anthropic on Microsoft Foundry uses `anthropic_foundry`; it is not an Azure OpenAI chat deployment. Native Vertex uses Google Cloud project/location and credentials, while `google` uses a Gemini API key.
    - **Default text model**: when no preference is given for OpenAI/Azure, start with `gpt-6-luna`. Check the current official catalog and the user's account/deployment before a paid call; an Azure deployment can have a different name. Other providers need a model from their own catalog. Do not claim any model is universally available, infer a model from a provider name, or silently switch providers after a failed request.
-   - Keep a shared `models.provider`/`extraction_model` only as a fallback. Use `models.transcription_config`, `parser_config`, `extraction_config`, `embedding_config`, `answer_config`, and `judge_config` for independent stage choices. These dictionaries contain provider, model/deployment and nonsecret settings such as `base_url` or `model_family`; never put API keys or tokens in the blueprint, generated files, prompts or conversation. The generated `config.yaml` stores `stages.transcription`, `parser`, `extraction`, `embedding`, `answer`, and `judge`. Generated Python calls `get_stage_config(config, '<stage>')` from `provider_config.py`; that helper builds each stage through `get_llm_config` using the selected provider's own credentials.
+   - Keep a shared `models.provider`/`extraction_model` only as a fallback. Use `models.transcription_config`, `parser_config`, `extraction_config`, `embedding_config`, `answer_config`, and `judge_config` for independent stage choices. These dictionaries contain provider, model/deployment and nonsecret settings such as `base_url` or `model_family`; never put API keys or tokens in the blueprint, generated files, prompts or conversation. The generated `config.yaml` stores `stages.transcription`, `parser`, `extraction`, `embedding`, `answer`, and `judge`. Generated Python calls `get_stage_config(config, '<stage>')` from `provider_config.py`; that helper builds each stage through `get_llm_config` using the selected provider's own credentials. A `models.<stage>_model` belongs to `models.provider`; when that stage's config selects another provider, put the model inside the config (the scaffolder refuses the mix). `openai` and `openai_compatible` stages both read `OPENAI_API_KEY`/`OPENAI_BASE_URL`, so the scaffolder refuses them in one PoC; give one of them a separately keyed provider instead.
    - **Capabilities**: text extraction/schema generation needs structured output; parsing images or visually extracting PDFs needs image input as well. Aitta and generic OpenAI-compatible chat endpoints do not automatically provide images, embeddings or audio. Select and test an actual supported model. An unsupported stage needs its own capable provider; do not reuse another provider's key or endpoint.
-   - **Audio**: hosted Transcriber, ParallelTranscriber and TextToSpeech accept native OpenAI/Azure configurations only. Audio-to-text and speech deployments are separate from chat models. For Aitta/Google/Anthropic/LiteLLM text pipelines, provide a separate native OpenAI/Azure transcription config. The existing explicitly configured local-Whisper modes have their own endpoint and capability rules from Phase 5.
+   - **Audio**: hosted Transcriber, ParallelTranscriber and TextToSpeech accept native OpenAI/Azure configurations only. Audio-to-text and speech deployments are separate from chat models. For Aitta/Google/Anthropic/LiteLLM text pipelines, provide a separate native OpenAI/Azure transcription config. The existing explicitly configured local-Whisper modes have their own endpoint and capability rules from Phase 5. For self-hosted Whisper set `transcription_model: whisper_local` in `models.transcription_config` (provider `openai` or `azure`); its stage then needs no cloud credentials unless transcript enhancement is on.
    - **Embeddings**: configure a separate embedding model/deployment, never the chat model. Anthropic/Foundry has no native embedding API; use another embedding provider. Aitta, custom compatible endpoints and LiteLLM require an explicit offered embedding model. Verify vector dimensions, use the same provider/model for ingestion and query embedding, and rebuild the collection when either changes.
    - **Optional backends**: add `gaik[llm-google]` for native Google/Vertex, `gaik[llm-anthropic]` for Anthropic/Foundry, or `gaik[llm-litellm]` for LiteLLM, alongside component extras. LiteLLM is an optional backend with an explicitly routed model ID such as `azure/<deployment>` or `openai/<model>`; do not add such prefixes to native provider model IDs. Generic OpenAI-compatible endpoints need an explicit `base_url` and model. Aitta uses CSC's documented `https://aitta-api.csc.fi/openai/v1` endpoint and may need its 600-second cold-start timeout.
-   - **Sampling and reasoning**: omit temperature (`temperature: null` for constructor parameters) for the default GPT-6 setup unless explicitly using a supported `reasoning_effort: none`. Recognized GPT-6/GPT-5.6 paths normalize incompatible sampling controls; do not describe every newer model as rejecting temperature unconditionally. GPT-6 supports `low`, `medium`, `high`, `xhigh`, and `max`; Sol/Luna also support `none`, Astra does not. Set `model_family` for a custom Azure deployment alias. PostgresAgent/TabularAgent raw paths still need explicit `temperature=None`. For other model families and native Google/Anthropic, verify their own options rather than applying OpenAI rules globally.
+   - **Sampling and reasoning**: omit temperature (`temperature: null` for constructor parameters) for the default GPT-6 setup unless explicitly using a supported `reasoning_effort: none`. Recognized GPT-6/GPT-5.6 paths normalize incompatible sampling controls; do not describe every newer model as rejecting temperature unconditionally. GPT-6 supports `low`, `medium`, `high`, `xhigh`, and `max`; Sol/Luna also support `none`, Astra does not. Set `model_family` for a custom Azure deployment alias. PostgresAgent/TabularAgent drop their `0.0` default for GPT-6/GPT-5.6 automatically; pass `temperature=None` only for other reasoning deployments that reject it. For other model families and native Google/Anthropic, verify their own options rather than applying OpenAI rules globally.
    - Omit an unspecified reasoning effort rather than treating omission as guaranteed zero reasoning. With shared `api_config`, VisionExtractor/MultimodalParser read a configured effort from that dictionary; their legacy constructor defaults do not force that effort on the shared client. GPT-6 tool calling with reasoning requires the Responses API; the shared Chat Completions path does not make that combination available automatically.
    If a required provider, model or capability is unavailable, record the gap and resolve that stage's choice with the user before claiming the PoC is runnable.
 
@@ -776,20 +780,22 @@ Never offer promotion for the three fixed patterns (`audio_to_structured`, `docu
 
 1. **Generalise** the validated `poc/run_poc.py` into a template candidate: copy it and replace
    every use-case-specific literal with the matching `${variable}` from the wizard's variable set
-   (`${use_case_name}`, `${use_case_id}`, `${schema_name}`, `${language}`, `${provider}`,
-   `${use_azure}`, `${transcription_model}`, `${extraction_model}`, `${llm_judge_section_generic}`,
-   `${generic_input_loaders}`, `${generic_pipeline_skeleton}`, etc.). Keep all reusable structure
-   (helpers, contract, step blocks) as-is. Save this candidate as `<output_dir>/poc/run_poc.py.tmpl`.
+   (`${use_case_name}`, `${use_case_id}`, `${schema_name}`, `${language}`,
+   `${llm_judge_section_generic}`, `${generic_input_loaders}`, `${generic_pipeline_skeleton}`, etc.).
+   Keep every model stage as `get_stage_config(config, "<stage>")`: providers and models come from
+   `config.yaml`, never from a `${...}` variable or the legacy `use_azure` flag. Keep all reusable
+   structure (helpers, contract, step blocks) as-is. Save this candidate as
+   `<output_dir>/poc/run_poc.py.tmpl`.
 
 2. **Validate + save** with the promotion script (it does the checks and refuses bad templates):
    ```bash
    python scripts/promote_template.py \
        --blueprint <output_dir>/use_case.blueprint.json \
-       --candidate <output_dir>/poc/run_poc.py.tmpl \
-       --check-imports
+       --candidate <output_dir>/poc/run_poc.py.tmpl
    ```
    The script enforces: no use-case tokens leak outside `${...}`; it fills cleanly; the filled
-   output parses; gaik imports resolve; the pattern key is not already in the library.
+   output parses; model stages use `get_stage_config`; gaik imports resolve (on by default;
+   `--skip-import-check` when gaik extras are missing); the pattern key is not already in the library.
 
 3. **If the script rejects it**, tell the user honestly that the wiring is too use-case-specific
    to generalise cleanly, and keep it as a one-off rather than pollute the library. Show the

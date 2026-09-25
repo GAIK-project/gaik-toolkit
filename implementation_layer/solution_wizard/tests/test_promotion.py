@@ -196,3 +196,27 @@ def test_import_check_runs_by_default(tmp_path, monkeypatch):
     parser.add_argument("--skip-import-check", action="store_true")
     args = parser.parse_args([])
     assert not args.skip_import_check  # default is False = check IS run
+
+
+def test_promotion_requires_stage_configs_the_scaffolder_accepts(tmp_path, monkeypatch, capsys):
+    """The scaffolder refuses a promoted template without get_stage_config."""
+    import json
+
+    bp_path = tmp_path / "use_case.blueprint.json"
+    bp_path.write_text(json.dumps(_blueprint().model_dump(mode="json")), encoding="utf-8")
+    candidate = tmp_path / "run_poc.py.tmpl"
+    candidate.write_text('name = "${use_case_name}"\nuse_azure = True\n', encoding="utf-8")
+    library = tmp_path / "library"
+    monkeypatch.setattr(promo, "TEMPLATES_DIR", library)
+    argv = ["promote_template.py", "--blueprint", str(bp_path), "--candidate", str(candidate)]
+    monkeypatch.setattr(sys, "argv", argv)
+    assert promo.main() == 1
+    assert "provider_stages" in capsys.readouterr().out
+    assert not library.exists()
+
+    candidate.write_text(
+        'name = "${use_case_name}"\nstage = get_stage_config(config, "extraction")\n',
+        encoding="utf-8",
+    )
+    assert promo.main() == 0
+    assert len(list(library.glob("*/run_poc.py.tmpl"))) == 1

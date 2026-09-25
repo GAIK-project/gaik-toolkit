@@ -33,7 +33,7 @@ Required variables:
 
     CLAUDE_CODE_USE_FOUNDRY=1
     ANTHROPIC_FOUNDRY_API_KEY=<your Azure Foundry API key>
-    ANTHROPIC_FOUNDRY_RESOURCE=<your Foundry resource name, e.g. haagahelia-poc-gaik>
+    ANTHROPIC_FOUNDRY_RESOURCE=<your Foundry resource name, e.g. my-foundry-resource>
 
 Recommended (model selection):
 

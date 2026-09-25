@@ -28,7 +28,14 @@ def get_stage_config(config: dict, stage: str) -> dict:
         else:
             settings["model"] = models.get(stage) or models.get("extraction")
     settings = {key: value for key, value in settings.items() if value is not None}
-    result = get_llm_config(provider, **settings)
+    try:
+        result = get_llm_config(provider, **settings)
+    except ValueError:
+        # Self-hosted Whisper takes LOCAL_TRANSCRIBER_* constructor arguments; OpenAI/Azure
+        # credentials are then needed only for optional transcript enhancement.
+        if stage != "transcription" or settings.get("transcription_model") != "whisper_local":
+            raise
+        result = {**settings, "provider": provider, "use_azure": provider == "azure"}
     if stage == "embedding" and not result.get("embedding_model"):
         raise ValueError("Configure an embedding model served by stages.embedding.provider.")
     return result

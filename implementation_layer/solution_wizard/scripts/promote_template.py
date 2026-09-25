@@ -12,6 +12,7 @@ Promotion checks (all must pass):
   - fills cleanly: safe_substitute leaves no unfilled ${...} for this blueprint
   - parses: the filled template is valid Python (ast.parse)
   - imports resolve: every `from gaik...import` matches a registry import_path
+  - provider stages: model stages use get_stage_config (the scaffolder refuses others)
   - no duplicate: the pattern_key directory does not already exist
 
 Usage:
@@ -100,6 +101,11 @@ def _check_parses(candidate: str, variables: dict) -> str | None:
         return str(exc)
 
 
+def _check_provider_stages(candidate: str) -> bool:
+    """Mirror scaffolder._determine_pattern, which refuses templates without it."""
+    return "get_stage_config(" in candidate
+
+
 def _check_imports(candidate: str) -> list:
     """Return gaik imports that do not resolve to an installed module."""
     unresolved = []
@@ -167,7 +173,14 @@ def main() -> int:
     if parse_err:
         failures.append(f"parses: filled template is not valid Python: {parse_err}")
 
-    # 5. Imports resolve (optional -- needs gaik installed)
+    # 5. Provider stages
+    if not _check_provider_stages(candidate):
+        failures.append(
+            "provider_stages: build each model stage with "
+            'provider_config.get_stage_config(config, "<stage>"), not use_azure or a fixed model'
+        )
+
+    # 6. Imports resolve (optional -- needs gaik installed)
     if not args.skip_import_check:
         unresolved = _check_imports(candidate)
         if unresolved:

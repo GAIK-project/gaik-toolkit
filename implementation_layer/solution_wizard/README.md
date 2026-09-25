@@ -206,9 +206,10 @@ All wizard outputs go to the directory the user specifies. Never written inside 
 ├── poc/
 │   ├── README.md                  # use-case-specific run instructions
 │   ├── run_poc.py                 # runnable pipeline
-│   ├── requirements.txt           # gaik[extras] for selected components
-│   ├── .env.example               # env vars for chosen provider
-│   ├── config.yaml                # model names, temperature, paths
+│   ├── requirements.txt           # gaik[extras]>=0.8.0 for selected components and providers
+│   ├── .env.example               # env vars for the stage providers
+│   ├── config.yaml                # provider/model per stage, language, paths
+│   ├── provider_config.py         # get_stage_config(config, stage) for each model stage
 │   ├── sample_input/              # place your input file here
 │   ├── output/                    # run_poc.py writes results here
 │   │   ├── result.json            # structured output (always)
@@ -287,6 +288,8 @@ transform, not a copy. The script refuses the save unless every check passes:
  language code) leaks outside a `${...}` placeholder;
 - **fills cleanly** — no unfilled `${...}` for the blueprint;
 - **parses** — the filled template is valid Python;
+- **provider stages** — model stages call `get_stage_config(config, "<stage>")`, which the
+ scaffolder requires of every promoted template;
 - **imports resolve** — every `from gaik…import` is a real module (use `--skip-import-check`
  if the relevant gaik extras are not installed on the promotion machine);
 - **no duplicate** — the topology-aware `pattern_key` is not already in the library.
@@ -412,9 +415,9 @@ solution_wizard/
 | `validate_blueprint.py` | `--blueprint` path | Pass/fail report printed to stdout; exit code 0 (pass) or 1 (fail) | Thin wrapper around `validator.validate()`. Loads the blueprint via `Blueprint.from_file()` (Pydantic type-checks on load), then runs the validation rules (12, incl. the Rule-12 redundancy warning). Errors are printed with the rule number and the offending step or artifact id. |
 | `generate_mermaid.py` | `--blueprint` path + `--output-dir`; optional `--skip-validation` | `workflow.mmd` in the output directory | Generates the Mermaid diagram from the blueprint. Validates the blueprint first by default; use `--skip-validation` for draft iteration. |
 | `generate_bpmn.py` | `--blueprint` path + `--output-dir`; optional `--skip-validation` | `workflow.bpmn` in the output directory | Generates the BPMN 2.0 visual blueprint from the blueprint. Validates first by default; use `--skip-validation` for draft iteration. Open the output in bpmn-js, Camunda Modeler, or draw.io. |
-| `generate_schema.py` | `--requirements` (path to `extraction_requirements.md`) + `--schema-name` + `--output-dir`; optional `--no-azure` / `--model` | `output_schema.py`, `output_schema_requirements.json`, `output_schema.json`, `output_schema.hash` — all written to `<output-dir>/schemas/` | Calls GAIK `SchemaGenerator` exactly once to generate a typed Pydantic extraction model from the natural-language requirements text. Saves the schema files in the format `load_schema()` expects, and saves a SHA-256 hash of the requirements file so the PoC can detect when the prompt has changed and regenerate automatically. |
+| `generate_schema.py` | `--requirements` (path to `extraction_requirements.md`) + `--schema-name` + `--output-dir`; optional `--provider`, `--model`, `--base-url` (legacy `--use-azure` / `--no-azure` apply only without `--provider`; Azure is the default) | `output_schema.py`, `output_schema_requirements.json`, `output_schema.json`, `output_schema.hash` — all written to `<output-dir>/schemas/` | Calls GAIK `SchemaGenerator` exactly once to generate a typed Pydantic extraction model from the natural-language requirements text. Saves the schema files in the format `load_schema()` expects, and saves a SHA-256 hash of the requirements file so the PoC can detect when the prompt has changed and regenerate automatically. |
 | `scaffold_poc.py` | `--blueprint` path; optional `--output-dir`, `--synthetic`, `--skip-validation` | Complete `poc/` folder in the output directory | Validates the blueprint (unless `--skip-validation`), refuses output paths inside the GAIK repo, then calls `scaffolder.scaffold_poc()`. Prints the pattern key, template save path, and use-case-specific handoff message. |
-| `promote_template.py` | `--blueprint` + `--candidate` (agent-generalised `.tmpl`); optional `--status`, `--skip-import-check`, `--force` | `templates/poc/<pattern_key>/run_poc.py.tmpl` + `template.json` manifest, or a rejection report | Validates a generalised hybrid PoC template (5 checks: genericity scan, fills cleanly, parses, imports resolve, no duplicate) and saves it to the dynamic template library. Import checking is on by default; use `--skip-import-check` when gaik extras are not installed. |
+| `promote_template.py` | `--blueprint` + `--candidate` (agent-generalised `.tmpl`); optional `--status`, `--skip-import-check`, `--force` | `templates/poc/<pattern_key>/run_poc.py.tmpl` + `template.json` manifest, or a rejection report | Validates a generalised hybrid PoC template (6 checks: genericity scan, fills cleanly, parses, `get_stage_config` provider stages, imports resolve, no duplicate) and saves it to the dynamic template library. Import checking is on by default; use `--skip-import-check` when gaik extras are not installed. |
 
 ---
 

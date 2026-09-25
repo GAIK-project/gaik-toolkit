@@ -105,7 +105,7 @@ def main() -> None:
         documents = find_documents(config)
         if not documents:
             print(f"ERROR: No documents found in {sample_dir}", file=sys.stderr)
-            print("Place .pdf or .txt files there, or use --synthetic.")
+            print("Place .pdf files there, or use --synthetic.")
             sys.exit(1)
 
     persist_path = str(Path(__file__).parent / "output" / "chroma_store")

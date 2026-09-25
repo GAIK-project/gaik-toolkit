@@ -220,6 +220,8 @@ def test_scaffold_hybrid_endtoend(tmp_path):
     # Contract variables present
     assert "extracted_fields = None" in run_poc
     assert "source_text" in run_poc
+    # Stages come from get_stage_config; the legacy flag must not invite wiring.
+    assert "use_azure" not in run_poc
 
 
 # ---------------------------------------------------------------------------

@@ -1177,7 +1177,7 @@
         "name": "temperature",
         "type": "float | None",
         "default": 0.0,
-        "effect": "None omits sampling temperature on both SQL-generation and answer calls. These raw OpenAI/Azure paths do not apply the general GPT-family sampling normalizer, so explicitly pass None for GPT-6/GPT-5.6 or other reasoning deployments that reject temperature. Conventional models may use 0.0 if their API permits it; it does not guarantee identical SQL.",
+        "effect": "None omits sampling temperature on both SQL-generation and answer calls. GPT-6/GPT-5.6 models (or a config with model_family) drop the 0.0 default automatically unless reasoning_effort is 'none'; pass None for other reasoning deployments that reject temperature. Conventional models may use 0.0 if their API permits it; it does not guarantee identical SQL.",
         "selection_relevant": true,
         "infer_from": "Default GPT-6 setup -> temperature=None; other models -> verify support before setting a number."
       },
@@ -2138,7 +2138,7 @@
         "name": "temperature",
         "type": "float | None",
         "default": 0.0,
-        "effect": "None omits sampling temperature on both SQL-generation and answer calls. These raw OpenAI/Azure paths do not apply the general GPT-family sampling normalizer, so explicitly pass None for GPT-6/GPT-5.6 or other reasoning deployments that reject temperature. Conventional models may use 0.0 if their API permits it; it does not guarantee identical SQL.",
+        "effect": "None omits sampling temperature on both SQL-generation and answer calls. GPT-6/GPT-5.6 models (or a config with model_family) drop the 0.0 default automatically unless reasoning_effort is 'none'; pass None for other reasoning deployments that reject temperature. Conventional models may use 0.0 if their API permits it; it does not guarantee identical SQL.",
         "selection_relevant": true,
         "infer_from": "Default GPT-6 setup -> temperature=None; other models -> verify support before setting a number."
       },

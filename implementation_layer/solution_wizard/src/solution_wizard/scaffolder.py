@@ -28,6 +28,9 @@ from .schema_designer import write_extraction_requirements, write_schema_files
 
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "poc"
 
+# provider_config.py and the stage-config constructor arguments need gaik 0.8.0.
+_MIN_GAIK_VERSION = "0.8.0"
+
 _PROVIDERS = {
     "azure",
     "openai",
@@ -95,19 +98,28 @@ def _stage_settings(blueprint: Blueprint) -> dict[str, dict]:
             )
         selected = _provider_name(override.get("provider", provider))
         settings = dict(shared) if selected == provider else {}
-        model = models.get(f"{stage}_model")
+        explicit = models.get(f"{stage}_model")
+        model = explicit
         if stage in {"parser", "judge"} and model is None:
             model = models.get("extraction_model") or models.get("answer_model")
         if stage == "extraction" and model is None:
             model = models.get("answer_model")
+        key = (
+            "embedding_model"
+            if stage == "embedding"
+            else "transcription_model"
+            if stage == "transcription"
+            else "model"
+        )
         if selected == provider and model:
-            settings[
-                "embedding_model"
-                if stage == "embedding"
-                else "transcription_model"
-                if stage == "transcription"
-                else "model"
-            ] = model
+            settings[key] = model
+        elif explicit and key not in override:
+            # Model IDs are provider-specific; never drop or move one silently.
+            raise ValueError(
+                f"models.{stage}_model belongs to models.provider {provider!r}, but "
+                f"models.{stage}_config selects {selected!r}. Set {key!r} in "
+                f"models.{stage}_config instead."
+            )
         settings.update(override)
         settings["provider"] = selected
         stages[stage] = settings
@@ -134,7 +146,7 @@ def _needed_stages(blueprint: Blueprint, pattern: str) -> set[str]:
         stages.add("parser")
     if "Embedder" in names:
         stages.add("embedding")
-    if "AnswerGenerator" in names:
+    if names & {"AnswerGenerator", "PostgresAgent", "TabularAgent", "MultiSourceReportGenerator"}:
         stages.add("answer")
     if "LLMJudge" in names:
         stages.add("judge")
@@ -168,6 +180,12 @@ def _validate_stage_settings(stages: dict[str, dict], needed: set[str]) -> None:
             raise ValueError(
                 "Set an explicit models.embedding_config.embedding_model for this provider."
             )
+    if {"openai", "openai_compatible"} <= {stages[stage]["provider"] for stage in needed}:
+        raise ValueError(
+            "An openai stage and an openai_compatible stage would both read OPENAI_API_KEY "
+            "and OPENAI_BASE_URL, sending one key to both endpoints. Use one of them for "
+            "every stage, or a separately keyed provider (e.g. litellm) for the other."
+        )
     for stage in needed:
         settings = stages[stage]
         if settings["provider"] == "litellm" and (
@@ -817,6 +835,9 @@ def _write_requirements_txt(blueprint: Blueprint, poc_dir: Path) -> None:
         requirement = f"gaik[{extra}]"
         if extra and requirement not in lines:
             lines.append(requirement)
+    lines = [f"{line}>={_MIN_GAIK_VERSION}" if line.startswith("gaik[") else line for line in lines]
+    if not any(line.startswith("gaik[") for line in lines):
+        lines.append(f"gaik>={_MIN_GAIK_VERSION}")
     lines.append("pyyaml")
     if _wants_pdf(blueprint):
         lines.append("reportlab>=4.0")

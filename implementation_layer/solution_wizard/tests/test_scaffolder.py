@@ -10,8 +10,13 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from solution_wizard.blueprint import Blueprint
-from solution_wizard.scaffolder import scaffold_poc, validate_generated_python, _determine_pattern
 from solution_wizard.registry import get_registry
+from solution_wizard.scaffolder import (
+    _determine_pattern,
+    _write_requirements_txt,
+    scaffold_poc,
+    validate_generated_python,
+)
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 
@@ -121,6 +126,22 @@ def test_requirements_txt_audio_module(tmp_path):
     scaffold_poc(bp, tmp_path)
     req = (tmp_path / "poc" / "requirements.txt").read_text()
     assert "audio-to-structured-data" in req
+
+
+def test_requirements_txt_needs_the_provider_api_release(tmp_path):
+    """provider_config.py needs gaik 0.8.0, so every gaik line carries that floor."""
+    bp = _load_example("incident_reporting_blueprint.json")
+    scaffold_poc(bp, tmp_path)
+    req = (tmp_path / "poc" / "requirements.txt").read_text().splitlines()
+    gaik = [line for line in req if line.startswith("gaik")]
+    assert "gaik[audio-to-structured-data]>=0.8.0" in gaik
+    assert all(line.endswith(">=0.8.0") for line in gaik)
+
+    bp.components.selected_modules = []
+    bp.components.selected_building_blocks = []
+    _write_requirements_txt(bp, tmp_path)
+    req = (tmp_path / "requirements.txt").read_text().splitlines()
+    assert [line for line in req if line.startswith("gaik")] == ["gaik>=0.8.0"]
 
 
 def test_requirements_txt_rag_module(tmp_path):
