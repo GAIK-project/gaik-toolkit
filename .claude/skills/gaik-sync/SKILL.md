@@ -42,10 +42,12 @@ Run in one of two modes. Prefer **informed mode** when the user tells you what t
 
 ## Phase 1 — Scan (deterministic backbone)
 
-Always start here. From the repo root:
+Always start here. From the repo root, after `uv sync --all-extras` (components swallow a
+missing optional dependency, so a missing extra makes a class silently absent and shows
+up as false `removed` drift):
 
 ```bash
-python .claude/skills/gaik-sync/scripts/audit_registry.py --json
+uv run python .claude/skills/gaik-sync/scripts/audit_registry.py --json
 ```
 
 This introspects the *installed* gaik and returns structured findings. Categories:
@@ -60,7 +62,7 @@ This introspects the *installed* gaik and returns structured findings. Categorie
 Read the human-readable report too for a quick overview:
 
 ```bash
-python .claude/skills/gaik-sync/scripts/audit_registry.py
+uv run python .claude/skills/gaik-sync/scripts/audit_registry.py
 ```
 
 The scan only sees what introspection exposes. It **cannot** see `subsumes` relationships, `install_extra` packaging, `input/output_artifact_types`, or selection semantics — those need the diff (Phase 2) and your reading of gaik source.
@@ -167,18 +169,11 @@ the user to confirm — never silently fabricate `best_for`/`known_limitations`.
 Run the wizard's own structural tests (they cross-check cards against gaik via `inspect`) plus re-scan:
 
 ```bash
-cd implementation_layer/solution_wizard
-python -m pytest tests/test_reference_cards.py -q
-cd ../..
-python .claude/skills/gaik-sync/scripts/audit_registry.py --strict   # expect exit 0 (version finding alone is OK)
+uv run python -m pytest implementation_layer/solution_wizard/tests -q
+uv run python .claude/skills/gaik-sync/scripts/audit_registry.py --strict   # expect exit 0 (version finding alone is OK)
 ```
 
-When the only remaining finding is `version` (i.e. every defect is resolved), **record the validated version** so future runs detect the next drift:
-
-```bash
-python -c "from importlib.metadata import version; print(version('gaik'))" \
-  > implementation_layer/solution_wizard/gaik_validated_version.txt
-```
+When the only remaining finding is `version` (i.e. every defect is resolved), **record the validated version** in `implementation_layer/solution_wizard/gaik_validated_version.txt` so future runs detect the next drift. Write a clean release version `X.Y.Z`, never the installed version of an in-repo checkout: setuptools-scm reports it as a dev build such as `0.7.3.post1.dev5`, and the release gate (`scripts/release_check.py --version X.Y.Z`) refuses a pin that differs from the version being released. Use the version you will tag next; when gaik arrived as a released dependency, its installed version is already clean. The audit keeps reporting `installed != last-validated` against a dev build; that finding is informational.
 
 Report a short summary: which assets changed, which findings were intentionally ignored (and why), and the new validated version.
 

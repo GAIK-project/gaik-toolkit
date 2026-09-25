@@ -91,7 +91,7 @@ See [Installation Reference](references/installation.md) for all available extra
 ```bash
 AZURE_API_KEY=your-key
 AZURE_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_DEPLOYMENT=gpt-5.4
+AZURE_DEPLOYMENT=gpt-6-luna        # default when unset
 AZURE_API_VERSION=2025-03-01-preview
 ```
 
@@ -99,14 +99,19 @@ AZURE_API_VERSION=2025-03-01-preview
 
 ```bash
 OPENAI_API_KEY=your-key
-OPENAI_MODEL=gpt-5.4
+OPENAI_MODEL=gpt-6-luna            # default when unset
 ```
+
+Other providers read their own variables (`AITTA_API_KEY`, `ANTHROPIC_API_KEY`,
+`GOOGLE_API_KEY`, `LITELLM_MODEL` …); `LLM_PROVIDER` is the default for
+`get_llm_config()` called without a provider. See
+[Building Blocks Reference](references/building-blocks.md#provider-settings).
 
 ## Configuration Pattern
 
-Two parallel surfaces ship since `gaik>=0.3.21`. Pick the simpler one for OpenAI/Azure-only use cases; pick the multi-provider one when the same code needs to switch between OpenAI, Azure, Anthropic, or Google.
+Two parallel surfaces. Pick the simpler one for OpenAI/Azure-only use cases; pick the multi-provider one for any other provider or when the same code must switch providers. Components take either dict in their config argument (`config`, `api_config`, `openai_config` …).
 
-**Legacy surface (OpenAI/Azure only — bit-for-bit unchanged):**
+**Legacy surface (OpenAI/Azure only — keeps working unchanged):**
 
 ```python
 from gaik.software_components.config import get_openai_config, create_openai_client
@@ -116,16 +121,22 @@ config = get_openai_config(use_azure=False)  # Standard OpenAI
 client = create_openai_client(config)        # OpenAI/AzureOpenAI client
 ```
 
-**Multi-provider surface (Anthropic, Google, OpenAI, Azure):**
+**Multi-provider surface:**
 
 ```python
 from gaik.software_components.llm import get_llm_config, create_llm_client
 
-config = get_llm_config("google")            # or "anthropic", "openai", "azure"
-client = create_llm_client(config)           # ProviderClient with chat/chat_parsed/chat_stream/embed
+config = get_llm_config("aitta")   # openai, azure, aitta, openai_compatible, google, vertex,
+                                   # anthropic, anthropic_foundry, litellm
+client = create_llm_client(config) # ProviderClient with chat/chat_parsed/chat_stream/embed
 ```
 
-`gaik[llm-anthropic]` and `gaik[llm-google]` extras pull in the provider SDKs on demand. Audio components (transcriber, TTS) and vision parsing only support OpenAI/Azure — they raise `NotImplementedError` for native Anthropic/Google. For multi-provider vision, use `MultimodalParser`. For Gemini-via-OpenAI-compat-endpoint, set `OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/` on a standard OpenAI config — every component then routes through the legacy path.
+- **No extra:** `openai`, `azure`, `aitta` (CSC's OpenAI-compatible API; default model `google/gemma-4-31b-it`, 600 s timeout for cold starts) and `openai_compatible` (explicit `base_url` and `model`, e.g. vLLM or Ollama).
+- **Extras:** `gaik[llm-anthropic]`, `gaik[llm-google]`; `gaik[llm-litellm]` for the optional `litellm` backend, which needs a provider-prefixed model such as `azure/<deployment>`. Native adapters stay the default; `gaik[llm-all]` installs all three.
+- **Audio** (Transcriber, ParallelTranscriber, TextToSpeech) accepts only OpenAI/Azure and raises `NotImplementedError` for every other provider, Aitta and `openai_compatible` included.
+- **Vision** (VisionParser, MultimodalParser, VisionExtractor) accepts any provider config; the model must accept images.
+- **Legacy dicts win:** a config with `use_azure` keeps its backend whatever `LLM_PROVIDER` says, and a bare dict without `provider` or `use_azure` keeps its pre-0.8 routing ([resolution rules](references/building-blocks.md#provider-resolution-priority)).
+- **`gpt-6-*` are reasoning models:** sampling options (`temperature`, `top_p`) work only with `reasoning_effort="none"`, which `gpt-6-astra` does not offer, and the token limit is `max_completion_tokens`. Components translate this themselves; when calling a raw SDK client, pass the options through `normalize_chat_kwargs` from `gaik.software_components.llm.parameters`.
 
 ## Building Blocks
 
@@ -220,7 +231,11 @@ Composed pipelines in `gaik.software_modules.*`. For full API, see [Software Com
 | RAGWorkflow | PDF → Parse → Embed → Store → Retrieve → Answer | `from gaik.software_modules.RAG_workflow import RAGWorkflow` |
 | MultiSourceReportGenerator | Mixed files (PDF/DOCX/Excel/audio/images) → Normalize → Sectioned Markdown report | `from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator` |
 
-The first three pipelines follow: `pipeline = Pipeline(use_azure=True)` → `result = pipeline.run(file_path, user_requirements, ...)`. `MultiSourceReportGenerator` instead takes a set of source files plus a report structure (section titles + per-section instructions) and returns the assembled Markdown report with a per-section breakdown.
+- `AudioToStructuredData` / `DocumentsToStructuredData`: `pipeline = Pipeline(use_azure=True)` → `result = pipeline.run(file_path=..., user_requirements=...)` (keyword-only arguments).
+- `RAGWorkflow` has no `run()`: `workflow.index_documents([path, ...])` → `IndexResult`, then `workflow.ask(query)` → `RAGWorkflowResult`.
+- `MultiSourceReportGenerator.run(input_paths=..., sections=...)` takes source files plus a report structure (section titles + per-section instructions) and returns the assembled Markdown report with a per-section breakdown.
+
+Each stage can use its own provider; an omitted stage config falls back to the shared `api_config` (or the legacy `use_azure` default). Constructor arguments: `DocumentsToStructuredData(parser_config=, extraction_config=)`, `AudioToStructuredData(transcription_config=, extraction_config=)` (transcription stays OpenAI/Azure), `RAGWorkflow(parser_config=, embedding_config=, answer_config=)`. `MultiSourceReportGenerator` takes them per run as `api_config` inside `parser_options`, `image_options`, `writer_options`, `review_options`, and `transcriber_options={"ctor": {"api_config": ...}}`.
 
 ## Architecture Overview
 

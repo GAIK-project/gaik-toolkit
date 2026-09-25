@@ -77,10 +77,11 @@ Notes:
 ## Main class constructor pattern
 
 For LLM-based components, the constructor takes a `config` dict from
-`get_openai_config()` and creates the client via `create_openai_client()`:
+`get_llm_config()` or the legacy `get_openai_config()` and creates the client via
+`build_compat_client()`:
 
 ```python
-from gaik.software_components.config import create_openai_client
+from gaik.software_components.llm.factory import build_compat_client
 
 
 class MainClass:
@@ -89,8 +90,14 @@ class MainClass:
     def __init__(self, config: dict, model: str | None = None):
         self.config = config
         self.model = model or config["model"]
-        self.client = create_openai_client(config)
+        self.client = build_compat_client(config)
 ```
+
+`self.client` is the raw `OpenAI` / `AzureOpenAI` client for OpenAI/Azure configs
+and a `ProviderClient` for other providers; call sites branch on
+`isinstance(self.client, ProviderClient)` (see `form_understander/understander.py`).
+An audio or other OpenAI-only component uses `create_openai_client(config)` after
+`assert_openai_or_azure(config, component=...)` instead.
 
 For provider-agnostic components, drop the `config` / `client` and accept only
 the arguments the component actually needs.
@@ -99,7 +106,7 @@ Never do these inside a component file:
 - `load_dotenv()` — only examples call this.
 - `os.getenv("OPENAI_API_KEY")` or other env var reads — config handles this.
 - Instantiate `OpenAI(...)` or `AzureOpenAI(...)` directly — use
-  `create_openai_client(config)`.
+  `build_compat_client(config)` or `create_openai_client(config)`.
 
 ## Result dataclass pattern (optional)
 
@@ -113,11 +120,13 @@ fine if the output is simple.
 
 ## Shared config rule
 
-Always import `get_openai_config` and `create_openai_client` from
-`gaik.software_components.config`. Do not re-implement them. Do not duplicate
+Import the config helpers — `get_openai_config` / `create_openai_client` from
+`gaik.software_components.config`, `get_llm_config` / `build_compat_client` from
+`gaik.software_components.llm`. Do not re-implement them. Do not duplicate
 the env-var reading logic inside your component.
 
-Source: `implementation_layer/src/gaik/software_components/config.py`.
+Source: `implementation_layer/src/gaik/software_components/config.py` and
+`implementation_layer/src/gaik/software_components/llm/`.
 
 ## `pyproject.toml` extras
 

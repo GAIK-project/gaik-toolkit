@@ -97,7 +97,9 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from gaik.software_components.config import create_openai_client
+from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.factory import build_compat_client
+from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -110,21 +112,39 @@ class {{MainClassName}}:
         Initialize {{MainClassName}}.
 
         Args:
-            config: OpenAI config from `get_openai_config()`.
+            config: Provider config from `get_llm_config()` or legacy `get_openai_config()`.
             model: Optional model override. Defaults to `config["model"]`.
         """
         self.config = config
         self.model = model or config["model"]
-        self.client = create_openai_client(config)
+        self.client = build_compat_client(config)
+
+    def _chat(self, messages: list[dict]) -> str:
+        if isinstance(self.client, ProviderClient):
+            return self.client.chat(messages, model=self.model, temperature=0).text
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            **normalize_chat_kwargs(self.model, {"temperature": 0}, config=self.config),
+        )
+        return response.choices[0].message.content or ""
 
     def {{method_name}}(self, *args, **kwargs):
         """<fill in from plan — primary entry point>"""
         raise NotImplementedError
 ```
 
-Replace the `{{method_name}}` stub with the real method(s) from the plan,
-implemented to call `self.client` and return the result shape described in
-the plan's Public API section.
+Replace the `{{method_name}}` stub with the real method(s) from the plan, built
+on `self._chat` (or `chat_parsed` / `beta.chat.completions.parse` for structured
+output, as `FormUnderstander` does), returning the result shape described in the
+plan's Public API section. `build_compat_client` returns the raw `OpenAI` /
+`AzureOpenAI` client for OpenAI/Azure configs and a `ProviderClient` for every
+other provider, so keep both branches; `normalize_chat_kwargs` drops options that
+reasoning models such as `gpt-6-luna` reject.
+
+For an audio or other OpenAI-only endpoint, use
+`create_openai_client(config)` from `gaik.software_components.config` after
+`assert_openai_or_azure(config, component="{{MainClassName}}")` instead.
 
 ---
 
@@ -167,7 +187,7 @@ class {{MainClassName}}:
 pip install gaik[{{extra_name}}]
 ```
 
-**Note:** Requires OpenAI or Azure OpenAI API access (for LLM-based components).
+**Note:** LLM-based components work with any provider configured with `get_llm_config()` (or the legacy `get_openai_config()`); audio components require OpenAI or Azure OpenAI.
 
 ---
 
@@ -236,7 +256,7 @@ from gaik.software_components.{{component_name}} import {{MainClassName}}, get_o
 
 def basic_example():
     """Minimal usage example."""
-    config = get_openai_config(use_azure=True)
+    config = get_openai_config(use_azure=True)  # or get_llm_config("aitta") etc.
     instance = {{MainClassName}}(config=config)
 
     # Replace with a real call from the plan's Example usage section.

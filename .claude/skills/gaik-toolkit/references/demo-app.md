@@ -67,6 +67,7 @@ From `implementation_layer/toolkit_demo_app/CLAUDE.md`:
 - **All demos** (everything under `(demos)`) require **login + admin approval** — enforced by `PROTECTED_ROUTES` in `lib/supabase/proxy.ts` (pages) plus a login+approval gate on heavy `/api` POSTs in `proxy.ts`. When adding a new demo route, add it to `PROTECTED_ROUTES`.
 - **Report Writer** additionally enforces a per-user quota (`REPORT_WRITER_MAX_REPORTS`, default 5) in `app/api/report-writer/run/route.ts`. Admins manage it in the `/admin` "Report Writer Usage" tab: per-user counts/tokens, **Reset**, and a per-user **limit override** (`access_requests.report_limit_override`; e.g. demo/team accounts → Unlimited).
 - **Solution Wizard** needs a per-user `wizard_access` grant (or team `?key=`), independent of approval.
+- **Model settings** let a user run supported demos on their own OpenAI/Azure/Aitta key. The key lives only in the tab's memory and travels as the `x-gaik-model-settings` header to the POST paths allowlisted in both `api/utils/model_settings.py` (`_PATHS`) and `lib/model-settings.ts` (`SUPPORTED_PATHS`); routers pick it up through `get_api_config()`.
 - `BYPASS_AUTH=true` opens everything in local dev.
 
 ## Project Structure
@@ -173,11 +174,16 @@ BYPASS_AUTH=true
 # Azure OpenAI (for toolkit components)
 AZURE_API_KEY=your-key
 AZURE_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_DEPLOYMENT=gpt-5.1
+AZURE_DEPLOYMENT=gpt-6-luna
 AZURE_API_VERSION=2025-03-01-preview
 
-# Or standard OpenAI
+# Or standard OpenAI / CSC Aitta
 OPENAI_API_KEY=your-key
+AITTA_API_KEY=your-token
+
+# Optional server model override (else the provider's defaults apply)
+DEMO_LLM_PROVIDER=azure
+DEMO_LLM_MODEL=gpt-6-luna
 
 # Supabase (auth + database)
 NEXT_PUBLIC_SUPABASE_URL=your-url
@@ -220,5 +226,12 @@ NEXT_PUBLIC_POSTHOG_HOST=your-host
     - `haproxy.router.openshift.io/timeout: 15m` (for long-running RAG indexing)
     - `haproxy.router.openshift.io/proxy-body-size: 50m` (for large PDF uploads)
     - `haproxy.router.openshift.io/response-buffering: "off"` (for SSE streaming)
-- **Deploy script:** `deploy.sh api|frontend|all` for building and pushing to Rahti registry
+- **Deploy:** push main to the deploy branch, `git push origin main:deploy/demo-app`. A GitHub
+  webhook starts the BuildConfigs in `openshift/buildconfigs.yaml`, and the deployments roll
+  out when the new images land. `openshift/deploy.sh api|frontend|all` is the local fallback.
+- **Never `oc apply` the deployment manifests:** the live deployments carry env vars set with
+  `oc set env` (Allas, `DATABASE_URL`, TTS, report-writer limits) that the manifests lack, and
+  applying them drops those.
+- **gaik comes from PyPI:** the API image installs the released gaik, not this repository's
+  source, so a library fix reaches the demo only after a PyPI release.
 - **Docling API:** External parsing service at `DOCLING_API_BASE` (env var in Rahti secret)

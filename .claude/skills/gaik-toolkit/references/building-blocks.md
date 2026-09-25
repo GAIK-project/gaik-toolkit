@@ -35,10 +35,12 @@ client = create_openai_client(config)
 **Returns (Azure):**
 ```python
 {
+    "use_azure": True,
     "api_key": str,
     "azure_endpoint": str,
-    "api_version": str,
-    "model": str,  # Default: "gpt-5.4"
+    "azure_audio_endpoint": str,  # Same as azure_endpoint
+    "api_version": str,  # Default: "2025-03-01-preview"
+    "model": str,  # AZURE_DEPLOYMENT, default: "gpt-6-luna"
     "transcription_model": str,  # Default: "gpt-4o-transcribe"
 }
 ```
@@ -46,37 +48,64 @@ client = create_openai_client(config)
 **Returns (OpenAI):**
 ```python
 {
+    "use_azure": False,
     "api_key": str,
-    "model": str,  # Default: "gpt-5.4-2026-03-05"
+    "base_url": str | None,  # OPENAI_BASE_URL
+    "model": str,  # OPENAI_MODEL, default: "gpt-6-luna"
     "transcription_model": str,  # Default: "gpt-4o-transcribe"
 }
 ```
+
+Models chosen explicitly (`gpt-5.4`, `gpt-4o` …) keep working; only the default moved.
 
 ---
 
 ## Multi-Provider Configuration (`llm/`)
 
-Available since `gaik>=0.3.21`. The `gaik.software_components.llm` package provides a `ProviderClient` adapter that lets the same component code call OpenAI, Azure, Anthropic, or Google through a uniform interface — without breaking the legacy `get_openai_config()` path. Components detect the config shape and route automatically.
+The `gaik.software_components.llm` package provides a `ProviderClient` adapter that lets the same component code call any supported provider through a uniform interface — without breaking the legacy `get_openai_config()` path. Components detect the config shape and route automatically.
 
 ### get_llm_config()
 
 ```python
 from gaik.software_components.llm import get_llm_config, create_llm_client
 
-config = get_llm_config("google")        # or "openai", "azure", "anthropic",
-                                         #    "anthropic_foundry", "vertex"
+config = get_llm_config("google")        # or "openai", "azure", "aitta",
+                                         #    "openai_compatible", "vertex", "anthropic",
+                                         #    "anthropic_foundry", "litellm"
+config = get_llm_config("aitta", model="google/gemma-4-31b-it")  # overrides beat env vars
 client = create_llm_client(config)       # ProviderClient
 ```
 
-**Returns (always includes `provider` and `model`):**
+Keyword overrides are applied before required-field validation, so credentials can be
+passed without environment variables. A missing required field raises `ValueError`.
+
+**Returns (always includes `provider`, `use_azure` and `model`):**
 ```python
 # google: {"provider": "google", "api_key": str, "model": "gemini-2.5-flash",
 #          "embedding_model": "gemini-embedding-001"}
 # anthropic: {"provider": "anthropic", "api_key": str, "model": "claude-sonnet-4-6",
 #             "max_tokens": 4096}
 # azure: {"provider": "azure", "use_azure": True, "api_key": str,
-#         "azure_endpoint": str, "api_version": str, "model": str, ...}
+#         "azure_endpoint": str, "api_version": str, "model": "gpt-6-luna",
+#         "embedding_model": "text-embedding-3-small", ...}
+# aitta: {"provider": "aitta", "api_key": str, "model": "google/gemma-4-31b-it",
+#         "base_url": "https://aitta-api.csc.fi/openai/v1", "embedding_model": "",
+#         "timeout": 600.0}
 ```
+
+### Provider settings
+
+| Provider | Environment variables (optional ones in brackets) |
+|---|---|
+| `openai` | `OPENAI_API_KEY` [`OPENAI_MODEL`, `OPENAI_BASE_URL`, `EMBEDDING_MODEL`] |
+| `azure` | `AZURE_API_KEY`, `AZURE_ENDPOINT` [`AZURE_DEPLOYMENT`, `AZURE_API_VERSION`, `EMBEDDING_MODEL`] |
+| `aitta` | `AITTA_API_KEY` (or `AITTA_API_TOKEN` / `AITTA_TOKEN`) [`AITTA_MODEL`, `AITTA_BASE_URL`, `AITTA_EMBEDDING_MODEL`] |
+| `openai_compatible` | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` [`EMBEDDING_MODEL`] |
+| `google` | `GOOGLE_API_KEY` (or `GEMINI_API_KEY`) [`GOOGLE_MODEL`, `EMBEDDING_MODEL`] |
+| `vertex` | `GOOGLE_PROJECT_ID` (or `GOOGLE_CLOUD_PROJECT`) [`GOOGLE_CLOUD_LOCATION`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_MODEL`]; otherwise application-default credentials |
+| `anthropic` | `ANTHROPIC_API_KEY` [`ANTHROPIC_MODEL`, `ANTHROPIC_MAX_TOKENS`] |
+| `anthropic_foundry` | `ANTHROPIC_FOUNDRY_API_KEY` (or `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE` [`ANTHROPIC_MODEL`] |
+| `litellm` | `LITELLM_MODEL`, provider-prefixed (`azure/<deployment>`) [`LITELLM_API_KEY`, `LITELLM_BASE_URL`, `LITELLM_API_VERSION`, `LITELLM_EMBEDDING_MODEL`]; unset credentials fall back to LiteLLM's own variables for that backend |
 
 ### ProviderClient interface
 
@@ -87,35 +116,46 @@ client = create_llm_client(config)       # ProviderClient
 | `chat_stream(messages, **kwargs)` | `Iterator[str]` of text deltas, normalized across providers. |
 | `embed(texts, **kwargs)` | Batch embeddings. Anthropic raises `NotImplementedError` (Voyage AI is recommended). |
 
+OpenAI, Azure, Aitta and `openai_compatible` share one adapter over the OpenAI SDK; `litellm`
+calls `litellm.completion` and validates `chat_parsed` output against the Pydantic model.
+
 ### Provider resolution priority
 
 1. Explicit `provider` argument to `get_llm_config()`
 2. `config["provider"]` field
-3. Env `LLM_PROVIDER`
-4. Legacy `config["use_azure"]` → `azure` or `openai`
+3. Legacy `config["use_azure"]` → `azure` or `openai` (an explicit legacy config keeps its backend whatever `LLM_PROVIDER` says)
+4. Env `LLM_PROVIDER`
 5. Default `azure`
+
+A bare legacy dict with neither `provider` nor `use_azure` (e.g. `{"api_key": ...}`) means
+standard OpenAI in `create_openai_client`, `build_compat_client` and the audio components;
+`create_llm_client` on such a dict follows steps 4–5 instead, and `VisionParser` keeps its
+own legacy default, Azure.
 
 ### Helpers
 
-- `build_compat_client(config)` — used by every component constructor: returns the raw `OpenAI`/`AzureOpenAI` for legacy configs (preserves bit-for-bit deterministic behavior), `ProviderClient` for `anthropic`/`google` configs.
-- `assert_openai_or_azure(config, component=...)` — guard used by audio components (transcriber, parallel_transcriber, text_to_speech) to reject Anthropic/Google with a clear error message.
+- `build_compat_client(config)` — used by component constructors: returns the raw `OpenAI`/`AzureOpenAI` client for `openai`/`azure` configs, legacy `use_azure` dicts and bare dicts (preserving the original call paths), and a `ProviderClient` for every other provider, Aitta and `openai_compatible` included.
+- `assert_openai_or_azure(config, component=...)` — guard used by audio components (transcriber, parallel_transcriber, text_to_speech) to reject every provider except OpenAI/Azure with `NotImplementedError`; an OpenAI-compatible chat endpoint does not imply transcription or speech endpoints.
 
 ### Provider support matrix
 
-| Component | OpenAI/Azure | Anthropic native | Google native | Gemini-via-OpenAI-compat |
-|---|---|---|---|---|
-| Extractor, Doc Classifier, Enhance Transcript, Answer Generator | ✅ | ✅ | ✅ | ✅ |
-| Embedder | ✅ | ❌ → Voyage | ✅ (`gemini-embedding-001`) | ✅ |
-| Vision Parser | ✅ | → `MultimodalParser` | → `MultimodalParser` | ✅ |
-| Transcriber, Parallel Transcriber, TextToSpeech | ✅ | ❌ NotImplementedError | ❌ NotImplementedError | ✅ (separate audio client) |
+| Component | OpenAI/Azure | Aitta, `openai_compatible` | Google/Vertex | Anthropic | LiteLLM |
+|---|---|---|---|---|---|
+| Extractor, Doc Classifier, Enhance Transcript, Answer Generator | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Embedder | ✅ | explicit `embedding_model` | ✅ (`gemini-embedding-001`) | ❌ → Voyage | explicit `embedding_model` |
+| VisionParser, MultimodalParser, VisionExtractor | ✅ | ✅ (image-capable model) | ✅ | ✅ | ✅ |
+| Transcriber, Parallel Transcriber, TextToSpeech | ✅ | ❌ NotImplementedError | ❌ | ❌ | ❌ |
 
 ### Extras
 
 ```toml
 gaik[llm-anthropic]   # adds anthropic SDK
 gaik[llm-google]      # adds google-genai + google-auth
-gaik[llm-all]         # both
+gaik[llm-litellm]     # optional LiteLLM backend; native adapters stay the default
+gaik[llm-all]         # all three
 ```
+
+`gaik[all]` does not include `llm-litellm`. OpenAI, Azure, Aitta and `openai_compatible` need no extra.
 
 ### Example: same code, three providers
 
@@ -309,6 +349,8 @@ pages = parser.convert_pdf("document.pdf")
 # pages is a list of markdown strings, one per page
 ```
 
+`openai_config` also accepts `get_llm_config(...)` for any provider; the model must accept images.
+
 **Returns:** `List[str]` - Markdown content per page
 
 ### PyMuPDFParser
@@ -409,9 +451,12 @@ result: ParseResult = parser.parse("document.pdf")
 Path("out.md").write_text(result.clean_markdown, encoding="utf-8")
 ```
 
-Keyword arguments only, and there is **no `config` parameter** — credentials come from the
-environment. Other options: `model`, `reasoning_effort`, `merge_table` (stitches tables
-split across a page break), `use_azure`, `vertex_ai`, `additional_instructions`.
+Keyword arguments only. Pass `api_config=get_llm_config(...)` for any provider; it
+supersedes `model_provider`, `use_azure`, `vertex_ai` and `reasoning_effort` (set that in
+the config instead). Without it, credentials come from
+the environment variables of the `model_provider` + flag combination. Other options:
+`model`, `reasoning_effort`, `merge_table` (stitches tables split across a page break),
+`additional_instructions`.
 
 **Returns:** `ParseResult` — a dataclass with `raw_markdown`, `clean_markdown`, `html`
 (only when `create_html=True`) and `usage`. It has **no `save()` method**; write the file
@@ -515,10 +560,9 @@ enhancer = TranscriptEnhancer(
     api_config=config,         # Optional; uses get_openai_config() if omitted
     use_azure=True,            # Used only when api_config is omitted
     model=None,                # Optional model override
-    reasoning_effort=None,     # Optional: "minimal" | "low" | "medium" | "high"
-                               #   Forwarded to gpt-5.x reasoning models;
-                               #   provider-agnostic — silently ignored by
-                               #   models that don't accept it.
+    reasoning_effort=None,     # Optional; sent only when set, so the model must
+                               #   accept the value (gpt-6: "none", "low" … "max";
+                               #   gpt-6-astra has no "none").
 )
 
 # From string
@@ -556,7 +600,7 @@ result.diff_chunks             # List[DiffChunk] (if diff_chunks=True)
 result.model_dump()            # Serialize to dict
 ```
 
-**Default models:** Azure: `gpt-5.4`, OpenAI: `gpt-5.4-2026-03-05`
+**Default model:** `config["model"]`, else `gpt-6-luna` (Azure and OpenAI). `api_config` may come from `get_llm_config()` for any chat provider.
 
 ---
 

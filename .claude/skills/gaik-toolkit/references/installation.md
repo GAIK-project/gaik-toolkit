@@ -47,6 +47,8 @@ pip install "gaik[evaluators]"
 # Multi-provider LLM client adapters (opt-in per provider)
 pip install "gaik[llm-anthropic]"
 pip install "gaik[llm-google]"
+pip install "gaik[llm-litellm]"   # optional LiteLLM backend
+pip install "gaik[llm-all]"       # all three
 
 # Finnish RAG text processing (lemmatization + compound splitting)
 pip install "gaik[finnish-rag]"

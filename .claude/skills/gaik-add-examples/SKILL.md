@@ -106,17 +106,20 @@ Pipeline constructors accept `use_azure=True/False` directly:
 pipeline = DocumentsToStructuredData(use_azure=True)
 ```
 
-**Multi-provider examples** (validators, evaluators, anything that must run on
-Anthropic or Google in addition to OpenAI/Azure) use the multi-provider surface:
+**Multi-provider examples** (anything that must run on another provider than
+OpenAI/Azure) use the multi-provider surface; component constructors accept the
+same dict as `config` / `api_config`:
 
 ```python
 from gaik.software_components.llm import get_llm_config, create_llm_client
 
-config = get_llm_config("anthropic")  # or "openai", "azure", "google"
+config = get_llm_config("anthropic")  # or "openai", "azure", "aitta", "openai_compatible",
+                                      #    "google", "vertex", "anthropic_foundry", "litellm"
 client = create_llm_client(config)    # ProviderClient (chat / chat_parsed / chat_stream / embed)
 ```
 
-`gaik[llm-anthropic]` and `gaik[llm-google]` extras pull in the provider SDKs on demand.
+`gaik[llm-anthropic]`, `gaik[llm-google]` and `gaik[llm-litellm]` pull in the provider
+SDKs on demand; OpenAI, Azure, Aitta and `openai_compatible` need no extra.
 
 ## Step 6 — Optional follow-ups (ask the user)
 
@@ -161,6 +164,14 @@ If yes:
 - Add schema(s) under `implementation_layer/toolkit_demo_app/api/schemas/`
 - Add or update a Next.js page/route under `implementation_layer/toolkit_demo_app/app/`
 - Handle missing optional dependencies gracefully (the extra may not be installed by default)
+- If the endpoint makes chat or vision calls, let **Model settings** (a user's own
+  key, sent as the `x-gaik-model-settings` header) reach it: add its POST path to
+  `_PATHS` in `api/utils/model_settings.py` and `SUPPORTED_PATHS` in
+  `lib/model-settings.ts`, add the page to `pageUsesModelSettings` (its "own
+  model" notice), and build the config with `get_api_config()` from
+  `api/utils/config.py`. A path missing from the frontend list silently runs on the
+  server key, and the API answers the header on an unlisted path with 400. Leave
+  audio and embedding endpoints out: an own key selects one chat/vision model only.
 - Dev preview: `bun run dev:all` from `implementation_layer/toolkit_demo_app/`
 
 ### 6d. Tag a PyPI release
@@ -172,12 +183,20 @@ Only relevant if the example accompanies a code change in
 release).
 
 If yes:
-1. Commit and push all changes.
-2. Run the test suite locally (`uv run pytest`).
-3. Choose the semver bump (patch / minor / major).
-4. Tag and push: `git tag v0.X.Y && git push origin v0.X.Y`.
-5. `.github/workflows/publish.yml` triggers on `v*.*.*` tag push — runs tests,
-   builds wheel + sdist, uploads to PyPI, creates a GitHub Release.
+1. Choose the semver bump (patch / minor / major); call the planned version `X.Y.Z`.
+2. Set `implementation_layer/solution_wizard/gaik_validated_version.txt` to `X.Y.Z`
+   (run the `gaik-sync` skill first if gaik's public surface changed), then commit
+   the intended release.
+3. Certify that commit — mandatory before every tag:
+   `uv run python scripts/release_check.py --live --version X.Y.Z`. Set
+   `RELEASE_PROVIDERS` and explicit `RELEASE_<PROVIDER>_MODEL` IDs first
+   (`docs/releasing.md`). The passing `results/release-check.json` must name this
+   commit and `X.Y.Z`; rerun after any tracked change. A failed, skipped or timed-out
+   check, or missing credentials, stops the release — never bypass it.
+4. Push, then tag and push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+5. `.github/workflows/publish.yml` triggers on the `v*.*.*` tag, reruns the full
+   gate including live certification (`release_gate: true`), and only then builds,
+   uploads to PyPI and creates a GitHub Release.
 6. setuptools-scm derives the version from the tag — **never** edit version
    strings manually.
 

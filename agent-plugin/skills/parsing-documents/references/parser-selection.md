@@ -45,7 +45,7 @@ from `gaik.software_components.llm`. Supply it through `VisionParser(openai_conf
 | `anthropic_foundry` | `ANTHROPIC_FOUNDRY_API_KEY` (or `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE`, optional `ANTHROPIC_MODEL` |
 | `aitta` | `AITTA_API_KEY` (aliases `AITTA_API_TOKEN`, `AITTA_TOKEN`), optional `AITTA_MODEL` |
 | `openai_compatible` | `OPENAI_API_KEY`, explicit `OPENAI_BASE_URL` and `OPENAI_MODEL` |
-| `litellm` | `LITELLM_MODEL` with a provider prefix; credentials required by the selected LiteLLM backend, or explicit config overrides |
+| `litellm` | `LITELLM_MODEL` with a provider prefix (`azure/<deployment>`); optional `LITELLM_API_KEY`, `LITELLM_BASE_URL`, `LITELLM_API_VERSION`, sent with each request — when unset, LiteLLM reads that backend's own variables; `LITELLM_EMBEDDING_MODEL` for embeddings |
 
 Explicit `api_key`, `base_url`, `model`, and other overrides are applied before
 validation. Do not copy one provider's credentials into another provider's config.

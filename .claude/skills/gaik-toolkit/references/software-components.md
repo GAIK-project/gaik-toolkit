@@ -26,6 +26,8 @@ from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
 pipeline = AudioToStructuredData(
     api_config=None,       # Optional: pass config dict
     use_azure=True,        # Use Azure (True) or OpenAI (False)
+    transcription_config=None,  # Optional: OpenAI/Azure audio config for this stage
+    extraction_config=None,     # Optional: any get_llm_config(...) for schema + extraction
 )
 ```
 
@@ -110,6 +112,8 @@ from gaik.software_modules.documents_to_structured_data import DocumentsToStruct
 pipeline = DocumentsToStructuredData(
     api_config=None,       # Optional: pass config dict
     use_azure=True,        # Use Azure (True) or OpenAI (False)
+    parser_config=None,    # Optional: config for the parser (image-capable model)
+    extraction_config=None,  # Optional: any get_llm_config(...) for schema + extraction
 )
 ```
 
@@ -190,7 +194,7 @@ Both pipelines support saving and loading schemas for reuse.
 ```python
 from pathlib import Path
 
-result = pipeline.run(file_path, user_requirements)
+result = pipeline.run(file_path=file_path, user_requirements=user_requirements)
 
 # Save schema and requirements
 if result.schema and result.requirements:
@@ -314,7 +318,9 @@ result = pipeline.run(
 from gaik.software_components.RAG.pg_vector_store import PgVectorStore
 from gaik.software_components.RAG.retriever import Retriever
 
-store = PgVectorStore("postgresql://user:pass@host/db", embedding_dim=3072)
+# embedding_dim must equal the embedder's output and be at most 2,000 (HNSW):
+# e.g. Embedder(config, model="text-embedding-3-small") -> 1536
+store = PgVectorStore("postgresql://user:pass@host/db", embedding_dim=1536)
 store.setup()
 
 # Works the same as VectorStore with Retriever

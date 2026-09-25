@@ -76,10 +76,10 @@ hits = Ranker(expose_ranks=True).fuse(
 `Embedder` also accepts `get_llm_config()` from `gaik.software_components.llm` for
 native `google`/`vertex`, `aitta`, `openai_compatible`, or optional `litellm`. Native
 Google/Vertex needs `gaik[llm-google]`; LiteLLM needs `gaik[llm-litellm]` and an explicit
-provider-prefixed `embedding_model`. Aitta requires `AITTA_API_KEY` (also accepts
-`AITTA_API_TOKEN` or `AITTA_TOKEN`) and an explicit `AITTA_EMBEDDING_MODEL`, or an
-`embedding_model` config override naming an embedding model available on Aitta. A chat
-model is not an embedding model. Other compatible servers need their endpoint, API key,
+provider-prefixed `embedding_model` (or `LITELLM_EMBEDDING_MODEL`). Aitta requires
+`AITTA_API_KEY` (also accepts `AITTA_API_TOKEN` or `AITTA_TOKEN`) and an explicit
+`AITTA_EMBEDDING_MODEL`, or an `embedding_model` config override naming an embedding model
+available on Aitta. A chat model is not an embedding model. Other compatible servers need their endpoint, API key,
 and an explicit embedding model. Use the same embedding model for indexing and queries,
 and match `embedding_dim` to its output. Native Anthropic does not provide embeddings.
 
@@ -117,10 +117,14 @@ reached 33.7% recall@15, equal weights at k=60 scored 8.7 points below vectors w
 at k=20 (`Ranker(rrf_k=...)` sets k).
 
 **`embedding_dim` must equal the model's output, and at most 2,000.** `setup()` builds an
-HNSW index on `vector(N)`, which pgvector refuses above 2,000 dimensions. For example,
-`text-embedding-3-large` produces 3,072 by default. Pick a model (or a deployment)
-that outputs 2,000 or fewer, or build the schema yourself with `halfvec`, which indexes up
-to 4,000: `references/postgres-without-gaik.md`.
+HNSW index on `vector(N)`, which pgvector refuses above 2,000 dimensions. Without `model=`,
+`Embedder` falls back to a default that depends on the config helper, and two of them
+are too large: `get_openai_config()` gives `text-embedding-3-large` (3,072) and
+`get_llm_config("google")` or `"vertex"` gives `gemini-embedding-001` (3,072).
+`get_llm_config("openai")` or `"azure"` gives `EMBEDDING_MODEL`, else
+`text-embedding-3-small` (1,536). Pass `model=` explicitly, pick a model (or a
+deployment) that outputs 2,000 or fewer, or build the schema yourself with `halfvec`,
+which indexes up to 4,000: `references/postgres-without-gaik.md`.
 
 ## Three ways the keyword arm returns nothing, silently
 

@@ -33,9 +33,20 @@ embedder = Embedder(config=config, model="text-embedding-3-large", batch_size=10
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `config` | dict | required | OpenAI/Azure config from `get_openai_config()` |
-| `model` | str\|None | `"text-embedding-3-large"` | Embedding model name |
+| `config` | dict | required | `get_openai_config()` or `get_llm_config(provider)` |
+| `model` | str\|None | `config["embedding_model"]`, see below | Embedding model (Azure: deployment name) |
 | `batch_size` | int | 100 | Batch size for embedding calls |
+
+The default model depends on the config helper, and so does the vector size `PgVectorStore`
+must be given as `embedding_dim` (pgvector's HNSW index takes at most 2,000):
+
+| Config | Default model | Dimensions |
+|---|---|---|
+| `get_openai_config()` / legacy dict | `text-embedding-3-large` | 3,072 — too many for `PgVectorStore`; pass `model=` |
+| `get_llm_config("openai" / "azure")` | `EMBEDDING_MODEL`, else `text-embedding-3-small` | 1,536 |
+| `get_llm_config("google" / "vertex")` | `gemini-embedding-001` | 3,072 |
+| `aitta`, `openai_compatible`, `litellm` | none — pass `embedding_model` or `model=` | model's own |
+| `anthropic` | no embeddings API | — |
 
 **Methods:**
 
@@ -382,7 +393,7 @@ generator = AnswerGenerator(
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `config` | dict\|None | None | OpenAI config (auto-fetched if None) |
+| `config` | dict\|None | None | `get_openai_config()` or `get_llm_config(provider)`; built from `use_azure` if None |
 | `use_azure` | bool | True | Used when config is None |
 | `model` | str\|None | None | Override model from config |
 | `citations` | bool | False | Include `[document_name, page X]` citations |

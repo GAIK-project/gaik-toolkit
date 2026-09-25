@@ -53,11 +53,16 @@ Before moving on, make sure you understand:
 2. What external library/APIs it wraps (if any).
 3. What Python dependencies it needs, with versions when available.
 4. Whether it is LLM-based and which config surface to use:
-   - **OpenAI/Azure-only** → `get_openai_config()` + `create_openai_client()`
-     from `gaik.software_components.config`
-   - **Multi-provider** (OpenAI/Azure/Anthropic/Google) → `get_llm_config()` +
-     `create_llm_client()` from `gaik.software_components.llm`. Use this when
-     the component needs to swap providers (e.g. validators, evaluators).
+   - **Chat / structured output / vision** (the default for LLM components) →
+     the constructor takes a `config` dict from either `get_openai_config()` or
+     `get_llm_config(provider)` and builds its client with
+     `build_compat_client(config)`, as the extractor, classifier and
+     `FormUnderstander` do. That keeps legacy OpenAI/Azure dicts on the raw SDK
+     client and serves every other provider (Aitta, `openai_compatible`, Google,
+     Anthropic, LiteLLM) through a `ProviderClient`.
+   - **Audio or another OpenAI-only endpoint** → `create_openai_client(config)`
+     guarded by `assert_openai_or_azure(config, component=...)`, like
+     `TextToSpeech`.
    - **Provider-agnostic** (pure Python / local library, no LLM call).
 5. **Layout decision — top-level or nested?**
    - **Top-level** — sibling of `extractor/`, `transcriber/`, `doc_classifier/`. Use
@@ -83,8 +88,8 @@ with these sections:
    `MainClassName` (PascalCase), one-line description.
 2. **Public API** — classes, methods with signatures, any result dataclasses.
 3. **Dependencies** — Python packages with version pins, marked required vs optional.
-4. **Config integration** — uses `get_openai_config()` / `create_openai_client()`,
-   or provider-agnostic.
+4. **Config integration** — `build_compat_client(config)` (multi-provider),
+   `create_openai_client(config)` (OpenAI/Azure-only endpoint), or provider-agnostic.
 5. **Layout** — top-level (`software_components/<name>/`) or nested
    (`software_components/<category>/<name>/`).
 6. **Files to create** — full relative paths.
@@ -204,11 +209,14 @@ Before tagging (this is the build-side addition to the checklist in
   Never touch the demo app, docs website, or other components during source
   creation. Phase 6 is the only phase where those edits are allowed, and only
   after the user has explicitly opted in.
-- **Shared config:** for any component that calls an LLM, import from
-  `gaik.software_components.config` (`get_openai_config` /
-  `create_openai_client`) for OpenAI/Azure-only components, or from
-  `gaik.software_components.llm` (`get_llm_config` / `create_llm_client`) for
-  multi-provider components (OpenAI/Azure/Anthropic/Google). Never call
+- **Shared config:** for any component that calls an LLM, build the client from
+  the caller's `config` with `build_compat_client` (from
+  `gaik.software_components.llm`), or with `create_openai_client` (from
+  `gaik.software_components.config`) plus `assert_openai_or_azure` for an
+  OpenAI/Azure-only endpoint. Do not hand the caller's dict straight to
+  `create_llm_client`: it resolves a bare legacy `{"api_key": ...}` dict through
+  `LLM_PROVIDER` (default Azure), where that dict has always meant standard
+  OpenAI. Never call
   `load_dotenv()` inside the component and never read `OPENAI_API_KEY` /
   `AZURE_API_KEY` directly.
 - **Never commit during Phases 1–5.** Leave source changes uncommitted so the
