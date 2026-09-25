@@ -79,6 +79,31 @@ const EXAMPLE_QUESTIONS = [
   "Are there any missing values?",
 ];
 
+// Synthetic files in public/. Both hold the same sales figures; the Excel one
+// adds title rows, subtotals and notes that the agent cleans up.
+const SAMPLES = [
+  {
+    file: "gaik_tabular_demo_sales.csv",
+    label: "Sales CSV",
+    questions: [
+      "Which region had the highest revenue?",
+      "Compare Widget and Gadget revenue by quarter.",
+      "How many units were sold in Q3?",
+    ],
+  },
+  {
+    file: "gaik_tabular_demo_report.xlsx",
+    label: "Messy Excel report",
+    questions: [
+      "What was the total revenue in Q1?",
+      "Which region had the highest revenue?",
+      "Show units by product and region.",
+    ],
+  },
+] as const;
+
+type Sample = (typeof SAMPLES)[number];
+
 function RowsTable({ rows }: { rows: Record<string, unknown>[] }) {
   const columns = Object.keys(rows[0] ?? {});
   return (
@@ -122,6 +147,7 @@ export default function TabularAgentPage() {
   const [upload, setUpload] = useState<UploadResponse | null>(null);
   const [result, setResult] = useState<AskResponse | null>(null);
   const [status, setStatus] = useState<StatusResponse | null>(null);
+  const [sample, setSample] = useState<Sample | null>(null);
 
   useEffect(() => {
     async function loadStatus(): Promise<void> {
@@ -135,8 +161,12 @@ export default function TabularAgentPage() {
     void loadStatus();
   }, []);
 
-  async function handleUpload(selected: File): Promise<void> {
+  async function handleUpload(
+    selected: File,
+    fromSample: Sample | null = null,
+  ): Promise<void> {
     setFile(selected);
+    setSample(fromSample);
     setUpload(null);
     setResult(null);
     setIsUploading(true);
@@ -170,9 +200,24 @@ export default function TabularAgentPage() {
     } catch (error) {
       if (error instanceof RateLimitError) return;
       setFile(null);
+      setSample(null);
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsUploading(false);
+    }
+  }
+
+  async function loadSample(next: Sample): Promise<void> {
+    try {
+      const response = await fetch(`/${next.file}`);
+      if (!response.ok) throw new Error("Could not load the sample file");
+      const blob = await response.blob();
+      await handleUpload(
+        new File([blob], next.file, { type: blob.type }),
+        next,
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "An error occurred");
     }
   }
 
@@ -183,6 +228,7 @@ export default function TabularAgentPage() {
       }).catch(() => undefined);
     }
     setFile(null);
+    setSample(null);
     setUpload(null);
     setResult(null);
   }
@@ -256,10 +302,9 @@ export default function TabularAgentPage() {
             <CardHeader>
               <CardTitle>Upload a spreadsheet</CardTitle>
               <CardDescription>
-                Your file is loaded into an in-memory database, profiled, and
-                queried with validated read-only SQL. Report-style sheets with
-                title rows, subtotals and trailing notes are cleaned up
-                automatically. The file is deleted when you close the session.
+                Messy report sheets (title rows, subtotals, notes) are cleaned
+                up automatically. The file is deleted when you close the
+                session.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -273,25 +318,20 @@ export default function TabularAgentPage() {
               />
 
               {!upload && (
-                <p className="text-muted-foreground text-xs">
-                  No spreadsheet handy? Try{" "}
-                  <a
-                    href="/gaik_tabular_demo_sales.csv"
-                    download
-                    className="underline underline-offset-2"
-                  >
-                    a tidy sales CSV
-                  </a>{" "}
-                  or{" "}
-                  <a
-                    href="/gaik_tabular_demo_report.xlsx"
-                    download
-                    className="underline underline-offset-2"
-                  >
-                    a messy Excel report
-                  </a>{" "}
-                  — both are synthetic sample data.
-                </p>
+                <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
+                  <span>No file? Try synthetic sample data:</span>
+                  {SAMPLES.map((s) => (
+                    <Button
+                      key={s.file}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void loadSample(s)}
+                      disabled={isUploading || isAsking}
+                    >
+                      {s.label}
+                    </Button>
+                  ))}
+                </div>
               )}
 
               {upload && (
@@ -336,7 +376,7 @@ export default function TabularAgentPage() {
                     Example questions
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {EXAMPLE_QUESTIONS.map((q) => (
+                    {(sample?.questions ?? EXAMPLE_QUESTIONS).map((q) => (
                       <Badge
                         key={q}
                         variant="outline"
@@ -356,12 +396,14 @@ export default function TabularAgentPage() {
                   The tabular agent is not available in this build.
                 </p>
               )}
-              {status && status.component_available && !status.llm_configured && (
-                <p className="text-muted-foreground flex items-center gap-2 text-sm">
-                  <AlertTriangle className="h-4 w-4 shrink-0" />
-                  No LLM API key configured — questions cannot be answered.
-                </p>
-              )}
+              {status &&
+                status.component_available &&
+                !status.llm_configured && (
+                  <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    No LLM API key configured — questions cannot be answered.
+                  </p>
+                )}
             </CardContent>
           </Card>
 
@@ -377,13 +419,13 @@ export default function TabularAgentPage() {
 
           <HowItWorksCard description="The agent loads your file into DuckDB, profiles every column, generates validated read-only SQL, runs it, and explains the result.">
             <p>
-              <strong>1. Upload:</strong> CSV, Excel, Parquet or JSON. Each Excel
-              sheet becomes its own table, so questions can span sheets.
+              <strong>1. Upload:</strong> CSV, Excel, Parquet or JSON. Each
+              Excel sheet becomes its own table, so questions can span sheets.
             </p>
             <p>
               <strong>2. Clean-up:</strong> Title rows, blank spacers, subtotal
-              lines and trailing notes are removed. Nordic number formats
-              (<code>1 234,56</code>) become real numbers.
+              lines and trailing notes are removed. Nordic number formats (
+              <code>1 234,56</code>) become real numbers.
             </p>
             <p>
               <strong>3. Profiling:</strong> Every column is described — its

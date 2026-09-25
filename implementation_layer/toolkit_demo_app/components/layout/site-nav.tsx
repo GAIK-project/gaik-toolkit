@@ -708,8 +708,8 @@ export function SiteNav({
           </div>
         </nav>
 
-        {/* Right: Actions */}
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+        {/* Right: Actions. min-w-fit keeps them from sliding under the nav. */}
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-3 md:min-w-fit">
           <ModelSettingsButton />
           <GitHubLink
             preview={mounted ? githubPreview : null}
@@ -721,9 +721,11 @@ export function SiteNav({
               size="sm"
               className="text-muted-foreground hover:text-foreground hidden gap-1.5 lg:inline-flex"
               onClick={handleSignOut}
+              aria-label="Sign out"
+              title="Sign out"
             >
               <LogOut className="h-4 w-4" />
-              Sign out
+              <span className="hidden xl:inline">Sign out</span>
             </Button>
           )}
           <MobileNav

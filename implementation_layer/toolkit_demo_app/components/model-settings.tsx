@@ -145,9 +145,11 @@ export function ModelSettingsButton() {
         size="sm"
         onClick={() => changeOpen(true)}
         aria-label="Model settings"
+        title="Model settings"
       >
         <KeyRound className="h-4 w-4" />
-        <span className="hidden sm:inline">
+        {/* Icon only while the desktop nav needs the room (md to xl). */}
+        <span className="hidden sm:inline md:hidden xl:inline">
           {settings ? "Own model" : "Model settings"}
         </span>
       </Button>
