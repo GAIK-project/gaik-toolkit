@@ -517,7 +517,7 @@ export function SiteNav({
 
   return (
     <header className="border-border/60 bg-card/95 sticky top-0 z-50 border-b shadow-sm backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center px-4 py-3 md:px-6 md:py-4">
+      <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 md:px-6 md:py-4">
         {/* Left: Logo */}
         <div className="flex min-w-0 flex-1 items-center">
           <Link href="/" className="shrink-0">
@@ -725,7 +725,6 @@ export function SiteNav({
               title="Sign out"
             >
               <LogOut className="h-4 w-4" />
-              <span className="hidden xl:inline">Sign out</span>
             </Button>
           )}
           <MobileNav
