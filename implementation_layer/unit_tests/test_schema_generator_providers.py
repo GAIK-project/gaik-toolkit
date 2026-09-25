@@ -115,3 +115,24 @@ def test_native_provider_receives_temperature_without_openai_reasoning_option(pr
 
     assert client.calls[0]["temperature"] == 0.2
     assert "reasoning_effort" not in client.calls[0]
+
+
+def test_invalid_structured_output_is_retried_once():
+    from gaik.software_components.extractor import schema
+    from pydantic import BaseModel, ValidationError
+
+    class _Answer(BaseModel):
+        value: int
+
+    responses = iter(['{"value": "not a number"}', '{"value": 7}'])
+    assert schema._with_retries(lambda: _Answer.model_validate_json(next(responses))).value == 7
+
+    attempts = []
+
+    def always_invalid():
+        attempts.append(1)
+        return _Answer.model_validate_json('{"value": "still not a number"}')
+
+    with pytest.raises(ValidationError):
+        schema._with_retries(always_invalid)
+    assert len(attempts) == 2

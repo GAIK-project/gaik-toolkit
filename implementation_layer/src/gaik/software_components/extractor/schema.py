@@ -32,6 +32,7 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    ValidationError,
     WithJsonSchema,
     constr,
     create_model,
@@ -69,9 +70,17 @@ SYSTEM_PARSER = (
 
 
 def _with_retries(call, tries: int = 4):
+    invalid_outputs = 0
     for i in range(tries):
         try:
             return call()
+        except ValidationError:
+            # Strict schemas cannot express every local rule (e.g. a non-empty
+            # enum or unique field names), so a sampled answer occasionally fails
+            # them. Ask once more before giving up.
+            invalid_outputs += 1
+            if invalid_outputs > 1 or i == tries - 1:
+                raise
         except (RateLimitError, APITimeoutError, APIError):
             if i == tries - 1:
                 raise
