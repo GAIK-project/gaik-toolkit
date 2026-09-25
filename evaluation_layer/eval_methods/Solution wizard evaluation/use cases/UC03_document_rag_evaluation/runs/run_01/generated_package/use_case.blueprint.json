@@ -427,7 +427,7 @@
   },
   "package": {
     "name": "manufacturing_knowledge_assistant_use_case",
-    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\772370966e9e",
+    "output_dir": "%USERPROFILE%\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\772370966e9e",
     "include_tests": true,
     "include_evals": true,
     "include_docs": true

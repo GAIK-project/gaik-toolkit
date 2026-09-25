@@ -11,6 +11,7 @@ install; other types need their respective GAIK extras.
 
 from __future__ import annotations
 
+import copy
 import sys
 from pathlib import Path
 
@@ -133,6 +134,10 @@ def main() -> None:
     if USE_CONFIG_FILE and CONFIG_FILE.exists():
         print(f"Config: loading existing config → {CONFIG_FILE}")
         run_kwargs = load_report_config(CONFIG_FILE)
+        # Like the paths above, the transcriber workspace is stored relative to the config.
+        ctor = (run_kwargs.get("transcriber_options") or {}).get("ctor", {})
+        if ctor.get("output_dir"):
+            ctor["output_dir"] = str(CONFIG_FILE.parent / ctor["output_dir"])
     else:
         if USE_CONFIG_FILE:
             print(
@@ -160,7 +165,7 @@ def main() -> None:
                     "output_dir": str(transcripts_dir),
                 },
             },
-            "writer_options": {"model": "gpt-5.4"},
+            "writer_options": {"model": "gpt-6-luna"},
             "agentic": USE_AGENTIC,
             "curate_evidence": True,
             "polish": True,
@@ -168,8 +173,19 @@ def main() -> None:
         }
 
     # Always save/update the config so it stays current with any code changes.
+    # save_report_config() stores input/output paths relative to the config file;
+    # store the transcriber workspace the same way so no absolute path is saved.
+    config_kwargs = copy.deepcopy(run_kwargs)
+    ctor = (config_kwargs.get("transcriber_options") or {}).get("ctor", {})
+    if ctor.get("output_dir"):
+        try:
+            ctor["output_dir"] = (
+                Path(ctor["output_dir"]).resolve().relative_to(CONFIG_FILE.parent.resolve())
+            ).as_posix()
+        except ValueError:
+            pass  # outside the example folder; keep it as given
     config_existed = CONFIG_FILE.exists()
-    save_report_config(CONFIG_FILE, **run_kwargs)
+    save_report_config(CONFIG_FILE, **config_kwargs)
     print(f"Config: {'updated' if config_existed else 'created'} → {CONFIG_FILE}")
 
     generator = MultiSourceReportGenerator(use_azure=True)

@@ -466,7 +466,7 @@
   },
   "package": {
     "name": "purchase_order_erp_record_use_case",
-    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\f576bfaeea69",
+    "output_dir": "%USERPROFILE%\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\f576bfaeea69",
     "include_tests": true,
     "include_evals": true,
     "include_docs": true

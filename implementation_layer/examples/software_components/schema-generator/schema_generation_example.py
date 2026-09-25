@@ -446,10 +446,10 @@ def main() -> None:
     # Schema generation uses the same OpenAI/Azure OpenAI config helper as the
     # extractor component. Set use_azure=False for direct OpenAI.
 
-    MODEL = "gpt-5.4"  # Temperature parameter only exists upto gpt-5.4
+    MODEL = "gpt-6-luna"  # GPT-6 accepts temperature only with reasoning_effort="none"
     MODEL_OPTIONS = {
         "temperature": 0.0,
-        "reasoning_effort": None,
+        "reasoning_effort": "none",
     }
 
     # ##If we want to use reasoning for gpt-5.4 and above. Disable temperature.

@@ -155,7 +155,7 @@ User:
 
  The evaluated collection contains three synthetic, text-based English PDFs supplied in the wizard-visible input bundle: `employee_travel_policy.pdf`, `mx200_maintenance_manual.pdf`, and the management-confidential `project_aurora_pricing_strategy.pdf`. The same bundle contains `access_manifest.json`, `query_set.json`, and `poc_input_bundle.json`. Each document has a title, filename, classification, allowed-role metadata, and 1-based PDF page-number metadata. The first PoC uses these supplied local inputs; connection to a live document repository is outside its scope.
 
-All these documents can be found in C:\Users\h02317\Downloads\runs\run_01\wizard_input
+All these documents can be found in %USERPROFILE%\Downloads\runs\run_01\wizard_input
 
 ---
 Wizard:
@@ -166,7 +166,7 @@ The user has provided:
 - Input files: `employee_travel_policy.pdf`, `mx200_maintenance_manual.pdf`, `project_aurora_pricing_strategy.pdf`
 - Supplementary files: `access_manifest.json`, `query_set.json`, `poc_input_bundle.json`
 - Metadata: title, filename, classification, allowed-role metadata, 1-based PDF page-number metadata
-- Input location: `C:\Users\h02317\Downloads\runs\run_01\wizard_input`
+- Input location: `%USERPROFILE%\Downloads\runs\run_01\wizard_input`
 - Scope: local inputs only, no live document repository connection
 - Still need to pin down: model provider, runtime interface (CLI vs API vs web), and evaluation requirements before finalizing the blueprint
 
@@ -189,7 +189,7 @@ Use Azure OpenAI for generation with model gpt-5.4, temperature 0.0, and reasoni
 
 The first PoC should demonstrate role-aware, citation-grounded question answering over the three PDFs, `access_manifest.json`, and `query_set.json` supplied in the wizard-visible input bundle. It must support the command `python run_poc.py --input <path-to-poc_input_bundle.json>`, resolve the other supplied files relative to that bundle, execute all four role-tagged queries, and save non-empty parseable JSON results. The role is trusted request metadata and must not be inferred from the question. Q01 uses role `employee` and asks the Helsinki hotel limit; it must answer EUR 180 per night and written Finance Director approval before booking when exceeded, citing `["employee_travel_policy.pdf", 3]`. Q02 uses role `employee` and asks about the MX-200 filter; it must answer inspection every 250 operating hours and replacement after 1,000 operating hours or above 1.8 bar, whichever occurs first, citing `["mx200_maintenance_manual.pdf", 3]` and `["mx200_maintenance_manual.pdf", 4]`. Q03 uses role `employee` and asks for the Project Aurora discount ceiling; it must return `access_decision` `denied`, an empty citations list, and no 12 percent, 22 percent, or Chief Financial Officer details. Q04 uses role `manager` and asks for the Project Aurora ceiling and exception approver; it must answer 12 percent and written Chief Financial Officer approval above the ceiling, citing `["project_aurora_pricing_strategy.pdf", 3]`. A web interface, live repository connector, enterprise sign-in, and numerical RAG-quality threshold are outside the first PoC.
 
-All these documents can be found in C:\Users\h02317\Downloads\runs\run_01\wizard_input
+All these documents can be found in %USERPROFILE%\Downloads\runs\run_01\wizard_input
 
 
 
@@ -638,9 +638,9 @@ The Azure setup should be handled by the `use_azure` flag and environment variab
 5. `toolkit_demo_app/` → `implementation_layer/`
 6. `implementation_layer/` → `gaik-toolkit/`
 
-So going up 6 levels from `run_poc.py` gets me to `gaik-toolkit/src/`. But the scaffolded code only uses 5 parent references, so let me trace through that path more carefully to see where it actually lands. `parents[6]` points to `gaik-toolkit/`, so the path `Path(__file__).resolve().parents[6] / "src"` should resolve to the correct `src` directory. Let me verify that the `gaik` module is actually present there.`gaik` is installed at `C:\Users\h02317\gaik-toolkit\implementation_layer\src\gaik\`. So the correct `sys.path` addition should be `parents[5] / "src"`:
-- `parents[5]` = `C:\Users\h02317\gaik-toolkit\implementation_layer`
-- `parents[5] / "src"` = `C:\Users\h02317\gaik-toolkit\implementation_layer\src`
+So going up 6 levels from `run_poc.py` gets me to `gaik-toolkit/src/`. But the scaffolded code only uses 5 parent references, so let me trace through that path more carefully to see where it actually lands. `parents[6]` points to `gaik-toolkit/`, so the path `Path(__file__).resolve().parents[6] / "src"` should resolve to the correct `src` directory. Let me verify that the `gaik` module is actually present there.`gaik` is installed at `%USERPROFILE%\gaik-toolkit\implementation_layer\src\gaik\`. So the correct `sys.path` addition should be `parents[5] / "src"`:
+- `parents[5]` = `%USERPROFILE%\gaik-toolkit\implementation_layer`
+- `parents[5] / "src"` = `%USERPROFILE%\gaik-toolkit\implementation_layer\src`
 
 Let me now also check what RAGWorkflow's constructor signature looks like to understand what params to pass.The Document is a LangChain `Document` object. It has `.page_content` and `.metadata` fields. The metadata should contain the source file path and page number from the VisionRagParser.
 
@@ -762,7 +762,7 @@ cp poc/.env.example poc/.env
 #         AZURE_OPENAI_EMBEDDING_DEPLOYMENT
 
 # 3. Run all four queries
-python poc/run_poc.py --input C:\Users\h02317\Downloads\runs\run_01\wizard_input\poc_input_bundle.json
+python poc/run_poc.py --input %USERPROFILE%\Downloads\runs\run_01\wizard_input\poc_input_bundle.json
 
 # 4. Inspect output
 #    poc/output/query_results.json

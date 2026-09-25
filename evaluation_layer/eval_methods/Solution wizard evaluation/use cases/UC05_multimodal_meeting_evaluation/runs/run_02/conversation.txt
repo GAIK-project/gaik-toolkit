@@ -55,7 +55,7 @@ Return one JSON object with meeting_id, title, meeting_date, start_time, end_tim
 
 Every decision, action, unresolved issue, and conflict must have at least one citation. Each citation is a single pipe-delimited string, and an item may carry several. For audio, use `file_name|start_timestamp|end_timestamp` with `HH:MM:SS` timestamps. For the agenda, use `file_name|page_number`. The spoken meeting determines what was actually decided; an agenda item is only planned content and must not be treated as a decision by itself. When sources conflict, record the conflict and follow the explicit spoken decision. Do not infer owners, deadlines, approvals, budgets, or facts that are not stated. Use `null` with `uncertainty_reason` when an action lacks an explicit owner or due date.
 
-see the fixture documents in C:\Users\h02317\Downloads\fixtures
+see the fixture documents in %USERPROFILE%\Downloads\fixtures
 
 ---
 Wizard:

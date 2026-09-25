@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.parsers import VisionParser, get_openai_config  # noqa: E402
 
-MODEL = "gpt-5.4"
+MODEL = "gpt-6-luna"
 MODEL_OPTIONS = {
     "temperature": None,  # omitted from API request
     "reasoning_effort": "medium",
@@ -43,7 +43,7 @@ def main() -> None:
         print("   4. Or use Azure OpenAI:")
         print("      export AZURE_API_KEY='...'")
         print("      export AZURE_ENDPOINT='https://...'")
-        print("      export AZURE_DEPLOYMENT='gpt-4o'")
+        print("      export AZURE_DEPLOYMENT='gpt-6-luna'")
         print("\n[INFO] For CLI usage, see: demo_vision_parser.py")
         return
 

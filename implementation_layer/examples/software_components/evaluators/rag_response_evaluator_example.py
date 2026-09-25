@@ -12,7 +12,7 @@ Configure your provider via standard GAIK env vars (Azure shown here):
 
     AZURE_API_KEY=...
     AZURE_ENDPOINT=https://...openai.azure.com/
-    AZURE_DEPLOYMENT=gpt-5.1
+    AZURE_DEPLOYMENT=gpt-6-luna
     AZURE_API_VERSION=2025-03-01-preview
 """
 

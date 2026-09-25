@@ -37,7 +37,7 @@ Usage::
 Provider env vars (only those for the chosen provider are required)::
 
     GOOGLE_VERTEXAI_PROJECT, GOOGLE_VERTEXAI_LOCATION, GOOGLE_APPLICATION_CREDENTIALS
-    AZURE_API_KEY, AZURE_RESOURCE_NAME, AZURE_API_VERSION, AZURE_DEPLOYMENT
+    AZURE_API_KEY, AZURE_ENDPOINT, AZURE_API_VERSION, AZURE_DEPLOYMENT
     ANTHROPIC_API_KEY (or Foundry: ANTHROPIC_FOUNDRY_RESOURCE)
 """
 
@@ -197,6 +197,7 @@ class BenchmarkReport:
 _PRICING_PER_M: dict[str, tuple[float, float]] = {
     "gemini-3-flash-preview": (0.30, 2.50),
     "gemini-3.1-flash-lite-preview": (0.10, 0.40),
+    "gpt-6-luna": (0.10, 0.50),
     "gpt-5.4-mini": (0.40, 1.60),
     "gpt-5.4": (1.25, 10.00),
     "gpt-5.5": (1.25, 10.00),
@@ -223,8 +224,8 @@ class JudgeBenchmarkHarness:
     """
 
     DEFAULT_MODELS: dict[str, str] = {
-        "openai": "gpt-5.4-mini",
-        "azure": "gpt-5.4-mini",
+        "openai": "gpt-6-luna",
+        "azure": "gpt-6-luna",
         "anthropic": "claude-haiku-4-5-20251001",
         "google": "gemini-3-flash-preview",
     }

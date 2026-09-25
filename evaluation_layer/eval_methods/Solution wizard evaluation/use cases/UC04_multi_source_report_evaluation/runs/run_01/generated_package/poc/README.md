@@ -48,7 +48,7 @@ python run_poc.py --input <path-to-poc_input_bundle.json>
 Example (using the supplied fixtures):
 
 ```
-python run_poc.py --input C:\Users\h02317\Downloads\fixtures\poc_input_bundle.json
+python run_poc.py --input %USERPROFILE%\Downloads\fixtures\poc_input_bundle.json
 ```
 
 The bundle resolves all source file paths relative to its own directory.

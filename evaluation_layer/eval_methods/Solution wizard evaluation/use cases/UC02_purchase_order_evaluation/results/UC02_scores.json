@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "scenario_id": "UC02",
-  "source_workbook": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\results\\UC02_comparison.xlsx",
+  "source_workbook": "%USERPROFILE%\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\results\\UC02_comparison.xlsx",
   "complete": true,
   "metrics": {
     "EQ1": {

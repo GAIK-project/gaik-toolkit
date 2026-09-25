@@ -423,6 +423,7 @@ Set your API key in `.env`:
 
 ```bash
 AZURE_API_KEY=your-azure-api-key
+AZURE_ENDPOINT=https://your-resource.openai.azure.com/  # only for OpenAITextEmbedding3Large
 ```
 
 ---

@@ -63,11 +63,9 @@ def directory_classification():
         "bill of material",
     ]
 
-    # Classify entire directory
-    results = classifier.classify(
-        file_or_dir=r"C:\Users\h02317\Downloads\test\multi-type with hierarchical relationships\Luvata",
-        classes=classes,
-    )
+    # Classify entire directory (sample PO and BOM PDFs from the extractor folder)
+    sample_dir = Path(__file__).parent.parent / "extractor" / "input" / "example_data2"
+    results = classifier.classify(file_or_dir=str(sample_dir), classes=classes)
 
     # Print results summary
     print(f"\nClassified {len(results)} documents:\n")

@@ -13,6 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.extractor import DataExtractor, SchemaGenerator, get_openai_config
+from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.parsers import VisionParser
 
 try:
@@ -38,12 +39,12 @@ def _make_llm_client(cfg: dict):
             api_version=cfg["api_version"],
             azure_endpoint=cfg["azure_endpoint"].split("/openai/")[0],  # robust to full path input
         )
-        model = cfg.get("model", "gpt-5.4")
+        model = cfg.get("model", "gpt-6-luna")
     else:
         if OpenAI is None:
             raise RuntimeError("OpenAI SDK not available. Please install `openai` >= 1.0")
         client = OpenAI(api_key=cfg["api_key"])
-        model = cfg.get("model", "gpt-5.4")
+        model = cfg.get("model", "gpt-6-luna")
 
     return client, model, use_azure
 
@@ -60,7 +61,7 @@ def classify_document(
       - 'Bill of material'
 
     Returns the **formatted header** string, e.g. "**Purchase order:**"
-    Deterministic: temperature=0, top_p=1
+    Deterministic where the model allows it: temperature=0, top_p=1
     """
     system_msg = (
         "You are a precise document classifier. "
@@ -82,9 +83,9 @@ def classify_document(
             {"role": "system", "content": system_msg},
             {"role": "user", "content": user_msg},
         ],
-        temperature=0,
-        top_p=1.0,
-        max_completion_tokens=50,
+        # GPT-6 and GPT-5.6 reject sampling options while reasoning, and reasoning
+        # tokens count toward any token cap, so no cap is set here.
+        **normalize_chat_kwargs(model, {"temperature": 0, "top_p": 1.0}),
     )
 
     if use_azure:

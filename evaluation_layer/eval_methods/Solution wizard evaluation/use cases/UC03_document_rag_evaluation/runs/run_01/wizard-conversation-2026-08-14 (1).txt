@@ -81,7 +81,7 @@ Preserve `file_name`, 1-based integer `page_number`, `classification`, and `allo
 
 Every output must preserve `query_id` and `role`. `access_decision` must be `allowed` or `denied`. An allowed factual answer requires at least one citation to a document allowed for that role. Each citation must contain exactly two elements in the order `[file_name, page_number]`, with a string filename and a 1-based integer page number. A denied answer requires a `refusal_reason`, an empty citations list, and no restricted facts. Do not answer from model memory when authorized evidence is absent. The four PoC results must be returned separately and must match the expected access behavior and citation pairs.
 
-See the aforementioned fixture documents in C:\Users\h02317\Downloads\fixtures
+See the aforementioned fixture documents in %USERPROFILE%\Downloads\fixtures
 
 ---
 Wizard:

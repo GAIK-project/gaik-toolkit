@@ -73,7 +73,7 @@ extractor = VisionExtractor(
     use_azure=True,  # True = Azure OpenAI, False = OpenAI direct
     vertex_ai=False,  # True = Google Vertex AI, False = Gemini direct (google only)
     # --- Model ---
-    model="gpt-5.4-mini",  # None = use model from config/.env; e.g., gemini-3.1-flash-lite
+    model="gpt-6-luna",  # None = use model from config/.env; e.g., gemini-3.1-flash-lite
     api_config=None,  # None = auto-build from .env; or pass a config dict directly
     # --- Reasoning ---
     reasoning_effort="low",  # "low" | "medium" | "high"

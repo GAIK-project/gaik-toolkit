@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "scenario_id": "UC05",
-  "source_workbook": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC05_multimodal_meeting_evaluation\\results\\UC05_comparison.xlsx",
+  "source_workbook": "%USERPROFILE%\\Solution wizard evaluation\\use cases\\UC05_multimodal_meeting_evaluation\\results\\UC05_comparison.xlsx",
   "complete": true,
   "metrics": {
     "EQ1": {

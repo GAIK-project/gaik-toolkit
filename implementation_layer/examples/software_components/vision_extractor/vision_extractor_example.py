@@ -1,9 +1,9 @@
 """
 VisionExtractor example — single-pass PDF/image → structured data.
 
-Two test cases using documents in C:/Users/h02317/Downloads/temp/:
+Two test cases using the sample documents next to this script:
 
-  Case 1 — Single document (singple_PO.pdf):
+  Case 1 — Single document (PO2.pdf):
     One PDF containing both PO and BOM information.
 
   Case 2 — Multi-document (PO folder):

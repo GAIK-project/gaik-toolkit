@@ -71,7 +71,7 @@ def openai_example(pdf_path: str):
 
     parser = MultimodalParser(
         model_provider="openai",
-        model="gpt-5.4",
+        model="gpt-6-luna",
         use_azure=True,
         reasoning_effort="low",
         merge_table=True,
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     print_total(results)
 
 
-# Example output (single-provider run, OpenAI / Azure):
+# Example output (single-provider run, OpenAI / Azure; recorded with gpt-5.4):
 #
 #     ============================================================
 #     OpenAI / Azure OpenAI Parser

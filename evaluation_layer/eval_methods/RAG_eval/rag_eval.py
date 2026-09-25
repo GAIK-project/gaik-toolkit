@@ -79,7 +79,7 @@ FORCE_REBUILD_INDICES = False
 # Embedding API endpoints
 # SnowflakeV2 uses local LM Studio (default in Settings)
 # OpenAITextEmbedding3Large uses Azure OpenAI
-AZURE_EMBEDDING_API_BASE = "https://haagahelia-poc-gaik.openai.azure.com/"
+AZURE_EMBEDDING_API_BASE = os.getenv("AZURE_ENDPOINT", "")
 AZURE_EMBEDDING_API_KEY = os.getenv("AZURE_API_KEY", "")  # from .env — never commit real keys
 AZURE_EMBEDDING_API_VERSION = "2023-05-15"
 

@@ -1,6 +1,6 @@
 [
   {
-    "source_path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\supplier_kpis_q2_2026.xlsx",
+    "source_path": "%USERPROFILE%\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\supplier_kpis_q2_2026.xlsx",
     "source_type": "xlsx",
     "metadata": {
       "index": 1,
@@ -12,7 +12,7 @@
     "content_chars": 11480
   },
   {
-    "source_path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\nordic_components_quality_audit.pdf",
+    "source_path": "%USERPROFILE%\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\nordic_components_quality_audit.pdf",
     "source_type": "pdf",
     "metadata": {
       "index": 2,
@@ -24,7 +24,7 @@
     "content_chars": 9184
   },
   {
-    "source_path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\procurement_meeting_notes_q2_2026.md",
+    "source_path": "%USERPROFILE%\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\procurement_meeting_notes_q2_2026.md",
     "source_type": "markdown",
     "metadata": {
       "index": 3,
@@ -36,7 +36,7 @@
     "content_chars": 8738
   },
   {
-    "source_path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\delivery_incidents_q2_2026.csv",
+    "source_path": "%USERPROFILE%\\Downloads\\Wizard evaluation\\UC04_multi_source_report_evaluation\\fixtures\\poc_input\\sources\\delivery_incidents_q2_2026.csv",
     "source_type": "csv",
     "metadata": {
       "index": 4,

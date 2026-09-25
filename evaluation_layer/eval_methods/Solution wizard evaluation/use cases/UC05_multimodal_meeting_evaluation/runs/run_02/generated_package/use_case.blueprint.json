@@ -491,7 +491,7 @@
   },
   "package": {
     "name": "meeting_record_generation_use_case",
-    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\6d4e4e362d6a",
+    "output_dir": "%USERPROFILE%\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\6d4e4e362d6a",
     "include_tests": true,
     "include_evals": true,
     "include_docs": true

@@ -503,7 +503,7 @@
   },
   "package": {
     "name": "po_erp_extraction_use_case",
-    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\d9bd69984195",
+    "output_dir": "%USERPROFILE%\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\d9bd69984195",
     "include_tests": true,
     "include_evals": true,
     "include_docs": true

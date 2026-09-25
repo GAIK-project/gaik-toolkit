@@ -107,7 +107,7 @@ Use MultiSourceReportGenerator as the single primary end-to-end module. Do not c
 
 Require the exact title, all six headings, a KPI table with one-decimal calculations, an action table with supported owners and dates, inline [source_file] references, and an evidence index that covers all four source files. Explicitly disclose the approximate spend discrepancy. Reject unsupported facts, actions, references, or a claim that the PoC draft is already approved. The procurement manager either approves the draft for release or returns it for analyst rework and regeneration.
 
-The documents mentioned about are in "C:\Users\h02317\Downloads\fixtures".
+The documents mentioned about are in "%USERPROFILE%\Downloads\fixtures".
 
 ---
 Wizard:
@@ -475,7 +475,7 @@ For document/RAG use cases, I may generate synthetic sample documents:
 python scripts/scaffold_poc.py --blueprint <output_dir>/use_case.blueprint.json --synthetic
 ```
 
-But this is a multi_source_report pattern. The user has already provided synthetic source files in `C:\Users\h02317\Downloads\fixtures`. So I don't need `--synthetic`.
+But this is a multi_source_report pattern. The user has already provided synthetic source files in `%USERPROFILE%\Downloads\fixtures`. So I don't need `--synthetic`.
 Pattern is `_generic` (template_wired=False). I need to read the scaffolded `run_poc.py` and wire the steps properly. Let me read it and the other generated files.Now I have a clear picture of what needs to be done. The scaffolded `run_poc.py` is a skeleton that needs to be wired. I need to:
 
 1. Replace the entire `run_poc.py` with a fully wired version that:
@@ -493,10 +493,10 @@ Pattern is `_generic` (template_wired=False). I need to read the scaffolded `run
 
 Writing config JSON... Writing the CLI script... Writing the run_poc.py script...Now I have the full picture. I can see that:
 
-1. The `poc_input_bundle.json` already exists at `C:\Users\h02317\Downloads\fixtures\poc_input_bundle.json` with the exact format the user specified.
+1. The `poc_input_bundle.json` already exists at `%USERPROFILE%\Downloads\fixtures\poc_input_bundle.json` with the exact format the user specified.
 2. The `report_spec.json` already exists with the six sections (though section IDs differ slightly - `risks` instead of `quality_and_delivery_risks`, `actions` instead of `actions_and_owners`).
 3. The `report_template.md` is a basic skeleton.
-4. The source files are in `C:\Users\h02317\Downloads\fixtures\poc_input\sources\`.
+4. The source files are in `%USERPROFILE%\Downloads\fixtures\poc_input\sources\`.
 5. The `expected_report_results.json` contains the fixture facts.
 
 I'm noticing a discrepancy between the supplier names in the blueprint versus what's actually in the fixture data. The expected results reference "Baltic Fasteners" and "Alpine Sensors," but the original spec mentioned "Baltic Parts" and "Alpine Precision." I need to verify which names are correct by checking the KPI Overview section in the report spec.
@@ -547,7 +547,7 @@ For the technical_specification.md, I'm selecting MultiSourceReportGenerator bec
 
 Configuring the generator with include_source_references=True so every material claim carries a source citation, include_evidence_index=True for the audit trail, and specifying the model as gpt-5.4 with temperature=1.0 and medium reasoning effort. I'm also pointing to report_template.md to enforce the required six-heading structure, while explicitly excluding output_docx, curate_evidence, and polish options per the user's requirements.
 
-For the user_guide.md, the pipeline reads four source files referenced inside poc_input_bundle.json with all paths resolved relative to the bundle file location. For the Q2 2026 PoC, the bundle goes at C:\Users\h02317\Downloads\fixtures\poc_input_bundle.json alongside the poc_input/ directory.
+For the user_guide.md, the pipeline reads four source files referenced inside poc_input_bundle.json with all paths resolved relative to the bundle file location. For the Q2 2026 PoC, the bundle goes at %USERPROFILE%\Downloads\fixtures\poc_input_bundle.json alongside the poc_input/ directory.
 
 The poc_input/ directory must contain the supplier KPIs spreadsheet, the Nordic Components quality audit PDF, the procurement meeting notes markdown file, and the delivery incidents CSV, plus the report_spec.json and report_template.md files.
 
@@ -598,7 +598,7 @@ copy poc\.env.example poc\.env
 # Open poc\.env and fill in your Azure OpenAI endpoint and API key
 
 # 3. Run
-python poc/run_poc.py --input C:\Users\h02317\Downloads\fixtures\poc_input_bundle.json
+python poc/run_poc.py --input %USERPROFILE%\Downloads\fixtures\poc_input_bundle.json
 
 # 4. Inspect outputs
 #    poc/output/report.md            -- draft report

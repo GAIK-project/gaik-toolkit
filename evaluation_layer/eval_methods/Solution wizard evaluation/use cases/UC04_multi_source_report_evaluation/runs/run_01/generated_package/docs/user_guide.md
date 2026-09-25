@@ -16,7 +16,7 @@ This proof of concept demonstrates: Given poc_input_bundle.json (four synthetic 
 - **Expected input:** spreadsheet, pdf, markdown, csv (formats: xlsx, pdf, md, csv)
 - Place your input file(s) in `poc/sample_input/`.
 
-The pipeline reads all source files from a bundle manifest — do **not** place files in `sample_input/` directly. Instead, pass a `poc_input_bundle.json` file that lists the four source paths (resolved relative to the bundle). The supplied fixture bundle is at `C:\Users\h02317\Downloads\fixtures\poc_input_bundle.json` and references:
+The pipeline reads all source files from a bundle manifest — do **not** place files in `sample_input/` directly. Instead, pass a `poc_input_bundle.json` file that lists the four source paths (resolved relative to the bundle). The supplied fixture bundle is at `%USERPROFILE%\Downloads\fixtures\poc_input_bundle.json` and references:
 
 | File | Format | Role |
 |------|--------|------|
@@ -35,7 +35,7 @@ python poc/run_poc.py --input <path-to-poc_input_bundle.json>
 Example using the supplied fixtures:
 
 ```bash
-python poc/run_poc.py --input "C:\Users\h02317\Downloads\fixtures\poc_input_bundle.json"
+python poc/run_poc.py --input "%USERPROFILE%\Downloads\fixtures\poc_input_bundle.json"
 ```
 
 The pipeline prints `[INFO]` / `[OK]` / `[ERROR]` status lines as it runs (Windows-safe ASCII). Per-section progress is shown during the agentic synthesis pass.

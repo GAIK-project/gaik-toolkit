@@ -1,6 +1,6 @@
 [
   {
-    "source_path": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\deployment-freeze-policy.pdf",
+    "source_path": "sample_inputs/deployment-freeze-policy.pdf",
     "source_type": "pdf",
     "metadata": {
       "index": 1,
@@ -12,7 +12,7 @@
     "content_chars": 2033
   },
   {
-    "source_path": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\meeting_recording.mp3",
+    "source_path": "sample_inputs/meeting_recording.mp3",
     "source_type": "audio",
     "metadata": {
       "index": 2,
@@ -24,7 +24,7 @@
     "content_chars": 1967
   },
   {
-    "source_path": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\notes.txt",
+    "source_path": "sample_inputs/notes.txt",
     "source_type": "text",
     "metadata": {
       "index": 3,
@@ -36,7 +36,7 @@
     "content_chars": 1004
   },
   {
-    "source_path": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\project-budget.xlsx",
+    "source_path": "sample_inputs/project-budget.xlsx",
     "source_type": "xlsx",
     "metadata": {
       "index": 4,
@@ -48,7 +48,7 @@
     "content_chars": 375
   },
   {
-    "source_path": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\sample_inputs\\sketch.png",
+    "source_path": "sample_inputs/sketch.png",
     "source_type": "image",
     "metadata": {
       "index": 5,

@@ -16,7 +16,7 @@ This proof of concept demonstrates: Run as 'python run_poc.py --input <path-to-p
 - **Expected input:** xlsx, pdf, markdown, csv (formats: xlsx, pdf, md, csv)
 - Place your input file(s) in `poc/sample_input/`.
 
-The pipeline reads the four source files referenced inside `poc_input_bundle.json`. All paths are resolved relative to the bundle file's directory. For the Q2 2026 PoC the ready-made bundle is at `C:\Users\h02317\Downloads\fixtures\poc_input_bundle.json`; the `poc_input/` directory alongside it must contain:
+The pipeline reads the four source files referenced inside `poc_input_bundle.json`. All paths are resolved relative to the bundle file's directory. For the Q2 2026 PoC the ready-made bundle is at `%USERPROFILE%\Downloads\fixtures\poc_input_bundle.json`; the `poc_input/` directory alongside it must contain:
 
 | File | Location in bundle | Format |
 |---|---|---|
@@ -29,7 +29,7 @@ The pipeline reads the four source files referenced inside `poc_input_bundle.jso
 
 ## Running
 ```bash
-python poc/run_poc.py --input C:\Users\h02317\Downloads\fixtures\poc_input_bundle.json
+python poc/run_poc.py --input %USERPROFILE%\Downloads\fixtures\poc_input_bundle.json
 ```
 
 ## Inspecting the output

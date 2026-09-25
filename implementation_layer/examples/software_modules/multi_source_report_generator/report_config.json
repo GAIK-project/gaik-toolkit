@@ -44,14 +44,14 @@
   "parser_options": {},
   "transcriber_options": {
     "ctor": {
-      "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\examples\\software_modules\\multi_source_report_generator\\output\\transcripts"
+      "output_dir": "output/transcripts"
     }
   },
   "image_options": {
     "mode": "parse"
   },
   "writer_options": {
-    "model": "gpt-5.4"
+    "model": "gpt-6-luna"
   },
   "agentic": true,
   "review_options": null,

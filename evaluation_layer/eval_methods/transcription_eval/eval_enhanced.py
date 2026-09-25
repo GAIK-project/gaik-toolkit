@@ -289,9 +289,7 @@ def main():
         print("Usage: python eval_enhanced.py <reference_dir> <original_dir> <enhanced_dir>")
         print()
         print("Example:")
-        print(
-            '  python eval_enhanced.py "C:\\Users\\h02317\\Downloads\\transcripts" transcripts enhanced'
-        )
+        print("  python eval_enhanced.py reference_transcripts transcripts enhanced")
         sys.exit(1)
 
     evaluate_batch(sys.argv[1], sys.argv[2], sys.argv[3])

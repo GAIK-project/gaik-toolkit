@@ -1,5 +1,7 @@
 # gaik-toolkit agent instructions
 
+This repo is public: never commit machine-local paths, usernames or secret-store locations.
+
 ## gaik-sync (keep the Solution Wizard in step with gaik)
 
 The Solution Wizard (`implementation_layer/solution_wizard/`) mirrors gaik's API in a

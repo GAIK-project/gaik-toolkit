@@ -514,7 +514,7 @@
   },
   "package": {
     "name": "supplier_performance_report_use_case",
-    "output_dir": "C:\\Users\\h02317\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\e292a67afa49",
+    "output_dir": "%USERPROFILE%\\gaik-toolkit\\implementation_layer\\toolkit_demo_app\\api\\.wizard_workspaces\\e292a67afa49",
     "include_tests": true,
     "include_evals": true,
     "include_docs": true

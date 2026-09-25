@@ -103,7 +103,7 @@ Use MultiSourceReportGenerator as the single primary end-to-end module. Do not c
 
 Require the exact title, all six headings, a KPI table with one-decimal calculations, an action table with supported owners and dates, inline [source_file] references, and an evidence index that covers all four source files. Explicitly disclose the approximate spend discrepancy. Reject unsupported facts, actions, references, or a claim that the PoC draft is already approved. The procurement manager either approves the draft for release or returns it for analyst rework and regeneration.
 
-The documents mentioned about are in "C:\Users\h02317\Downloads\fixtures".
+The documents mentioned about are in "%USERPROFILE%\Downloads\fixtures".
 
 ---
 Wizard:
@@ -166,7 +166,7 @@ For multi_source_report, Round 3 collects:
 2. Per-section instructions
 3. Depends_on relationships - "from report_spec.json"
 
-The user mentioned `report_spec.json` is in `C:\Users\h02317\Downloads\fixtures`. Let me read that file to understand the section specifications. I should also check what other fixture files are there.
+The user mentioned `report_spec.json` is in `%USERPROFILE%\Downloads\fixtures`. Let me read that file to understand the section specifications. I should also check what other fixture files are there.
 Let me also read the other fixture files to understand the expected output.Now I have a complete picture. Let me also check the fixture_manifest.json and the source files listing.
 
 I have everything I need for Round 3. The report_spec.json gives me the sections with their instructions and depends_on. 
@@ -188,7 +188,7 @@ The report must have the exact title, all six required sections, a KPI table wit
 
 Let me construct the blueprint properly following the template structure. I'll use the current date 2026-08-10 as specified.
 
-The output directory is: C:\Users\h02317\gaik-toolkit\implementation_layer\toolkit_demo_app\api\.wizard_workspaces\106758202084
+The output directory is: %USERPROFILE%\gaik-toolkit\implementation_layer\toolkit_demo_app\api\.wizard_workspaces\106758202084
 
 Let me draft the complete blueprint:I need to fix two issues:
 1. `use_case.knowledge_processes` - only allows `knowledge_capture`, `knowledge_access`, or `knowledge_synthesis`. I should use `knowledge_synthesis` (main) and `knowledge_capture`.
@@ -599,7 +599,7 @@ Scaffolding the PoC now.Pattern is `_generic` — I need to wire the step blocks
    (fill in AZURE_API_KEY and AZURE_ENDPOINT)
 
 3. Run the pipeline:
-   python poc/run_poc.py --input "C:\Users\h02317\Downloads\fixtures\poc_input_bundle.json"
+   python poc/run_poc.py --input "%USERPROFILE%\Downloads\fixtures\poc_input_bundle.json"
 
 4. Inspect the output:
    poc/output/report.md          — Markdown draft (six sections, KPI table, citations)
@@ -846,7 +846,7 @@ Starting with the blueprint update (Issue 2), then patching run_poc.py for both 
 
 **To re-run:**
 ```
-python poc/run_poc.py --input "C:\Users\h02317\Downloads\fixtures\poc_input_bundle.json"
+python poc/run_poc.py --input "%USERPROFILE%\Downloads\fixtures\poc_input_bundle.json"
 ```
 
 The output should now have:
@@ -1016,7 +1016,7 @@ Now update `_SECTION_OVERRIDES` in run_poc.py:Done. Blueprint is at v1.2, valida
 
 **To re-run:**
 ```
-python poc/run_poc.py --input "C:\Users\h02317\Downloads\fixtures\poc_input_bundle.json"
+python poc/run_poc.py --input "%USERPROFILE%\Downloads\fixtures\poc_input_bundle.json"
 ```
 
 The expected Actions table should now contain exactly the five actions from the meeting notes action log — no Baltic Fasteners monitoring row. Paste the updated `output/report.md` and I'll confirm Gate 3.

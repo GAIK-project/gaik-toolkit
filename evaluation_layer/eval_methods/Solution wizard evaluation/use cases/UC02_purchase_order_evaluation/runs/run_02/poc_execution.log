@@ -1,61 +1,61 @@
 Run: UC02_run_02
 Attempt: 0 (original)
 EQ4 baseline: True
-Fixture: {'path': 'C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\fixtures\\purchase_order_complex.pdf', 'sha256': 'e8d0ec6d20e6d3ede18f5d250c1229ce2fbdf0991b5c3d0a4a1d06a662e25fe9', 'size_bytes': 47474}
-Setup command: ['C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-m', 'pip', 'install', '-r', 'requirements.txt']
+Fixture: {'path': '%USERPROFILE%\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\fixtures\\purchase_order_complex.pdf', 'sha256': 'e8d0ec6d20e6d3ede18f5d250c1229ce2fbdf0991b5c3d0a4a1d06a662e25fe9', 'size_bytes': 47474}
+Setup command: ['%USERPROFILE%\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', '-m', 'pip', 'install', '-r', 'requirements.txt']
 Setup exit code: 0
 --- setup stdout ---
-Requirement already satisfied: pydantic>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 1)) (2.12.5)
-Requirement already satisfied: python-dotenv in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 2)) (1.2.1)
-Requirement already satisfied: pyyaml in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 5)) (6.0.3)
-Requirement already satisfied: gaik[llm-judge] in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 3)) (0.5.16)
-Requirement already satisfied: annotated-types>=0.6.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.7.0)
-Requirement already satisfied: pydantic-core==2.41.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (2.41.5)
-Requirement already satisfied: typing-extensions>=4.14.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (4.15.0)
-Requirement already satisfied: typing-inspection>=0.4.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.4.2)
-Requirement already satisfied: openai>=2.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[llm-judge]->-r requirements.txt (line 3)) (2.8.1)
-Requirement already satisfied: anthropic>=0.43.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[vision-extract]->-r requirements.txt (line 4)) (0.96.0)
-Requirement already satisfied: google-auth>=2.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[vision-extract]->-r requirements.txt (line 4)) (2.50.0)
-Requirement already satisfied: requests>=2.31.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[vision-extract]->-r requirements.txt (line 4)) (2.32.5)
-Requirement already satisfied: anyio<5,>=3.5.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (4.12.0)
-Requirement already satisfied: distro<2,>=1.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (1.9.0)
-Requirement already satisfied: docstring-parser<1,>=0.15 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.18.0)
-Requirement already satisfied: httpx<1,>=0.25.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.28.1)
-Requirement already satisfied: jiter<1,>=0.4.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.12.0)
-Requirement already satisfied: sniffio in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (1.3.1)
-Requirement already satisfied: pyasn1-modules>=0.2.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.4.2)
-Requirement already satisfied: cryptography>=38.0.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (46.0.3)
-Requirement already satisfied: tqdm>4 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[llm-judge]->-r requirements.txt (line 3)) (4.67.1)
-Requirement already satisfied: charset_normalizer<4,>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (3.4.4)
-Requirement already satisfied: idna<4,>=2.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (3.11)
-Requirement already satisfied: urllib3<3,>=1.21.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2.6.2)
-Requirement already satisfied: certifi>=2017.4.17 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2025.11.12)
-Requirement already satisfied: google-genai>=0.3.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[llm-judge]->-r requirements.txt (line 3)) (1.74.0)
-Requirement already satisfied: cffi>=2.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from cryptography>=38.0.3->google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2.0.0)
-Requirement already satisfied: tenacity<9.2.0,>=8.2.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[llm-judge]->-r requirements.txt (line 3)) (9.1.2)
-Requirement already satisfied: websockets<17.0,>=13.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[llm-judge]->-r requirements.txt (line 3)) (15.0.1)
-Requirement already satisfied: httpcore==1.* in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpx<1,>=0.25.0->anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (1.0.9)
-Requirement already satisfied: h11>=0.16 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpcore==1.*->httpx<1,>=0.25.0->anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.16.0)
-Requirement already satisfied: pyasn1<0.7.0,>=0.6.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pyasn1-modules>=0.2.1->google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.6.1)
-Requirement already satisfied: colorama in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from tqdm>4->openai>=2.7.0->gaik[llm-judge]->-r requirements.txt (line 3)) (0.4.6)
-Requirement already satisfied: pycparser in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from cffi>=2.0.0->cryptography>=38.0.3->google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2.23)
+Requirement already satisfied: pydantic>=2 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 1)) (2.12.5)
+Requirement already satisfied: python-dotenv in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 2)) (1.2.1)
+Requirement already satisfied: pyyaml in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 5)) (6.0.3)
+Requirement already satisfied: gaik[llm-judge] in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 3)) (0.5.16)
+Requirement already satisfied: annotated-types>=0.6.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.7.0)
+Requirement already satisfied: pydantic-core==2.41.5 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (2.41.5)
+Requirement already satisfied: typing-extensions>=4.14.1 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (4.15.0)
+Requirement already satisfied: typing-inspection>=0.4.2 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.4.2)
+Requirement already satisfied: openai>=2.7.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[llm-judge]->-r requirements.txt (line 3)) (2.8.1)
+Requirement already satisfied: anthropic>=0.43.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[vision-extract]->-r requirements.txt (line 4)) (0.96.0)
+Requirement already satisfied: google-auth>=2.0.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[vision-extract]->-r requirements.txt (line 4)) (2.50.0)
+Requirement already satisfied: requests>=2.31.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[vision-extract]->-r requirements.txt (line 4)) (2.32.5)
+Requirement already satisfied: anyio<5,>=3.5.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (4.12.0)
+Requirement already satisfied: distro<2,>=1.7.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (1.9.0)
+Requirement already satisfied: docstring-parser<1,>=0.15 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.18.0)
+Requirement already satisfied: httpx<1,>=0.25.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.28.1)
+Requirement already satisfied: jiter<1,>=0.4.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.12.0)
+Requirement already satisfied: sniffio in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (1.3.1)
+Requirement already satisfied: pyasn1-modules>=0.2.1 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.4.2)
+Requirement already satisfied: cryptography>=38.0.3 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (46.0.3)
+Requirement already satisfied: tqdm>4 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[llm-judge]->-r requirements.txt (line 3)) (4.67.1)
+Requirement already satisfied: charset_normalizer<4,>=2 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (3.4.4)
+Requirement already satisfied: idna<4,>=2.5 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (3.11)
+Requirement already satisfied: urllib3<3,>=1.21.1 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2.6.2)
+Requirement already satisfied: certifi>=2017.4.17 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2025.11.12)
+Requirement already satisfied: google-genai>=0.3.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[llm-judge]->-r requirements.txt (line 3)) (1.74.0)
+Requirement already satisfied: cffi>=2.0.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from cryptography>=38.0.3->google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2.0.0)
+Requirement already satisfied: tenacity<9.2.0,>=8.2.3 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[llm-judge]->-r requirements.txt (line 3)) (9.1.2)
+Requirement already satisfied: websockets<17.0,>=13.0.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[llm-judge]->-r requirements.txt (line 3)) (15.0.1)
+Requirement already satisfied: httpcore==1.* in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from httpx<1,>=0.25.0->anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (1.0.9)
+Requirement already satisfied: h11>=0.16 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from httpcore==1.*->httpx<1,>=0.25.0->anthropic>=0.43.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.16.0)
+Requirement already satisfied: pyasn1<0.7.0,>=0.6.1 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from pyasn1-modules>=0.2.1->google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (0.6.1)
+Requirement already satisfied: colorama in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from tqdm>4->openai>=2.7.0->gaik[llm-judge]->-r requirements.txt (line 3)) (0.4.6)
+Requirement already satisfied: pycparser in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from cffi>=2.0.0->cryptography>=38.0.3->google-auth>=2.0.0->gaik[vision-extract]->-r requirements.txt (line 4)) (2.23)
 
 --- setup stderr ---
 
 [notice] A new release of pip is available: 25.0.1 -> 26.1.2
 [notice] To update, run: python.exe -m pip install --upgrade pip
 
-Run command: ['C:\\Users\\h02317\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', 'run_poc.py']
+Run command: ['%USERPROFILE%\\AppData\\Local\\Programs\\Python\\Python312\\python.exe', 'run_poc.py']
 Run exit code: 0
 --- run stdout ---
-Input: C:\Users\h02317\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\poc\sample_input\purchase_order_complex.pdf
+Input: %USERPROFILE%\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\poc\sample_input\purchase_order_complex.pdf
 Warning: Additional format options not available. Only PDF will be supported.
 Using wizard-approved schema (requirements unchanged).
 Extracting PO fields with VisionExtractor...
 Extraction complete: 1 document(s) processed.
 Usage: 8341 tokens  |  Cost: $0.053503
 
-Result written to: C:\Users\h02317\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\poc\output\result.json
+Result written to: %USERPROFILE%\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\poc\output\result.json
 {
   "purchase_order_number": {
     "value": "PO-2026-0471",
@@ -304,12 +304,12 @@ WARNING: 5 hallucination flag(s) detected:
   field=line_items[1].applicable_standard  value=null  reason=Source gives only ASTM A276 as the standard; no extra applicable standard is stated.
   field=line_items[1].special_flags  value=null  reason=No special flags are stated for item 0020 anywhere in the source.
   field=line_items[2].applicable_standard  value=null  reason=Source gives only ASTM B221 as the standard; no extra applicable standard is stated.
-Validation report written to: C:\Users\h02317\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\poc\output\validation.json
+Validation report written to: %USERPROFILE%\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\poc\output\validation.json
 
 --- Record ready for reviewer verification ---
 Approved JSON may be transferred to ERP. Unreviewed records must NOT be transferred.
 
-No fixture found at C:\Users\h02317\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\fixtures\expected_erp_record.json -- skipping comparison.
+No fixture found at %USERPROFILE%\Downloads\Wizard evaluation\UC02_purchase_order_evaluation\runs\run_02\generated_package\fixtures\expected_erp_record.json -- skipping comparison.
 To enable: place your expected_erp_record.json in the fixtures/ directory.
 
 PoC complete.
@@ -321,7 +321,7 @@ INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/opena
 --- outputs ---
 [
   {
-    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\result.json",
+    "path": "%USERPROFILE%\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\result.json",
     "relative_path": "output\\result.json",
     "size_bytes": 10052,
     "new_or_modified": true,
@@ -569,7 +569,7 @@ INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/opena
     }
   },
   {
-    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\validation.json",
+    "path": "%USERPROFILE%\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\validation.json",
     "relative_path": "output\\validation.json",
     "size_bytes": 1124,
     "new_or_modified": true,
@@ -612,7 +612,7 @@ INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/opena
     }
   },
   {
-    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\result.json",
+    "path": "%USERPROFILE%\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\result.json",
     "relative_path": "output\\result.json",
     "size_bytes": 10052,
     "new_or_modified": true,
@@ -860,7 +860,7 @@ INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/opena
     }
   },
   {
-    "path": "C:\\Users\\h02317\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\validation.json",
+    "path": "%USERPROFILE%\\Downloads\\Wizard evaluation\\UC02_purchase_order_evaluation\\runs\\run_02\\generated_package\\poc\\output\\validation.json",
     "relative_path": "output\\validation.json",
     "size_bytes": 1124,
     "new_or_modified": true,

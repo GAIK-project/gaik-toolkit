@@ -1,47 +1,47 @@
 --- setup command ---
-'C:\Users\h02317\AppData\Local\Programs\Python\Python312\python.exe' -m pip install -r requirements.txt
+'%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe' -m pip install -r requirements.txt
 
 exit code: 0
 
 --- setup stdout ---
-Requirement already satisfied: pydantic>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 1)) (2.12.5)
-Requirement already satisfied: python-dotenv in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 2)) (1.2.1)
-Requirement already satisfied: pyyaml in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 7)) (6.0.3)
-Requirement already satisfied: gaik[extract] in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 3)) (0.5.18)
-Requirement already satisfied: annotated-types>=0.6.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.7.0)
-Requirement already satisfied: pydantic-core==2.41.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (2.41.5)
-Requirement already satisfied: typing-extensions>=4.14.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (4.15.0)
-Requirement already satisfied: typing-inspection>=0.4.2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.4.2)
-Requirement already satisfied: openai>=2.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (2.8.1)
-Requirement already satisfied: PyMuPDF>=1.26.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[parser-cpu]->-r requirements.txt (line 5)) (1.27.2.2)
-Requirement already satisfied: python-docx>=1.2.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[parser-cpu]->-r requirements.txt (line 5)) (1.2.0)
-Requirement already satisfied: pydub>=0.25.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[transcriber]->-r requirements.txt (line 6)) (0.25.1)
-Requirement already satisfied: requests>=2.31.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[transcriber]->-r requirements.txt (line 6)) (2.32.5)
-Requirement already satisfied: anyio<5,>=3.5.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (4.12.0)
-Requirement already satisfied: distro<2,>=1.7.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (1.9.0)
-Requirement already satisfied: httpx<1,>=0.23.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.28.1)
-Requirement already satisfied: jiter<1,>=0.10.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.12.0)
-Requirement already satisfied: sniffio in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (1.3.1)
-Requirement already satisfied: tqdm>4 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (4.67.1)
-Requirement already satisfied: lxml>=3.1.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from python-docx>=1.2.0->gaik[parser-cpu]->-r requirements.txt (line 5)) (6.0.2)
-Requirement already satisfied: charset_normalizer<4,>=2 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (3.4.4)
-Requirement already satisfied: idna<4,>=2.5 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (3.11)
-Requirement already satisfied: urllib3<3,>=1.21.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (2.6.2)
-Requirement already satisfied: certifi>=2017.4.17 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (2025.11.12)
-Requirement already satisfied: anthropic>=0.43.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (0.96.0)
-Requirement already satisfied: google-genai>=0.3.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (1.74.0)
-Requirement already satisfied: google-auth>=2.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (2.50.0)
-Requirement already satisfied: docstring-parser<1,>=0.15 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[extract]->-r requirements.txt (line 3)) (0.18.0)
-Requirement already satisfied: pyasn1-modules>=0.2.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (0.4.2)
-Requirement already satisfied: cryptography>=38.0.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (46.0.3)
-Requirement already satisfied: tenacity<9.2.0,>=8.2.3 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[extract]->-r requirements.txt (line 3)) (9.1.2)
-Requirement already satisfied: websockets<17.0,>=13.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[extract]->-r requirements.txt (line 3)) (15.0.1)
-Requirement already satisfied: httpcore==1.* in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpx<1,>=0.23.0->openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (1.0.9)
-Requirement already satisfied: h11>=0.16 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from httpcore==1.*->httpx<1,>=0.23.0->openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.16.0)
-Requirement already satisfied: colorama in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from tqdm>4->openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.4.6)
-Requirement already satisfied: cffi>=2.0.0 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from cryptography>=38.0.3->google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (2.0.0)
-Requirement already satisfied: pyasn1<0.7.0,>=0.6.1 in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from pyasn1-modules>=0.2.1->google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (0.6.1)
-Requirement already satisfied: pycparser in c:\users\h02317\appdata\local\programs\python\python312\lib\site-packages (from cffi>=2.0.0->cryptography>=38.0.3->google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (2.23)
+Requirement already satisfied: pydantic>=2 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 1)) (2.12.5)
+Requirement already satisfied: python-dotenv in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 2)) (1.2.1)
+Requirement already satisfied: pyyaml in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 7)) (6.0.3)
+Requirement already satisfied: gaik[extract] in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from -r requirements.txt (line 3)) (0.5.18)
+Requirement already satisfied: annotated-types>=0.6.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.7.0)
+Requirement already satisfied: pydantic-core==2.41.5 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (2.41.5)
+Requirement already satisfied: typing-extensions>=4.14.1 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (4.15.0)
+Requirement already satisfied: typing-inspection>=0.4.2 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from pydantic>=2->-r requirements.txt (line 1)) (0.4.2)
+Requirement already satisfied: openai>=2.7.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (2.8.1)
+Requirement already satisfied: PyMuPDF>=1.26.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[parser-cpu]->-r requirements.txt (line 5)) (1.27.2.2)
+Requirement already satisfied: python-docx>=1.2.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[parser-cpu]->-r requirements.txt (line 5)) (1.2.0)
+Requirement already satisfied: pydub>=0.25.1 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[transcriber]->-r requirements.txt (line 6)) (0.25.1)
+Requirement already satisfied: requests>=2.31.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[transcriber]->-r requirements.txt (line 6)) (2.32.5)
+Requirement already satisfied: anyio<5,>=3.5.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (4.12.0)
+Requirement already satisfied: distro<2,>=1.7.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (1.9.0)
+Requirement already satisfied: httpx<1,>=0.23.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.28.1)
+Requirement already satisfied: jiter<1,>=0.10.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.12.0)
+Requirement already satisfied: sniffio in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (1.3.1)
+Requirement already satisfied: tqdm>4 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (4.67.1)
+Requirement already satisfied: lxml>=3.1.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from python-docx>=1.2.0->gaik[parser-cpu]->-r requirements.txt (line 5)) (6.0.2)
+Requirement already satisfied: charset_normalizer<4,>=2 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (3.4.4)
+Requirement already satisfied: idna<4,>=2.5 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (3.11)
+Requirement already satisfied: urllib3<3,>=1.21.1 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (2.6.2)
+Requirement already satisfied: certifi>=2017.4.17 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from requests>=2.31.0->gaik[transcriber]->-r requirements.txt (line 6)) (2025.11.12)
+Requirement already satisfied: anthropic>=0.43.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (0.96.0)
+Requirement already satisfied: google-genai>=0.3.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (1.74.0)
+Requirement already satisfied: google-auth>=2.0.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from gaik[extract]->-r requirements.txt (line 3)) (2.50.0)
+Requirement already satisfied: docstring-parser<1,>=0.15 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from anthropic>=0.43.0->gaik[extract]->-r requirements.txt (line 3)) (0.18.0)
+Requirement already satisfied: pyasn1-modules>=0.2.1 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (0.4.2)
+Requirement already satisfied: cryptography>=38.0.3 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (46.0.3)
+Requirement already satisfied: tenacity<9.2.0,>=8.2.3 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[extract]->-r requirements.txt (line 3)) (9.1.2)
+Requirement already satisfied: websockets<17.0,>=13.0.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from google-genai>=0.3.0->gaik[extract]->-r requirements.txt (line 3)) (15.0.1)
+Requirement already satisfied: httpcore==1.* in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from httpx<1,>=0.23.0->openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (1.0.9)
+Requirement already satisfied: h11>=0.16 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from httpcore==1.*->httpx<1,>=0.23.0->openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.16.0)
+Requirement already satisfied: colorama in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from tqdm>4->openai>=2.7.0->gaik[extract]->-r requirements.txt (line 3)) (0.4.6)
+Requirement already satisfied: cffi>=2.0.0 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from cryptography>=38.0.3->google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (2.0.0)
+Requirement already satisfied: pyasn1<0.7.0,>=0.6.1 in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from pyasn1-modules>=0.2.1->google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (0.6.1)
+Requirement already satisfied: pycparser in %USERPROFILE%\appdata\local\programs\python\python312\lib\site-packages (from cffi>=2.0.0->cryptography>=38.0.3->google-auth>=2.0.0->gaik[extract]->-r requirements.txt (line 3)) (2.23)
 
 
 --- setup stderr ---
@@ -51,18 +51,18 @@ Requirement already satisfied: pycparser in c:\users\h02317\appdata\local\progra
 
 
 --- run command ---
-'C:\Users\h02317\AppData\Local\Programs\Python\Python312\python.exe' run_poc.py --input 'C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\poc_input_bundle.json'
+'%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe' run_poc.py --input '%USERPROFILE%\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\poc_input_bundle.json'
 
 exit code: 0
 
 --- run stdout ---
-meeting_audio: C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_meeting.wav
-agenda_pdf: C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_agenda.pdf
-participant_list: C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_participants.json
+meeting_audio: %USERPROFILE%\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_meeting.wav
+agenda_pdf: %USERPROFILE%\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_agenda.pdf
+participant_list: %USERPROFILE%\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_participants.json
 
 [1/3] Transcribing meeting recording (whisper_local)...
 ================================================================================
-Transcribing file: C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_meeting.wav
+Transcribing file: %USERPROFILE%\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\fixtures\input\project_nimbus_meeting.wav
 ================================================================================
 Transcribing prompt: Detect the language and extract transcript in the same language. The audio could be in any language, such as English, Finnish, Swedish, etc.
 Sending: project_nimbus_meeting.wav ...
@@ -88,7 +88,7 @@ Processing document 1/1...
 
 OK Completed extraction from 1 document(s)
 
-Result written to: C:\Users\h02317\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\runs\run_02\generated_package\poc\output\meeting_record.json
+Result written to: %USERPROFILE%\Solution wizard evaluation\use cases\UC05_multimodal_meeting_evaluation\runs\run_02\generated_package\poc\output\meeting_record.json
 {
   "meeting_id": "NIMBUS-PRR-2026-09-17",
   "title": "Project Nimbus Pilot Readiness Review",
@@ -253,12 +253,12 @@ INFO:httpx:HTTP Request: POST https://haagahelia-poc-gaik.openai.azure.com/opena
 --- outputs ---
 [
   {
-    "path": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC05_multimodal_meeting_evaluation\\runs\\run_02\\generated_package\\poc\\output\\meeting_record.json",
+    "path": "%USERPROFILE%\\Solution wizard evaluation\\use cases\\UC05_multimodal_meeting_evaluation\\runs\\run_02\\generated_package\\poc\\output\\meeting_record.json",
     "size_bytes": 5897,
     "parseable_json": true
   },
   {
-    "path": "C:\\Users\\h02317\\Solution wizard evaluation\\use cases\\UC05_multimodal_meeting_evaluation\\runs\\run_02\\generated_package\\poc\\output\\validation.json",
+    "path": "%USERPROFILE%\\Solution wizard evaluation\\use cases\\UC05_multimodal_meeting_evaluation\\runs\\run_02\\generated_package\\poc\\output\\validation.json",
     "size_bytes": 442,
     "parseable_json": true
   }

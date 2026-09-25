@@ -1,6 +1,6 @@
 """LLM-as-Judge Panel (jury) demo.
 
-Runs three judges (Gemini + Claude + GPT-5.4-mini) over the same extractor
+Runs three judges (Gemini + Claude + GPT-6 Luna) over the same extractor
 output and aggregates them via majority vote. Useful when:
 
   - You want to mitigate single-model self-preference bias
@@ -56,7 +56,7 @@ def main() -> None:
         judges=[
             LLMJudge(model_provider="google", model="gemini-3-flash-preview", use_vertexai=True),
             LLMJudge(model_provider="anthropic", model="claude-haiku-4-5-20251001"),
-            LLMJudge(model_provider="azure", model="gpt-5.4-mini", use_azure=True),
+            LLMJudge(model_provider="azure", model="gpt-6-luna", use_azure=True),
         ]
     )
 

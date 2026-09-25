@@ -1,6 +1,6 @@
 ## Source 1: supplier_kpis_q2_2026.xlsx
 Type: xlsx
-Path: C:\Users\h02317\Downloads\Wizard evaluation\UC04_multi_source_report_evaluation\fixtures\poc_input\sources\supplier_kpis_q2_2026.xlsx
+Path: %USERPROFILE%\Downloads\Wizard evaluation\UC04_multi_source_report_evaluation\fixtures\poc_input\sources\supplier_kpis_q2_2026.xlsx
 
 ### Sheet: Monthly KPI Data
 
@@ -106,7 +106,7 @@ Path: C:\Users\h02317\Downloads\Wizard evaluation\UC04_multi_source_report_evalu
 
 ## Source 2: nordic_components_quality_audit.pdf
 Type: pdf
-Path: C:\Users\h02317\Downloads\Wizard evaluation\UC04_multi_source_report_evaluation\fixtures\poc_input\sources\nordic_components_quality_audit.pdf
+Path: %USERPROFILE%\Downloads\Wizard evaluation\UC04_multi_source_report_evaluation\fixtures\poc_input\sources\nordic_components_quality_audit.pdf
 
 Nordic Components Quality Audit - Q2 2026 | Synthetic evaluation fixture
 Page 1
@@ -435,7 +435,7 @@ Audit report issued; supplier corrective action remains open
 
 ## Source 3: procurement_meeting_notes_q2_2026.md
 Type: markdown
-Path: C:\Users\h02317\Downloads\Wizard evaluation\UC04_multi_source_report_evaluation\fixtures\poc_input\sources\procurement_meeting_notes_q2_2026.md
+Path: %USERPROFILE%\Downloads\Wizard evaluation\UC04_multi_source_report_evaluation\fixtures\poc_input\sources\procurement_meeting_notes_q2_2026.md
 
 # Procurement Review Meeting Notes - Q2 2026
 
@@ -568,7 +568,7 @@ These notes are part of a synthetic evaluation package. They do not contain pers
 
 ## Source 4: delivery_incidents_q2_2026.csv
 Type: csv
-Path: C:\Users\h02317\Downloads\Wizard evaluation\UC04_multi_source_report_evaluation\fixtures\poc_input\sources\delivery_incidents_q2_2026.csv
+Path: %USERPROFILE%\Downloads\Wizard evaluation\UC04_multi_source_report_evaluation\fixtures\poc_input\sources\delivery_incidents_q2_2026.csv
 
 | incident_id | supplier | date | shipment_reference | purchase_order | receiving_site | material_group | delay_days | cause_category | cause_detail | operational_impact | production_delay_hours | containment_action | corrective_action_owner | status | closure_date | source_record |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
