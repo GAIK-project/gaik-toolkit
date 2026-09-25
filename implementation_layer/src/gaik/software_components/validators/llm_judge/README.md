@@ -132,18 +132,46 @@ The severity-to-score mapping the prompt enforces:
 - score 2-3 → "suspect"
 - score 4-5 → "ok"
 
+## Shared provider configuration
+
+```python
+from gaik.software_components.llm import get_llm_config
+from gaik.software_components.validators import LLMJudge
+
+judge = LLMJudge(config=get_llm_config("openai", model="gpt-6-luna"))
+result = judge.judge_text_pair("The total is 12 euros.", "Total: EUR 12.")
+
+aitta_judge = LLMJudge(config=get_llm_config("aitta"))
+```
+
+`config` takes precedence over the legacy provider flags and selects the shared
+client used by the other components. Text judging works with any configured chat
+provider. `validate(...)` and image-based comparisons require a vision-capable
+model; provider support alone does not guarantee that capability. Native
+Google/Vertex and Anthropic adapters translate image messages, while Aitta,
+OpenAI-compatible servers and optional LiteLLM use the configured model's image
+support. Aitta credentials and endpoints remain separate from Azure/OpenAI.
+
+Legacy `model_provider="openai"` and `model_provider="azure"` now default to
+`gpt-6-luna`; set `model` to your Azure deployment name when it differs. Explicit
+`model_provider="azure"` always selects Azure. GPT-6 reasoning settings are
+validated before the request, including Astra's requirement to keep reasoning
+enabled. The overall no-argument judge still defaults to the Google legacy path.
+
 ## API
 
 ```python
 class LLMJudge:
     def __init__(
         self,
-        model_provider: Literal["openai", "azure", "anthropic", "google"] = "google",
+        model_provider: str = "google",
         model: str | None = None,
         use_azure: bool = True,
         use_vertexai: bool = True,
         max_tokens: int = 4096,
         reasoning_effort: str | None = None,
+        *,
+        config: dict | None = None,
     ): ...
 
     def validate(

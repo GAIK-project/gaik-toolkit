@@ -50,3 +50,28 @@ prefer `graphify query|path|explain` for codebase questions and run `graphify up
 after code changes. If it is not installed, use normal search and do not mention it.
 Invoke `/graphify` only when that skill is listed. Dirty `graphify-out/` files are
 expected.
+
+## release certification (required before every tag and PyPI release)
+
+- Every version tag/release requires real authenticated component tests, not only
+  imports, mocked calls, or the presence of API keys. Before tagging, commit the
+  intended release, set the wizard validated pin to the planned version, then run
+  `uv run python scripts/release_check.py --live --version X.Y.Z`. The command runs
+  all-extras sync, offline tests, wizard tests/audit, package validation, and bounded
+  live component checks. A passing sanitized `results/release-check.json` must name
+  the exact commit and planned version. Rerun after any tracked release change.
+- Set `RELEASE_PROVIDERS` and explicit `RELEASE_<PROVIDER>_MODEL` model/deployment IDs.
+  Check current official model documentation/catalogs before choosing IDs; do not
+  assume a model name in an old example is current. Every changed provider/model
+  family and every newly added provider needs a sanitized live smoke report before
+  tagging. The normal matrix is representative; exhaustive catalog evaluation is
+  separate and must not automatically run on every release.
+- CI always requires Azure plus any providers selected in `RELEASE_PROVIDERS`.
+  Missing selected credentials, timeouts, skipped required checks, and invalid model
+  output fail the gate. Do not turn these into a pass or bypass the gate to publish.
+  Aitta and other optional providers can be certified locally; do not require a
+  permanently valid Aitta token for unrelated releases.
+- `publish.yml` calls the test workflow with `release_gate: true`; publishing depends
+  on that complete workflow succeeding. Do not tag, upload to PyPI, or deploy the
+  demo until the applicable certification passes. Keep credentials, raw provider
+  errors, and personal documents out of reports; use the synthetic fixtures.

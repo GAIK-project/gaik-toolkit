@@ -15,6 +15,10 @@ from __future__ import annotations
 # (input_per_M_USD, output_per_M_USD)
 JUDGE_PRICING_PER_M: dict[str, tuple[float, float]] = {
     # OpenAI / Azure
+    # GPT-6 standard short-context list prices, verified 2026-09-25.
+    "gpt-6-astra": (10.00, 50.00),
+    "gpt-6-sol": (2.00, 10.00),
+    "gpt-6-luna": (0.10, 0.50),
     "gpt-5.5": (3.00, 15.00),
     "gpt-5.4": (2.50, 10.00),
     "gpt-5.4-mini": (0.25, 2.00),

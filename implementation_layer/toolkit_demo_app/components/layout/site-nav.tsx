@@ -1,5 +1,8 @@
 "use client";
 
+import { ModelSettingsButton } from "@/components/model-settings";
+import { setModelSettings } from "@/lib/model-settings-store";
+
 import { GitHubIcon } from "@/components/github-icon";
 import {
   Glimpse,
@@ -302,6 +305,7 @@ function GitHubLink({ preview, variant }: GitHubLinkProps) {
 
 /** Handles sign-out via API and redirects */
 async function handleSignOut(): Promise<void> {
+  setModelSettings(null);
   const res = await fetch("/api/auth/sign-out", { method: "POST" });
   const data = await res.json();
   if (data.redirectTo) {
@@ -583,7 +587,8 @@ export function SiteNav({
                                         href={item.href}
                                         className={cn(
                                           "hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full space-y-1 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none",
-                                          active && "bg-primary/10 text-primary",
+                                          active &&
+                                            "bg-primary/10 text-primary",
                                         )}
                                       >
                                         <div className="flex items-center gap-2 text-sm leading-none font-medium">
@@ -705,7 +710,11 @@ export function SiteNav({
 
         {/* Right: Actions */}
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
-          <GitHubLink preview={mounted ? githubPreview : null} variant="desktop" />
+          <ModelSettingsButton />
+          <GitHubLink
+            preview={mounted ? githubPreview : null}
+            variant="desktop"
+          />
           {isLoggedIn && (
             <Button
               variant="ghost"

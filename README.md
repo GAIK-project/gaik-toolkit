@@ -13,6 +13,18 @@ https://gaik-project.github.io/gaik-toolkit/
 
 **Live Demo:** https://gaik-demo.2.rahtiapp.fi/
 
+## Use different model providers
+
+The Python toolkit provides one `ProviderClient` interface for OpenAI, Azure OpenAI,
+Google Gemini, Anthropic, CSC Aitta, and other OpenAI-compatible servers. Configure the
+provider with `get_llm_config("azure")`, `get_llm_config("google")`, or
+`get_llm_config("aitta")` and pass that config to supported text components. Aitta and
+other compatible servers reuse the OpenAI SDK, so LiteLLM is not required. Capabilities
+such as structured output and embeddings depend on the selected model.
+
+See [provider configuration and examples](implementation_layer/README.md#configuration--environment-variables)
+and the [multi-provider guide](guidance_layer/website/content/docs/toolkit/multi-provider-llm.mdx).
+
 # Why the toolkit is needed
 
 **Generative AI has significant potential to increase the productivity of knowledge work** 

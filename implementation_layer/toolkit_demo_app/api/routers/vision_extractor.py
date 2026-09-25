@@ -16,8 +16,8 @@ from typing import Any, Literal
 try:
     from utils import (
         MODEL,
-        MODEL_OPTIONS,
         get_api_config,
+        get_model_options,
         load_saved_requirements,
         load_saved_schema,
         schema_to_python_source,
@@ -26,8 +26,8 @@ try:
 except ImportError:
     from api.utils import (
         MODEL,
-        MODEL_OPTIONS,
         get_api_config,
+        get_model_options,
         load_saved_requirements,
         load_saved_schema,
         schema_to_python_source,
@@ -36,6 +36,11 @@ except ImportError:
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
+
+try:
+    from utils.model_settings import get_request_api_config, provider_error_detail
+except ImportError:
+    from api.utils.model_settings import get_request_api_config, provider_error_detail
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -55,23 +60,22 @@ SUPPORTED_SUFFIXES = {
 Provider = Literal["openai", "azure", "claude", "google"]
 ReasoningEffort = Literal["low", "medium", "high"]
 
+_OPENAI_MODELS = tuple(
+    value.strip()
+    for value in os.getenv(
+        "DEMO_OPENAI_MODELS", "gpt-6-luna,gpt-6-sol,gpt-6-astra,gpt-5.6-terra"
+    ).split(",")
+    if value.strip()
+)
 PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
-    "openai": (
-        "gpt-5.4-mini",
-        "gpt-5.4",
-        "gpt-5.5-deployment",
-        "gpt-5.6-sol",
+    "openai": _OPENAI_MODELS,
+    "azure": _OPENAI_MODELS,
+    "claude": tuple(
+        os.getenv("DEMO_CLAUDE_MODELS", "claude-sonnet-4.6,claude-sonnet-5").split(",")
     ),
-    # ``azure`` remains an accepted alias for older clients.
-    "azure": (
-        "gpt-5.4-mini",
-        "gpt-5.4",
-        "gpt-5.5-deployment",
-        "gpt-5.6-sol",
-    ),
-    "claude": ("claude-sonnet-4.6", "claude-sonnet-5"),
-    "google": ("gemini-3.1-flash-lite",),
+    "google": tuple(os.getenv("DEMO_GOOGLE_MODELS", "gemini-3.1-flash-lite").split(",")),
 }
+
 
 EXAMPLE_SCHEMA_ID = "example"
 EXAMPLE_SCHEMA_DIR = Path(__file__).parent.parent / "schemas" / "vision_extractor_example"
@@ -308,7 +312,7 @@ async def get_example_schema():
             user_requirements,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail=provider_error_detail(exc)) from exc
 
 
 @router.post("/generate-schema", response_model=GenerateSchemaResponse)
@@ -321,7 +325,8 @@ async def generate_schema(request: GenerateSchemaRequest):
     try:
         from gaik.software_components.extractor import SchemaGenerator
 
-        generator = SchemaGenerator(get_api_config(), model=MODEL, **MODEL_OPTIONS)
+        config = get_api_config()
+        generator = SchemaGenerator(config, model=config["model"], **get_model_options(config))
         schema = generator.generate_schema(user_requirements=user_requirements)
         requirements = generator.item_requirements
         schema_id = _remember_temporary_schema(user_requirements, schema, requirements)
@@ -338,7 +343,7 @@ async def generate_schema(request: GenerateSchemaRequest):
     except ImportError as exc:
         raise HTTPException(status_code=500, detail=f"Extractor not installed: {exc}") from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail=provider_error_detail(exc)) from exc
 
 
 @router.post("", response_model=VisionExtractResponse)
@@ -347,7 +352,7 @@ async def extract_vision(
     user_requirements: str = Form(..., description="Natural-language extraction task"),
     schema_id: str = Form(..., description="Reviewed example or temporary schema ID"),
     model_provider: Provider = Form("openai"),
-    model: str = Form("gpt-5.4"),
+    model: str = Form(MODEL),
     reasoning_effort: ReasoningEffort = Form("medium"),
     merge_table: bool = Form(False),
     additional_instructions: str | None = Form(None),
@@ -363,7 +368,12 @@ async def extract_vision(
     extraction_model, requirements = _resolve_requested_schema(
         schema_id, normalized_user_requirements
     )
-    lib_provider, use_azure, vertex_ai = _provider_settings(model_provider, model)
+    request_config = get_request_api_config()
+    if request_config is not None:
+        model = request_config["model"]
+        lib_provider, use_azure, vertex_ai = "openai", request_config["provider"] == "azure", False
+    else:
+        lib_provider, use_azure, vertex_ai = _provider_settings(model_provider, model)
 
     for uploaded_file in files:
         _validate_suffix(uploaded_file.filename)
@@ -391,9 +401,14 @@ async def extract_vision(
 
         try:
             extractor = VisionExtractor(
+                **({"api_config": request_config} if request_config is not None else {}),
                 model_provider=lib_provider,
                 model=model,
-                reasoning_effort=reasoning_effort,
+                reasoning_effort=(
+                    get_model_options(request_config)["reasoning_effort"]
+                    if request_config
+                    else reasoning_effort
+                ),
                 merge_table=merge_table,
                 use_azure=use_azure,
                 vertex_ai=vertex_ai,
@@ -405,7 +420,7 @@ async def extract_vision(
                 status_code=400,
                 detail=(
                     f"Failed to initialize VisionExtractor for provider "
-                    f"'{model_provider}': {exc}. "
+                    f"'{model_provider}': {provider_error_detail(exc)}. "
                     "Check that the relevant provider credentials are configured."
                 ),
             ) from exc
@@ -418,7 +433,9 @@ async def extract_vision(
                 requirements=requirements,
             )
         except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Vision extraction failed: {exc}") from exc
+            raise HTTPException(
+                status_code=500, detail=f"Vision extraction failed: {provider_error_detail(exc)}"
+            ) from exc
 
         return VisionExtractResponse(
             data=result.data,
@@ -431,3 +448,11 @@ async def extract_vision(
     finally:
         for path in temp_paths:
             path.unlink(missing_ok=True)
+
+
+@router.get("/models")
+async def model_catalogue():
+    return {
+        "models": {name: list(values) for name, values in PROVIDER_MODELS.items()},
+        "default": MODEL,
+    }

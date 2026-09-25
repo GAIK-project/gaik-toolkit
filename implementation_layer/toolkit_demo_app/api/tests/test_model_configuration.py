@@ -1,77 +1,73 @@
-"""Regression tests for the demo website's shared OpenAI model settings."""
+"""Behavior checks for server defaults and per-model sampling options."""
 
-import ast
-from pathlib import Path
 from unittest.mock import patch
 
-from api.utils.config import MODEL, MODEL_OPTIONS, get_api_config
-
-ROUTERS_DIR = Path(__file__).parents[1] / "routers"
-TARGETS = {"SchemaGenerator", "DataExtractor", "VisionParser"}
-
-
-def _call_name(call: ast.Call) -> str | None:
-    if isinstance(call.func, ast.Name):
-        return call.func.id
-    if isinstance(call.func, ast.Attribute):
-        return call.func.attr
-    return None
+import pytest
+from api.utils.config import get_api_config, get_model_options
+from fastapi import HTTPException
 
 
-def test_shared_model_profile() -> None:
-    assert MODEL == "gpt-5.4"
-    assert MODEL_OPTIONS == {
-        "temperature": None,
-        "reasoning_effort": "medium",
-    }
+@pytest.fixture(autouse=True)
+def clear_provider_environment(monkeypatch):
+    for name in (
+        "DEMO_LLM_PROVIDER",
+        "DEMO_LLM_MODEL",
+        "LLM_PROVIDER",
+        "AZURE_API_KEY",
+        "OPENAI_API_KEY",
+        "AITTA_API_KEY",
+        "AITTA_API_TOKEN",
+        "AITTA_TOKEN",
+    ):
+        monkeypatch.delenv(name, raising=False)
 
 
-def test_get_api_config_pins_the_website_model(monkeypatch) -> None:
-    monkeypatch.delenv("AZURE_API_KEY", raising=False)
+def test_preserves_provider_model_when_no_demo_override_is_set(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-
     with patch(
-        "gaik.software_components.config.get_openai_config",
-        return_value={"api_key": "test-key", "model": "provider-default"},
-    ) as get_openai_config:
+        "gaik.software_components.llm.get_llm_config",
+        return_value={"provider": "openai", "model": "account-specific-model"},
+    ) as factory:
         config = get_api_config()
+    assert config["model"] == "account-specific-model"
+    factory.assert_called_once_with("openai")
 
-    assert config["model"] == MODEL
-    get_openai_config.assert_called_once_with(use_azure=False)
+
+def test_explicit_server_provider_and_model_win_over_azure_autodetection(monkeypatch):
+    monkeypatch.setenv("AZURE_API_KEY", "test-azure")
+    monkeypatch.setenv("DEMO_LLM_PROVIDER", "aitta")
+    monkeypatch.setenv("DEMO_LLM_MODEL", "served-model")
+    with patch("gaik.software_components.llm.get_llm_config", return_value={}) as factory:
+        get_api_config()
+    factory.assert_called_once_with("aitta", model="served-model")
 
 
-def test_all_target_router_constructors_use_the_shared_profile() -> None:
-    missing_options: list[str] = []
-    missing_model: list[str] = []
+def test_aitta_token_is_detected_without_azure_or_openai(monkeypatch):
+    monkeypatch.setenv("AITTA_TOKEN", "test-token")
+    with patch("gaik.software_components.llm.get_llm_config", return_value={}) as factory:
+        get_api_config()
+    factory.assert_called_once_with("aitta")
 
-    for path in ROUTERS_DIR.glob("*.py"):
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            call_name = _call_name(node)
-            if call_name not in TARGETS:
-                continue
 
-            has_shared_options = any(
-                keyword.arg is None
-                and isinstance(keyword.value, ast.Name)
-                and keyword.value.id == "MODEL_OPTIONS"
-                for keyword in node.keywords
-            )
-            location = f"{path.name}:{node.lineno} ({call_name})"
-            if not has_shared_options:
-                missing_options.append(location)
+def test_unconfigured_server_has_actionable_error():
+    with pytest.raises(HTTPException, match="Model settings") as error:
+        get_api_config()
+    assert error.value.status_code == 503
 
-            if call_name in {"SchemaGenerator", "DataExtractor"}:
-                has_shared_model = any(
-                    keyword.arg == "model"
-                    and isinstance(keyword.value, ast.Name)
-                    and keyword.value.id == "MODEL"
-                    for keyword in node.keywords
-                )
-                if not has_shared_model:
-                    missing_model.append(location)
 
-    assert not missing_options, f"Missing **MODEL_OPTIONS: {missing_options}"
-    assert not missing_model, f"Missing model=MODEL: {missing_model}"
+@pytest.mark.parametrize(
+    "model,effort", [("gpt-6-luna", "none"), ("gpt-6-sol", "none"), ("gpt-6-astra", "low")]
+)
+def test_gpt6_sampling_is_valid_for_chat_and_schema(model, effort):
+    for schema in (False, True):
+        assert get_model_options({"provider": "azure", "model": model}, schema=schema) == {
+            "temperature": None,
+            "reasoning_effort": effort,
+        }
+
+
+def test_other_providers_do_not_receive_gpt_reasoning_settings():
+    assert get_model_options({"provider": "aitta", "model": "served-model"}) == {
+        "temperature": None,
+        "reasoning_effort": None,
+    }

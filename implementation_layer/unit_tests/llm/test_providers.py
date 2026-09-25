@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 
 import pytest
-
 from gaik.software_components.llm.providers import Provider, resolve_provider
 
 
@@ -51,3 +50,13 @@ def test_unknown_provider_raises():
 
 def test_provider_name_is_normalized():
     assert resolve_provider("  GOOGLE  ") == "google"
+
+
+@pytest.mark.parametrize("provider", list(Provider))
+def test_provider_enum_accepted_in_config(provider):
+    assert resolve_provider(config={"provider": provider}) == provider.value
+
+
+def test_legacy_config_takes_precedence_over_environment(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "aitta")
+    assert resolve_provider(config={"use_azure": False}) == "openai"

@@ -17,7 +17,8 @@ description: >-
 
 ```bash
 pip install "gaik[extract]"
-pip install "gaik[vision-extract]"   # VisionExtractor with Claude or Gemini models
+pip install "gaik[vision-extract]"   # PDF/image extraction
+# Add llm-google for shared Google/Vertex configs, or llm-litellm for LiteLLM.
 ```
 
 Two entry points, and the choice is about where the document is in its lifecycle:
@@ -29,18 +30,66 @@ Two entry points, and the choice is about where the document is in its lifecycle
 
 ```python
 from gaik.software_components.vision_extractor import VisionExtractor
+from gaik.software_components.llm import get_llm_config
 
-result = VisionExtractor(model_provider="openai").extract(  # Azure unless use_azure=False
+config = get_llm_config("azure")   # or another supported vision/structured-output model
+result = VisionExtractor(api_config=config).extract(
     file_paths=["invoice.pdf"],
     user_requirements="Supplier name, invoice number, and every line item with quantity and unit price.",
 )
 result.data          # dict
-result.usage         # tokens and cost
+result.usage         # None on the shared structured-output path; do not invent token cost
 ```
 
 Arguments are keyword-only. With no `extraction_model`, gaik generates the schema from the
 prose (an extra LLM call); pass `schema_dir=...` and it caches the generated schema to disk
 and reuses it, which makes runs both cheaper and reproducible.
+
+For text extraction, `DataExtractor(config=get_llm_config(provider))` accepts the shared
+configuration from `gaik.software_components.llm`. Choose `azure`, `openai`, `google`,
+`vertex`, `anthropic`, `anthropic_foundry`, `aitta`, `openai_compatible`, or optional
+`litellm`; the model must support structured output. Native Google/Vertex and Anthropic
+need the `llm-google` and `llm-anthropic` extras respectively. LiteLLM requires
+`gaik[llm-litellm]` and a provider-prefixed model identifier. Aitta uses
+`AITTA_API_KEY` (aliases `AITTA_API_TOKEN`, `AITTA_TOKEN`) and `AITTA_MODEL`, defaulting to
+`google/gemma-4-31b-it`. Other compatible servers require `OPENAI_API_KEY`, `OPENAI_BASE_URL`,
+and `OPENAI_MODEL`, or equivalent explicit config overrides.
+
+`VisionExtractor(api_config=config)` uses the same interface, renders PDF pages as PNG
+images, and generates schemas with that provider. Its model must support both images and
+structured output. `SchemaGenerator(config=config)` supports the shared provider path;
+use a hand-built Pydantic schema and `ExtractionRequirements` when you already know the
+schema. `LLMJudge(config=config)` also accepts the shared config; visual judging requires
+images, while `judge_text_pair(...)` only needs a chat model. Keep credentials in runtime
+configuration or environment variables, not generated source code.
+
+## Choose providers separately for audio, vision and extraction
+
+The modules accept stage configs so transcription can stay on a supported audio service
+while text extraction uses Aitta or another chat provider:
+
+```bash
+pip install "gaik[audio-to-structured-data,documents-to-structured-data]"
+```
+
+```python
+from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
+from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData
+
+audio_pipeline = AudioToStructuredData(
+    transcription_config=get_llm_config("azure"),
+    extraction_config=get_llm_config("aitta"),
+)
+document_pipeline = DocumentsToStructuredData(
+    parser_config=get_llm_config("openai", model="gpt-6-luna"),
+    extraction_config=get_llm_config("aitta"),
+)
+```
+
+Omitted stage configs use `api_config`; without a shared config, missing stages load the
+legacy OpenAI/Azure default. Supplying every stage config avoids loading unrelated default
+credentials. Audio transcription remains OpenAI/Azure-only: a chat provider selection,
+including LiteLLM, does not make toolkit transcription support that provider.
 
 ## Fix the schema, not the prompt
 
@@ -160,13 +209,15 @@ comparing two runs.
 
 - `generate_schema()` returns only the model, but `DataExtractor.extract()` also needs
   `requirements`. Use `generate_schema_with_usage()`, which returns both on
-  `SchemaGenerationResult` (`.schema`, `.requirements`), plus token usage.
+  `SchemaGenerationResult` (`.schema`, `.requirements`), plus usage when the client
+  exposes it. Shared parsed-output clients may not provide token counts.
 - `DataExtractor.extract(documents=...)` takes document **text**, not file paths.
   `VisionExtractor.extract(file_paths=...)` takes paths. Passing paths to `DataExtractor`
   extracts from the literal filename string and returns confident nonsense.
-- `VisionExtractor` and `MultimodalParser` default to `use_azure=True` and
-  `vertex_ai=True`. Supplying a direct provider key without flipping the flag produces an
-  auth error that reads like a bad key.
+- Without a shared `api_config`, `VisionExtractor` and `MultimodalParser` retain legacy
+  `use_azure=True` and `vertex_ai=True` defaults. Supplying a direct provider key without
+  choosing the direct hosting flag produces an auth error that reads like a bad key.
+  An explicit shared provider config supersedes these routing flags.
 - Every layer that calls a model must classify its own errors. A rate-limit response
   arriving through a layer that does not recognise it gets re-raised as permanent, the
   runner does not retry, and the affected documents score zero — which is indistinguishable

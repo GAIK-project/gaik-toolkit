@@ -47,8 +47,10 @@ from gaik.observability import (
 )
 
 # Import shared configuration
-from gaik.software_components.config import create_openai_client, get_openai_config
+from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.factory import build_compat_client
+from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 # -----------------------------------------------------------------------------
 # Setup
@@ -131,6 +133,7 @@ def _parse_with(
     response_format: type[BaseModel],
     temperature: float | None = 0.0,
     reasoning_effort: str | None = None,
+    config: dict | None = None,
 ):
     """
     Wraps client.beta.chat.completions.parse in a retry + deterministic settings.
@@ -155,22 +158,31 @@ def _parse_with(
             with ``temperature=None``.
     """
     if isinstance(client, ProviderClient):
+        # Temperature is shared by the text adapters. Reasoning effort is an
+        # OpenAI option; native Anthropic and Google have different controls.
+        provider_effort = (
+            reasoning_effort
+            if client.provider in {"openai", "azure", "openai_compatible", "aitta", "litellm"}
+            else None
+        )
+        sampling = _sampling_kwargs(temperature, provider_effort)
         parsed = _with_retries(
             lambda: client.chat_parsed(
                 messages=messages,
                 response_format=response_format,
                 model=model,
+                **sampling,
             )
         )
         return _ParsedShim(parsed)
     sampling = _sampling_kwargs(temperature, reasoning_effort)
+    sampling = normalize_chat_kwargs(model, {"top_p": 1.0, **sampling}, config=config)
     return _with_retries(
         lambda: client.beta.chat.completions.parse(
             model=model,
             messages=messages,
             response_format=response_format,
-            top_p=1.0,
-            timeout=30,
+            timeout=(config or {}).get("timeout", 30),
             **sampling,
         )
     )
@@ -438,6 +450,7 @@ def detect_structure_type(
     temperature: float | None = 0.0,
     reasoning_effort: str | None = None,
     _usage_sink: list | None = None,
+    config: dict | None = None,
 ) -> StructureAnalysis:
     """
     Analyze if the extraction requires a nested list structure or flat structure.
@@ -452,8 +465,8 @@ def detect_structure_type(
     generation calls; external callers can ignore it.
     """
     if client is None:
-        config = get_openai_config(use_azure=True)
-        client = create_openai_client(config)
+        config = config or get_openai_config(use_azure=True)
+        client = build_compat_client(config)
         model = model if model else config["model"]
     elif model is None:
         raise ValueError("model must be provided when client is specified")
@@ -471,6 +484,7 @@ def detect_structure_type(
         response_format=StructureAnalysis,
         temperature=temperature,
         reasoning_effort=reasoning_effort,
+        config=config,
     )
     analysis = resp.choices[0].message.parsed
     if _usage_sink is not None:
@@ -657,6 +671,7 @@ def parse_nested_requirements(
     temperature: float | None = 0.0,
     reasoning_effort: str | None = None,
     _usage_sink: list | None = None,
+    config: dict | None = None,
 ) -> tuple[
     type[BaseModel],
     ExtractionRequirements | CompositeExtractionRequirements,
@@ -679,14 +694,14 @@ def parse_nested_requirements(
     external callers can ignore it.
     """
     if client is None:
-        config = get_openai_config(use_azure=True)
-        client = create_openai_client(config)
+        config = config or get_openai_config(use_azure=True)
+        client = build_compat_client(config)
         model = model if model else config["model"]
     elif model is None:
         raise ValueError("model must be provided when client is specified")
 
     print("Analyzing structure type...")
-    sampling = {"temperature": temperature, "reasoning_effort": reasoning_effort}
+    sampling = {"temperature": temperature, "reasoning_effort": reasoning_effort, "config": config}
     analysis = detect_structure_type(
         user_description, client=client, model=model, _usage_sink=_usage_sink, **sampling
     )
@@ -1016,6 +1031,7 @@ def parse_user_requirements(
     reasoning_effort: str | None = None,
     _usage_sink: list | None = None,
     parse_mode: RequirementsParseMode = "normal",
+    config: dict | None = None,
 ) -> ExtractionRequirements:
     """
     Parse extraction requirements from natural language using LLM with type detection rules.
@@ -1030,8 +1046,8 @@ def parse_user_requirements(
     external callers can ignore it.
     """
     if client is None:
-        config = get_openai_config(use_azure=True)
-        client = create_openai_client(config)
+        config = config or get_openai_config(use_azure=True)
+        client = build_compat_client(config)
         model = model if model else config["model"]
     elif model is None:
         raise ValueError("model must be provided when client is specified")
@@ -1049,6 +1065,7 @@ def parse_user_requirements(
         response_format=ExtractionRequirements,
         temperature=temperature,
         reasoning_effort=reasoning_effort,
+        config=config,
     )
     req = resp.choices[0].message.parsed
     # Keep the original line/bullet structure for field-scoped policy
@@ -2155,7 +2172,8 @@ class SchemaGenerator:
         Initialize the SchemaGenerator.
 
         Args:
-            config: OpenAI configuration dict from get_openai_config()
+            config: Provider configuration from get_llm_config(), or a legacy
+                OpenAI configuration dict from get_openai_config().
             model: Optional model name override
             temperature: Sampling temperature for every schema-generation call.
                 Defaults to ``0.0`` so the same requirements yield the same
@@ -2172,7 +2190,7 @@ class SchemaGenerator:
         self.model = model if model else self.config["model"]
         self.temperature = temperature
         self.reasoning_effort = reasoning_effort
-        self.client = create_openai_client(self.config)
+        self.client = build_compat_client(self.config)
         self.extraction_model = None
         self.item_requirements = None
         self.structure_analysis = None
@@ -2198,6 +2216,7 @@ class SchemaGenerator:
             model=self.model,
             temperature=self.temperature,
             reasoning_effort=self.reasoning_effort,
+            config=self.config,
         )
         return self.structure_analysis
 
@@ -2221,6 +2240,7 @@ class SchemaGenerator:
                 model=self.model,
                 temperature=self.temperature,
                 reasoning_effort=self.reasoning_effort,
+                config=self.config,
                 _usage_sink=usage_sink,
             )
         duration_s = round(elapsed(), 3)

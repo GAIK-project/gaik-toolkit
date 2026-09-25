@@ -12,6 +12,8 @@ from pydantic import BaseModel
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
+from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.llm.providers import resolve_provider
 
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 """Optional callback for live pass-by-pass progress updates.
@@ -26,8 +28,8 @@ Errors raised by the callback are swallowed so a misbehaving observer
 can never break the enhancement run.
 """
 
-DEFAULT_MODEL_AZURE = "gpt-5.4"
-DEFAULT_MODEL_OPENAI = "gpt-5.4-2026-03-05"
+DEFAULT_MODEL_AZURE = "gpt-6-luna"
+DEFAULT_MODEL_OPENAI = "gpt-6-luna"
 
 PASS1_SYSTEM_PROMPT = """You are a Finnish transcript editor.
 
@@ -206,8 +208,10 @@ class TranscriptEnhancer:
         config = (
             dict(api_config) if api_config is not None else get_openai_config(use_azure=use_azure)
         )
-        config["model"] = model or self._default_model_for_config(config)
-        if not config.get("api_key"):
+        config["model"] = model or config.get("model") or self._default_model_for_config(config)
+        if resolve_provider(config=config) not in {"vertex", "litellm"} and not config.get(
+            "api_key"
+        ):
             key_name = "AZURE_API_KEY" if config.get("use_azure", False) else "OPENAI_API_KEY"
             raise ValueError(f"{key_name} not found in environment or api_config")
 
@@ -366,8 +370,9 @@ class TranscriptEnhancer:
         response = self.client.chat.completions.create(  # type: ignore[call-overload]
             model=self.model,
             messages=messages,
-            temperature=0.0,
-            **extra_kwargs,
+            **normalize_chat_kwargs(
+                self.model, {"temperature": 0.0, **extra_kwargs}, config=self.api_config
+            ),
         )
         return self._extract_response_text(response, fallback)
 

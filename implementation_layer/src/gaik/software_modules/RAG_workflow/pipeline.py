@@ -42,6 +42,9 @@ class RAGWorkflow:
         *,
         api_config: dict | None = None,
         use_azure: bool = True,
+        parser_config: dict | None = None,
+        embedding_config: dict | None = None,
+        answer_config: dict | None = None,
         persist: bool = True,
         persist_path: str = "chroma_store",
         collection_name: str = "gaik_rag",
@@ -61,6 +64,9 @@ class RAGWorkflow:
         Args:
             api_config: OpenAI/Azure config. If None, built via get_openai_config(use_azure).
             use_azure: Whether to build default config for Azure (ignored if api_config supplied).
+            parser_config: Optional separate config for the vision model.
+            embedding_config: Optional separate config for the embedding provider.
+            answer_config: Optional separate config for the answer generation provider.
             persist: If True, use persistent Chroma vector store.
             persist_path: Directory for Chroma persistence.
             collection_name: Chroma collection name.
@@ -74,10 +80,19 @@ class RAGWorkflow:
             conversation_history: Maintain last n Q/A pairs.
             last_n: Number of Q/A pairs to keep if conversation_history is True.
         """
-        self.api_config = api_config or get_openai_config(use_azure=use_azure)
+        self.api_config = api_config
+        if self.api_config is None and any(
+            config is None for config in (parser_config, embedding_config, answer_config)
+        ):
+            self.api_config = get_openai_config(use_azure=use_azure)
+        self.parser_config = parser_config if parser_config is not None else self.api_config
+        self.embedding_config = (
+            embedding_config if embedding_config is not None else self.api_config
+        )
+        self.answer_config = answer_config if answer_config is not None else self.api_config
 
-        self.parser = VisionRagParser(vision_config=self.api_config)
-        self.embedder = Embedder(config=self.api_config, model=embedding_model)
+        self.parser = VisionRagParser(vision_config=self.parser_config)
+        self.embedder = Embedder(config=self.embedding_config, model=embedding_model)
         self.vector_store = VectorStore(
             persist=persist,
             persist_path=persist_path,
@@ -92,7 +107,7 @@ class RAGWorkflow:
             score_threshold=retriever_threshold,
         )
         self.answer_generator = AnswerGenerator(
-            config=self.api_config,
+            config=self.answer_config,
             citations=citations,
             stream=stream,
             conversation_history=conversation_history,

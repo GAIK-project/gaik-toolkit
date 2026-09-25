@@ -16,6 +16,17 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+
+try:
+    from utils.model_settings import provider_error_detail
+except ImportError:
+    from api.utils.model_settings import provider_error_detail
+
+try:
+    from utils.model_settings import get_request_api_config
+except ImportError:
+    from api.utils.model_settings import get_request_api_config
+
 router = APIRouter()
 
 DEMO_SCHEMA = "gaik_postgres_agent_demo"
@@ -35,6 +46,9 @@ def _llm_config() -> dict | None:
     """
     from gaik.software_components.config import get_openai_config
 
+    request_config = get_request_api_config()
+    if request_config is not None:
+        return request_config
     if os.getenv("AZURE_API_KEY"):
         return get_openai_config(use_azure=True)
     if os.getenv("OPENAI_API_KEY"):
@@ -193,7 +207,7 @@ async def get_demo_schema():
         return await asyncio.to_thread(_run_schema, agent)
     except Exception as e:
         logger.error("postgres_agent schema failed: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
 
 
 @router.post("/ask", response_model=AskResponse)
@@ -208,7 +222,7 @@ async def ask_question(req: AskRequest):
         return await asyncio.to_thread(_run_ask, agent, question)
     except Exception as e:
         logger.error("postgres_agent ask failed: %s", e)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
 
 
 # ---------- Internal helpers ----------

@@ -3,7 +3,8 @@
 Rates are USD per million tokens in ``(input, output)`` order. Reasoning /
 thinking tokens are billed at the output rate across all three providers.
 
-Sources (2026-03-25):
+GPT-6 rates verified 2026-09-25 (standard, short context; Azure contracts may differ).
+Other sources (2026-03-25):
 - OpenAI: https://developers.openai.com/api/docs/pricing
 - Anthropic: https://platform.claude.com/docs/en/about-claude/pricing
 - Google Gemini: https://ai.google.dev/gemini-api/docs/pricing
@@ -17,9 +18,23 @@ from __future__ import annotations
 
 from typing import Literal
 
-Provider = Literal["openai", "claude", "google"]
+Provider = Literal[
+    "openai",
+    "azure",
+    "claude",
+    "anthropic",
+    "anthropic_foundry",
+    "google",
+    "vertex",
+    "aitta",
+    "openai_compatible",
+    "litellm",
+]
 
 OPENAI_PRICING_PER_M: dict[str, tuple[float, float]] = {
+    "gpt-6-astra": (10.00, 50.00),
+    "gpt-6-sol": (2.00, 10.00),
+    "gpt-6-luna": (0.10, 0.50),
     "gpt-5.6-sol": (4.00, 20.00),
     "gpt-5.5-deployment": (5.00, 30.00),
     "gpt-5.5": (5.00, 30.00),
@@ -63,8 +78,12 @@ GEMINI_PRICING_PER_M: dict[str, tuple[float, float]] = {
 
 _TABLE_BY_PROVIDER: dict[Provider, dict[str, tuple[float, float]]] = {
     "openai": OPENAI_PRICING_PER_M,
+    "azure": OPENAI_PRICING_PER_M,
     "claude": ANTHROPIC_PRICING_PER_M,
+    "anthropic": ANTHROPIC_PRICING_PER_M,
+    "anthropic_foundry": ANTHROPIC_PRICING_PER_M,
     "google": GEMINI_PRICING_PER_M,
+    "vertex": GEMINI_PRICING_PER_M,
 }
 
 

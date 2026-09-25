@@ -94,7 +94,7 @@ const DEFAULT_OPTIONS: ReportOptions = {
   initialPrompt: "",
   imageMode: "parse",
   imageRequirements: "",
-  writerModel: "gpt-5.4",
+  writerModel: "gpt-6-luna",
   temperature: 0,
   reasoningEffort: "medium",
   additionalInstructions: "",
@@ -142,7 +142,7 @@ function buildConfig(
   if (options.imageMode === "structured" && options.imageRequirements)
     image_options.user_requirements = options.imageRequirements;
 
-  const writer_options: Record<string, unknown> = { model: options.writerModel || "gpt-5.4" };
+  const writer_options: Record<string, unknown> = { model: options.writerModel || "gpt-6-luna" };
   if (options.temperature !== 0) writer_options.temperature = options.temperature;
   if (options.reasoningEffort) writer_options.reasoning_effort = options.reasoningEffort;
 
@@ -213,7 +213,7 @@ function applyConfig(
     initialPrompt: (ctor.initial_prompt as string) || "",
     imageMode: (img.mode as string) || "parse",
     imageRequirements: (img.user_requirements as string) || "",
-    writerModel: (wr.model as string) || "gpt-5.4",
+    writerModel: (wr.model as string) || "gpt-6-luna",
     temperature: typeof wr.temperature === "number" ? wr.temperature : 0,
     reasoningEffort: (wr.reasoning_effort as string) || "",
     additionalInstructions: (config.additional_instructions as string) || "",

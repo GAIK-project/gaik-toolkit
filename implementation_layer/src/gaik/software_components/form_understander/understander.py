@@ -8,7 +8,9 @@ from typing import Literal
 from openai import APIError, APITimeoutError, RateLimitError
 from pydantic import BaseModel, Field
 
-from gaik.software_components.config import create_openai_client
+from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.factory import build_compat_client
+from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 LanguageHint = Literal["fi", "en"]
 
@@ -34,7 +36,7 @@ class InputField(BaseModel):
     id: str
     raw: str
     type: str | None = None
-    htmlType: str | None = None
+    htmlType: str | None = None  # noqa: N815 - public input field used by browser clients
     parent: str | None = None
 
 
@@ -68,7 +70,7 @@ class FormUnderstander:
     Turn cryptic form-field identifiers into readable labels.
 
     Args:
-        config: configuration dict from ``gaik.software_components.config.get_openai_config``.
+        config: Provider config from ``get_llm_config`` or legacy ``get_openai_config``.
         model: optional model name override. Defaults to ``config["model"]``.
 
     Example:
@@ -85,7 +87,7 @@ class FormUnderstander:
     def __init__(self, config: dict, model: str | None = None):
         self.config = config
         self.model = model or self.config["model"]
-        self.client = create_openai_client(self.config)
+        self.client = build_compat_client(self.config)
 
     def clean_labels(
         self,
@@ -127,22 +129,32 @@ class FormUnderstander:
                 chunks.append(f"parent={snippet!r}")
             lines.append(" ".join(chunks))
         user_prompt = "\n".join(lines)
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ]
 
         def _call():
-            return self.client.beta.chat.completions.parse(
+            if isinstance(self.client, ProviderClient):
+                return self.client.chat_parsed(
+                    model=self.model,
+                    messages=messages,
+                    response_format=LabelMapping,
+                    temperature=0,
+                )
+            response = self.client.beta.chat.completions.parse(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_prompt},
-                ],
+                messages=messages,
                 response_format=LabelMapping,
-                temperature=0,
-                top_p=1.0,
-                timeout=30,
+                **normalize_chat_kwargs(
+                    self.model, {"temperature": 0, "top_p": 1.0, "timeout": 30}, config=self.config
+                ),
             )
+            return response.choices[0].message.parsed
 
-        resp = _with_retries(_call)
-        parsed: LabelMapping = resp.choices[0].message.parsed
+        parsed: LabelMapping | None = _with_retries(_call)
+        if parsed is None:
+            raise ValueError("The model did not return a structured label mapping")
 
         known_ids = {f.id for f in safe_fields}
         result: dict[str, str] = {}

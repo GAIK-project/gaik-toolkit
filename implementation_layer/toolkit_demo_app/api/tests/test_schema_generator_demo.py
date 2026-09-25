@@ -17,12 +17,6 @@ from gaik.software_components.extractor.schema import create_extraction_model
 
 @pytest.mark.asyncio
 async def test_generate_schema_returns_preview_and_downloadable_artifacts(monkeypatch) -> None:
-    assert route.MODEL == "gpt-5.4"
-    assert route.MODEL_OPTIONS == {
-        "temperature": 0.0,
-        "reasoning_effort": None,
-    }
-
     requirements = ExtractionRequirements(
         use_case_name="invoice",
         fields=[
@@ -43,7 +37,7 @@ async def test_generate_schema_returns_preview_and_downloadable_artifacts(monkey
             self.structure_analysis = SimpleNamespace(structure_type="flat")
             self.last_usage = SimpleNamespace(
                 provider="openai",
-                model=route.MODEL,
+                model="custom-schema-model",
                 input_tokens=100,
                 output_tokens=50,
                 thinking_tokens=0,
@@ -51,7 +45,7 @@ async def test_generate_schema_returns_preview_and_downloadable_artifacts(monkey
                 cost_usd=0.01,
             )
             self.last_duration_s = 0.25
-            self.model = route.MODEL
+            self.model = "custom-schema-model"
 
         def generate_schema(self, user_requirements):
             captured["task"] = user_requirements
@@ -61,16 +55,19 @@ async def test_generate_schema_returns_preview_and_downloadable_artifacts(monkey
             return {"field_count": 1}
 
     monkeypatch.setattr(route, "SchemaGenerator", FakeSchemaGenerator)
-    monkeypatch.setattr(route, "get_api_config", lambda: {"api_key": "test"})
+    monkeypatch.setattr(
+        route, "get_api_config", lambda: {"api_key": "test", "model": "custom-schema-model"}
+    )
 
     response = await route.generate_schema(
         route.GenerateSchemaRequest(user_requirements="  Extract invoice number.  ")
     )
 
     assert captured["constructor"] == {
-        "config": {"api_key": "test"},
-        "model": route.MODEL,
-        **route.MODEL_OPTIONS,
+        "config": {"api_key": "test", "model": "custom-schema-model"},
+        "model": "custom-schema-model",
+        "temperature": 0.0,
+        "reasoning_effort": None,
     }
     assert captured["task"] == "Extract invoice number."
     assert response.structure_type == "flat"

@@ -43,6 +43,8 @@ class AudioToStructuredData:
         *,
         api_config: dict | None = None,
         use_azure: bool = True,
+        transcription_config: dict | None = None,
+        extraction_config: dict | None = None,
     ) -> None:
         """
         Initialize the pipeline.
@@ -50,8 +52,19 @@ class AudioToStructuredData:
         Args:
             api_config: OpenAI/Azure config. If None, built via get_openai_config(use_azure).
             use_azure: Whether to build default config for Azure (ignored if api_config supplied).
+            transcription_config: Optional separate OpenAI/Azure audio configuration.
+            extraction_config: Optional separate provider config for schema generation
+                and text extraction, such as Google or Aitta.
         """
-        self.api_config = api_config or get_openai_config(use_azure=use_azure)
+        self.api_config = api_config
+        if self.api_config is None and (transcription_config is None or extraction_config is None):
+            self.api_config = get_openai_config(use_azure=use_azure)
+        self.transcription_config = (
+            transcription_config if transcription_config is not None else self.api_config
+        )
+        self.extraction_config = (
+            extraction_config if extraction_config is not None else self.api_config
+        )
 
     def run(
         self,
@@ -79,17 +92,19 @@ class AudioToStructuredData:
             schema: Optional pre-generated schema model to reuse.
             requirements: Optional ExtractionRequirements corresponding to the schema.
         """
-        transcriber_ctor = transcriber_ctor or {}
+        transcriber_ctor = dict(transcriber_ctor or {})
         transcriber_ctor.setdefault("enhanced_transcript", False)
-        transcriber = Transcriber(api_config=self.api_config, **transcriber_ctor)
+        transcriber_ctor.setdefault("api_config", self.transcription_config)
+        transcriber = Transcriber(**transcriber_ctor)
         transcribe_options = transcribe_options or {}
         transcription = transcriber.transcribe(
             file_path=file_path,
             **transcribe_options,
         )
 
-        extractor_cfg = self.api_config.copy()
-        model_override = (extractor_ctor or {}).get("model")
+        extractor_ctor = dict(extractor_ctor or {})
+        extractor_cfg = dict(extractor_ctor.pop("config", self.extraction_config))
+        model_override = extractor_ctor.get("model")
         if model_override:
             extractor_cfg["model"] = model_override
 
@@ -105,7 +120,6 @@ class AudioToStructuredData:
             transcription.enhanced_transcript or transcription.raw_transcript
         ]
 
-        extractor_ctor = extractor_ctor or {}
         data_extractor = DataExtractor(config=extractor_cfg, **extractor_ctor)
 
         extract_opts = {

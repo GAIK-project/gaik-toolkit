@@ -5,6 +5,8 @@ import os
 import fitz
 from fastapi import HTTPException, UploadFile
 
+from .model_settings import get_request_api_config, request_model_settings
+
 # File size limits. Audio and video uploads get their own, larger budget: a
 # meeting recording is easily tens of megabytes, while the document demos work
 # on much smaller files. The audio limit must stay in step with the three layers
@@ -31,10 +33,10 @@ MAX_VISION_PAGES = 10
 # Shared OpenAI settings for the demo website. Passing ``temperature=None``
 # omits that unsupported parameter for newer models while ``reasoning_effort``
 # remains available to models that accept it.
-MODEL = "gpt-5.4"
+MODEL = os.getenv("DEMO_LLM_MODEL", "gpt-6-luna")
 MODEL_OPTIONS = {
     "temperature": None,
-    "reasoning_effort": "medium",
+    "reasoning_effort": "none",
 }
 
 
@@ -60,31 +62,49 @@ async def validate_audio_file_size(file: UploadFile) -> bytes:
 
 
 def get_api_config():
-    """
-    Get OpenAI configuration from environment variables.
+    """Resolve tab-only settings first, then the deployment's provider and model."""
+    request_config = get_request_api_config()
+    if request_config is not None:
+        return request_config
 
-    Checks for either Azure or standard OpenAI API keys and returns
-    the appropriate configuration.
+    from gaik.software_components.llm import get_llm_config
 
-    Raises:
-        HTTPException: If neither AZURE_API_KEY nor OPENAI_API_KEY is set.
-    """
-    use_azure = bool(os.getenv("AZURE_API_KEY"))
-    if not use_azure and not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Set AZURE_API_KEY or OPENAI_API_KEY. "
-                "For Gemini, set OPENAI_API_KEY=<google-api-key> and "
-                "OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/"
-            ),
-        )
+    provider = os.getenv("DEMO_LLM_PROVIDER") or os.getenv("LLM_PROVIDER")
+    if not provider:
+        if os.getenv("AZURE_API_KEY"):
+            provider = "azure"
+        elif os.getenv("OPENAI_API_KEY"):
+            provider = "openai"
+        elif any(os.getenv(name) for name in ("AITTA_API_KEY", "AITTA_API_TOKEN", "AITTA_TOKEN")):
+            provider = "aitta"
+        else:
+            raise HTTPException(
+                503, "Configure a server model provider or use Model settings with your own key."
+            )
+    overrides = {}
+    if os.getenv("DEMO_LLM_MODEL"):
+        overrides["model"] = os.environ["DEMO_LLM_MODEL"]
+    try:
+        return get_llm_config(provider, **overrides)
+    except ValueError:
+        raise HTTPException(503, "The server model provider is not configured correctly.") from None
 
-    from gaik.software_components.config import get_openai_config
 
-    config = get_openai_config(use_azure=use_azure)
-    config["model"] = MODEL
-    return config
+def get_model_options(config: dict, *, schema: bool = False) -> dict:
+    """Use only sampling options supported by the selected model family."""
+    model = str(config.get("model", "")).lower()
+    if model.startswith("gpt-6"):
+        effort = "low" if "astra" in model else "none"
+        return {"temperature": None, "reasoning_effort": effort}
+    if request_model_settings() is not None or config.get("provider") not in {
+        None,
+        "openai",
+        "azure",
+    }:
+        return {"temperature": None, "reasoning_effort": None}
+    if schema:
+        return {"temperature": 0.0, "reasoning_effort": None}
+    return {"temperature": None, "reasoning_effort": "medium"}
 
 
 def validate_vision_page_limit(file_path: str, suffix: str, parser_type: str) -> None:

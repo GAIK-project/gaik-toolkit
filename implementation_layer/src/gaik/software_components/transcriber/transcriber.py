@@ -12,13 +12,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-import openai
 from openai import AzureOpenAI
 from pydub import AudioSegment
 
 from gaik.observability import measure_duration
+from gaik.software_components.config import create_openai_client
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
 from gaik.software_components.llm.factory import assert_openai_or_azure
+from gaik.software_components.llm.providers import resolve_provider
 
 from .whisper_local import transcribe as whisper_local_transcribe
 
@@ -38,6 +39,27 @@ REMOTE_MAX_DURATION_SECONDS = 1400
 
 # Default chunking threshold, with margin below the API ceiling.
 DEFAULT_MAX_DURATION_SECONDS = 1200
+
+
+def _create_audio_client(api_config: dict):
+    """Create an isolated SDK client, preserving the caller's HTTP transport."""
+    assert_openai_or_azure(api_config, component="Transcriber")
+    provider = resolve_provider(config=api_config)
+    audio_config = {**api_config, "provider": provider, "use_azure": provider == "azure"}
+    if provider == "azure":
+        endpoint = api_config.get("azure_audio_endpoint") or api_config.get("azure_endpoint")
+        if endpoint:
+            audio_config["azure_endpoint"] = endpoint.split("/openai/")[0]
+            audio_config.pop("base_url", None)
+        audio_config.setdefault("api_version", "2024-12-01-preview")
+    return create_openai_client(audio_config)
+
+
+def _close_owned_audio_client(client, api_config: dict) -> None:
+    # SDK close() also closes an injected transport. Its caller may reuse that
+    # transport for enhancement or another attachment in the same request.
+    if client is not None and api_config.get("http_client") is None:
+        client.close()
 
 
 @dataclass
@@ -358,41 +380,20 @@ class Transcriber:
         """
         Single-pass transcription of the original file (audio OR video).
         """
-        use_azure = bool(self.api_config.get("use_azure", False))
-        api_key = self.api_config.get("api_key")
-
-        with file_path.open("rb") as f:
-            if use_azure:
-                audio_client = self._build_azure_audio_client()
+        audio_client = _create_audio_client(self.api_config)
+        try:
+            with file_path.open("rb") as f:
                 response = audio_client.audio.transcriptions.create(
                     model=transcription_model,
                     file=f,
                     prompt=prompt,
                 )
-            else:
-                openai.api_key = api_key
-                response = openai.audio.transcriptions.create(
-                    model=transcription_model,
-                    file=f,
-                    prompt=prompt,
-                )
-        return response.text
+            return response.text
+        finally:
+            _close_owned_audio_client(audio_client, self.api_config)
 
     def _build_azure_audio_client(self) -> AzureOpenAI:
-        api_key = self.api_config.get("api_key")
-        api_version = self.api_config.get("api_version", "2024-12-01-preview")
-        audio_endpoint = self.api_config.get(
-            "azure_audio_endpoint",
-            self.api_config.get("azure_endpoint", "").replace(
-                "chat/completions?", "audio/transcriptions?"
-            ),
-        )
-
-        return AzureOpenAI(
-            api_key=api_key,
-            azure_endpoint=audio_endpoint.split("/openai/")[0],
-            api_version=api_version,
-        )
+        return _create_audio_client(self.api_config)
 
 
 def split_and_transcribe_with_context(
@@ -406,8 +407,7 @@ def split_and_transcribe_with_context(
 ):
     """Split audio into chunks and transcribe with rolling context."""
 
-    use_azure = bool(api_config.get("use_azure", False))
-    api_key = api_config.get("api_key")
+    assert_openai_or_azure(api_config, component="Transcriber")
     if transcription_model is None:
         transcription_model = api_config.get("transcription_model", "whisper")
 
@@ -434,23 +434,9 @@ def split_and_transcribe_with_context(
     transcripts = []
     context_text = ""
 
-    if use_azure:
-        audio_endpoint_url = api_config.get(
-            "azure_audio_endpoint",
-            api_config.get("azure_endpoint", "").replace(
-                "chat/completions?", "audio/transcriptions?"
-            ),
-        )
-        audio_client = AzureOpenAI(
-            api_key=api_key,
-            azure_endpoint=audio_endpoint_url.split("/openai/")[0],
-            api_version=api_config.get("api_version", "2024-12-01-preview"),
-        )
-    else:
-        openai.api_key = api_key
-        audio_client = None
-
+    audio_client = None
     try:
+        audio_client = _create_audio_client(api_config)
         for i in range(num_chunks):
             start_ms = i * chunk_length_ms
             end_ms = min((i + 1) * chunk_length_ms, len(audio))
@@ -476,25 +462,18 @@ Continue the transcription, maintaining speaker consistency and dialogue structu
 
             try:
                 with open(chunk_path, "rb") as chunk_file:
-                    if use_azure:
-                        transcript_response = audio_client.audio.transcriptions.create(
-                            model=transcription_model,
-                            file=chunk_file,
-                            prompt=prompt,
-                        )
-                    else:
-                        transcript_response = openai.audio.transcriptions.create(
-                            model=transcription_model,
-                            file=chunk_file,
-                            prompt=prompt,
-                        )
+                    transcript_response = audio_client.audio.transcriptions.create(
+                        model=transcription_model,
+                        file=chunk_file,
+                        prompt=prompt,
+                    )
 
                     chunk_transcript = transcript_response.text
                     transcripts.append(chunk_header + chunk_transcript)
                     context_text = chunk_transcript
                     time.sleep(1)
             except Exception as exc:
-                print(f"Error transcribing chunk {i + 1}: {exc}")
+                print(f"Error transcribing chunk {i + 1}: {type(exc).__name__}")
                 transcripts.append(f"{chunk_header}[Transcription failed for segment {i + 1}]")
                 time.sleep(5)
             finally:
@@ -503,6 +482,7 @@ Continue the transcription, maintaining speaker consistency and dialogue structu
                 except OSError:
                     pass
     finally:
+        _close_owned_audio_client(audio_client, api_config)
         shutil.rmtree(temp_dir, ignore_errors=True)
 
     return "\n\n".join(transcripts)

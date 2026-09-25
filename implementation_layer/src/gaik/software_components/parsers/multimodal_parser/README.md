@@ -19,7 +19,7 @@ from gaik.software_components.parsers.multimodal_parser import MultimodalParser
 
 parser = MultimodalParser(
     model_provider="openai",
-    model="gpt-5.4",
+    model="gpt-6-luna",
     use_azure=True,
     reasoning_effort="low",
     merge_table=True,
@@ -39,6 +39,7 @@ print(result.clean_markdown)
 from gaik.software_components.parsers.multimodal_parser import MultimodalParser
 
 parser = MultimodalParser(
+    api_config=None,                            # Optional shared get_llm_config(...) dictionary
     model_provider="openai",                    # "openai" | "claude" | "google"
     model=None,                                 # Model name (None = default from config)
     reasoning_effort="low",                     # "low" | "medium" | "high"
@@ -50,6 +51,30 @@ parser = MultimodalParser(
 )
 result = parser.parse("document.pdf")
 ```
+
+### Shared provider configuration
+
+```python
+from gaik.software_components.llm import get_llm_config
+
+parser = MultimodalParser(
+    api_config=get_llm_config("openai", model="gpt-6-luna"),
+)
+result = parser.parse("document.pdf")
+```
+
+`api_config` selects the common toolkit client and supersedes the legacy
+`model_provider`, `use_azure` and `vertex_ai` routing flags. It supports native
+OpenAI/Azure, Google/Vertex and Anthropic adapters, plus Aitta, OpenAI-compatible
+servers and the optional LiteLLM adapter. The chosen model must support image
+input. The shared path renders PDF pages as PNG images before sending canonical
+image messages; native PDF-upload support is not required.
+
+Set provider-specific request options, such as `reasoning_effort`, in the shared
+config. Legacy constructor reasoning defaults apply only to the legacy route.
+Install `gaik[llm-litellm]` to use `provider="litellm"` and a model with its
+LiteLLM provider prefix. Token usage is recorded when the provider returns it;
+unknown model prices remain zero in the local pricing table.
 
 ### ParseResult
 
@@ -105,7 +130,7 @@ from gaik.software_components.parsers.multimodal_parser import (
 ```python
 from gaik.software_components.parsers.multimodal_parser import MultimodalParser
 
-parser = MultimodalParser(model_provider="openai", model="gpt-5.4", use_azure=True)
+parser = MultimodalParser(model_provider="openai", model="gpt-6-luna", use_azure=True)
 result = parser.parse("document.pdf")
 ```
 
@@ -155,10 +180,10 @@ result = parser.parse("document.pdf")
 |----------|------|---------|-------------|
 | `AZURE_API_KEY` | `use_azure=True` | — | Azure OpenAI API key |
 | `AZURE_ENDPOINT` | `use_azure=True` | — | Azure OpenAI endpoint URL |
-| `AZURE_DEPLOYMENT` | `use_azure=True` | `gpt-5.4` | Azure deployment name (fallback when `model=None`) |
+| `AZURE_DEPLOYMENT` | `use_azure=True` | `gpt-6-luna` | Azure deployment name (fallback when `model=None`) |
 | `AZURE_API_VERSION` | `use_azure=True` | `2025-03-01-preview` | API version |
 | `OPENAI_API_KEY` | `use_azure=False` | — | Standard OpenAI API key |
-| `OPENAI_MODEL` | `use_azure=False` | `gpt-5.4-2026-03-05` | Model name (fallback when `model=None`) |
+| `OPENAI_MODEL` | `use_azure=False` | `gpt-6-luna` | Model name (fallback when `model=None`) |
 
 ### Anthropic (Claude)
 

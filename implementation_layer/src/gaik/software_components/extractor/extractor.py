@@ -163,6 +163,7 @@ class DataExtractor:
         with measure_duration() as elapsed:
             resp = _parse_with(
                 client=self.client,
+                config=self.config,
                 model=self.model,
                 messages=messages,
                 response_format=extraction_model,

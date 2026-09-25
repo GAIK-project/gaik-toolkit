@@ -62,12 +62,12 @@ const DEMO_PROVIDER: Provider = "openai";
 
 // Panel runs several models in parallel for a cost/speed disagreement signal.
 // The backend resolves the provider per judge to the configured credentials.
-// The third judge (gpt-5.1) is intentionally a different generation so the
-// panel does not just echo the gpt-5.4 family's biases.
+// The third judge (gpt-5.6-terra) is intentionally a different generation so the
+// panel does not just echo the gpt-6-sol family's biases.
 const PANEL_JUDGES: { provider: Provider; model: string; label: string }[] = [
-  { provider: "openai", model: "gpt-5.4-mini", label: "gpt-5.4-mini" },
-  { provider: "openai", model: "gpt-5.4", label: "gpt-5.4" },
-  { provider: "openai", model: "gpt-5.1", label: "gpt-5.1" },
+  { provider: "openai", model: "gpt-6-luna", label: "gpt-6-luna" },
+  { provider: "openai", model: "gpt-6-sol", label: "gpt-6-sol" },
+  { provider: "openai", model: "gpt-5.6-terra", label: "gpt-5.6-terra" },
 ];
 
 const JUDGE_DOCS_URL =
@@ -1339,7 +1339,7 @@ export default function LlmJudgePage() {
           </p>
           <p>
             <strong>4. Panel.</strong> Runs the text-pair check across three
-            Azure models (gpt-5.4-mini, gpt-5.4 and gpt-5.1) and reports an
+            Azure models (gpt-6-luna, gpt-6-sol and gpt-5.6-terra) and reports an
             agreement score. Verdicts aggregate by majority vote; ties resolve
             to the harshest severity so problems don&apos;t get silently dropped.
             Cross-provider panels (Azure + Claude + Gemini) are supported by the

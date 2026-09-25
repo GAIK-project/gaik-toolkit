@@ -10,6 +10,11 @@ except ImportError:
     from api.utils import get_api_config, validate_file_size
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
+try:
+    from utils.model_settings import provider_error_detail
+except ImportError:
+    from api.utils.model_settings import provider_error_detail
+
 router = APIRouter()
 
 
@@ -68,16 +73,22 @@ async def classify_document(
         filename = Path(tmp_path).name
         result = results.get(filename, {})
 
+        # The component represents a failed provider call as an unknown class.
+        # Do not return a remote error body through the regular result response.
+        reasoning = result.get("reasoning", "")
+        if result.get("class") == "unknown" and reasoning.startswith("Classification error:"):
+            reasoning = provider_error_detail(RuntimeError(reasoning))
+
         return {
             "filename": file.filename,
             "classification": result.get("class", "unknown"),
             "confidence": result.get("confidence", 0.0),
-            "reasoning": result.get("reasoning", ""),
+            "reasoning": reasoning,
         }
 
     except ImportError as e:
         raise HTTPException(status_code=500, detail=f"Classifier not installed: {e}") from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
     finally:
         Path(tmp_path).unlink(missing_ok=True)

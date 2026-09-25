@@ -73,6 +73,35 @@ hits = Ranker(expose_ranks=True).fuse(
 )
 ```
 
+`Embedder` also accepts `get_llm_config()` from `gaik.software_components.llm` for
+native `google`/`vertex`, `aitta`, `openai_compatible`, or optional `litellm`. Native
+Google/Vertex needs `gaik[llm-google]`; LiteLLM needs `gaik[llm-litellm]` and an explicit
+provider-prefixed `embedding_model`. Aitta requires `AITTA_API_KEY` (also accepts
+`AITTA_API_TOKEN` or `AITTA_TOKEN`) and an explicit `AITTA_EMBEDDING_MODEL`, or an
+`embedding_model` config override naming an embedding model available on Aitta. A chat
+model is not an embedding model. Other compatible servers need their endpoint, API key,
+and an explicit embedding model. Use the same embedding model for indexing and queries,
+and match `embedding_dim` to its output. Native Anthropic does not provide embeddings.
+
+For the Chroma-based end-to-end module, choose the three model stages independently:
+
+```python
+from gaik.software_components.llm import get_llm_config
+from gaik.software_modules.RAG_workflow import RAGWorkflow
+
+workflow = RAGWorkflow(
+    parser_config=get_llm_config("openai", model="gpt-6-luna"),
+    embedding_config=get_llm_config("google", embedding_model="gemini-embedding-001"),
+    answer_config=get_llm_config("aitta"),
+)
+```
+
+Install `gaik[rag-workflow,llm-google]` for this example. The parser model must accept
+images; answer generation only needs chat. Each omitted stage uses shared `api_config`
+or the legacy OpenAI/Azure default. When all stages are explicit, no unrelated default
+credentials are loaded. `RAGWorkflow` uses Chroma; the PostgreSQL recipe above remains
+the path for `PgVectorStore`.
+
 Fuse the two lists yourself instead of calling `store.search_hybrid()`:
 
 - the semantic list keeps its cosine similarities, which the relevance gate needs —
@@ -88,8 +117,8 @@ reached 33.7% recall@15, equal weights at k=60 scored 8.7 points below vectors w
 at k=20 (`Ranker(rrf_k=...)` sets k).
 
 **`embedding_dim` must equal the model's output, and at most 2,000.** `setup()` builds an
-HNSW index on `vector(N)`, which pgvector refuses above 2,000 dimensions — and gaik's
-`Embedder` defaults to `text-embedding-3-large` at 3,072. Pick a model (or a deployment)
+HNSW index on `vector(N)`, which pgvector refuses above 2,000 dimensions. For example,
+`text-embedding-3-large` produces 3,072 by default. Pick a model (or a deployment)
 that outputs 2,000 or fewer, or build the schema yourself with `halfvec`, which indexes up
 to 4,000: `references/postgres-without-gaik.md`.
 

@@ -7,6 +7,7 @@ back through Pydantic.
 
 from __future__ import annotations
 
+import base64
 from collections.abc import Iterator
 from typing import Any
 
@@ -14,6 +15,7 @@ import anthropic
 from pydantic import BaseModel
 
 from gaik.software_components.llm.base import ChatMessage, ChatResponse
+from gaik.software_components.llm.content import image_data
 
 
 class AnthropicProvider:
@@ -26,21 +28,83 @@ class AnthropicProvider:
 
     @staticmethod
     def _build_client(config: dict):
+        options = {
+            key: config[key]
+            for key in ("timeout", "max_retries", "http_client")
+            if config.get(key) is not None
+        }
         if config.get("provider") == "anthropic_foundry":
             return anthropic.AnthropicFoundry(
                 resource=config["resource"],
                 api_key=config["api_key"],
+                **options,
             )
-        return anthropic.Anthropic(api_key=config["api_key"])
+        return anthropic.Anthropic(api_key=config["api_key"], **options)
 
     @staticmethod
     def _split_system(messages: list[ChatMessage]) -> tuple[str | None, list[ChatMessage]]:
-        system_parts = [m["content"] for m in messages if m.get("role") == "system"]
-        rest = [m for m in messages if m.get("role") != "system"]
-        system = "\n\n".join(str(s) for s in system_parts) if system_parts else None
+        system_parts = []
+        for message in messages:
+            if message.get("role") != "system":
+                continue
+            content = message["content"]
+            if isinstance(content, str):
+                system_parts.append(content)
+            elif isinstance(content, list) and all(
+                isinstance(part, dict)
+                and part.get("type") == "text"
+                and isinstance(part.get("text"), str)
+                for part in content
+            ):
+                system_parts.extend(part["text"] for part in content)
+            else:
+                raise ValueError("AnthropicProvider system messages require text content")
+        rest = []
+        for message in messages:
+            if message.get("role") == "system":
+                continue
+            if message.get("role") not in {"user", "assistant"} or message.get("tool_calls"):
+                raise ValueError("AnthropicProvider supports user, assistant and system messages")
+            content = message["content"]
+            if isinstance(content, list):
+                parts = []
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "image_url":
+                        mime_type, data = image_data(part)
+                        parts.append(
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": mime_type,
+                                    "data": base64.b64encode(data).decode("ascii"),
+                                },
+                            }
+                        )
+                    elif isinstance(part, dict) and part.get("type") == "text":
+                        parts.append(part)
+                    else:
+                        raise ValueError("AnthropicProvider supports text and inline image parts")
+                content = parts
+            rest.append({"role": message["role"], "content": content})
+        system = "\n\n".join(system_parts) if system_parts else None
         return system, rest
 
+    def _options(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        options = dict(kwargs)
+        token_keys = [
+            key
+            for key in ("max_tokens", "max_completion_tokens", "max_output_tokens")
+            if key in options
+        ]
+        if len(token_keys) > 1:
+            raise ValueError("Use only one token limit: " + ", ".join(token_keys))
+        if token_keys:
+            options["max_tokens"] = options.pop(token_keys[0])
+        return options
+
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
+        kwargs = self._options(kwargs)
         system, rest = self._split_system(messages)
         params: dict[str, Any] = {
             "model": kwargs.pop("model", self.model),
@@ -74,6 +138,7 @@ class AnthropicProvider:
         response_format: type[BaseModel],
         **kwargs: Any,
     ) -> BaseModel:
+        kwargs = self._options(kwargs)
         schema = response_format.model_json_schema()
         tool_name = response_format.__name__
         tool = {
@@ -101,6 +166,7 @@ class AnthropicProvider:
         raise ValueError(f"Anthropic response did not return tool_use for '{tool_name}'.")
 
     def chat_stream(self, messages: list[ChatMessage], **kwargs: Any) -> Iterator[str]:
+        kwargs = self._options(kwargs)
         system, rest = self._split_system(messages)
         params: dict[str, Any] = {
             "model": kwargs.pop("model", self.model),

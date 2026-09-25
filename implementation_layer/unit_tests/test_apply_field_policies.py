@@ -1083,6 +1083,7 @@ class TestCompositeFieldPolicies:
     def test_extractor_dispatches_composite(self, composite, record):
         """_extract_one must route composite requirements away from the flat path."""
         extractor = DataExtractor.__new__(DataExtractor)
+        extractor.config = {"model": "test-model"}
         extractor.client = object()
         extractor.model = "test-model"
         extractor.temperature = 0.0

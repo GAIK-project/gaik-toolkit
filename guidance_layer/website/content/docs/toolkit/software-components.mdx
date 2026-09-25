@@ -14,7 +14,7 @@ Use software components when you need fine-grained control over each processing 
 </Callout>
 
 <Callout type="info">
-Most chat-based components (Extractor, Classifier, TranscriptEnhancer, AnswerGenerator, Embedder) can run against OpenAI, Azure OpenAI, Anthropic, or Google with the same code — see [Multi-Provider LLM Client](/toolkit/multi-provider-llm) for the `gaik.software_components.llm` package and the per-provider support matrix.
+Most chat-based components (Extractor, Classifier, TranscriptEnhancer, AnswerGenerator, Embedder) accept the same configuration interface for OpenAI, Azure OpenAI, Anthropic, Google, CSC Aitta, and other OpenAI-compatible servers. Available operations depend on the provider and model; see [Multi-Provider LLM Client](/toolkit/multi-provider-llm) for the `gaik.software_components.llm` package and the capability matrix.
 </Callout>
 
 ---
@@ -131,7 +131,7 @@ flowchart LR
 
 | Parser | When to use |
 |--------|-------------|
-| `VisionParser` | Single-provider (OpenAI / Azure) vision parsing — page images → markdown |
+| `VisionParser` | Shared provider configs with a vision model — OpenAI/Azure, Google/Vertex, Anthropic, Aitta, compatible servers or optional LiteLLM; page images → markdown |
 | `MultimodalParser` | Multi-provider PDF → markdown (OpenAI · Anthropic Claude · Google Gemini) with one API |
 | `PyMuPDFParser` | Fast local PDF text extraction, no API calls, lowest cost |
 | `DocxParser` | Local Word document (`.docx` / `.doc`) extraction via `python-docx` |

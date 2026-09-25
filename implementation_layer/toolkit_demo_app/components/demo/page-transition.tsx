@@ -16,7 +16,8 @@
  */
 
 import { motion } from "motion/react";
-import { useEffect, useState, type ReactNode, type CSSProperties } from "react";
+import { type ReactNode, type CSSProperties } from "react";
+import { useHasMounted } from "@/hooks/use-has-mounted";
 
 interface PageTransitionProps {
   children: ReactNode;
@@ -29,11 +30,7 @@ export function PageTransition({
   className,
   style,
 }: PageTransitionProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHasMounted();
 
   if (!mounted) {
     // Server render and first client render: visible, no animation.

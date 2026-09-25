@@ -74,16 +74,16 @@ def test_temporary_schema_task_matching_normalizes_multipart_newlines() -> None:
 def test_provider_model_allowlists(monkeypatch) -> None:
     assert route.PROVIDER_MODELS == {
         "openai": (
-            "gpt-5.4-mini",
-            "gpt-5.4",
-            "gpt-5.5-deployment",
-            "gpt-5.6-sol",
+            "gpt-6-luna",
+            "gpt-6-sol",
+            "gpt-6-astra",
+            "gpt-5.6-terra",
         ),
         "azure": (
-            "gpt-5.4-mini",
-            "gpt-5.4",
-            "gpt-5.5-deployment",
-            "gpt-5.6-sol",
+            "gpt-6-luna",
+            "gpt-6-sol",
+            "gpt-6-astra",
+            "gpt-5.6-terra",
         ),
         "claude": ("claude-sonnet-4.6", "claude-sonnet-5"),
         "google": ("gemini-3.1-flash-lite",),
@@ -91,7 +91,7 @@ def test_provider_model_allowlists(monkeypatch) -> None:
 
     monkeypatch.setenv("AZURE_API_KEY", "test-key")
     monkeypatch.setenv("ANTHROPIC_FOUNDRY_RESOURCE", "test-resource")
-    assert route._provider_settings("openai", "gpt-5.4") == ("openai", True, False)
+    assert route._provider_settings("openai", "gpt-6-sol") == ("openai", True, False)
     assert route._provider_settings("claude", "claude-sonnet-5") == (
         "claude",
         True,
@@ -99,7 +99,7 @@ def test_provider_model_allowlists(monkeypatch) -> None:
     )
 
     with pytest.raises(HTTPException, match="not available"):
-        route._provider_settings("google", "gpt-5.4")
+        route._provider_settings("google", "gpt-6-sol")
 
 
 @pytest.mark.asyncio

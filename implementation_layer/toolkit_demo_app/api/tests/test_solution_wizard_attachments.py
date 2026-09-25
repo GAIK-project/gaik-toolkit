@@ -7,7 +7,9 @@ Run standalone:
 import base64
 from unittest.mock import patch
 
+import pytest
 from api.routers.solution_wizard import FileAttachment, _extract_text_from_attachment
+from fastapi import HTTPException
 
 
 def _attachment(name: str, payload: bytes) -> FileAttachment:
@@ -40,6 +42,24 @@ def test_pdf_uses_docling_api_when_pymupdf_extracts_no_text():
 
     assert "Degrees" in text
     assert "1,698" in text
+
+
+def test_image_attachment_uses_the_request_config_without_local_import_shadowing():
+    config = {"provider": "aitta", "model": "vision-model", "api_key": "fake-key"}
+    with (
+        patch("api.routers.solution_wizard.get_api_config", return_value=config),
+        patch("gaik.software_components.parsers.VisionParser") as parser,
+    ):
+        parser.return_value.convert_image.return_value = "image text"
+        text = _extract_text_from_attachment(_attachment("image.png", b"fake image"))
+    assert text == "image text"
+    assert parser.call_args.kwargs["openai_config"] is config
+
+
+def test_audio_attachment_requires_server_settings_without_a_transcription_deployment():
+    with patch("api.routers.solution_wizard.request_model_settings", return_value=object()):
+        with pytest.raises(HTTPException, match="Clear your own model settings"):
+            _extract_text_from_attachment(_attachment("audio.wav", b"fake audio"))
 
 
 if __name__ == "__main__":

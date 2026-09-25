@@ -16,15 +16,24 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 try:
+    from utils.model_settings import provider_error_detail
+except ImportError:
+    from api.utils.model_settings import provider_error_detail
+
+try:
     from utils import (
+        MODEL,
         SCHEMA_FORMAT_VERSION,
         get_api_config,
+        get_model_options,
         schema_to_python_source,
     )
 except ImportError:
     from api.utils import (
+        MODEL,
         SCHEMA_FORMAT_VERSION,
         get_api_config,
+        get_model_options,
         schema_to_python_source,
     )
 
@@ -35,13 +44,6 @@ except ImportError:  # Compatibility with gaik releases predating the alias pack
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# Keep schema generation deterministic on the non-reasoning GPT-5.4 profile.
-MODEL = "gpt-5.4"
-MODEL_OPTIONS = {
-    "temperature": 0.0,
-    "reasoning_effort": None,
-}
 
 
 class GenerateSchemaRequest(BaseModel):
@@ -131,10 +133,11 @@ async def generate_schema(request: GenerateSchemaRequest) -> GenerateSchemaRespo
         raise HTTPException(status_code=400, detail="No extraction task provided")
 
     try:
+        config = get_api_config()
         generator = SchemaGenerator(
-            config=get_api_config(),
-            model=MODEL,
-            **MODEL_OPTIONS,
+            config=config,
+            model=config.get("model", MODEL),
+            **get_model_options(config, schema=True),
         )
         started_at = time.perf_counter()
         schema = await run_in_threadpool(generator.generate_schema, user_requirements)
@@ -179,4 +182,4 @@ async def generate_schema(request: GenerateSchemaRequest) -> GenerateSchemaRespo
         ) from exc
     except Exception as exc:
         logger.exception("Schema generation failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail=provider_error_detail(exc)) from exc

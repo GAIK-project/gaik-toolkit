@@ -166,8 +166,8 @@ print(result.diff_chunks)
 
 ## Default Models
 
-- Azure OpenAI: `gpt-5.4`
-- OpenAI: `gpt-5.4-2026-03-05`
+- Azure OpenAI: `gpt-6-luna` (or your `AZURE_DEPLOYMENT`)
+- OpenAI: `gpt-6-luna`
 
 ## Output Structure
 

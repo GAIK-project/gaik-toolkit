@@ -180,6 +180,8 @@ def test_every_import_in_the_skills_resolves(module_name, name):
 
 # (module, attribute, keyword arguments the skills pass by name)
 QUOTED_CALLS = [
+    # Shared provider configuration
+    ("gaik.software_components.llm", "get_llm_config", ("provider",)),
     # parsing-documents
     ("gaik.software_components.parsers", "PyMuPDFParser.parse_pdf", ()),
     ("gaik.software_components.parsers", "parse_pdf", ()),
@@ -187,18 +189,21 @@ QUOTED_CALLS = [
     ("gaik.software_components.parsers", "DoclingParser.parse_document", ()),
     ("gaik.software_components.parsers", "VisionPlusParser", ("vision_config",)),
     ("gaik.software_components.parsers", "VisionPlusParser.parse_document", ()),
+    ("gaik.software_components.parsers", "VisionParser", ("openai_config",)),
+    ("gaik.software_components.parsers", "VisionParser.convert_image", ()),
+    ("gaik.software_components.RAG.rag_parser_vision", "VisionRagParser", ("vision_config",)),
     ("gaik.software_components.parsers", "DoclingApiClientParser", ("api_base", "password")),
     (
         "gaik.software_components.parsers",
         "MultimodalParser",
-        ("model_provider", "merge_table", "create_html", "use_azure", "vertex_ai"),
+        ("api_config", "model_provider", "merge_table", "create_html", "use_azure", "vertex_ai"),
     ),
     ("gaik.software_components.parsers", "MultimodalParser.parse", ()),
     # extracting-structured-data
     (
         "gaik.software_components.vision_extractor",
         "VisionExtractor",
-        ("model_provider", "use_azure", "vertex_ai", "include_verification"),
+        ("api_config", "model_provider", "use_azure", "vertex_ai", "include_verification"),
     ),
     (
         "gaik.software_components.vision_extractor",
@@ -206,6 +211,8 @@ QUOTED_CALLS = [
         ("file_paths", "user_requirements", "extraction_model", "schema_dir"),
     ),
     ("gaik.software_components.extractor", "DataExtractor.extract", ("documents", "requirements")),
+    ("gaik.software_components.extractor", "DataExtractor", ("config",)),
+    ("gaik.software_components.schema_generator", "SchemaGenerator", ("config",)),
     ("gaik.software_components.schema_generator", "SchemaGenerator.generate_schema", ()),
     (
         "gaik.software_components.schema_generator",
@@ -215,14 +222,30 @@ QUOTED_CALLS = [
     ("gaik.software_components.evaluators", "ExtractionEvaluator.evaluate_dataset", ()),
     ("gaik.software_components.evaluators", "BatchEvaluationRunner", ("on_error",)),
     ("gaik.software_components.evaluators", "RAGEvaluator", ("judge",)),
-    ("gaik.software_components.validators", "LLMJudge", ()),
+    ("gaik.software_components.validators", "LLMJudge", ("config",)),
+    ("gaik.software_components.validators", "LLMJudge.judge_text_pair", ()),
     ("gaik.software_components.validators", "LLMJudgePanel", ()),
     ("gaik.software_components.validators", "compare_pairwise", ()),
+    (
+        "gaik.software_modules.audio_to_structured_data",
+        "AudioToStructuredData",
+        ("api_config", "transcription_config", "extraction_config"),
+    ),
+    (
+        "gaik.software_modules.documents_to_structured_data",
+        "DocumentsToStructuredData",
+        ("api_config", "parser_config", "extraction_config"),
+    ),
     # searching-documents
     ("gaik.software_components.config", "get_openai_config", ("use_azure",)),
-    ("gaik.software_components.RAG.embedder", "Embedder", ("model",)),
+    ("gaik.software_components.RAG.embedder", "Embedder", ("config", "model")),
     ("gaik.software_components.RAG.embedder", "Embedder.embed", ()),
     ("gaik.software_components.RAG.embedder", "Embedder.embed_query", ()),
+    (
+        "gaik.software_modules.RAG_workflow",
+        "RAGWorkflow",
+        ("api_config", "parser_config", "embedding_config", "answer_config"),
+    ),
     (
         "gaik.software_components.RAG.pg_vector_store",
         "PgVectorStore",

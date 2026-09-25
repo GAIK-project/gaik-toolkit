@@ -229,7 +229,7 @@ export function OptionsForm({ options, onChange, disabled }: OptionsFormProps) {
         <AccordionContent className="space-y-3 pb-3">
           <Row label="Model">
             <Input
-              placeholder="gpt-5.4"
+              placeholder="gpt-6-luna"
               value={options.writerModel}
               onChange={(e) => set({ writerModel: e.target.value })}
               disabled={disabled}

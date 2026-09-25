@@ -139,6 +139,7 @@ class TestComponentsForwardTheirSettings:
 
         inst = extractor_module.DataExtractor.__new__(extractor_module.DataExtractor)
         inst.client = object()
+        inst.config = {"model_family": "gpt-6-sol"}
         inst.model = "test-model"
         inst.temperature = None
         inst.reasoning_effort = "medium"
@@ -152,6 +153,28 @@ class TestComponentsForwardTheirSettings:
         )
         assert captured["temperature"] is None
         assert captured["reasoning_effort"] == "medium"
+        assert captured["config"] == inst.config
+
+    def test_schema_generator_forwards_deployment_family(self, monkeypatch):
+        from gaik.software_components.extractor import schema as schema_module
+
+        client = _RecordingClient()
+        monkeypatch.setattr(schema_module, "build_compat_client", lambda config: client)
+        generator = schema_module.SchemaGenerator(
+            {
+                "provider": "azure",
+                "model": "production",
+                "model_family": "gpt-6-astra",
+                "reasoning_effort": "high",
+                "timeout": 120,
+            }
+        )
+        generator.analyze_structure("Extract an answer")
+        assert client.last["model"] == "production"
+        assert client.last["reasoning_effort"] == "high"
+        assert client.last["timeout"] == 120
+        assert "temperature" not in client.last
+        assert "top_p" not in client.last
 
     def test_nested_list_parser_passes_settings_to_item_parser(self, monkeypatch):
         from gaik.software_components.extractor import schema as schema_module

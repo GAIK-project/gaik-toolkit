@@ -17,7 +17,9 @@ class UsageRecord:
     """Token counts and derived cost for a single LLM call.
 
     Attributes:
-        provider: One of ``"openai"``, ``"claude"``, ``"google"``.
+        provider: Provider identifier used for this call. Known Azure, Vertex,
+            and Anthropic aliases use public list-price estimates; custom
+            endpoints and LiteLLM backends have unknown pricing in this table.
         model: Model/deployment identifier the call actually used.
         input_tokens: Prompt tokens sent to the model.
         output_tokens: Completion tokens returned (includes thinking tokens

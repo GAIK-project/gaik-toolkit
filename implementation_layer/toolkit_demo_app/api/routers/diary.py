@@ -13,9 +13,8 @@ try:
     from utils import (
         AUDIO_TOO_LARGE_DETAIL,
         MAX_AUDIO_FILE_SIZE_BYTES,
-        MODEL,
-        MODEL_OPTIONS,
         get_api_config,
+        get_model_options,
         load_schema,
         save_schema,
         sse_event,
@@ -24,9 +23,8 @@ except ImportError:
     from api.utils import (
         AUDIO_TOO_LARGE_DETAIL,
         MAX_AUDIO_FILE_SIZE_BYTES,
-        MODEL,
-        MODEL_OPTIONS,
         get_api_config,
+        get_model_options,
         load_schema,
         save_schema,
         sse_event,
@@ -51,7 +49,9 @@ def _get_or_create_schema(config, user_requirements: str, schema_key: str, regen
         schema, requirements = loaded
         return schema, requirements, False
 
-    schema_generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
+    schema_generator = SchemaGenerator(
+        config=config, model=config["model"], **get_model_options(config)
+    )
     extraction_model = schema_generator.generate_schema(user_requirements)
     requirements = schema_generator.item_requirements
 
@@ -186,7 +186,9 @@ async def diary_audio_pipeline_stream(
             yield sse_event("step_update", steps[2])
 
             documents = [transcription.enhanced_transcript or transcription.raw_transcript]
-            extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
+            extractor = DataExtractor(
+                config=config, model=config["model"], **get_model_options(config)
+            )
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
                 requirements=requirements,
@@ -359,7 +361,9 @@ async def diary_text_pipeline_stream(
             steps[2]["status"] = "in_progress"
             yield sse_event("step_update", steps[2])
 
-            extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
+            extractor = DataExtractor(
+                config=config, model=config["model"], **get_model_options(config)
+            )
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
                 requirements=requirements,

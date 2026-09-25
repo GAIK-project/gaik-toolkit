@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { FooterServer } from "@/components/layout/footer-server";
 import { SiteNavServer } from "@/components/layout/site-nav-server";
+import { ModelSettingsNotice } from "@/components/model-settings";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -23,6 +24,7 @@ export function MainLayout({
     <div className="flex min-h-screen flex-col" suppressHydrationWarning>
       <SiteNavServer />
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 pt-8 pb-24 sm:px-8">
+        <ModelSettingsNotice />
         {contentWrapper === "spaced" ? (
           <div className="space-y-6">{children}</div>
         ) : (

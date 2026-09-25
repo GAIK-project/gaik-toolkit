@@ -1,159 +1,196 @@
 ---
 title: Multi-Provider LLM Client
-description: One configuration shape, four LLM providers (OpenAI, Azure, Anthropic, Google) — without rewriting component code.
+description: One configuration shape for OpenAI, Azure, Anthropic, Google, CSC Aitta, and other OpenAI-compatible servers.
 ---
 
 import { Callout } from 'fumadocs-ui/components/callout';
 
-The `gaik.software_components.llm` package, available since `gaik>=0.3.21`, lets a single piece of component code run against OpenAI, Azure OpenAI, Anthropic Claude, or Google Gemini. The same `DataExtractor`, `DocumentClassifier`, `TranscriptEnhancer`, `AnswerGenerator`, or `Embedder` instance can switch providers by changing only its config dict — no per-provider branches in your code.
+The `gaik.software_components.llm` package lets text components use OpenAI, Azure OpenAI, Anthropic Claude, Google Gemini, CSC Aitta, or another OpenAI-compatible server. Choose a configuration and pass it to `DataExtractor`, `DocumentClassifier`, `TranscriptEnhancer`, `AnswerGenerator`, or `Embedder`. Each component keeps the same public interface; the chosen model must support the capabilities it uses.
 
-The legacy `get_openai_config()` path is unchanged: existing OpenAI/Azure deployments keep using `client.beta.chat.completions.parse()` bit-for-bit, with the same deterministic settings (temperature, top_p, seed). The multi-provider path activates only when the config carries an explicit `provider` field for Anthropic or Google.
+`create_llm_client()` exposes a common `ProviderClient` interface for direct calls. OpenAI, Azure, Aitta, and compatible servers share the OpenAI SDK adapter; Anthropic, Google and Vertex use native SDKs. LiteLLM is an optional backend for additional provider integrations. Existing `get_openai_config()` configurations still use the legacy OpenAI/Azure component paths.
 
 <Callout type="info">
-For multi-provider PDF / image parsing, use `MultimodalParser` instead — it has been multi-provider since before the `llm/` package and ships its own per-provider image payload handling. The `llm/` package focuses on text chat, structured output, streaming, and embeddings.
+This interface covers text and image chat, structured output, streaming, and embeddings. Vision components also accept shared configs in gaik 0.8.0. Audio support remains limited to the toolkit's OpenAI/Azure audio paths.
 </Callout>
-
----
-
-## Why a multi-provider abstraction
-
-Three forces motivated the package:
-
-1. **AI-Act compliance and resilience.** Production systems should not be coupled to a single vendor. Switching providers per use case (cheaper Gemini for batch extraction, Claude for nuanced classification, Azure for enterprise contracts) reduces lock-in and lets compliance reviewers see the choice surface.
-2. **Native provider features.** OpenAI-compatible endpoints exist for some providers (e.g. Gemini exposes one), but they only cover a subset of features and lag behind the native APIs. The `llm/` package routes through each provider's official SDK so structured output, streaming, and embeddings use whatever each provider exposes natively.
-3. **Same code paths for every component.** Without an abstraction, every component would grow a `_is_gemini()` branch (or three). With it, components ask `isinstance(client, ProviderClient)` once and the adapter handles the differences.
-
----
 
 ## Installation
 
-Provider-specific SDKs are opt-in extras:
+OpenAI, Azure, Aitta, and other OpenAI-compatible servers use the core `openai` dependency. Install the extras needed by your component and, for native Google or Anthropic, its SDK:
 
 ```bash
-pip install 'gaik[llm-anthropic]'   # adds anthropic SDK
-pip install 'gaik[llm-google]'      # adds google-genai + google-auth
-pip install 'gaik[llm-all]'         # both
+pip install 'gaik[extract]'
+pip install 'gaik[llm-google]'      # google-genai + google-auth
+pip install 'gaik[llm-anthropic]'   # anthropic SDK
+pip install 'gaik[llm-all]'         # native SDKs and LiteLLM
+pip install 'gaik[llm-litellm]'     # optional LiteLLM backend
 ```
 
-OpenAI and Azure OpenAI work with no extras (the core `gaik` install already includes the `openai` SDK).
+## Same component, different provider
 
----
-
-## Quick start
+For example, the following extraction uses the same schema and method for Azure, Google, or Aitta. Configure credentials for the selected provider, then change only `provider`:
 
 ```python
+from pydantic import BaseModel, ConfigDict
+
 from gaik.software_components.extractor import DataExtractor
+from gaik.software_components.extractor.schema import ExtractionRequirements, FieldSpec
 from gaik.software_components.llm import get_llm_config
 
-# Pick a provider — same code, four backends
-config = get_llm_config("google")            # or "openai", "azure", "anthropic"
-extractor = DataExtractor(config=config)
 
+class Project(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str
+
+
+requirements = ExtractionRequirements(
+    use_case_name="project",
+    fields=[FieldSpec(field_name="title", field_type="str", description="Project title")],
+)
+
+provider = "aitta"  # "azure", "google", "openai", or "anthropic"
+extractor = DataExtractor(config=get_llm_config(provider))
 results = extractor.extract(
-    extraction_model=ProjectModel,
+    extraction_model=Project,
     requirements=requirements,
-    user_requirements="Extract project metadata.",
-    documents=["Project: AIRI. Funding: 2.5M EUR. Status: ongoing."],
+    user_requirements="Extract the project title.",
+    documents=["Project: Advanced AI Research Initiative."],
 )
 ```
 
-The same flow works for `DocumentClassifier`, `TranscriptEnhancer`, `AnswerGenerator`, and `Embedder` — every component constructor accepts either the legacy `get_openai_config()` dict or the new `get_llm_config()` dict.
-
-A complete runnable example that auto-detects which providers are configured is at [`examples/software_components/llm/example_multi_provider_extractor.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/llm/example_multi_provider_extractor.py).
-
----
+Extraction and classification require structured output support from the selected model and endpoint. OpenAI-compatible chat alone does not guarantee JSON-schema support. A complete multi-provider example is at [`example_multi_provider_extractor.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/llm/example_multi_provider_extractor.py).
 
 ## Configuration
 
-`get_llm_config(provider, **overrides)` returns a dict superset of the legacy shape. The resolution order for the active provider is:
+`get_llm_config(provider, **overrides)` reads the provider's environment variables and returns a dictionary. Keyword overrides such as `api_key`, `model`, `base_url`, or `embedding_model` are applied before required fields are validated, so configuration can come from your own secret manager instead of environment variables.
 
-1. Explicit `provider` argument
-2. `config["provider"]` field
-3. Env variable `LLM_PROVIDER`
-4. Legacy `config["use_azure"]` flag → `azure` or `openai`
-5. Default `azure`
+When resolving an existing config, the priority is:
 
-### Required environment variables per provider
+1. Explicit `provider` argument to `resolve_provider()`
+2. `config["provider"]`
+3. Legacy `config["use_azure"]` (`True` → Azure, `False` → OpenAI)
+4. `LLM_PROVIDER` environment variable
+5. Azure by default
 
-| Provider | Required env vars | Default model |
+`get_llm_config()` without an argument uses `LLM_PROVIDER`, then Azure. An existing legacy config with `use_azure` keeps its provider even if `LLM_PROVIDER` is set elsewhere.
+
+| Provider | Required environment variables | Model selection |
 |---|---|---|
-| `openai` | `OPENAI_API_KEY` | `OPENAI_MODEL` (or `gpt-5.4-2026-03-05`) |
-| `azure` | `AZURE_API_KEY`, `AZURE_ENDPOINT` | `AZURE_DEPLOYMENT` (or `gpt-5.4`) |
-| `anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL` (or `claude-sonnet-4-6`) |
-| `anthropic_foundry` | `AZURE_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE` | same as anthropic |
-| `google` | `GOOGLE_API_KEY` (or `GEMINI_API_KEY`) | `GOOGLE_MODEL` (or `gemini-2.5-flash`) |
-| `vertex` | `GOOGLE_PROJECT_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_SCOPES`, `GOOGLE_GENERATE_CONTENT_URL` | same as google |
+| `openai` | `OPENAI_API_KEY` | `OPENAI_MODEL`, default `gpt-6-luna` |
+| `azure` | `AZURE_API_KEY`, `AZURE_ENDPOINT` | `AZURE_DEPLOYMENT`, default `gpt-6-luna`; must name your deployment |
+| `anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL`, default `claude-sonnet-4-6` |
+| `anthropic_foundry` | `ANTHROPIC_FOUNDRY_API_KEY` (or `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE` | Same as Anthropic |
+| `google` | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `GOOGLE_MODEL`, default `gemini-2.5-flash` |
+| `aitta` | `AITTA_API_KEY` (aliases: `AITTA_API_TOKEN`, `AITTA_TOKEN`) | `AITTA_MODEL`, default `google/gemma-4-31b-it` |
+| `openai_compatible` | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` | Explicit server model; no default |
+| `vertex` | `GOOGLE_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT`, plus Google credentials | `GOOGLE_MODEL`; region from `GOOGLE_CLOUD_LOCATION`, default `global` |
+| `litellm` | `LITELLM_MODEL`; credentials for the selected backend | Provider-prefixed ID, e.g. `azure/gpt-6-luna` |
 
----
+The Google SDK adapter supports the direct Gemini API and Vertex AI. Vertex accepts application-default credentials, a `credentials` object, or service-account data via `service_account_json` (`GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS`). Choose a region where your model is served.
+
+LiteLLM is opt-in: `get_llm_config("litellm", model="azure/gpt-6-luna", api_key=key, base_url=endpoint, api_version=version)`. It uses the same component interface and passes credentials per request. `LITELLM_API_KEY`, `LITELLM_BASE_URL`, `LITELLM_API_VERSION`, and `LITELLM_EMBEDDING_MODEL` are optional environment defaults. Select a provider-prefixed embedding model separately when needed.
+
+### CSC Aitta
+
+Keep the token in `AITTA_API_KEY` in your environment or an untracked `.env` file. The Aitta config sets `base_url` to `https://aitta-api.csc.fi/openai/v1` and defaults to a 600-second timeout to accommodate model startup:
+
+```python
+from gaik.software_components.llm import create_llm_client, get_llm_config
+
+config = get_llm_config("aitta", timeout=600.0, max_retries=1)
+client = create_llm_client(config)
+response = client.chat([
+    {"role": "user", "content": "Explain knowledge management in one sentence."}
+])
+print(response.text)
+```
+
+Aitta provides chat-completion and embedding endpoints. Select a model using the authenticated [model catalogue](https://aitta-api.csc.fi/model), and inspect its capabilities. Embeddings require an embedding model: set `AITTA_EMBEDDING_MODEL` or pass `embedding_model` explicitly. The chat model is not an embedding fallback. Embedding requests timed out in the integration checks, so live embedding availability is not confirmed; select another embedding provider if needed. See the [official Aitta documentation](https://docs.lumi-supercomputer.eu/laif/inference/aitta/).
+
+Aitta is a shared research inference service. A first request may wait for a model to load or for computing capacity; a client timeout alone does not establish an authentication failure. Check the service status and active workers, and prefer an already running model when capacity is limited. Availability can change during LUMI maintenance. See [Aitta's capacity and availability guidance](https://docs.lumi-supercomputer.eu/laif/inference/aitta/#capacity-limits).
+
+In the September 2026 integration checks, `google/gemma-4-31b-it` completed chat, streaming, structured output, schema generation, extraction, image parsing and PDF vision extraction. `LumiOpen/Llama-Poro-2-70B-Instruct` handled chat and a small schema but failed the more complex schema-generation check with invalid JSON. Use the tested Gemma model for extraction, and validate your own schema before relying on another model. These checks establish compatibility for those requests, not a general quality ranking.
+
+From a repository checkout, run the live connectivity example with credentials already configured:
+
+```bash
+uv run python implementation_layer/examples/software_components/llm/example_aitta_smoke.py
+```
+
+### Other OpenAI-compatible servers
+
+Use `openai_compatible` to keep the server's endpoint and model explicit:
+
+```python
+config = get_llm_config(
+    "openai_compatible",
+    api_key=server_api_key,
+    base_url="https://your-inference-server.example/v1",
+    model="your-served-model",
+    timeout=120.0,
+    max_retries=1,
+)
+client = create_llm_client(config)
+```
+
+For embeddings, also set `embedding_model` or `EMBEDDING_MODEL` to a model served by that endpoint. Protocol compatibility does not add features the server or model lacks.
 
 ## ProviderClient interface
 
-All adapters implement the same `ProviderClient` protocol:
-
-| Method | Purpose | Notes |
+| Method | Result | Notes |
 |---|---|---|
-| `chat(messages, **kwargs)` | Single completion → `ChatResponse(text, model, provider, raw, usage)` | `raw` is the original SDK response if you need provider-specific fields |
-| `chat_parsed(messages, response_format, **kwargs)` | Pydantic structured output → instance of `response_format` | OpenAI uses `beta.chat.completions.parse()`, Anthropic uses forced tool_use, Google uses `response_json_schema` |
-| `chat_stream(messages, **kwargs)` | `Iterator[str]` of text deltas | Per-provider streaming differences are normalized away |
-| `embed(texts, **kwargs)` | Batch embeddings → `list[list[float]]` | Anthropic raises `NotImplementedError` (Voyage AI is recommended) |
+| `chat(messages, **kwargs)` | `ChatResponse(text, model, provider, raw, usage)` | `raw` retains the SDK response |
+| `chat_parsed(messages, response_format, **kwargs)` | An instance of the Pydantic `response_format` | OpenAI-compatible servers must support the structured-output request |
+| `chat_stream(messages, **kwargs)` | `Iterator[str]` of text deltas | Requires streaming support |
+| `embed(texts, **kwargs)` | `list[list[float]]` | Requires a separate supported embedding model; Anthropic raises `NotImplementedError` |
 
-You usually do not call these directly — components call them through their own methods. But the interface is stable, so you can call it for one-off scripts or new components.
+## Component support
 
----
-
-## Provider support matrix
-
-| Component | OpenAI / Azure | Anthropic native | Google native | Gemini-via-OpenAI-compat |
+| Component | OpenAI / Azure | Anthropic native | Google native | Aitta / other compatible server |
 |---|:---:|:---:|:---:|:---:|
-| Extractor | ✅ | ✅ | ✅ | ✅ |
-| Document Classifier | ✅ | ✅ | ✅ | ✅ |
-| Transcript Enhancer | ✅ | ✅ | ✅ | ✅ |
-| Answer Generator (incl. streaming) | ✅ | ✅ | ✅ | ✅ |
-| Embedder | ✅ | ❌ | ✅ | ✅ |
-| Vision Parser | ✅ | ❌ | ❌ | ✅ |
-| Transcriber, Parallel Transcriber, TextToSpeech | ✅ | ❌ | ❌ | ✅ |
+| DataExtractor | Yes | Yes | Yes | Requires structured output |
+| DocumentClassifier (locally parsed text) | Yes | Yes | Yes | Requires structured output |
+| TranscriptEnhancer | Yes | Yes | Yes | Requires chat |
+| AnswerGenerator, including streaming | Yes | Yes | Yes | Requires chat / streaming |
+| Embedder | Yes | No | Yes | Requires an embedding model |
+| VisionParser | Yes | Requires vision model | Requires vision model | Requires a vision model and image input support |
+| Transcriber, ParallelTranscriber, TextToSpeech | Yes | No | No | Not supported by this provider path |
 
-**Gemini-via-OpenAI-compat** means setting `OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/` on a standard OpenAI config. Every component routes through the legacy path and the OpenAI SDK transparently calls Gemini. This is how the Cloud Run deployment at [gaik-demo.8wave.ai](https://gaik-demo.8wave.ai) currently runs Gemini for non-audio components.
+Every “Yes” also requires a model or Azure deployment that supports the operation. For Google embeddings, the default is `gemini-embedding-001`; match your vector store dimensions to the returned vectors. Use the same embedding model for documents and queries.
 
-**Notes on the ❌ cells:**
-- *Embedder + Anthropic*: Anthropic does not expose a native embeddings API. The `embed()` call raises `NotImplementedError`; Anthropic recommends [Voyage AI](https://docs.voyageai.com/) for embeddings.
-- *Embedder + Google*: uses `gemini-embedding-001` (3072 dimensions).
-- *Vision Parser + Anthropic / Google*: `VisionParser` stays OpenAI-shaped. For native multi-provider vision use [`MultimodalParser`](/toolkit/software-components) — it handles OpenAI, Claude, and Gemini natively with per-provider image payloads.
-- *Audio components + Anthropic / Google*: raise `NotImplementedError`. Anthropic has no audio API; Google's audio is on the separate Live API. Route through Gemini-via-OpenAI-compat instead (a separate audio client targets `api.openai.com` so `/audio/speech` and Whisper still work).
+`DocumentClassifier` uses local parsing for PDF/DOCX text by default; classifying images or explicitly selecting its vision parser also requires vision support. `VisionParser` accepts all shared provider configs, and the endpoint must serve a vision model before sending images. `MultimodalParser(api_config=config)`, `VisionExtractor(api_config=config)`, `FormUnderstander(config=config)`, and `LLMJudge(config=config)` also use the shared interface. Their legacy provider arguments remain available.
 
----
+Shared vision messages contain text plus base64 image data URLs in OpenAI-shaped `image_url` parts. Native adapters translate these into provider-specific image payloads. This avoids a provider adapter fetching arbitrary remote image URLs; callers should supply image bytes through the vision components or construct base64 data URLs.
 
-## Audio components
+## Choose providers per pipeline stage
 
-Anthropic does not expose an audio API, and Google's audio is served through the separate Live API (not OpenAI-shaped). The transcriber, parallel transcriber, and text-to-speech components therefore reject native Anthropic / Google configs with a clear `NotImplementedError`. To use Gemini for audio, set `OPENAI_BASE_URL` as above and route through the OpenAI client.
+Audio, parsing, embeddings and answering do not have to use the same provider:
 
----
+```python
+from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
 
-## Vision
+audio = get_llm_config("azure")
+text = get_llm_config("aitta")
+pipeline = AudioToStructuredData(
+    api_config=audio,
+    transcription_config=audio,
+    extraction_config=text,
+)
+```
 
-`VisionParser` likewise stays OpenAI-shaped. For native multi-provider vision (per-provider image payload formats), use [`MultimodalParser`](/toolkit/software-components#multimodal-parser) — it has handled OpenAI, Claude, and Gemini natively since before the `llm/` package and is the recommended path when you need each provider's native image handling.
+`DocumentsToStructuredData` accepts `parser_config` and `extraction_config`. `RAGWorkflow` accepts `parser_config`, `embedding_config`, and `answer_config`. Omitted stage configs fall back to `api_config`. Indexing and queries must keep the same embedding model and vector dimensions.
 
----
+Report generation accepts runtime configs under `writer_options["api_config"]` and `review_options["api_config"]`. `save_report_config()` rejects credential-bearing configs: save the nonsecret report settings and supply keys at runtime.
 
-## Helpers
+### Audio
 
-Two utilities make the legacy / multi-provider split painless for component authors:
+The audio components use the toolkit's OpenAI/Azure audio clients. Aitta and native Anthropic/Google configurations are rejected. Pointing a chat client at Gemini's OpenAI-compatible endpoint does not enable OpenAI transcription or speech endpoints. A workflow that uses Gemini or Aitta for text and OpenAI/Azure for audio needs separate configs and credentials for those services.
 
-| Helper | Use |
+## Helpers for component authors
+
+| Helper | Behavior |
 |---|---|
-| `build_compat_client(config)` | Returns a raw `OpenAI` / `AzureOpenAI` for legacy configs (preserves the original deterministic call shape), a `ProviderClient` adapter for `anthropic` / `google`. Every component constructor calls this. |
-| `assert_openai_or_azure(config, component=...)` | One-liner guard for audio components to reject Anthropic / Google with a hint to use `OPENAI_BASE_URL` instead. |
+| `create_llm_client(config)` | Returns a `ProviderClient` adapter for direct use |
+| `build_compat_client(config)` | Returns the raw SDK client for legacy OpenAI/Azure component paths, and a `ProviderClient` for other supported providers |
+| `assert_openai_or_azure(config, component=...)` | Rejects unsupported provider configs early for OpenAI/Azure-only components |
 
-Both are exported from `gaik.software_components.llm`.
-
----
-
-## Migration checklist
-
-If you are adding multi-provider support to a new component:
-
-1. Replace `create_openai_client(config)` with `build_compat_client(config)` in the constructor.
-2. Inside any method that calls the LLM, branch with `isinstance(self.client, ProviderClient)`:
-   - For the non-OpenAI branch, call `self.client.chat()`, `chat_parsed()`, `chat_stream()`, or `embed()` as appropriate.
-   - The OpenAI branch keeps its existing `client.chat.completions.create()` or `client.beta.chat.completions.parse()` call unchanged.
-3. For audio components, add `assert_openai_or_azure(config, component="<name>")` early in the constructor.
+To migrate a text component, use `build_compat_client(config)` in its constructor. Where it calls the model, use `isinstance(self.client, ProviderClient)` to select `chat()`, `chat_parsed()`, `chat_stream()`, or `embed()`, while retaining the existing raw SDK path for legacy OpenAI/Azure callers. Test both paths and reject unsupported capabilities explicitly.

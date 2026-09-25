@@ -6,7 +6,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
 from gaik.software_components.transcriber.transcriber import (
     DEFAULT_MAX_DURATION_SECONDS,
     REMOTE_MAX_DURATION_SECONDS,
@@ -162,10 +161,10 @@ def test_chunks_never_exceed_the_api_ceiling(
     audio = _SliceableFakeAudio(duration_ms=int(duration_s * 1000))
 
     with (
-        patch("gaik.software_components.transcriber.transcriber.openai") as fake_openai,
+        patch("gaik.software_components.transcriber.transcriber.create_openai_client") as factory,
         patch("gaik.software_components.transcriber.transcriber.time.sleep"),
     ):
-        fake_openai.audio.transcriptions.create.return_value.text = "chunk transcript"
+        factory.return_value.audio.transcriptions.create.return_value.text = "chunk transcript"
         split_and_transcribe_with_context(
             str(audio_path),
             {"use_azure": False, "api_key": "test-key"},

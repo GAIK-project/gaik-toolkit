@@ -29,6 +29,13 @@ from fastapi.responses import JSONResponse  # noqa: E402
 from gaik import __version__ as gaik_version  # noqa: E402
 
 try:
+    from routers import model_settings
+    from utils.model_settings import ModelSettingsMiddleware
+except ImportError:
+    from api.routers import model_settings
+    from api.utils.model_settings import ModelSettingsMiddleware
+
+try:
     # Docker: routers/ is in same directory as main.py
     from routers import (
         classifier,
@@ -121,6 +128,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(ModelSettingsMiddleware)
 
 
 @app.exception_handler(Exception)
@@ -134,6 +142,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # Include routers
+app.include_router(model_settings.router, prefix="/model-settings", tags=["Model settings"])
 app.include_router(parser.router, prefix="/parse", tags=["Parser"])
 app.include_router(classifier.router, prefix="/classify", tags=["Classifier"])
 app.include_router(extractor.router, prefix="/extract", tags=["Extractor"])

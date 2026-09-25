@@ -1,6 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@keyframes text-shimmer {
+  from {
+    background-position: 100% center;
+  }
+  to {
+    background-position: 0% center;
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -441,7 +450,8 @@
 .driver-popover.gaik-tour .driver-popover-arrow-side-left.driver-popover-arrow {
   border-left-color: var(--popover);
 }
-.driver-popover.gaik-tour .driver-popover-arrow-side-right.driver-popover-arrow {
+.driver-popover.gaik-tour
+  .driver-popover-arrow-side-right.driver-popover-arrow {
   border-right-color: var(--popover);
 }
 .driver-popover.gaik-tour .driver-popover-arrow-side-top.driver-popover-arrow {

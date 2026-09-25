@@ -14,7 +14,7 @@ import {
 import { GitHubIcon } from "@/components/github-icon";
 import { useOnboarding } from "@/components/onboarding/onboarding-provider";
 import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
-import { useEffect, useState } from "react";
+import { useHasMounted } from "@/hooks/use-has-mounted";
 
 const DOCS_URL = "https://gaik-toolkit.2.rahtiapp.fi/" as const;
 
@@ -28,10 +28,7 @@ export function Footer({ githubPreview }: FooterProps) {
 
   // Suppress hydration mismatch: GlimpseTrigger (Radix HoverCard asChild) renders
   // differently on the server vs. client. Only activate the hover card after mount.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHasMounted();
 
   const githubLink = (
     <a

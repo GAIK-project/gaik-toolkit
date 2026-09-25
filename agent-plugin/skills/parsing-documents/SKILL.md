@@ -18,6 +18,7 @@ description: >-
 ```bash
 pip install "gaik[parser]"              # PyMuPDF, python-docx, Docling
 pip install "gaik[multimodal-parser]"   # multi-provider vision parsing
+# Add llm-google for shared Google/Vertex configs, or llm-litellm for LiteLLM.
 ```
 
 ## Choose by what must survive, not by file type
@@ -30,7 +31,7 @@ task needed. Decide first what has to still be true afterwards, then pick:
 | Plain prose, simple single-column layout | `PyMuPDFParser` | free, local, milliseconds |
 | A Word document's text | `DocxParser` | free, local |
 | Text on scans / no text layer | `DoclingParser` (OCR) | slow on CPU, free |
-| **Table structure — merged cells, multi-row headers** | `MultimodalParser` or `VisionParser` | API call per page |
+| **Table structure — merged cells, multi-row headers** | `MultimodalParser` or `VisionParser` | API calls |
 | Images explained in place, for RAG chunks | `VisionPlusParser` | Docling + API call |
 | Docling quality without the local install | `DoclingApiClientParser` | a Docling service (`api_base=`, `password=`) |
 
@@ -96,22 +97,33 @@ Every `parse_document` returns a dict, and the key differs by parser:
 
 ```python
 from gaik.software_components.parsers import (
-    DocxParser, DoclingParser, VisionPlusParser, MultimodalParser, get_openai_config,
+    DocxParser, DoclingParser, VisionParser, VisionPlusParser, MultimodalParser,
 )
+from gaik.software_components.llm import get_llm_config
 
 DocxParser().parse_docx("doc.docx")                             # -> str
 DoclingParser().parse_document("scan.pdf")["text_content"]      # OCR
-VisionPlusParser(vision_config=get_openai_config(use_azure=True)).parse_document(
+config = get_llm_config("azure")                               # explicit provider
+VisionPlusParser(vision_config=config).parse_document(
     "doc.pdf"
 )["parsed_markdown"]                                            # note: different key
-MultimodalParser(model_provider="openai").parse("doc.pdf")      # -> ParseResult
+VisionParser(openai_config=config).convert_image("page.jpg")    # -> str
+MultimodalParser(api_config=config).parse("doc.pdf")             # -> ParseResult
 ```
 
 `VisionPlusParser` and `DoclingApiClientParser` take required keyword arguments —
 `vision_config=`, and `api_base=` plus `password=` — and a bare constructor call fails.
 
-`MultimodalParser` takes **keyword arguments only** and has no `config` parameter — it
-reads credentials from the environment. `ParseResult` is a plain dataclass with
+`MultimodalParser` takes **keyword arguments only**. Use `api_config=get_llm_config(...)`
+for the shared provider interface; the legacy `model_provider` flags read credentials
+from the environment. It has no `config` parameter. `VisionParser` uses `openai_config`
+and `VisionPlusParser` uses `vision_config` for the same shared dictionary. Choose native
+`openai`, `azure`, `google`, `vertex`, `anthropic`, `anthropic_foundry`, `aitta`,
+`openai_compatible`, or optional `litellm` through `get_llm_config`. The configured model
+must accept images. Shared multimodal parsing renders PDF pages as PNG images, so native
+PDF uploads are not required.
+
+`ParseResult` is a plain dataclass with
 `raw_markdown`, `clean_markdown`, `html` (populated only when `create_html=True`) and
 `usage`; it has no `save()` method, so write the files yourself. `DoclingParser` has no
 `parse()` method.
@@ -150,9 +162,14 @@ column-collapse and page-drop, which both otherwise read as fine prose.
   its accuracy, so never reach for Docling to improve a *quality* result you measured on
   CPU — the number will be identical.
 - `DoclingParser` requires the `parser` extra, not `parser-cpu`.
-- Vision and audio components only accept OpenAI/Azure credentials and raise
-  `NotImplementedError` for native Anthropic or Google. `MultimodalParser` is the
-  multi-provider path.
+- `VisionParser` accepts all shared provider configs, including native Google/Vertex,
+  Anthropic, Aitta and optional LiteLLM. The selected model must support image inputs.
+  `MultimodalParser(api_config=...)` uses the same interface. LiteLLM requires
+  `gaik[llm-litellm]` and a provider-prefixed model identifier; capabilities still depend
+  on that backend/model.
+- Audio transcription components require OpenAI/Azure audio configs. Aitta, native
+  Google/Anthropic, and an arbitrary compatible chat endpoint do not acquire audio
+  support through the shared chat client. Use separate audio and text stage configs.
 - On Windows, write parsed output with `encoding="utf-8"` explicitly. `Path.write_text()`
   defaults to the platform codepage, which raises on characters a document parser routinely
   produces — and a crashed write downstream looks exactly like a bad parse.

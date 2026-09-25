@@ -300,7 +300,7 @@ result = generator.run(
 
     # Main report writer LLM options.
     writer_options={
-        "model": "gpt-5.4",
+        "model": "gpt-6-luna",
         "reasoning_effort": "medium",
     },
 
@@ -341,7 +341,7 @@ for section in result.sections:
 | `parser_options` | `None` | Parser constructor/config options. Supports `{"ctor": {...}}` and `{"openai_config": ...}` for relevant parsers. |
 | `transcriber_options` | `None` | Transcriber options: `{"ctor": {...}, "call": {...}}`. |
 | `image_options` | `None` | Image handling options. `{"mode": "parse"}` uses `VisionParser`; `{"mode": "structured"}` uses `VisionExtractor`. |
-| `writer_options` | `None` | LLM options for the report writer. `model` and `provider` select the client; remaining keys are forwarded to `client.chat(...)`. |
+| `writer_options` | `None` | LLM options for the report writer. `model`, `provider`, and `api_config` select the client; remaining keys are forwarded to `client.chat(...)`. |
 | `agentic` | `False` | If `False`, writes the whole report in one LLM call. If `True`, uses per-section agentic drafting and review. |
 | `review_options` | `None` | Optional separate LLM options for the agentic reviewer. If `None`, reviewer reuses the writer client/config. |
 | `polish` | `False` | Agentic only. Runs a final style/proofreading pass after mandatory review repair. |
@@ -350,6 +350,44 @@ for section in result.sections:
 | `verbose` | `False` | Agentic only. Prints workflow progress events. |
 | `progress_callback` | `None` | Agentic only. Callable receiving progress strings. Overrides default printing behavior. |
 | `output_docx` | `False` | Also write `report.docx` alongside `report.md` when `output_dir` is set. Requires the `multi-source-report-generator-docx` extra and the Pandoc system binary. |
+
+## Separate providers for each stage
+
+The constructor's `api_config` is the shared fallback. Override it for a stage
+when the report model lacks the required audio, image or structured-output
+capability:
+
+```python
+from gaik.software_components.llm import get_llm_config
+from gaik.software_modules.multi_source_report_generator import MultiSourceReportGenerator
+
+writer_config = get_llm_config("aitta")
+vision_config = get_llm_config("openai", model="gpt-6-luna")
+audio_config = get_llm_config("azure")
+generator = MultiSourceReportGenerator(api_config=writer_config)
+
+# Pass these options alongside the usual sources and sections to run().
+stage_options = {
+    "parser_choice": "vision",
+    "parser_options": {"api_config": vision_config},
+    "image_options": {"api_config": vision_config},
+    "transcriber_options": {"ctor": {"api_config": audio_config}},
+    "writer_options": {"api_config": writer_config},
+    "review_options": {"api_config": writer_config},
+}
+```
+
+`parser_options.api_config` also configures `MultimodalParser`.
+`image_options.api_config` configures `VisionExtractor` when `mode="structured"`.
+An explicitly supplied legacy `ctor.model_provider` uses that provider's legacy
+configuration unless an explicit stage `api_config` is also supplied. Switching
+`writer_options.provider` or `review_options.provider` loads that provider's own
+environment settings; credentials from the previous provider are not reused.
+
+Runtime `api_config` dictionaries can contain credentials. `save_report_config`
+rejects credential-bearing option dictionaries so secrets are not written into
+reusable JSON configurations. Save provider/model choices instead, or supply
+the credential-bearing stage configs when running the report.
 
 ## Supported Input Types
 
@@ -601,7 +639,7 @@ image_options={
 
 ```python
 writer_options={
-    "model": "gpt-5.4",
+    "model": "gpt-6-luna",
     "provider": "openai",       # optional; depends on config/client
     "temperature": 0,
     "reasoning_effort": "medium",
@@ -616,7 +654,7 @@ Agentic only:
 
 ```python
 review_options={
-    "model": "gpt-5.4",
+    "model": "gpt-6-luna",
     "temperature": 0,
 }
 ```
@@ -695,7 +733,7 @@ save_report_config(
     curate_evidence=True,
     polish=True,
     transcriber_options={"ctor": {"transcription_model": "gpt-4o-transcribe"}},
-    writer_options={"model": "gpt-5.4"},
+    writer_options={"model": "gpt-6-luna"},
 )
 
 # Reload on the next run — returns a dict ready to unpack into run().

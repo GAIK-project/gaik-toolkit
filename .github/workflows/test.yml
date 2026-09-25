@@ -11,8 +11,11 @@ on:
       - 'agent-plugin/**'
       - '.claude-plugin/**'
       - 'pyproject.toml'
+      - 'MANIFEST.in'
       - '.github/workflows/test.yml'
       - '.github/workflows/publish.yml'
+      - 'scripts/release_*.py'
+      - 'AGENTS.md'
   pull_request:
     branches:
       - main
@@ -23,8 +26,11 @@ on:
       - 'agent-plugin/**'
       - '.claude-plugin/**'
       - 'pyproject.toml'
+      - 'MANIFEST.in'
       - '.github/workflows/test.yml'
       - '.github/workflows/publish.yml'
+      - 'scripts/release_*.py'
+      - 'AGENTS.md'
   schedule:
     # Nightly, for the live-LLM job only (see `llm-tests` below).
     - cron: '0 3 * * *'
@@ -35,6 +41,11 @@ on:
         description: 'Git ref to checkout (for tag-based builds)'
         required: false
         type: string
+      release_gate:
+        description: 'Require the complete authenticated component release gate'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   test:
@@ -60,7 +71,7 @@ jobs:
       uses: astral-sh/setup-uv@v4
 
     - name: Install package
-      run: uv pip install --system ".[all,dev]"
+      run: uv pip install --system ".[all,dev,llm-all]"
 
     - name: Smoke test basic import
       run: python -c "from gaik import __version__; print(f'gaik {__version__} OK')"
@@ -78,7 +89,7 @@ jobs:
     - name: Run tests
       run: pytest -m "not llm" --strict-markers
 
-  # Tests that make real LLM calls. Kept off the push path deliberately: they
+  # Tests that make real LLM calls. Kept off the ordinary push path: they
   # are a signal about the model and the AZURE_DEPLOYMENT behind it, not a
   # regression gate for our code. Run nightly and on demand
   # (`gh workflow run test.yml`), so a failure here points at the deployment.
@@ -109,3 +120,74 @@ jobs:
         AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
         AZURE_DEPLOYMENT: ${{ secrets.AZURE_DEPLOYMENT }}
       run: pytest -m llm --strict-markers
+
+  # A tag is not publishable on the strength of offline tests alone. This job
+  # runs the same complete command maintainers run before tagging, on the exact
+  # release commit. Missing selected credentials or failed/empty live results fail.
+  release-validation:
+    if: inputs.release_gate == true
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 60
+    steps:
+    - name: Checkout release commit
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref || github.ref }}
+        fetch-depth: 0
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Require tag and run complete release certification
+      env:
+        RELEASE_REF: ${{ github.ref }}
+        RELEASE_VERSION: ${{ github.ref_name }}
+        RELEASE_PROVIDERS: ${{ vars.RELEASE_PROVIDERS || 'azure' }}
+        RELEASE_AZURE_MODEL: ${{ vars.RELEASE_AZURE_MODEL || 'gpt-6-luna' }}
+        RELEASE_AZURE_BACKENDS: ${{ vars.RELEASE_AZURE_BACKENDS || 'native' }}
+        RELEASE_OPENAI_BACKENDS: ${{ vars.RELEASE_OPENAI_BACKENDS || 'native' }}
+        RELEASE_GOOGLE_BACKENDS: ${{ vars.RELEASE_GOOGLE_BACKENDS || 'native' }}
+        RELEASE_VERTEX_BACKENDS: ${{ vars.RELEASE_VERTEX_BACKENDS || 'native' }}
+        RELEASE_AITTA_BACKENDS: ${{ vars.RELEASE_AITTA_BACKENDS || 'native' }}
+        RELEASE_ANTHROPIC_BACKENDS: ${{ vars.RELEASE_ANTHROPIC_BACKENDS || 'native' }}
+        RELEASE_OPENAI_MODEL: ${{ vars.RELEASE_OPENAI_MODEL }}
+        RELEASE_GOOGLE_MODEL: ${{ vars.RELEASE_GOOGLE_MODEL }}
+        RELEASE_VERTEX_MODEL: ${{ vars.RELEASE_VERTEX_MODEL }}
+        RELEASE_AITTA_MODEL: ${{ vars.RELEASE_AITTA_MODEL }}
+        RELEASE_ANTHROPIC_MODEL: ${{ vars.RELEASE_ANTHROPIC_MODEL }}
+        RELEASE_ANTHROPIC_FOUNDRY_MODEL: ${{ vars.RELEASE_ANTHROPIC_FOUNDRY_MODEL }}
+        RELEASE_AZURE_EMBEDDING_MODEL: ${{ vars.RELEASE_AZURE_EMBEDDING_MODEL }}
+        RELEASE_OPENAI_EMBEDDING_MODEL: ${{ vars.RELEASE_OPENAI_EMBEDDING_MODEL }}
+        RELEASE_GOOGLE_EMBEDDING_MODEL: ${{ vars.RELEASE_GOOGLE_EMBEDDING_MODEL }}
+        RELEASE_VERTEX_EMBEDDING_MODEL: ${{ vars.RELEASE_VERTEX_EMBEDDING_MODEL }}
+        RELEASE_AITTA_EMBEDDING_MODEL: ${{ vars.RELEASE_AITTA_EMBEDDING_MODEL }}
+        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+        AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+        AZURE_API_VERSION: ${{ secrets.AZURE_API_VERSION }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        GOOGLE_PROJECT_ID: ${{ vars.GOOGLE_PROJECT_ID }}
+        GOOGLE_CLOUD_LOCATION: ${{ vars.GOOGLE_CLOUD_LOCATION || 'global' }}
+        GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        AITTA_API_KEY: ${{ secrets.AITTA_API_KEY }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        ANTHROPIC_FOUNDRY_API_KEY: ${{ secrets.ANTHROPIC_FOUNDRY_API_KEY }}
+        ANTHROPIC_FOUNDRY_RESOURCE: ${{ vars.ANTHROPIC_FOUNDRY_RESOURCE }}
+      run: |
+        case "$RELEASE_REF" in refs/tags/v*) ;; *) echo 'Release certification requires a version tag'; exit 1;; esac
+        uv run python scripts/release_check.py --live --require-provider azure --version "${RELEASE_VERSION#v}"
+
+    - name: Upload sanitized certification report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-certification-${{ github.sha }}
+        path: results/release-check.json
+        if-no-files-found: error
+        retention-days: 90

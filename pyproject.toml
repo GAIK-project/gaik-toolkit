@@ -175,7 +175,8 @@ classifier = [
 
 # Multi-provider PDF-to-markdown parser (OpenAI, Claude, Google Gemini)
 multimodal-parser = [
-    "anthropic>=0.43.0",
+    "PyMuPDF>=1.26.0",
+    "anthropic>=0.96.0",
     "google-auth>=2.0.0",
     "requests>=2.31.0",
     "markdown-it-py>=3.0.0",
@@ -183,7 +184,8 @@ multimodal-parser = [
 
 # Single-pass vision extraction: PDF/image → structured data (OpenAI, Claude, Google)
 vision-extract = [
-    "anthropic>=0.43.0",
+    "PyMuPDF>=1.26.0",
+    "anthropic>=0.96.0",
     "google-auth>=2.0.0",
     "requests>=2.31.0",
 ]
@@ -191,15 +193,19 @@ vision-extract = [
 # Multi-provider LLM client adapters used across software_components/llm/.
 # Opt-in: install only the providers you need at runtime.
 llm-anthropic = [
-    "anthropic>=0.43.0",
+    "anthropic>=0.96.0",
 ]
 llm-google = [
-    "google-genai>=0.3.0",
+    "google-genai>=1.73.1",
     "google-auth>=2.0.0",
+]
+llm-litellm = [
+    "litellm>=1.102.1,<2",
 ]
 llm-all = [
     "gaik[llm-anthropic]",
     "gaik[llm-google]",
+    "gaik[llm-litellm]",
 ]
 
 # LLM-as-judge validator (multi-provider second-opinion on extraction outputs)

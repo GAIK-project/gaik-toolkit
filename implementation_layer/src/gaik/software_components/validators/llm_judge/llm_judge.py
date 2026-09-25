@@ -9,6 +9,9 @@ import os
 import time
 from typing import Any, Literal
 
+from gaik.software_components.llm import create_llm_client, get_llm_config, resolve_provider
+from gaik.software_components.llm.parameters import normalize_chat_kwargs
+
 from .pricing import compute_judge_cost_usd
 from .prompts import (
     HALLUCINATION_SYSTEM_PROMPT,
@@ -34,8 +37,8 @@ logger = logging.getLogger(__name__)
 ModelProvider = Literal["openai", "azure", "anthropic", "google"]
 
 DEFAULT_MODELS: dict[str, str] = {
-    "openai": "gpt-5.4-mini",
-    "azure": "gpt-5.4-mini",
+    "openai": "gpt-6-luna",
+    "azure": "gpt-6-luna",
     "anthropic": "claude-haiku-4-5-20251001",
     "google": "gemini-3-flash-preview",
 }
@@ -75,6 +78,9 @@ class LLMJudge:
         max_tokens: Upper bound on the judge's response length.
         reasoning_effort: Optional ``"low" | "medium" | "high"`` for reasoning
             models (gpt-5.4, gpt-5.5). Ignored for non-reasoning models.
+        config: Optional shared provider configuration from ``get_llm_config``.
+            Selects the shared client for text and image judging; the configured
+            model must support images when calling ``validate``.
     """
 
     def __init__(
@@ -85,18 +91,26 @@ class LLMJudge:
         use_vertexai: bool = True,
         max_tokens: int = 4096,
         reasoning_effort: str | None = None,
+        *,
+        config: dict | None = None,
     ) -> None:
-        if model_provider not in ("openai", "azure", "anthropic", "google"):
-            raise ValueError(
-                f"Unknown model_provider: {model_provider!r}. "
-                "Expected one of openai/azure/anthropic/google."
-            )
+        if config is not None:
+            self.config = dict(config)
+            model_provider = resolve_provider(config=config)
+        elif model_provider not in DEFAULT_MODELS:
+            self.config = get_llm_config(model_provider)
+            model_provider = self.config["provider"]
+        else:
+            self.config = None
         self.model_provider = model_provider
-        self.model = model or DEFAULT_MODELS[model_provider]
-        self.use_azure = use_azure
+        self.model = model or (
+            self.config["model"] if self.config is not None else DEFAULT_MODELS[model_provider]
+        )
+        self.use_azure = True if model_provider == "azure" else use_azure
         self.use_vertexai = use_vertexai
         self.max_tokens = max_tokens
         self.reasoning_effort = reasoning_effort
+        self._shared_client = None
 
     # ── Public API ────────────────────────────────────────────────
 
@@ -293,6 +307,8 @@ class LLMJudge:
         system_prompt: str,
     ) -> tuple[str, int, int]:
         """Route to the right ``_call_*`` for ``self.model_provider``."""
+        if self.config is not None:
+            return self._call_shared(user_prompt, system_prompt, source_pages)
         provider_call = {
             "openai": self._call_openai,
             "azure": self._call_openai,
@@ -307,6 +323,8 @@ class LLMJudge:
         system_prompt: str,
     ) -> tuple[str, int, int]:
         """Route a text-only call (no source images) to the right provider."""
+        if self.config is not None:
+            return self._call_shared(user_prompt, system_prompt)
         provider_call = {
             "openai": self._call_openai_text,
             "azure": self._call_openai_text,
@@ -314,6 +332,44 @@ class LLMJudge:
             "google": self._call_google_text,
         }[self.model_provider]
         return provider_call(user_prompt, system_prompt)
+
+    def _call_shared(
+        self,
+        user_prompt: str,
+        system_prompt: str,
+        source_pages: list[bytes] | None = None,
+    ) -> tuple[str, int, int]:
+        if self._shared_client is None:
+            self._shared_client = create_llm_client({**self.config, "model": self.model})
+        content: str | list[dict] = user_prompt
+        if source_pages:
+            content = [{"type": "text", "text": user_prompt}]
+            content.extend(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{base64.b64encode(page).decode()}"
+                    },
+                }
+                for page in source_pages
+            )
+        options: dict[str, Any] = {"max_tokens": self.max_tokens}
+        effort = self.reasoning_effort or self.config.get("reasoning_effort")
+        if effort is not None:
+            options["reasoning_effort"] = effort
+        response = self._shared_client.chat(
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": content},
+            ],
+            model=self.model,
+            **options,
+        )
+        return (
+            response.text,
+            response.usage.get("prompt_tokens", response.usage.get("input_tokens", 0)) or 0,
+            response.usage.get("completion_tokens", response.usage.get("output_tokens", 0)) or 0,
+        )
 
     def _call_openai(
         self,
@@ -356,7 +412,9 @@ class LLMJudge:
         if self.reasoning_effort:
             kwargs["reasoning_effort"] = self.reasoning_effort
 
-        resp = client.chat.completions.create(**kwargs)
+        resp = client.chat.completions.create(
+            **normalize_chat_kwargs(self.model, kwargs, config=config)
+        )
         text = resp.choices[0].message.content or ""
         usage = resp.usage
         return (
@@ -481,7 +539,9 @@ class LLMJudge:
         if self.reasoning_effort:
             kwargs["reasoning_effort"] = self.reasoning_effort
 
-        resp = client.chat.completions.create(**kwargs)
+        resp = client.chat.completions.create(
+            **normalize_chat_kwargs(self.model, kwargs, config=config)
+        )
         text = resp.choices[0].message.content or ""
         usage = resp.usage
         return (

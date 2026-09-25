@@ -16,9 +16,8 @@ try:
         MAX_AUDIO_FILE_SIZE_BYTES,
         MAX_FILE_SIZE_BYTES,
         MAX_FILE_SIZE_MB,
-        MODEL,
-        MODEL_OPTIONS,
         get_api_config,
+        get_model_options,
         load_schema,
         save_schema,
         sse_event,
@@ -33,9 +32,8 @@ except ImportError:
         MAX_AUDIO_FILE_SIZE_BYTES,
         MAX_FILE_SIZE_BYTES,
         MAX_FILE_SIZE_MB,
-        MODEL,
-        MODEL_OPTIONS,
         get_api_config,
+        get_model_options,
         load_schema,
         save_schema,
         sse_event,
@@ -64,7 +62,7 @@ def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config
     if parser_type == "vision":
         from gaik.software_components.parsers import VisionParser
 
-        parser = VisionParser(openai_config=config, **MODEL_OPTIONS)
+        parser = VisionParser(openai_config=config, **get_model_options(config))
         parsed_content = parser.convert_pdf(tmp_path)
         if isinstance(parsed_content, list):
             parsed_content = "\n\n".join(parsed_content)
@@ -129,7 +127,7 @@ def _get_or_create_schema(
             schema, requirements = loaded
             return schema, requirements, False
 
-    generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
+    generator = SchemaGenerator(config=config, model=config["model"], **get_model_options(config))
     schema = generator.generate_schema(user_requirements)
     requirements = generator.item_requirements
 
@@ -423,9 +421,6 @@ async def document_pipeline(
         steps[1].status = "in_progress"
 
         from gaik.software_components.extractor import DataExtractor
-        from gaik.software_modules.documents_to_structured_data import (
-            DocumentsToStructuredData,
-        )
 
         extraction_model, requirements, _generated_new_schema = _get_or_create_schema(
             config=config,
@@ -439,7 +434,7 @@ async def document_pipeline(
         steps[1].status = "completed"
         steps[1].message = "Document parsed"
 
-        extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
+        extractor = DataExtractor(config=config, model=config["model"], **get_model_options(config))
         extracted_data = extractor.extract(
             extraction_model=extraction_model,
             requirements=requirements,
@@ -555,7 +550,7 @@ async def text_pipeline(
         )
 
         # Step 2: Extract data using the generated schema
-        extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
+        extractor = DataExtractor(config=config, model=config["model"], **get_model_options(config))
         extracted_data = extractor.extract(
             extraction_model=extraction_model,
             requirements=requirements,
@@ -746,7 +741,9 @@ async def audio_pipeline_stream(
             yield sse_event("step_update", steps[2])
 
             documents = [transcription.enhanced_transcript or transcription.raw_transcript]
-            extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
+            extractor = DataExtractor(
+                config=config, model=config["model"], **get_model_options(config)
+            )
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
                 requirements=requirements,
@@ -888,7 +885,9 @@ async def text_pipeline_stream(
             steps[1]["status"] = "in_progress"
             yield sse_event("step_update", steps[1])
 
-            extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
+            extractor = DataExtractor(
+                config=config, model=config["model"], **get_model_options(config)
+            )
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
                 requirements=requirements,
@@ -1081,7 +1080,9 @@ async def document_pipeline_stream(
             steps[2]["message"] = "Extracting structured data..."
             yield sse_event("step_update", steps[2])
 
-            extractor = DataExtractor(config=config, model=MODEL, **MODEL_OPTIONS)
+            extractor = DataExtractor(
+                config=config, model=config["model"], **get_model_options(config)
+            )
             extracted_data = extractor.extract(
                 extraction_model=extraction_model,
                 requirements=requirements,

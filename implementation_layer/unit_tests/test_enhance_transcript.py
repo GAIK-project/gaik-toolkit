@@ -13,8 +13,6 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
-
 from gaik.software_components.enhance_transcript.enhance_transcript import (
     PASS1_SYSTEM_PROMPT,
     PASS2_SYSTEM_PROMPT,
@@ -22,6 +20,31 @@ from gaik.software_components.enhance_transcript.enhance_transcript import (
     TranscriptEnhancerResult,
     apply_domain_rules,
 )
+
+
+def test_explicit_provider_model_is_not_replaced_by_openai_default(monkeypatch):
+    captured = []
+    monkeypatch.setattr(
+        "gaik.software_components.enhance_transcript.enhance_transcript.build_compat_client",
+        lambda config: captured.append(config) or object(),
+    )
+    enhancer = TranscriptEnhancer(
+        {"provider": "vertex", "project_id": "project", "model": "gemini-2.5-flash"}
+    )
+    assert enhancer.model == "gemini-2.5-flash"
+    assert captured[0]["provider"] == "vertex"
+    assert "api_key" not in captured[0]
+
+
+def test_constructor_model_override_wins_over_config(monkeypatch):
+    monkeypatch.setattr(
+        "gaik.software_components.enhance_transcript.enhance_transcript.build_compat_client",
+        lambda config: object(),
+    )
+    enhancer = TranscriptEnhancer(
+        {"provider": "aitta", "api_key": "test", "model": "configured"}, model="explicit"
+    )
+    assert enhancer.model == "explicit"
 
 
 def _build_enhancer(

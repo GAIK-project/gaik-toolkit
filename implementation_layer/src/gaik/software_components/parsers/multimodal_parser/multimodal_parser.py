@@ -164,6 +164,7 @@ class MultimodalParser:
         vertex_ai: bool = True,
         additional_instructions: str | None = None,
         create_html: bool = False,
+        api_config: dict | None = None,
     ):
         """
         Args:
@@ -176,8 +177,10 @@ class MultimodalParser:
             vertex_ai: Whether to use Vertex AI (for google provider).
             additional_instructions: Extra text appended to the user prompt.
             create_html: If True, also produce an HTML version of the cleaned markdown.
+            api_config: Shared provider config. Uses chat with rendered PDF page
+                images, so the selected model must support image input.
         """
-        if model_provider not in ("openai", "claude", "google"):
+        if api_config is None and model_provider not in ("openai", "claude", "google"):
             raise ValueError(f"Unsupported model_provider: {model_provider}")
         if reasoning_effort not in ("low", "medium", "high"):
             raise ValueError(f"Unsupported reasoning_effort: {reasoning_effort}")
@@ -190,7 +193,14 @@ class MultimodalParser:
         self.additional_instructions = additional_instructions
         self.create_html = create_html
 
-        self.config = self._build_config()
+        self._shared_config = api_config is not None
+        if self._shared_config:
+            from gaik.software_components.llm import resolve_provider
+
+            self.config = dict(api_config)
+            self.model_provider = resolve_provider(config=self.config)
+        else:
+            self.config = self._build_config()
         if model:
             self.config["model"] = model
 
@@ -220,7 +230,12 @@ class MultimodalParser:
             "google": self._call_google,
         }
         start = time.perf_counter()
-        raw_output, usage_dict = callers[self.model_provider](pdf_path, system_prompt, user_prompt)
+        if self._shared_config:
+            raw_output, usage_dict = self._call_shared(pdf_path, system_prompt, user_prompt)
+        else:
+            raw_output, usage_dict = callers[self.model_provider](
+                pdf_path, system_prompt, user_prompt
+            )
         duration_s = time.perf_counter() - start
         raw_markdown = _unwrap_fenced_output(raw_output)
 
@@ -256,10 +271,10 @@ class MultimodalParser:
     # -- prompt helpers -------------------------------------------------------
 
     def _get_system_prompt(self) -> str:
-        return SYSTEM_PROMPTS[self.model_provider]
+        return SYSTEM_PROMPTS.get(self.model_provider, SYSTEM_PROMPTS["openai"])
 
     def _get_user_prompt(self) -> str:
-        prompt = USER_PROMPTS[self.model_provider]
+        prompt = USER_PROMPTS.get(self.model_provider, USER_PROMPTS["openai"])
 
         merge_instruction = "If a table is split across multiple pages, combine it."
         if self.merge_table and merge_instruction not in prompt:
@@ -271,6 +286,35 @@ class MultimodalParser:
         return prompt
 
     # -- provider calls -------------------------------------------------------
+
+    def _call_shared(
+        self, pdf_path: Path, system_prompt: str, user_prompt: str
+    ) -> tuple[str, dict[str, int]]:
+        from gaik.software_components.llm import create_llm_client
+
+        from .chat_content import build_chat_document_content
+
+        client = create_llm_client(self.config)
+        options = {"max_tokens": 32768}
+        if self.config.get("reasoning_effort") is not None:
+            options["reasoning_effort"] = self.config["reasoning_effort"]
+        try:
+            response = client.chat(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user",
+                        "content": build_chat_document_content([pdf_path], user_prompt),
+                    },
+                ],
+                **options,
+            )
+            return response.text, response.usage
+        finally:
+            close = getattr(client.raw, "close", None)
+            # Injected transports belong to the caller and may serve later stages.
+            if self.config.get("http_client") is None and callable(close):
+                close()
 
     def _call_openai(
         self, pdf_path: Path, system_prompt: str, user_prompt: str

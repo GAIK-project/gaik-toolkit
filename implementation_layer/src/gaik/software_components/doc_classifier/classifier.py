@@ -13,10 +13,11 @@ from pydantic import BaseModel, Field
 
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
+from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 from ..parsers.docx_parser import DocxParser
 from ..parsers.pymypdf import PyMuPDFParser
-from ..parsers.vision import OpenAIConfig, VisionParser
+from ..parsers.vision import VisionParser
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -282,16 +283,7 @@ class DocumentClassifier:
 
         elif parser_type == "vision":
             try:
-                # Convert dict config to OpenAIConfig dataclass
-                openai_config = OpenAIConfig(
-                    model=self.config.get("model", "gpt-4.1"),
-                    use_azure=self.config.get("use_azure", True),
-                    api_key=self.config.get("api_key"),
-                    azure_endpoint=self.config.get("azure_endpoint"),
-                    api_version=self.config.get("api_version"),
-                )
-
-                parser = VisionParser(openai_config=openai_config)
+                parser = VisionParser(openai_config=self.config)
 
                 # Check if file is PDF or image
                 file_type = self._detect_file_type(file_path)
@@ -302,13 +294,7 @@ class DocumentClassifier:
                     return pages[0] if pages else ""
 
                 elif file_type == "image":
-                    # For standalone images: read bytes and parse directly
-                    with open(file_path, "rb") as f:
-                        image_bytes = f.read()
-
-                    # Parse image (entire image is analyzed)
-                    text = parser._parse_image(image_bytes, page=1, previous_context=None)
-                    return text
+                    return parser.convert_image(file_path)
 
                 else:
                     raise ValueError(f"Vision parser received unexpected file type: {file_type}")
@@ -370,7 +356,7 @@ Provide your classification with:
                     model=self.model,
                     messages=messages,
                     response_format=ClassificationModel,
-                    temperature=0,
+                    **normalize_chat_kwargs(self.model, {"temperature": 0}, config=self.config),
                     timeout=30,
                 )
                 parsed = response.choices[0].message.parsed

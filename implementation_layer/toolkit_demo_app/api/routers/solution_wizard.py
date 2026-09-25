@@ -36,9 +36,11 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 try:
-    from utils import MODEL_OPTIONS, get_api_config, sse_event
+    from utils import get_api_config, get_model_options, sse_event
+    from utils.model_settings import provider_error_detail, request_model_settings
 except ImportError:
-    from api.utils import MODEL_OPTIONS, get_api_config, sse_event
+    from api.utils import get_api_config, get_model_options, sse_event
+    from api.utils.model_settings import provider_error_detail, request_model_settings
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -223,13 +225,18 @@ def _extract_text_from_attachment(attachment: FileAttachment) -> str:
         elif ext in (".jpg", ".jpeg", ".png", ".webp", ".tiff", ".gif"):
             from gaik.software_components.parsers import VisionParser
 
-            parser = VisionParser(openai_config=get_api_config(), **MODEL_OPTIONS)
+            attachment_config = get_api_config()
+            parser = VisionParser(
+                openai_config=attachment_config, **get_model_options(attachment_config)
+            )
             return parser.convert_image(tmp_path)
         elif ext in (".mp3", ".mp4", ".wav", ".m4a", ".ogg", ".webm", ".flac", ".mpeg", ".mpga"):
-            try:
-                from utils import get_api_config
-            except ImportError:
-                from api.utils import get_api_config
+            if request_model_settings() is not None:
+                raise HTTPException(
+                    400,
+                    "Audio attachments need a separate transcription model. "
+                    "Clear your own model settings to use the server's audio service.",
+                )
             from gaik.software_components.transcriber import Transcriber
 
             transcriber_workspace = tempfile.mkdtemp()
@@ -579,7 +586,7 @@ async def send_message(session_id: str, body: MessageRequest) -> StreamingRespon
                     try:
                         content = _extract_text_from_attachment(f)
                     except Exception as exc:  # noqa: BLE001
-                        content = f"[Could not extract text: {exc}]"
+                        content = f"[Could not extract text: {provider_error_detail(exc)}]"
                     file_sections.append(
                         f'<attached_file name="{f.name}">\n{content}\n</attached_file>'
                     )

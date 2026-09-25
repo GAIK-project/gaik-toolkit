@@ -8,7 +8,7 @@ Convert PDFs and Word documents to structured text using multiple parsing backen
 pip install gaik[parser]
 ```
 
-**Note:** Vision parsing requires OpenAI or Azure OpenAI API access.
+**Note:** Vision parsing requires a provider and model that support image input. Shared configs support OpenAI, Azure, Google, Anthropic, Aitta-compatible models, and optional LiteLLM routes.
 
 ---
 
@@ -18,15 +18,25 @@ GAIK provides seven parser options, each optimized for different use cases:
 
 | Parser | Use Case | Speed | Requirements |
 |--------|----------|-------|--------------|
-| `MultimodalParser` | Premium PDF parsing with layout-aware table extraction across multiple LLM providers | Slow | OpenAI/Azure, Anthropic, or Google API |
-| `VisionParser` | High-quality PDF/image parsing with table extraction | Medium | OpenAI/Azure API |
+| `MultimodalParser` | PDF parsing with layout-aware table extraction across multiple LLM providers | Slow | Image-capable model through shared or legacy provider config |
+| `VisionParser` | High-quality PDF/image parsing with table extraction | Medium | Image-capable model through a shared provider config |
 | `PyMuPDFParser` | Fast PDF text extraction | Fast | None (local) |
 | `DocxParser` | Word document parsing | Fast | None (local) |
 | `DoclingParser` | Advanced OCR with multi-format support | Medium | Optional GPU |
-| `VisionPlusParser` | Docling + Vision LLM for advanced parsing | Medium | OpenAI/Azure + Docling |
+| `VisionPlusParser` | Docling + Vision LLM for advanced parsing | Medium | Image-capable model + Docling |
 | `DoclingApiClientParser` | Remote Docling parsing via Haaga-Helia Docling service | Fast | API_BASE + PASSWORD |
 
 ### Quick Comparison
+
+```python
+from gaik.software_components.llm import get_llm_config
+from gaik.software_components.parsers import VisionParser
+
+parser = VisionParser(get_llm_config("openai", model="gpt-6-luna"))
+markdown = parser.convert_image("invoice.jpg")
+```
+
+The same configuration shape works with `VisionPlusParser(vision_config=...)` and `VisionRagParser(vision_config=...)`. Native Google and Anthropic adapters translate the image messages. For Aitta or another compatible server, select a model whose catalog entry supports image input.
 
 **Use MultimodalParser when:**
 - Documents contain messy, irregular, or complex tables that span multiple pages

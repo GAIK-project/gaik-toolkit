@@ -122,13 +122,13 @@ type Provider = "openai" | "claude" | "google";
 type ReasoningEffort = "low" | "medium" | "high";
 
 const PROVIDER_MODELS: Record<Provider, readonly string[]> = {
-  openai: ["gpt-5.4-mini", "gpt-5.4", "gpt-5.5-deployment", "gpt-5.6-sol"],
+  openai: ["gpt-6-luna", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-terra"],
   claude: ["claude-sonnet-4.6", "claude-sonnet-5"],
   google: ["gemini-3.1-flash-lite"],
 };
 
 const DEFAULT_MODELS: Record<Provider, string> = {
-  openai: "gpt-5.4",
+  openai: "gpt-6-luna",
   claude: "claude-sonnet-4.6",
   google: "gemini-3.1-flash-lite",
 };
@@ -380,6 +380,7 @@ export default function VisionExtractorPage() {
   const [userRequirements, setUserRequirements] = useState("");
   const [provider, setProvider] = useState<Provider>("openai");
   const [model, setModel] = useState(DEFAULT_MODELS.openai);
+  const [modelChoices, setModelChoices] = useState(PROVIDER_MODELS);
   const [reasoningEffort, setReasoningEffort] =
     useState<ReasoningEffort>("medium");
   const [mergeTable, setMergeTable] = useState(false);
@@ -402,7 +403,7 @@ export default function VisionExtractorPage() {
 
   function handleProviderChange(value: Provider): void {
     setProvider(value);
-    setModel(DEFAULT_MODELS[value]);
+    setModel(modelChoices[value][0] ?? DEFAULT_MODELS[value]);
   }
 
   async function handlePreviewSchema(): Promise<void> {
@@ -436,7 +437,35 @@ export default function VisionExtractorPage() {
   }
 
   useEffect(() => {
+    let active = true;
+    void apiFetch("/api/extract-vision/models")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((catalogue) => {
+        if (!active || !catalogue?.models) return;
+        const providers: Provider[] = ["openai", "claude", "google"];
+        if (
+          !providers.every(
+            (name) =>
+              Array.isArray(catalogue.models[name]) &&
+              catalogue.models[name].length > 0 &&
+              catalogue.models[name].every(
+                (value: unknown) => typeof value === "string",
+              ),
+          )
+        )
+          return;
+        setModelChoices(catalogue.models);
+        if (typeof catalogue.default === "string") {
+          setModel((current) =>
+            current === DEFAULT_MODELS.openai ? catalogue.default : current,
+          );
+        }
+      })
+      .catch(() => {
+        /* Keep bundled suggestions if the catalogue is unavailable. */
+      });
     return () => {
+      active = false;
       abortControllerRef.current?.abort();
     };
   }, []);
@@ -775,7 +804,7 @@ export default function VisionExtractorPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {PROVIDER_MODELS[provider].map((modelName) => (
+                      {modelChoices[provider].map((modelName) => (
                         <SelectItem key={modelName} value={modelName}>
                           {modelName}
                         </SelectItem>

@@ -16,10 +16,11 @@ jobs:
     uses: ./.github/workflows/test.yml
     with:
       ref: ${{ github.ref }}  # Pass the tag ref to test workflow
+      release_gate: true  # Offline checks AND authenticated component certification are mandatory
     secrets: inherit  # Pass Azure-test secrets through to the called workflow
 
   build-and-publish:
-    needs: test  # Only publish if tests pass
+    needs: test  # The reusable workflow includes the mandatory live release gate
     runs-on: ubuntu-latest
     environment: release  # Use GitHub environment for protection
 
@@ -87,25 +88,19 @@ jobs:
         echo "HEAD commit: $HEAD_COMMIT"
 
     - name: Check package
-      run: twine check dist/*
+      run: |
+        twine check dist/*
+        python -c "import json, os; from pathlib import Path; from scripts.release_check import validate_distributions; print(json.dumps(validate_distributions(Path('dist'), os.environ['GITHUB_REF_NAME'].removeprefix('v')), indent=2))"
 
     - name: Publish to PyPI
+      shell: bash
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: |
-        if twine upload dist/* 2>&1 | tee upload_output.txt; then
-          echo "✅ Successfully uploaded to PyPI"
-        else
-          if grep -q "File already exists" upload_output.txt; then
-            echo "::warning::Package version already exists on PyPI - skipping upload"
-            echo "⚠️ This version was already published to PyPI"
-          else
-            echo "❌ Upload failed with unexpected error"
-            cat upload_output.txt
-            exit 1
-          fi
-        fi
+        # Any failed artifact upload fails the release, including an already
+        # existing file. A partially published version is not a successful run.
+        twine upload --non-interactive dist/*
 
     - name: Test installation from PyPI
       run: |

@@ -342,10 +342,11 @@ def test_visionparser_convert_image(tmp_path, monkeypatch):
 
     captured = {}
 
-    def fake_parse_image(image_bytes, *, page, previous_context):
+    def fake_parse_image(image_bytes, *, page, previous_context, mime_type):
         captured["bytes"] = image_bytes
         captured["page"] = page
         captured["previous_context"] = previous_context
+        captured["mime_type"] = mime_type
         return "IMAGE-MARKDOWN"
 
     monkeypatch.setattr(parser, "_parse_image", fake_parse_image)
@@ -358,5 +359,6 @@ def test_visionparser_convert_image(tmp_path, monkeypatch):
     assert captured["bytes"] == b"\x89PNG\r\n\x1a\n"
     assert captured["page"] == 1
     assert captured["previous_context"] is None
+    assert captured["mime_type"] == "image/png"
     # existing public API is unchanged
     assert hasattr(parser, "convert_pdf")

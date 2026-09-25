@@ -6,15 +6,26 @@ from pathlib import Path
 from typing import Literal
 
 try:
-    from utils import MODEL_OPTIONS, get_api_config, validate_file_size, validate_vision_page_limit
+    from utils import get_api_config, validate_file_size, validate_vision_page_limit
 except ImportError:
     from api.utils import (
-        MODEL_OPTIONS,
         get_api_config,
         validate_file_size,
         validate_vision_page_limit,
     )
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+
+try:
+    from utils.model_settings import provider_error_detail
+except ImportError:
+    from api.utils.model_settings import provider_error_detail
+
+try:
+    from utils.config import get_model_options
+    from utils.model_settings import get_request_api_config
+except ImportError:
+    from api.utils.config import get_model_options
+    from api.utils.model_settings import get_request_api_config
 
 router = APIRouter()
 
@@ -80,15 +91,19 @@ async def parse_document(
         elif parser_type == "vision":
             from gaik.software_components.parsers import VisionParser
 
-            parser = VisionParser(openai_config=get_api_config(), **MODEL_OPTIONS)
+            vision_config = get_api_config()
+            parser = VisionParser(openai_config=vision_config, **get_model_options(vision_config))
             # VisionParser uses convert_pdf() which returns list of markdown pages
-            markdown_pages = parser.convert_pdf(tmp_path)
+            markdown_pages = (
+                parser.convert_pdf(tmp_path)
+                if suffix == ".pdf"
+                else [parser.convert_image(tmp_path)]
+            )
             result = {"text_content": "\n\n".join(markdown_pages), "metadata": {}}
         elif parser_type == "vision_plus":
-            from gaik.software_components.config import get_openai_config
             from gaik.software_components.RAG.rag_parser_vision import VisionRagParser
 
-            vision_config = get_openai_config(use_azure=bool(os.getenv("AZURE_API_KEY")))
+            vision_config = get_api_config()
             parser = VisionRagParser(
                 vision_config=vision_config,
                 verbose=False,
@@ -111,14 +126,16 @@ async def parse_document(
 
             from gaik.software_components.parsers import MultimodalParser
 
-            # Default to gpt-5.4-mini on Azure (lighter + cheaper than gpt-5.4).
+            # Use the shared deployment model unless a parser-specific model is configured.
             # Override with AZURE_MULTIMODAL_DEPLOYMENT without redeploy.
-            multimodal_model = os.getenv("AZURE_MULTIMODAL_DEPLOYMENT", "gpt-5.4-mini")
+            request_config = get_request_api_config()
+            config = request_config or get_api_config()
+            if request_config is None and os.getenv("AZURE_MULTIMODAL_DEPLOYMENT"):
+                config = {**config, "model": os.environ["AZURE_MULTIMODAL_DEPLOYMENT"]}
             parser = MultimodalParser(
-                model_provider="openai",
-                model=multimodal_model,
-                use_azure=bool(os.getenv("AZURE_API_KEY")),
-                reasoning_effort="low",
+                api_config=config,
+                model=config["model"],
+                reasoning_effort=get_model_options(config)["reasoning_effort"],
                 merge_table=True,
                 create_html=False,
             )
@@ -202,7 +219,7 @@ async def parse_document(
     except ImportError as e:
         raise HTTPException(status_code=500, detail=f"Parser not installed: {e}") from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=provider_error_detail(e)) from e
     finally:
         # Cleanup temp file
         Path(tmp_path).unlink(missing_ok=True)

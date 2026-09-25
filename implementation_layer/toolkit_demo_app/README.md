@@ -37,6 +37,36 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 
 ## Quick Start
 
+The **Model settings** button lets signed-in users optionally select their own OpenAI,
+Azure OpenAI or CSC Aitta account. Enter the model/deployment and key; Azure also needs
+its public resource endpoint. **Test connection** makes one small chat request. **Use
+settings** activates it for this browser tab until refresh, navigation away or sign-out.
+**Use server defaults** clears it.
+
+Own settings apply to Extractor, Schema Generator, Classifier, LLM-based Parser modes,
+Vision Extractor, PostgreSQL Agent questions, single LLM Judge tasks and Solution Wizard
+image attachments. Wizard text/document attachments keep their existing local parsing
+or server Docling fallback; audio attachments require clearing own model settings to
+use the server transcription deployment. The conversation uses the hosted Claude Agent SDK.
+The judge panel, RAG/Tabular sessions, audio workflows and Report Writer use server
+settings; their page notice makes this explicit. Select a vision-capable model for
+images, and use the server settings for mixed-provider workflows.
+
+Keys stay in browser memory and travel only on supported same-origin POST requests,
+through the existing authenticated proxy. They are not saved to browser storage,
+cookies, application sessions, generated projects, or the process environment. The
+API creates and closes a request-specific HTTP client, including streaming requests.
+OpenAI and Aitta endpoints are fixed. Azure accepts public HTTPS resource hosts under
+`openai.azure.com` or `services.ai.azure.com`; private endpoints and redirects are rejected.
+
+Server defaults accept `DEMO_LLM_PROVIDER` and `DEMO_LLM_MODEL`; otherwise the toolkit's
+provider environment model is preserved. The default OpenAI/Azure model is `gpt-6-luna`.
+Azure model values are deployment names. `gpt-6-sol`, `gpt-6-astra`, and the `gpt-5.6`
+family can be selected where available. Vision Extractor's server-side menu can be set
+with comma-separated `DEMO_OPENAI_MODELS`, `DEMO_CLAUDE_MODELS`, and `DEMO_GOOGLE_MODELS`.
+Aitta defaults to `google/gemma-4-31b-it`, which passed the integration's text, schema,
+extraction and vision checks. Cold starts can take several minutes.
+
 ### Prerequisites
 
 - Node.js 22+ / bun

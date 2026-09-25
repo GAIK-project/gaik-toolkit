@@ -24,7 +24,7 @@ config = get_openai_config(use_azure=True)
 
 generator = SchemaGenerator(
     config=config,
-    model="gpt-5.4",
+    model="gpt-6-luna",
     temperature=0.0,
 )
 

@@ -15,6 +15,7 @@ except ImportError:
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
+from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 DEFAULT_PROMPT = (
     "You are a helpful assistant that answers questions using only the provided context.\n"
@@ -95,7 +96,7 @@ class AnswerGenerator:
                 lambda: self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
-                    temperature=0.0,
+                    **normalize_chat_kwargs(self.model, {"temperature": 0.0}, config=self.config),
                 )
             )
             if not response or not response.choices:
@@ -140,7 +141,9 @@ class AnswerGenerator:
                     lambda: self.client.chat.completions.create(
                         model=self.model,
                         messages=messages,
-                        temperature=0.0,
+                        **normalize_chat_kwargs(
+                            self.model, {"temperature": 0.0}, config=self.config
+                        ),
                         stream=True,
                     )
                 )

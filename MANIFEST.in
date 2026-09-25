@@ -1,0 +1,6 @@
+# setuptools-scm otherwise includes the whole tracked monorepo in the sdist.
+# Ship the installable library and its build metadata, not demos or research data.
+global-exclude *
+include pyproject.toml README.md LICENSE MANIFEST.in
+recursive-include implementation_layer/src/gaik *.py *.sql py.typed
+global-exclude __pycache__ *.py[cod] .env .env.*

@@ -554,7 +554,7 @@ class MultiSourceReportGenerator:
             chat_kwargs = {
                 k: v
                 for k, v in writer_options.items()
-                if k not in ("model", "provider") and v is not None
+                if k not in ("model", "provider", "api_config") and v is not None
             }
 
             response = self._write_report(
@@ -702,7 +702,7 @@ class MultiSourceReportGenerator:
         writer_kwargs = {
             k: v
             for k, v in writer_options.items()
-            if k not in ("model", "provider") and v is not None
+            if k not in ("model", "provider", "api_config") and v is not None
         }
 
         # Reviewer client: a separate model via review_options, else reuse the writer.
@@ -711,7 +711,7 @@ class MultiSourceReportGenerator:
             reviewer_kwargs = {
                 k: v
                 for k, v in review_options.items()
-                if k not in ("model", "provider") and v is not None
+                if k not in ("model", "provider", "api_config") and v is not None
             }
         else:
             reviewer_client = writer_client
@@ -849,17 +849,24 @@ class MultiSourceReportGenerator:
 
             return PyMuPDFParser().parse_pdf(str(path), use_markdown=True)
         if choice in ("vision", "vision_parser"):
-            from gaik.software_components.parsers import VisionParser, get_openai_config
+            from gaik.software_components.parsers import VisionParser
 
-            cfg = parser_options.get("openai_config") or get_openai_config(
-                use_azure=self.api_config.get("use_azure", True)
+            cfg = (
+                parser_options.get("api_config")
+                or parser_options.get("openai_config")
+                or self.api_config
             )
             pages = VisionParser(cfg, **parser_options.get("ctor", {})).convert_pdf(str(path))
             return "\n\n".join(pages)
         if choice == "multimodal":
             from gaik.software_components.parsers import MultimodalParser
 
-            result = MultimodalParser(**parser_options.get("ctor", {})).parse(str(path))
+            ctor = dict(parser_options.get("ctor", {}))
+            if parser_options.get("api_config") is not None:
+                ctor.setdefault("api_config", parser_options["api_config"])
+            elif "model_provider" not in ctor:
+                ctor.setdefault("api_config", self.api_config)
+            result = MultimodalParser(**ctor).parse(str(path))
             return result.clean_markdown or result.raw_markdown
         if choice == "docling":
             from gaik.software_components.parsers import DoclingParser
@@ -880,7 +887,8 @@ class MultiSourceReportGenerator:
         from gaik.software_components.transcriber import Transcriber
 
         ctor = dict(transcriber_options.get("ctor", {}))
-        transcriber = Transcriber(api_config=self.api_config, **ctor)
+        ctor.setdefault("api_config", self.api_config)
+        transcriber = Transcriber(**ctor)
         result = transcriber.transcribe(str(path), **transcriber_options.get("call", {}))
         return result.enhanced_transcript or result.raw_transcript
 
@@ -890,7 +898,10 @@ class MultiSourceReportGenerator:
             from gaik.software_components.vision_extractor import VisionExtractor
 
             ctor = dict(image_options.get("ctor", {}))
-            ctor.setdefault("api_config", self.api_config)
+            if image_options.get("api_config") is not None:
+                ctor.setdefault("api_config", image_options["api_config"])
+            elif "model_provider" not in ctor:
+                ctor.setdefault("api_config", self.api_config)
             extractor = VisionExtractor(**ctor)
             user_requirements = image_options.get(
                 "user_requirements",
@@ -900,10 +911,10 @@ class MultiSourceReportGenerator:
             return _dict_to_markdown(result.data)
 
         # default: general parsing to markdown via VisionParser.convert_image()
-        from gaik.software_components.parsers import VisionParser, get_openai_config
+        from gaik.software_components.parsers import VisionParser
 
-        cfg = image_options.get("openai_config") or get_openai_config(
-            use_azure=self.api_config.get("use_azure", True)
+        cfg = (
+            image_options.get("api_config") or image_options.get("openai_config") or self.api_config
         )
         return VisionParser(cfg, **image_options.get("ctor", {})).convert_image(str(path))
 
@@ -937,11 +948,21 @@ class MultiSourceReportGenerator:
                 "The LLM client could not be imported. Install the base GAIK "
                 "dependencies (openai) to run the report writer."
             )
-        cfg = dict(self.api_config)
+        from gaik.software_components.llm import get_llm_config, resolve_provider
+
+        cfg = dict(writer_options.get("api_config") or self.api_config)
+        requested_provider = writer_options.get("provider")
+        if requested_provider and resolve_provider(requested_provider) != resolve_provider(
+            config=cfg
+        ):
+            # Provider switches must load that provider's credentials. Carrying
+            # api_key/base_url across providers can send a key to the wrong service.
+            model_override = (
+                {"model": writer_options["model"]} if writer_options.get("model") else {}
+            )
+            cfg = get_llm_config(requested_provider, **model_override)
         if writer_options.get("model"):
             cfg["model"] = writer_options["model"]
-        if writer_options.get("provider"):
-            cfg["provider"] = writer_options["provider"]
         return create_llm_client(cfg)
 
     def _write_report(
@@ -1143,12 +1164,39 @@ def save_report_config(
     Paths (``input_paths``, ``output_dir``, ``sample_report_path``) are stored
     relative to the config file's directory so the config is portable. All keys
     inside option dicts (``transcriber_options``, ``parser_options``, etc.) are
-    stored as-is — any option supported by ``run()`` is preserved.
+    stored as-is, except credential-bearing configs are rejected. Keep credentials
+    in the environment and persist the provider/model selection instead.
 
     Not persisted: ``verbose``, ``progress_callback`` (runtime display), and
     ``section_context_mode`` (reserved/unused). Pass them directly to ``run()``
     as needed.
     """
+    credential_keys = {
+        "api_key",
+        "api_token",
+        "access_token",
+        "azure_ad_token",
+        "client_secret",
+        "password",
+        "service_account_json",
+    }
+
+    def _check_credentials(value: Any) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if str(key).lower() in credential_keys and item:
+                    raise ValueError(
+                        "Report config files must not contain credentials; use environment "
+                        "variables and save provider/model options instead."
+                    )
+                _check_credentials(item)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                _check_credentials(item)
+
+    _check_credentials(
+        [parser_options, transcriber_options, image_options, writer_options, review_options]
+    )
     config_path = Path(path)
     base = config_path.parent
 

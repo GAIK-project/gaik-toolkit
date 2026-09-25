@@ -133,7 +133,7 @@ requirements = RequirementsModel.model_validate(metadata["requirements"])
 
 extractor = DataExtractor(
     config=get_openai_config(use_azure=True),
-    model="gpt-5.4",
+    model="gpt-6-luna",
     temperature=None,
     reasoning_effort="medium",
 )

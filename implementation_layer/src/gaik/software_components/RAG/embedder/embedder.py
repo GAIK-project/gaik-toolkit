@@ -17,6 +17,7 @@ except ImportError as exc:
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
+from gaik.software_components.llm.providers import resolve_provider
 
 
 def _chunked(items: list[str], batch_size: int) -> Iterable[list[str]]:
@@ -45,9 +46,24 @@ class Embedder:
         batch_size: int = 100,
     ) -> None:
         self.config = config
-        self.model = model or config.get("embedding_model") or "text-embedding-3-large"
         self.batch_size = batch_size
+        provider = resolve_provider(config=config)
+        if provider in {"aitta", "openai_compatible"} and not (
+            model or config.get("embedding_model")
+        ):
+            raise ValueError(
+                f"{provider} requires an explicit embedding_model or model; "
+                "select an embedding model offered by the service."
+            )
         self.client = build_compat_client(config)
+        if isinstance(self.client, ProviderClient):
+            self.model = (
+                model
+                or config.get("embedding_model")
+                or getattr(self.client, "embedding_model", None)
+            )
+        else:
+            self.model = model or config.get("embedding_model") or "text-embedding-3-large"
 
     def embed(
         self,

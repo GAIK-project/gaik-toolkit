@@ -23,9 +23,8 @@ from pydantic import BaseModel, Field
 
 try:
     from utils import (
-        MODEL,
-        MODEL_OPTIONS,
         get_api_config,
+        get_model_options,
         load_saved_requirements,
         load_saved_schema,
         save_requirements,
@@ -34,9 +33,8 @@ try:
     )
 except ImportError:
     from api.utils import (
-        MODEL,
-        MODEL_OPTIONS,
         get_api_config,
+        get_model_options,
         load_saved_requirements,
         load_saved_schema,
         save_requirements,
@@ -526,7 +524,9 @@ async def extract_po_data(po_file: UploadFile) -> PurchaseOrder:
             po_model = load_saved_schema(schema_path, model_name)
         else:
             logger.info("Generating new PO schema...")
-            generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
+            generator = SchemaGenerator(
+                config=config, model=config["model"], **get_model_options(config)
+            )
             po_model = generator.generate_schema(user_requirements=user_requirements)
 
             # Save schema and requirements
@@ -534,7 +534,7 @@ async def extract_po_data(po_file: UploadFile) -> PurchaseOrder:
             save_requirements(generator.item_requirements, po_model.__name__, requirements_path)
             requirements = generator.item_requirements
         # Extract data
-        extractor = DataExtractor(config, model=MODEL, **MODEL_OPTIONS)
+        extractor = DataExtractor(config, model=config["model"], **get_model_options(config))
         result = extractor.extract(
             extraction_model=po_model,
             requirements=requirements,
@@ -654,14 +654,16 @@ async def extract_bom_data(bom_file: UploadFile) -> BOMData:
             bom_model = load_saved_schema(schema_path, model_name)
         else:
             logger.info("Generating new BOM schema...")
-            generator = SchemaGenerator(config=config, model=MODEL, **MODEL_OPTIONS)
+            generator = SchemaGenerator(
+                config=config, model=config["model"], **get_model_options(config)
+            )
             bom_model = generator.generate_schema(user_requirements=user_requirements)
             # Save schema and requirements
             save_schema_to_python(bom_model, schema_path)
             save_requirements(generator.item_requirements, bom_model.__name__, requirements_path)
             requirements = generator.item_requirements
         # Extract data
-        extractor = DataExtractor(config, model=MODEL, **MODEL_OPTIONS)
+        extractor = DataExtractor(config, model=config["model"], **get_model_options(config))
         result = extractor.extract(
             extraction_model=bom_model,
             requirements=requirements,

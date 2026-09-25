@@ -1,6 +1,6 @@
 {
   "name": "gaik-toolkit",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Skills for building document pipelines with the gaik Python toolkit: choosing a document parser that preserves table structure, designing extraction schemas that stay inside provider limits, and building hybrid pgvector search whose failures are visible instead of silent.",
   "author": {
     "name": "GAIK project",

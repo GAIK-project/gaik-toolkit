@@ -34,7 +34,7 @@ load_dotenv() #loads .env
 
 extractor = VisionExtractor(
     model_provider="openai",
-    model="gpt-5.4-mini",
+    model="gpt-6-luna",
     use_azure=True,
     reasoning_effort="low",
 )
@@ -63,6 +63,35 @@ result = extractor.extract(
 print(json.dumps(result.data, indent=2, default=str, ensure_ascii=False))
 print(f"Cost: ${result.usage.cost_usd:.6f}" if result.usage else "Cost: N/A")
 ```
+## Shared provider configuration
+
+Use the same `get_llm_config(...)` dictionary as other toolkit components:
+
+```python
+from gaik.software_components.llm import get_llm_config
+from gaik.software_components.vision_extractor import VisionExtractor
+
+extractor = VisionExtractor(
+    api_config=get_llm_config("openai", model="gpt-6-luna"),
+)
+result = extractor.extract(
+    file_paths=["invoice.pdf"],
+    user_requirements="Extract the invoice number and total amount.",
+)
+```
+
+An explicit `api_config.provider` selects the shared client, including native
+Google/Vertex, Anthropic, Aitta, other OpenAI-compatible servers and the optional
+LiteLLM backend. Choose a model that supports both images and structured output.
+The shared path renders PDF pages into PNG images; it does not require the
+provider to accept PDF uploads. Legacy `model_provider` flags remain available
+when no shared provider config is supplied.
+
+The shared structured-output interface returns the validated data but does not
+currently expose token usage, so `result.usage` is `None` on this path. Duration
+and model metadata remain available. Install `gaik[llm-litellm]` when selecting
+`provider="litellm"`; its `model` must include the LiteLLM provider prefix.
+
 ## Environment Variables
 
 Set provider credentials before running the extractor. Put them in a `.env` file or export them in your shell/session; the toolkit configuration
@@ -127,7 +156,7 @@ Constructor options:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `api_config` | `dict | None` | `None` | Provider config dictionary. If provided, it is used directly instead of loading from environment variables. |
+| `api_config` | `dict | None` | `None` | Shared `get_llm_config(...)` dictionary. Its explicit `provider` selects the common client and overrides the legacy provider flags. |
 | `model_provider` | `"openai" | "claude" | "google"` | `"openai"` | Provider used for the vision extraction API call. |
 | `model` | `str | None` | `None` | Model or deployment name. If `None`, uses the configured provider default. |
 | `reasoning_effort` | `"low" | "medium" | "high"` | `"medium"` | Provider reasoning/thinking effort. Used during layout understanding and extraction. |
@@ -203,9 +232,10 @@ When `include_verification=True`, scalar fields are returned with confidence met
 ## Schema Generation
 
 If no schema is supplied, `VisionExtractor` uses `SchemaGenerator` to build a dynamic Pydantic model from `user_requirements`.
-Schema generation uses OpenAI/Azure OpenAI configuration and follows the
-`VisionExtractor(use_azure=...)` flag: `use_azure=True` uses Azure OpenAI, while
-`use_azure=False` uses the standard OpenAI configuration.
+With an explicit `api_config` from `get_llm_config(...)`, schema generation uses
+the same provider and model as extraction. Without that shared config, legacy
+schema generation follows `use_azure`: `True` uses Azure OpenAI and `False` uses
+standard OpenAI configuration.
 
 The generated schema supports:
 
@@ -251,7 +281,7 @@ Delete or change `schema_dir` when you want to force schema regeneration.
 ```python
 extractor = VisionExtractor(
     model_provider="openai",
-    model="gpt-5.4-mini",
+    model="gpt-6-luna",
     use_azure=False,
     reasoning_effort="low",
 )

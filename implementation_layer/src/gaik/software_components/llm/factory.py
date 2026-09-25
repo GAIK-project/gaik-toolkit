@@ -19,7 +19,21 @@ def create_llm_client(config: dict) -> ProviderClient:
     ``ImportError`` with a useful hint if the provider's SDK extra is missing.
     """
     name = resolve_provider(config=config)
-    if name in (Provider.OPENAI.value, Provider.AZURE.value):
+    config = {**config, "provider": name, "use_azure": name == Provider.AZURE.value}
+    if name == Provider.LITELLM.value:
+        try:
+            from gaik.software_components.llm.litellm_provider import LiteLLMProvider
+        except ImportError as exc:
+            raise ImportError(
+                "LiteLLM requires the 'llm-litellm' extra: pip install 'gaik[llm-litellm]'"
+            ) from exc
+        return LiteLLMProvider(config)
+    if name in (
+        Provider.OPENAI.value,
+        Provider.AZURE.value,
+        Provider.OPENAI_COMPATIBLE.value,
+        Provider.AITTA.value,
+    ):
         from gaik.software_components.llm.openai_provider import OpenAIProvider
 
         return OpenAIProvider(config)
@@ -48,18 +62,15 @@ def assert_openai_or_azure(config: dict, *, component: str) -> None:
 
     Audio components (transcriber, parallel_transcriber, text_to_speech) only
     support OpenAI and Azure: Anthropic has no audio API and Google's audio is
-    served through a different (Live) API. Gemini transcription/TTS through
-    Gemini's OpenAI-compatible endpoint still works because that produces a
-    config with ``provider`` unset (or ``openai``) plus an ``OPENAI_BASE_URL``.
+    served through different APIs. An OpenAI-compatible chat endpoint does not
+    imply support for OpenAI's transcription or speech endpoints.
     """
-    provider = config.get("provider")
-    if provider and provider not in {Provider.OPENAI.value, Provider.AZURE.value}:
+    provider = resolve_provider(config=config)
+    if provider not in {Provider.OPENAI.value, Provider.AZURE.value}:
         raise NotImplementedError(
             f"{component} only supports OpenAI/Azure (got provider='{provider}'). "
-            f"Anthropic has no audio API; Google's audio is on the Live API "
-            f"(not yet wired). To use Gemini for transcription/TTS, set "
-            f"OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/ "
-            f"on a standard OpenAI config instead."
+            "OpenAI-compatible chat endpoints do not necessarily support "
+            "transcription or text-to-speech. Configure an OpenAI/Azure audio provider."
         )
 
 
@@ -71,13 +82,16 @@ def build_compat_client(config: dict):
     deterministic call paths and kwargs in older code), while non-OpenAI
     providers go through the multi-provider ``ProviderClient`` adapter.
 
-    Returns the raw ``OpenAI``/``AzureOpenAI`` client for legacy configs
-    (no ``provider`` key, or provider in ``{openai, azure}``); returns a
-    ``ProviderClient`` for ``anthropic``/``google`` configs.
+    Returns the raw ``OpenAI``/``AzureOpenAI`` client for OpenAI/Azure configs,
+    including legacy configs with ``use_azure``; returns a ``ProviderClient``
+    for other providers, including Aitta and custom compatible servers.
+    Minimal legacy dictionaries without either routing field retain standard
+    OpenAI. New callers wanting the environment-selected provider should use
+    ``get_llm_config()`` or ``create_llm_client()``.
     """
-    if "provider" not in config and "use_azure" in config:
-        return create_openai_client(config)
+    if "provider" not in config and "use_azure" not in config:
+        return create_openai_client({**config, "provider": Provider.OPENAI.value})
     name = resolve_provider(config=config)
     if name in (Provider.OPENAI.value, Provider.AZURE.value):
-        return create_openai_client(config)
+        return create_openai_client({**config, "provider": name})
     return create_llm_client(config)

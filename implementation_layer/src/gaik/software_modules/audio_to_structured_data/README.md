@@ -31,8 +31,23 @@ print(result.extracted_fields)
 ## Parameters
 
 ### Constructor
-- `api_config`: Optional OpenAI/Azure config dict. If omitted, `get_openai_config(use_azure)` is used.
+- `api_config`: Shared default config. If a stage needs a fallback and this is omitted, `get_openai_config(use_azure)` is used. No default credentials are loaded when both stage configs are explicit.
 - `use_azure`: Boolean, passed to `get_openai_config` when `api_config` is not supplied.
+- `transcription_config`: Optional separate OpenAI/Azure audio configuration.
+- `extraction_config`: Optional shared provider configuration for schema generation and text extraction. Each omitted stage config falls back to `api_config`.
+
+For Azure transcription followed by Aitta text extraction:
+
+```python
+from gaik.software_components.llm import get_llm_config
+
+pipeline = AudioToStructuredData(
+    transcription_config=get_llm_config("azure"),
+    extraction_config=get_llm_config("aitta"),
+)
+```
+
+Google, Anthropic and optional LiteLLM text models can be selected through the same configuration helper. The transcription component still requires an OpenAI/Azure audio endpoint; a chat-compatible endpoint alone does not provide transcription.
 
 ### `run(...)`
 - `file_path`: Path to the audio/video file to transcribe.

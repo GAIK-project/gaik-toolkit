@@ -109,7 +109,7 @@ Key software components:
 
 - `SchemaGenerator` – infers a Pydantic model from a requirements prompt (field names, types, nested structures)
 - `DataExtractor` – uses that model to extract structured records from one or more documents
-- Shared helpers: `get_openai_config`, `create_openai_client` for OpenAI/Azure configuration
+- Shared helpers: `get_llm_config`, `create_llm_client` for provider-aware configuration; `get_openai_config`, `create_openai_client` remain available for legacy OpenAI/Azure code
 
 ### 2. Vision Extractor – document/image → structured data in one call
 
@@ -162,7 +162,7 @@ Software components:
 
 - `rag_parser_docling` – parses PDFs with Docling into chunked Documents with metadata
 - `rag_parser_vision` – combines Docling with vision models to add image descriptions into chunks
-- `embedder` – generates vector embeddings from text chunks using OpenAI/Azure models
+- `embedder` – generates vector embeddings with OpenAI/Azure, Google, or a configured embedding model on Aitta / another OpenAI-compatible server
 - `vector_store` – stores embeddings and metadata (in‑memory or Chroma persistent storage)
 - `pg_vector_store` – PostgreSQL/pgvector storage with hybrid vector and full-text retrieval support
 - `retriever` – retrieves relevant chunks using semantic search (supports hybrid search + reranking)
@@ -250,16 +250,58 @@ from gaik.software_modules.multi_source_report_generator import MultiSourceRepor
 
 ## Configuration & environment variables
 
-All modules share a consistent configuration pattern via `get_openai_config` and `create_openai_client`.
+Text components use `get_llm_config` and the shared `ProviderClient` interface. Supported
+providers and their environment variables are:
 
-Supported providers & environment variables:
+| Provider | Required env vars | Model selection |
+|----------|-------------------|-----------------|
+| `openai` | `OPENAI_API_KEY` | `OPENAI_MODEL` |
+| `azure` | `AZURE_API_KEY`, `AZURE_ENDPOINT` | `AZURE_DEPLOYMENT` names your deployed model |
+| `google` | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `GOOGLE_MODEL`; install `gaik[llm-google]` |
+| `anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL`; install `gaik[llm-anthropic]` |
+| `anthropic_foundry` | `ANTHROPIC_FOUNDRY_API_KEY` (fallback `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE` | `ANTHROPIC_MODEL`; install `gaik[llm-anthropic]` |
+| `vertex` | `GOOGLE_PROJECT_ID` and Google application-default or service-account credentials | `GOOGLE_MODEL`, `GOOGLE_CLOUD_LOCATION`; install `gaik[llm-google]` |
+| `litellm` | Provider credentials or `LITELLM_API_KEY` | Required provider-prefixed `LITELLM_MODEL`; install `gaik[llm-litellm]` |
+| `aitta` | `AITTA_API_KEY` (also accepts `AITTA_API_TOKEN` or `AITTA_TOKEN`) | `AITTA_MODEL`, default `google/gemma-4-31b-it` |
+| `openai_compatible` | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` | Explicit model required |
 
-| Provider | Required env vars                                     |
-|----------|--------------------------------------------------------|
-| OpenAI   | `OPENAI_API_KEY`                                      |
-| Azure    | `AZURE_API_KEY`, `AZURE_ENDPOINT`, `AZURE_DEPLOYMENT` |
+```python
+from gaik.software_components.llm import create_llm_client, get_llm_config
 
-`get_openai_config(use_azure=True)` returns a config dict that can be passed to all building blocks.
+config = get_llm_config("aitta")  # or "azure", "google", "openai", "anthropic"
+client = create_llm_client(config)
+response = client.chat([{"role": "user", "content": "Explain knowledge management briefly."}])
+print(response.text)
+```
+
+Pass the same config to `DataExtractor`, `DocumentClassifier`, `TranscriptEnhancer`,
+`AnswerGenerator`, or `Embedder`. Choose a model that supports the component's operation:
+extraction/classification need structured output, and embeddings need a separate embedding
+model (`AITTA_EMBEDDING_MODEL` for Aitta). Aitta uses
+`https://aitta-api.csc.fi/openai/v1` with a 600-second default timeout for cold starts.
+`timeout` and `max_retries` can be overridden in `get_llm_config` for OpenAI SDK clients.
+See the [official Aitta guide](https://docs.lumi-supercomputer.eu/laif/inference/aitta/) for
+project tokens, available models, and capacity limits, and run
+[`example_aitta_smoke.py`](examples/software_components/llm/example_aitta_smoke.py) to check
+connectivity with your configured token.
+
+OpenAI-compatible providers reuse the OpenAI SDK. Google/Vertex and Anthropic use native
+SDKs; LiteLLM is an optional backend for other integrations. `VisionParser`,
+`MultimodalParser(api_config=config)`, `VisionExtractor(api_config=config)`,
+`FormUnderstander(config=config)`, and `LLMJudge(config=config)` accept shared provider
+configs. Image inputs require a vision-capable model. Audio components require
+OpenAI/Azure audio configs; choose separate transcription and extraction configs in
+`AudioToStructuredData` when using a different provider for text extraction.
+
+The September 2026 Aitta checks passed chat, structured extraction and vision with
+`google/gemma-4-31b-it`. Embedding service availability was not confirmed; configure an
+explicit supported embedding model or use a separate embedding provider in `RAGWorkflow`.
+
+Legacy `get_openai_config(use_azure=True)` and `create_openai_client` remain supported.
+Provider resolution prioritizes an explicit provider, then `config["provider"]`, then
+legacy `config["use_azure"]`, then `LLM_PROVIDER`, then Azure. See the
+[multi-provider guide](../guidance_layer/website/content/docs/toolkit/multi-provider-llm.mdx)
+for the capability matrix and component examples.
 
 ---
 
