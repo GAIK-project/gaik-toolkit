@@ -16,7 +16,7 @@ import { useOnboarding } from "@/components/onboarding/onboarding-provider";
 import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
 import { useHasMounted } from "@/hooks/use-has-mounted";
 
-const DOCS_URL = "https://gaik-toolkit.2.rahtiapp.fi/" as const;
+const DOCS_URL = "https://gaik-project.github.io/gaik-toolkit/" as const;
 
 export interface FooterProps {
   githubPreview?: LinkPreview | null;
