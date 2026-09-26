@@ -32,15 +32,24 @@ export async function POST(request: NextRequest) {
 
   // Rebuild FormData (buffered Files) for forwarding, like the legacy route.
   const fwd = new FormData();
-  for (const key of ["stage", "spec", "artifacts"])
-    fwd.append(key, form.get(key) as string);
+  for (const key of ["stage", "spec"]) fwd.append(key, form.get(key) as string);
+  // A file part: the backend caps plain form fields at 1 MB, and the workspace grows.
+  fwd.append(
+    "artifacts",
+    new Blob([form.get("artifacts") as string], { type: "application/json" }),
+    "artifacts.json",
+  );
   for (const key of ["files", "sample_report"])
     for (const f of form.getAll(key) as File[]) fwd.append(key, f, f.name);
 
   return forwardReportRun("/report-writer-v2/run", fwd, async (usage) => {
     if (!userId || !usage.sawResult) return;
     const reports = stage === "synthesize" ? 1 : 0;
-    if (reports || usage.totalTokens)
+    if (!reports && !usage.totalTokens) return;
+    try {
       await recordReportUsage(userId, reports, usage.totalTokens);
+    } catch (e) {
+      console.error("[report-writer-v2] failed to record usage:", e);
+    }
   });
 }

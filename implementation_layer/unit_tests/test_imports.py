@@ -102,7 +102,7 @@ def test_postgres_agent_import():
     ],
 )
 def test_report_writer_family_import(module):
-    """The CURACT components and the ReportWriter module import without optional deps."""
+    """The CURACT components and the ReportWriter module import with their extras installed."""
     import importlib
 
     assert importlib.import_module(module) is not None

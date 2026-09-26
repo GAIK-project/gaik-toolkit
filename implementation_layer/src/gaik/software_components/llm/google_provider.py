@@ -19,8 +19,9 @@ def _usage(response) -> dict[str, int]:
     if not getattr(response, "usage_metadata", None):
         return {}
     return {
-        "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", 0),
-        "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", 0),
+        # The SDK declares every count Optional; a missing count is 0 tokens.
+        "prompt_tokens": response.usage_metadata.prompt_token_count or 0,
+        "completion_tokens": response.usage_metadata.candidates_token_count or 0,
     }
 
 

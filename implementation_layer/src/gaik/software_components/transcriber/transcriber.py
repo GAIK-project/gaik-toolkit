@@ -520,8 +520,6 @@ Continue the transcription, maintaining speaker consistency and dialogue structu
                     )
 
                     chunk_transcript = transcript_response.text
-                    if usage is not None:
-                        usage.add(_transcription_usage(transcript_response))
                     transcripts.append(chunk_header + chunk_transcript)
                     context_text = chunk_transcript
                     time.sleep(1)
@@ -529,6 +527,10 @@ Continue the transcription, maintaining speaker consistency and dialogue structu
                 print(f"Error transcribing chunk {i + 1}: {type(exc).__name__}")
                 transcripts.append(f"{chunk_header}[Transcription failed for segment {i + 1}]")
                 time.sleep(5)
+            else:
+                # Outside the try: a usage error must raise, not mark a good chunk as failed.
+                if usage is not None:
+                    usage.add(_transcription_usage(transcript_response))
             finally:
                 try:
                     os.remove(chunk_path)

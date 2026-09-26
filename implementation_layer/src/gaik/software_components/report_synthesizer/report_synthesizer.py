@@ -12,7 +12,13 @@ from collections.abc import Callable
 from graphlib import CycleError, TopologicalSorter
 from typing import Annotated, TypedDict
 
-from langgraph.graph import END, START, StateGraph
+try:
+    from langgraph.graph import END, START, StateGraph
+except ImportError as exc:
+    raise ImportError(
+        "ReportSynthesizer requires 'langgraph'. Install it with:\n"
+        '    pip install "gaik[report-synthesizer]"'
+    ) from exc
 
 from gaik.software_components.draft_reviewer import DraftReviewer
 from gaik.software_components.knowledge_curator.models import (

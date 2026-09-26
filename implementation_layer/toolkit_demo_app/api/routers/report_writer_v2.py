@@ -42,6 +42,14 @@ _ARTIFACT = re.compile(
 _ARTIFACTS = TypeAdapter(dict[str, str])
 
 
+def _errors(exc: ValidationError) -> str:
+    """The validation errors without the submitted values, which may hold a secret."""
+    return "; ".join(
+        f"{'.'.join(map(str, e['loc'])) or 'input'}: {e['msg']}"
+        for e in exc.errors(include_input=False, include_url=False)
+    )
+
+
 def _gaik():
     """gaik's Report Writer, imported per request (see the module docstring)."""
     from gaik.software_modules.report_writer import ReportSpec, ReportWriter
@@ -165,7 +173,7 @@ async def get_example_file(example_id: str, name: str):
 async def run_stage(
     stage: str = Form(...),
     spec: str = Form(...),
-    artifacts: str = Form(...),
+    artifacts: UploadFile = File(...),
     files: list[UploadFile] = File([]),
     sample_report: UploadFile | None = File(None),
 ):
@@ -176,22 +184,24 @@ async def run_stage(
         ``result``    {"stage", "artifacts", "docx_b64", "usage"}
         ``error``     {"message": str}
     """
-    writer_class, spec_class = _gaik()
     if stage not in _STAGES:
         raise HTTPException(400, f"Unknown stage {stage!r}; use one of {', '.join(_STAGES)}")
+    writer_class, spec_class = _gaik()
     try:
         parsed = spec_class.model_validate_json(spec)
     except ValidationError as exc:
-        raise HTTPException(400, f"Invalid spec: {exc}") from exc
+        raise HTTPException(400, f"Invalid spec: {_errors(exc)}") from exc
     names = [str(p) for p in _paths(parsed)]
     if bad := [n for n in names if _not_a_file_name(n)]:
         raise HTTPException(400, f"Spec files must be file names, not paths: {bad}")
     if len(set(names)) != len(names):
         raise HTTPException(400, f"Spec file names must be distinct: {names}")
     try:
-        workspace_files = _ARTIFACTS.validate_json(artifacts)
+        workspace_files = _ARTIFACTS.validate_json(await artifacts.read())
     except ValidationError as exc:
-        raise HTTPException(400, f"artifacts must be a JSON object of path to text: {exc}") from exc
+        raise HTTPException(
+            400, f"artifacts must be a JSON object of path to text: {_errors(exc)}"
+        ) from exc
     if bad := [k for k in workspace_files if not _ARTIFACT.fullmatch(k)]:
         raise HTTPException(400, f"Artifact paths not allowed: {bad}; allowed: {_ARTIFACT.pattern}")
     # Uploads pair with the spec names by position: browsers and undici escape some
@@ -201,8 +211,9 @@ async def run_stage(
         expected = sum(len(paths) for paths in parsed.sources.values())
         if len(files) != expected:
             raise HTTPException(
-                400, f"Upload one file per spec source, in spec order: expected {expected}, "
-                f"got {len(files)}"
+                400,
+                f"Upload one file per spec source, in spec order: expected {expected}, "
+                f"got {len(files)}",
             )
         if (sample_report is None) != (parsed.sample_report is None):
             raise HTTPException(400, "Upload a sample_report exactly when the spec names one")

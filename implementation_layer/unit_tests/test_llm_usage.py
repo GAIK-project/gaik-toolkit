@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from gaik.software_components.llm import google_provider
 from gaik.software_components.llm.base import UsageCounter, add_usage, usage_since
 from gaik.software_components.llm.openai_provider import OpenAIProvider
 from openai.types import CompletionUsage
@@ -44,3 +45,14 @@ def test_openai_counts_chat_and_chat_parsed():
         "completion_tokens": 6,
         "total_tokens": 20,
     }
+
+
+def test_google_usage_treats_missing_counts_as_zero():
+    # genai declares every usage count Optional; None must not reach UsageCounter.add.
+    metadata = SimpleNamespace(prompt_token_count=4, candidates_token_count=None)
+    usage = google_provider._usage(SimpleNamespace(usage_metadata=metadata))
+    assert usage == {"prompt_tokens": 4, "completion_tokens": 0}
+    counter = UsageCounter()
+    counter.add(usage)
+    assert counter.snapshot() == usage
+    assert google_provider._usage(SimpleNamespace(usage_metadata=None)) == {}

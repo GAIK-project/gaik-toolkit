@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import io
 import json
 import threading
 import time
@@ -16,7 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 from api.routers import report_writer_v2 as route
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile
 from fastapi.testclient import TestClient
 from gaik.software_modules.report_writer import ReportSpec
 
@@ -113,15 +114,12 @@ def examples(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def _run(client, stage="normalize", spec=SPEC, artifacts=None, files=SOURCES, sample=SAMPLE):
+    workspace = artifacts if isinstance(artifacts, str) else json.dumps(artifacts or {})
     uploads = [("files", f) for f in files] + ([("sample_report", sample)] if sample else [])
     return client.post(
         "/report-writer-v2/run",
-        data={
-            "stage": stage,
-            "spec": spec if isinstance(spec, str) else json.dumps(spec),
-            "artifacts": artifacts if isinstance(artifacts, str) else json.dumps(artifacts or {}),
-        },
-        files=uploads,
+        data={"stage": stage, "spec": spec if isinstance(spec, str) else json.dumps(spec)},
+        files=[("artifacts", ("artifacts.json", workspace.encode())), *uploads],
     )
 
 
@@ -235,6 +233,7 @@ def test_run_rejects_a_bad_request_before_any_work(client, request_changes, deta
 
     assert response.status_code == 400
     assert detail in response.json()["detail"]
+    assert "sk-secret" not in response.json()["detail"]
     assert RUNS == []
 
 
@@ -330,6 +329,14 @@ def test_rebuild_returns_the_docx_without_usage(client):
     assert result["usage"] == {}
 
 
+def test_a_workspace_over_the_1_mb_form_field_limit_is_accepted(client):
+    artifacts = {"report/report.md": "# Demo report\n" + "x" * 2_000_000}
+    [(kind, result)] = _events(_run(client, "rebuild", artifacts=artifacts, files=[], sample=None))
+
+    assert kind == "result"
+    assert result["artifacts"]["report/report.md"] == artifacts["report/report.md"]
+
+
 def test_without_docx_the_result_has_none(client):
     spec = {**SPEC, "settings": {"docx": False}}
     artifacts = {"report/report.md": "# Demo report\n"}
@@ -374,7 +381,11 @@ def test_closing_the_stream_stops_the_stage_at_its_next_message(monkeypatch):
 
     async def disconnect_after_the_first_event() -> None:
         response = await route.run_stage(
-            stage="curate", spec=json.dumps(SPEC), artifacts="{}", files=[], sample_report=None
+            stage="curate",
+            spec=json.dumps(SPEC),
+            artifacts=UploadFile(io.BytesIO(b"{}")),
+            files=[],
+            sample_report=None,
         )
         assert "Curating Summary" in await anext(response.body_iterator)
         await response.body_iterator.aclose()

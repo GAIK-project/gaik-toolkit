@@ -178,7 +178,9 @@ def test_plain_list_has_no_source_class(tmp_path):
 )
 def test_source_id_is_a_portable_slug(index, name, expected):
     assert source_id(index, name) == expected
-    NormalizedSource(id=expected, file=name, source_class=None, source_type="text", tool="t", text="")
+    NormalizedSource(
+        id=expected, file=name, source_class=None, source_type="text", tool="t", text=""
+    )
 
 
 def test_any_file_name_keeps_its_name_and_gets_a_slug_id(tmp_path):
