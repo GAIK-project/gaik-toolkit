@@ -49,6 +49,7 @@ try:
         postgres_agent,
         rag,
         report_writer,
+        report_writer_v2,
         schema_generator,
         tabular_agent,
         text_to_speech,
@@ -70,6 +71,7 @@ except ImportError:
         postgres_agent,
         rag,
         report_writer,
+        report_writer_v2,
         schema_generator,
         tabular_agent,
         text_to_speech,
@@ -172,6 +174,7 @@ app.include_router(video_search.router, prefix="/video-search", tags=["Video Sea
 app.include_router(luvata_order.router, tags=["Luvata Order"])
 app.include_router(llm_judge.router, prefix="/llm-judge", tags=["LLM Judge"])
 app.include_router(report_writer.router, prefix="/report-writer", tags=["Report Writer"])
+app.include_router(report_writer_v2.router, prefix="/report-writer-v2", tags=["Report Writer v2"])
 if solution_wizard is not None:
     app.include_router(solution_wizard.router, prefix="/wizard", tags=["Solution Wizard"])
 

@@ -82,7 +82,8 @@ export default async function proxy(request: NextRequest) {
   const isNextApiRoute =
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/admin") ||
-    pathname === "/api/report-writer/run"; // owned by its route handler
+    pathname === "/api/report-writer/run" || // owned by its route handler
+    pathname === "/api/report-writer-v2/run"; // likewise
   if (pathname.startsWith("/api") && !isNextApiRoute) {
     // Rate limit requests that change state (heavy processing, deletes)
     if (ratelimit && isStateChanging(request.method)) {

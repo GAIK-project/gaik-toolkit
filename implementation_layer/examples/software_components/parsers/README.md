@@ -10,6 +10,7 @@ This folder demonstrates how to use different document parsing strategies to con
 - `demo_docling_api_client.py` - Remote parsing example using Haaga-Helia Docling API client parser
 - `demo_vision_simple.py` - Vision-based parsing example using GPT for complex layouts and tables
 - `demo_multimodal_parser.py` - Multi-provider (OpenAI / Claude / Gemini) PDF parser with token usage + USD cost printed per call
+- `demo_spreadsheet_parser.py` - Excel (.xlsx) and CSV files to Markdown tables that keep the source row numbers; local, no API calls
 - `sample_report.pdf` - Sample PDF document for testing local/remote parsing
 - `WEF-page-10.pdf` - Sample PDF with complex layout for testing vision-based parsing
 
@@ -43,6 +44,9 @@ python demo_vision_simple.py
 
 # Multi-provider vision parsing with per-call cost reporting
 python demo_multimodal_parser.py
+
+# Spreadsheet parsing (.xlsx, .csv)
+python demo_spreadsheet_parser.py
 ```
 
 ## Related Documentation

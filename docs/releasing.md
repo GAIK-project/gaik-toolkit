@@ -14,8 +14,9 @@ versions may differ before tagging; the wizard pin and built wheel must match
 The command synchronizes **all extras**, runs the offline unit suite, wizard tests
 and strict registry audit, builds/checks the distributions, then makes real
 authenticated requests with synthetic data. Required live checks are chat,
-streaming, SchemaGenerator → DataExtractor, AnswerGenerator, and a PDF through
-DocumentClassifier. Embedder is also required when an embedding model is selected.
+streaming, SchemaGenerator → DataExtractor, AnswerGenerator, a PDF through
+DocumentClassifier, and KnowledgeCurator → DraftReviewer → ReportSynthesizer on one
+synthetic report section. Embedder is also required when an embedding model is selected.
 It writes a sanitized `results/release-check.json` and exits nonzero for any failed,
 missing, incomplete, or timed-out required check. It never treats having a key as
 successful authentication. Reports contain model IDs and status, never credentials,
@@ -57,8 +58,8 @@ to `azure/<deployment>` and forwards the Azure endpoint and API version explicit
 For Google it uses `gemini/`, and for OpenAI/Aitta it uses `openai/`. CI always keeps
 the native Azure target even if the repository variable selects only LiteLLM.
 
-Each selected provider gets at most 10 calls through the real provider clients,
-normally 7 without embeddings. A thin client decorator caps output at 2048 tokens
+Each selected provider gets at most 24 calls through the real provider clients,
+normally about 11 without embeddings. A thin client decorator caps output at 2048 tokens
 per call while the components execute their public methods. The budget proxies
 preserve constructor-selected raw OpenAI/Azure SDK paths and native adapter paths;
 they do not replace raw SDK clients with adapters or normalize sampling parameters.

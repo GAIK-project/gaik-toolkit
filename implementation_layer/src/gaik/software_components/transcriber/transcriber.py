@@ -8,7 +8,7 @@ import os
 import shutil
 import tempfile
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -18,6 +18,7 @@ from pydub import AudioSegment
 from gaik.observability import measure_duration
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.enhance_transcript import TranscriptEnhancer
+from gaik.software_components.llm.base import UsageCounter
 from gaik.software_components.llm.factory import assert_openai_or_azure
 from gaik.software_components.llm.providers import resolve_provider
 
@@ -50,6 +51,22 @@ def _audio_provider(api_config: dict) -> str:
     provider = resolve_provider(config={"use_azure": False, **api_config})
     assert_openai_or_azure({"provider": provider}, component="Transcriber")
     return provider
+
+
+def _transcription_usage(response) -> dict[str, int]:
+    """The usage of one transcription response, in chat-style token keys."""
+    usage = response.usage
+    if usage is None:
+        return {}
+    if usage.type == "tokens":
+        return {
+            "prompt_tokens": usage.input_tokens,
+            "completion_tokens": usage.output_tokens,
+            "total_tokens": usage.total_tokens,
+        }
+    if usage.type == "duration":
+        return {"audio_seconds": math.ceil(usage.seconds)}
+    raise ValueError(f"Unknown transcription usage type {usage.type!r}")
 
 
 def _create_audio_client(api_config: dict):
@@ -91,6 +108,9 @@ class TranscriptionResult:
     duration_s: float | None = None  # transcriber wall-clock seconds
     audio_duration_s: float | None = None  # input audio length in seconds
     model_used: str | None = None  # resolved transcription model
+    # Usage of the transcription requests (not of transcript enhancement): token counts,
+    # or ``audio_seconds`` for duration-billed models; empty for local Whisper.
+    usage: dict[str, int] = field(default_factory=dict)
 
     def save(
         self,
@@ -209,6 +229,7 @@ class Transcriber:
         segments: list[dict] | None = None
         srt_content: str | None = None
         vtt_content: str | None = None
+        usage = UsageCounter()
 
         with measure_duration() as elapsed:
             if effective_model == "whisper_local":
@@ -225,6 +246,7 @@ class Transcriber:
                     input_path=input_path,
                     prompt=prompt,
                     transcription_model=effective_model,
+                    usage=usage,
                 )
 
             enhanced_text: str | None = None
@@ -252,6 +274,7 @@ class Transcriber:
             duration_s=duration_s,
             audio_duration_s=audio_duration_s,
             model_used=effective_model,
+            usage=usage.snapshot(),
         )
 
     # ------------------------------------------------------------------
@@ -345,7 +368,11 @@ class Transcriber:
         return text, segments or None
 
     def _transcribe_input_remote(
-        self, input_path: Path, prompt: str, transcription_model: str
+        self,
+        input_path: Path,
+        prompt: str,
+        transcription_model: str,
+        usage: UsageCounter | None = None,
     ) -> str:
         """
         If input is within configured size and duration limits: single-pass
@@ -367,10 +394,11 @@ class Transcriber:
                 audio,
                 base_prompt=prompt,
                 transcription_model=transcription_model,
+                usage=usage,
             )
 
         print("Transcribing in a single request (original file)...")
-        return self._single_pass_transcription(input_path, prompt, transcription_model)
+        return self._single_pass_transcription(input_path, prompt, transcription_model, usage)
 
     def _needs_chunking(self, file_path: Path) -> bool:
         size_mb = file_path.stat().st_size / (1024 * 1024)
@@ -388,7 +416,11 @@ class Transcriber:
         return duration_seconds > min(self.max_duration_seconds, REMOTE_MAX_DURATION_SECONDS)
 
     def _single_pass_transcription(
-        self, file_path: Path, prompt: str, transcription_model: str
+        self,
+        file_path: Path,
+        prompt: str,
+        transcription_model: str,
+        usage: UsageCounter | None = None,
     ) -> str:
         """
         Single-pass transcription of the original file (audio OR video).
@@ -401,6 +433,8 @@ class Transcriber:
                     file=f,
                     prompt=prompt,
                 )
+            if usage is not None:
+                usage.add(_transcription_usage(response))
             return response.text
         finally:
             _close_owned_audio_client(audio_client, self.api_config)
@@ -417,8 +451,12 @@ def split_and_transcribe_with_context(
     audio=None,
     base_prompt: str = DEFAULT_PROMPT,
     transcription_model: str | None = None,
+    usage: UsageCounter | None = None,
 ):
-    """Split audio into chunks and transcribe with rolling context."""
+    """Split audio into chunks and transcribe with rolling context.
+
+    ``usage``, if given, gets the usage of every chunk request added to it.
+    """
 
     _audio_provider(api_config)
     if transcription_model is None:
@@ -482,6 +520,8 @@ Continue the transcription, maintaining speaker consistency and dialogue structu
                     )
 
                     chunk_transcript = transcript_response.text
+                    if usage is not None:
+                        usage.add(_transcription_usage(transcript_response))
                     transcripts.append(chunk_header + chunk_transcript)
                     context_text = chunk_transcript
                     time.sleep(1)

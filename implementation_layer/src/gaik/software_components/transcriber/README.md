@@ -33,6 +33,7 @@ transcriber = Transcriber(
 result = transcriber.transcribe(file_path="meeting.mp3")
 print(result.raw_transcript)
 print(result.enhanced_transcript)
+print(result.usage)  # token counts, or audio_seconds for whisper-1; empty for local Whisper
 ```
 
 ## Transcription Models

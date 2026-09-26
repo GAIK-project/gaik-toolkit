@@ -17,7 +17,8 @@ class _CapturingCompletions:
     def create(self, **kwargs):
         self.kwargs = kwargs
         return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content="parsed markdown"))]
+            choices=[SimpleNamespace(message=SimpleNamespace(content="parsed markdown"))],
+            usage=None,
         )
 
 
@@ -167,7 +168,9 @@ def test_native_provider_uses_shared_client_for_image_and_cleanup(monkeypatch, p
 
         def chat(self, messages, **kwargs):
             self.calls.append((messages, kwargs))
-            return ChatResponse(text="parsed", model=self.model, provider=self.provider)
+            return ChatResponse(
+                text="parsed", model=self.model, provider=self.provider, usage={"prompt_tokens": 3}
+            )
 
         def chat_parsed(self, *args, **kwargs):
             raise AssertionError("Expected plain chat")
@@ -189,6 +192,7 @@ def test_native_provider_uses_shared_client_for_image_and_cleanup(monkeypatch, p
     assert client.calls[0][0][0]["content"][1]["type"] == "image_url"
     assert "first" in client.calls[1][0][0]["content"]
     assert client.calls[0][1]["max_tokens"] == 16000
+    assert parser.usage.snapshot() == {"prompt_tokens": 6}
 
 
 def test_gpt6_raw_vision_omits_default_sampling(monkeypatch):

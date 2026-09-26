@@ -55,7 +55,7 @@ interface OptionsFormProps {
   disabled?: boolean;
 }
 
-function Row({
+export function Row({
   label,
   children,
 }: {
@@ -70,7 +70,7 @@ function Row({
   );
 }
 
-function SwitchRow({
+export function SwitchRow({
   label,
   checked,
   onCheckedChange,

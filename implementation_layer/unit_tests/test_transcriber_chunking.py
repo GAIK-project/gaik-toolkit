@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -10,6 +11,7 @@ from gaik.software_components.transcriber.transcriber import (
     DEFAULT_MAX_DURATION_SECONDS,
     REMOTE_MAX_DURATION_SECONDS,
     Transcriber,
+    _transcription_usage,
     split_and_transcribe_with_context,
 )
 
@@ -83,7 +85,21 @@ def test_gpt_transcription_single_pass_when_within_size_and_duration(tmp_path: P
         result = transcriber._transcribe_input_remote(audio, "prompt", "gpt-4o-transcribe")
 
     assert result == "single-pass transcript"
-    single.assert_called_once_with(audio, "prompt", "gpt-4o-transcribe")
+    single.assert_called_once_with(audio, "prompt", "gpt-4o-transcribe", None)
+
+
+def test_transcription_usage_maps_tokens_and_duration():
+    tokens = SimpleNamespace(type="tokens", input_tokens=7, output_tokens=3, total_tokens=10)
+    duration = SimpleNamespace(type="duration", seconds=61.2)
+    assert _transcription_usage(SimpleNamespace(usage=tokens)) == {
+        "prompt_tokens": 7,
+        "completion_tokens": 3,
+        "total_tokens": 10,
+    }
+    assert _transcription_usage(SimpleNamespace(usage=duration)) == {"audio_seconds": 62}
+    assert _transcription_usage(SimpleNamespace(usage=None)) == {}
+    with pytest.raises(ValueError, match="'credits'"):
+        _transcription_usage(SimpleNamespace(usage=SimpleNamespace(type="credits")))
 
 
 def test_default_duration_limit_stays_under_the_api_ceiling():

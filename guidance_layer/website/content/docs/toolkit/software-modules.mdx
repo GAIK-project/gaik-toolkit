@@ -20,7 +20,8 @@ Use software modules when you want a complete, working pipeline with minimal int
 | Audio-to-Structured-Data | Audio / Video | Transcribe → Extract | Structured fields from spoken content |
 | Document-to-Structured-Data | PDF / DOCX | Parse → Extract | Structured fields from document content |
 | RAG-Workflow | PDF files + User query | Parse → Embed → Store → Retrieve → Generate | Contextual answers with citations |
-| Multi-Source-Report-Generator | Mixed files (PDF, DOCX, Excel/CSV, audio/video, images) + use-case definition (title, description, sections) | Normalize → Curate → Draft → Review & Repair → Assemble | User-defined long-form report (Markdown + optional DOCX) |
+| Report-Writer | Recordings + documents (PDF, DOCX, Excel/CSV, text, images) as primary and secondary sources + report spec (sections, required items, instructions) | Normalize → Curate → Write & Review → Assemble | Templated, source-grounded report (Markdown + DOCX) with knowledge files and a review log |
+| Multi-Source-Report-Generator (legacy) | Mixed files (PDF, DOCX, Excel/CSV, audio/video, images) + use-case definition (title, description, sections) | Normalize → Curate → Draft → Review & Repair → Assemble | User-defined long-form report (Markdown + optional DOCX) |
 
 ---
 
@@ -241,7 +242,101 @@ flowchart TD
 
 ---
 
-### Multi-Source-Report-Generator
+### Report-Writer
+
+This module writes a fixed-template report, such as a building condition assessment, from mixed source files. It follows CURACT (Curation-Anchored, Governed, Traceable Reporting) and runs three stage components in turn: the Source Normalizer, the Knowledge Curator and the Report Synthesizer. One JSON report spec defines the report: title, language, sections with their required items, report instructions, sources grouped as primary and secondary, an optional sample report and an optional model for each role. Each stage saves plain files to a workspace folder that the next stage reads. A person can inspect and edit the files of any stage and rerun only the later stages.
+
+The curation stage extracts fact units with verbatim quotes for each technical section and checks every quote against its source. The writer drafts each section from its own knowledge file only, and a separate reviewer model checks the draft with exact search-and-replace edits. Sections with `depends_on`, such as recommendations and a summary, are written afterwards from the reviewed texts of the sections they depend on. A single-call mode writes the whole report in one call from every source, as a baseline that shows what curation and review add.
+
+<Mermaid chart={`
+flowchart TD
+    IN1("🎙️ Recordings<br/>primary sources") --> MOD
+    IN2("📑 Documents<br/>secondary sources") --> MOD
+    IN3("📋 Report Spec<br/>sections · instructions · models") --> MOD
+
+    subgraph MOD["Report-Writer"]
+        direction TB
+
+        subgraph S1["Step 1 · SourceNormalizer"]
+            direction LR
+            PT["Parsers &<br/>Transcriber"] --> PV["Provenance<br/>& source class"]
+        end
+
+        subgraph S2["Step 2 · KnowledgeCurator"]
+            direction LR
+            CU["Curation<br/>model"] --> QC["Quote<br/>check"]
+        end
+
+        subgraph S3["Step 3 · ReportSynthesizer"]
+            direction LR
+            WR["Writer"] --> RV["Reviewer"] --> AS["Assembly"]
+        end
+
+        S1 -->|"normalized/"| S2
+        S2 -->|"knowledge/"| S3
+    end
+
+    MOD --> O1("📄 Normalized Sources")
+    MOD --> O2("🗂️ Knowledge Files")
+    MOD --> O3("✅ report.md · report.docx")
+    MOD --> O4("🗂️ Review Log")
+
+    style IN1 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style IN2 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style IN3 fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style O2 fill:#fefce8,stroke:#ca8a04,color:#713f12
+    style O3 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O4 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style MOD fill:#f0f4ff,stroke:#6366f1,color:#1e1b4b
+    style S1 fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style S2 fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style S3 fill:#faf5ff,stroke:#9333ea,color:#2e1065
+`} />
+
+> **Example:** The house condition assessment example describes a fictional 1½-storey timber-frame house built in 1978. Its spec lists three site recordings as primary sources, and two PDF reports, a DOCX moisture survey, an XLSX maintenance log and a floor plan image as secondary sources. A sample report on another house sets the format and tone. The recordings are synthesized from written scripts by the example's `generate_dataset.py` (a paid text-to-speech call), so run it before the first report. The module writes one knowledge file for each of the five technical sections. A building services unit, for example, quotes the 1998 renovation report word for word: *"Mechanical ventilation system installed during 1998 renovation. Design life 25 years."* The dataset's expected behaviours include: the 1998 replacement of the distribution board is attributed to the renovation report, the vibration of the supply-air unit is narrated as a field observation, and *(missing: latest sewer camera inspection)* appears because no source covers that required item. The recommendations and the summary are written last, from the reviewed sections.
+
+**What the module returns:**
+
+| Output | Description |
+| --- | --- |
+| Normalized Sources (`normalized/`) | One Markdown file per source and `sources.json` with each file's source class, type and conversion tool |
+| Knowledge Files (`knowledge/`) | One JSON file per technical section: fact units with verbatim quotes and locators, missing required items, and conflicts marked resolved or unresolved |
+| Report (`report/report.md`, `report/report.docx`) | The sections in spec order; also returned as a `Report` object |
+| Section Drafts (`report/sections/`) | One Markdown file per section, editable before `rebuild()` |
+| Review Log (`report/review_log.json`) | The reviewer's applied and unresolved edits for each section |
+| Single-Call Baseline (`single_call/`) | Only with `mode="single_call"`: the same layout as `report/`, with an empty review log |
+
+**Key features:**
+- **One report spec** (`ReportSpec.load("report_spec.json")`) with an optional model per role: vision, transcription, curator, writer and reviewer, and optional `settings`: transcription language, parallel curation, review attempts, strict review, DOCX output, and reasoning effort and temperature per step. The spec holds no credentials; an unknown key such as `api_key` raises
+- **Inspectable stages**: `run()` executes all three stages, and `normalize()`, `curate()` and `synthesize()` each run one, so a run can resume from edited knowledge files
+- **No-model rebuild**: `rebuild()` reassembles `report.md` and `report.docx` from edited section files without an LLM call
+- **Verified quotes**: every quote must appear in its cited source, ignoring only whitespace; a section that still fails after one retry stops the run
+- **Role separation**: the curator, the writer and the reviewer are separate calls, each with its own model setting
+- **Explicit gaps**: a required item that no source covers becomes `(missing: <item>)`, and an unresolved conflict is stated with both views
+- **Fails loudly**: an unsupported, unreadable or empty source stops the run; with `settings.strict_review`, so does a reviewer edit that cannot be applied
+- **Install**: `pip install "gaik[report-writer]"`. The stages save `report.docx` unless `settings.docx` is off, which needs the Pandoc binary. Recordings go to the Transcriber, which needs OpenAI or Azure OpenAI
+- **Token usage**: each stage result has `usage`: transcription and vision for `normalize()`, the curator for `curate()`, the writer and reviewer for `synthesize()`
+
+**Potential applications:**
+- Building and property condition assessments from site recordings and customer documents
+- Technical due diligence of properties
+- Machinery audits and field service reports
+- Environmental site assessments
+- Clinical case summaries
+- Meeting reports from a recording, notes and supporting documents
+- Legal due diligence, with the executed documents declared the primary sources
+
+- **Interactive demo**: [Report Writer demo](https://gaik-demo.2.rahtiapp.fi/report-writer-v2)
+- **Use case**: [Report Writing](/use-cases/report-writing)
+- **Implementation code**: [software_modules/report_writer](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/report_writer)
+- **Usage examples**: [examples/report_writer](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/report_writer)
+
+---
+
+### Multi-Source-Report-Generator (legacy)
+
+This module is kept as the legacy report writer; its successor is [Report-Writer](#report-writer).
 
 This module generates a fully user-defined long-form report from any mix of source files. You define the use case: report title, a description of the report's purpose, and as many sections as needed — each with a plain-language instruction describing what to extract from the evidence and what the section should contain. The module normalises every input file (PDF, Word, Excel/CSV, audio/video, images, text) into a common Markdown evidence pack, then runs an **agentic workflow** that drafts each section independently, fact-checks and repairs it with a diff-editor reviewer, and assembles the final report in your original section order.
 
@@ -323,6 +418,6 @@ flowchart TD
 - Research and literature summaries across documents and recordings
 - Sales proposals and marketing materials from briefs and assets
 
-- **Interactive demo**: [Report Writer demo](/report-writer)
+- **Interactive demo**: [Report Writer (legacy) demo](https://gaik-demo.2.rahtiapp.fi/report-writer)
 - **Implementation code**: [software_modules/multi_source_report_generator](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_modules/multi_source_report_generator)
 - **Usage examples**: [examples/multi_source_report_generator](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/multi_source_report_generator)

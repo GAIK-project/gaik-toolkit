@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.base import ProviderClient, UsageCounter
 from gaik.software_components.llm.factory import create_llm_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.providers import Provider, resolve_provider
@@ -170,6 +170,8 @@ class VisionParser:
         self.temperature = temperature
         self.reasoning_effort = reasoning_effort
         self._client = self._initialize_client()
+        self.usage = UsageCounter()
+        """Token totals of every model call this parser made."""
 
     # ---------------------------------------------------------------------
     # Public API
@@ -416,12 +418,14 @@ class VisionParser:
 
     def _chat_content(self, messages: list[dict]) -> str | None:
         if isinstance(self._client, ProviderClient):
-            return self._client.chat(
+            chat = self._client.chat(
                 messages,
                 model=self.config.model,
                 max_tokens=self.max_tokens,
                 **self._sampling_kwargs(),
-            ).text
+            )
+            self.usage.add(chat.usage)
+            return chat.text
         options = normalize_chat_kwargs(
             self.config.model,
             {"max_completion_tokens": self.max_tokens, **self._sampling_kwargs()},
@@ -430,6 +434,10 @@ class VisionParser:
         response = self._client.chat.completions.create(
             model=self.config.model, messages=messages, **options
         )
+        if response.usage:
+            self.usage.add(
+                {k: v for k, v in response.usage.model_dump().items() if isinstance(v, int)}
+            )
         return response.choices[0].message.content
 
     def _build_prompt(self, previous_context: str | None) -> str:

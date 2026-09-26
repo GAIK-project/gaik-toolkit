@@ -47,23 +47,29 @@ class PyMuPDFParser:
 
         self.supported_extensions = [".pdf"]
 
-    def parse_pdf(self, file_path: str, use_markdown: bool = True) -> str:
+    def parse_pdf(
+        self, file_path: str, use_markdown: bool = True, page_markers: bool = False
+    ) -> str:
         """
         Parse PDF file and extract text content.
 
         Args:
             file_path: Path to the PDF file
             use_markdown: If True, returns simple text. If False, returns structured text with positioning
+            page_markers: If True, writes a ``[Page N]`` line before each page's simple text
 
         Returns:
             Extracted text content as string
 
         Raises:
             FileNotFoundError: If file does not exist
+            ValueError: If page_markers is used with structured text
             Exception: If PDF parsing fails
         """  # noqa: E501
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
+        if page_markers and not use_markdown:
+            raise ValueError("page_markers needs use_markdown=True")
 
         try:
             doc = fitz.open(file_path)
@@ -73,6 +79,8 @@ class PyMuPDFParser:
                 text_content = ""
                 for page_num in range(doc.page_count):
                     page = doc[page_num]
+                    if page_markers:
+                        text_content += f"[Page {page_num + 1}]\n"
                     text_content += str(page.get_text())
                     text_content += "\n\n"  # Add page separator
             else:
@@ -86,13 +94,16 @@ class PyMuPDFParser:
             logger.error(f"Error parsing PDF {file_path}: {e}")
             raise
 
-    def parse_document(self, file_path: str, use_markdown: bool = True) -> dict[str, Any]:
+    def parse_document(
+        self, file_path: str, use_markdown: bool = True, page_markers: bool = False
+    ) -> dict[str, Any]:
         """
         Parse a PDF document and return its content with metadata.
 
         Args:
             file_path: Path to the PDF file
             use_markdown: If True, returns simple text. If False, returns structured text
+            page_markers: If True, writes a ``[Page N]`` line before each page's simple text
 
         Returns:
             Dictionary containing:
@@ -124,7 +135,7 @@ class PyMuPDFParser:
         logger.info(f"Parsing document: {file_name} (format: {format_type})")
 
         # Extract text
-        text_content = self.parse_pdf(file_path, use_markdown)
+        text_content = self.parse_pdf(file_path, use_markdown, page_markers)
 
         if not text_content:
             logger.warning(f"No text content extracted from {file_name}")

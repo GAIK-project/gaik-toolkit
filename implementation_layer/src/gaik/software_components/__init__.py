@@ -22,4 +22,8 @@ __all__ = [
     "tabular_agent",
     "evaluators",
     "validators",
+    "source_normalizer",
+    "knowledge_curator",
+    "draft_reviewer",
+    "report_synthesizer",
 ]

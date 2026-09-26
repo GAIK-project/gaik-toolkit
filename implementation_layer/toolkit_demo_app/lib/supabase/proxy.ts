@@ -20,6 +20,7 @@ const PROTECTED_ROUTES = [
   "/tabular-agent",
   "/rag",
   "/report-writer",
+  "/report-writer-v2",
   "/schema-generator",
   "/text-to-speech",
   "/transcriber",

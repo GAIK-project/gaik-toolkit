@@ -107,16 +107,16 @@ flowchart LR
 
 ### Document Parser
 
-The Document Parser converts PDF, DOCX, and other file types into clean, structured markdown text. The package ships **seven parser variants** so you can match accuracy, cost, and infrastructure needs: vision-based parsing (GPT, Claude, or Gemini), local parsing (PyMuPDF, Docling), a Docling + vision hybrid that returns markdown plus metadata, and a remote Docling API client. How much structure survives depends on the variant: the local parsers are the fastest and cheapest route to prose and simple grids, while tables with merged cells or stacked headers need a vision parser, because a markdown pipe table cannot express a merged cell.
+The Document Parser converts PDF, DOCX, and other file types into clean, structured markdown text. The package ships **eight parser variants** so you can match accuracy, cost, and infrastructure needs: vision-based parsing (GPT, Claude, or Gemini), local parsing (PyMuPDF, Docling, and SpreadsheetParser for Excel and CSV files), a Docling + vision hybrid that returns markdown plus metadata, and a remote Docling API client. How much structure survives depends on the variant: the local parsers are the fastest and cheapest route to prose and simple grids, while tables with merged cells or stacked headers need a vision parser, because a markdown pipe table cannot express a merged cell.
 
 <Mermaid chart={`
 flowchart LR
-    A("📄 Document<br/>PDF / DOCX") --> B
+    A("📄 Document<br/>PDF / DOCX / XLSX / CSV") --> B
 
     subgraph B["Document Parser"]
         direction TB
         V["Vision Parsers<br/>VisionParser · MultimodalParser"]
-        L["Local Parsers<br/>PyMuPDF · DocxParser · Docling"]
+        L["Local Parsers<br/>PyMuPDF · DocxParser · Docling · SpreadsheetParser"]
         H["Hybrid / Remote<br/>VisionPlusParser · DoclingApiClient"]
     end
 
@@ -136,11 +136,12 @@ flowchart LR
 | `PyMuPDFParser` | Fast local PDF text extraction, no API calls, lowest cost |
 | `DocxParser` | Local Word document (`.docx` / `.doc`) extraction via `python-docx` |
 | `DoclingParser` | Advanced local parsing with OCR, table extraction, multi-format support |
+| `SpreadsheetParser` | Local Excel (`.xlsx`) and CSV to Markdown tables, no API calls. One `## Sheet: <name>` table per sheet, with a `Row` column of source row numbers for citations. `.xls` is not supported. Install `gaik[spreadsheet-parser]` |
 | `VisionPlusParser` | Docling + vision hybrid that returns markdown **and** metadata in one pass |
 | `DoclingApiClientParser` | Remote client for a hosted Docling parsing service |
 
 **Key features:**
-- Seven parsers covering local, vision, hybrid, and remote-service strategies
+- Eight parsers covering local, vision, hybrid, and remote-service strategies
 - Headings and multi-page structure preserved across every variant
 - Complex tables preserved by the vision parsers, which can emit HTML
 - Multi-page processing with consistent formatting
@@ -691,3 +692,203 @@ flowchart LR
 
 - **Implementation code**: [software_components/tabular_agent](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/tabular_agent)
 - **Usage examples**: [examples/tabular_agent](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/tabular_agent)
+
+---
+
+### Source Normalizer
+
+The Source Normalizer converts a mixed set of files, such as a project folder, into Markdown texts that keep their provenance. PDFs, Word files and spreadsheets are parsed locally and text files are read as they are. Recordings go to the Transcriber and images to the VisionParser. Each text records its file name, the group it was given in (such as `primary` or `secondary`), its file type and the tool that produced it. It is the first stage of the Report-Writer module, and it is also useful on its own: one call turns mixed files into a set of Markdown texts, for example for RAG ingestion or for the Extractor.
+
+<Mermaid chart={`
+flowchart LR
+    A("📄 Documents<br/>PDF · DOCX · XLSX · CSV · TXT · MD") --> SN
+    B("🎙️ Recordings") --> SN
+    C("🖼️ Images") --> SN
+
+    subgraph SN["Source Normalizer"]
+        direction TB
+        P["Local Parsers<br/>PyMuPDF · DocxParser · SpreadsheetParser"]
+        T["Transcriber"]
+        V["VisionParser"]
+    end
+
+    SN --> O1("📝 Markdown Text<br/>one file per source")
+    SN --> O2("🗂️ sources.json<br/>file · class · type · tool")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style SN fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- One call for mixed files: `SourceNormalizer(config).normalize({"primary": [...], "secondary": [...]})`, or a plain list of paths. The config is needed only for recordings and images
+- Provenance for every text: `file`, `source_class`, `source_type` and `tool`
+- Citation-ready text: each PDF page starts with a `[Page N]` line, Word headings become `#` headings, and spreadsheet tables carry the source row numbers
+- Recordings give the raw transcript, which has no per-utterance timestamps
+- Fails loudly: an unsupported type (such as `.pptx`, `.doc` or `.xls`), a missing file, two files with the same name, a PDF with no text layer or a file that yields no text raises instead of being skipped. All paths are checked before the first conversion
+- `save()` writes one Markdown file per source and a `sources.json` manifest, and `NormalizedSources.load()` reads them back, so the texts can be edited before use
+- Options: `vision_model`, `transcription_model` and `language`
+- Install: `pip install "gaik[source-normalizer]"`. Recordings need OpenAI or Azure OpenAI
+
+**Potential applications:**
+- Preparing mixed document folders for RAG ingestion
+- Turning site recordings, notes and documents into text for the Extractor or other LLM steps
+- The ingestion step of source-grounded report writing
+
+- **Implementation code**: [software_components/source_normalizer](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/source_normalizer)
+- **Usage examples**: [examples/source_normalizer](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/source_normalizer)
+
+---
+
+### Knowledge Curator
+
+The Knowledge Curator collects the evidence for a fixed set of topics from normalized sources. For each topic, called a section, an LLM extracts fact units: a short summary paired with the exact words of the source, the file it came from and a locator such as a page or a sheet row. It also lists the required items that no source covers and the conflicts between sources. The source hierarchy in the instructions decides whether a conflict is resolved or unresolved. Every quote is checked against its source. It is the second stage of the Report-Writer module. On its own it suits any task that needs traceable evidence for fixed questions, such as audits and due diligence.
+
+<Mermaid chart={`
+flowchart TD
+    A("📝 Normalized Sources") --> KC
+    B("📋 Sections<br/>instructions · required items") --> KC
+
+    subgraph KC["Knowledge Curator"]
+        direction TB
+        CU["Curation Call<br/>one per section, in parallel"]
+        QC["Quote Check<br/>verbatim in the cited source"]
+        CU --> QC
+        QC -.->|"retry once"| CU
+    end
+
+    KC --> O1("🗂️ Fact Units<br/>summary · quote · source · locator")
+    KC --> O2("⚠️ Missing Items & Conflicts")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style KC fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- `KnowledgeCurator(config, model=None, *, max_workers=4)` and `curate(sources, sections, *, instructions="")`: one structured-output call per section, run in parallel
+- Sections are `SectionSpec` objects with an id, a title, instructions and required items. Sections with `depends_on` are derived and are not curated
+- Verified quotes: a quote must occur in its cited source, and only whitespace may differ. A failing section is requested again once with the failing quotes as feedback; if it still fails, `curate()` raises `ValueError`
+- Locators: `page N` for PDFs, `sheet <name>, row <n>` for spreadsheets, the nearest heading for other structured documents, and null for recordings and plain text
+- Editable output: `save()` writes one JSON file per section. `KnowledgeBase.load()` validates edited files and `verify_quotes(sources)` checks the quotes again
+- Texts that already exist can be wrapped with `NormalizedSources.from_texts(...)`, so the Source Normalizer is optional
+- Install: `pip install "gaik[knowledge-curator]"` (core dependencies only). Works with any provider supported by `get_llm_config`
+- The curator's calls are not counted in any token usage total
+
+**Potential applications:**
+- Audit evidence collection, with a quote and a location for every finding
+- Technical and legal due diligence
+- Gap checks: which required items no source covers
+- Finding conflicting statements across a document set
+- The knowledge input of the Report Synthesizer
+
+- **Implementation code**: [software_components/knowledge_curator](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/knowledge_curator)
+- **Usage examples**: [examples/knowledge_curator](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/knowledge_curator)
+
+---
+
+### Draft Reviewer
+
+The Draft Reviewer fact-checks generated text against reference material. It works on any text: summaries, report sections, incident reports or meeting minutes. An LLM proposes exact search-and-replace edits, each with a reason. An edit is applied only where its search text occurs exactly once, and failed edits go back to the model for new ones. The result is the corrected text with a log of the applied edits and the edits that could not be applied. The Report Synthesizer uses it to review every section, but it can check the output of any generation step against its source.
+
+<Mermaid chart={`
+flowchart LR
+    A("📝 Draft Text") --> DR
+    B("📄 Reference Material") --> DR
+
+    subgraph DR["Draft Reviewer"]
+        direction TB
+        P["Propose Edits<br/>search · replace · reason"]
+        AP["Apply Edits<br/>exact single match only"]
+        P --> AP
+        AP -.->|"failed edits → retry"| P
+    end
+
+    DR --> O1("✅ Reviewed Text")
+    DR --> O2("🗂️ Applied & Unresolved Edits")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style DR fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- `DraftReviewer(config, model=None, *, max_attempts=5)` and `review(draft, *, reference, instructions="")`, which returns a `ReviewResult` with `text`, `applied` and `unresolved`
+- Default checks: every factual claim must be supported by the reference, wrong numbers, dates, names and attributions are corrected, unsupported claims are removed, and style and order are left alone. `instructions` replaces these checks
+- Exact matching: no fuzzy or case-insensitive matching. An empty `replace` deletes the passage
+- Bounded retries: at most `max_attempts` requests, the first one included. Edits that still fail are returned in `unresolved`, not raised, so the caller decides whether they are fatal
+- An empty draft or reference raises `ValueError`
+- Install: `pip install "gaik[draft-reviewer]"` (core dependencies only). Works with any provider supported by `get_llm_config`
+- The reviewer's calls are not counted in any token usage total
+
+**Potential applications:**
+- Checking an LLM summary against the source document
+- Checking a generated incident report against its transcript
+- Checking meeting minutes against the meeting notes
+- A review step after any generation component, with a log of each correction
+
+- **Implementation code**: [software_components/draft_reviewer](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/draft_reviewer)
+- **Usage examples**: [examples/draft_reviewer](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/draft_reviewer)
+
+---
+
+### Report Synthesizer
+
+The Report Synthesizer writes a governed report section by section from curated knowledge. Each technical section is written from its own knowledge only. Derived sections, such as recommendations and a summary, are written afterwards from the reviewed texts of the sections they depend on. A Draft Reviewer with its own model setting checks every draft, and a review log records the edits. The knowledge is plain data: it usually comes from the Knowledge Curator, but it can also be written by hand. It is the third stage of the Report-Writer module.
+
+<Mermaid chart={`
+flowchart TD
+    K("🗂️ Knowledge<br/>curated or hand-written") --> RS
+    S("📋 Sections & Instructions") --> RS
+
+    subgraph RS["Report Synthesizer"]
+        direction TB
+        subgraph L1["Technical sections in parallel"]
+            direction LR
+            W1["Writer"] --> V1["DraftReviewer"]
+        end
+        subgraph L2["Derived sections"]
+            direction LR
+            W2["Writer<br/>from reviewed texts only"] --> V2["DraftReviewer"]
+        end
+        L1 -->|"reviewed texts"| L2
+    end
+
+    RS --> O1("✅ report.md · report.docx")
+    RS --> O2("🗂️ review_log.json")
+
+    style K fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style S fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style RS fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+    style L1 fill:#faf5ff,stroke:#9333ea,color:#2e1065
+    style L2 fill:#faf5ff,stroke:#9333ea,color:#2e1065
+`} />
+
+**Key features:**
+- `ReportSynthesizer(config, model=None, *, reviewer_model=None, strict_review=False, review_attempts=5, writer_options=None, reviewer_options=None)` and `synthesize(knowledge, sections, *, title, language="English", instructions="", sample_report=None)`, which returns a `Report`
+- LangGraph workflow: sections without dependencies start in parallel, and a derived section starts once its prerequisites are reviewed
+- The writer uses only the facts in its material, writes `(missing: <item>)` for each required item the material does not cover, and states both sides of an unresolved conflict, marked `Unresolved:`
+- `sample_report` sets structure, length and tone only. It contributes no content and never goes to the reviewer
+- Before any LLM call, `synthesize()` raises `ValueError` for duplicate section ids, an unknown dependency, a dependency cycle, or knowledge that does not match the non-derived sections
+- `strict_review=True` stops the run when a reviewer edit cannot be applied
+- `report.save(directory)` writes `sections/NN_<id>.md`, `review_log.json`, `report.md` and `report.docx`. Hand-edited section files are loaded with `Report.load()` and saved again, which rebuilds the report without a model call
+- `report.usage` counts the writer and reviewer calls
+- Install: `pip install "gaik[report-synthesizer]"`, which adds LangGraph and `pypandoc`. DOCX export also needs the Pandoc binary; `save(..., docx=False)` skips it
+
+**Potential applications:**
+- Condition assessments and inspection reports from verified findings
+- Audit and due diligence reports from collected evidence
+- Recurring reports from facts that a team keeps by hand
+- The writing stage of source-grounded report pipelines
+
+- **Implementation code**: [software_components/report_synthesizer](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/report_synthesizer)
+- **Usage examples**: [examples/report_synthesizer](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/report_synthesizer)

@@ -566,7 +566,7 @@ export default function ReportWriterPage() {
     <PageTransition>
       <DemoPageHeader
         icon={FileText}
-        title="Report Writer"
+        title="Report Writer (legacy)"
         description="Generate structured reports from any mix of documents, audio, images, and spreadsheets"
         className="mb-6"
       />

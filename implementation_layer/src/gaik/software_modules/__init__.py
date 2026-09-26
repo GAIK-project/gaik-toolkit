@@ -5,4 +5,5 @@ __all__ = [
     "documents_to_structured_data",
     "RAG_workflow",
     "multi_source_report_generator",
+    "report_writer",
 ]

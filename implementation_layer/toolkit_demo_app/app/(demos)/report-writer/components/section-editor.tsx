@@ -21,6 +21,7 @@ export interface SectionRow {
   title: string;
   instructions: string;
   depends_on: string[];
+  required_items?: string[]; // only edited when withRequiredItems is set
 }
 
 /** Derive a stable section id from its title (mirrors pipeline._slug). */
@@ -37,13 +38,23 @@ export function effectiveId(row: SectionRow): string {
   return row.id || slugifyTitle(row.title);
 }
 
+const requiredCount = (row: SectionRow) =>
+  (row.required_items ?? []).filter((x) => x.trim()).length;
+
 interface SectionEditorProps {
   sections: SectionRow[];
   onChange: (sections: SectionRow[]) => void;
   disabled?: boolean;
+  /** Show a one-per-line required_items field under Advanced. */
+  withRequiredItems?: boolean;
 }
 
-export function SectionEditor({ sections, onChange, disabled }: SectionEditorProps) {
+export function SectionEditor({
+  sections,
+  onChange,
+  disabled,
+  withRequiredItems,
+}: SectionEditorProps) {
   const baseId = useId();
 
   function update(key: string, patch: Partial<SectionRow>) {
@@ -148,10 +159,15 @@ export function SectionEditor({ sections, onChange, disabled }: SectionEditorPro
           <Accordion type="single" collapsible>
             <AccordionItem value="adv" className="border-none">
               <AccordionTrigger className="py-0 text-xs text-muted-foreground hover:no-underline">
-                Advanced (id · depends_on)
+                Advanced (id · depends_on{withRequiredItems && " · required items"})
                 {row.depends_on.length > 0 && (
                   <span className="ml-2 text-primary font-medium">
                     {row.depends_on.length} dep{row.depends_on.length > 1 ? "s" : ""}
+                  </span>
+                )}
+                {withRequiredItems && requiredCount(row) > 0 && (
+                  <span className="ml-2 text-primary font-medium">
+                    {requiredCount(row)} required item{requiredCount(row) > 1 ? "s" : ""}
                   </span>
                 )}
               </AccordionTrigger>
@@ -216,6 +232,25 @@ export function SectionEditor({ sections, onChange, disabled }: SectionEditorPro
                         No dependencies — this section runs in parallel with others.
                       </p>
                     )}
+                  </div>
+                )}
+
+                {withRequiredItems && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">
+                      Required items
+                      <span className="ml-1 font-normal opacity-60">
+                        — one per line; facts this section must cover
+                      </span>
+                    </Label>
+                    <Textarea
+                      value={(row.required_items ?? []).join("\n")}
+                      onChange={(e) =>
+                        update(row.key, { required_items: e.target.value.split("\n") })
+                      }
+                      disabled={disabled}
+                      className="text-xs min-h-[56px] resize-y"
+                    />
                   </div>
                 )}
               </AccordionContent>

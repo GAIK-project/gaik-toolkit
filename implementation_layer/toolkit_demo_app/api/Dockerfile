@@ -50,6 +50,25 @@ COPY implementation_layer/toolkit_demo_app/api/ .
 COPY implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf ./public/
 COPY implementation_layer/toolkit_demo_app/public/example-index.json ./public/
 
+# Report Writer v2 examples, at their repository paths: routers/report_writer_v2.py
+# finds them by walking up from /app/routers, and the specs name their files by
+# relative path. Only the files the specs name, not the dataset generator or the
+# recording scripts. The multi_source_report_generator folder also gets
+# report_config.json because the legacy routers/report_writer.py now finds this
+# folder before /app/report_examples and reads its config from it.
+COPY implementation_layer/examples/software_modules/report_writer/project_meeting/report_spec.json \
+     ./implementation_layer/examples/software_modules/report_writer/project_meeting/
+COPY implementation_layer/examples/software_modules/report_writer/house_condition_assessment/report_spec.json \
+     implementation_layer/examples/software_modules/report_writer/house_condition_assessment/sample_report.docx \
+     ./implementation_layer/examples/software_modules/report_writer/house_condition_assessment/
+COPY implementation_layer/examples/software_modules/report_writer/house_condition_assessment/inputs \
+     ./implementation_layer/examples/software_modules/report_writer/house_condition_assessment/inputs
+COPY implementation_layer/examples/software_modules/multi_source_report_generator/sample_inputs \
+     ./implementation_layer/examples/software_modules/multi_source_report_generator/sample_inputs
+COPY implementation_layer/examples/software_modules/multi_source_report_generator/sample_report.md \
+     implementation_layer/examples/software_modules/multi_source_report_generator/report_config.json \
+     ./implementation_layer/examples/software_modules/multi_source_report_generator/
+
 # OpenShift arbitrary UID support
 # CSC Rahti 2 assigns random UIDs but always GID=0 (root group)
 # Create cache directory for Huggingface models

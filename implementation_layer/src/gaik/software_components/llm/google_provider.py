@@ -11,8 +11,17 @@ from google import genai
 from google.genai import types as genai_types
 from pydantic import BaseModel
 
-from gaik.software_components.llm.base import ChatMessage, ChatResponse
+from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.content import image_data
+
+
+def _usage(response) -> dict[str, int]:
+    if not getattr(response, "usage_metadata", None):
+        return {}
+    return {
+        "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", 0),
+        "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", 0),
+    }
 
 
 class GoogleProvider:
@@ -21,6 +30,7 @@ class GoogleProvider:
         self.model = config["model"]
         self.embedding_model = config.get("embedding_model", "gemini-embedding-001")
         self._config = config
+        self.usage = UsageCounter()
         options = {}
         http_options = {}
         if config.get("timeout") is not None:
@@ -152,14 +162,8 @@ class GoogleProvider:
             contents=self._to_contents(rest),
             config=self._config_for(system, kwargs or None),
         )
-        usage = (
-            {
-                "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", 0),
-                "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", 0),
-            }
-            if getattr(response, "usage_metadata", None)
-            else {}
-        )
+        usage = _usage(response)
+        self.usage.add(usage)
         return ChatResponse(
             text=response.text or "",
             model=model,
@@ -232,6 +236,7 @@ class GoogleProvider:
             contents=self._to_contents(rest),
             config=config,
         )
+        self.usage.add(_usage(response))
         if response.parsed is not None:
             if isinstance(response.parsed, response_format):
                 return response.parsed

@@ -88,3 +88,21 @@ def test_postgres_agent_import():
     from gaik.software_components import postgres_agent
 
     assert postgres_agent is not None
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "gaik.software_components.parsers.spreadsheet_parser",
+        "gaik.software_components.source_normalizer",
+        "gaik.software_components.knowledge_curator",
+        "gaik.software_components.draft_reviewer",
+        "gaik.software_components.report_synthesizer",
+        "gaik.software_modules.report_writer",
+    ],
+)
+def test_report_writer_family_import(module):
+    """The CURACT components and the ReportWriter module import without optional deps."""
+    import importlib
+
+    assert importlib.import_module(module) is not None

@@ -1,0 +1,90 @@
+{
+  "title": "Q3 Product Roadmap Review Meeting Report",
+  "description": "A structured report of the Q3 product roadmap review meeting held on December 15, 2024, documenting decisions, priorities, action items, and open questions.",
+  "language": "English",
+  "sections": [
+    {
+      "id": "executive_summary",
+      "title": "Executive Summary",
+      "instructions": "Summarize the purpose and outcome of the meeting. Cover the main themes discussed, the overall direction the team aligned on, and any high-level capacity or resource considerations mentioned.",
+      "required_items": [],
+      "depends_on": [
+        "decisions_made",
+        "action_items",
+        "open_questions",
+        "next_steps"
+      ]
+    },
+    {
+      "id": "decisions_made",
+      "title": "Decisions Made",
+      "instructions": "List and briefly explain the key decisions reached during the meeting. For each decision, state what was agreed and the main reason or constraint behind it.",
+      "required_items": [],
+      "depends_on": []
+    },
+    {
+      "id": "action_items",
+      "title": "Action Items",
+      "instructions": "List all action items from the meeting in a table with columns: Action Item, Owner, Due Date, and Priority. Use only items explicitly stated in the evidence.",
+      "required_items": [],
+      "depends_on": []
+    },
+    {
+      "id": "open_questions",
+      "title": "Open Questions",
+      "instructions": "List the unresolved questions or topics that require follow-up after the meeting. Present them as a bulleted list.",
+      "required_items": [],
+      "depends_on": []
+    },
+    {
+      "id": "next_steps",
+      "title": "Next Steps",
+      "instructions": "Summarize the immediate next steps and follow-up actions the team should take. Include any scheduled follow-up meetings or deadlines mentioned.",
+      "required_items": [],
+      "depends_on": [
+        "decisions_made",
+        "action_items",
+        "open_questions"
+      ]
+    }
+  ],
+  "instructions": "Use only facts stated in the sources, and cite the source file of each fact. Use the sample report for structure and style only; never copy facts from it.",
+  "sources": {
+    "primary": [
+      "../../multi_source_report_generator/sample_inputs/meeting_recording.mp3",
+      "../../multi_source_report_generator/sample_inputs/notes.txt"
+    ],
+    "secondary": [
+      "../../multi_source_report_generator/sample_inputs/deployment-freeze-policy.pdf",
+      "../../multi_source_report_generator/sample_inputs/project-budget.xlsx",
+      "../../multi_source_report_generator/sample_inputs/sketch.png"
+    ]
+  },
+  "sample_report": "../../multi_source_report_generator/sample_report.md",
+  "models": {
+    "vision": null,
+    "transcription": null,
+    "curator": null,
+    "writer": null,
+    "reviewer": null
+  },
+  "settings": {
+    "transcription_language": "auto",
+    "curator_workers": 4,
+    "review_attempts": 5,
+    "strict_review": false,
+    "docx": true,
+    "curator": {
+      "reasoning_effort": null,
+      "temperature": null
+    },
+    "writer": {
+      "reasoning_effort": null,
+      "temperature": null
+    },
+    "reviewer": {
+      "reasoning_effort": null,
+      "temperature": null
+    }
+  }
+}

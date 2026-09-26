@@ -287,6 +287,12 @@ all = [
     "gaik[finnish-rag]",
     "gaik[evaluators]",
     "gaik[rag-response-evaluator]",
+    "gaik[spreadsheet-parser]",
+    "gaik[source-normalizer]",
+    "gaik[knowledge-curator]",
+    "gaik[draft-reviewer]",
+    "gaik[report-synthesizer]",
+    "gaik[report-writer]",
 ]
 
 # Software components
@@ -321,6 +327,40 @@ multi-source-report-generator-docx = [
     "pypandoc>=1.13",
 ]
 
+# CURACT report writing: reusable stage components and the ReportWriter module.
+# Excel/CSV to Markdown tables with sheet names and row numbers.
+spreadsheet-parser = [
+    "openpyxl>=3.1",
+]
+
+# Mixed files (PDF, DOCX, spreadsheets, text, audio, images) to Markdown texts.
+source-normalizer = [
+    "gaik[parser-cpu]",
+    "gaik[transcriber]",
+    "gaik[spreadsheet-parser]",
+]
+
+# Section-bound fact units with verified verbatim quotes (core deps only).
+knowledge-curator = []
+
+# Exact search-and-replace fact check of generated text (core deps only).
+draft-reviewer = []
+
+# Governed report writing from curated knowledge. DOCX export needs the Pandoc
+# system binary (https://pandoc.org/installing.html).
+report-synthesizer = [
+    "gaik[knowledge-curator]",
+    "gaik[draft-reviewer]",
+    "langgraph>=0.2",
+    "pypandoc>=1.13",
+]
+
+report-writer = [
+    "gaik[source-normalizer]",
+    "gaik[knowledge-curator]",
+    "gaik[report-synthesizer]",
+]
+
 # CPU-only variants (no GPU/torch/docling dependencies)
 parser-cpu = [
     "PyMuPDF>=1.26.0",
@@ -350,6 +390,12 @@ all-cpu = [
     "gaik[finnish-rag]",
     "gaik[evaluators]",
     "gaik[rag-response-evaluator]",
+    "gaik[spreadsheet-parser]",
+    "gaik[source-normalizer]",
+    "gaik[knowledge-curator]",
+    "gaik[draft-reviewer]",
+    "gaik[report-synthesizer]",
+    "gaik[report-writer]",
 ]
 
 # Development tooling for maintainers only (pip install -e ".[dev]")

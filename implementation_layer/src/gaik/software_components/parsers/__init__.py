@@ -12,6 +12,7 @@ Local Parsing:
     - parse_pdf: Convenience function for PyMuPDF parsing
     - DocxParser: Fast local Word document (.docx, .doc) text extraction using python-docx
     - parse_docx: Convenience function for DOCX parsing
+    - SpreadsheetParser: Local .xlsx/.csv to Markdown tables with source row numbers
 
 Advanced Parsing:
     - DoclingParser: Advanced document parsing with OCR, table extraction, and multi-format support
@@ -83,5 +84,13 @@ try:
     from .multimodal_parser import MultimodalParser, ParseResult
 
     __all__.extend(["MultimodalParser", "ParseResult"])
+except ImportError:
+    pass
+
+# Local spreadsheet parsing (openpyxl is imported when an .xlsx is parsed)
+try:
+    from .spreadsheet_parser import SpreadsheetParser
+
+    __all__.extend(["SpreadsheetParser"])
 except ImportError:
     pass

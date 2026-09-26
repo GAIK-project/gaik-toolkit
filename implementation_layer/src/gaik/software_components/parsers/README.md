@@ -14,7 +14,7 @@ pip install gaik[parser]
 
 ## Available Parsers
 
-GAIK provides seven parser options, each optimized for different use cases:
+GAIK provides eight parser options, each optimized for different use cases:
 
 | Parser | Use Case | Speed | Requirements |
 |--------|----------|-------|--------------|
@@ -25,6 +25,9 @@ GAIK provides seven parser options, each optimized for different use cases:
 | `DoclingParser` | Advanced OCR with multi-format support | Medium | Optional GPU |
 | `VisionPlusParser` | Docling + Vision LLM for advanced parsing | Medium | Image-capable model + Docling |
 | `DoclingApiClientParser` | Remote Docling parsing via Haaga-Helia Docling service | Fast | API_BASE + PASSWORD |
+| `SpreadsheetParser` | Excel (`.xlsx`) and CSV to Markdown tables with row numbers | Fast | None (local) |
+
+`PyMuPDFParser.parse_pdf(path, page_markers=True)` writes a `[Page N]` line before each page, and `DocxParser.parse_docx(path, keep_structure=True)` keeps headings and tables in document order, so a quote can be traced to its place.
 
 ### Quick Comparison
 

@@ -42,11 +42,13 @@ import {
   FileBarChart,
   FileCode,
   FileOutput,
+  FilePen,
   FileSearch,
   FileText,
   GraduationCap,
   HardHat,
   Headset,
+  House,
   Lightbulb,
   LogOut,
   LucideIcon,
@@ -105,6 +107,11 @@ const navGroups: NavGroup[] = [
         label: "Purchase Order Processing",
         href: "/luvata-order",
         icon: FileBarChart,
+      },
+      {
+        label: "Condition Assessment",
+        href: "/report-writer-v2?example=house_condition_assessment",
+        icon: House,
       },
       {
         label: "Solution Wizard",
@@ -168,6 +175,11 @@ const navGroups: NavGroup[] = [
       },
       { label: "RAG Builder", href: "/rag", icon: Bot },
       { label: "Report Writer", href: "/report-writer", icon: FileText },
+      {
+        label: "Report Writer v2",
+        href: "/report-writer-v2",
+        icon: FilePen,
+      },
     ],
   },
   {
@@ -512,7 +524,8 @@ export function SiteNav({
   }, []);
 
   function isActive(href: string): boolean {
-    return href === "/" ? pathname === "/" : pathname.startsWith(href);
+    if (href === "/") return pathname === "/";
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
 
   return (

@@ -40,6 +40,7 @@ REQUIRED_CHECKS = {
     "data_extractor",
     "answer_generator",
     "document_classifier",
+    "report_writing",
 }
 MODEL_ENV_FALLBACKS = {
     "azure": "AZURE_DEPLOYMENT",
@@ -314,7 +315,7 @@ def run_gate(args) -> dict:
                     "--output-tokens",
                     str(args.output_tokens),
                     "--max-calls",
-                    "10",
+                    "24",
                     "--result",
                     str(result_path),
                 ]

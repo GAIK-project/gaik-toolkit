@@ -19,6 +19,11 @@ Complete pipeline for building question-answering systems over document collecti
 
 **Use cases:** Knowledge base search, document Q&A, research assistance, customer support knowledge retrieval
 
+### [Report-Writer](./report_writer)
+CURACT report writing from one report spec: normalizes mixed sources (documents, spreadsheets, recordings, images), curates quoted fact units per section, then writes and reviews each section. Every stage is saved to an editable workspace; a single-call mode gives a baseline. Combines SourceNormalizer, KnowledgeCurator and ReportSynthesizer. Includes a house condition assessment and a project meeting example.
+
+**Use cases:** Condition assessments, inspection and field service reports, meeting reports, any fixed-template report from observations and documents
+
 ## Modules vs Components
 
 - **Software Modules** - Ready-to-use pipelines that handle complete workflows with minimal setup
