@@ -190,8 +190,8 @@ graph TD
 
 To run the evaluation on the provided sample data:
 
-1. Install dependencies: `pip install -r requirements.txt && python -m spacy download en_core_web_sm`
-2. Navigate to `evaluation_layer/eval_methods/translation_eval/`
+1. Navigate to `evaluation_layer/eval_methods/translation_eval/`
+2. Install dependencies: `pip install -r requirements.txt && python -m spacy download en_core_web_sm`
 3. Run `python src/evaluate_standalone.py` — evaluates all 10 sample file pairs and prints a metrics report with averages
 4. To evaluate multiple models, place outputs under `data/translation_results/<model_name>/` and run `python src/translation_evaluation.py`
 5. After batch evaluation, run `python src/generate_metrics_plot.py` to generate the comparison chart

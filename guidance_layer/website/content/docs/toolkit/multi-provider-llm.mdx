@@ -91,7 +91,7 @@ A legacy dict with neither `provider` nor `use_azure`, such as `{"api_key": key,
 | `vertex` | `GOOGLE_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT`, plus Google credentials | `GOOGLE_MODEL`; region from `GOOGLE_CLOUD_LOCATION`, default `global` |
 | `litellm` | `LITELLM_MODEL`; credentials for the selected backend | Provider-prefixed ID, e.g. `azure/gpt-6-luna` |
 
-The Google SDK adapter supports the direct Gemini API and Vertex AI. Vertex accepts application-default credentials, a `credentials` object, or service-account data via `service_account_json` (`GOOGLE_SERVICE_ACCOUNT_JSON` / `GOOGLE_APPLICATION_CREDENTIALS`). Choose a region where your model is served.
+The Google SDK adapter supports the direct Gemini API and Vertex AI. Vertex accepts application-default credentials (including a `GOOGLE_APPLICATION_CREDENTIALS` file), a `credentials` object, or service-account data via `service_account_json` (`GOOGLE_SERVICE_ACCOUNT_JSON`, inline JSON or a file path). Choose a region where your model is served.
 
 LiteLLM is opt-in: `get_llm_config("litellm", model="azure/gpt-6-luna", api_key=key, base_url=endpoint, api_version=version)`. It uses the same component interface and passes credentials per request. `LITELLM_API_KEY`, `LITELLM_BASE_URL`, `LITELLM_API_VERSION`, and `LITELLM_EMBEDDING_MODEL` are optional environment defaults. Select a provider-prefixed embedding model separately when needed.
 

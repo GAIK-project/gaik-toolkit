@@ -21,7 +21,7 @@ Most chat-based components (Extractor and SchemaGenerator, Classifier, Transcrip
 
 ### Transcriber
 
-The Transcriber converts spoken audio or video recordings into written text. It uses OpenAI's Whisper model for accurate speech-to-text transcription and optionally applies a GPT-based post-processing step to clean up the raw output — fixing punctuation, removing filler words, and improving overall readability. It handles long recordings automatically through chunked processing, making it suitable for real-world audio captured in noisy or uncontrolled environments.
+The Transcriber converts spoken audio or video recordings into written text. It uses OpenAI's Whisper model for accurate speech-to-text transcription and optionally applies a GPT-based post-processing step (the Transcript Enhancer below) to fix transcription errors in the raw output — misspellings, inconsistent terms, and split or merged words — without rewriting it. It handles long recordings automatically through chunked processing, making it suitable for real-world audio captured in noisy or uncontrolled environments.
 
 <Mermaid chart={`
 flowchart LR
@@ -45,7 +45,7 @@ flowchart LR
 
 **Key features:**
 - Whisper-based transcription with high accuracy across languages
-- Optional GPT enhancement for clean, readable output
+- Optional GPT enhancement that repairs ASR errors without rewriting the transcript
 - Automatic chunking for recordings of any length
 - Supports MP3, WAV, M4A, OGG, and video formats
 
@@ -134,14 +134,14 @@ flowchart LR
 | `VisionParser` | Shared provider configs with a vision model — OpenAI/Azure, Google/Vertex, Anthropic, Aitta, compatible servers or optional LiteLLM; page images → markdown |
 | `MultimodalParser` | Multi-provider PDF → markdown (OpenAI · Anthropic Claude · Google Gemini, or Aitta, compatible servers and LiteLLM via a shared config) with one API |
 | `PyMuPDFParser` | Fast local PDF text extraction, no API calls, lowest cost |
-| `DocxParser` | Local Word document (`.docx` / `.doc`) extraction via `python-docx` |
+| `DocxParser` | Local Word document (`.docx`) extraction via `python-docx` |
 | `DoclingParser` | Advanced local parsing with OCR, table extraction, multi-format support |
 | `VisionPlusParser` | Docling + vision hybrid that returns markdown **and** metadata in one pass |
 | `DoclingApiClientParser` | Remote client for a hosted Docling parsing service |
 
 **Key features:**
 - Seven parsers covering local, vision, hybrid, and remote-service strategies
-- Headings and multi-page structure preserved across every variant
+- Headings and multi-page structure preserved by the vision and Docling-based parsers (`PyMuPDFParser` and `DocxParser` return plain text)
 - Complex tables preserved by the vision parsers, which can emit HTML
 - Multi-page processing with consistent formatting
 - Suitable for both simple forms and complex, visually rich documents
@@ -331,7 +331,7 @@ flowchart LR
 - Form-extraction review where missing or hallucinated fields are expensive
 - Two-tier setups: cheap pre-screen + premium judge on flagged rows
 
-**Recommended judge model:** `gemini-3-flash-preview` via Vertex AI — F1 = 1.000 at $0.004/PO in our [Luvata judge benchmark](https://github.com/GAIK-project/parse-bench-test/blob/main/results-luvata/judge-bench/BENCHMARK-REPORT.md) across 8 candidates including GPT-5.4 / 5.5, Claude Haiku 4.5 / Sonnet 4.6 / Opus 4.7, and Gemini 3.1 Flash Lite.
+**Recommended judge model:** `gemini-3-flash-preview` via Vertex AI — F1 = 1.000 at $0.004/PO in our internal Luvata judge benchmark across 8 candidates including GPT-5.4 / 5.5, Claude Haiku 4.5 / Sonnet 4.6 / Opus 4.7, and Gemini 3.1 Flash Lite.
 
 - **Implementation code**: [software_components/validators/llm_judge](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/validators/llm_judge)
 - **Usage examples**: [examples/validators](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/validators)
@@ -413,7 +413,7 @@ Extracts text from source documents and splits it into manageable chunks with pr
 
 <Mermaid chart={`
 flowchart LR
-    A("📄 Source Documents<br/>PDF, DOCX, TXT") --> B
+    A("📄 Source Documents<br/>PDF, DOCX") --> B
 
     subgraph B["Parser"]
         direction TB

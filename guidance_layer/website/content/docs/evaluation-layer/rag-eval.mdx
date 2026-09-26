@@ -18,7 +18,7 @@ Key challenges include:
 
 ## How We Evaluate
 
-Retrieval quality is measured by comparing the retrieved chunks against a target text — a manually annotated gold passage that a correct retrieval should cover. The evaluation function takes the target text and a ranked list of chunks, and computes 14 deterministic metrics using token sequences and n-gram sets. No LLM calls are made.
+Retrieval quality is measured by comparing the retrieved chunks against a target text — a manually annotated gold passage that a correct retrieval should cover. The evaluation function takes the target text and a ranked list of chunks, and computes 15 deterministic metrics using token sequences and n-gram sets. No LLM calls are made.
 
 The figure below shows how the evaluation works at the function level.
 
@@ -161,7 +161,7 @@ graph TD
   end
 
   subgraph "Results"
-    D["14 Metrics\n(token, structure, rank, n-gram)"]
+    D["15 Metrics\n(token, structure, rank, n-gram)"]
     E[/"Console Report\nor integrate into your pipeline"/]
   end
 

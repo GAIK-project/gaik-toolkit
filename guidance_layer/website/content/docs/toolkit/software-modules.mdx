@@ -26,7 +26,7 @@ Use software modules when you want a complete, working pipeline with minimal int
 
 ### Audio-to-Structured-Data
 
-This module bridges the gap between spoken language and structured data. It combines the Transcriber and Extractor components into a single pipeline: audio is transcribed to text, and the text is processed against your field requirements to produce validated, structured output. Both the transcript and the extracted fields are returned together. The generated schema is persisted and reused on subsequent runs, making repeated processing fast and cost-efficient.
+This module bridges the gap between spoken language and structured data. It combines the Transcriber and Extractor components into a single pipeline: audio is transcribed to text, and the text is processed against your field requirements to produce validated, structured output. Both the transcript and the extracted fields are returned together. The generated schema can be saved and reused on subsequent runs (`save_schema()` / `load_schema()`), making repeated processing fast and cost-efficient.
 
 <Mermaid chart={`
 flowchart TD
@@ -72,7 +72,7 @@ flowchart TD
 | Output | Description |
 | --- | --- |
 | Raw Transcript | Verbatim speech-to-text output |
-| Enhanced Transcript | GPT-refined, readable version |
+| Enhanced Transcript | Transcript with ASR errors repaired, not rewritten (optional; set `enhanced_transcript=True` in `transcriber_ctor`) |
 | Structured Fields | All defined fields extracted and validated |
 | Reusable Schema | Pydantic schema saved for future runs |
 
@@ -110,7 +110,7 @@ flowchart TD
 
         subgraph P["Step 1 · Document Parser"]
             direction LR
-            V["Vision Parser<br/>GPT-based"] --> L["Local Parser<br/>PyMuPDF / Docling"]
+            V["Vision Parser<br/>LLM-based"] --> L["Local Parser<br/>PyMuPDF / Docling"]
         end
 
         subgraph X["Step 2 · Extractor"]
@@ -216,7 +216,7 @@ flowchart TD
 | Index Result | Number of documents and chunks indexed, vector store path |
 | Answer | Generated response with inline citations |
 | Retrieved Documents | Top-k relevant chunks used for answer generation |
-| Conversation History | Optional: Last n Q/A pairs for context-aware responses |
+| Conversation History | Optional: Last n Q/A pairs, kept inside the workflow for context-aware responses |
 
 **Key features:**
 - Two-phase workflow: index once, query many times
@@ -243,9 +243,9 @@ flowchart TD
 
 ### Multi-Source-Report-Generator
 
-This module generates a fully user-defined long-form report from any mix of source files. You define the use case: report title, a description of the report's purpose, and as many sections as needed — each with a plain-language instruction describing what to extract from the evidence and what the section should contain. The module normalises every input file (PDF, Word, Excel/CSV, audio/video, images, text) into a common Markdown evidence pack, then runs an **agentic workflow** that drafts each section independently, fact-checks and repairs it with a diff-editor reviewer, and assembles the final report in your original section order.
+This module generates a fully user-defined long-form report from any mix of source files. You define the use case: report title, a description of the report's purpose, and as many sections as needed — each with a plain-language instruction describing what to extract from the evidence and what the section should contain. The module normalises every input file (PDF, Word, Excel/CSV, audio/video, images, text) into a common Markdown evidence pack. By default it writes the whole report in a single LLM call; with `agentic=True` (and the `multi-source-report-generator-agentic` extra) it runs an **agentic workflow** that drafts each section independently, fact-checks and repairs it with a diff-editor reviewer, and assembles the final report in your original section order.
 
-Sections can declare dependencies on other sections using `depends_on`. Sections with no dependencies run in parallel; dependent sections wait for their dependencies to be finalized and receive their content as context — enabling a Summary or Recommendations section to synthesize from what earlier sections already established. The complete use-case configuration can be saved to a JSON file and reloaded for repeat runs on new evidence.
+In agentic mode, sections can declare dependencies on other sections using `depends_on` (single-call mode ignores it). Sections with no dependencies run in parallel; dependent sections wait for their dependencies to be finalized and receive their content as context — enabling a Summary or Recommendations section to synthesize from what earlier sections already established. The complete use-case configuration can be saved to a JSON file and reloaded for repeat runs on new evidence.
 
 <Mermaid chart={`
 flowchart TD
@@ -301,15 +301,15 @@ flowchart TD
 
 | Output | Description |
 | --- | --- |
-| Markdown Report (`report.md`) | Assembled long-form report in your section order — always produced |
-| Word Document (`report.docx`) | Optional DOCX export; requires `output_docx=True` and Pandoc |
+| Markdown Report (`report.md`) | Assembled long-form report in your section order — always returned; written to `report.md` when `output_dir` is set |
+| Word Document (`report.docx`) | Optional DOCX export; requires `output_docx=True`, `output_dir`, the `multi-source-report-generator-docx` extra and Pandoc |
 | Per-Section Breakdown | Each section's content, usage tokens, and any reviewer warnings |
 | Evidence Index | Source files with metadata and normalized content |
 
 **Key features:**
 - **Fully user-defined use case** — report title, description, and any number of sections each with a plain-language instruction specifying what to extract and how to write it
-- **Agentic per-section workflow** — independent drafting, mandatory diff-editor reviewer repair, optional style polish per section
-- **Dependency-ordered sections** — `depends_on` lets summary or recommendation sections synthesize from finalized earlier sections rather than re-deriving from raw evidence
+- **Agentic per-section workflow** (opt-in, `agentic=True`) — independent drafting, mandatory diff-editor reviewer repair, optional style polish per section
+- **Dependency-ordered sections** (agentic mode) — `depends_on` lets summary or recommendation sections synthesize from finalized earlier sections rather than re-deriving from raw evidence
 - **Mixed input normalization** — PDF, Word, Excel/CSV, audio/video, images, and plain text all processed in a single pipeline
 - **Optional sample report** — provide an existing report to enforce a specific format, tone, and length; the writer mirrors its structure without copying content
 - **Config persistence** — save the full use-case definition (sections, options, paths) to JSON with `save_report_config`; reload with `load_report_config` for repeat runs on new evidence
