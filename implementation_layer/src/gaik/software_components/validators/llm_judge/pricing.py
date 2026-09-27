@@ -1,43 +1,25 @@
-"""Per-million-token rates for known LLM-as-judge models.
+"""Per-million-token rates for LLM-as-judge models.
 
-Pattern mirrors `software_components.parsers.multimodal_parser.pricing`.
-Add a new prefix when a new judge model rotates in.
-
-Sources (2026):
-- Gemini: https://ai.google.dev/gemini-api/docs/pricing
-- Anthropic: https://www.anthropic.com/pricing
-- OpenAI: https://openai.com/api/pricing/
-- Azure OpenAI: customer-specific deal; values below are the public list price.
+The judge reads the shared tables in :mod:`gaik.observability.pricing`, so a
+model is priced in one place. It used to keep its own copy, which drifted:
+GPT-5.5, GPT-5.4 and GPT-5.4-mini, Haiku 4.5 and Opus 4.7 at other models'
+prices, and Sonnet 5 and Opus 5.5 missing (reported as free).
 """
 
 from __future__ import annotations
 
-from gaik.observability.pricing import ANTHROPIC_PRICING_PER_M
+from gaik.observability.pricing import (
+    ANTHROPIC_PRICING_PER_M,
+    GEMINI_PRICING_PER_M,
+    OPENAI_PRICING_PER_M,
+)
 
-# (input_per_M_USD, output_per_M_USD)
+# (input_per_M_USD, output_per_M_USD). The prefixes do not overlap across
+# providers (gpt-, claude-, gemini-), so one merged table is unambiguous.
 JUDGE_PRICING_PER_M: dict[str, tuple[float, float]] = {
-    # OpenAI / Azure
-    # GPT-6 standard short-context list prices, verified 2026-09-25.
-    "gpt-6-astra": (10.00, 50.00),
-    "gpt-6-sol": (2.00, 10.00),
-    "gpt-6-luna": (0.10, 0.50),
-    "gpt-5.5": (3.00, 15.00),
-    "gpt-5.4": (2.50, 10.00),
-    "gpt-5.4-mini": (0.25, 2.00),
-    "gpt-5.1": (1.25, 10.00),
-    "gpt-5-mini": (0.25, 2.00),
-    # Anthropic: the shared table, so a new Claude model is priced in one place.
-    # This table used to keep its own copy, which had Haiku 4.5 and Opus 4.7 at
-    # older models' prices and no Sonnet 5 or Opus 5.5 (reported as free).
+    **OPENAI_PRICING_PER_M,
     **ANTHROPIC_PRICING_PER_M,
-    # Google
-    "gemini-3-flash": (0.50, 3.00),
-    "gemini-3.1-flash-lite": (0.25, 1.50),
-    "gemini-2.5-flash": (0.30, 2.50),
-    "gemini-2.5-flash-lite": (0.10, 0.40),
-    "gemini-2.0-flash": (0.10, 0.40),
-    "gemini-2.5-pro": (1.25, 10.00),
-    "gemini-3.1-pro": (2.00, 12.00),
+    **GEMINI_PRICING_PER_M,
 }
 
 

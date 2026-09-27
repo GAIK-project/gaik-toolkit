@@ -3,7 +3,8 @@
 Rates are USD per million tokens in ``(input, output)`` order. Reasoning /
 thinking tokens are billed at the output rate across all three providers.
 
-GPT-6 rates verified 2026-09-25 (standard, short context; Azure contracts may differ).
+GPT-6 rates verified 2026-09-25, the other OpenAI rows 2026-09-27 (standard, short
+context; Azure contracts may differ).
 Claude rates verified 2026-09-27 (list price; Claude on Microsoft Foundry bills the same).
 Other sources (2026-03-25):
 - OpenAI: https://developers.openai.com/api/docs/pricing
@@ -39,7 +40,7 @@ OPENAI_PRICING_PER_M: dict[str, tuple[float, float]] = {
     "gpt-5.6-sol": (4.00, 20.00),
     "gpt-5.5-deployment": (5.00, 30.00),
     "gpt-5.5": (5.00, 30.00),
-    "gpt-5-mini": (0.75, 4.50),
+    "gpt-5-mini": (0.25, 2.00),
     "gpt-5.4-mini": (0.75, 4.50),
     "gpt-5.4-nano": (0.20, 1.25),
     "gpt-5.4": (2.50, 15.00),

@@ -41,3 +41,23 @@ def test_claude_list_prices_in_parser_and_judge_tables(model, rates):
 
     assert lookup_price("anthropic_foundry", model) == rates
     assert lookup_judge_price(model) == rates
+
+
+@pytest.mark.parametrize(
+    ("model", "rates"),
+    [
+        ("gpt-5.5", (5.00, 30.00)),
+        ("gpt-5.4", (2.50, 15.00)),
+        ("gpt-5.4-mini", (0.75, 4.50)),
+        ("gpt-5-mini", (0.25, 2.00)),
+        ("gpt-5.1", (1.25, 10.00)),
+    ],
+)
+def test_openai_list_prices_agree_between_parser_and_judge(model, rates):
+    # OpenAI list prices, checked 2026-09-27. The judge's own copy had gpt-5.5
+    # at 3/15, gpt-5.4 at 2.5/10 and gpt-5.4-mini at 0.25/2; the shared table
+    # had gpt-5-mini at 0.75/4.5.
+    from gaik.software_components.validators.llm_judge.pricing import lookup_judge_price
+
+    assert lookup_price("openai", model) == rates
+    assert lookup_judge_price(model) == rates

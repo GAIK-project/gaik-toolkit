@@ -38,6 +38,23 @@ def _accepts_effort(model: str, effort: object) -> bool:
     return effort in levels
 
 
+# Models that answer 400 to `temperature`, `top_p` or `top_k` ("deprecated for
+# this model"). Components such as DataExtractor send temperature=0 for
+# determinism; on these models the only choice is not to send it.
+_NO_SAMPLING_MODELS = (
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-opus-5",
+    "claude-sonnet-5",
+    "claude-fable",
+    "claude-mythos",
+)
+_SAMPLING_KEYS = ("temperature", "top_p", "top_k")
+
+# Models that answer 400 to a forced tool_choice (`tool` or `any`).
+_NO_FORCED_TOOL_MODELS = ("claude-opus-5-5", "claude-fable-5-1", "claude-mythos-5-1")
+
+
 class AnthropicProvider:
     def __init__(self, config: dict):
         self.provider = config.get("provider", "anthropic")
@@ -118,8 +135,12 @@ class AnthropicProvider:
         # model lacks errors too, and "none" is OpenAI's). Dropping it everywhere
         # made a component's thinking setting silently do nothing on Claude.
         effort = options.pop("reasoning_effort", None)
-        if _accepts_effort(str(options.get("model", self.model)), effort):
+        model = str(options.get("model", self.model))
+        if _accepts_effort(model, effort):
             options["output_config"] = {**options.get("output_config", {}), "effort": effort}
+        if model.startswith(_NO_SAMPLING_MODELS):
+            for key in _SAMPLING_KEYS:
+                options.pop(key, None)
         token_keys = [
             key
             for key in ("max_tokens", "max_completion_tokens", "max_output_tokens")
@@ -177,12 +198,20 @@ class AnthropicProvider:
             "input_schema": schema,
         }
         system, rest = self._split_system(messages)
+        model = kwargs.pop("model", self.model)
+        tool_choice: dict[str, Any] = {"type": "tool", "name": tool_name}
+        if str(model).startswith(_NO_FORCED_TOOL_MODELS):
+            # These models reject a forced tool, so offer it and ask for it; a
+            # reply without the call still raises below.
+            tool_choice = {"type": "auto"}
+            ask = f"Answer only by calling the {tool_name} tool."
+            system = f"{system}\n\n{ask}" if system else ask
         params: dict[str, Any] = {
-            "model": kwargs.pop("model", self.model),
+            "model": model,
             "max_tokens": kwargs.pop("max_tokens", self.max_tokens),
             "messages": rest,
             "tools": [tool],
-            "tool_choice": {"type": "tool", "name": tool_name},
+            "tool_choice": tool_choice,
         }
         if system is not None:
             params["system"] = system

@@ -115,3 +115,43 @@ def test_effort_merges_into_a_caller_output_config():
     )
 
     assert bodies[0]["output_config"] == {"format": fmt, "effort": "high"}
+
+
+@pytest.mark.parametrize(
+    ("model", "kept"), [("claude-sonnet-5", False), ("claude-sonnet-4-6", True)]
+)
+def test_sampling_is_dropped_only_where_claude_rejects_it(model, kept):
+    # Sonnet 5 answers 400 "temperature is deprecated for this model";
+    # DataExtractor sends temperature=0 on every call.
+    bodies = []
+    _client_for(model, bodies).chat([{"role": "user", "content": "Hi"}], temperature=0)
+
+    assert ("temperature" in bodies[0]) is kept
+
+
+def test_models_without_forced_tools_are_asked_instead():
+    # Opus 5.5 answers 400 to tool_choice "tool"; it gets "auto" and an instruction.
+    bodies = []
+
+    def handle(request):
+        bodies.append(json.loads(request.content))
+        content = [{"type": "tool_use", "id": "t", "name": "Receipt", "input": {"total": 1}}]
+        return httpx.Response(200, json=_response(content))
+
+    client = create_llm_client(
+        get_llm_config(
+            "anthropic",
+            api_key="test-key",
+            model="claude-opus-5-5",
+            max_retries=0,
+            http_client=httpx.Client(transport=httpx.MockTransport(handle)),
+        )
+    )
+    result = client.chat_parsed(
+        [{"role": "system", "content": "Be brief."}, {"role": "user", "content": "Hi"}],
+        response_format=Receipt,
+    )
+
+    assert result.total == 1
+    assert bodies[0]["tool_choice"] == {"type": "auto"}
+    assert bodies[0]["system"].endswith("Answer only by calling the Receipt tool.")
