@@ -1,0 +1,245 @@
+@import "tailwindcss";
+
+@theme {
+  /* --- Dark petrol/teal palette --- */
+  --color-app: #0b1c21;
+  --color-surface: #132c33;
+  --color-surface-muted: #1c3e47;
+  --color-border: #254951;
+  --color-border-strong: #335f68;
+  --color-text: #e8eff0;
+  --color-text-strong: #f4f8f8;
+  --color-text-secondary: #b9cccd;
+  --color-text-muted: #8aa3a7;
+
+  /* --- Accent 1: teal (functional) --- */
+  --color-brand: #34a99a;
+  --color-brand-hover: #3dc2b0;
+  --color-brand-active: #2c8f82;
+  --color-brand-strong: #3dc2b0;
+  --color-brand-soft: #143a3a;
+  --color-brand-soft-border: #2c6a64;
+  --color-brand-text: #6fd6c6;
+  --color-on-brand: #06231f;
+  --color-on-brand-muted: #07231f;
+
+  /* --- Accent 2: gold (warm highlight) --- */
+  --color-gold: #d6b878;
+  --color-gold-strong: #e7cf9b;
+  --color-gold-soft: #2b2616;
+  --color-gold-text: #e3c891;
+  --color-on-gold: #2a2008;
+
+  /* --- Blueprint step accents --- */
+  --color-step-io: #5bb0d0;
+  --color-step-ai: #d6b878;
+  --color-step-human: #e09a52;
+
+  /* --- Status: success --- */
+  --color-success-bg: #12302a;
+  --color-success-border: #2c6b53;
+  --color-success-text: #5fd38a;
+  /* --- Status: warning --- */
+  --color-warning-bg: #2e2615;
+  --color-warning-border: #6b5a2e;
+  --color-warning-text: #e3b765;
+  /* --- Status: danger --- */
+  --color-danger-bg: #341c1c;
+  --color-danger-border: #6b3636;
+  --color-danger-text: #f08a8a;
+  /* --- Status: info / running --- */
+  --color-info-bg: #143a3a;
+  --color-info-border: #2c6a64;
+  --color-info-text: #6fd6c6;
+  /* --- Status: neutral / locked --- */
+  --color-neutral-bg: #1c3e47;
+  --color-neutral-border: #335f68;
+  --color-neutral-text: #8aa3a7;
+
+  /* --- Terminal (PoC logs) --- */
+  --color-term-bg: #04181d;
+  --color-term-bar: #0c262c;
+  --color-term-text: #d6e3e4;
+  --color-term-muted: #8aa3a7;
+  --color-term-ok: #5fd38a;
+  --color-term-err: #f08a8a;
+  --color-term-accent: #5eead4;
+
+  /* --- Layout (4px grid) --- */
+  --spacing-header: 3.5rem; /* 56px */
+  --width-chat: 24rem; /* 384px */
+  --width-chat-rail: 3.25rem; /* 52px */
+  --width-progress-sidebar: 12rem; /* 192px */
+  --width-step-cell: 6rem; /* 96px */
+
+  /* --- Radius --- */
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* --- Shadows (for dark background) --- */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.30);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.40), 0 1px 2px -1px rgb(0 0 0 / 0.30);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.45), 0 2px 6px -2px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 12px 32px -8px rgb(0 0 0 / 0.55);
+
+  /* --- Fonts --- */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: "Orbitron", ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  background:
+    radial-gradient(1100px 560px at 8% -12%, #163a41 0%, rgba(11, 28, 33, 0) 58%),
+    radial-gradient(900px 500px at 100% 0%, #12333a 0%, rgba(11, 28, 33, 0) 55%),
+    var(--color-app);
+  background-attachment: fixed;
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.hex {
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+.hex-hero {
+  clip-path: polygon(50% 0%, 97.5% 25%, 97.5% 75%, 50% 100%, 2.5% 75%, 2.5% 25%);
+}
+
+.chat-bg {
+  background:
+    radial-gradient(130% 55% at 50% 0%, rgba(52, 169, 154, 0.16) 0%, rgba(52, 169, 154, 0) 55%),
+    linear-gradient(180deg, #163740 0%, #0d2127 100%);
+}
+
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(52 169 154 / 0.35);
+  border-color: var(--color-brand-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .skip-link {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .skip-link:focus {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 50;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0.5rem 1rem;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    border-width: 1px;
+    @apply rounded-md bg-surface text-text shadow-md border-border;
+  }
+
+  .app-header {
+    @apply h-14 shrink-0 px-5 flex items-center justify-between bg-surface/80 backdrop-blur-sm border-b border-border;
+  }
+
+  .field-label {
+    @apply block text-sm font-medium text-text-secondary mb-1.5;
+  }
+
+  .input-field {
+    @apply w-full rounded-md bg-surface border border-border-strong px-3 py-2 text-sm text-text placeholder:text-text-muted shadow-xs transition-colors hover:border-text-muted focus:outline-none focus:border-brand;
+  }
+
+  .btn-brand {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-medium text-on-brand shadow-xs transition-colors hover:bg-brand-hover active:bg-brand-active disabled:bg-brand/50 disabled:text-on-brand/70 disabled:cursor-not-allowed disabled:shadow-none;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-gold px-4 py-2 text-sm font-semibold text-on-gold shadow-xs transition-[filter] hover:brightness-110 active:brightness-95;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-surface px-4 py-2 text-sm font-medium text-text-secondary border border-border-strong shadow-xs transition-colors hover:bg-surface-muted hover:text-text hover:border-text-muted disabled:bg-surface-muted/50 disabled:text-text-muted disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-text transition-colors hover:border-brand hover:text-brand-strong disabled:border-border disabled:text-text-muted disabled:cursor-not-allowed;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium bg-success-bg border-success-border text-success-text;
+  }
+
+  .badge-info {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium bg-info-bg border-info-border text-info-text;
+  }
+
+  .badge-warning {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium bg-warning-bg border-warning-border text-warning-text;
+  }
+
+  .badge-gate {
+    @apply mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-wide;
+  }
+
+  .tab-btn {
+    @apply px-3 py-1.5 rounded-md text-xs font-medium transition-colors;
+  }
+
+  .tab-btn-active {
+    @apply px-3 py-1.5 rounded-md text-xs font-medium transition-colors bg-brand-soft text-brand-text shadow-xs;
+  }
+
+  .tab-btn-inactive {
+    @apply px-3 py-1.5 rounded-md text-xs font-medium transition-colors text-text-muted hover:text-text;
+  }
+
+  .section-kicker {
+    @apply text-xs font-bold uppercase tracking-wide text-gold;
+  }
+
+  .stream-cursor {
+    @apply text-brand motion-safe:animate-pulse;
+  }
+}
