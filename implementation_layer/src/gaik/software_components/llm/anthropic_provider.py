@@ -33,8 +33,17 @@ _EFFORT_BY_MODEL: dict[str, tuple[str, ...]] = {
 }
 
 
+def _is_family(model: str, prefixes: tuple[str, ...]) -> bool:
+    """Match a model id to a family with a version boundary.
+
+    ``claude-opus-5`` covers ``claude-opus-5`` and ``claude-opus-5-5`` but not
+    ``claude-opus-50``.
+    """
+    return any(model == p or model.startswith(p + "-") for p in prefixes)
+
+
 def _accepts_effort(model: str, effort: object) -> bool:
-    levels = next((v for k, v in _EFFORT_BY_MODEL.items() if model.startswith(k)), ())
+    levels = next((v for k, v in _EFFORT_BY_MODEL.items() if _is_family(model, (k,))), ())
     return effort in levels
 
 
@@ -138,7 +147,7 @@ class AnthropicProvider:
         model = str(options.get("model", self.model))
         if _accepts_effort(model, effort):
             options["output_config"] = {**options.get("output_config", {}), "effort": effort}
-        if model.startswith(_NO_SAMPLING_MODELS):
+        if _is_family(model, _NO_SAMPLING_MODELS):
             for key in _SAMPLING_KEYS:
                 options.pop(key, None)
         token_keys = [
@@ -200,7 +209,7 @@ class AnthropicProvider:
         system, rest = self._split_system(messages)
         model = kwargs.pop("model", self.model)
         tool_choice: dict[str, Any] = {"type": "tool", "name": tool_name}
-        if str(model).startswith(_NO_FORCED_TOOL_MODELS):
+        if _is_family(str(model), _NO_FORCED_TOOL_MODELS):
             # These models reject a forced tool, so offer it and ask for it; a
             # reply without the call still raises below.
             tool_choice = {"type": "auto"}

@@ -155,3 +155,13 @@ def test_models_without_forced_tools_are_asked_instead():
     assert result.total == 1
     assert bodies[0]["tool_choice"] == {"type": "auto"}
     assert bodies[0]["system"].endswith("Answer only by calling the Receipt tool.")
+
+
+def test_model_families_match_on_a_version_boundary():
+    from gaik.software_components.llm.anthropic_provider import _is_family
+
+    assert _is_family("claude-opus-5", ("claude-opus-5",))
+    assert _is_family("claude-opus-5-5", ("claude-opus-5",))
+    assert _is_family("claude-opus-4-5-20251101", ("claude-opus-4-5",))
+    assert not _is_family("claude-opus-50", ("claude-opus-5",))
+    assert not _is_family("claude-opus-4-70", ("claude-opus-4-7",))
