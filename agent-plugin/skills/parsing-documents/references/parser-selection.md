@@ -65,7 +65,7 @@ and hosting flag reads a different variable:
 |---|---|---|
 | `openai` | `use_azure=True` (default) | `AZURE_API_KEY`, `AZURE_ENDPOINT` |
 | `openai` | `use_azure=False` | `OPENAI_API_KEY` |
-| `claude` | `use_azure=True` (default) | `AZURE_API_KEY`, `ANTHROPIC_FOUNDRY_RESOURCE` |
+| `claude` | `use_azure=True` (default) | `ANTHROPIC_FOUNDRY_API_KEY` (or `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE` |
 | `claude` | `use_azure=False` | `ANTHROPIC_API_KEY` |
 | `google` | `vertex_ai=True` (default) | `GOOGLE_PROJECT_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_SCOPES`, `GOOGLE_GENERATE_CONTENT_URL` |
 | `google` | `vertex_ai=False` | `GOOGLE_API_KEY` |

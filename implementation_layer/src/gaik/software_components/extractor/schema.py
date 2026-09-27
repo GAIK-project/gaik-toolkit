@@ -167,11 +167,21 @@ def _parse_with(
             with ``temperature=None``.
     """
     if isinstance(client, ProviderClient):
-        # Temperature is shared by the text adapters. Reasoning effort is an
-        # OpenAI option; native Anthropic and Google have different controls.
+        # Temperature is shared by the text adapters. Reasoning effort reaches
+        # the OpenAI-shaped ones and Anthropic, whose adapter maps it to
+        # `output_config.effort` where the model takes it; Google has its own.
         provider_effort = (
             reasoning_effort
-            if client.provider in {"openai", "azure", "openai_compatible", "aitta", "litellm"}
+            if client.provider
+            in {
+                "openai",
+                "azure",
+                "openai_compatible",
+                "aitta",
+                "litellm",
+                "anthropic",
+                "anthropic_foundry",
+            }
             else None
         )
         sampling = _sampling_kwargs(temperature, provider_effort)

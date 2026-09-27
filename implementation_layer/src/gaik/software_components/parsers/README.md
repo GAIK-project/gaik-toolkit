@@ -89,6 +89,7 @@ For MultimodalParser (see [multimodal_parser/README.md](multimodal_parser/README
 |----------|------|-------------|
 | `AZURE_API_KEY` | OpenAI or Claude with `use_azure=True` | Azure / Foundry API key |
 | `AZURE_ENDPOINT` | OpenAI with `use_azure=True` | Azure OpenAI endpoint URL |
+| `ANTHROPIC_FOUNDRY_API_KEY` | Claude with `use_azure=True` | Foundry API key; `AZURE_API_KEY` is the fallback |
 | `ANTHROPIC_FOUNDRY_RESOURCE` | Claude with `use_azure=True` | Foundry resource name |
 | `ANTHROPIC_API_KEY` | Claude with `use_azure=False` | Direct Anthropic API key |
 | `GOOGLE_PROJECT_ID` | Google with `vertex_ai=True` | GCP project ID |

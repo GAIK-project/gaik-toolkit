@@ -114,7 +114,8 @@ The `.env` file can be saved in the same directory and loaded through `load_dote
 
 | Variable | When | Description |
 |----------|------|-------------|
-| `AZURE_API_KEY` | `use_azure=True` | Anthropic Foundry API key |
+| `ANTHROPIC_FOUNDRY_API_KEY` | `use_azure=True` | Anthropic Foundry API key (read first) |
+| `AZURE_API_KEY` | `use_azure=True` | Fallback when the Foundry key is unset |
 | `ANTHROPIC_FOUNDRY_RESOURCE` | `use_azure=True` | Foundry resource name |
 | `ANTHROPIC_API_KEY` | `use_azure=False` | Direct Anthropic API key |
 | `ANTHROPIC_MODEL` | Always | Default Claude model |

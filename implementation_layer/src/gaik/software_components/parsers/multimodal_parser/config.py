@@ -62,7 +62,10 @@ def get_claude_config(use_azure: bool = True) -> dict:
     if use_azure:
         return {
             "use_azure": True,
-            "api_key": require_env("AZURE_API_KEY"),
+            # The Foundry key first, as the shared `get_llm_config` reads it;
+            # AZURE_API_KEY only when the two resources share one key.
+            "api_key": os.getenv("ANTHROPIC_FOUNDRY_API_KEY", "").strip()
+            or require_env("AZURE_API_KEY"),
             "resource": require_env("ANTHROPIC_FOUNDRY_RESOURCE"),
             "model": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
         }

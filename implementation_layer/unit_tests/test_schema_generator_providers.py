@@ -98,8 +98,13 @@ def test_provider_adapter_receives_reasoning_options(provider):
     assert "timeout" not in client.calls[0]
 
 
-@pytest.mark.parametrize("provider", ["google", "anthropic", "anthropic_foundry"])
-def test_native_provider_receives_temperature_without_openai_reasoning_option(provider):
+@pytest.mark.parametrize(
+    ("provider", "effort"),
+    [("google", None), ("anthropic", "low"), ("anthropic_foundry", "low")],
+)
+def test_native_provider_receives_temperature_and_only_an_effort_it_maps(provider, effort):
+    # Anthropic's adapter turns the effort into output_config.effort (or drops
+    # it for a model without one); Google has no equivalent here.
     from gaik.software_components.extractor.schema import StructureAnalysis, _parse_with
 
     client = _ProviderClient()
@@ -114,7 +119,7 @@ def test_native_provider_receives_temperature_without_openai_reasoning_option(pr
     )
 
     assert client.calls[0]["temperature"] == 0.2
-    assert "reasoning_effort" not in client.calls[0]
+    assert client.calls[0].get("reasoning_effort") == effort
 
 
 def test_invalid_structured_output_is_retried_once():
