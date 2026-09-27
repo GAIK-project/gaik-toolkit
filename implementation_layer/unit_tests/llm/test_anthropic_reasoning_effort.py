@@ -57,3 +57,61 @@ def test_reasoning_effort_is_ignored(method):
 
     assert "reasoning_effort" not in bodies[0]
     assert bodies[0]["max_tokens"] == 50
+
+
+def _client_for(model, bodies):
+    def handle(request):
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, json=_response([{"type": "text", "text": "OK"}]))
+
+    return create_llm_client(
+        get_llm_config(
+            "anthropic",
+            api_key="test-key",
+            model=model,
+            max_retries=0,
+            http_client=httpx.Client(transport=httpx.MockTransport(handle)),
+        )
+    )
+
+
+@pytest.mark.parametrize("model", ["claude-sonnet-5", "claude-opus-5-5", "claude-opus-4-6"])
+def test_reasoning_effort_becomes_output_config_effort(model):
+    # MultimodalParser(api_config=...) and LLMJudge(config=...) pass the
+    # component's effort here; dropping it left Claude on its default.
+    bodies = []
+    _client_for(model, bodies).chat([{"role": "user", "content": "Hi"}], reasoning_effort="low")
+
+    assert "reasoning_effort" not in bodies[0]
+    assert bodies[0]["output_config"] == {"effort": "low"}
+
+
+@pytest.mark.parametrize(
+    ("model", "effort"),
+    [
+        ("claude-haiku-4-5", "low"),
+        ("claude-sonnet-4-5", "high"),
+        ("claude-sonnet-5", "none"),
+        # Levels a model lacks: xhigh arrived with Opus 4.7, max with 4.6.
+        ("claude-sonnet-4-6", "xhigh"),
+        ("claude-opus-4-5", "max"),
+    ],
+)
+def test_effort_is_dropped_where_claude_would_reject_it(model, effort):
+    bodies = []
+    _client_for(model, bodies).chat([{"role": "user", "content": "Hi"}], reasoning_effort=effort)
+
+    assert "reasoning_effort" not in bodies[0]
+    assert "output_config" not in bodies[0]
+
+
+def test_effort_merges_into_a_caller_output_config():
+    bodies = []
+    fmt = {"type": "json_schema", "schema": {"type": "object"}}
+    _client_for("claude-sonnet-5", bodies).chat(
+        [{"role": "user", "content": "Hi"}],
+        reasoning_effort="high",
+        output_config={"format": fmt},
+    )
+
+    assert bodies[0]["output_config"] == {"format": fmt, "effort": "high"}

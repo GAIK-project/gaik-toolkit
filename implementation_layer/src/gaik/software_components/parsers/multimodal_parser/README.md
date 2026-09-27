@@ -189,7 +189,8 @@ result = parser.parse("document.pdf")
 
 | Variable | When | Default | Description |
 |----------|------|---------|-------------|
-| `AZURE_API_KEY` | `use_azure=True` | — | Foundry API key |
+| `ANTHROPIC_FOUNDRY_API_KEY` | `use_azure=True` | — | Foundry API key (read first) |
+| `AZURE_API_KEY` | `use_azure=True` | — | Fallback when the Foundry key is unset |
 | `ANTHROPIC_FOUNDRY_RESOURCE` | `use_azure=True` | — | Foundry resource name |
 | `ANTHROPIC_API_KEY` | `use_azure=False` | — | Direct Anthropic API key |
 | `ANTHROPIC_MODEL` | Always | `claude-sonnet-4-6` | Model name (fallback when `model=None`) |

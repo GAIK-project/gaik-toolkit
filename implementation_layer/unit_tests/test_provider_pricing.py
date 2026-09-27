@@ -19,3 +19,25 @@ def test_native_provider_aliases_preserve_pricing():
 def test_custom_endpoint_does_not_inherit_model_vendors_price():
     assert lookup_price("aitta", "gpt-6-luna") == (0.0, 0.0)
     assert lookup_price("openai_compatible", "gpt-6-luna") == (0.0, 0.0)
+
+
+@pytest.mark.parametrize(
+    ("model", "rates"),
+    [
+        ("claude-sonnet-5", (2.00, 10.00)),
+        ("claude-opus-5-5", (4.00, 20.00)),
+        ("claude-opus-5", (5.00, 25.00)),
+        ("claude-opus-4-8", (5.00, 25.00)),
+        ("claude-opus-4-7", (5.00, 25.00)),
+        ("claude-fable-5-1", (10.00, 50.00)),
+        ("claude-haiku-4-5", (1.00, 5.00)),
+        ("claude-opus-4-1", (15.00, 75.00)),
+    ],
+)
+def test_claude_list_prices_in_parser_and_judge_tables(model, rates):
+    # The judge kept its own Claude copy, which drifted: Haiku 4.5 and Opus 4.7
+    # at older models' prices, Sonnet 5 and Opus 5.5 missing and so "free".
+    from gaik.software_components.validators.llm_judge.pricing import lookup_judge_price
+
+    assert lookup_price("anthropic_foundry", model) == rates
+    assert lookup_judge_price(model) == rates

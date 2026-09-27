@@ -85,6 +85,7 @@ For MultimodalParser (the variable depends on provider and hosting flag):
 |----------|------|
 | `AZURE_API_KEY` | `openai` or `claude` with `use_azure=True` (the default) |
 | `AZURE_ENDPOINT` | `openai` with `use_azure=True` |
+| `ANTHROPIC_FOUNDRY_API_KEY` | `claude` with `use_azure=True`; `AZURE_API_KEY` is the fallback |
 | `ANTHROPIC_FOUNDRY_RESOURCE` | `claude` with `use_azure=True` |
 | `ANTHROPIC_API_KEY` | `claude` with `use_azure=False` |
 | `GOOGLE_PROJECT_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON` | `google` with `vertex_ai=True` (the default) |

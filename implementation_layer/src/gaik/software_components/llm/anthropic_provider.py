@@ -17,6 +17,26 @@ from pydantic import BaseModel
 from gaik.software_components.llm.base import ChatMessage, ChatResponse
 from gaik.software_components.llm.content import image_data
 
+# The `output_config.effort` levels each model accepts (Foundry deployments use
+# the same ids). A model or level not listed here is not sent the option.
+_ALL_EFFORTS = ("low", "medium", "high", "xhigh", "max")
+_EFFORT_BY_MODEL: dict[str, tuple[str, ...]] = {
+    "claude-opus-4-5": ("low", "medium", "high"),
+    "claude-opus-4-6": ("low", "medium", "high", "max"),
+    "claude-sonnet-4-6": ("low", "medium", "high", "max"),
+    "claude-opus-4-7": _ALL_EFFORTS,
+    "claude-opus-4-8": _ALL_EFFORTS,
+    "claude-opus-5": _ALL_EFFORTS,
+    "claude-sonnet-5": _ALL_EFFORTS,
+    "claude-fable": _ALL_EFFORTS,
+    "claude-mythos": _ALL_EFFORTS,
+}
+
+
+def _accepts_effort(model: str, effort: object) -> bool:
+    levels = next((v for k, v in _EFFORT_BY_MODEL.items() if model.startswith(k)), ())
+    return effort in levels
+
 
 class AnthropicProvider:
     def __init__(self, config: dict):
@@ -92,9 +112,14 @@ class AnthropicProvider:
 
     def _options(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         options = dict(kwargs)
-        # OpenAI's reasoning option; components document it as ignored elsewhere,
-        # and the Messages API rejects the unknown keyword.
-        options.pop("reasoning_effort", None)
+        # The Messages API rejects `reasoning_effort`; its equivalent is
+        # `output_config.effort`. Map it for models that take effort and drop it
+        # for the rest (Haiku 4.5, Sonnet 4.5 and older error on it, a level a
+        # model lacks errors too, and "none" is OpenAI's). Dropping it everywhere
+        # made a component's thinking setting silently do nothing on Claude.
+        effort = options.pop("reasoning_effort", None)
+        if _accepts_effort(str(options.get("model", self.model)), effort):
+            options["output_config"] = {**options.get("output_config", {}), "effort": effort}
         token_keys = [
             key
             for key in ("max_tokens", "max_completion_tokens", "max_output_tokens")
