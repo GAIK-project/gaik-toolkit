@@ -19,7 +19,7 @@ test("defaults when env is unset", () => {
   expect(getReportWriterLimits()).toEqual({
     maxReports: 5,
     maxTokensPerReport: 32000,
-    maxUploadMb: 25,
+    maxUploadMb: 100,
     maxSections: 12,
     maxEvidenceChars: 200000,
     maxCuratorWorkers: 8,

@@ -127,7 +127,7 @@ The public route (`gaik-demo.2.rahtiapp.fi`) has these HAProxy annotations:
 | Annotation | Value | Purpose |
 |---|---|---|
 | `haproxy.router.openshift.io/timeout` | `15m` | Allow long-running RAG indexing |
-| `haproxy.router.openshift.io/proxy-body-size` | `50m` | Allow large PDF uploads (up to 20MB app limit) |
+| `haproxy.router.openshift.io/proxy-body-size` | `128m` | Upload envelope hint; actual limits are enforced by the application |
 | `haproxy.router.openshift.io/response-buffering` | `off` | Enable SSE streaming passthrough |
 | `haproxy.router.openshift.io/disable-cookies` | `true` | Not needed for this app |
 
@@ -163,3 +163,26 @@ cd implementation_layer/toolkit_demo_app/openshift
 | `services.yaml`            | ClusterIP services for both      |
 | `route.yaml`               | Public HTTPS route for frontend  |
 | `secrets.yaml.example`     | Example secrets template         |
+
+## Report Writer upload limits
+
+Both Report Writer versions allow **100 MiB total file content per run**, including
+the sample report. `REPORT_WRITER_MAX_UPLOAD_MB` is read at runtime by the
+**frontend** route handlers, not by the Python API. Update an existing deployment
+without applying its manifest:
+
+```bash
+oc set env deployment/gaik-demo REPORT_WRITER_MAX_UPLOAD_MB=100 -n gaik
+```
+
+The frontend image sets `experimental.proxyClientMaxBodySize` to **128 MiB** so
+multipart boundaries, filenames and configuration fit above the file budget.
+Changing that setting requires rebuilding the frontend image. The Route retains
+a matching body-size annotation as a hint; do not rely on it as enforcement.
+The Report Writer handler enforces the file budget; unrelated demos retain their
+own limits. The Route timeout remains 15 minutes.
+
+Verify authenticated uploads through the public Route at exactly 100 MiB and
+just over it: the former must parse successfully, the latter must return the
+application's HTTP 413. Also complete a real audio report and check streaming,
+downloads, frontend memory and pod restarts.

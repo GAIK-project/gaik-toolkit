@@ -23,7 +23,7 @@ export function getReportWriterLimits(): ReportWriterLimits {
   return {
     maxReports: intEnv("REPORT_WRITER_MAX_REPORTS", 5),
     maxTokensPerReport: intEnv("REPORT_WRITER_MAX_TOKENS_PER_REPORT", 32000),
-    maxUploadMb: intEnv("REPORT_WRITER_MAX_UPLOAD_MB", 25),
+    maxUploadMb: intEnv("REPORT_WRITER_MAX_UPLOAD_MB", 100),
     maxSections: intEnv("REPORT_WRITER_MAX_SECTIONS", 12),
     maxEvidenceChars: intEnv("REPORT_WRITER_MAX_EVIDENCE_CHARS", 200000),
     maxCuratorWorkers: intEnv("REPORT_WRITER_MAX_CURATOR_WORKERS", 8),

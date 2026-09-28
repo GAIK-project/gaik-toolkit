@@ -23,6 +23,8 @@ spec:
           env:
             # Runtime server-side variables only
             # NEXT_PUBLIC_* vars are baked in at build time from .env.production
+            - name: REPORT_WRITER_MAX_UPLOAD_MB
+              value: "100"
             - name: BACKEND_URL
               value: "http://gaik-demo-api:8000"
             - name: ADMIN_PASSWORD
@@ -57,9 +59,9 @@ spec:
                   key: UPSTASH_REDIS_REST_TOKEN
                   optional: true
           # proxy.ts buffers each upload body in memory before forwarding it
-          # (streaming truncates data in Bun/standalone), so a 50MB audio upload
-          # costs roughly 100MB here on top of the Next.js baseline. 512Mi left
-          # too little headroom for two of those at once.
+          # (streaming truncates data in Bun/standalone). Report Writer allows
+          # 100 MiB of files; parsing and forwarding can retain multiple copies.
+          # Keep headroom above the Next.js baseline and monitor peak usage.
           resources:
             requests:
               cpu: 100m
