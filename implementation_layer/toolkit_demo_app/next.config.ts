@@ -16,7 +16,8 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["shiki"],
   experimental: {
-    proxyClientMaxBodySize: "50mb",
+    // Include multipart metadata and config above the 100 MiB file budget.
+    proxyClientMaxBodySize: "128mb",
   },
   async rewrites() {
     return [
