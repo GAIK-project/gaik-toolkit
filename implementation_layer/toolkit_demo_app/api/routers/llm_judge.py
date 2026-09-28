@@ -109,7 +109,17 @@ def _flag_dict(flag) -> dict[str, Any]:
 
 
 def _usage_dict(usage) -> dict[str, Any] | None:
-    return asdict(usage) if usage is not None else None
+    data = asdict(usage) if usage is not None else None
+    if data is not None:
+        try:
+            try:
+                from utils.ops import record_llm
+            except ImportError:
+                from api.utils.ops import record_llm
+            record_llm(data)
+        except Exception:
+            pass  # Optional telemetry must never affect the demo response.
+    return data
 
 
 def _render_pdf_pages(pdf_bytes: bytes, dpi: int = 150, max_pages: int = 5) -> list[bytes]:

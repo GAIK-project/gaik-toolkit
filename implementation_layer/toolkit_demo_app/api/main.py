@@ -31,9 +31,11 @@ from gaik import __version__ as gaik_version  # noqa: E402
 try:
     from routers import model_settings
     from utils.model_settings import ModelSettingsMiddleware
+    from utils.ops import OpsMiddleware
 except ImportError:
     from api.routers import model_settings
     from api.utils.model_settings import ModelSettingsMiddleware
+    from api.utils.ops import OpsMiddleware
 
 try:
     # Docker: routers/ is in same directory as main.py
@@ -129,6 +131,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(ModelSettingsMiddleware)
+app.add_middleware(OpsMiddleware)
 
 
 @app.exception_handler(Exception)
