@@ -13,7 +13,7 @@ Two approaches for Generative AI solution implementation are supported by the to
 The key parts of the code-based implementation layer includes:
 
 - **Software components** – reusable utilities for extraction, parsing, transcription, transcript enhancement, classification, RAG, validation/evaluation, LLM provider access, text-to-speech, PostgreSQL querying, and one-call vision extraction
-- **Software modules** – end‑to‑end pipelines combining the software components such as "audio → structured data", "documents → structured data", "RAG workflow", and "multi‑source report generation"
+- **Software modules** – end‑to‑end pipelines combining the software components such as "audio → structured data", "documents → structured data", "RAG workflow", "multi‑source report generation" and "CURACT report writing"
 
 ## Architecture overview
 
@@ -22,8 +22,8 @@ GAIK distinguishes three levels:
 | Level                  | Concept in GAIK                         | Examples                                                      |
 |------------------------|-----------------------------------------|---------------------------------------------------------------|
 | **Knowledge Service**            | Logical capability                      | `speech_to_text`, `document_parsing`, `information_extraction` |
-| **Software component** | Atomic toolkit class / function         | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`, `VisionExtractor`, `DocumentClassifier`, `LLMJudge`, `TextToSpeech` |
-| **Software module**    | Composed, workflow‑ready unit           | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow`, `MultiSourceReportGenerator` |
+| **Software component** | Atomic toolkit class / function         | `Transcriber`, `SchemaGenerator`, `DataExtractor`, `VisionParser`, `PyMuPDFParser`, `DoclingParser`, `VisionExtractor`, `DocumentClassifier`, `LLMJudge`, `TextToSpeech`, `KnowledgeCurator`, `DraftReviewer` |
+| **Software module**    | Composed, workflow‑ready unit           | `AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow`, `MultiSourceReportGenerator`, `ReportWriter` |
 
 In code, that maps to:
 
@@ -84,11 +84,18 @@ pip install "gaik[rag-response-evaluator]"
 pip install "gaik[text-to-speech]"
 pip install "gaik[postgres-agent]"
 
+# Report writing stages (each one also installs on its own)
+pip install "gaik[source-normalizer]"
+pip install "gaik[knowledge-curator]"
+pip install "gaik[draft-reviewer]"
+pip install "gaik[report-synthesizer]"
+
 # Software modules (pipelines)
 pip install "gaik[audio-to-structured-data]"
 pip install "gaik[documents-to-structured-data]"
 pip install "gaik[rag-workflow]"
 pip install "gaik[multi-source-report-generator]"
+pip install "gaik[report-writer]"
 
 # Everything
 pip install "gaik[all]"
@@ -130,6 +137,7 @@ Software components:
 - `PyMuPDFParser` – fast, local PDF text extraction (no external binaries)
 - `DoclingParser` – OCR and multi‑format parsing (for more complex documents)
 - `VisionRagParser` – combines Docling with vision models for RAG‑optimized parsing (chunked outputs with image descriptions)
+- `SpreadsheetParser` – Excel and CSV files → Markdown tables with sheet names and row numbers
 
 ### 4. Transcriber and Transcript Enhancement – audio / video → transcripts
 
@@ -187,6 +195,17 @@ Software components:
 - `text_to_speech` – generates spoken audio from text
 - `postgres_agent` – turns natural-language questions into controlled PostgreSQL queries with schema introspection and safety constraints
 
+### 9. Report Writing – sources → curated knowledge → reviewed report
+
+**Goal:** write governed, source-grounded reports in stages whose results are plain files that a person can inspect and edit. Each component also works on its own.
+
+Software components:
+
+- `SourceNormalizer` – converts mixed files (PDF, DOCX, spreadsheets, text, recordings, images) into Markdown texts with their provenance and source class
+- `KnowledgeCurator` – extracts section-bound fact units with verified verbatim quotes, and lists missing items and conflicts between sources
+- `DraftReviewer` – fact-checks a generated text against reference material with exact search-and-replace edits and an edit log
+- `ReportSynthesizer` – writes and reviews a report section by section from curated knowledge, and saves it as Markdown and DOCX
+
 ---
 
 ## Software modules (end‑to‑end pipelines)
@@ -234,7 +253,21 @@ A retrieval‑augmented pipeline that:
 3. Retrieves top‑k relevant chunks for a query
 4. Produces a cited answer from retrieved context
 
-### Multi‑Source Report Generator
+### Report Writer (CURACT)
+
+`ReportWriter` writes a templated, source-grounded report from one report spec (`report_spec.json`) in three stages:
+
+1. `SourceNormalizer` converts the primary and secondary sources to Markdown in `normalized/`
+2. `KnowledgeCurator` curates fact units with verbatim quotes, one `knowledge/<section>.json` per section
+3. `ReportSynthesizer` writes each section from its knowledge only, has `DraftReviewer` check it, and saves `report/`
+
+Each stage reads the files of the stage before it, so knowledge files and section drafts can be edited and only the later stages rerun. `run(..., mode="single_call")` writes the report in one call as a baseline.
+
+```python
+from gaik.software_modules.report_writer import ReportSpec, ReportWriter
+```
+
+### Multi‑Source Report Generator (legacy)
 
 `MultiSourceReportGenerator` turns a set of mixed source files into one user‑defined, long‑form Markdown report:
 

@@ -1,0 +1,129 @@
+{
+  "title": "Condition assessment – 12 Example Road, Sampleton",
+  "description": "Condition assessment of a fictional 1½-storey timber-frame house built in 1978, written from three site recordings and five customer documents.",
+  "language": "English",
+  "sections": [
+    {
+      "id": "summary",
+      "title": "Summary",
+      "instructions": "Overall condition in 5–8 sentences and the most urgent actions.",
+      "required_items": [],
+      "depends_on": [
+        "background",
+        "structures",
+        "wet_rooms",
+        "building_services",
+        "electrical",
+        "recommendations"
+      ]
+    },
+    {
+      "id": "background",
+      "title": "Property and background",
+      "instructions": "Describe the property: type, building year, floor area and construction. List the main renovations in date order with the source for each, and name the documents the assessment relied on.",
+      "required_items": [
+        "building year",
+        "floor area",
+        "main renovations with their years"
+      ],
+      "depends_on": []
+    },
+    {
+      "id": "structures",
+      "title": "Structures and roof",
+      "instructions": "Describe the condition of the foundation, base floor, external walls, roof covering and attic from what was observed on site. Compare the observations with the roof renovation report, and state any signs of moisture or damage with their location.",
+      "required_items": [
+        "foundation and base floor",
+        "external walls",
+        "roof covering",
+        "attic and roof underlay"
+      ],
+      "depends_on": []
+    },
+    {
+      "id": "wet_rooms",
+      "title": "Wet rooms",
+      "instructions": "Describe each wet room's surfaces, waterproofing and any moisture findings. State the measured values with where they were taken, and compare them with the 2019 moisture survey.",
+      "required_items": [
+        "age of the waterproofing",
+        "moisture measurements made during the visit"
+      ],
+      "depends_on": []
+    },
+    {
+      "id": "building_services",
+      "title": "Building services (heating, ventilation, water and sewer)",
+      "instructions": "Describe the heating, ventilation, water and sewer systems: their type, age and observed condition. Compare each system's age with its design life where a source gives one, and state when the sewers were last inspected.",
+      "required_items": [
+        "heating system",
+        "ventilation system and its age",
+        "latest sewer camera inspection"
+      ],
+      "depends_on": []
+    },
+    {
+      "id": "electrical",
+      "title": "Electrical systems",
+      "instructions": "Describe the main distribution board, the wiring and any observed faults. State the year of the latest electrical work and inspection, with the source for each.",
+      "required_items": [
+        "main distribution board",
+        "latest electrical inspection record"
+      ],
+      "depends_on": []
+    },
+    {
+      "id": "recommendations",
+      "title": "Recommendations",
+      "instructions": "One line per action, classed as Repair now / Within 1–2 years / Within 3–5 years / Further investigation / Maintenance.",
+      "required_items": [],
+      "depends_on": [
+        "structures",
+        "wet_rooms",
+        "building_services",
+        "electrical"
+      ]
+    }
+  ],
+  "instructions": "Source hierarchy\n- Site recordings are primary sources. Customer documents are secondary sources.\n- Narrate observations directly (\"It was observed that ...\") and cite them as\n  [field observation, date].\n- Attribute document content (\"According to the 1998 renovation report ...\") and\n  cite the document.\n- When a clear observation contradicts a document, follow the observation and\n  mention what the document says.\n- When an uncertain observation contradicts a document, write \"Unresolved: ...\"\n  and give both views.\n- When two documents disagree on the same topic, follow the newer one.\n\nMissing data and scope\n- If a required item is not covered by any source, write (missing: item).\n- If an area was not inspected, state the limitation and the reason, e.g.\n  \"The roof surface was not inspected because of snow cover.\" Do not use the\n  missing marker for this.\n\nStyle\n- English, third person, past tense for observations.\n- Short paragraphs; bullet lists only in Recommendations.\n- Use the sample report for tone and format only. Never copy facts from it.",
+  "sources": {
+    "primary": [
+      "inputs/rec1_exterior_attic.mp3",
+      "inputs/rec2_interior_wet_rooms.mp3",
+      "inputs/rec3_building_services.mp3"
+    ],
+    "secondary": [
+      "inputs/renovation_report_1998.pdf",
+      "inputs/roof_renovation_2012.pdf",
+      "inputs/moisture_survey_2019.docx",
+      "inputs/maintenance_log.xlsx",
+      "inputs/floor_plan.png"
+    ]
+  },
+  "sample_report": "sample_report.docx",
+  "models": {
+    "vision": null,
+    "transcription": null,
+    "curator": null,
+    "writer": null,
+    "reviewer": null
+  },
+  "settings": {
+    "transcription_language": "auto",
+    "curator_workers": 4,
+    "review_attempts": 5,
+    "strict_review": false,
+    "docx": true,
+    "curator": {
+      "reasoning_effort": null,
+      "temperature": null
+    },
+    "writer": {
+      "reasoning_effort": null,
+      "temperature": null
+    },
+    "reviewer": {
+      "reasoning_effort": null,
+      "temperature": null
+    }
+  }
+}

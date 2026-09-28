@@ -21,6 +21,7 @@ import {
   ExternalLink,
   FileBarChart,
   FileOutput,
+  FilePen,
   FileSearch,
   FileText,
   FileUp,
@@ -29,6 +30,7 @@ import {
   GraduationCap,
   HardHat,
   Headset,
+  House,
   Lock,
   type LucideIcon,
   MessageSquareQuote,
@@ -288,6 +290,13 @@ const newUseCases: Demo[] = [
     icon: FileBarChart,
   },
   {
+    title: "Condition Assessment",
+    description:
+      "Turn on-site voice notes and the customer's documents into a source-grounded house condition assessment report, stage by stage",
+    href: "/report-writer-v2?example=house_condition_assessment",
+    icon: House,
+  },
+  {
     title: "Report Writer",
     description:
       "Generate structured reports from any mix of documents, audio, images, and spreadsheets — with agentic per-section review and reusable JSON configs",
@@ -298,6 +307,19 @@ const newUseCases: Demo[] = [
       { label: "Agentic review", icon: Sparkles },
       { label: "Section dependencies", icon: Database },
       { label: "Config import/export", icon: Download },
+    ],
+  },
+  {
+    title: "Report Writer v2",
+    description:
+      "Write a report in stages — normalize sources, curate facts per section, synthesize and review — and inspect or edit every intermediate file in between",
+    href: "/report-writer-v2",
+    icon: FilePen,
+    featureList: [
+      { label: "Staged pipeline", icon: Sparkles },
+      { label: "Editable workspace", icon: FilePen },
+      { label: "Section dependencies", icon: Database },
+      { label: "Workspace .zip export", icon: Download },
     ],
   },
 ];

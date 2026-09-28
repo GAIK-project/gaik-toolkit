@@ -11,6 +11,8 @@ export interface ReportWriterLimits {
   maxUploadMb: number;
   maxSections: number;
   maxEvidenceChars: number;
+  maxCuratorWorkers: number;
+  maxReviewAttempts: number;
 }
 
 /**
@@ -24,5 +26,7 @@ export function getReportWriterLimits(): ReportWriterLimits {
     maxUploadMb: intEnv("REPORT_WRITER_MAX_UPLOAD_MB", 25),
     maxSections: intEnv("REPORT_WRITER_MAX_SECTIONS", 12),
     maxEvidenceChars: intEnv("REPORT_WRITER_MAX_EVIDENCE_CHARS", 200000),
+    maxCuratorWorkers: intEnv("REPORT_WRITER_MAX_CURATOR_WORKERS", 8),
+    maxReviewAttempts: intEnv("REPORT_WRITER_MAX_REVIEW_ATTEMPTS", 5),
   };
 }

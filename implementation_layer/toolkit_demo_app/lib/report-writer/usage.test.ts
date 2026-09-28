@@ -18,3 +18,9 @@ test("result without usage counts as a run with 0 tokens", () => {
     'event: result\ndata: {"markdown":"# R","sections":[],"usage":{},"docx_b64":null}\n\n';
   expect(extractReportUsage(sse)).toEqual({ sawResult: true, totalTokens: 0 });
 });
+
+test("sums prompt and completion tokens when total_tokens is absent", () => {
+  const sse =
+    'event: result\ndata: {"stage":"curate","usage":{"prompt_tokens":900,"completion_tokens":100}}\n\n';
+  expect(extractReportUsage(sse)).toEqual({ sawResult: true, totalTokens: 1000 });
+});

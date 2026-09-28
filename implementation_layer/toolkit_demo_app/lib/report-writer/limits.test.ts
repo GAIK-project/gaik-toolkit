@@ -7,6 +7,8 @@ const KEYS = [
   "REPORT_WRITER_MAX_UPLOAD_MB",
   "REPORT_WRITER_MAX_SECTIONS",
   "REPORT_WRITER_MAX_EVIDENCE_CHARS",
+  "REPORT_WRITER_MAX_CURATOR_WORKERS",
+  "REPORT_WRITER_MAX_REVIEW_ATTEMPTS",
 ];
 
 afterEach(() => {
@@ -20,6 +22,8 @@ test("defaults when env is unset", () => {
     maxUploadMb: 25,
     maxSections: 12,
     maxEvidenceChars: 200000,
+    maxCuratorWorkers: 8,
+    maxReviewAttempts: 5,
   });
 });
 

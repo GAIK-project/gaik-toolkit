@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { ratelimit } from "@/lib/rate-limit";
-import { getReportWriterLimits } from "@/lib/report-writer/limits";
 import {
-  pickUsageFromEvents,
-  type ReportUsageInfo,
-} from "@/lib/report-writer/usage";
-import { parseSSEEvents } from "@/lib/sse";
-
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
-const BYPASS_AUTH = process.env.BYPASS_AUTH === "true";
+  forwardReportRun,
+  gateReportWriter,
+  recordReportUsage,
+} from "@/lib/report-writer/gate";
+import { getReportWriterLimits } from "@/lib/report-writer/limits";
 
 /**
  * Report Writer run endpoint. Carved out of the generic proxy so it can enforce
@@ -18,79 +13,11 @@ const BYPASS_AUTH = process.env.BYPASS_AUTH === "true";
  */
 export async function POST(request: NextRequest) {
   const limits = getReportWriterLimits();
-  let userId: string | null = null;
 
-  // 1) Auth + approval + quota
-  if (!BYPASS_AUTH) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: "Sign in to use the Report Writer." },
-        { status: 401 },
-      );
-    }
-    userId = user.id;
-
-    const { data: row } = await supabase
-      .from("access_requests")
-      .select("status, reports_count, report_limit_override")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!row || row.status !== "approved") {
-      return NextResponse.json(
-        { error: "Your access is pending approval." },
-        { status: 403 },
-      );
-    }
-
-    const used = (row.reports_count as number) ?? 0;
-    // Per-user override wins over the global default (e.g. demo/team accounts).
-    const cap =
-      (row.report_limit_override as number | null) ?? limits.maxReports;
-    if (used >= cap) {
-      return NextResponse.json(
-        {
-          error: `You've used all ${cap} of your reports. Ask an admin to reset your counter.`,
-          used,
-          limit: cap,
-        },
-        { status: 403 },
-      );
-    }
-  }
-
-  // 2) Per-IP burst limit (parity with the proxy; this route is not proxied)
-  if (ratelimit && !BYPASS_AUTH) {
-    try {
-      const ip =
-        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-        request.headers.get("x-real-ip") ??
-        "anonymous";
-      const { success, limit, remaining, reset } = await ratelimit.limit(ip);
-      if (!success) {
-        return NextResponse.json(
-          { error: "Liian monta pyyntöä. Yritä hetken päästä uudelleen." },
-          {
-            status: 429,
-            headers: {
-              "X-RateLimit-Limit": limit.toString(),
-              "X-RateLimit-Remaining": remaining.toString(),
-              "X-RateLimit-Reset": reset.toString(),
-            },
-          },
-        );
-      }
-    } catch (e) {
-      console.warn(
-        "[report-writer] rate limit skipped:",
-        e instanceof Error ? e.message : e,
-      );
-    }
-  }
+  // 1) Auth + approval + quota, 2) per-IP burst limit
+  const gate = await gateReportWriter(request, limits.maxReports);
+  if (gate instanceof Response) return gate;
+  const { userId } = gate;
 
   // 3) Parse + validate the multipart body
   let form: FormData;
@@ -152,80 +79,14 @@ export async function POST(request: NextRequest) {
   if (sample instanceof File) fwd.append("sample_report", sample, sample.name);
   fwd.append("config", JSON.stringify(config));
 
-  // 5) Forward to the backend
-  let backendRes: Response;
-  try {
-    backendRes = await fetch(`${BACKEND_URL}/report-writer/run`, {
-      method: "POST",
-      body: fwd,
-    });
-  } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Backend error" },
-      { status: 502 },
-    );
-  }
-
-  if (!backendRes.ok || !backendRes.body) {
-    const text = await backendRes.text().catch(() => "");
-    return NextResponse.json(
-      { error: text || "Generation failed" },
-      { status: backendRes.status || 502 },
-    );
-  }
-
-  // 6) Tee the SSE stream: pass through to the client AND, on a successful
-  //    result event, record the run (count + tokens). Failed runs aren't charged.
-  const decoder = new TextDecoder();
-  let buf = "";
-  let usage: ReportUsageInfo = { sawResult: false, totalTokens: 0 };
-
-  const recordUsage = async () => {
-    if (BYPASS_AUTH || !userId || !usage.sawResult) return;
+  // 5) Forward to the backend, 6) record the run (count + tokens) when a result
+  //    event arrived. Failed runs aren't charged.
+  return forwardReportRun("/report-writer/run", fwd, async (usage) => {
+    if (!userId || !usage.sawResult) return;
     try {
-      const svc = createServiceClient();
-      const { data: cur } = await svc
-        .from("access_requests")
-        .select("reports_count, report_tokens_used")
-        .eq("user_id", userId)
-        .single();
-      await svc
-        .from("access_requests")
-        .update({
-          reports_count: ((cur?.reports_count as number) ?? 0) + 1,
-          report_tokens_used:
-            ((cur?.report_tokens_used as number) ?? 0) + usage.totalTokens,
-          last_report_at: new Date().toISOString(),
-        })
-        .eq("user_id", userId);
+      await recordReportUsage(userId, 1, usage.totalTokens);
     } catch (e) {
       console.error("[report-writer] failed to record usage:", e);
     }
-  };
-
-  const tee = new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      controller.enqueue(chunk);
-      buf += decoder.decode(chunk, { stream: true });
-      const { events, remaining } = parseSSEEvents(buf);
-      buf = remaining;
-      usage = pickUsageFromEvents(events, usage);
-    },
-    async flush() {
-      if (buf.trim()) {
-        const { events } = parseSSEEvents(`${buf}\n\n`);
-        usage = pickUsageFromEvents(events, usage);
-      }
-      await recordUsage();
-    },
-  });
-
-  return new Response(backendRes.body.pipeThrough(tee), {
-    status: 200,
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      "X-Accel-Buffering": "no",
-    },
   });
 }

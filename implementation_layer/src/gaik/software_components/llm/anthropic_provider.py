@@ -14,7 +14,7 @@ from typing import Any
 import anthropic
 from pydantic import BaseModel
 
-from gaik.software_components.llm.base import ChatMessage, ChatResponse
+from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.content import image_data
 
 # The `output_config.effort` levels each model accepts (Foundry deployments use
@@ -64,6 +64,15 @@ _SAMPLING_KEYS = ("temperature", "top_p", "top_k")
 _NO_FORCED_TOOL_MODELS = ("claude-opus-5-5", "claude-fable-5-1", "claude-mythos-5-1")
 
 
+def _usage(response) -> dict[str, int]:
+    if not getattr(response, "usage", None):
+        return {}
+    return {
+        "prompt_tokens": getattr(response.usage, "input_tokens", 0),
+        "completion_tokens": getattr(response.usage, "output_tokens", 0),
+    }
+
+
 class AnthropicProvider:
     def __init__(self, config: dict):
         self.provider = config.get("provider", "anthropic")
@@ -71,6 +80,7 @@ class AnthropicProvider:
         self.max_tokens = config.get("max_tokens", 4096)
         self._config = config
         self.raw = self._build_client(config)
+        self.usage = UsageCounter()
 
     @staticmethod
     def _build_client(config: dict):
@@ -174,14 +184,8 @@ class AnthropicProvider:
         params.update(kwargs)
         response = self.raw.messages.create(**params)
         text_blocks = [b.text for b in response.content if getattr(b, "type", None) == "text"]
-        usage = (
-            {
-                "prompt_tokens": getattr(response.usage, "input_tokens", 0),
-                "completion_tokens": getattr(response.usage, "output_tokens", 0),
-            }
-            if getattr(response, "usage", None)
-            else {}
-        )
+        usage = _usage(response)
+        self.usage.add(usage)
         return ChatResponse(
             text="".join(text_blocks),
             model=response.model,
@@ -226,6 +230,7 @@ class AnthropicProvider:
             params["system"] = system
         params.update(kwargs)
         response = self.raw.messages.create(**params)
+        self.usage.add(_usage(response))
         for block in response.content:
             if getattr(block, "type", None) == "tool_use" and block.name == tool_name:
                 return response_format.model_validate(block.input)

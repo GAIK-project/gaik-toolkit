@@ -8,9 +8,17 @@ from typing import Any
 from pydantic import BaseModel
 
 from gaik.software_components.config import create_openai_client
-from gaik.software_components.llm.base import ChatMessage, ChatResponse
+from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.providers import Provider, resolve_provider
+
+
+def _usage(completion) -> dict[str, int]:
+    # Top-level counts only, as ChatResponse.usage declares; the dump also holds
+    # nested *_tokens_details dicts or None.
+    if not completion.usage:
+        return {}
+    return {k: v for k, v in completion.usage.model_dump().items() if isinstance(v, int)}
 
 
 class OpenAIProvider:
@@ -26,6 +34,7 @@ class OpenAIProvider:
         self.embedding_model = config.get("embedding_model", default_embedding)
         self._config = {**config, "provider": self.provider}
         self.raw = self._build_client(self._config)
+        self.usage = UsageCounter()
 
     @staticmethod
     def _build_client(config: dict):
@@ -40,7 +49,8 @@ class OpenAIProvider:
             **kwargs,
         )
         choice = completion.choices[0].message
-        usage = completion.usage.model_dump() if completion.usage else {}
+        usage = _usage(completion)
+        self.usage.add(usage)
         return ChatResponse(
             text=choice.content or "",
             model=completion.model,
@@ -63,6 +73,7 @@ class OpenAIProvider:
             response_format=response_format,
             **kwargs,
         )
+        self.usage.add(_usage(completion))
         parsed = completion.choices[0].message.parsed
         if parsed is None:
             raise ValueError("OpenAI parse() returned None — check the model/schema.")

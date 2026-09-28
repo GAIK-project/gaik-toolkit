@@ -52,6 +52,28 @@ def test_api_image_preinstalls_cpu_torch_before_gaik():
     )
 
 
+def test_api_image_copies_report_writer_v2_examples_at_repo_paths():
+    dockerfile = API_DOCKERFILE.read_text(encoding="utf-8")
+    copies = " ".join(dockerfile.replace("\\", " ").split())
+    examples = "implementation_layer/examples/software_modules"
+    house = f"{examples}/report_writer/house_condition_assessment"
+    legacy = f"{examples}/multi_source_report_generator"
+
+    # routers/report_writer_v2.py walks up from /app/routers to /app/<examples>.
+    for line in (
+        f"COPY {examples}/report_writer/project_meeting/report_spec.json "
+        f"./{examples}/report_writer/project_meeting/",
+        f"COPY {house}/report_spec.json {house}/sample_report.docx ./{house}/",
+        f"COPY {house}/inputs ./{house}/inputs",
+        f"COPY {legacy}/sample_inputs ./{legacy}/sample_inputs",
+        # The legacy router now finds this folder first, so it needs its config too.
+        f"COPY {legacy}/sample_report.md {legacy}/report_config.json ./{legacy}/",
+    ):
+        assert line in copies, line
+    assert "generate_dataset.py" not in dockerfile
+    assert "recording_scripts" not in dockerfile
+
+
 def test_api_deploy_uses_repo_root_build_context():
     deploy_script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
 
@@ -64,5 +86,6 @@ def test_api_deploy_uses_repo_root_build_context():
 if __name__ == "__main__":
     test_api_image_installs_published_gaik_with_report_writer_extras()
     test_api_image_preinstalls_cpu_torch_before_gaik()
+    test_api_image_copies_report_writer_v2_examples_at_repo_paths()
     test_api_deploy_uses_repo_root_build_context()
     print("Report Writer image build regression tests passed.")

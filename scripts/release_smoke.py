@@ -19,6 +19,7 @@ import tempfile
 import time
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 REQUIRED_CHECKS = (
     "chat",
@@ -27,6 +28,7 @@ REQUIRED_CHECKS = (
     "data_extractor",
     "answer_generator",
     "document_classifier",
+    "report_writing",
 )
 
 LITELLM_PREFIXES = {
@@ -281,6 +283,62 @@ def run_smoke(args) -> dict:
 
         check("document_classifier", document_classifier)
 
+        def report_writing():
+            import gaik.software_components.draft_reviewer.draft_reviewer as reviewer_module
+            import gaik.software_components.report_synthesizer.report_synthesizer as writer_module
+            from gaik.software_components.draft_reviewer import DraftReviewer
+            from gaik.software_components.knowledge_curator import KnowledgeCurator, SectionSpec
+            from gaik.software_components.report_synthesizer import ReportSynthesizer
+            from gaik.software_components.source_normalizer import NormalizedSources
+
+            sources = NormalizedSources.from_texts(
+                {
+                    "site_notes.txt": "Site visit on 14 March 2026. The heat pump in the "
+                    "utility room was installed in 2019 and ran quietly."
+                },
+                source_class="primary",
+            )
+            sections = [
+                SectionSpec(
+                    id="heating",
+                    title="Heating",
+                    instructions="Describe the heating system.",
+                    required_items=["heating system", "latest chimney inspection"],
+                )
+            ]
+            knowledge = bounded(KnowledgeCurator(config)).curate(sources, sections)
+            heating = knowledge.get("heating")
+            if not heating.units or any(u.source.file != "site_notes.txt" for u in heating.units):
+                raise AssertionError("KnowledgeCurator did not cite the synthetic source")
+            if not any("chimney" in item.lower() for item in heating.missing):
+                raise AssertionError("KnowledgeCurator did not list the missing item")
+
+            review = bounded(DraftReviewer(config)).review(
+                "The heat pump was installed in 2015.",
+                reference="The heat pump was installed in 2019.",
+            )
+            if "2019" not in review.text or "2015" in review.text:
+                raise AssertionError("DraftReviewer did not correct the planted year")
+
+            # ReportSynthesizer creates its writer and reviewer clients per call.
+            def budgeted_client(component_config):
+                original = create_llm_client(component_config)
+                created_clients.append(original)
+                return BoundedClient(original, budget=client.budget)
+
+            with (
+                mock.patch.object(writer_module, "create_llm_client", budgeted_client),
+                mock.patch.object(reviewer_module, "create_llm_client", budgeted_client),
+            ):
+                report = ReportSynthesizer(config).synthesize(
+                    knowledge, sections, title="Synthetic heating check"
+                )
+            text = report.sections[0].text
+            if "2019" not in text or "(missing:" not in text:
+                raise AssertionError("ReportSynthesizer lost the fact or the missing marker")
+
+        check("report_writing", report_writing)
+
         if args.embedding_model:
 
             def embedder():
@@ -321,7 +379,7 @@ def main() -> int:
     parser.add_argument("--model", required=True)
     parser.add_argument("--embedding-model")
     parser.add_argument("--timeout", type=float, default=180)
-    parser.add_argument("--max-calls", type=int, default=10)
+    parser.add_argument("--max-calls", type=int, default=24)
     parser.add_argument("--output-tokens", type=int, default=2048)
     parser.add_argument("--result", type=Path, required=True)
     args = parser.parse_args()

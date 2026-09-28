@@ -73,6 +73,21 @@ def test_compatible_chat_and_structured_output_use_configured_endpoint(provider)
         assert request.extensions["timeout"]["read"] == 73
 
 
+def test_chat_usage_keeps_only_top_level_token_counts():
+    body = completion("Hello")
+    body["usage"] |= {
+        "completion_tokens_details": {"reasoning_tokens": 0},
+        "prompt_tokens_details": None,
+    }
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json=body))
+
+    with httpx.Client(transport=transport) as http:
+        config = get_llm_config("openai", api_key="k", model="served-model", http_client=http)
+        response = create_llm_client(config).chat([{"role": "user", "content": "Hello"}])
+
+    assert response.usage == {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3}
+
+
 def test_aitta_stream_uses_chat_endpoint_and_skips_usage_chunks():
     def handle(request):
         assert json.loads(request.content)["stream"] is True

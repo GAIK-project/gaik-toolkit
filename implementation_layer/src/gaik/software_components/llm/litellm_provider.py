@@ -8,7 +8,7 @@ from typing import Any
 import litellm
 from pydantic import BaseModel
 
-from gaik.software_components.llm.base import ChatMessage, ChatResponse
+from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 
@@ -28,6 +28,7 @@ class LiteLLMProvider:
         self.embedding_model = config.get("embedding_model", "")
         self._config = dict(config)
         self.raw = litellm
+        self.usage = UsageCounter()
 
     def _options(self, kwargs: dict[str, Any], *, chat: bool = True) -> dict[str, Any]:
         options = {}
@@ -54,12 +55,18 @@ class LiteLLMProvider:
         response = litellm.completion(
             model=options.pop("model", self.model), messages=messages, **options
         )
+        usage = (
+            {k: v for k, v in response.usage.model_dump().items() if isinstance(v, int)}
+            if response.usage
+            else {}
+        )
+        self.usage.add(usage)
         return ChatResponse(
             text=response.choices[0].message.content or "",
             model=response.model,
             provider=self.provider,
             raw=response,
-            usage=response.usage.model_dump() if response.usage else {},
+            usage=usage,
         )
 
     def chat_parsed(
