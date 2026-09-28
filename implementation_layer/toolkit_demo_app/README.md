@@ -170,3 +170,26 @@ API docs: <http://localhost:8000/docs> (Swagger UI)
 - **Package managers:** bun (frontend), uv (backend)
 - **Auth:** Supabase
 - **Deployment:** CSC Rahti 2 (OpenShift) — see `openshift/README.md`
+
+## Optional GAIK Ops reporting
+
+The demo API can report operational events to a GAIK Ops instance. Leave both
+`OPS_URL` and `OPS_INGEST_KEY` unset to disable reporting completely. Neither the
+`gaik` library nor a copied customer project requires this service.
+
+When enabled, the demo reports successful POST/PUT/PATCH/DELETE operations and
+HTTP server failures with a request trace, route template, status and duration.
+The LLM Judge endpoints also report the model/provider and numeric usage records
+returned by the judge. Other demos currently provide operation traces, not model
+or token accounting. A matched route template is used instead of a request URL;
+request bodies, documents, headers, user identifiers, exception messages and model
+responses are not collected.
+
+Delivery is best effort in daemon threads with a three-second HTTP timeout, no
+retries, at most four concurrent sends and 60 attempts per minute per API process.
+Excess events are dropped; process shutdown can also lose pending events. A slow,
+misconfigured or unavailable monitor never changes the demo's response. These
+limits apply to event delivery; critical email alert limits belong to GAIK Ops.
+
+Tests: `api/tests/test_ops.py` covers missing settings, delivery failure, limits,
+content filtering, exception handling and unchanged streaming responses.
