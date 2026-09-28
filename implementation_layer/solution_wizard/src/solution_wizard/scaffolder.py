@@ -146,7 +146,16 @@ def _needed_stages(blueprint: Blueprint, pattern: str) -> set[str]:
         stages.add("parser")
     if "Embedder" in names:
         stages.add("embedding")
-    if names & {"AnswerGenerator", "PostgresAgent", "TabularAgent", "MultiSourceReportGenerator"}:
+    if names & {
+        "AnswerGenerator",
+        "PostgresAgent",
+        "TabularAgent",
+        "MultiSourceReportGenerator",
+        "ReportWriter",
+        "KnowledgeCurator",
+        "ReportSynthesizer",
+        "DraftReviewer",
+    }:
         stages.add("answer")
     if "LLMJudge" in names:
         stages.add("judge")

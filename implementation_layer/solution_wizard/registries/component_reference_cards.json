@@ -1987,6 +1987,363 @@
     ],
     "note": "End-to-end report synthesis module: parses/transcribes/extracts every source file itself and writes the full report. Do NOT add parsers, Transcriber, or VisionExtractor as separate steps. Provide input_paths + sections (each with title, instructions, optional id and depends_on). Sections with depends_on are written after their dependencies in agentic mode, receiving finalized dependency content as context. Use save_report_config/load_report_config to persist and reuse use-case configurations. Install multi-source-report-generator-agentic for agentic mode; multi-source-report-generator-docx for DOCX export. Provider stages: constructor api_config is the writer fallback; run(parser_options={'api_config': parser_cfg}, image_options={'api_config': parser_cfg}, transcriber_options={'ctor': {'api_config': audio_cfg}}, writer_options={'api_config': writer_cfg}, review_options={'api_config': judge_cfg}) selects separate clients. Do not serialize credential-bearing configs with save_report_config; supply them only at runtime. Audio must use native OpenAI/Azure."
   },
+  "ReportWriter": {
+    "import": "from gaik.software_modules.report_writer import ReportWriter, ReportSpec, SectionSpec, RunSettings, ModelSettings",
+    "construct": "writer = ReportWriter(config=get_stage_config(config, 'answer'))",
+    "call": "settings = RunSettings(transcription_language=language, strict_review=False, docx=False)\n    models = ModelSettings(transcription=None, reviewer=None)\n    spec = ReportSpec(\n        title=report_title,\n        language=report_language,\n        sections=[SectionSpec(**s) for s in sections],\n        instructions=report_instructions,\n        sources={'primary': primary_paths, 'secondary': secondary_paths},\n        sample_report=sample_report_path,\n        models=models,\n        settings=settings,\n    )\n    report = writer.run(spec, output_dir / 'workspace', progress_callback=print)\n    report_markdown = report.markdown\n    review_log = report.review_log",
+    "call_from_spec_file": "spec = ReportSpec.load(spec_path)  # relative source paths resolve against the spec file's folder; spec.save(path) writes them back relative",
+    "call_resume": "report = writer.synthesize(spec, workspace, progress_callback=print)  # after editing workspace/knowledge/*.json; normalize and curate are not rerun",
+    "call_rebuild": "report = writer.rebuild(spec, workspace)  # after editing workspace/report/sections/*.md (keep the '## <title>' first line); no LLM call",
+    "call_single_call": "baseline = writer.run(spec, workspace, mode='single_call', progress_callback=print)  # normalize + one writer call, into workspace/single_call/",
+    "returns": "Report(.title, .sections [ReportSection(.id, .title, .text)], .review_log [ReviewEntry(.section_id, .applied, .unresolved)], .usage, .markdown); files under the workspace: normalized/ (NN_<stem>.md + sources.json), sample_report.md, knowledge/<section_id>.json, report/sections/NN_<id>.md, report/review_log.json, report/report.md, report/report.docx",
+    "install_extra": "report-writer",
+    "subsumes": [
+      "SourceNormalizer",
+      "KnowledgeCurator",
+      "ReportSynthesizer",
+      "DraftReviewer",
+      "PyMuPDFParser",
+      "DocxParser",
+      "Transcriber",
+      "VisionParser"
+    ],
+    "spec_fields": {
+      "title": "Report title, the '#' heading of report.md. Required.",
+      "description": "What the report is for; for people only, never sent to a model.",
+      "language": "Language the report is written in, e.g. 'English' or 'Finnish' (default 'English'). Not the transcription language.",
+      "sections": "Template in report order: SectionSpec(id, title, instructions, required_items, depends_on). id is letters, digits, '_' or '-'. Maps 1:1 from target_output_spec.fields.",
+      "required_items": "Per section: items it must cover; each one no source covers becomes '(missing: <item>)' in the report.",
+      "depends_on": "Per section: makes it DERIVED -- no knowledge file, written only from the reviewed texts of these sections (never from the sources). Cycles and unknown ids raise.",
+      "instructions": "Report-wide rules sent to curator, writer and reviewer: source hierarchy (which class outranks which), citation/attribution style, tone, missing-data policy.",
+      "sources": "{'primary': [...], 'secondary': [...]} -- at least one non-empty list; file names must be unique across both.",
+      "sample_report": "Optional report (any SourceNormalizer type) whose structure, length and tone the new report follows; never its facts. Never sent to the reviewer."
+    },
+    "options": [
+      {
+        "name": "mode",
+        "type": "enum",
+        "values": [
+          "curact",
+          "single_call"
+        ],
+        "default": "curact",
+        "effect": "run() mode. 'curact' normalizes, curates section-bound fact units with verified verbatim quotes, then writes and reviews each section. 'single_call' normalizes and then writes the whole report in one writer call from every source, into single_call/ -- no curation, no review; the answer must contain exactly one '## <section title>' per spec section in order or run() raises ValueError.",
+        "selection_relevant": true,
+        "infer_from": "default 'curact'. Use 'single_call' only as a comparison baseline, or when the user explicitly accepts lower traceability for a small source set that fits the writer model's context window."
+      },
+      {
+        "name": "config",
+        "type": "dict",
+        "default": null,
+        "effect": "Required constructor argument: explicit get_llm_config(provider, ...) dictionary for every stage (vision, transcription, curator, writer, reviewer). Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities -- but audio sources require OpenAI/Azure.",
+        "selection_relevant": true,
+        "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      }
+    ],
+    "spec_settings": [
+      {
+        "name": "strict_review",
+        "type": "bool",
+        "default": false,
+        "effect": "RunSettings field. When true, synthesize fails with RuntimeError when a reviewer edit cannot be applied, instead of logging it in report/review_log.json.",
+        "selection_relevant": true,
+        "infer_from": "accuracy_critical == yes OR the report must never be saved with unresolved reviewer corrections -> true; otherwise false and surface review_log to the human reviewer"
+      },
+      {
+        "name": "review_attempts",
+        "type": "int",
+        "default": 5,
+        "effect": "RunSettings field. Most reviewer requests per section, the first one included; retries only re-request edits that did not match exactly once.",
+        "selection_relevant": false,
+        "infer_from": "leave at 5; lower it only when reviewer cost dominates"
+      },
+      {
+        "name": "docx",
+        "type": "bool",
+        "default": true,
+        "effect": "RunSettings field. Also write report.docx next to report.md (and delete a stale one when false). Needs pypandoc (in the extra) AND the Pandoc system binary; without Pandoc, synthesize/rebuild/run raise.",
+        "selection_relevant": true,
+        "infer_from": "output_format == word OR user requests .docx -> true (confirm Pandoc is installed); otherwise false so the PoC does not depend on Pandoc"
+      },
+      {
+        "name": "transcription_language",
+        "type": "str",
+        "default": "auto",
+        "effect": "RunSettings field. Language of the recordings, e.g. 'en' or 'fi', or 'auto'. Distinct from the spec's report language.",
+        "selection_relevant": true,
+        "infer_from": "audio sources present -> technical_spec.language code; mixed or unknown -> 'auto'"
+      },
+      {
+        "name": "curator_workers",
+        "type": "int",
+        "default": 4,
+        "effect": "RunSettings field. Sections curated in parallel.",
+        "selection_relevant": false,
+        "infer_from": "lower it when the provider rate-limits; otherwise leave at 4"
+      },
+      {
+        "name": "transcription",
+        "type": "str | None",
+        "default": null,
+        "effect": "ModelSettings field: Transcriber model for recordings, e.g. 'gpt-4o-transcribe'. None uses the Transcriber default. Recordings use the constructor config, which must then be OpenAI/Azure.",
+        "selection_relevant": true,
+        "infer_from": "audio sources present -> blueprint.models transcription model"
+      },
+      {
+        "name": "reviewer",
+        "type": "str | None",
+        "default": null,
+        "effect": "ModelSettings field: model or deployment name for the reviewer step (DraftReviewer). None reuses the config's model. ModelSettings also takes vision, curator and writer names; RunSettings takes curator/writer/reviewer StepOptions(reasoning_effort, temperature). Names only -- all steps share the constructor config's provider and credentials.",
+        "selection_relevant": true,
+        "infer_from": "role separation or independent fact-checking wanted (human_review == yes, accuracy_critical) -> a different model on the same provider as the writer; otherwise None"
+      }
+    ],
+    "note": "End-to-end CURACT report module (report writer v2): SourceNormalizer -> KnowledgeCurator -> ReportSynthesizer (with DraftReviewer). Do NOT add parsers, Transcriber, VisionParser, SourceNormalizer, KnowledgeCurator, ReportSynthesizer or DraftReviewer as separate steps, and do not add LLMJudge. Behaviour knobs other than mode/config are ReportSpec fields, not constructor or run() kwargs: see spec_fields and spec_settings (same shape as options; RunSettings and ModelSettings fields). Build one ReportSpec from the blueprint: target_output_spec.fields -> sections (SectionSpec keys only: id, title, instructions, required_items, depends_on), report-wide rules -> instructions, input files grouped as primary/secondary -> sources. Each stage writes plain files to the workspace, so a human can edit knowledge/*.json and call writer.synthesize(spec, workspace), or edit report/sections/*.md and call writer.rebuild(spec, workspace). Prefer this over the legacy MultiSourceReportGenerator unless the SKILL.md Phase 5 report-writer rule says otherwise (scanned PDFs, unsupported file types, audio with a non-OpenAI/Azure text provider)."
+  },
+  "SourceNormalizer": {
+    "import": "from gaik.software_components.source_normalizer import SourceNormalizer, NormalizedSources",
+    "construct": "normalizer = SourceNormalizer(config=get_stage_config(config, 'parser'), transcription_model=None, language=language)",
+    "call": "sources = normalizer.normalize({'primary': primary_paths, 'secondary': secondary_paths}, progress_callback=print)\n    sources.save(output_dir / 'normalized')\n    source_text = '\\n\\n'.join(s.text for s in sources.sources)",
+    "call_single_file": "sample_markdown = normalizer.to_markdown(sample_report_path)",
+    "returns": "NormalizedSources(.sources [NormalizedSource(.id, .file, .source_class, .source_type, .tool, .text)], .usage); .get(file_name), .save(dir) -> <id>.md per source + sources.json, NormalizedSources.load(dir), NormalizedSources.from_texts({'notes.txt': text}, source_class='primary')",
+    "install_extra": "source-normalizer",
+    "subsumes": [
+      "PyMuPDFParser",
+      "DocxParser",
+      "Transcriber",
+      "VisionParser"
+    ],
+    "options": [
+      {
+        "name": "config",
+        "type": "dict | None",
+        "default": null,
+        "effect": "get_llm_config(...) dictionary, needed only for recordings (Transcriber) and images (VisionParser); documents are parsed locally. Recordings require an OpenAI/Azure config; images require a model accepting image content. Without a config, an audio or image source raises before any conversion.",
+        "selection_relevant": true,
+        "infer_from": "audio sources -> an OpenAI/Azure stage config; image sources only -> the parser stage config; documents only -> may be omitted"
+      },
+      {
+        "name": "transcription_model",
+        "type": "str | None",
+        "default": null,
+        "effect": "Transcriber model for recordings, e.g. 'gpt-4o-transcribe'. None uses the Transcriber default.",
+        "selection_relevant": true,
+        "infer_from": "audio sources present -> blueprint.models transcription model"
+      },
+      {
+        "name": "vision_model",
+        "type": "str | None",
+        "default": null,
+        "effect": "Model override for images; defaults to config['model'].",
+        "selection_relevant": false,
+        "infer_from": "image sources present and the default text model is not vision-capable -> an image-capable model"
+      },
+      {
+        "name": "language",
+        "type": "str",
+        "default": "auto",
+        "effect": "Transcription language for recordings, e.g. 'en' or 'fi', or 'auto'.",
+        "selection_relevant": true,
+        "infer_from": "audio sources present -> technical_spec.language code; mixed or unknown -> 'auto'"
+      }
+    ],
+    "note": "Stage 1 of CURACT report writing, usable on its own to turn a folder of mixed sources into Markdown with provenance. Sources are {source_class: [paths]} or a plain list (source_class=None). The file name is the citation key downstream, so names must be unique. PDFs must have a text layer; for scanned PDFs use a vision parser step instead. ReportWriter already runs this stage -- add it separately only in a custom pipeline."
+  },
+  "KnowledgeCurator": {
+    "import": "from gaik.software_components.knowledge_curator import KnowledgeCurator, SectionSpec, KnowledgeBase",
+    "construct": "curator = KnowledgeCurator(config=get_stage_config(config, 'extraction'), max_workers=4)",
+    "call": "section_specs = [SectionSpec(**s) for s in sections]\n    knowledge = curator.curate(sources, section_specs, instructions=report_instructions, progress_callback=print)\n    knowledge.save(output_dir / 'knowledge')",
+    "call_verify": "bad_units = knowledge.verify_quotes(sources)  # after hand-editing knowledge files reloaded with KnowledgeBase.load(dir); [] means every quote is verbatim in its source",
+    "returns": "KnowledgeBase(.sections [SectionKnowledge(.section_id, .units [FactUnit(.id, .topic, .time_qualifier, .summary, .quote, .source(.file, .locator), .source_class, .confidence)], .missing, .conflicts [Conflict(.topic, .description, .status, .unit_ids)])], .usage); .get(section_id), .save(dir) -> <section_id>.json per section, KnowledgeBase.load(dir), .verify_quotes(sources)",
+    "install_extra": "knowledge-curator",
+    "options": [
+      {
+        "name": "instructions",
+        "type": "str",
+        "default": "",
+        "effect": "curate() argument: report-level rules -- source hierarchy, scope and style. The curator uses the hierarchy to mark each conflict resolved or unresolved.",
+        "selection_relevant": true,
+        "infer_from": "requirements name a source hierarchy (e.g. site observations outrank older documents) or scope rules -> state them here"
+      },
+      {
+        "name": "model",
+        "type": "str | None",
+        "default": null,
+        "effect": "Model/deployment override for the curator; defaults to the config's model. Must support structured output.",
+        "selection_relevant": true,
+        "infer_from": "Select an available model with structured-output support; default OpenAI/Azure suggestion is gpt-6-luna."
+      },
+      {
+        "name": "max_workers",
+        "type": "int",
+        "default": 4,
+        "effect": "Number of sections curated in parallel.",
+        "selection_relevant": false,
+        "infer_from": "lower it when the provider rate-limits; otherwise leave at 4"
+      },
+      {
+        "name": "chat_options",
+        "type": "dict | None",
+        "default": null,
+        "effect": "Extra options for every curator call, such as reasoning_effort or temperature.",
+        "selection_relevant": false,
+        "infer_from": "blueprint.models reasoning_effort for the extraction stage, if set"
+      },
+      {
+        "name": "config",
+        "type": "dict",
+        "default": null,
+        "effect": "Required constructor argument: explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities.",
+        "selection_relevant": true,
+        "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      }
+    ],
+    "note": "Stage 2 of CURACT report writing. Reads NormalizedSources (SourceNormalizer output, NormalizedSources.load, or NormalizedSources.from_texts) and writes one editable JSON file per non-derived section: fact units with verbatim quotes, the required items no source covers (missing) and conflicts between sources. Sections with depends_on are skipped. ReportWriter already runs this stage -- add it separately only in a custom pipeline, e.g. when the curated knowledge itself is the deliverable."
+  },
+  "ReportSynthesizer": {
+    "import": "from gaik.software_components.report_synthesizer import ReportSynthesizer, Report",
+    "construct": "synthesizer = ReportSynthesizer(config=get_stage_config(config, 'answer'), reviewer_model=None, strict_review=False, review_attempts=5)",
+    "call": "report = synthesizer.synthesize(knowledge, section_specs, title=report_title, language=report_language, instructions=report_instructions, sample_report=sample_report_markdown, progress_callback=print)\n    report.save(output_dir / 'report', docx=False)\n    report_markdown = report.markdown",
+    "call_rebuild": "Report.load(output_dir / 'report').save(output_dir / 'report', docx=False)  # after hand-editing report/sections/*.md; no LLM call",
+    "returns": "Report(.title, .sections [ReportSection(.id, .title, .text)], .review_log [ReviewEntry(.section_id, .applied, .unresolved)], .usage, .markdown); .save(dir, docx=True) -> sections/NN_<id>.md, review_log.json, report.md, report.docx; Report.load(dir)",
+    "install_extra": "report-synthesizer",
+    "subsumes": [
+      "DraftReviewer"
+    ],
+    "options": [
+      {
+        "name": "strict_review",
+        "type": "bool",
+        "default": false,
+        "effect": "When true, a section with unresolved reviewer edits raises RuntimeError and stops the run; otherwise the edits are logged in review_log.",
+        "selection_relevant": true,
+        "infer_from": "accuracy_critical == yes OR the report must never be saved with unresolved reviewer corrections -> true"
+      },
+      {
+        "name": "reviewer_model",
+        "type": "str | None",
+        "default": null,
+        "effect": "Model/deployment for the DraftReviewer; defaults to the config's model. Same provider and credentials as the writer.",
+        "selection_relevant": true,
+        "infer_from": "role separation or independent fact-checking wanted -> a different model; otherwise None"
+      },
+      {
+        "name": "model",
+        "type": "str | None",
+        "default": null,
+        "effect": "Writer model/deployment override; defaults to the config's model.",
+        "selection_relevant": true,
+        "infer_from": "Select an available model with the required text capability; default OpenAI/Azure suggestion is gpt-6-luna."
+      },
+      {
+        "name": "review_attempts",
+        "type": "int",
+        "default": 5,
+        "effect": "The reviewer's max_attempts: most reviewer requests per section, the first one included.",
+        "selection_relevant": false,
+        "infer_from": "leave at 5; lower it only when reviewer cost dominates"
+      },
+      {
+        "name": "writer_options",
+        "type": "dict | None",
+        "default": null,
+        "effect": "Extra options for every writer call, such as reasoning_effort or temperature.",
+        "selection_relevant": false,
+        "infer_from": "blueprint.models reasoning_effort for the answer stage, if set"
+      },
+      {
+        "name": "reviewer_options",
+        "type": "dict | None",
+        "default": null,
+        "effect": "Extra options for every reviewer call, such as reasoning_effort or temperature.",
+        "selection_relevant": false,
+        "infer_from": "blueprint.models reasoning_effort for the judge stage, if set"
+      },
+      {
+        "name": "sample_report",
+        "type": "str | None",
+        "default": null,
+        "effect": "synthesize() argument: Markdown text of a sample report, a format reference for structure, length and tone only. Contributes no content and never goes to the reviewer. An empty string raises; pass None for none.",
+        "selection_relevant": true,
+        "infer_from": "user supplies an example or target report format -> convert it to Markdown (SourceNormalizer.to_markdown) and pass it"
+      },
+      {
+        "name": "language",
+        "type": "str",
+        "default": "English",
+        "effect": "synthesize() argument: the language the sections are written in.",
+        "selection_relevant": false,
+        "infer_from": "technical_spec.language"
+      },
+      {
+        "name": "instructions",
+        "type": "str",
+        "default": "",
+        "effect": "synthesize() argument: report-wide rules (source hierarchy, missing data, citation style) sent to every writer and to every review. Pass the same instructions as to KnowledgeCurator.curate().",
+        "selection_relevant": true,
+        "infer_from": "requirements mention a source hierarchy, citation/attribution style, or a report-wide tone rule"
+      },
+      {
+        "name": "config",
+        "type": "dict",
+        "default": null,
+        "effect": "Required constructor argument: explicit get_llm_config(provider, ...) dictionary for the writer and reviewer. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities.",
+        "selection_relevant": true,
+        "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      }
+    ],
+    "note": "Stage 3 of CURACT report writing: writes each technical section from its own knowledge only and each derived section (depends_on) from the reviewed texts of its prerequisites, reviewing every draft with DraftReviewer. knowledge must hold exactly the non-derived sections of section_specs (SectionSpec comes from gaik.software_components.knowledge_curator). Sections come back in section_specs order. ReportWriter already runs this stage -- add it separately only in a custom pipeline, e.g. from hand-written knowledge."
+  },
+  "DraftReviewer": {
+    "import": "from gaik.software_components.draft_reviewer import DraftReviewer",
+    "construct": "reviewer = DraftReviewer(config=get_stage_config(config, 'judge'), max_attempts=5)",
+    "call": "result = reviewer.review(draft_text, reference=source_text)\n    reviewed_text = result.text\n    unresolved_edits = result.unresolved",
+    "returns": "ReviewResult(.text, .applied [Edit(.search, .replace, .reason)], .unresolved [Edit])",
+    "install_extra": "draft-reviewer",
+    "options": [
+      {
+        "name": "instructions",
+        "type": "str",
+        "default": "",
+        "effect": "review() argument that REPLACES the default checks (every claim supported by the reference; contradicting numbers, dates, names and attributions corrected; unsupported claims removed; style and order left alone), e.g. 'Check only numbers and dates. Do not delete sentences.'",
+        "selection_relevant": true,
+        "infer_from": "the user wants a narrower or different check than full fact-checking -> set it; otherwise leave empty"
+      },
+      {
+        "name": "max_attempts",
+        "type": "int",
+        "default": 5,
+        "effect": "Most LLM requests per review, the first one included. Retries re-request only edits whose search text did not match exactly once; edits still failing end up in unresolved.",
+        "selection_relevant": false,
+        "infer_from": "leave at 5; lower it only when reviewer cost dominates"
+      },
+      {
+        "name": "model",
+        "type": "str | None",
+        "default": null,
+        "effect": "Model/deployment override; defaults to the config's model. Must support structured output.",
+        "selection_relevant": true,
+        "infer_from": "independent review wanted -> a different model from the one that wrote the draft"
+      },
+      {
+        "name": "chat_options",
+        "type": "dict | None",
+        "default": null,
+        "effect": "Extra options for every reviewer call, such as reasoning_effort or temperature.",
+        "selection_relevant": false,
+        "infer_from": "blueprint.models reasoning_effort for the judge stage, if set"
+      },
+      {
+        "name": "config",
+        "type": "dict",
+        "default": null,
+        "effect": "Required constructor argument: explicit get_llm_config(provider, ...) dictionary for this stage. Supports native OpenAI/Azure, Anthropic/Foundry, Google/Vertex, Aitta, generic OpenAI-compatible endpoints, and optional LiteLLM, subject to model capabilities.",
+        "selection_relevant": true,
+        "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      }
+    ],
+    "note": "Fact-checks any generated text (summaries, report sections, incident reports, meeting minutes) against reference material with exact search-and-replace edits and returns the corrected text plus an edit log. Unlike LLMJudge it repairs the text instead of scoring it. ReportSynthesizer and ReportWriter already use it internally -- do not add it as a separate step after them."
+  },
   "VisionPlusParser": {
     "import": "from gaik.software_components.parsers import VisionPlusParser",
     "construct": "parser = VisionPlusParser(vision_config=get_stage_config(config, 'parser'), enable_ocr=False, enable_table_structure=True, enable_formula_enrichment=False, ocr_engine='rapidocr')",
