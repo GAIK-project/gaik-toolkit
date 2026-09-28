@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import re
 import string
 from pathlib import Path
 from typing import Any
@@ -78,6 +79,25 @@ def _provider_name(value: str) -> str:
     return provider
 
 
+_MODEL_KEYS = ("model", "embedding_model", "transcription_model")
+
+
+def _model_id(value, where: str):
+    """Keep only the ID from a model field; older blueprints may append a note.
+
+    e.g. "text-embedding-3-large (env-overridable via RAG_EMBEDDING_DEPLOYMENT)".
+    """
+    if not isinstance(value, str):
+        return value
+    model = re.sub(r"\s*\(.*\)\s*$", "", value).strip()
+    if not model or re.search(r"\s", model):
+        raise ValueError(
+            f"{where} must be a model or deployment ID, got {value!r}. Put notes in "
+            "assumptions, not in the model field."
+        )
+    return model
+
+
 def _stage_settings(blueprint: Blueprint) -> dict[str, dict]:
     """Resolve nonsecret, deterministic settings without loading credentials."""
     models = blueprint.models or {}
@@ -122,6 +142,11 @@ def _stage_settings(blueprint: Blueprint) -> dict[str, dict]:
             )
         settings.update(override)
         settings["provider"] = selected
+        for model_key in _MODEL_KEYS:
+            if model_key in settings:
+                settings[model_key] = _model_id(
+                    settings[model_key], f"models ({stage}.{model_key})"
+                )
         stages[stage] = settings
     return stages
 
@@ -628,7 +653,9 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
     use_azure = str(provider == "azure")
 
     # Determine model names
-    transcription_model = models.get("transcription_model", "gpt-4o-transcribe")
+    transcription_model = _model_id(
+        models.get("transcription_model", "gpt-4o-transcribe"), "models.transcription_model"
+    )
     extraction_model = stages["extraction"].get("model")
     temperature = models.get("temperature", 0.0)
 
