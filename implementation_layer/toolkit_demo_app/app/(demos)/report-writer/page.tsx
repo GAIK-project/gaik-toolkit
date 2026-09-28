@@ -45,6 +45,13 @@ import {
 import { OptionsForm, type ReportOptions } from "./components/options-form";
 import { ProgressStream } from "./components/progress-stream";
 import { ConfigActions } from "./components/config-actions";
+import {
+  AUDIO_COMPRESS_COMMAND,
+  isMediaFile,
+  REPORT_UPLOAD_MAX_BYTES,
+  REPORT_UPLOAD_MAX_MB,
+  totalFileBytes,
+} from "@/lib/report-writer/upload-limit";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -463,6 +470,10 @@ export default function ReportWriterPage() {
       toast.error("Add at least one section");
       return;
     }
+    if (uploadTooLarge) {
+      toast.error(`Uploads exceed the ${REPORT_UPLOAD_MAX_MB} MB limit. See the note under Input Files.`);
+      return;
+    }
 
     abortRef.current?.abort();
     abortRef.current = new AbortController();
@@ -561,6 +572,9 @@ export default function ReportWriterPage() {
   }
 
   const hasInput = (files.length > 0 || additionalContext.trim().length > 0) && sections.some((s) => s.title.trim());
+  const uploadBytes = totalFileBytes(sampleReport ? [...files, sampleReport] : files);
+  const uploadTooLarge = uploadBytes > REPORT_UPLOAD_MAX_BYTES;
+  const mediaFiles = files.filter((f) => isMediaFile(f.name));
 
   return (
     <PageTransition>
@@ -704,6 +718,46 @@ export default function ReportWriterPage() {
                   </label>
                 )}
               </div>
+
+              {uploadTooLarge && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="space-y-2">
+                    <p>
+                      The upload is {formatFileSize(uploadBytes)}, over the{" "}
+                      {REPORT_UPLOAD_MAX_MB} MB limit for all input files and the
+                      sample report together.
+                    </p>
+                    {mediaFiles.length > 0 ? (
+                      <>
+                        <p>
+                          Compress{" "}
+                          {mediaFiles.map((f) => f.name).join(", ")} to
+                          speech-quality MP3. It stays accurate for transcription
+                          and takes about 14 MB per hour of audio, so roughly 7
+                          hours fit. With{" "}
+                          <a
+                            href="https://ffmpeg.org/download.html"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline"
+                          >
+                            ffmpeg
+                          </a>
+                          , replacing <code>input.mp4</code> with your file (audio or
+                          video):
+                        </p>
+                        <pre className="rounded bg-muted px-2 py-1.5 text-xs text-foreground whitespace-pre-wrap break-all">
+                          {AUDIO_COMPRESS_COMMAND}
+                        </pre>
+                        <p>Then remove the original file here and add the compressed one.</p>
+                      </>
+                    ) : (
+                      <p>Remove some files or split large documents, then try again.</p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 
@@ -720,7 +774,7 @@ export default function ReportWriterPage() {
               size="lg"
               className="flex-1"
               onClick={handleGenerate}
-              disabled={isLoading || !hasInput}
+              disabled={isLoading || !hasInput || uploadTooLarge}
             >
               {isLoading ? (
                 <>

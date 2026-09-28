@@ -6,6 +6,11 @@ import {
   pickUsageFromEvents,
   type ReportUsageInfo,
 } from "@/lib/report-writer/usage";
+import {
+  COMPRESS_HINT,
+  REPORT_REQUEST_MAX_BYTES,
+  REPORT_UPLOAD_MAX_MB,
+} from "@/lib/report-writer/upload-limit";
 import { parseSSEEvents } from "@/lib/sse";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
@@ -92,7 +97,18 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 3) Parse + validate the multipart body
+  // 3) Parse + validate the multipart body. A body over the proxy cap arrives
+  //    truncated and fails to parse, so reject it by its declared length first.
+  const declaredBytes = Number(request.headers.get("content-length") ?? 0);
+  if (declaredBytes > REPORT_REQUEST_MAX_BYTES) {
+    return NextResponse.json(
+      {
+        error: `Uploads exceed the ${REPORT_UPLOAD_MAX_MB} MB limit. ${COMPRESS_HINT}`,
+      },
+      { status: 413 },
+    );
+  }
+
   let form: FormData;
   try {
     form = await request.formData();
@@ -115,7 +131,7 @@ export async function POST(request: NextRequest) {
   if (sample instanceof File) totalBytes += sample.size;
   if (totalBytes > limits.maxUploadMb * 1024 * 1024) {
     return NextResponse.json(
-      { error: `Uploads exceed the ${limits.maxUploadMb} MB limit.` },
+      { error: `Uploads exceed the ${limits.maxUploadMb} MB limit. ${COMPRESS_HINT}` },
       { status: 413 },
     );
   }
