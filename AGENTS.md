@@ -2,6 +2,12 @@
 
 This repo is public: never commit machine-local paths, usernames or secret-store locations.
 
+## formatting
+
+CI fails on `ruff format --check implementation_layer/` (ruff 0.14.10). Run
+`uvx pre-commit install` once per clone so `.pre-commit-config.yaml` formats staged
+Python files at commit time; keep its `rev` in step with the version in `test.yml`.
+
 ## gaik-sync (keep the Solution Wizard in step with gaik)
 
 The Solution Wizard (`implementation_layer/solution_wizard/`) mirrors gaik's API in a
