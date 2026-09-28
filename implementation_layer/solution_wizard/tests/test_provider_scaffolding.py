@@ -218,6 +218,25 @@ def test_generated_config_omits_secrets_and_requires_explicit_embedding_model(tm
         scaffold_poc(bp, tmp_path)
 
 
+def test_model_fields_drop_notes_from_older_blueprints(tmp_path):
+    # Wizard V1 blueprints put notes in model fields; only the ID may reach config.yaml.
+    bp = _blueprint(
+        "rag_workflow_blueprint.json",
+        {
+            "provider": "azure_openai",
+            "answer_model": "gpt-5.4",
+            "embedding_model": "text-embedding-3-large (env-overridable via RAG_EMBEDDING_DEPLOYMENT)",
+        },
+    )
+    poc = scaffold_poc(bp, tmp_path)["poc_dir"]
+    stages = yaml.safe_load((poc / "config.yaml").read_text())["stages"]
+    assert stages["embedding"]["embedding_model"] == "text-embedding-3-large"
+    assert stages["answer"]["model"] == "gpt-5.4"
+    bp.models["embedding_model"] = "text embedding large"
+    with pytest.raises(ValueError, match="model or deployment ID"):
+        scaffold_poc(bp, tmp_path / "invalid")
+
+
 def test_custom_azure_audio_deployment_and_resource_reach_component(tmp_path, monkeypatch):
     from gaik.software_components.transcriber import Transcriber
 
