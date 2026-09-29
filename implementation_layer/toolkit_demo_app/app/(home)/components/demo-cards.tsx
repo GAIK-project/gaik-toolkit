@@ -290,7 +290,7 @@ const newUseCases: Demo[] = [
     icon: FileBarChart,
   },
   {
-    title: "Condition Assessment",
+    title: "Report Writer V2",
     description:
       "Turn on-site voice notes and the customer's documents into a source-grounded house condition assessment report, stage by stage",
     href: "/report-writer-v2?example=house_condition_assessment",

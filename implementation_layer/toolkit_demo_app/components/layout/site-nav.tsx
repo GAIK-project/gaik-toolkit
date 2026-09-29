@@ -109,7 +109,7 @@ const navGroups: NavGroup[] = [
         icon: FileBarChart,
       },
       {
-        label: "Condition Assessment",
+        label: "Report Writer V2",
         href: "/report-writer-v2?example=house_condition_assessment",
         icon: House,
       },
