@@ -20,6 +20,17 @@ Evaluation methods are organized by:
 - **Knowledge Process**: Evaluations specific to extraction, capture, or generation processes
 - **Metric Type**: Accuracy, latency, cost, user satisfaction, etc.
 
+## Available evaluation methods
+
+| Folder | Evaluates |
+|--------|-----------|
+| [`extraction_eval/`](extraction_eval/README.md) | Structured data extraction |
+| [`transcription_eval/`](transcription_eval/README.md) | Speech transcription (WER, CER) |
+| [`translation_eval/`](translation_eval/README.md) | Finnish-to-English translation: BLEU, chrF, TER, cosine and blind LLM-judge error points |
+| [`RAG_eval/`](RAG_eval/README.md) | Retrieval-augmented generation answers |
+| [`report_writing_eval/`](report_writing_eval/README.md) | Report writing |
+| [`video_search_eval/`](video_search_eval/README.md) | Video moment search |
+
 ## Usage
 
 Evaluation methods are used to:
