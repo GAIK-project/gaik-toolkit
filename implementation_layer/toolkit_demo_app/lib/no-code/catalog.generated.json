@@ -1,0 +1,249 @@
+{
+  "plugin": {
+    "name": "gaik-toolkit",
+    "version": "0.2.5",
+    "marketplace": "GAIK-project/gaik-toolkit",
+    "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin"
+  },
+  "skills": [
+    {
+      "id": "incident-report-writing",
+      "group": "no-code",
+      "title": "Incident report writing",
+      "tagline": "Turn a spoken incident or safety observation into a Word report.",
+      "description": "Extracts structured data from incident/safety observation audio recordings for manufacturing company reporting. Use when the user needs to process supervisor or employee audio recordings into standardized incident report data.",
+      "input": "Audio recording",
+      "output": "Word (.docx)",
+      "needs": [
+        "Claude Desktop",
+        "gaik-transcriber MCP server"
+      ],
+      "tryPrompt": "Use the incident-report-writing skill to turn my audio recording into an incident report. I will attach the file next.",
+      "files": [
+        "SKILL.md"
+      ],
+      "zip": "/downloads/skills/incident-report-writing.zip",
+      "zipBytes": 13855,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/incident-report-writing/incident-report-writing",
+      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/incident-report-writing"
+    },
+    {
+      "id": "construction-diary-creation",
+      "group": "no-code",
+      "title": "Construction diary creation",
+      "tagline": "Turn a site manager's spoken day into a Työmaapäiväkirja.",
+      "description": "Extracts structured data from Finnish construction site daily diary audio recordings (Työmaapäiväkirja) and creates a formatted Word document with extracted fields. Use when the user needs to process construction site manager's audio diary recordings into standardized documentation.",
+      "input": "Audio recording (Finnish or English)",
+      "output": "Word (.docx)",
+      "needs": [
+        "Claude Desktop",
+        "gaik-transcriber MCP server"
+      ],
+      "tryPrompt": "Use the construction-diary-creation skill to create today's Työmaapäiväkirja from my site recording. I will attach the audio next.",
+      "files": [
+        "SKILL.md"
+      ],
+      "zip": "/downloads/skills/construction-diary-creation.zip",
+      "zipBytes": 14899,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/construction-diary-creation/construction-diary-creation",
+      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/construction-diary-creation"
+    },
+    {
+      "id": "purchase-order-processing",
+      "group": "no-code",
+      "title": "Purchase order processing",
+      "tagline": "Match a purchase order and its BOMs against a price list and produce a priced sales order.",
+      "description": "Process Purchase Orders and Bills of Material to generate priced Sales Orders",
+      "input": "PO, BOM PDFs and a price list",
+      "output": "Word (.docx) and calculation breakdown",
+      "needs": [
+        "Claude Desktop",
+        "Filesystem MCP server"
+      ],
+      "tryPrompt": "Use the purchase-order-processing skill to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next.",
+      "files": [
+        "EVALUATION.md",
+        "README.md",
+        "SKILL.md",
+        "reference/CALCULATION_BREAKDOWN_TEMPLATE.md",
+        "reference/CALCULATION_LOGIC.md",
+        "reference/EXTRACTION_FIELDS.md",
+        "reference/OUTPUT_FORMAT.md",
+        "reference/PRICING_RULES.md"
+      ],
+      "zip": "/downloads/skills/purchase-order-processing.zip",
+      "zipBytes": 126786,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing",
+      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing"
+    },
+    {
+      "id": "report-writing",
+      "group": "no-code",
+      "title": "Report writing",
+      "tagline": "Consolidate recordings, notes and documents into one structured Word report.",
+      "description": "Converts scattered documents and media (recordings, notes, diagrams, PDFs, spreadsheets) into structured MS Word reports. Automatically infers appropriate sections from content or follows provided template/sample structure. Use when the user needs to create a report, summarize documents, consolidate materials, generate documentation, or create meeting notes.",
+      "input": "Recordings, notes, PDFs, spreadsheets",
+      "output": "Word (.docx)",
+      "needs": [
+        "Claude Desktop",
+        "Filesystem MCP server",
+        "gaik-transcriber MCP server"
+      ],
+      "tryPrompt": "Use the report-writing skill to write a report from the materials I am about to attach. Infer the sections from the content.",
+      "files": [
+        "EVALUATION.md",
+        "SKILL.md",
+        "reference/INPUT_FORMATS.md",
+        "reference/OUTPUT_SECTIONS.md"
+      ],
+      "zip": "/downloads/skills/report-writing.zip",
+      "zipBytes": 46607,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing",
+      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/report-writing-skill"
+    },
+    {
+      "id": "parsing-documents",
+      "group": "developer",
+      "title": "Parsing documents",
+      "tagline": "Pick a parser that keeps table structure, and catch pages that parsed to nothing.",
+      "description": "Converts PDFs, scans, and Word documents into text or markdown with the gaik toolkit's parsers, choosing the parser that will not silently destroy the structure the downstream task depends on. Use when reading a PDF or DOCX into text, pulling tables out of a document, running OCR on scans, feeding documents into a RAG pipeline or an LLM, deciding between PyMuPDF, Docling, and vision-LLM parsing, or when a parse appeared to succeed but the tables, columns, or whole pages came out wrong or empty. Also use when document parsing is costing more time or money than expected. Covers parser selection, per-page verification, and escalation from cheap local parsing to vision models.",
+      "input": "PDF, scan or Word file",
+      "output": "Text or markdown",
+      "needs": [
+        "An AI coding agent",
+        "gaik[parser]"
+      ],
+      "tryPrompt": "Use the parsing-documents skill to choose a parser for my PDFs and check that the tables came through intact.",
+      "files": [
+        "SKILL.md",
+        "references/parser-selection.md"
+      ],
+      "zip": "/downloads/skills/parsing-documents.zip",
+      "zipBytes": 16102,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/parsing-documents",
+      "guideUrl": null
+    },
+    {
+      "id": "extracting-structured-data",
+      "group": "developer",
+      "title": "Extracting structured data",
+      "tagline": "Design an extraction schema that stays inside provider limits and carries checkable evidence.",
+      "description": "Extracts structured data — fields, tables, line items — out of documents into a validated schema using the gaik toolkit, and designs schemas that stay inside provider limits and produce checkable evidence. Use when pulling fields from invoices, forms, contracts, reports, or scanned documents into JSON or a Pydantic model; when an extraction request fails with a 400, returns a truncated list, or silently drops its deepest fields; when deciding whether to parse a document first or feed the PDF straight to the model; when adding page numbers, quotes, or confidence scores as evidence; or when extraction accuracy needs to be measured rather than guessed. Covers schema design, property limits, prompt-versus-schema tuning, and citation verification.",
+      "input": "Invoices, forms, contracts, reports",
+      "output": "Validated JSON or Pydantic model",
+      "needs": [
+        "An AI coding agent",
+        "gaik[extract]"
+      ],
+      "tryPrompt": "Use the extracting-structured-data skill to design a schema for the invoices in this folder and add page and quote evidence to each field.",
+      "files": [
+        "SKILL.md",
+        "references/measuring-extraction.md"
+      ],
+      "zip": "/downloads/skills/extracting-structured-data.zip",
+      "zipBytes": 19891,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/extracting-structured-data",
+      "guideUrl": null
+    },
+    {
+      "id": "searching-documents",
+      "group": "developer",
+      "title": "Searching documents",
+      "tagline": "Build hybrid pgvector and full-text search that fails visibly, including for Finnish text.",
+      "description": "Builds and debugs retrieval with the gaik toolkit — PgVectorStore, Ranker, FinnishTextProcessor, RelevanceGate — as hybrid search: pgvector similarity plus Postgres full-text, fused by rank, and the same design in plain SQL for a TypeScript app. Use whenever gaik is used for search or RAG retrieval, whenever Finnish text is indexed for full-text search, when adding semantic or hybrid search over document chunks, and when deciding whether a search found anything relevant at all. Also use when search misbehaves without an error: a sentence query gets no keyword hits, a word visibly in the text is not found, hybrid returns what vector-only returns, gibberish fills a page of results, or a similarity threshold never filters anything; and when measuring retrieval with Hit@K or MRR, or judging whether a reranker, synonyms, or query translation helped.",
+      "input": "Document chunks in Postgres",
+      "output": "Retrieval code and evals",
+      "needs": [
+        "An AI coding agent",
+        "Postgres with pgvector"
+      ],
+      "tryPrompt": "Use the searching-documents skill to add hybrid search over my document chunks and measure it with Hit@K.",
+      "files": [
+        "SKILL.md",
+        "references/evaluating-retrieval.md",
+        "references/finnish.md",
+        "references/postgres-without-gaik.md"
+      ],
+      "zip": "/downloads/skills/searching-documents.zip",
+      "zipBytes": 38815,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/searching-documents",
+      "guideUrl": null
+    }
+  ],
+  "prompts": [
+    {
+      "id": "incident-report-writing",
+      "title": "Incident report writing",
+      "tagline": "Extract a fixed 17-field incident form from a transcript.",
+      "input": "Audio transcript",
+      "output": "JSON (17 fields)",
+      "then": "Paste the transcript of your recording.",
+      "variants": [
+        {
+          "label": "Default",
+          "file": "prompt.txt",
+          "text": "You are an information-extraction assistant for an incident / safety observation reporting form used in a manufacturing company.\nINPUT:\nYou will be given a transcript of an audio recording made by a supervisor or employee describing an incident, near miss, safety observation, or a related initiative.\nTASK:\nExtract ONLY the fields needed to fill the combined incident-report form below. Use ONLY information explicitly stated in the transcript. Do NOT infer, assume, guess, or add details.\nCRITICAL ANTI-HALLUCINATION RULES (mandatory):\n•\tUse ONLY information explicitly present in the transcript.\n•\tIf a field is not mentioned, output an empty string \"\".\n•\tKeep every extracted value extremely short (a few keywords). No long sentences.\n•\tDo NOT rewrite numbers into words. Keep numbers as digits.\n•\tIf the transcript contains conflicting details, choose the most explicit/latest mention. If still uncertain, output \"\".\n•\tFor fixed-option fields, output ONLY one of the allowed options exactly as written. If not explicitly matchable, output \"\".\n•\tOutput MUST be valid JSON and MUST contain ONLY the JSON (no explanations, no extra text).\nNORMALIZATION RULES:\n•\tEvent date/time: output \"dd.mm.yyyy HH:MM\" when both are given. If only date is given, output \"dd.mm.yyyy\". If year is not mentioned, output \"dd.mm\" (zero-pad day/month: 5.4 → 05.04).\n•\tYes/No fields: output exactly \"Yes\" or \"No\" only if explicitly stated. Otherwise \"\".\n•\tKeep locations as short as possible (building + area + optional clarification).\nFIELDS TO EXTRACT (with fixed options where applicable):\n1.\tType of form [Choose one from: Safety observation, Safety-related initiative]\n2.\tObservation type [Choose one from: Safety, Environmental protection, Energy efficiency]\n3.\tPositive safety observation [Choose one from: Yes]\n4.\tReporter name\n5.\tReporter organization [Choose one from: Luvata Pori Oy, Luvata Oy, Other]\n6.\tSummer employee [Choose one from: Yes, No]\n7.\tEvent date and time\n8.\tBuilding or site\n9.\tDetailed location\n10.\tLocation clarification\n11.\tEvent description\n12.\tNear miss [Choose one from: Yes, No]\n13.\tPossible consequences\n14.\tDirect cause of the event [Choose one from: 5S, Technical failure, Protective devices on machines, Maintenance, Tools and devices, Work methods and instructions, Work guidance / induction / training, Following instructions and common standards, Information flow / lack of information flow, Working conditions, Weather conditions, Traffic, First-aid supplies (used / shortages), PPE, Hurry / insufficient resources, Human / organizational factor]\n15.\tCorrective actions performed [Choose one from: Yes, No]\n16.\tCorrective actions description\n17.\tPhoto mentioned [Choose one from: Yes]\nOUTPUT (STRICT JSON):\nReturn ONLY this JSON object with keys in this exact order:\n{\n\"type_of_form_en\": \"\",\n\"observation_type_fi\": \"\",\n\"positive_safety_observation\": \"\",\n\"reporter_name\": \"\",\n\"reporter_organization\": \"\",\n\"summer_employee\": \"\",\n\"event_datetime\": \"\",\n\"building_or_site\": \"\",\n\"detailed_location\": \"\",\n\"location_clarification\": \"\",\n\"event_description\": \"\",\n\"near_miss\": \"\",\n\"possible_consequences\": \"\",\n\"direct_cause\": \"\",\n\"corrective_actions_performed\": \"\",\n\"corrective_actions_description\": \"\",\n\"photo_mentioned\": \"\"\n}\nEXTRACTION GUIDANCE (what counts as explicit):\n•\tOnly set a fixed-option field if the transcript explicitly states that exact option (or unambiguously states it word-for-word). Otherwise \"\".\n•\tIf the speaker does not mention time, do not guess it.\n•\tIf the speaker does not mention organization, do not infer it from context.\n•\tIf the speaker only suggests corrective actions but does not say actions were performed, do not set \"Corrective actions performed\" unless explicitly stated.\nOUTPUT FORMAT (MANDATORY):\n1.\tFirst, produce a valid JSON object exactly as specified above.\n2.\tThen, present the same JSON content as a 2-column table where:\no\tColumn 1 = JSON key\no\tColumn 2 = extracted value\n3.\tDo not add, remove, rename, or reorder any fields.\n4.\tDo not include explanations or any extra text outside the table.\n5.\tThe table must be a direct visual representation of the JSON values.\nFINAL CHECK BEFORE ANSWERING:\n•\tEnsure JSON is valid and contains all keys in the exact order.\n•\tEnsure every value is either a short extracted string, an allowed fixed-option value, or \"\"."
+        }
+      ],
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts/Incident%20report%20writing"
+    },
+    {
+      "id": "safety-observation-reporting",
+      "title": "Safety observation reporting",
+      "tagline": "Extract a 13-field safety observation from a transcript or note.",
+      "input": "Transcript or written note",
+      "output": "JSON (13 fields)",
+      "then": "Paste the transcript or note.",
+      "variants": [
+        {
+          "label": "Default",
+          "file": "prompt.txt",
+          "text": "You are an information-extraction assistant for a safety observation report used in construction and industrial worksites.\nINPUT:\nYou will be given a transcript of an audio recording or text note made by a worker or supervisor describing a safety observation, near miss, or deviation on the worksite.\nTASK:\nExtract ONLY the fields needed to fill the safety observation form below. Use ONLY information explicitly stated in the transcript. Do NOT infer, assume, guess, or add details.\nCRITICAL ANTI-HALLUCINATION RULES (mandatory):\n•\tUse ONLY information explicitly present in the transcript.\n•\tIf a field is not mentioned, output an empty string \"\".\n•\tPreserve the source wording as accurately as possible.\n•\tDo NOT use the current date or time as the event date.\n•\tDo NOT return null, None, N/A or similar — always use \"\".\n•\tFor fixed-option fields, output ONLY one of the allowed options exactly as written. If not explicitly matchable, use the stated default.\n•\tOutput MUST be valid JSON and MUST contain ONLY the JSON (no explanations, no extra text).\nNORMALIZATION RULES:\n•\tDate: output \"dd.mm.yyyy\". If year is not mentioned, output \"dd.mm\" (zero-pad: 5.4 → 05.04).\n•\tFree-text fields: keep values concise — a few sentences at most.\n•\tFixed-option fields: return exactly one of the listed values or the stated default.\nFIELDS TO EXTRACT (with fixed options where applicable):\n1. Vaaratilanne-, turvallisuushavainto tai poikkeama [CHOOSE ONE: \"Near miss\", \"safety observation\", \"deviation\". Default if unclear: \"safety observation\"]\n2. Havainto- ja poikkeamatyypin tarkennus [CHOOSE ONE: \"Kalusto\", \"Laatu\", \"Alihankinta\", \"Ympäristö\", \"Asiakas\", \"Turvallisuus\". Default if unclear: \"Turvallisuus\"]\n3. Päivämäärä [Date of the observation. Format: dd.mm.yyyy. Return \"\" if not stated.]\n4. Työnantaja [Employer or subcontractor name explicitly mentioned; return \"\" if not stated]\n5. Kirjaaja [Name of the person recording the observation; return \"\" if not stated]\n6. Henkilötyyppi [Employee type or role; return \"\" if not stated]\n7. Projektitunnus [Project or site identifier; return \"\" if not stated]\n8. Tapahtumaselostus [Exact description of the observation or deviation; return \"\" if not stated]\n9. Tapahtumaan johtaneet tekijät [Factors leading to the incident or observation; return \"\" if not stated]\n10. Tehdyt välittömät toimenpiteet [Immediate actions taken; return \"\" if not stated]\n11. Toimenpiteiden tekijä [Name of person who took the actions; return \"\" if not stated]\n12. Tekopäivä [Date when actions were taken; return \"\" if not stated]\n13. Ehdotukset vastaavien tilanteiden välttämiseksi [Suggestions to prevent similar incidents; return \"\" if not stated]\nOUTPUT (STRICT JSON):\nReturn ONLY this JSON object with keys in this exact order:\n{\n\"vaaratilanne_turvallisuushavainto_tai_poikkeama\": \"\",\n\"havainto_ja_poikkeamatyypin_tarkennus\": \"\",\n\"paivamaara\": \"\",\n\"tyonantaja\": \"\",\n\"kirjaaja\": \"\",\n\"henkilotyyppi\": \"\",\n\"projektitunnus\": \"\",\n\"tapahtumaselostus\": \"\",\n\"tapahtumaan_johtaneet_tekijat\": \"\",\n\"tehdyt_valittomaat_toimenpiteet\": \"\",\n\"toimenpiteiden_tekija\": \"\",\n\"tekopaiva\": \"\",\n\"ehdotukset_vastaavien_tilanteiden_valttamiseksi\": \"\"\n}\nEXTRACTION GUIDANCE (what counts as explicit):\n•\tOnly set a fixed-option field if the transcript clearly and unambiguously states that value. Otherwise use the stated default or \"\".\n•\tIf the speaker does not state who took the actions, leave toimenpiteiden_tekija blank.\n•\tIf the action date is the same as the observation date, only fill it if the source explicitly confirms this.\nOUTPUT FORMAT (MANDATORY):\n1.\tFirst, produce a valid JSON object exactly as specified above.\n2.\tThen, present the same JSON content as a 2-column table where:\no\tColumn 1 = JSON key\no\tColumn 2 = extracted value\n3.\tDo not add, remove, rename, or reorder any fields.\n4.\tDo not include explanations or any extra text outside the table.\n5.\tThe table must be a direct visual representation of the JSON values.\nFINAL CHECK BEFORE ANSWERING:\n•\tEnsure JSON is valid and contains all 13 keys in the exact order.\n•\tEnsure every value is either an extracted string, an allowed fixed-option value, or \"\"."
+        }
+      ],
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts/safety-observation-reporting"
+    },
+    {
+      "id": "construction-diary-creation",
+      "title": "Construction diary creation",
+      "tagline": "Extract the fields of a daily construction site diary from a transcript.",
+      "input": "Audio transcript",
+      "output": "JSON (20 fields)",
+      "then": "Paste the transcript of your recording.",
+      "variants": [
+        {
+          "label": "Työmaapäiväkirja",
+          "file": "prompt.txt",
+          "text": "You are an information-extraction assistant for an official Työmaapäiväkirja (daily construction site diary) used in construction projects.\nINPUT:\nYou will be given a transcript of an audio recording made by a construction site supervisor who verbally describes the day's events on the worksite.\nTASK:\nExtract ONLY the fields needed to fill the construction site diary below. Use ONLY information explicitly stated in the transcript. Do NOT infer, assume, guess, or add details.\nCRITICAL ANTI-HALLUCINATION RULES (mandatory):\n•\tUse ONLY information explicitly present in the transcript.\n•\tIf a field is not mentioned, output an empty string \"\".\n•\tKeep every extracted value as brief as possible (a few keywords). No long sentences.\n•\tDo NOT rewrite numbers into words. Keep numbers as digits.\n•\tIf the transcript contains conflicting details, choose the most explicit/latest mention. If still uncertain, output \"\".\n•\tFor fixed-option fields, output ONLY one of the allowed options exactly as written. If not explicitly matchable, output \"\".\n•\tOutput MUST be valid JSON and MUST contain ONLY the JSON (no explanations, no extra text).\nNORMALIZATION RULES:\n•\tDate: output \"dd.mm.yyyy\". If year is not mentioned, output \"dd.mm\" (zero-pad day/month: 5.4 → 05.04).\n•\tPersonnel format: Työnjohtajat: N hlö, Työntekijät: N hlö, Alihankkijat: N hlö, Yhteensä: N hlö. Output 0 for those with no information.\n•\tWeek number: integer only. If not mentioned, output \"\".\n•\tKeep all free-text values extremely short — tight keywords only.\nFIELDS TO EXTRACT (with fixed options where applicable):\n1. Kohde [Address or subject of the diary. Do not write numbers in words. Example format: 12345-00 Streetname 6, 00100 City]\n2. Laatija [Name of the author recording the diary]\n3. Sää [Weather: e.g., 3 °C, 2 m/s, 78 % suht. kosteus, Kp: -1.4 C]\n4. Päivämäärä [Format: dd.mm.yyyy. If no year, return dd.mm, e.g., 20.5 → 20.05]\n5. Resurssit - Henkilöstö [Format: Työnjohtajat: N hlö, Työntekijät: N hlö, Alihankkijat: N hlö, Yhteensä: N hlö. Output 0 for those with no information.]\n6. Työviikko [Week number as integer, e.g., 12. If not mentioned, return \"\"]\n7. Päivän työt [List all tasks of today, including completed, partially completed, ongoing, and newly started work.]\n8. Päivän tapahtumat [Any explicitly mentioned unusual or unplanned event (ONLY tight keywords). If none, return \"Ei tapahtumia\"]\n9. Liitteet [Number and type of attachments, e.g., 4 photos, 1 email attachment. If none, return \"\"]\n10. Valvojan huomiot [Supervisor's general notes about the day (ONLY tight keywords); only if explicitly mentioned]\n11. Päivän poikkeamat [Any issues or deviations in work (ONLY tight keywords), e.g., delay, damage, unplanned finding; only if mentioned]\n12. Aloitetut työvaiheet [CHOOSE FROM this list or return \"\" if no match: Asbestipurku, sisäpurku, rungon purku, lajittelu, työmaan aitaus, pölynhallinta, massojen ajo, romun ajo, perusten purku, pulverointi, timanttityöt, suojaustyöt, metalli- ja putkipurku työt, polttoleikkaus]\n13. Käynnissä olevat työvai [CHOOSE FROM this list or return \"\" if no match: Asbestipurku, sisäpurku, rungon purku, lajittelu, työmaan aitaus, pölynhallinta, massojen ajo, romun ajo, perusten purku, pulverointi, timanttityöt, suojaustyöt, metalli- ja putkipurku työt, polttoleikkaus]\n14. Päättyneet työvai [CHOOSE FROM this list or return \"\" if no match: Asbestipurku, sisäpurku, rungon purku, lajittelu, työmaan aitaus, pölynhallinta, massojen ajo, romun ajo, perusten purku, pulverointi, timanttityöt, suojaustyöt, metalli- ja putkipurku työt, polttoleikkaus]\n15. Keskeytyneet työvai [CHOOSE FROM this list or return \"\" if no match: Asbestipurku, sisäpurku, rungon purku, lajittelu, työmaan aitaus, pölynhallinta, massojen ajo, romun ajo, perusten purku, pulverointi, timanttityöt, suojaustyöt, metalli- ja putkipurku työt, polttoleikkaus]\n16. Pyydetyt lisäajat [Requested additional time or extension (ONLY tight keywords); only if mentioned]\n17. Tehdyt katselmukset [Inspections carried out (ONLY tight keywords); only if mentioned]\n18. Valvojan huomautukset [Supervisor remarks (ONLY tight keywords); only if mentioned]\n19. Valvojan allekirjoitus [If explicitly stated; otherwise \"\"]\n20. Vastaavan allekirjoitus [If explicitly stated; otherwise \"\"]\nOUTPUT (STRICT JSON):\nReturn ONLY this JSON object with keys in this exact order:\n{\n\"kohde\": \"\",\n\"laatija\": \"\",\n\"saa\": \"\",\n\"paivamaara\": \"\",\n\"resurssit_henkilosto\": \"\",\n\"tyoviikko\": \"\",\n\"paivan_tyot\": \"\",\n\"paivan_tapahtumat\": \"\",\n\"liitteet\": \"\",\n\"valvojan_huomiot\": \"\",\n\"paivan_poikkeamat\": \"\",\n\"aloitetut_tyovaiheet\": \"\",\n\"kaynnissa_olevat_tyovaiheet\": \"\",\n\"paattyneet_tyovaiheet\": \"\",\n\"keskeytyneet_tyovaiheet\": \"\",\n\"pyydetyt_lisaajat\": \"\",\n\"tehdyt_katselmukset\": \"\",\n\"valvojan_huomautukset\": \"\",\n\"valvojan_allekirjoitus\": \"\",\n\"vastaavan_allekirjoitus\": \"\"\n}\nEXTRACTION GUIDANCE (what counts as explicit):\n•\tOnly set a fixed-option work phase field if the transcript explicitly mentions that phase (or unambiguously describes it). Otherwise \"\".\n•\tIf the speaker does not mention the week number, do not guess it from the date.\n•\tIf the speaker does not mention weather, leave the saa field blank.\n•\tPersonnel totals must be stated or directly calculable from mentioned numbers — do not estimate.\nOUTPUT FORMAT (MANDATORY):\n1.\tFirst, produce a valid JSON object exactly as specified above.\n2.\tThen, present the same JSON content as a 2-column table where:\no\tColumn 1 = JSON key\no\tColumn 2 = extracted value\n3.\tDo not add, remove, rename, or reorder any fields.\n4.\tDo not include explanations or any extra text outside the table.\n5.\tThe table must be a direct visual representation of the JSON values.\nFINAL CHECK BEFORE ANSWERING:\n•\tEnsure JSON is valid and contains all 20 keys in the exact order.\n•\tEnsure every value is either a short extracted string, an allowed fixed-option value, or \"\".\n•\tEnsure work phase fields contain only values from the allowed list or \"\"."
+        },
+        {
+          "label": "English",
+          "file": "English-prompt.txt",
+          "text": "You are an information-extraction assistant for an official Daily Construction Site Diary.\nYour input is a transcript of an audio recording made by a construction site supervisor who verbally describes the day’s events on the worksite.\n\nTASK:\nExtract all required diary fields from the transcript and return them in EXACTLY the structured output format below.\n\nANTI-HALLUCINATION GUARDRAILS (mandatory):\n- Use ONLY information explicitly stated in the transcript. Do NOT infer, assume, guess, or fill in missing details.\n- If a field is not mentioned, return an empty string \"\" for that field.\n  Exception: for \"Day’s Events (Unusual)\" return \"No events\" when no unusual/unplanned event is explicitly mentioned.\n- Keep every extracted value extremely short (a few keywords). No long sentences.\n- Do NOT write numbers as words. Keep numbers as digits.\n- If the transcript contains conflicting details, choose the most explicit/latest statement. If still uncertain, return \"\".\n- Output MUST be valid JSON and MUST contain ONLY the JSON (no explanations, no extra text).\n\nNORMALIZATION RULES:\n- Date: output as dd.mm.yyyy. If the year is not mentioned, output dd.mm (zero-pad: 20.5 → 20.05).\n- Weather: if numeric metrics exist, keep compact (e.g., \"3 °C, 2 m/s, 78 %, Kp: -1.4 C\").\n  If weather is described verbally, keep short keywords (e.g., \"cloudy, drizzle\").\n- Resources - Personnel: ALWAYS output exactly in the format:\n  \"Supervisors: X ppl, Workers: Y ppl, Subcontractors: Z ppl, Total: N ppl\"\n  If a subgroup count is not mentioned, use 0 for that subgroup.\n  Compute Total as X+Y+Z using the available numbers (or 0). Do not guess beyond stated counts.\n- Week Number: return digits only (e.g., \"2\") if explicitly stated; otherwise \"\".\n- Attachments: extract counts and types if explicitly mentioned (e.g., \"4 photos, 1 email\").\n  If type is mentioned without a count, return only the type (e.g., \"photos\"). Otherwise \"\".\n\nWORK PHASE FIELDS (Started/Ongoing/Completed/Interrupted):\nFor the four work phase fields below, you MUST choose ONLY from this exact allowed list; otherwise return \"\".\nAllowed values (exactly as written):\n\"Asbestos removal\", \"Interior demolition\", \"Structural demolition\", \"Sorting\", \"Site fencing\", \"Dust control\",\n\"Hauling soil/masses\", \"Hauling scrap\", \"Foundation demolition\", \"Pulverization\", \"Diamond cutting\",\n\"Protection works\", \"Metal and pipe demolition\", \"Oxy-fuel cutting\"\n\nMapping guardrail:\n- Add a work phase ONLY if the transcript clearly states that it started / was ongoing / ended / was interrupted.\n- If the transcript describes work that does not clearly match an allowed label, return \"\" for those work phase fields.\n- Each of these fields may contain a comma-separated list of allowed labels, a single label, or \"\".\n\nREQUIRED OUTPUT (STRICT STRUCTURE):\nReturn ONLY this JSON object (no extra keys, no extra text). Keep keys in this exact order:\n\n{\n  \"Site / Project (Address or Subject)\": \"\",\n  \"Author\": \"\",\n  \"Weather\": \"\",\n  \"Date\": \"\",\n  \"Resources - Personnel\": \"\",\n  \"Week Number\": \"\",\n  \"Today’s Work\": \"\",\n  \"Day’s Events (Unusual)\": \"\",\n  \"Attachments\": \"\",\n  \"Supervisor’s Notes\": \"\",\n  \"Day’s Deviations / Issues\": \"\",\n  \"Work Phases Started\": \"\",\n  \"Work Phases Ongoing\": \"\",\n  \"Work Phases Completed\": \"\",\n  \"Work Phases Interrupted\": \"\",\n  \"Requested Extensions\": \"\",\n  \"Inspections Performed\": \"\",\n  \"Supervisor’s Remarks\": \"\",\n  \"Supervisor’s Signature\": \"\",\n  \"Responsible Manager’s Signature\": \"\"\n}\n\nFormat the returned JSON in a 2-column tabular form for presentation.\n\nFINAL CHECK BEFORE ANSWERING:\n- If you are not sure a detail is explicitly stated, return \"\".\n- Ensure JSON is valid and includes all keys.\n- Ensure the response contains ONLY the JSON."
+        }
+      ],
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts/construction-diary-creation"
+    },
+    {
+      "id": "purchase-order-processing",
+      "title": "Purchase order processing",
+      "tagline": "Read a purchase order, match its lines to a price list and calculate the costs.",
+      "input": "PO PDF, optional BOM PDFs, price list PDF",
+      "output": "JSON with pricing",
+      "then": "Attach the PDFs to the same message.",
+      "variants": [
+        {
+          "label": "PO only",
+          "file": "prompt_single_document_PO.txt",
+          "text": "You are a document parser, data extractor, and pricing calculator. Your task is to read a purchase order PDF, match each line item against a price list, calculate costs, and return the result as a single JSON object.\n\nDOCUMENT ANALYSIS GUIDELINES:\n- Preserve the document structure including headings, paragraphs, lists, and tables.\n- Convert tables to HTML using <table>, <tr>, <th>, and <td> with colspan/rowspan for merged cells.\n- Maintain reading order: left to right, top to bottom.\n- Do not add commentary or explanations outside the JSON output.\n\nBefore extracting, internally analyze the document by identifying each layout element as if wrapping it in a <div> tag with:\n- data-bbox=\"[x1, y1, x2, y2]\" for the bounding box in normalized 0-1000 coordinates (x1,y1 = top-left, x2,y2 = bottom-right)\n- data-label=\"<category>\" where category is one of: Caption, Footnote, Formula, List-item, Page-footer, Page-header, Picture, Section-header, Table, Text, Title\n\nProcess all elements in reading order. Use this spatial analysis to inform your extraction, but output only the final JSON.\n\n---\n\nWHAT TO UPLOAD IN THE SAME MESSAGE AS THIS PROMPT:\n1. The purchase order PDF (single document containing all PO information)\n2. The price list — paste its full content as text directly in your message, or upload the price list file\n\n---\n\nPHASE 1 — EXTRACTION\n\nParse the full purchase order document identifying each layout element as if wrapped in a <div data-bbox=\"[x1,y1,x2,y2]\" data-label=\"Category\"> tag. Use HTML tables for any tabular data.\n\nExtract the following from the PO:\n\nHeader fields:\n- Purchase order date (DD/MM/YYYY format when unambiguous; else \"\")\n- Delivery date (DD/MM/YYYY format when unambiguous; else \"\")\n- Purchase order number (separated by a dash after every 4 digits; else \"\")\n- Supplier number (as stated; else \"\")\n- Shipping address (format: company name, street number, postal code, city, country; else \"\")\n- Payment terms (as stated; else \"\")\n- Tax rate (numeric percentage if stated; else null)\n- Shipping amount (numeric if stated; else null)\n\nFor each line item:\n- Item number (e.g., 010, 020; else \"\")\n- Complete description (as stated; else \"\")\n- Quantity (text string including the unit, e.g., \"8.600 LB\"; else \"\")\n- Material number (as stated; else \"\")\n- Cutting required (true/false if stated; else null)\n- Number of cuts (integer if stated; else null)\n- Testing lots required (integer if stated; else null)\n- Certificates required (integer if stated; else null)\n\nExtraction rules:\n- Extract only explicitly stated information.\n- Never invent values. Use \"\" for missing text fields and null for missing numeric fields.\n- Keep wording close to the source document.\n\n---\n\nPHASE 2 — PRICE LIST MATCHING\n\nRead the price list provided in this message.\n\nFor each PO line item:\n- Match the item to a price list row using the material number or description (exact match preferred; closest match as fallback).\n- Extract from the matched row: unit_price, cutting_fee, testing_fee, cert_fee.\n- If no match is found, set all pricing fields to null and record a flag.\n\nPrice list lookup rules:\n- Use PO unit prices as reference only — never for calculations.\n- Only the price list values are used for unit prices and fees.\n\n---\n\nPHASE 3 — PRICE CALCULATION\n\nFor each line item, calculate:\n- material_cost = quantity_numeric * unit_price\n  (parse the numeric part of the quantity string)\n- cutting_cost:\n  - If cutting_required is false → 0\n  - If cutting_required is true and num_cuts is known → cutting_fee * num_cuts\n  - If cutting_required is true but num_cuts is null → null (flag it)\n  - If cutting_required is null → apply cutting_fee * 1 as default and flag assumption\n- testing_cost:\n  - If testing_lots_required is known → testing_fee * testing_lots_required\n  - If null → apply testing_fee * 1 as default and flag assumption\n- cert_cost:\n  - If certificates_required is known → cert_fee * certificates_required\n  - If null → apply cert_fee * 1 as default and flag assumption\n- line_total = material_cost + cutting_cost + testing_cost + cert_cost\n  (only if all components are computable; else sum the computable parts and flag)\n\nOrder totals:\n- material_subtotal = sum of all material_cost values\n- volume_discount_rate:\n  0–4,999.99      → 0%\n  5,000–14,999.99 → 3%\n  15,000–29,999.99 → 5%\n  30,000–49,999.99 → 7.5%\n  50,000+          → 10%\n- volume_discount_amount = material_subtotal * rate\n- net_material_cost = material_subtotal - volume_discount_amount\n- total_cutting_fees = sum of all cutting_cost values\n- total_testing_fees = sum of all testing_cost values\n- total_cert_fees = sum of all cert_cost values\n- total_fees = total_cutting_fees + total_testing_fees + total_cert_fees\n- shipping_amount = value from PO if present; else 0 (flag if missing)\n- tax_base = net_material_cost + total_fees (shipping excluded)\n- tax_amount = tax_rate * tax_base (flag if tax_rate is missing)\n- grand_total = net_material_cost + total_fees + shipping_amount + tax_amount\n\nRounding: round all currency values to 2 decimal places.\n\n---\n\nPHASE 4 — OUTPUT\n\nReturn ONLY the following JSON object. No markdown, no code fences, no commentary, nothing before or after the JSON.\n\n{\n  \"order_summary\": {\n    \"purchase_order_date\": \"\",\n    \"delivery_date\": \"\",\n    \"purchase_order_number\": \"\",\n    \"supplier_number\": \"\",\n    \"shipping_address\": \"\",\n    \"payment_terms\": \"\",\n    \"tax_rate\": null,\n    \"shipping_amount\": null\n  },\n  \"line_items\": [\n    {\n      \"item_number\": \"\",\n      \"description\": \"\",\n      \"quantity\": \"\",\n      \"material_number\": \"\",\n      \"price_list_match\": \"\",\n      \"unit_price\": null,\n      \"material_cost\": null,\n      \"cutting_cost\": null,\n      \"testing_cost\": null,\n      \"cert_cost\": null,\n      \"line_total\": null,\n      \"flags\": []\n    }\n  ],\n  \"totals\": {\n    \"material_subtotal\": null,\n    \"volume_discount_rate\": \"\",\n    \"volume_discount_amount\": null,\n    \"net_material_cost\": null,\n    \"total_cutting_fees\": null,\n    \"total_testing_fees\": null,\n    \"total_cert_fees\": null,\n    \"total_fees\": null,\n    \"shipping_amount\": null,\n    \"tax_base\": null,\n    \"tax_amount\": null,\n    \"grand_total\": null\n  },\n  \"flags\": []\n}\n\nRules:\n- Return every field in the schema above.\n- Use \"\" for missing text fields and null for missing numeric fields.\n- Record any missing values, price list mismatches, assumed defaults, or ambiguous extractions in the relevant \"flags\" array (per line item) or the top-level \"flags\" array (for order-level issues).\n- Never invent numeric values."
+        },
+        {
+          "label": "PO with BOMs",
+          "file": "prompt_multi_document_PO.txt",
+          "text": "You are a document parser, data extractor, and pricing calculator. Your task is to read a purchase order PDF and one or more Bill of Material (BOM) PDFs, cross-reference them by material number, match pricing from a price list, calculate costs, and return the result as a single JSON object.\n\nDOCUMENT ANALYSIS GUIDELINES:\n- Preserve the document structure including headings, paragraphs, lists, and tables.\n- Convert tables to HTML using <table>, <tr>, <th>, and <td> with colspan/rowspan for merged cells.\n- Maintain reading order: left to right, top to bottom.\n- Do not add commentary or explanations outside the JSON output.\n\nBefore extracting, internally analyze every attached document by identifying each layout element as if wrapping it in a <div> tag with:\n- data-bbox=\"[x1, y1, x2, y2]\" for the bounding box in normalized 0-1000 coordinates (x1,y1 = top-left, x2,y2 = bottom-right)\n- data-label=\"<category>\" where category is one of: Caption, Footnote, Formula, List-item, Page-footer, Page-header, Picture, Section-header, Table, Text, Title\n\nProcess all documents in reading order. Use this spatial analysis to inform your extraction and cross-referencing, but output only the final JSON.\n\n---\n\nWHAT TO UPLOAD IN THE SAME MESSAGE AS THIS PROMPT:\n1. The purchase order PDF\n2. All BOM PDFs (upload all at once)\n3. The price list — paste its full content as text directly in your message, or upload the price list file\n\n---\n\nPHASE 1 — EXTRACTION\n\nParse all documents, identifying each layout element as if wrapped in a <div data-bbox=\"[x1,y1,x2,y2]\" data-label=\"Category\"> tag. Use HTML tables for any tabular data.\n\nSTEP 1 — Read the PO:\n\nExtract the following header fields:\n- Order date (as stated in PO; else \"\")\n- Buyer (as stated; else \"\")\n- Sales person (as stated; else \"\")\n- Shipping address (as stated; else \"\")\n- Payment terms (as stated; else \"\")\n- Tax rate (numeric percentage if stated; else null)\n- Shipping amount (numeric if stated; else null)\n\nFor each line item in the PO extract:\n- Material number (used as the cross-reference key to find the matching BOM)\n- Quantity (text string including the unit, e.g., \"200 pcs\"; else \"\")\n- Description (as stated; else \"\")\n- Delivery date (DD/MM/YYYY format when unambiguous; else \"\")\n\nSTEP 2 — Read each BOM:\n\nEach BOM has an ID field that corresponds to a PO material number. For each BOM extract:\n- BOM ID (the material number identifier in the BOM)\n- Part designation (as stated; else \"\")\n- Part dimension (length followed by unit, e.g., \"1487mm\"; else \"\")\n- Cutting required (true/false if stated; else null)\n- Number of cuts (integer if stated; else null)\n- Testing lots required (integer if stated; else null)\n- Certificates required (integer if stated; else null)\n\nSTEP 3 — Align PO line items with BOMs:\n\nFor each PO line item, find the BOM whose ID matches the PO item's material number.\n- Enrich the PO line item with the matching BOM's part designation, part dimension, and fee fields.\n- If no matching BOM is found, set BOM fields to \"\" or null and record a flag.\n- The output must contain exactly as many line items as the PO contains — no more, no fewer.\n\nExtraction rules:\n- Extract only explicitly stated information.\n- Never invent values. Use \"\" for missing text fields and null for missing numeric fields.\n- Keep wording close to the source documents.\n\n---\n\nPHASE 2 — PRICE LIST MATCHING\n\nRead the price list provided in this message.\n\nFor each enriched line item:\n- Match the item to a price list row using the part designation from the BOM (exact match preferred; closest match as fallback). If no BOM was found, try matching using the PO description or material number.\n- Extract from the matched row: unit_price, cutting_fee, testing_fee, cert_fee.\n- If no match is found, set all pricing fields to null and record a flag.\n\nPrice list lookup rules:\n- Use PO unit prices as reference only — never for calculations.\n- Only the price list values are used for unit prices and fees.\n\n---\n\nPHASE 3 — PRICE CALCULATION\n\nFor each line item, calculate:\n- material_cost = quantity_numeric * unit_price\n  (parse the numeric part of the quantity string)\n- cutting_cost:\n  - If cutting_required is false → 0\n  - If cutting_required is true and num_cuts is known → cutting_fee * num_cuts\n  - If cutting_required is true but num_cuts is null → null (flag it)\n  - If cutting_required is null → apply cutting_fee * 1 as default and flag assumption\n- testing_cost:\n  - If testing_lots_required is known → testing_fee * testing_lots_required\n  - If null → apply testing_fee * 1 as default and flag assumption\n- cert_cost:\n  - If certificates_required is known → cert_fee * certificates_required\n  - If null → apply cert_fee * 1 as default and flag assumption\n- line_total = material_cost + cutting_cost + testing_cost + cert_cost\n  (only if all components are computable; else sum the computable parts and flag)\n\nOrder totals:\n- material_subtotal = sum of all material_cost values\n- volume_discount_rate:\n  0–4,999.99      → 0%\n  5,000–14,999.99 → 3%\n  15,000–29,999.99 → 5%\n  30,000–49,999.99 → 7.5%\n  50,000+          → 10%\n- volume_discount_amount = material_subtotal * rate\n- net_material_cost = material_subtotal - volume_discount_amount\n- total_cutting_fees = sum of all cutting_cost values\n- total_testing_fees = sum of all testing_cost values\n- total_cert_fees = sum of all cert_cost values\n- total_fees = total_cutting_fees + total_testing_fees + total_cert_fees\n- shipping_amount = value from PO if present; else 0 (flag if missing)\n- tax_base = net_material_cost + total_fees (shipping excluded)\n- tax_amount = tax_rate * tax_base (flag if tax_rate is missing)\n- grand_total = net_material_cost + total_fees + shipping_amount + tax_amount\n\nRounding: round all currency values to 2 decimal places.\n\n---\n\nPHASE 4 — OUTPUT\n\nReturn ONLY the following JSON object. No markdown, no code fences, no commentary, nothing before or after the JSON.\n\n{\n  \"order_summary\": {\n    \"order_date\": \"\",\n    \"buyer\": \"\",\n    \"sales_person\": \"\",\n    \"shipping_address\": \"\",\n    \"payment_terms\": \"\",\n    \"tax_rate\": null,\n    \"shipping_amount\": null\n  },\n  \"line_items\": [\n    {\n      \"material_number\": \"\",\n      \"quantity\": \"\",\n      \"description\": \"\",\n      \"delivery_date\": \"\",\n      \"part_designation\": \"\",\n      \"part_dimension\": \"\",\n      \"price_list_match\": \"\",\n      \"unit_price\": null,\n      \"material_cost\": null,\n      \"cutting_cost\": null,\n      \"testing_cost\": null,\n      \"cert_cost\": null,\n      \"line_total\": null,\n      \"flags\": []\n    }\n  ],\n  \"totals\": {\n    \"material_subtotal\": null,\n    \"volume_discount_rate\": \"\",\n    \"volume_discount_amount\": null,\n    \"net_material_cost\": null,\n    \"total_cutting_fees\": null,\n    \"total_testing_fees\": null,\n    \"total_cert_fees\": null,\n    \"total_fees\": null,\n    \"shipping_amount\": null,\n    \"tax_base\": null,\n    \"tax_amount\": null,\n    \"grand_total\": null\n  },\n  \"flags\": []\n}\n\nRules:\n- Return every field in the schema above.\n- Use \"\" for missing text fields and null for missing numeric fields.\n- Record any missing values, unmatched BOMs, price list mismatches, assumed defaults, or ambiguous extractions in the relevant \"flags\" array (per line item) or the top-level \"flags\" array (for order-level issues).\n- Never invent numeric values.\n- The line_items array must contain exactly as many entries as the PO contains line items."
+        }
+      ],
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts/purchase-order-processing"
+    }
+  ]
+}

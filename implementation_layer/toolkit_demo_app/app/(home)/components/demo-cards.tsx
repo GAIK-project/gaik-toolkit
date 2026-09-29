@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { TransitionPanel } from "@/components/ui/transition-panel";
+import { prompts, skills } from "@/lib/no-code/catalog";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -18,7 +18,7 @@ import {
   Cpu,
   Database,
   Download,
-  ExternalLink,
+  MessageSquare,
   FileBarChart,
   FileOutput,
   FilePen,
@@ -39,6 +39,7 @@ import {
   ScanEye,
   Search,
   Volume2,
+  Wand2,
   Sparkles,
   Table2,
   Users,
@@ -333,63 +334,6 @@ const comingSoonUseCases = [
 
 const comingSoonModules: { title: string; icon: LucideIcon }[] = [];
 
-// No-code Assets data with full details
-const noCodeAssets = {
-  prompts: [
-    {
-      title: "Incident Report Writing",
-      description: "Extract structured incident data from transcripts",
-      href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts/Incident%20report%20writing",
-      setup: "Paste in ChatGPT",
-      output: "JSON (17 fields)",
-    },
-    {
-      title: "Construction Diary Creation",
-      description: "Extract construction site diary entries from recordings",
-      href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts/construction-diary-creation",
-      setup: "Paste in ChatGPT",
-      output: "JSON (20 fields)",
-    },
-    {
-      title: "Purchase Order Processing",
-      description: "Generate sales orders from PO + BOMs + price lists",
-      href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts/purchase-order-processing",
-      setup: "Paste in ChatGPT",
-      output: "Markdown + JSON",
-    },
-  ],
-  skills: [
-    {
-      title: "Incident Report Writing",
-      description: "Full audio → Word document pipeline",
-      href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/incident-report-writing",
-      setup: "Claude Desktop",
-      output: "Word (.docx)",
-    },
-    {
-      title: "Construction Diary Creation",
-      description: "Audio transcription → structured diary",
-      href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/construction-diary-creation",
-      setup: "Claude Desktop",
-      output: "Word (.docx)",
-    },
-    {
-      title: "Purchase Order Processing",
-      description: "PO + BOMs → priced sales order",
-      href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing",
-      setup: "Claude Desktop + MCP",
-      output: "Word + breakdown",
-    },
-    {
-      title: "Report Writing",
-      description: "General report generation from audio",
-      href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/report-writing-skill",
-      setup: "Claude Desktop + MCP",
-      output: "Word (.docx)",
-    },
-  ],
-};
-
 interface DemoCardsProps {
   isUnlocked: boolean;
 }
@@ -600,105 +544,53 @@ function ComingSoonSection({
   );
 }
 
-function NoCodeAssetItem({
-  title,
-  description,
-  href,
-  setup,
-  output,
-  type,
-}: {
-  title: string;
-  description: string;
-  href: string;
-  setup: string;
-  output: string;
-  type: "prompt" | "skill";
-}) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block h-full"
-    >
-      <Card className="bg-card hover:border-primary/40 group relative h-full overflow-hidden rounded-xl border transition-colors duration-200 hover:shadow-md">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <Badge variant={type === "prompt" ? "secondary" : "default"}>
-              {type === "prompt" ? "Prompt" : "Skill"}
-            </Badge>
-            <ExternalLink className="text-muted-foreground h-4 w-4" />
-          </div>
-          <CardTitle className="text-base">{title}</CardTitle>
-          <CardDescription className="text-sm">{description}</CardDescription>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="bg-muted rounded px-2 py-1">{setup}</span>
-            <span className="bg-muted rounded px-2 py-1">{output}</span>
-          </div>
-        </CardContent>
-      </Card>
-    </a>
-  );
-}
+const noCodeLinks = [
+  {
+    title: "Agent skills",
+    description:
+      "Download a skill for Claude Desktop or install the plugin in a coding agent.",
+    href: "/skills",
+    count: skills.length,
+    icon: Wand2,
+  },
+  {
+    title: "Prompts",
+    description:
+      "Copy a prompt into ChatGPT or Claude to extract structured data. Nothing to install.",
+    href: "/prompts",
+    count: prompts.length,
+    icon: MessageSquare,
+  },
+];
 
 function NoCodeAssetsSection() {
-  const [activeTab, setActiveTab] = useState(0);
-  const tabs = ["Prompts", "Agent Skills"];
-
   return (
     <motion.div variants={itemVariants} className="space-y-4">
       <h2 className="font-serif text-2xl font-semibold md:text-3xl">
         No-code Assets
       </h2>
-      <p className="text-muted-foreground text-sm">
-        Ready-to-use prompts and Claude Desktop skills. Click to view on GitHub.
-      </p>
-
-      {/* Tabs */}
-      <div className="flex space-x-2">
-        {tabs.map((tab, index) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(index)}
-            className={cn(
-              "rounded-md px-4 py-2 text-sm font-medium transition",
-              activeTab === index
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/80",
-            )}
-          >
-            {tab}
-          </button>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {noCodeLinks.map(({ title, description, href, count, icon: Icon }) => (
+          <Link key={href} href={href} className="block h-full">
+            <Card className="bg-card hover:border-primary/40 h-full rounded-xl border transition-colors duration-200 hover:shadow-md">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <span className="bg-primary/10 text-primary flex h-9 w-9 items-center justify-center rounded-full">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="text-muted-foreground text-sm">
+                    {count} available
+                  </span>
+                </div>
+                <CardTitle className="text-base">{title}</CardTitle>
+                <CardDescription className="text-sm">
+                  {description}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
         ))}
       </div>
-
-      {/* Content */}
-      <TransitionPanel
-        activeIndex={activeTab}
-        transition={{ duration: 0.2, ease: "easeInOut" }}
-        variants={{
-          enter: { opacity: 0, y: -20, filter: "blur(4px)" },
-          center: { opacity: 1, y: 0, filter: "blur(0px)" },
-          exit: { opacity: 0, y: 20, filter: "blur(4px)" },
-        }}
-      >
-        {/* Prompts Tab */}
-        <div className="grid gap-4 pt-4 sm:grid-cols-2 lg:grid-cols-3">
-          {noCodeAssets.prompts.map((item) => (
-            <NoCodeAssetItem key={item.title} {...item} type="prompt" />
-          ))}
-        </div>
-
-        {/* Skills Tab */}
-        <div className="grid gap-4 pt-4 sm:grid-cols-2">
-          {noCodeAssets.skills.map((item) => (
-            <NoCodeAssetItem key={item.title} {...item} type="skill" />
-          ))}
-        </div>
-      </TransitionPanel>
     </motion.div>
   );
 }
