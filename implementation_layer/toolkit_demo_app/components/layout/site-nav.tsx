@@ -78,6 +78,8 @@ interface NavItem {
   /** Built but gated behind beta access (e.g. the Solution Wizard `?key=`). */
   beta?: boolean;
   external?: boolean;
+  /** Knowledge process this item belongs to; a heading shows where it changes. */
+  section?: string;
 }
 
 interface NavGroup {
@@ -85,6 +87,22 @@ interface NavGroup {
   icon: LucideIcon;
   items: NavItem[];
 }
+
+type NavEntry = NavItem | { heading: string };
+
+/** Inserts a heading before the first item of each new section. */
+function withSections(items: NavItem[]): NavEntry[] {
+  return items.flatMap((item, i) =>
+    item.section && item.section !== items[i - 1]?.section
+      ? [{ heading: item.section }, item]
+      : [item],
+  );
+}
+
+// The three knowledge processes the toolkit is organised around.
+const CAPTURE = "Knowledge capture";
+const ACCESS = "Knowledge access";
+const SYNTHESIS = "Knowledge synthesis";
 
 const navGroups: NavGroup[] = [
   {
@@ -143,20 +161,61 @@ const navGroups: NavGroup[] = [
     label: "Software Components",
     icon: Boxes,
     items: [
-      { label: "Schema Generator", href: "/schema-generator", icon: Braces },
-      { label: "Extractor", href: "/extractor", icon: FileSearch },
-      { label: "Vision Extractor", href: "/vision-extractor", icon: ScanEye },
-      { label: "Parser", href: "/parser", icon: FileText },
-      { label: "Classifier", href: "/classifier", icon: Tags },
-      { label: "Transcriber", href: "/transcriber", icon: Mic },
-      { label: "Text-to-Speech", href: "/text-to-speech", icon: Volume2 },
-      { label: "LLM Judge", href: "/llm-judge", icon: Scale },
+      {
+        label: "Schema Generator",
+        href: "/schema-generator",
+        icon: Braces,
+        section: CAPTURE,
+      },
+      {
+        label: "Extractor",
+        href: "/extractor",
+        icon: FileSearch,
+        section: CAPTURE,
+      },
+      {
+        label: "Vision Extractor",
+        href: "/vision-extractor",
+        icon: ScanEye,
+        section: CAPTURE,
+      },
+      { label: "Parser", href: "/parser", icon: FileText, section: CAPTURE },
+      {
+        label: "Classifier",
+        href: "/classifier",
+        icon: Tags,
+        section: CAPTURE,
+      },
+      {
+        label: "Transcriber",
+        href: "/transcriber",
+        icon: Mic,
+        section: CAPTURE,
+      },
       {
         label: "PostgreSQL Agent",
         href: "/postgres-agent",
         icon: Database,
+        section: ACCESS,
       },
-      { label: "Tabular Agent", href: "/tabular-agent", icon: Table2 },
+      {
+        label: "Tabular Agent",
+        href: "/tabular-agent",
+        icon: Table2,
+        section: ACCESS,
+      },
+      {
+        label: "Text-to-Speech",
+        href: "/text-to-speech",
+        icon: Volume2,
+        section: SYNTHESIS,
+      },
+      {
+        label: "LLM Judge",
+        href: "/llm-judge",
+        icon: Scale,
+        section: SYNTHESIS,
+      },
     ],
   },
   {
@@ -167,18 +226,26 @@ const navGroups: NavGroup[] = [
         label: "Audio → Structured",
         href: "/audio-structured",
         icon: AudioWaveform,
+        section: CAPTURE,
       },
       {
         label: "Document → Structured",
         href: "/document-structured",
         icon: FileOutput,
+        section: CAPTURE,
       },
-      { label: "RAG Builder", href: "/rag", icon: Bot },
-      { label: "Report Writer", href: "/report-writer", icon: FileText },
+      { label: "RAG Builder", href: "/rag", icon: Bot, section: ACCESS },
+      {
+        label: "Report Writer",
+        href: "/report-writer",
+        icon: FileText,
+        section: SYNTHESIS,
+      },
       {
         label: "Report Writer v2",
         href: "/report-writer-v2",
         icon: FilePen,
+        section: SYNTHESIS,
       },
     ],
   },
@@ -391,7 +458,18 @@ function MobileNav({
                 {group.label}
               </div>
               <div className="flex flex-col gap-0.5 pl-2">
-                {group.items.map((item) => {
+                {withSections(group.items).map((entry) => {
+                  if ("heading" in entry) {
+                    return (
+                      <div
+                        key={entry.heading}
+                        className="text-muted-foreground/70 mt-1 px-3 pt-1 text-[11px] font-medium tracking-wider uppercase first:mt-0"
+                      >
+                        {entry.heading}
+                      </div>
+                    );
+                  }
+                  const item = entry;
                   // Beta items: clickable for beta-access holders, otherwise a
                   // locked "Beta" row.
                   if (item.beta) {
@@ -583,134 +661,151 @@ export function SiteNav({
                       </NavigationMenuTrigger>
                       <NavigationMenuContent align={dropdownAlign}>
                         <ul className="grid w-[400px] gap-3 p-4 md:w-[500px] md:grid-cols-2 lg:w-[600px]">
-                          {group.items.map((item) => {
-                            const ItemIcon = item.icon;
-                            const active = isActive(item.href);
+                          {withSections(group.items).map(
+                            (entry, entryIndex) => {
+                              if ("heading" in entry) {
+                                return (
+                                  <li
+                                    key={entry.heading}
+                                    aria-hidden="true"
+                                    className={cn(
+                                      "text-muted-foreground/70 after:bg-border/60 flex items-center gap-3 px-3 text-[11px] font-medium tracking-wider uppercase after:h-px after:flex-1 md:col-span-2",
+                                      entryIndex > 0 && "pt-1",
+                                    )}
+                                  >
+                                    {entry.heading}
+                                  </li>
+                                );
+                              }
+                              const item = entry;
+                              const ItemIcon = item.icon;
+                              const active = isActive(item.href);
 
-                            // Beta items: built but gated behind beta access
-                            // (the Solution Wizard `?key=`). Clickable for
-                            // visitors who already hold the wizard_access cookie;
-                            // a locked "Beta" tile for everyone else.
-                            if (item.beta) {
-                              if (hasWizardAccess) {
+                              // Beta items: built but gated behind beta access
+                              // (the Solution Wizard `?key=`). Clickable for
+                              // visitors who already hold the wizard_access cookie;
+                              // a locked "Beta" tile for everyone else.
+                              if (item.beta) {
+                                if (hasWizardAccess) {
+                                  return (
+                                    <li key={item.label}>
+                                      <NavigationMenuLink asChild>
+                                        <Link
+                                          href={item.href}
+                                          className={cn(
+                                            "hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full space-y-1 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none",
+                                            active &&
+                                              "bg-primary/10 text-primary",
+                                          )}
+                                        >
+                                          <div className="flex items-center gap-2 text-sm leading-none font-medium">
+                                            <ItemIcon className="h-4 w-4" />
+                                            {item.label}
+                                            <span className="bg-primary/10 text-primary ml-auto rounded px-1.5 py-0.5 text-[10px] font-normal">
+                                              Beta
+                                            </span>
+                                          </div>
+                                          <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
+                                            Configure a solution from a
+                                            plain-language use case.
+                                          </p>
+                                        </Link>
+                                      </NavigationMenuLink>
+                                    </li>
+                                  );
+                                }
                                 return (
                                   <li key={item.label}>
                                     <NavigationMenuLink asChild>
-                                      <Link
-                                        href={item.href}
-                                        className={cn(
-                                          "hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full space-y-1 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none",
-                                          active &&
-                                            "bg-primary/10 text-primary",
-                                        )}
+                                      <button
+                                        type="button"
+                                        onClick={openWizardAccess}
+                                        className="hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full w-full space-y-1 rounded-md p-3 text-left leading-none transition-colors outline-none select-none"
                                       >
-                                        <div className="flex items-center gap-2 text-sm leading-none font-medium">
+                                        <span className="text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium">
                                           <ItemIcon className="h-4 w-4" />
                                           {item.label}
                                           <span className="bg-primary/10 text-primary ml-auto rounded px-1.5 py-0.5 text-[10px] font-normal">
                                             Beta
                                           </span>
-                                        </div>
-                                        <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
-                                          Configure a solution from a
-                                          plain-language use case.
-                                        </p>
-                                      </Link>
+                                        </span>
+                                        <span className="text-muted-foreground/70 line-clamp-2 block text-sm leading-snug">
+                                          In beta — request access.
+                                        </span>
+                                      </button>
                                     </NavigationMenuLink>
                                   </li>
                                 );
                               }
-                              return (
-                                <li key={item.label}>
-                                  <NavigationMenuLink asChild>
-                                    <button
-                                      type="button"
-                                      onClick={openWizardAccess}
-                                      className="hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full w-full space-y-1 rounded-md p-3 text-left leading-none transition-colors outline-none select-none"
-                                    >
-                                      <span className="text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium">
+
+                              // Coming Soon items
+                              if (item.comingSoon) {
+                                return (
+                                  <li key={item.label}>
+                                    <div className="block h-full cursor-not-allowed space-y-1 rounded-md p-3 leading-none opacity-50">
+                                      <div className="text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium">
                                         <ItemIcon className="h-4 w-4" />
                                         {item.label}
-                                        <span className="bg-primary/10 text-primary ml-auto rounded px-1.5 py-0.5 text-[10px] font-normal">
-                                          Beta
+                                        <span className="bg-muted ml-auto rounded px-1.5 py-0.5 text-[10px] font-normal">
+                                          Soon
                                         </span>
-                                      </span>
-                                      <span className="text-muted-foreground/70 line-clamp-2 block text-sm leading-snug">
-                                        In beta — request access.
-                                      </span>
-                                    </button>
-                                  </NavigationMenuLink>
-                                </li>
-                              );
-                            }
-
-                            // Coming Soon items
-                            if (item.comingSoon) {
-                              return (
-                                <li key={item.label}>
-                                  <div className="block h-full cursor-not-allowed space-y-1 rounded-md p-3 leading-none opacity-50">
-                                    <div className="text-muted-foreground flex items-center gap-2 text-sm leading-none font-medium">
-                                      <ItemIcon className="h-4 w-4" />
-                                      {item.label}
-                                      <span className="bg-muted ml-auto rounded px-1.5 py-0.5 text-[10px] font-normal">
-                                        Soon
-                                      </span>
+                                      </div>
+                                      <p className="text-muted-foreground/70 line-clamp-2 text-sm leading-snug">
+                                        Coming soon
+                                      </p>
                                     </div>
-                                    <p className="text-muted-foreground/70 line-clamp-2 text-sm leading-snug">
-                                      Coming soon
-                                    </p>
-                                  </div>
-                                </li>
-                              );
-                            }
+                                  </li>
+                                );
+                              }
 
-                            // External links
-                            if (item.external) {
+                              // External links
+                              if (item.external) {
+                                return (
+                                  <li key={item.label}>
+                                    <NavigationMenuLink asChild>
+                                      <a
+                                        href={item.href}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full space-y-1 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none"
+                                      >
+                                        <div className="flex items-center gap-2 text-sm leading-none font-medium">
+                                          <ItemIcon className="h-4 w-4" />
+                                          {item.label}
+                                          <ExternalLink className="text-muted-foreground ml-auto h-3 w-3" />
+                                        </div>
+                                        <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
+                                          View on GitHub
+                                        </p>
+                                      </a>
+                                    </NavigationMenuLink>
+                                  </li>
+                                );
+                              }
+
                               return (
-                                <li key={item.label}>
+                                <li key={item.href}>
                                   <NavigationMenuLink asChild>
-                                    <a
+                                    <Link
                                       href={item.href}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full space-y-1 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none"
+                                      className={cn(
+                                        "hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full space-y-1 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none",
+                                        active && "bg-primary/10 text-primary",
+                                      )}
                                     >
                                       <div className="flex items-center gap-2 text-sm leading-none font-medium">
                                         <ItemIcon className="h-4 w-4" />
                                         {item.label}
-                                        <ExternalLink className="text-muted-foreground ml-auto h-3 w-3" />
                                       </div>
                                       <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
-                                        View on GitHub
+                                        Explore the {item.label} features.
                                       </p>
-                                    </a>
+                                    </Link>
                                   </NavigationMenuLink>
                                 </li>
                               );
-                            }
-
-                            return (
-                              <li key={item.href}>
-                                <NavigationMenuLink asChild>
-                                  <Link
-                                    href={item.href}
-                                    className={cn(
-                                      "hover:bg-primary/5 hover:text-primary focus:bg-primary/5 focus:text-primary block h-full space-y-1 rounded-md p-3 leading-none no-underline transition-colors outline-none select-none",
-                                      active && "bg-primary/10 text-primary",
-                                    )}
-                                  >
-                                    <div className="flex items-center gap-2 text-sm leading-none font-medium">
-                                      <ItemIcon className="h-4 w-4" />
-                                      {item.label}
-                                    </div>
-                                    <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
-                                      Explore the {item.label} features.
-                                    </p>
-                                  </Link>
-                                </NavigationMenuLink>
-                              </li>
-                            );
-                          })}
+                            },
+                          )}
                         </ul>
                       </NavigationMenuContent>
                     </NavigationMenuItem>
