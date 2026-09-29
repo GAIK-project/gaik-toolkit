@@ -7,6 +7,7 @@ someone edits a skill or prompt under no-code-assets without regenerating them.
 
 from __future__ import annotations
 
+import difflib
 import importlib.util
 import json
 import zipfile
@@ -33,9 +34,16 @@ def builder():
 def test_generated_outputs_are_current(builder):
     catalog_text, zips = builder.build()
 
-    assert builder.CATALOG_OUT.read_bytes() == catalog_text.encode("utf-8"), (
+    committed = builder.CATALOG_OUT.read_text(encoding="utf-8")
+    diff = "
+".join(
+        list(difflib.unified_diff(committed.splitlines(), catalog_text.splitlines(), "committed", "built", n=0))[:20]
+    )
+    assert committed == catalog_text, (
         "catalog.generated.json is stale: run "
-        "`uv run python implementation_layer/toolkit_demo_app/scripts/build_no_code_catalog.py`"
+        "`uv run python implementation_layer/toolkit_demo_app/scripts/build_no_code_catalog.py`
+"
+        + diff
     )
     for name, payload in zips.items():
         assert (builder.ZIP_DIR / name).read_bytes() == payload, f"{name} is stale; regenerate"
