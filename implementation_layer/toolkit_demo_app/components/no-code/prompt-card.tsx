@@ -19,16 +19,23 @@ export function PromptCard({ prompt }: { prompt: Prompt }) {
   return (
     <article className="bg-card flex flex-col gap-4 rounded-xl border p-5">
       <header className="space-y-1">
-        <h3 className="text-lg font-semibold">{prompt.title}</h3>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-lg font-semibold">{prompt.title}</h3>
+          <a
+            href={prompt.githubUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${prompt.title} on GitHub`}
+            className="text-muted-foreground hover:text-foreground mt-1 shrink-0"
+          >
+            <ExternalLink className="size-4" />
+          </a>
+        </div>
         <p className="text-muted-foreground text-sm">{prompt.tagline}</p>
+        <p className="pt-1 text-sm">
+          {prompt.input} <span aria-label="to">→</span> {prompt.output}
+        </p>
       </header>
-
-      <dl className="text-muted-foreground grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        <dt>Takes</dt>
-        <dd className="text-foreground">{prompt.input}</dd>
-        <dt>Gives</dt>
-        <dd className="text-foreground">{prompt.output}</dd>
-      </dl>
 
       {prompt.variants.length > 1 && (
         <div role="group" aria-label="Prompt version" className="flex gap-1">
@@ -71,7 +78,7 @@ export function PromptCard({ prompt }: { prompt: Prompt }) {
       >
         {expanded
           ? "Show less"
-          : `Show all ${variant.text.length.toLocaleString("en")} characters`}
+          : "Show all"}
       </Button>
 
       <div className="flex flex-wrap gap-2">
@@ -82,7 +89,7 @@ export function PromptCard({ prompt }: { prompt: Prompt }) {
           message={message}
         >
           <OpenAIIcon />
-          Copy and open ChatGPT
+          Copy, open ChatGPT
         </CopyAndOpen>
         <CopyAndOpen
           text={variant.text}
@@ -90,21 +97,9 @@ export function PromptCard({ prompt }: { prompt: Prompt }) {
           message={message}
         >
           <ClaudeIcon />
-          Copy and open Claude
+          Copy, open Claude
         </CopyAndOpen>
       </div>
-
-      <footer className="text-sm">
-        <a
-          href={prompt.githubUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-        >
-          Sample data and guide on GitHub
-          <ExternalLink className="size-3.5" />
-        </a>
-      </footer>
     </article>
   );
 }

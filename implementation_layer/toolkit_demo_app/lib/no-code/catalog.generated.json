@@ -15,7 +15,6 @@
       "input": "Audio recording",
       "output": "Word (.docx)",
       "needs": [
-        "Claude Desktop",
         "gaik-transcriber MCP server"
       ],
       "tryPrompt": "Use the incident-report-writing skill to turn my audio recording into an incident report. I will attach the file next.",
@@ -36,7 +35,6 @@
       "input": "Audio recording (Finnish or English)",
       "output": "Word (.docx)",
       "needs": [
-        "Claude Desktop",
         "gaik-transcriber MCP server"
       ],
       "tryPrompt": "Use the construction-diary-creation skill to create today's Työmaapäiväkirja from my site recording. I will attach the audio next.",
@@ -57,7 +55,6 @@
       "input": "PO, BOM PDFs and a price list",
       "output": "Word (.docx) and calculation breakdown",
       "needs": [
-        "Claude Desktop",
         "Filesystem MCP server"
       ],
       "tryPrompt": "Use the purchase-order-processing skill to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next.",
@@ -85,7 +82,6 @@
       "input": "Recordings, notes, PDFs, spreadsheets",
       "output": "Word (.docx)",
       "needs": [
-        "Claude Desktop",
         "Filesystem MCP server",
         "gaik-transcriber MCP server"
       ],
@@ -110,10 +106,9 @@
       "input": "PDF, scan or Word file",
       "output": "Text or markdown",
       "needs": [
-        "An AI coding agent",
         "gaik[parser]"
       ],
-      "tryPrompt": "Use the parsing-documents skill to choose a parser for my PDFs and check that the tables came through intact.",
+      "tryPrompt": "Use the parsing-documents skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/parsing-documents) to choose a parser for my PDFs and check that the tables came through intact.",
       "files": [
         "SKILL.md",
         "references/parser-selection.md"
@@ -132,10 +127,9 @@
       "input": "Invoices, forms, contracts, reports",
       "output": "Validated JSON or Pydantic model",
       "needs": [
-        "An AI coding agent",
         "gaik[extract]"
       ],
-      "tryPrompt": "Use the extracting-structured-data skill to design a schema for the invoices in this folder and add page and quote evidence to each field.",
+      "tryPrompt": "Use the extracting-structured-data skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/extracting-structured-data) to design a schema for the invoices in this folder and add page and quote evidence to each field.",
       "files": [
         "SKILL.md",
         "references/measuring-extraction.md"
@@ -154,10 +148,9 @@
       "input": "Document chunks in Postgres",
       "output": "Retrieval code and evals",
       "needs": [
-        "An AI coding agent",
         "Postgres with pgvector"
       ],
-      "tryPrompt": "Use the searching-documents skill to add hybrid search over my document chunks and measure it with Hit@K.",
+      "tryPrompt": "Use the searching-documents skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/searching-documents) to add hybrid search over my document chunks and measure it with Hit@K.",
       "files": [
         "SKILL.md",
         "references/evaluating-retrieval.md",

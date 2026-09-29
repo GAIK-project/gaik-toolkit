@@ -57,6 +57,12 @@ const encode = encodeURIComponent;
 export const launch = {
   /** Claude Desktop, https://support.claude.com/en/articles/14729294 */
   claude: (prompt: string) => `claude://claude.ai/new?q=${encode(prompt)}`,
+  /** Claude Desktop's Code tab, same page as above */
+  claudeDesktopCode: (prompt: string) =>
+    `claude://code/new?q=${encode(prompt)}`,
+  /** Claude Code on the web, https://support.claude.com/en/articles/14898120 (needs Claude Code access) */
+  claudeCodeWeb: (prompt: string) =>
+    `https://claude.ai/code/new?q=${encode(prompt)}`,
   /** Claude Code in a terminal, https://code.claude.com/docs/en/deep-links (5,000 characters at most) */
   claudeCode: (prompt: string) => `claude-cli://open?q=${encode(prompt)}`,
   /** Cursor, https://cursor.com/docs/reference/deeplinks */
