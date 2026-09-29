@@ -50,10 +50,15 @@ def _read_bytes(path: Path) -> bytes:
 
 
 def _files(skill_dir: Path) -> list[Path]:
+    # Sort by the POSIX string: Path ordering ignores case on Windows only, which
+    # would make the output differ between a developer's machine and CI.
     return sorted(
-        p
-        for p in skill_dir.rglob("*")
-        if p.is_file() and not (SKIP_NAMES & set(p.relative_to(skill_dir).parts))
+        (
+            p
+            for p in skill_dir.rglob("*")
+            if p.is_file() and not (SKIP_NAMES & set(p.relative_to(skill_dir).parts))
+        ),
+        key=lambda p: p.relative_to(skill_dir).as_posix(),
     )
 
 

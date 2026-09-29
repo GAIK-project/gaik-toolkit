@@ -64,12 +64,12 @@
       "files": [
         "EVALUATION.md",
         "README.md",
+        "SKILL.md",
         "reference/CALCULATION_BREAKDOWN_TEMPLATE.md",
         "reference/CALCULATION_LOGIC.md",
         "reference/EXTRACTION_FIELDS.md",
         "reference/OUTPUT_FORMAT.md",
-        "reference/PRICING_RULES.md",
-        "SKILL.md"
+        "reference/PRICING_RULES.md"
       ],
       "zip": "/downloads/skills/purchase-order-processing.zip",
       "zipBytes": 126786,
@@ -92,9 +92,9 @@
       "tryPrompt": "Use the report-writing skill to write a report from the materials I am about to attach. Infer the sections from the content.",
       "files": [
         "EVALUATION.md",
+        "SKILL.md",
         "reference/INPUT_FORMATS.md",
-        "reference/OUTPUT_SECTIONS.md",
-        "SKILL.md"
+        "reference/OUTPUT_SECTIONS.md"
       ],
       "zip": "/downloads/skills/report-writing.zip",
       "zipBytes": 46607,
@@ -115,8 +115,8 @@
       ],
       "tryPrompt": "Use the parsing-documents skill to choose a parser for my PDFs and check that the tables came through intact.",
       "files": [
-        "references/parser-selection.md",
-        "SKILL.md"
+        "SKILL.md",
+        "references/parser-selection.md"
       ],
       "zip": "/downloads/skills/parsing-documents.zip",
       "zipBytes": 16102,
@@ -137,8 +137,8 @@
       ],
       "tryPrompt": "Use the extracting-structured-data skill to design a schema for the invoices in this folder and add page and quote evidence to each field.",
       "files": [
-        "references/measuring-extraction.md",
-        "SKILL.md"
+        "SKILL.md",
+        "references/measuring-extraction.md"
       ],
       "zip": "/downloads/skills/extracting-structured-data.zip",
       "zipBytes": 19891,
@@ -159,10 +159,10 @@
       ],
       "tryPrompt": "Use the searching-documents skill to add hybrid search over my document chunks and measure it with Hit@K.",
       "files": [
+        "SKILL.md",
         "references/evaluating-retrieval.md",
         "references/finnish.md",
-        "references/postgres-without-gaik.md",
-        "SKILL.md"
+        "references/postgres-without-gaik.md"
       ],
       "zip": "/downloads/skills/searching-documents.zip",
       "zipBytes": 38815,
