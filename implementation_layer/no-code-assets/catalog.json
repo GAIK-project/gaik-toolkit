@@ -1,0 +1,134 @@
+{
+  "$comment": "Hand-written metadata for the no-code assets. Names and descriptions of skills come from each SKILL.md, prompt text from the prompt files; scripts/build_no_code_catalog.py merges all of it into the demo app. Paths are relative to this file.",
+  "skills": [
+    {
+      "id": "incident-report-writing",
+      "group": "no-code",
+      "path": "agent-skills/incident-report-writing/incident-report-writing",
+      "guide": "agent-skills/incident-report-writing",
+      "title": "Incident report writing",
+      "tagline": "Turn a spoken incident or safety observation into a Word report.",
+      "input": "Audio recording",
+      "output": "Word (.docx)",
+      "needs": ["Claude Desktop", "gaik-transcriber MCP server"],
+      "tryPrompt": "Use the incident-report-writing skill to turn my audio recording into an incident report. I will attach the file next."
+    },
+    {
+      "id": "construction-diary-creation",
+      "group": "no-code",
+      "path": "agent-skills/construction-diary-creation/construction-diary-creation",
+      "guide": "agent-skills/construction-diary-creation",
+      "title": "Construction diary creation",
+      "tagline": "Turn a site manager's spoken day into a Työmaapäiväkirja.",
+      "input": "Audio recording (Finnish or English)",
+      "output": "Word (.docx)",
+      "needs": ["Claude Desktop", "gaik-transcriber MCP server"],
+      "tryPrompt": "Use the construction-diary-creation skill to create today's Työmaapäiväkirja from my site recording. I will attach the audio next."
+    },
+    {
+      "id": "purchase-order-processing",
+      "group": "no-code",
+      "path": "agent-skills/purchase-order-processing/purchase-order-processing",
+      "guide": "agent-skills/purchase-order-processing",
+      "title": "Purchase order processing",
+      "tagline": "Match a purchase order and its BOMs against a price list and produce a priced sales order.",
+      "input": "PO, BOM PDFs and a price list",
+      "output": "Word (.docx) and calculation breakdown",
+      "needs": ["Claude Desktop", "Filesystem MCP server"],
+      "tryPrompt": "Use the purchase-order-processing skill to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next."
+    },
+    {
+      "id": "report-writing",
+      "group": "no-code",
+      "path": "agent-skills/report-writing-skill/report-writing",
+      "guide": "agent-skills/report-writing-skill",
+      "title": "Report writing",
+      "tagline": "Consolidate recordings, notes and documents into one structured Word report.",
+      "input": "Recordings, notes, PDFs, spreadsheets",
+      "output": "Word (.docx)",
+      "needs": ["Claude Desktop", "Filesystem MCP server", "gaik-transcriber MCP server"],
+      "tryPrompt": "Use the report-writing skill to write a report from the materials I am about to attach. Infer the sections from the content."
+    },
+    {
+      "id": "parsing-documents",
+      "group": "developer",
+      "path": "agent-plugin/skills/parsing-documents",
+      "title": "Parsing documents",
+      "tagline": "Pick a parser that keeps table structure, and catch pages that parsed to nothing.",
+      "input": "PDF, scan or Word file",
+      "output": "Text or markdown",
+      "needs": ["An AI coding agent", "gaik[parser]"],
+      "tryPrompt": "Use the parsing-documents skill to choose a parser for my PDFs and check that the tables came through intact."
+    },
+    {
+      "id": "extracting-structured-data",
+      "group": "developer",
+      "path": "agent-plugin/skills/extracting-structured-data",
+      "title": "Extracting structured data",
+      "tagline": "Design an extraction schema that stays inside provider limits and carries checkable evidence.",
+      "input": "Invoices, forms, contracts, reports",
+      "output": "Validated JSON or Pydantic model",
+      "needs": ["An AI coding agent", "gaik[extract]"],
+      "tryPrompt": "Use the extracting-structured-data skill to design a schema for the invoices in this folder and add page and quote evidence to each field."
+    },
+    {
+      "id": "searching-documents",
+      "group": "developer",
+      "path": "agent-plugin/skills/searching-documents",
+      "title": "Searching documents",
+      "tagline": "Build hybrid pgvector and full-text search that fails visibly, including for Finnish text.",
+      "input": "Document chunks in Postgres",
+      "output": "Retrieval code and evals",
+      "needs": ["An AI coding agent", "Postgres with pgvector"],
+      "tryPrompt": "Use the searching-documents skill to add hybrid search over my document chunks and measure it with Hit@K."
+    }
+  ],
+  "prompts": [
+    {
+      "id": "incident-report-writing",
+      "path": "prompts/Incident report writing",
+      "title": "Incident report writing",
+      "tagline": "Extract a fixed 17-field incident form from a transcript.",
+      "input": "Audio transcript",
+      "output": "JSON (17 fields)",
+      "then": "Paste the transcript of your recording.",
+      "variants": [{ "label": "Default", "file": "prompt.txt" }]
+    },
+    {
+      "id": "safety-observation-reporting",
+      "path": "prompts/safety-observation-reporting",
+      "title": "Safety observation reporting",
+      "tagline": "Extract a 13-field safety observation from a transcript or note.",
+      "input": "Transcript or written note",
+      "output": "JSON (13 fields)",
+      "then": "Paste the transcript or note.",
+      "variants": [{ "label": "Default", "file": "prompt.txt" }]
+    },
+    {
+      "id": "construction-diary-creation",
+      "path": "prompts/construction-diary-creation",
+      "title": "Construction diary creation",
+      "tagline": "Extract the fields of a daily construction site diary from a transcript.",
+      "input": "Audio transcript",
+      "output": "JSON (20 fields)",
+      "then": "Paste the transcript of your recording.",
+      "variants": [
+        { "label": "Työmaapäiväkirja", "file": "prompt.txt" },
+        { "label": "English", "file": "English-prompt.txt" }
+      ]
+    },
+    {
+      "id": "purchase-order-processing",
+      "path": "prompts/purchase-order-processing",
+      "title": "Purchase order processing",
+      "tagline": "Read a purchase order, match its lines to a price list and calculate the costs.",
+      "input": "PO PDF, optional BOM PDFs, price list PDF",
+      "output": "JSON with pricing",
+      "then": "Attach the PDFs to the same message.",
+      "variants": [
+        { "label": "PO only", "file": "prompt_single_document_PO.txt" },
+        { "label": "PO with BOMs", "file": "prompt_multi_document_PO.txt" }
+      ]
+    }
+  ]
+}

@@ -82,6 +82,7 @@ flowchart LR
 - Domain adaptation of existing use cases (e.g. adapting incident reporting to a new industry)
 - Piloting GenAI capabilities before investing in software development
 
+- **Use them**: [Prompts in the demo app](https://gaik-demo.2.rahtiapp.fi/prompts) — copy a prompt, or copy it and open ChatGPT or Claude in one click
 - **Assets path**: [implementation_layer/no-code-assets/prompts](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts)
 
 ---
@@ -131,7 +132,12 @@ flowchart TD
 - Structured report generation for management and compliance purposes
 - Rapid use-case delivery in organizations without dedicated AI development teams
 
+- **Use them**: [Agent skills in the demo app](https://gaik-demo.2.rahtiapp.fi/skills) — download a skill as a .zip and open a ready-made "try this" prompt in Claude
 - **Assets path**: [implementation_layer/no-code-assets/agent-skills](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills)
+
+#### Skills for coding agents
+
+The same folder holds a plugin, [`agent-plugin`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin), with three skills for developers building document pipelines with the `gaik` package: parsing documents, extracting structured data and searching documents. It installs in Claude Code, Codex and Copilot CLI with `/plugin marketplace add GAIK-project/gaik-toolkit`; the demo app's skills page lists the command for each client.
 
 ---
 

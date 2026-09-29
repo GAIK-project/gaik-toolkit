@@ -10,7 +10,7 @@
     {
       "name": "gaik-toolkit",
       "description": "Choosing a document parser that preserves table structure, designing extraction schemas that stay inside provider limits and produce checkable evidence, and building hybrid pgvector search that fails visibly. Use when parsing PDFs or DOCX, pulling fields and line items into a schema, adding semantic or hybrid search over documents, or when a parse, extraction, or search looked fine but the output is wrong.",
-      "source": "./agent-plugin",
+      "source": "./implementation_layer/no-code-assets/agent-plugin",
       "category": "data",
       "homepage": "https://gaik-project.github.io/gaik-toolkit/"
     }

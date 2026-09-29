@@ -35,6 +35,19 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 
 - **Solution Configuration Wizard** - Natural-language use case → validated blueprint, BPMN diagram, Mermaid flow, and runnable PoC. Access is gated separately from the regular demos: anonymous visitors are sent to `/sign-in`, approved users need a per-user `wizard_access` grant from `/admin`, and the optional team shortcut `/solution-wizard?key=<WIZARD_ACCESS_SECRET>` sets a temporary access cookie.
 
+### No-code Assets
+
+- **Agent skills** (`/skills`) - Download each skill as a .zip, install the coding-agent plugin, and open a "try this" prompt in Claude, Claude Code or Cursor
+- **Prompts** (`/prompts`) - Copy a prompt, or copy it and open ChatGPT or Claude
+
+Both pages are public and read `lib/no-code/catalog.generated.json` and `public/downloads/skills/*.zip`. Those are generated from `implementation_layer/no-code-assets`, because the image is built from this folder alone. After changing a skill, a prompt or `no-code-assets/catalog.json`, run:
+
+```bash
+uv run python implementation_layer/toolkit_demo_app/scripts/build_no_code_catalog.py
+```
+
+and commit the result; a unit test fails while the generated files are stale.
+
 ## Quick Start
 
 The **Model settings** button lets signed-in users optionally select their own OpenAI,

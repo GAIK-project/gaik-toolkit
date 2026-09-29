@@ -8,7 +8,6 @@ on:
     paths:
       - 'src/**'
       - 'implementation_layer/**'
-      - 'agent-plugin/**'
       - '.claude-plugin/**'
       - 'pyproject.toml'
       - 'MANIFEST.in'
@@ -23,7 +22,6 @@ on:
     paths:
       - 'src/**'
       - 'implementation_layer/**'
-      - 'agent-plugin/**'
       - '.claude-plugin/**'
       - 'pyproject.toml'
       - 'MANIFEST.in'

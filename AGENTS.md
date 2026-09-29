@@ -28,15 +28,25 @@ checks they appear to run.
 
 ## agent-plugin (the published agent skills)
 
-`agent-plugin/` is installed by Claude Code, Codex, Copilot and VS Code through
+`implementation_layer/no-code-assets/agent-plugin/` is installed by Claude Code, Codex, Copilot and VS Code through
 `.claude-plugin/marketplace.json`, and its skills quote gaik's API.
 
-- Bump `version` in both `agent-plugin/plugin.json` and
-  `agent-plugin/.claude-plugin/plugin.json` with any change under `agent-plugin/`: each
+- Bump `version` in both `plugin.json` and
+  `.claude-plugin/plugin.json` in that directory with any change under it: each
   client caches an install under the version it read.
 - `implementation_layer/unit_tests/test_agent_plugin.py` fails when gaik renames a name a
   skill quotes; fix the skill in the same change. It checks names only, so a change in
   behaviour needs a read of the skill that describes it.
+
+## no-code assets (skills and prompts)
+
+`implementation_layer/no-code-assets/` holds the prompts, the Claude Desktop skills and
+`agent-plugin/`. The demo app's `/skills` and `/prompts` pages serve a generated copy of
+them, because its image is built from `toolkit_demo_app/` alone. After changing a skill,
+a prompt, the plugin or `no-code-assets/catalog.json`, run
+`uv run python implementation_layer/toolkit_demo_app/scripts/build_no_code_catalog.py` and
+commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
+`test_no_code_catalog.py` fails while they are stale.
 
 ## toolkit_demo_app on Rahti
 

@@ -255,15 +255,13 @@ const navGroups: NavGroup[] = [
     items: [
       {
         label: "Prompts",
-        href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/prompts",
+        href: "/prompts",
         icon: MessageSquare,
-        external: true,
       },
       {
         label: "Agent Skills",
-        href: "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills",
+        href: "/skills",
         icon: Wand2,
-        external: true,
       },
     ],
   },

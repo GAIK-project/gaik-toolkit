@@ -40,7 +40,7 @@ rows follow those clients' documentation.
 ## Layout
 
 ```text
-agent-plugin/
+agent-plugin/   (implementation_layer/no-code-assets/)
 ├── plugin.json          # Agent Plugins v1 manifest
 ├── .claude-plugin/
 │   └── plugin.json      # Claude Code's own manifest
@@ -85,7 +85,9 @@ ignores namespaces it does not implement, so the package stays portable.
 **Bump `version` in both manifests — `plugin.json` and `.claude-plugin/plugin.json` — with
 every change under this directory.** Each client caches an installed plugin under the
 version it read, so an edit that keeps the old version never reaches anyone who already
-installed it. The test below fails if the two versions disagree.
+installed it. The test below fails if the two versions disagree. Then run
+`uv run python implementation_layer/toolkit_demo_app/scripts/build_no_code_catalog.py`: the demo
+app's skills page serves a generated copy of these skills and shows the plugin version.
 
 The skills quote gaik's API. `implementation_layer/unit_tests/test_agent_plugin.py` checks
 the manifest, the marketplace entry, every skill's frontmatter and links, and that the gaik
@@ -131,13 +133,13 @@ Claude Code's Discover view browses, accepts third-party plugins through its
 
 ```bash
 claude plugin validate .
-claude plugin validate ./agent-plugin
-uvx --from skills-ref agentskills validate agent-plugin/skills/searching-documents
+claude plugin validate ./implementation_layer/no-code-assets/agent-plugin
+uvx --from skills-ref agentskills validate implementation_layer/no-code-assets/agent-plugin/skills/searching-documents
 uv run pytest implementation_layer/unit_tests/test_agent_plugin.py
 ```
 
 To try a change in Claude Code without installing it, run
-`claude --plugin-dir ./agent-plugin`; it loads the plugin for that session only.
+`claude --plugin-dir ./implementation_layer/no-code-assets/agent-plugin`; it loads the plugin for that session only.
 
 ## License
 
