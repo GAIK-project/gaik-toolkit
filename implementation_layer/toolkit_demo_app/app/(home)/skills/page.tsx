@@ -1,5 +1,6 @@
 import { CodeBlock } from "@/components/code-block";
-import { SkillRow } from "@/components/no-code/skill-row";
+import { NoCodeHeader } from "@/components/no-code/no-code-header";
+import { SkillCard } from "@/components/no-code/skill-card";
 import {
   developerSkills,
   installTabs,
@@ -15,46 +16,41 @@ export const metadata: Metadata = {
 
 export default function SkillsPage() {
   return (
-    <div className="mx-auto max-w-4xl space-y-14">
-      <header className="space-y-2">
-        <h1 className="font-serif text-3xl font-semibold tracking-tight md:text-4xl">
-          Agent skills
-        </h1>
-        <p className="text-muted-foreground">
-          Instructions an AI assistant loads when a task matches.
-        </p>
-      </header>
+    <div className="space-y-12">
+      <NoCodeHeader active="/skills" />
 
-      <section aria-labelledby="desktop-skills">
-        <h2 id="desktop-skills" className="font-serif text-2xl font-semibold">
-          Claude Desktop
-        </h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Add the .zip under Settings, Capabilities.
-        </p>
-        <ul className="divide-border mt-4 divide-y border-y">
+      <section aria-labelledby="desktop-skills" className="space-y-4">
+        <div>
+          <h2 id="desktop-skills" className="font-serif text-2xl font-semibold">
+            Claude Desktop
+          </h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Add the .zip under Settings, Capabilities.
+          </p>
+        </div>
+        <div className="grid items-start gap-5 md:grid-cols-2">
           {noCodeSkills.map((skill) => (
-            <SkillRow key={skill.id} skill={skill} variant="desktop" />
+            <SkillCard key={skill.id} skill={skill} variant="desktop" />
           ))}
-        </ul>
+        </div>
       </section>
 
-      <section aria-labelledby="agent-skills">
-        <h2 id="agent-skills" className="font-serif text-2xl font-semibold">
-          Coding agents
-        </h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          For building document pipelines with the gaik package. Install all
-          three as one plugin.
-        </p>
-        <div className="mt-4">
-          <CodeBlock language="bash" filename="Plugin" tabs={installTabs} />
+      <section aria-labelledby="agent-skills" className="space-y-4">
+        <div>
+          <h2 id="agent-skills" className="font-serif text-2xl font-semibold">
+            Coding agents
+          </h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            For building document pipelines with the gaik package. Install all
+            three as one plugin.
+          </p>
         </div>
-        <ul className="divide-border mt-2 divide-y border-y">
+        <CodeBlock language="bash" filename="Plugin" tabs={installTabs} />
+        <div className="grid items-start gap-5 md:grid-cols-2 lg:grid-cols-3">
           {developerSkills.map((skill) => (
-            <SkillRow key={skill.id} skill={skill} variant="agent" />
+            <SkillCard key={skill.id} skill={skill} variant="agent" />
           ))}
-        </ul>
+        </div>
       </section>
     </div>
   );

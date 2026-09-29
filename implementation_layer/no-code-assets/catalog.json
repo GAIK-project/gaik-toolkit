@@ -91,7 +91,7 @@
       "tagline": "Extract a fixed 17-field incident form from a transcript.",
       "input": "Audio transcript",
       "output": "JSON (17 fields)",
-      "then": "Paste the transcript of your recording.",
+      "then": "Paste your transcript in the next message.",
       "variants": [{ "label": "Default", "file": "prompt.txt" }]
     },
     {
@@ -101,7 +101,7 @@
       "tagline": "Extract a 13-field safety observation from a transcript or note.",
       "input": "Transcript or written note",
       "output": "JSON (13 fields)",
-      "then": "Paste the transcript or note.",
+      "then": "Paste your transcript or note in the next message.",
       "variants": [{ "label": "Default", "file": "prompt.txt" }]
     },
     {
@@ -111,7 +111,7 @@
       "tagline": "Extract the fields of a daily construction site diary from a transcript.",
       "input": "Audio transcript",
       "output": "JSON (20 fields)",
-      "then": "Paste the transcript of your recording.",
+      "then": "Paste your transcript in the next message.",
       "variants": [
         { "label": "Työmaapäiväkirja", "file": "prompt.txt" },
         { "label": "English", "file": "English-prompt.txt" }
@@ -124,7 +124,7 @@
       "tagline": "Read a purchase order, match its lines to a price list and calculate the costs.",
       "input": "PO PDF, optional BOM PDFs, price list PDF",
       "output": "JSON with pricing",
-      "then": "Attach the PDFs to the same message.",
+      "then": "Attach your PDFs in the next message.",
       "variants": [
         { "label": "PO only", "file": "prompt_single_document_PO.txt" },
         { "label": "PO with BOMs", "file": "prompt_multi_document_PO.txt" }
