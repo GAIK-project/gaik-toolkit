@@ -1,4 +1,304 @@
 
 ============================================================
+Model: Claude-Opus-5.5
+============================================================
+Ajokortti.txt | BLEU=38.14 | chrF=71.98 | TER=44.99 | Cosine=95.08
+Aki_Linden_20210115_Final.txt | BLEU=29.74 | chrF=69.45 | TER=58.81 | Cosine=92.14
+Antti_Ulvio_Pohjustus.txt | BLEU=33.48 | chrF=72.74 | TER=49.77 | Cosine=94.75
+Ari_Heiskanen_1.txt | BLEU=46.69 | chrF=77.74 | TER=40.38 | Cosine=90.95
+Ari_Heiskanen_2.txt | BLEU=39.48 | chrF=73.70 | TER=40.48 | Cosine=97.45
+Ari_Heiskanen_3.txt | BLEU=40.51 | chrF=70.66 | TER=40.56 | Cosine=95.03
+Atte_Lajunen_1080p.txt | BLEU=41.26 | chrF=76.93 | TER=48.55 | Cosine=94.57
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=32.22 | chrF=66.76 | TER=52.62 | Cosine=92.42
+Finnendo_Pohjustus.txt | BLEU=26.25 | chrF=72.17 | TER=106.41 | Cosine=94.09
+Hannu_Heiska.txt | BLEU=30.40 | chrF=68.49 | TER=55.70 | Cosine=92.52
+
+--- AVERAGE (10 files) ---
+BLEU=35.82
+chrF=72.06
+TER=53.83
+CosineSim=93.90
+
+============================================================
+Model: Gemini-3.5-Flash
+============================================================
+Ajokortti.txt | BLEU=39.09 | chrF=74.79 | TER=44.38 | Cosine=94.48
+Aki_Linden_20210115_Final.txt | BLEU=32.22 | chrF=72.61 | TER=54.19 | Cosine=94.51
+Antti_Ulvio_Pohjustus.txt | BLEU=39.09 | chrF=75.22 | TER=46.06 | Cosine=94.77
+Ari_Heiskanen_1.txt | BLEU=48.47 | chrF=79.19 | TER=40.11 | Cosine=93.06
+Ari_Heiskanen_2.txt | BLEU=37.34 | chrF=72.08 | TER=42.41 | Cosine=96.77
+Ari_Heiskanen_3.txt | BLEU=40.48 | chrF=69.64 | TER=42.89 | Cosine=94.27
+Atte_Lajunen_1080p.txt | BLEU=40.54 | chrF=77.58 | TER=46.38 | Cosine=96.73
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=34.77 | chrF=68.97 | TER=48.16 | Cosine=96.32
+Finnendo_Pohjustus.txt | BLEU=24.56 | chrF=71.50 | TER=110.58 | Cosine=95.09
+Hannu_Heiska.txt | BLEU=31.81 | chrF=68.19 | TER=54.84 | Cosine=93.41
+
+--- AVERAGE (10 files) ---
+BLEU=36.84
+chrF=72.98
+TER=53.00
+CosineSim=94.94
+
+============================================================
+Model: GPT-5.5
+============================================================
+Ajokortti.txt | BLEU=38.44 | chrF=74.55 | TER=46.42 | Cosine=97.03
+Aki_Linden_20210115_Final.txt | BLEU=27.31 | chrF=70.61 | TER=59.03 | Cosine=93.04
+Antti_Ulvio_Pohjustus.txt | BLEU=36.03 | chrF=74.45 | TER=50.23 | Cosine=94.77
+Ari_Heiskanen_1.txt | BLEU=40.05 | chrF=76.99 | TER=46.07 | Cosine=91.25
+Ari_Heiskanen_2.txt | BLEU=35.14 | chrF=72.07 | TER=46.99 | Cosine=96.08
+Ari_Heiskanen_3.txt | BLEU=38.26 | chrF=68.90 | TER=47.55 | Cosine=95.08
+Atte_Lajunen_1080p.txt | BLEU=36.62 | chrF=75.78 | TER=52.90 | Cosine=93.25
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=30.40 | chrF=67.52 | TER=53.79 | Cosine=92.08
+Finnendo_Pohjustus.txt | BLEU=26.75 | chrF=72.00 | TER=112.50 | Cosine=93.99
+Hannu_Heiska.txt | BLEU=26.69 | chrF=68.65 | TER=56.77 | Cosine=90.62
+
+--- AVERAGE (10 files) ---
+BLEU=33.57
+chrF=72.15
+TER=57.23
+CosineSim=93.72
+
+
+============================================================
+Model: Claude-Sonnet-5.5
+============================================================
+Ajokortti.txt | BLEU=40.20 | chrF=74.36 | TER=41.92 | Cosine=94.94
+Aki_Linden_20210115_Final.txt | BLEU=31.63 | chrF=70.84 | TER=54.41 | Cosine=93.43
+Antti_Ulvio_Pohjustus.txt | BLEU=38.73 | chrF=72.67 | TER=45.60 | Cosine=94.96
+Ari_Heiskanen_1.txt | BLEU=44.65 | chrF=76.08 | TER=41.46 | Cosine=92.06
+Ari_Heiskanen_2.txt | BLEU=36.87 | chrF=71.72 | TER=46.51 | Cosine=96.86
+Ari_Heiskanen_3.txt | BLEU=45.71 | chrF=72.49 | TER=36.83 | Cosine=94.70
+Atte_Lajunen_1080p.txt | BLEU=37.64 | chrF=75.89 | TER=59.18 | Cosine=94.21
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=30.33 | chrF=66.23 | TER=53.20 | Cosine=93.27
+Finnendo_Pohjustus.txt | BLEU=27.08 | chrF=71.70 | TER=108.97 | Cosine=95.79
+Hannu_Heiska.txt | BLEU=32.21 | chrF=68.17 | TER=50.75 | Cosine=92.89
+
+--- AVERAGE (10 files) ---
+BLEU=36.50
+chrF=72.02
+TER=53.88
+CosineSim=94.31
+
+============================================================
+Model: GPT-6-Astra
+============================================================
+Ajokortti.txt | BLEU=32.79 | chrF=71.62 | TER=51.12 | Cosine=95.47
+Aki_Linden_20210115_Final.txt | BLEU=26.50 | chrF=67.76 | TER=66.74 | Cosine=92.63
+Antti_Ulvio_Pohjustus.txt | BLEU=33.34 | chrF=70.50 | TER=52.08 | Cosine=94.72
+Ari_Heiskanen_1.txt | BLEU=34.53 | chrF=73.93 | TER=50.41 | Cosine=89.20
+Ari_Heiskanen_2.txt | BLEU=35.27 | chrF=70.85 | TER=49.88 | Cosine=95.93
+Ari_Heiskanen_3.txt | BLEU=32.78 | chrF=65.28 | TER=51.75 | Cosine=93.18
+Atte_Lajunen_1080p.txt | BLEU=34.41 | chrF=74.12 | TER=54.35 | Cosine=96.23
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=23.08 | chrF=61.26 | TER=60.58 | Cosine=89.23
+Finnendo_Pohjustus.txt | BLEU=27.17 | chrF=72.10 | TER=108.65 | Cosine=92.20
+Hannu_Heiska.txt | BLEU=24.37 | chrF=65.78 | TER=63.23 | Cosine=91.92
+
+--- AVERAGE (10 files) ---
+BLEU=30.42
+chrF=69.32
+TER=60.88
+CosineSim=93.07
+
+============================================================
+Model: Opus
+============================================================
+Ajokortti.txt | BLEU=32.01 | chrF=66.36 | TER=50.92 | Cosine=89.61
+Aki_Linden_20210115_Final.txt | BLEU=20.09 | chrF=63.52 | TER=69.82 | Cosine=83.09
+Antti_Ulvio_Pohjustus.txt | BLEU=29.61 | chrF=70.07 | TER=57.87 | Cosine=91.47
+Ari_Heiskanen_1.txt | BLEU=24.93 | chrF=62.96 | TER=63.96 | Cosine=89.38
+Ari_Heiskanen_2.txt | BLEU=28.38 | chrF=64.05 | TER=58.07 | Cosine=94.40
+Ari_Heiskanen_3.txt | BLEU=31.06 | chrF=62.23 | TER=53.15 | Cosine=89.05
+Atte_Lajunen_1080p.txt | BLEU=30.01 | chrF=68.90 | TER=63.77 | Cosine=93.09
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=23.81 | chrF=57.20 | TER=59.03 | Cosine=92.01
+Finnendo_Pohjustus.txt | BLEU=17.38 | chrF=63.67 | TER=114.74 | Cosine=90.98
+Hannu_Heiska.txt | BLEU=24.47 | chrF=62.42 | TER=62.80 | Cosine=92.85
+
+--- AVERAGE (10 files) ---
+BLEU=26.18
+chrF=64.14
+TER=65.41
+CosineSim=90.59
+
+
+============================================================
+Model: GPT-4.1
+============================================================
+Ajokortti.txt | BLEU=44.26 | chrF=77.58 | TER=39.26 | Cosine=96.81
+Aki_Linden_20210115_Final.txt | BLEU=37.90 | chrF=74.54 | TER=48.90 | Cosine=92.48
+Antti_Ulvio_Pohjustus.txt | BLEU=40.86 | chrF=73.89 | TER=42.36 | Cosine=94.39
+Ari_Heiskanen_1.txt | BLEU=52.71 | chrF=78.64 | TER=35.77 | Cosine=94.62
+Ari_Heiskanen_2.txt | BLEU=38.95 | chrF=72.55 | TER=43.86 | Cosine=95.74
+Ari_Heiskanen_3.txt | BLEU=46.78 | chrF=72.28 | TER=38.93 | Cosine=95.01
+Atte_Lajunen_1080p.txt | BLEU=44.24 | chrF=78.71 | TER=42.51 | Cosine=97.80
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=31.42 | chrF=62.74 | TER=50.49 | Cosine=95.01
+Finnendo_Pohjustus.txt | BLEU=29.31 | chrF=74.14 | TER=106.41 | Cosine=94.78
+Hannu_Heiska.txt | BLEU=29.14 | chrF=69.38 | TER=55.70 | Cosine=96.10
+
+--- AVERAGE (10 files) ---
+BLEU=39.56
+chrF=73.45
+TER=50.42
+CosineSim=95.27
+
+============================================================
+Model: GPT-6-Luna
+============================================================
+Ajokortti.txt | BLEU=30.59 | chrF=69.72 | TER=53.17 | Cosine=94.02
+Aki_Linden_20210115_Final.txt | BLEU=31.82 | chrF=69.43 | TER=63.00 | Cosine=90.65
+Antti_Ulvio_Pohjustus.txt | BLEU=36.82 | chrF=73.11 | TER=49.07 | Cosine=94.79
+Ari_Heiskanen_1.txt | BLEU=29.54 | chrF=67.54 | TER=55.83 | Cosine=91.50
+Ari_Heiskanen_2.txt | BLEU=34.57 | chrF=70.20 | TER=49.40 | Cosine=94.37
+Ari_Heiskanen_3.txt | BLEU=30.12 | chrF=62.23 | TER=52.91 | Cosine=92.27
+Atte_Lajunen_1080p.txt | BLEU=29.23 | chrF=70.96 | TER=57.73 | Cosine=94.69
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=20.15 | chrF=59.47 | TER=60.39 | Cosine=90.48
+Finnendo_Pohjustus.txt | BLEU=28.18 | chrF=71.58 | TER=88.46 | Cosine=91.75
+Hannu_Heiska.txt | BLEU=27.70 | chrF=65.63 | TER=60.00 | Cosine=93.27
+
+--- AVERAGE (10 files) ---
+BLEU=29.87
+chrF=67.99
+TER=59.00
+CosineSim=92.78
+
+============================================================
+Model: OpusBig
+============================================================
+Ajokortti.txt | BLEU=39.22 | chrF=72.14 | TER=46.22 | Cosine=96.59
+Aki_Linden_20210115_Final.txt | BLEU=21.88 | chrF=63.42 | TER=68.28 | Cosine=83.32
+Antti_Ulvio_Pohjustus.txt | BLEU=28.17 | chrF=70.97 | TER=59.26 | Cosine=94.78
+Ari_Heiskanen_1.txt | BLEU=30.26 | chrF=66.93 | TER=55.56 | Cosine=93.17
+Ari_Heiskanen_2.txt | BLEU=29.03 | chrF=67.34 | TER=54.46 | Cosine=95.04
+Ari_Heiskanen_3.txt | BLEU=31.55 | chrF=63.72 | TER=53.38 | Cosine=87.81
+Atte_Lajunen_1080p.txt | BLEU=31.49 | chrF=70.51 | TER=59.18 | Cosine=95.86
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=27.15 | chrF=62.66 | TER=52.62 | Cosine=93.85
+Finnendo_Pohjustus.txt | BLEU=19.81 | chrF=65.06 | TER=110.90 | Cosine=93.84
+Hannu_Heiska.txt | BLEU=21.51 | chrF=62.40 | TER=68.17 | Cosine=91.61
+
+--- AVERAGE (10 files) ---
+BLEU=28.01
+chrF=66.52
+TER=62.80
+CosineSim=92.59
+
+
+============================================================
+Model: GPT-4o
+============================================================
+Ajokortti.txt | BLEU=31.04 | chrF=64.81 | TER=47.03 | Cosine=93.58
+Aki_Linden_20210115_Final.txt | BLEU=39.94 | chrF=70.35 | TER=46.92 | Cosine=95.84
+Antti_Ulvio_Pohjustus.txt | BLEU=36.58 | chrF=68.43 | TER=45.14 | Cosine=90.81
+Ari_Heiskanen_1.txt | BLEU=50.72 | chrF=77.18 | TER=33.33 | Cosine=96.94
+Ari_Heiskanen_2.txt | BLEU=45.08 | chrF=73.02 | TER=35.90 | Cosine=95.42
+Ari_Heiskanen_3.txt | BLEU=41.68 | chrF=69.16 | TER=38.00 | Cosine=92.87
+Atte_Lajunen_1080p.txt | BLEU=43.08 | chrF=73.76 | TER=42.51 | Cosine=98.36
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=30.01 | chrF=61.63 | TER=50.10 | Cosine=89.44
+Finnendo_Pohjustus.txt | BLEU=35.48 | chrF=75.62 | TER=75.00 | Cosine=92.09
+Hannu_Heiska.txt | BLEU=32.05 | chrF=63.99 | TER=47.31 | Cosine=91.38
+
+--- AVERAGE (10 files) ---
+BLEU=38.57
+chrF=69.80
+TER=46.12
+CosineSim=93.67
+
+============================================================
+Model: GPT-6-Sol
+============================================================
+Ajokortti.txt | BLEU=35.34 | chrF=71.93 | TER=46.42 | Cosine=94.05
+Aki_Linden_20210115_Final.txt | BLEU=26.71 | chrF=65.13 | TER=62.56 | Cosine=94.68
+Antti_Ulvio_Pohjustus.txt | BLEU=32.53 | chrF=70.71 | TER=50.93 | Cosine=94.38
+Ari_Heiskanen_1.txt | BLEU=36.70 | chrF=67.34 | TER=49.32 | Cosine=91.61
+Ari_Heiskanen_2.txt | BLEU=30.69 | chrF=67.33 | TER=51.08 | Cosine=94.17
+Ari_Heiskanen_3.txt | BLEU=31.20 | chrF=64.52 | TER=52.21 | Cosine=92.70
+Atte_Lajunen_1080p.txt | BLEU=26.37 | chrF=67.19 | TER=62.80 | Cosine=95.42
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=19.26 | chrF=58.95 | TER=63.88 | Cosine=90.43
+Finnendo_Pohjustus.txt | BLEU=28.37 | chrF=70.98 | TER=86.54 | Cosine=89.21
+Hannu_Heiska.txt | BLEU=25.45 | chrF=63.81 | TER=61.08 | Cosine=93.11
+
+--- AVERAGE (10 files) ---
+BLEU=29.26
+chrF=66.79
+TER=58.68
+CosineSim=92.98
+
+============================================================
+Model: T5
+============================================================
+Ajokortti.txt | BLEU=18.26 | chrF=54.17 | TER=84.46 | Cosine=77.15
+Aki_Linden_20210115_Final.txt | BLEU=9.12 | chrF=52.40 | TER=106.39 | Cosine=63.60
+Antti_Ulvio_Pohjustus.txt | BLEU=9.56 | chrF=46.98 | TER=89.35 | Cosine=37.30
+Ari_Heiskanen_1.txt | BLEU=12.07 | chrF=54.49 | TER=89.70 | Cosine=60.74
+Ari_Heiskanen_2.txt | BLEU=13.21 | chrF=50.55 | TER=80.48 | Cosine=74.13
+Ari_Heiskanen_3.txt | BLEU=12.37 | chrF=47.07 | TER=79.25 | Cosine=70.33
+Atte_Lajunen_1080p.txt | BLEU=8.18 | chrF=50.35 | TER=93.72 | Cosine=52.51
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=10.77 | chrF=46.60 | TER=78.64 | Cosine=28.74
+Finnendo_Pohjustus.txt | BLEU=11.66 | chrF=54.65 | TER=114.42 | Cosine=80.46
+Hannu_Heiska.txt | BLEU=10.65 | chrF=49.43 | TER=98.28 | Cosine=54.92
+
+--- AVERAGE (10 files) ---
+BLEU=11.59
+chrF=50.67
+TER=91.47
+CosineSim=59.99
+
+
+============================================================
+Model: Gemini-3.1-Pro
+============================================================
+Ajokortti.txt | BLEU=41.57 | chrF=76.57 | TER=42.94 | Cosine=94.87
+Aki_Linden_20210115_Final.txt | BLEU=31.27 | chrF=73.60 | TER=56.17 | Cosine=91.95
+Antti_Ulvio_Pohjustus.txt | BLEU=36.83 | chrF=74.50 | TER=49.07 | Cosine=94.89
+Ari_Heiskanen_1.txt | BLEU=42.77 | chrF=77.81 | TER=47.43 | Cosine=93.80
+Ari_Heiskanen_2.txt | BLEU=37.80 | chrF=73.04 | TER=44.10 | Cosine=96.64
+Ari_Heiskanen_3.txt | BLEU=41.65 | chrF=71.77 | TER=44.76 | Cosine=95.28
+Atte_Lajunen_1080p.txt | BLEU=37.61 | chrF=76.19 | TER=50.48 | Cosine=97.52
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=37.95 | chrF=70.41 | TER=43.88 | Cosine=94.98
+Finnendo_Pohjustus.txt | BLEU=24.02 | chrF=71.53 | TER=130.13 | Cosine=93.88
+Hannu_Heiska.txt | BLEU=27.61 | chrF=68.59 | TER=59.14 | Cosine=92.37
+
+--- AVERAGE (10 files) ---
+BLEU=35.91
+chrF=73.40
+TER=56.81
+CosineSim=94.62
+
+============================================================
 Model: gpt-5.1
 ============================================================
+Ajokortti.txt | BLEU=38.53 | chrF=72.65 | TER=44.79 | Cosine=94.66
+Aki_Linden_20210115_Final.txt | BLEU=34.75 | chrF=70.99 | TER=51.98 | Cosine=94.15
+Antti_Ulvio_Pohjustus.txt | BLEU=35.63 | chrF=73.25 | TER=47.69 | Cosine=94.62
+Ari_Heiskanen_1.txt | BLEU=40.80 | chrF=70.93 | TER=42.55 | Cosine=92.91
+Ari_Heiskanen_2.txt | BLEU=36.68 | chrF=70.61 | TER=46.02 | Cosine=96.08
+Ari_Heiskanen_3.txt | BLEU=35.97 | chrF=64.19 | TER=47.79 | Cosine=92.75
+Atte_Lajunen_1080p.txt | BLEU=32.00 | chrF=69.80 | TER=56.52 | Cosine=93.20
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=21.80 | chrF=60.29 | TER=63.11 | Cosine=94.54
+Finnendo_Pohjustus.txt | BLEU=34.03 | chrF=71.50 | TER=75.32 | Cosine=93.06
+Hannu_Heiska.txt | BLEU=23.59 | chrF=63.89 | TER=63.23 | Cosine=92.39
+
+--- AVERAGE (10 files) ---
+BLEU=33.38
+chrF=68.81
+TER=53.90
+CosineSim=93.84
+
+============================================================
+Model: GPT-5.4-mini
+============================================================
+Ajokortti.txt | BLEU=41.05 | chrF=75.63 | TER=42.94 | Cosine=94.83
+Aki_Linden_20210115_Final.txt | BLEU=27.97 | chrF=68.81 | TER=59.91 | Cosine=92.43
+Antti_Ulvio_Pohjustus.txt | BLEU=39.38 | chrF=76.90 | TER=44.44 | Cosine=94.25
+Ari_Heiskanen_1.txt | BLEU=38.27 | chrF=75.64 | TER=51.22 | Cosine=93.54
+Ari_Heiskanen_2.txt | BLEU=34.52 | chrF=71.57 | TER=47.71 | Cosine=94.57
+Ari_Heiskanen_3.txt | BLEU=43.38 | chrF=71.90 | TER=38.69 | Cosine=95.17
+Atte_Lajunen_1080p.txt | BLEU=34.21 | chrF=75.32 | TER=55.07 | Cosine=97.50
+FINAL2_MAIN SEQUENCE_software_render.txt | BLEU=33.69 | chrF=69.19 | TER=50.10 | Cosine=93.31
+Finnendo_Pohjustus.txt | BLEU=25.32 | chrF=71.67 | TER=116.99 | Cosine=95.60
+Hannu_Heiska.txt | BLEU=30.01 | chrF=67.77 | TER=55.70 | Cosine=92.53
+
+--- AVERAGE (10 files) ---
+BLEU=34.78
+chrF=72.44
+TER=56.28
+CosineSim=94.37

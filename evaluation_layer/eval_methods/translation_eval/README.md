@@ -1,6 +1,6 @@
 # Translation Evaluation
 
-Translation quality assessment for Finnish-to-English speech translation. The scripts in this folder compare AI translation models against human reference translations with BLEU, chrF, TER and cosine similarity. A newer 20-clip evaluation (section 3.3) adds reference-free error annotation by blind LLM judges and shows why the reference-based numbers alone can pick the wrong model.
+Translation quality assessment for Finnish-to-English speech translation. The scripts in this folder compare AI translation models against human reference translations with BLEU, chrF, TER and cosine similarity. A newer 20-clip evaluation (section 3.4) adds reference-free error annotation by blind LLM judges and shows why the reference-based numbers alone can pick the wrong model.
 
 ---
 
@@ -170,18 +170,18 @@ Main packages:
 
 ### 2.3 Sample Data
 
-The sample files in `data/` are taken from a Finnish dental lecture corpus used to evaluate Finnish-to-English translation quality:
+The files in `data/` are the ten set A clips of the Finnish dental lecture corpus used in section 3:
 
 ```
 data/
-├── ground_truth/
-│   ├── Ajokortti.txt               — human reference translations (10 files)
-│   └── ...
+├── ground_truth/                   — HY's English reference texts (10 files, e.g. Ajokortti.txt)
+├── source_fi/                      — the Finnish source of each clip (HY's corrected transcript, same file names)
 └── translation_results/
-    └── <model_name>/               — one folder of outputs per model (legacy samples: gpt-5.1, Opus, OpusBig, T5)
+    ├── GPT-6-Astra/ ... Claude-Sonnet-5.5/   — the 11 current models of section 3, one file per clip
+    └── gpt-5.1/, Opus/, OpusBig/, T5/        — four older systems delivered earlier (see 3.3)
 ```
 
-The sample data (10 dental lecture files) only demonstrates the scripts. It is not the evaluation result: that is in section 3.
+Every folder holds one output file per clip with the same name as the reference file. The reference texts are HY's; who wrote them is not confirmed, and the judges find errors in them (section 3.4). To evaluate your own pipeline, add a folder with your outputs.
 
 ---
 
@@ -221,12 +221,37 @@ HY's own files of GPT-5.6-sol, GPT-5.4, Gemini-2.5-Flash and Gemini-3.5-Flash-li
 
 ![Rank by the judges versus chrF, BLEU and cosine, set A](images/translation-metric-disagreement.svg)
 
-### 3.3 Key Findings
+### 3.3 The toolkit scripts on all 15 model folders
+
+Running `src/translation_evaluation.py` on every folder in `data/translation_results/` (the ten set A clips) gives the reference-based scores below. The first column repeats the blind judges' error rate from 3.2 for the same folders; the four older sample systems were judged with the same method. Sorted by the judges' error rate:
+
+| Model | Errors per 100 words (judges) | BLEU ↑ | chrF ↑ | TER ↓ | Cosine ↑ |
+|-------|------:|------:|------:|------:|------:|
+| GPT-6 Astra | **0.3** | 30.4 | 69.3 | 60.9 | 93.1 |
+| GPT-6 Sol | **0.8** | 29.3 | 66.8 | 58.7 | 93.0 |
+| Claude-Opus-5.5 | **1.2** | 35.8 | 72.1 | 53.8 | 93.9 |
+| GPT-6 Luna | **1.5** | 29.9 | 68.0 | 59.0 | 92.8 |
+| GPT-5.5 | **2.0** | 33.6 | 72.2 | 57.2 | 93.7 |
+| GPT-4.1 | **2.2** | 39.6 | 73.4 | 50.4 | 95.3 |
+| Gemini-3.1-Pro | **2.2** | 35.9 | 73.4 | 56.8 | 94.6 |
+| Claude-Sonnet-5.5 | **2.8** | 36.5 | 72.0 | 53.9 | 94.3 |
+| Gemini-3.5-Flash | **3.0** | 36.8 | 73.0 | 53.0 | 94.9 |
+| GPT-4o | **4.5** | 38.6 | 69.8 | 46.1 | 93.7 |
+| GPT-5.4-mini | **4.8** | 34.8 | 72.4 | 56.3 | 94.4 |
+| QAdental app, older translation (folder `gpt-5.1`) | **8.0** | 33.4 | 68.8 | 53.9 | 93.8 |
+| OpusBig, Opus-MT big (older sample) | **23.1** | 28.0 | 66.5 | 62.8 | 92.6 |
+| Opus-MT (older sample) | **26.8** | 26.2 | 64.1 | 65.4 | 90.6 |
+| T5 (older sample) | **53.5** | 11.6 | 50.7 | 91.5 | 60.0 |
+
+The scores are means over the 10 clips. The reference-based columns do not follow the judges' order: the models with the fewest judged errors (GPT-6) are not the ones closest to the reference text, and the older Opus-MT models sit close to the models that the judges rate ten times better. The QAdental app's older translation has about as many judged errors as HY's own reference text (7.9). It translated its own transcript rather than the corrected Finnish for Ajokortti, and the input is not recorded for the other clips, so part of its errors may come from speech recognition. Opus is identical to HY's current file on 9 of 10 clips and OpusBig on 6 of 10, so these two are an older delivery.
+
+### 3.4 Key Findings
 
 - **GPT-6 Astra translated best on both sets and with both judges**, clearly ahead of every model run here. Its lead over HY's committed GPT-5.6-sol file is borderline (0.3 points).
 - **Reference-based metrics ranked the models almost unrelated to the judges on set A** (Spearman agreement -0.16 to -0.27; 1 means the same order) **and in reverse on set B** (-0.55 to -0.70). BLEU, chrF or cosine alone would have picked a different, worse model.
 - **The human reference is not a clean gold standard.** The judges score it at 7.9 (set A) and 15.2 (set B) error points, above every current LLM. One set A reference is 69 % of the length of every tool output and ends with a summary; set B's reference is close to OpusBig's output (chrF 82 and BLEU 68 for OpusBig against it, chrF 62-70 for the other five tools), so OpusBig ranks first on set B by BLEU while the judges rank it near the bottom.
 - **The Helsinki-NLP models make more than ten times as many errors as the top four LLMs** (23-34 points against 0.3-1.4), the largest gap in the study and consistent across both judges.
+- **The older sample systems fit the same picture:** the QAdental app's older translation has about as many judged errors as HY's reference text, Opus-MT about 23-27 and T5 about 54 (section 3.3).
 - **Limits:** the judges are LLMs and no human has checked their annotations; differences of a few tenths of a point between the top models are within judge noise; speed and cost were not compared beyond a rough latency (Astra 16 s, Sol 13 s, Luna 10 s per three-minute clip).
 
 The full study (code, per-clip data, judge annotations) is kept in the project's private evaluation repository; ask the GAIK team for access.
@@ -240,7 +265,7 @@ The full study (code, per-clip data, judge annotations) is kept in the project's
 - **Word order divergence** — Finnish SOV structure causes word-order differences in translated output that increase TER even when meaning is preserved. Cosine Similarity is more robust to this than BLEU.
 - **Compound word splitting** — Finnish medical compounds (e.g. "periimplantiitti") are inconsistently split or merged across models, causing BLEU penalties even for correct translations.
 - **Fluency vs accuracy trade-off** — some models produce fluent-sounding English that diverges from the reference wording, scoring lower on BLEU/TER while maintaining high Cosine Similarity.
-- **Reference quality** — a human reference can be a loose paraphrase, incomplete, or resemble one machine-translation system's output. Every reference-based metric then rewards the wrong thing, and the judges' ranking can be the reverse of the metrics' (section 3.3).
+- **Reference quality** — a human reference can be a loose paraphrase, incomplete, or resemble one machine-translation system's output. Every reference-based metric then rewards the wrong thing, and the judges' ranking can be the reverse of the metrics' (section 3.4).
 
 ---
 

@@ -1,1 +1,166 @@
 model,file,BLEU,chrF,TER,CosineSim,type
+Claude-Opus-5.5,Ajokortti.txt,38.14,71.98,44.99,95.08,per_file
+Claude-Opus-5.5,Aki_Linden_20210115_Final.txt,29.74,69.45,58.81,92.14,per_file
+Claude-Opus-5.5,Antti_Ulvio_Pohjustus.txt,33.48,72.74,49.77,94.75,per_file
+Claude-Opus-5.5,Ari_Heiskanen_1.txt,46.69,77.74,40.38,90.95,per_file
+Claude-Opus-5.5,Ari_Heiskanen_2.txt,39.48,73.7,40.48,97.45,per_file
+Claude-Opus-5.5,Ari_Heiskanen_3.txt,40.51,70.66,40.56,95.03,per_file
+Claude-Opus-5.5,Atte_Lajunen_1080p.txt,41.26,76.93,48.55,94.57,per_file
+Claude-Opus-5.5,FINAL2_MAIN SEQUENCE_software_render.txt,32.22,66.76,52.62,92.42,per_file
+Claude-Opus-5.5,Finnendo_Pohjustus.txt,26.25,72.17,106.41,94.09,per_file
+Claude-Opus-5.5,Hannu_Heiska.txt,30.4,68.49,55.7,92.52,per_file
+Claude-Opus-5.5,AVERAGE,35.82,72.06,53.83,93.9,average
+Gemini-3.5-Flash,Ajokortti.txt,39.09,74.79,44.38,94.48,per_file
+Gemini-3.5-Flash,Aki_Linden_20210115_Final.txt,32.22,72.61,54.19,94.51,per_file
+Gemini-3.5-Flash,Antti_Ulvio_Pohjustus.txt,39.09,75.22,46.06,94.77,per_file
+Gemini-3.5-Flash,Ari_Heiskanen_1.txt,48.47,79.19,40.11,93.06,per_file
+Gemini-3.5-Flash,Ari_Heiskanen_2.txt,37.34,72.08,42.41,96.77,per_file
+Gemini-3.5-Flash,Ari_Heiskanen_3.txt,40.48,69.64,42.89,94.27,per_file
+Gemini-3.5-Flash,Atte_Lajunen_1080p.txt,40.54,77.58,46.38,96.73,per_file
+Gemini-3.5-Flash,FINAL2_MAIN SEQUENCE_software_render.txt,34.77,68.97,48.16,96.32,per_file
+Gemini-3.5-Flash,Finnendo_Pohjustus.txt,24.56,71.5,110.58,95.09,per_file
+Gemini-3.5-Flash,Hannu_Heiska.txt,31.81,68.19,54.84,93.41,per_file
+Gemini-3.5-Flash,AVERAGE,36.84,72.98,53.0,94.94,average
+GPT-5.5,Ajokortti.txt,38.44,74.55,46.42,97.03,per_file
+GPT-5.5,Aki_Linden_20210115_Final.txt,27.31,70.61,59.03,93.04,per_file
+GPT-5.5,Antti_Ulvio_Pohjustus.txt,36.03,74.45,50.23,94.77,per_file
+GPT-5.5,Ari_Heiskanen_1.txt,40.05,76.99,46.07,91.25,per_file
+GPT-5.5,Ari_Heiskanen_2.txt,35.14,72.07,46.99,96.08,per_file
+GPT-5.5,Ari_Heiskanen_3.txt,38.26,68.9,47.55,95.08,per_file
+GPT-5.5,Atte_Lajunen_1080p.txt,36.62,75.78,52.9,93.25,per_file
+GPT-5.5,FINAL2_MAIN SEQUENCE_software_render.txt,30.4,67.52,53.79,92.08,per_file
+GPT-5.5,Finnendo_Pohjustus.txt,26.75,72.0,112.5,93.99,per_file
+GPT-5.5,Hannu_Heiska.txt,26.69,68.65,56.77,90.62,per_file
+GPT-5.5,AVERAGE,33.57,72.15,57.23,93.72,average
+Claude-Sonnet-5.5,Ajokortti.txt,40.2,74.36,41.92,94.94,per_file
+Claude-Sonnet-5.5,Aki_Linden_20210115_Final.txt,31.63,70.84,54.41,93.43,per_file
+Claude-Sonnet-5.5,Antti_Ulvio_Pohjustus.txt,38.73,72.67,45.6,94.96,per_file
+Claude-Sonnet-5.5,Ari_Heiskanen_1.txt,44.65,76.08,41.46,92.06,per_file
+Claude-Sonnet-5.5,Ari_Heiskanen_2.txt,36.87,71.72,46.51,96.86,per_file
+Claude-Sonnet-5.5,Ari_Heiskanen_3.txt,45.71,72.49,36.83,94.7,per_file
+Claude-Sonnet-5.5,Atte_Lajunen_1080p.txt,37.64,75.89,59.18,94.21,per_file
+Claude-Sonnet-5.5,FINAL2_MAIN SEQUENCE_software_render.txt,30.33,66.23,53.2,93.27,per_file
+Claude-Sonnet-5.5,Finnendo_Pohjustus.txt,27.08,71.7,108.97,95.79,per_file
+Claude-Sonnet-5.5,Hannu_Heiska.txt,32.21,68.17,50.75,92.89,per_file
+Claude-Sonnet-5.5,AVERAGE,36.5,72.02,53.88,94.31,average
+GPT-6-Astra,Ajokortti.txt,32.79,71.62,51.12,95.47,per_file
+GPT-6-Astra,Aki_Linden_20210115_Final.txt,26.5,67.76,66.74,92.63,per_file
+GPT-6-Astra,Antti_Ulvio_Pohjustus.txt,33.34,70.5,52.08,94.72,per_file
+GPT-6-Astra,Ari_Heiskanen_1.txt,34.53,73.93,50.41,89.2,per_file
+GPT-6-Astra,Ari_Heiskanen_2.txt,35.27,70.85,49.88,95.93,per_file
+GPT-6-Astra,Ari_Heiskanen_3.txt,32.78,65.28,51.75,93.18,per_file
+GPT-6-Astra,Atte_Lajunen_1080p.txt,34.41,74.12,54.35,96.23,per_file
+GPT-6-Astra,FINAL2_MAIN SEQUENCE_software_render.txt,23.08,61.26,60.58,89.23,per_file
+GPT-6-Astra,Finnendo_Pohjustus.txt,27.17,72.1,108.65,92.2,per_file
+GPT-6-Astra,Hannu_Heiska.txt,24.37,65.78,63.23,91.92,per_file
+GPT-6-Astra,AVERAGE,30.42,69.32,60.88,93.07,average
+Opus,Ajokortti.txt,32.01,66.36,50.92,89.61,per_file
+Opus,Aki_Linden_20210115_Final.txt,20.09,63.52,69.82,83.09,per_file
+Opus,Antti_Ulvio_Pohjustus.txt,29.61,70.07,57.87,91.47,per_file
+Opus,Ari_Heiskanen_1.txt,24.93,62.96,63.96,89.38,per_file
+Opus,Ari_Heiskanen_2.txt,28.38,64.05,58.07,94.4,per_file
+Opus,Ari_Heiskanen_3.txt,31.06,62.23,53.15,89.05,per_file
+Opus,Atte_Lajunen_1080p.txt,30.01,68.9,63.77,93.09,per_file
+Opus,FINAL2_MAIN SEQUENCE_software_render.txt,23.81,57.2,59.03,92.01,per_file
+Opus,Finnendo_Pohjustus.txt,17.38,63.67,114.74,90.98,per_file
+Opus,Hannu_Heiska.txt,24.47,62.42,62.8,92.85,per_file
+Opus,AVERAGE,26.18,64.14,65.41,90.59,average
+GPT-4.1,Ajokortti.txt,44.26,77.58,39.26,96.81,per_file
+GPT-4.1,Aki_Linden_20210115_Final.txt,37.9,74.54,48.9,92.48,per_file
+GPT-4.1,Antti_Ulvio_Pohjustus.txt,40.86,73.89,42.36,94.39,per_file
+GPT-4.1,Ari_Heiskanen_1.txt,52.71,78.64,35.77,94.62,per_file
+GPT-4.1,Ari_Heiskanen_2.txt,38.95,72.55,43.86,95.74,per_file
+GPT-4.1,Ari_Heiskanen_3.txt,46.78,72.28,38.93,95.01,per_file
+GPT-4.1,Atte_Lajunen_1080p.txt,44.24,78.71,42.51,97.8,per_file
+GPT-4.1,FINAL2_MAIN SEQUENCE_software_render.txt,31.42,62.74,50.49,95.01,per_file
+GPT-4.1,Finnendo_Pohjustus.txt,29.31,74.14,106.41,94.78,per_file
+GPT-4.1,Hannu_Heiska.txt,29.14,69.38,55.7,96.1,per_file
+GPT-4.1,AVERAGE,39.56,73.45,50.42,95.27,average
+GPT-6-Luna,Ajokortti.txt,30.59,69.72,53.17,94.02,per_file
+GPT-6-Luna,Aki_Linden_20210115_Final.txt,31.82,69.43,63.0,90.65,per_file
+GPT-6-Luna,Antti_Ulvio_Pohjustus.txt,36.82,73.11,49.07,94.79,per_file
+GPT-6-Luna,Ari_Heiskanen_1.txt,29.54,67.54,55.83,91.5,per_file
+GPT-6-Luna,Ari_Heiskanen_2.txt,34.57,70.2,49.4,94.37,per_file
+GPT-6-Luna,Ari_Heiskanen_3.txt,30.12,62.23,52.91,92.27,per_file
+GPT-6-Luna,Atte_Lajunen_1080p.txt,29.23,70.96,57.73,94.69,per_file
+GPT-6-Luna,FINAL2_MAIN SEQUENCE_software_render.txt,20.15,59.47,60.39,90.48,per_file
+GPT-6-Luna,Finnendo_Pohjustus.txt,28.18,71.58,88.46,91.75,per_file
+GPT-6-Luna,Hannu_Heiska.txt,27.7,65.63,60.0,93.27,per_file
+GPT-6-Luna,AVERAGE,29.87,67.99,59.0,92.78,average
+OpusBig,Ajokortti.txt,39.22,72.14,46.22,96.59,per_file
+OpusBig,Aki_Linden_20210115_Final.txt,21.88,63.42,68.28,83.32,per_file
+OpusBig,Antti_Ulvio_Pohjustus.txt,28.17,70.97,59.26,94.78,per_file
+OpusBig,Ari_Heiskanen_1.txt,30.26,66.93,55.56,93.17,per_file
+OpusBig,Ari_Heiskanen_2.txt,29.03,67.34,54.46,95.04,per_file
+OpusBig,Ari_Heiskanen_3.txt,31.55,63.72,53.38,87.81,per_file
+OpusBig,Atte_Lajunen_1080p.txt,31.49,70.51,59.18,95.86,per_file
+OpusBig,FINAL2_MAIN SEQUENCE_software_render.txt,27.15,62.66,52.62,93.85,per_file
+OpusBig,Finnendo_Pohjustus.txt,19.81,65.06,110.9,93.84,per_file
+OpusBig,Hannu_Heiska.txt,21.51,62.4,68.17,91.61,per_file
+OpusBig,AVERAGE,28.01,66.52,62.8,92.59,average
+GPT-4o,Ajokortti.txt,31.04,64.81,47.03,93.58,per_file
+GPT-4o,Aki_Linden_20210115_Final.txt,39.94,70.35,46.92,95.84,per_file
+GPT-4o,Antti_Ulvio_Pohjustus.txt,36.58,68.43,45.14,90.81,per_file
+GPT-4o,Ari_Heiskanen_1.txt,50.72,77.18,33.33,96.94,per_file
+GPT-4o,Ari_Heiskanen_2.txt,45.08,73.02,35.9,95.42,per_file
+GPT-4o,Ari_Heiskanen_3.txt,41.68,69.16,38.0,92.87,per_file
+GPT-4o,Atte_Lajunen_1080p.txt,43.08,73.76,42.51,98.36,per_file
+GPT-4o,FINAL2_MAIN SEQUENCE_software_render.txt,30.01,61.63,50.1,89.44,per_file
+GPT-4o,Finnendo_Pohjustus.txt,35.48,75.62,75.0,92.09,per_file
+GPT-4o,Hannu_Heiska.txt,32.05,63.99,47.31,91.38,per_file
+GPT-4o,AVERAGE,38.57,69.8,46.12,93.67,average
+GPT-6-Sol,Ajokortti.txt,35.34,71.93,46.42,94.05,per_file
+GPT-6-Sol,Aki_Linden_20210115_Final.txt,26.71,65.13,62.56,94.68,per_file
+GPT-6-Sol,Antti_Ulvio_Pohjustus.txt,32.53,70.71,50.93,94.38,per_file
+GPT-6-Sol,Ari_Heiskanen_1.txt,36.7,67.34,49.32,91.61,per_file
+GPT-6-Sol,Ari_Heiskanen_2.txt,30.69,67.33,51.08,94.17,per_file
+GPT-6-Sol,Ari_Heiskanen_3.txt,31.2,64.52,52.21,92.7,per_file
+GPT-6-Sol,Atte_Lajunen_1080p.txt,26.37,67.19,62.8,95.42,per_file
+GPT-6-Sol,FINAL2_MAIN SEQUENCE_software_render.txt,19.26,58.95,63.88,90.43,per_file
+GPT-6-Sol,Finnendo_Pohjustus.txt,28.37,70.98,86.54,89.21,per_file
+GPT-6-Sol,Hannu_Heiska.txt,25.45,63.81,61.08,93.11,per_file
+GPT-6-Sol,AVERAGE,29.26,66.79,58.68,92.98,average
+T5,Ajokortti.txt,18.26,54.17,84.46,77.15,per_file
+T5,Aki_Linden_20210115_Final.txt,9.12,52.4,106.39,63.6,per_file
+T5,Antti_Ulvio_Pohjustus.txt,9.56,46.98,89.35,37.3,per_file
+T5,Ari_Heiskanen_1.txt,12.07,54.49,89.7,60.74,per_file
+T5,Ari_Heiskanen_2.txt,13.21,50.55,80.48,74.13,per_file
+T5,Ari_Heiskanen_3.txt,12.37,47.07,79.25,70.33,per_file
+T5,Atte_Lajunen_1080p.txt,8.18,50.35,93.72,52.51,per_file
+T5,FINAL2_MAIN SEQUENCE_software_render.txt,10.77,46.6,78.64,28.74,per_file
+T5,Finnendo_Pohjustus.txt,11.66,54.65,114.42,80.46,per_file
+T5,Hannu_Heiska.txt,10.65,49.43,98.28,54.92,per_file
+T5,AVERAGE,11.59,50.67,91.47,59.99,average
+Gemini-3.1-Pro,Ajokortti.txt,41.57,76.57,42.94,94.87,per_file
+Gemini-3.1-Pro,Aki_Linden_20210115_Final.txt,31.27,73.6,56.17,91.95,per_file
+Gemini-3.1-Pro,Antti_Ulvio_Pohjustus.txt,36.83,74.5,49.07,94.89,per_file
+Gemini-3.1-Pro,Ari_Heiskanen_1.txt,42.77,77.81,47.43,93.8,per_file
+Gemini-3.1-Pro,Ari_Heiskanen_2.txt,37.8,73.04,44.1,96.64,per_file
+Gemini-3.1-Pro,Ari_Heiskanen_3.txt,41.65,71.77,44.76,95.28,per_file
+Gemini-3.1-Pro,Atte_Lajunen_1080p.txt,37.61,76.19,50.48,97.52,per_file
+Gemini-3.1-Pro,FINAL2_MAIN SEQUENCE_software_render.txt,37.95,70.41,43.88,94.98,per_file
+Gemini-3.1-Pro,Finnendo_Pohjustus.txt,24.02,71.53,130.13,93.88,per_file
+Gemini-3.1-Pro,Hannu_Heiska.txt,27.61,68.59,59.14,92.37,per_file
+Gemini-3.1-Pro,AVERAGE,35.91,73.4,56.81,94.62,average
+gpt-5.1,Ajokortti.txt,38.53,72.65,44.79,94.66,per_file
+gpt-5.1,Aki_Linden_20210115_Final.txt,34.75,70.99,51.98,94.15,per_file
+gpt-5.1,Antti_Ulvio_Pohjustus.txt,35.63,73.25,47.69,94.62,per_file
+gpt-5.1,Ari_Heiskanen_1.txt,40.8,70.93,42.55,92.91,per_file
+gpt-5.1,Ari_Heiskanen_2.txt,36.68,70.61,46.02,96.08,per_file
+gpt-5.1,Ari_Heiskanen_3.txt,35.97,64.19,47.79,92.75,per_file
+gpt-5.1,Atte_Lajunen_1080p.txt,32.0,69.8,56.52,93.2,per_file
+gpt-5.1,FINAL2_MAIN SEQUENCE_software_render.txt,21.8,60.29,63.11,94.54,per_file
+gpt-5.1,Finnendo_Pohjustus.txt,34.03,71.5,75.32,93.06,per_file
+gpt-5.1,Hannu_Heiska.txt,23.59,63.89,63.23,92.39,per_file
+gpt-5.1,AVERAGE,33.38,68.81,53.9,93.84,average
+GPT-5.4-mini,Ajokortti.txt,41.05,75.63,42.94,94.83,per_file
+GPT-5.4-mini,Aki_Linden_20210115_Final.txt,27.97,68.81,59.91,92.43,per_file
+GPT-5.4-mini,Antti_Ulvio_Pohjustus.txt,39.38,76.9,44.44,94.25,per_file
+GPT-5.4-mini,Ari_Heiskanen_1.txt,38.27,75.64,51.22,93.54,per_file
+GPT-5.4-mini,Ari_Heiskanen_2.txt,34.52,71.57,47.71,94.57,per_file
+GPT-5.4-mini,Ari_Heiskanen_3.txt,43.38,71.9,38.69,95.17,per_file
+GPT-5.4-mini,Atte_Lajunen_1080p.txt,34.21,75.32,55.07,97.5,per_file
+GPT-5.4-mini,FINAL2_MAIN SEQUENCE_software_render.txt,33.69,69.19,50.1,93.31,per_file
+GPT-5.4-mini,Finnendo_Pohjustus.txt,25.32,71.67,116.99,95.6,per_file
+GPT-5.4-mini,Hannu_Heiska.txt,30.01,67.77,55.7,92.53,per_file
+GPT-5.4-mini,AVERAGE,34.78,72.44,56.28,94.37,average

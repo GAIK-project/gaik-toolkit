@@ -100,6 +100,30 @@ Claude and Gemini models were scored by the other vendor's judge only (a judge n
 
 ![Rank by the judges versus chrF, BLEU and cosine, set A](/images/translation-metric-disagreement.svg)
 
+### The toolkit scripts on all 15 model folders
+
+The reference-based scores of `translation_evaluation.py` (means over the 10 set A clips), next to the judges' error rate, sorted by the judges' error rate:
+
+| Model | Errors per 100 words (judges) | BLEU ↑ | chrF ↑ | TER ↓ | Cosine ↑ |
+|-------|------:|------:|------:|------:|------:|
+| GPT-6 Astra | **0.3** | 30.4 | 69.3 | 60.9 | 93.1 |
+| GPT-6 Sol | **0.8** | 29.3 | 66.8 | 58.7 | 93.0 |
+| Claude-Opus-5.5 | **1.2** | 35.8 | 72.1 | 53.8 | 93.9 |
+| GPT-6 Luna | **1.5** | 29.9 | 68.0 | 59.0 | 92.8 |
+| GPT-5.5 | **2.0** | 33.6 | 72.2 | 57.2 | 93.7 |
+| GPT-4.1 | **2.2** | 39.6 | 73.4 | 50.4 | 95.3 |
+| Gemini-3.1-Pro | **2.2** | 35.9 | 73.4 | 56.8 | 94.6 |
+| Claude-Sonnet-5.5 | **2.8** | 36.5 | 72.0 | 53.9 | 94.3 |
+| Gemini-3.5-Flash | **3.0** | 36.8 | 73.0 | 53.0 | 94.9 |
+| GPT-4o | **4.5** | 38.6 | 69.8 | 46.1 | 93.7 |
+| GPT-5.4-mini | **4.8** | 34.8 | 72.4 | 56.3 | 94.4 |
+| QAdental app, older translation (folder `gpt-5.1`) | **8.0** | 33.4 | 68.8 | 53.9 | 93.8 |
+| OpusBig, Opus-MT big (older sample) | **23.1** | 28.0 | 66.5 | 62.8 | 92.6 |
+| Opus-MT (older sample) | **26.8** | 26.2 | 64.1 | 65.4 | 90.6 |
+| T5 (older sample) | **53.5** | 11.6 | 50.7 | 91.5 | 60.0 |
+
+The reference-based columns do not follow the judges' order. The QAdental app's older translation has about as many judged errors as HY's own reference text (7.9).
+
 ### Key Findings
 
 - **GPT-6 Astra translated best on both sets and with both judges**, clearly ahead of every model run here; its lead over HY's committed GPT-5.6-sol file is borderline (0.3 points)
