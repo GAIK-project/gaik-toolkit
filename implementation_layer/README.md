@@ -67,6 +67,9 @@ pip install "gaik[enhance-transcript]"
 # Document classification
 pip install "gaik[classifier]"
 
+# Text/document classification with the Jev model (via gaik-decide or TypeSafe)
+pip install "gaik[jev-classifier]"
+
 # Single-call vision extraction (document/image -> structured data)
 pip install "gaik[vision-extract]"
 
@@ -160,6 +163,7 @@ Software components:
 Software components:
 
 - `DocumentClassifier` – classifies PDF/DOCX/text inputs into user-defined categories
+- `JevClassifier` – classifies text and PDF/DOCX with the Jev model and returns per-class probabilities and a confidence
 - `form_understander` – form-oriented understanding utilities for structured document inputs
 
 ### 6. RAG Components – retrieval‑augmented generation

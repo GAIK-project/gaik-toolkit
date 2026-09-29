@@ -173,6 +173,13 @@ classifier = [
     "python-docx>=1.2.0",
 ]
 
+# Text/document classification with the Jev model (TypeSafe System One)
+jev-classifier = [
+    "typesafe-sdk>=0.7.2",
+    "PyMuPDF>=1.26.0",
+    "python-docx>=1.2.0",
+]
+
 # Multi-provider PDF-to-markdown parser (OpenAI, Claude, Google Gemini)
 multimodal-parser = [
     "PyMuPDF>=1.26.0",
@@ -266,6 +273,7 @@ all = [
     "gaik[text-to-speech]",
     "gaik[parallel-transcriber]",
     "gaik[classifier]",
+    "gaik[jev-classifier]",
     "gaik[rag-parser-docling]",
     "gaik[rag-parser-vision]",
     "gaik[embedder]",
@@ -380,6 +388,7 @@ all-cpu = [
     "gaik[text-to-speech]",
     "gaik[parallel-transcriber]",
     "gaik[classifier]",
+    "gaik[jev-classifier]",
     "gaik[audio-to-structured-data]",
     "gaik[documents-to-structured-data-cpu]",
     "gaik[pg-vector-store]",

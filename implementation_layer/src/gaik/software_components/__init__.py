@@ -16,6 +16,7 @@ __all__ = [
     "parallel_transcriber",
     "parsers",
     "doc_classifier",
+    "jev_classifier",
     "form_understander",
     "RAG",
     "postgres_agent",

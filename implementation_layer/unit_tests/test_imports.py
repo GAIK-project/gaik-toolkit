@@ -38,6 +38,13 @@ def test_doc_classifier_import():
     assert doc_classifier is not None
 
 
+def test_jev_classifier_import():
+    """Test that jev_classifier module can be imported."""
+    from gaik.software_components import jev_classifier
+
+    assert jev_classifier is not None
+
+
 def test_embedder_import():
     """Test that embedder module can be imported."""
     from gaik.software_components.RAG import embedder

@@ -830,6 +830,86 @@
     "install_extra": "classifier"
   },
   {
+    "id": "jev_classifier",
+    "name": "JevClassifier",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text",
+      "pdf",
+      "document"
+    ],
+    "output_artifact_types": [
+      "classification",
+      "classification_result"
+    ],
+    "knowledge_processes": [
+      "knowledge_access"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "api_key",
+      "classes"
+    ],
+    "optional_parameters": [
+      "base_url",
+      "model",
+      "timeout",
+      "max_retries",
+      "instructions",
+      "min_confidence",
+      "hierarchy",
+      "max_chars"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "One fast, cheap request per text; class descriptions and a min_confidence gate improve accuracy",
+      "cost_sensitivity": "low -- one small request per item",
+      "degrades_on": [
+        "overlapping_categories",
+        "very_short_texts",
+        "scanned_pdfs_without_text_layer"
+      ]
+    },
+    "known_limitations": [
+      "Uses the Jev model (TypeSafe System One) over HTTP, not a GAIK LLM provider: it needs a gaik-decide or TypeSafe API key passed by the caller, and no llm config, model deployment or provider choice applies",
+      "Text is sent to TypeSafe in the United States: do not select it for sensitive personal data or documents that must stay inside CSC, Azure or another chosen provider; use DocumentClassifier there",
+      "Text only (PDF and DOCX text layers): no image or scanned-document input, and no written reasoning -- it returns probabilities and a confidence instead",
+      "Single label per text; ambiguous or overlapping categories reduce accuracy, and a min_confidence threshold must be tuned on labelled examples"
+    ],
+    "best_for": [
+      "document_routing",
+      "email_triage",
+      "ticket_categorization",
+      "confidence_gated_review"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "classify_text",
+        "component": "JevClassifier",
+        "inputs": [
+          "source_text"
+        ],
+        "outputs": [
+          "classification_result"
+        ],
+        "parameters": {
+          "classes": {
+            "invoice": "asks for payment",
+            "receipt": "proof of payment",
+            "other": null
+          },
+          "min_confidence": 0.9
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/jev_classifier/",
+    "import_path": "gaik.software_components.jev_classifier",
+    "example_script_path": "implementation_layer/examples/software_components/jev_classifier/",
+    "readme_path": "implementation_layer/src/gaik/software_components/jev_classifier/README.md",
+    "install_extra": "jev-classifier"
+  },
+  {
     "id": "pg_vector_store",
     "name": "PgVectorStore",
     "type": "software_component",

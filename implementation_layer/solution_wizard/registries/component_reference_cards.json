@@ -704,6 +704,47 @@
       }
     ]
   },
+  "JevClassifier": {
+    "import": "from gaik.software_components.jev_classifier import JevClassifier",
+    "construct": "classifier = JevClassifier(api_key=os.environ['GAIK_DECIDE_API_KEY'], base_url=os.environ['GAIK_DECIDE_URL'])",
+    "call": "result = classifier.classify(text, classes={'invoice': 'asks for payment', 'receipt': 'proof of payment'}, instructions='Which kind of document is this?', min_confidence=0.9)\n    # PDF/DOCX: classifier.classify_file(str(input_path), classes) -> {filename: result}\n    # many texts: classifier.classify_many(texts, classes) -> list[result]",
+    "returns": "dict(class, confidence, probabilities: {label: p}, predicted, model). class is 'unknown' (or the parent label when hierarchy={child: parent} is given) when confidence < min_confidence; predicted is Jev's top label before that gate. classify_file returns {filename: that dict}; classify_many returns a list in input order, a failed item has an 'error' key.",
+    "install_extra": "jev-classifier",
+    "options": [
+      {
+        "name": "base_url",
+        "type": "str | None",
+        "default": null,
+        "effect": "API root. None calls TypeSafe directly with a TypeSafe key; the gaik-decide root URL routes through GAIK's shared service with a per-app key. GAIK applications must use gaik-decide, not their own TypeSafe key. The generated code reads GAIK_DECIDE_URL and GAIK_DECIDE_API_KEY; GAIK itself has no environment fallback.",
+        "selection_relevant": true,
+        "infer_from": "Always the gaik-decide URL for GAIK use cases; ask for it if the user has no gaik-decide key."
+      },
+      {
+        "name": "model",
+        "type": "str",
+        "default": "jev-1.13.0",
+        "effect": "Pinned Jev version. A partial version such as 'jev-1.13' is rejected by the API.",
+        "selection_relevant": false,
+        "infer_from": "Keep the default unless the user names another Jev version."
+      },
+      {
+        "name": "timeout",
+        "type": "float",
+        "default": 30.0,
+        "effect": "Request timeout in seconds.",
+        "selection_relevant": false,
+        "infer_from": "Keep the default."
+      },
+      {
+        "name": "max_retries",
+        "type": "int",
+        "default": 3,
+        "effect": "Retries for 429 and 5xx responses, handled by the TypeSafe SDK.",
+        "selection_relevant": false,
+        "infer_from": "Keep the default."
+      }
+    ]
+  },
   "Embedder": {
     "import": "from gaik.software_components.RAG.embedder import Embedder",
     "construct": "embedder = Embedder(config=get_stage_config(config, 'embedding'))",

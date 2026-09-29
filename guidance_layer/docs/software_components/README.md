@@ -3,6 +3,7 @@
 Index of available software component docs:
 
 - `doc_classifier.md`
+- `jev_classifier.md`
 - `extractor.md`
 - `vision_extractor.md`
 - `parsers.md`

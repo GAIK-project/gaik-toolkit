@@ -292,6 +292,45 @@ flowchart LR
 
 ---
 
+### Jev Classifier
+
+The Jev Classifier assigns one of your classes to a text or a PDF/Word document with **Jev**, TypeSafe's System One model. Jev returns the chosen label, a probability for every label and a confidence instead of a written answer, so the code around it decides what happens to a doubtful case: mark it "unknown", report a broader label, or send it to a person. It works through the `gaik-decide` service, so an application needs no TypeSafe key of its own.
+
+<Mermaid chart={`
+flowchart LR
+    A("📄 Text or document") --> B
+    C("🏷️ Classes + descriptions") --> B
+
+    subgraph B["Jev Classifier"]
+        direction TB
+        M["Jev Choice question<br/>via gaik-decide"]
+        G{"confidence ≥ threshold?"}
+        M --> G
+    end
+
+    G -- yes --> D("🏷️ Class + probabilities")
+    G -- no --> E("❓ unknown, or a broader label")
+
+    style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style C fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style D fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style E fill:#fef3c7,stroke:#d97706,color:#78350f
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- Probabilities for every class and a confidence that separates clear cases from doubtful ones
+- Confidence gate: `"unknown"` or a broader label from a class hierarchy, from one request
+- Class descriptions passed to the model as the meaning of each option
+- Concurrent batch classification where one failed item does not stop the rest
+
+**Compared with the Document Classifier:** Jev takes text only and gives no written reasoning, but its confidence is calibrated and it is fast and cheap per item. Use the Document Classifier for images, written reasons, or when the text must stay with your own LLM provider. The text sent to Jev leaves CSC for TypeSafe in the United States, so do not send sensitive personal data.
+
+- **Implementation code**: [software_components/jev_classifier](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/jev_classifier)
+- **Usage examples**: [examples/jev_classifier](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/jev_classifier)
+
+---
+
 ### Validator (LLM-as-Judge)
 
 The Validator runs a second-pass LLM over the output of an upstream extractor — feeding the source page images plus the extractor's JSON to a vision-capable model and asking it to flag fields whose value doesn't match the document. It returns per-field `ok` / `suspect` / `wrong` flags with reasons and suggested values, plus a token / cost / duration record per call. Useful when missing or hallucinated fields are expensive downstream and you want a cross-provider sanity check before acting on extraction output.

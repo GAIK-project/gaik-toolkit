@@ -15,6 +15,8 @@ Modules:
         Text-to-speech generation using OpenAI/Azure OpenAI
     - gaik.software_components.doc_classifier:
         Document classification into predefined categories
+    - gaik.software_components.jev_classifier:
+        Text and document classification with the Jev model (TypeSafe)
 
 Example - Schema-based Extraction:
     >>> from gaik.software_components.extractor import (
