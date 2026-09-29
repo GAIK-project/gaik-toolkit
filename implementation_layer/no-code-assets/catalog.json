@@ -11,6 +11,13 @@
       "input": "Audio recording",
       "output": "Word (.docx)",
       "needs": ["gaik-transcriber MCP server"],
+      "setup": [
+        "Windows only. Needs Python 3.8+ and an OpenAI or Azure OpenAI key for transcription.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
+        "Paste the config it prints into claude_desktop_config.json and restart Claude Desktop.",
+        "Add the skill .zip under Settings, Capabilities."
+      ],
+      "kit": true,
       "tryPrompt": "Use the incident-report-writing skill ({url}) to turn my audio recording into an incident report. I will attach the file next."
     },
     {
@@ -23,6 +30,13 @@
       "input": "Audio recording (Finnish or English)",
       "output": "Word (.docx)",
       "needs": ["gaik-transcriber MCP server"],
+      "setup": [
+        "Windows only. Needs Python 3.8+ and an OpenAI or Azure OpenAI key for transcription.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
+        "Paste the config it prints into claude_desktop_config.json and restart Claude Desktop.",
+        "Add the skill .zip under Settings, Capabilities."
+      ],
+      "kit": true,
       "tryPrompt": "Use the construction-diary-creation skill ({url}) to create today's Työmaapäiväkirja from my site recording. I will attach the audio next."
     },
     {
@@ -35,6 +49,10 @@
       "input": "PO, BOM PDFs and a price list",
       "output": "Word (.docx) and calculation breakdown",
       "needs": ["Filesystem MCP server"],
+      "setup": [
+        "Needs Node.js. Add the file access server to claude_desktop_config.json as shown in the setup guide, then restart Claude Desktop.",
+        "Add the skill .zip under Settings, Capabilities."
+      ],
       "tryPrompt": "Use the purchase-order-processing skill ({url}) to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next."
     },
     {
@@ -47,6 +65,13 @@
       "input": "Recordings, notes, PDFs, spreadsheets",
       "output": "Word (.docx)",
       "needs": ["Filesystem MCP server", "gaik-transcriber MCP server"],
+      "setup": [
+        "Windows only. Needs Python 3.8+, Node.js and an OpenAI or Azure OpenAI key for transcription.",
+        "Download the setup kit, unzip it and run setup.bat. It installs the transcriber and the file access server, saves your key and writes the Claude Desktop config.",
+        "Paste the config it prints into claude_desktop_config.json and restart Claude Desktop.",
+        "Add the skill .zip under Settings, Capabilities."
+      ],
+      "kit": true,
       "tryPrompt": "Use the report-writing skill ({url}) to write a report from the materials I am about to attach. Infer the sections from the content."
     },
     {

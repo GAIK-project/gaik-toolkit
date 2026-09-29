@@ -16,6 +16,8 @@ export interface Skill {
   input: string;
   output: string;
   needs: string[];
+  setup: string[];
+  kit: { zip: string; zipBytes: number } | null;
   tryPrompt: string;
   files: string[];
   zip: string;
