@@ -70,11 +70,15 @@ export const launch = {
     `cursor://anysphere.cursor-deeplink/prompt?text=${encode(prompt)}`,
 };
 
-/** Chat apps have no reliable way to pre-fill a long prompt, so the prompt is copied and the app opened. */
+/**
+ * Chat apps. `?q=` pre-fills the prompt box: tested with a 7,400-character
+ * prompt on ChatGPT, which also sends it at once. Claude's `?q=` is not
+ * documented for the web app, so the button copies the prompt too.
+ */
 export const chatApps = {
-  chatgpt: "https://chatgpt.com/",
-  claude: "https://claude.ai/new",
-} as const;
+  chatgpt: (prompt: string) => `https://chatgpt.com/?q=${encode(prompt)}`,
+  claude: (prompt: string) => `https://claude.ai/new?q=${encode(prompt)}`,
+};
 
 export const installTabs = [
   {
