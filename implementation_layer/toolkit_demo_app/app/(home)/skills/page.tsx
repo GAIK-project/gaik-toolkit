@@ -1,11 +1,13 @@
 import { CodeBlock } from "@/components/code-block";
 import { NoCodeHeader } from "@/components/no-code/no-code-header";
+import { ClaudeIcon } from "@/components/no-code/provider-icons";
 import { SkillCard } from "@/components/no-code/skill-card";
 import {
   developerSkills,
   installTabs,
   noCodeSkills,
 } from "@/lib/no-code/catalog";
+import { Terminal } from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -21,7 +23,11 @@ export default function SkillsPage() {
 
       <section aria-labelledby="desktop-skills" className="space-y-4">
         <div>
-          <h2 id="desktop-skills" className="font-serif text-2xl font-semibold">
+          <h2
+            id="desktop-skills"
+            className="flex items-center gap-2 font-serif text-2xl font-semibold"
+          >
+            <ClaudeIcon className="size-6" />
             Claude Desktop
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -37,7 +43,11 @@ export default function SkillsPage() {
 
       <section aria-labelledby="agent-skills" className="space-y-4">
         <div>
-          <h2 id="agent-skills" className="font-serif text-2xl font-semibold">
+          <h2
+            id="agent-skills"
+            className="flex items-center gap-2 font-serif text-2xl font-semibold"
+          >
+            <Terminal className="size-6" aria-hidden="true" />
             Coding agents
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
