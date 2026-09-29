@@ -86,6 +86,10 @@ class BoundedClient:
     def calls(self):
         return self.budget.calls
 
+    @property
+    def usage(self):
+        return self._client.usage
+
     def _options(self, kwargs):
         return self.budget.options(self.provider, kwargs)
 
