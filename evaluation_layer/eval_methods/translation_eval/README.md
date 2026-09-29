@@ -256,6 +256,27 @@ The scores are means over the 10 clips. The reference-based columns do not follo
 
 The full study (code, per-clip data, judge annotations) is kept in the project's private evaluation repository; ask the GAIK team for access.
 
+### 3.5 How the judging and the charts were made
+
+```mermaid
+flowchart LR
+  S["Finnish source text<br/>(HY's corrected transcript)"] --> T["11 models translate<br/>same prompt, 3 runs each"]
+  T --> J
+  H["HY's six tool outputs,<br/>older sample systems,<br/>HY's reference text"] --> J
+  S --> J["Blind LLM judge<br/>sees only the source and ONE text<br/>Claude Opus 5.5 or Gemini 3.1 Pro"]
+  J --> M["List of errors:<br/>category, severity, quoted spans"]
+  M --> P["Points per 100 source words<br/>10 critical, 5 major, 1 minor"]
+  P --> C["Common scale, 95 % interval over clips"]
+  C --> G["Charts drawn by a script<br/>from the result files"]
+```
+
+- **The judge is blind.** Each call gets the Finnish source and one text labelled only "Candidate translation": no model name, no vendor, and no hint that a human reference or other candidates exist. HY's reference text goes through the same call as any model.
+- **What the judge returns.** Every error with an MQM category (mistranslation, omission, addition, untranslated, terminology, names, grammar, unnatural phrasing, register), a severity, the exact words in the candidate and in the Finnish, and a suggested fix. Each quoted span is checked to occur in the candidate (99.9 % did). Points are 10 for a critical, 5 for a major and 1 for a minor error, divided by the Finnish word count times 100.
+- **Two vendors, never their own.** Claude judges everything except Claude models and Gemini judges everything except Gemini models, so a model is never graded by its own vendor. The Gemini judge is about 1.2 times stricter, so scores are put on the Claude judge's scale with one ratio fitted on the 12 candidates both judges scored.
+- **Uncertainty.** The unit is the clip. The 95 % intervals in the charts come from resampling the clips 5,000 times.
+- **The charts are not AI-generated pictures.** A Python script writes plain SVG from the committed result files, so every bar is a number in a file and the pictures can be redrawn without an image model. The three charts are the best-model bar chart, the per-judge chart with intervals and the rank comparison against the reference-based metrics.
+- **Where the code is.** The full pipeline (translation runs, judge prompt, scoring, chart script and a checklist for a human to verify the judges' annotations) is in the project's private evaluation repository, folder `qadental-translation-multiclip`.
+
 ---
 
 ## 4. Performance Issues

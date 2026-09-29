@@ -132,6 +132,22 @@ The reference-based columns do not follow the judges' order. The QAdental app's 
 - **The Helsinki-NLP models make more than ten times as many errors as the top four LLMs** (23-34 points against 0.3-1.4)
 - **Limits** — the judges are LLMs and no human has checked their annotations; differences of a few tenths of a point between the top models are within judge noise
 
+### How the judging works
+
+```mermaid
+flowchart LR
+  S["Finnish source text<br/>(HY's corrected transcript)"] --> T["11 models translate<br/>same prompt, 3 runs each"]
+  T --> J
+  H["HY's six tool outputs,<br/>older sample systems,<br/>HY's reference text"] --> J
+  S --> J["Blind LLM judge<br/>sees only the source and ONE text<br/>Claude Opus 5.5 or Gemini 3.1 Pro"]
+  J --> M["List of errors:<br/>category, severity, quoted spans"]
+  M --> P["Points per 100 source words<br/>10 critical, 5 major, 1 minor"]
+  P --> C["Common scale, 95 % interval over clips"]
+  C --> G["Charts drawn by a script<br/>from the result files"]
+```
+
+The judge is blind (it sees only the Finnish source and one text, with no model or vendor name, and HY's reference text is judged like any model). It returns every error with an MQM category, a severity and the quoted words; points are 10, 5 and 1 for critical, major and minor errors per 100 source words. Claude never judges Claude and Gemini never judges Gemini, and scores are put on one scale. The charts are plain SVG drawn by a script from the result files, not AI-generated images, so every bar is a number in a file.
+
 ---
 
 ## Error Classification
