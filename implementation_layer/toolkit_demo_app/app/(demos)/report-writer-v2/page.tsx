@@ -173,7 +173,7 @@ export default function ReportWriterV2Page() {
         if (!Array.isArray(data?.examples))
           throw new Error("The examples response has no examples list.");
         setExamples(data.examples);
-        // ?example=<id> opens an example, e.g. from the Condition Assessment use case.
+        // ?example=<id> opens an example, e.g. from the Report Writer V2 use case.
         const id = new URLSearchParams(window.location.search).get("example");
         if (!id) return;
         const ex = (data.examples as ExampleInfo[]).find((e) => e.id === id);
