@@ -1,4 +1,5 @@
 import { CodeBlock } from "@/components/code-block";
+import { AgentLogos } from "@/components/no-code/agent-logos";
 import { NoCodeHeader } from "@/components/no-code/no-code-header";
 import { ClaudeIcon } from "@/components/no-code/provider-icons";
 import { SkillCard } from "@/components/no-code/skill-card";
@@ -33,6 +34,10 @@ export default function SkillsPage() {
           <p className="text-muted-foreground mt-1 text-sm">
             Add the .zip under Settings, Capabilities.
           </p>
+          <AgentLogos
+            lead="Also plain Agent Skills in"
+            which={["codex", "gemini", "copilot", "cursor"]}
+          />
         </div>
         <div className="grid items-start gap-5 md:grid-cols-2">
           {noCodeSkills.map((skill) => (
@@ -54,6 +59,10 @@ export default function SkillsPage() {
             For building document pipelines with the gaik package. Install all
             three as one plugin.
           </p>
+          <AgentLogos
+            lead="Works with"
+            which={["claudeCode", "codex", "copilot", "cursor", "gemini"]}
+          />
         </div>
         <CodeBlock language="bash" filename="Plugin" tabs={installTabs} />
         <div className="grid items-start gap-5 md:grid-cols-2 lg:grid-cols-3">
