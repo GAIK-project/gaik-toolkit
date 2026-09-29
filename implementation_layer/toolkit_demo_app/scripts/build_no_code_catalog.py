@@ -76,6 +76,7 @@ def _zip_skill(skill_dir: Path, name: str) -> bytes:
         for path in _files(skill_dir):
             info = zipfile.ZipInfo(f"{name}/{path.relative_to(skill_dir).as_posix()}", ZIP_DATE)
             info.compress_type = zipfile.ZIP_STORED
+            info.create_system = 3  # Unix; the default differs by OS and would change the bytes
             info.external_attr = 0o644 << 16
             archive.writestr(info, _read_bytes(path))
     return buffer.getvalue()
