@@ -21,6 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = (
     REPO_ROOT / "implementation_layer" / "toolkit_demo_app" / "scripts" / "build_no_code_catalog.py"
 )
+REGENERATE = "uv run python implementation_layer/toolkit_demo_app/scripts/build_no_code_catalog.py"
 
 
 @pytest.fixture(scope="module")
@@ -35,15 +36,11 @@ def test_generated_outputs_are_current(builder):
     catalog_text, zips = builder.build()
 
     committed = builder.CATALOG_OUT.read_text(encoding="utf-8")
-    diff = "
-".join(
-        list(difflib.unified_diff(committed.splitlines(), catalog_text.splitlines(), "committed", "built", n=0))[:20]
+    diff = difflib.unified_diff(
+        committed.splitlines(), catalog_text.splitlines(), "committed", "built", n=0
     )
     assert committed == catalog_text, (
-        "catalog.generated.json is stale: run "
-        "`uv run python implementation_layer/toolkit_demo_app/scripts/build_no_code_catalog.py`
-"
-        + diff
+        f"catalog.generated.json is stale: run `{REGENERATE}`\n" + "\n".join(list(diff)[:20])
     )
     for name, payload in zips.items():
         assert (builder.ZIP_DIR / name).read_bytes() == payload, f"{name} is stale; regenerate"
