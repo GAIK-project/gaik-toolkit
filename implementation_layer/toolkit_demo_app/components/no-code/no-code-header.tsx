@@ -1,10 +1,16 @@
 import { prompts, skills } from "@/lib/no-code/catalog";
 import { cn } from "@/lib/utils";
+import { MessageSquare, Wand2 } from "lucide-react";
 import Link from "next/link";
 
 const tabs = [
-  { href: "/skills", label: "Agent skills", count: skills.length },
-  { href: "/prompts", label: "Prompts", count: prompts.length },
+  { href: "/skills", label: "Agent skills", count: skills.length, icon: Wand2 },
+  {
+    href: "/prompts",
+    label: "Prompts",
+    count: prompts.length,
+    icon: MessageSquare,
+  },
 ] as const;
 
 /** Shared top of /skills and /prompts: title and a two-way switch. */
@@ -20,8 +26,11 @@ export function NoCodeHeader({ active }: { active: "/skills" | "/prompts" }) {
           assistant you already use.
         </p>
       </div>
-      <nav aria-label="No-code assets" className="bg-muted inline-flex rounded-lg p-1">
-        {tabs.map(({ href, label, count }) => (
+      <nav
+        aria-label="No-code assets"
+        className="bg-muted inline-flex rounded-lg p-1"
+      >
+        {tabs.map(({ href, label, count, icon: Icon }) => (
           <Link
             key={href}
             href={href}
@@ -33,6 +42,7 @@ export function NoCodeHeader({ active }: { active: "/skills" | "/prompts" }) {
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
+            <Icon className="size-4" aria-hidden="true" />
             {label}
             <span className="text-muted-foreground text-xs">{count}</span>
           </Link>

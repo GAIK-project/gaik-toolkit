@@ -7,6 +7,7 @@ import { useState } from "react";
 import { CopyAndOpen, CopyButton } from "./actions";
 import { AssetIcon } from "./asset-icon";
 import { Disclosure } from "./disclosure";
+import { IoLine } from "./io-line";
 import { ClaudeIcon, OpenAIIcon } from "./provider-icons";
 
 export function PromptCard({ prompt }: { prompt: Prompt }) {
@@ -18,7 +19,9 @@ export function PromptCard({ prompt }: { prompt: Prompt }) {
       <header className="flex items-start gap-3">
         <AssetIcon id={prompt.id} />
         <div className="min-w-0 flex-1 space-y-1">
-          <h3 className="text-lg leading-tight font-semibold">{prompt.title}</h3>
+          <h3 className="text-lg leading-tight font-semibold">
+            {prompt.title}
+          </h3>
           <p className="text-muted-foreground text-sm">{prompt.tagline}</p>
         </div>
         <a
@@ -33,9 +36,7 @@ export function PromptCard({ prompt }: { prompt: Prompt }) {
         </a>
       </header>
 
-      <p className="text-sm">
-        {prompt.input} <span aria-label="to">→</span> {prompt.output}
-      </p>
+      <IoLine input={prompt.input} output={prompt.output} />
 
       {prompt.variants.length > 1 && (
         <div role="group" aria-label="Prompt version" className="flex gap-1">
