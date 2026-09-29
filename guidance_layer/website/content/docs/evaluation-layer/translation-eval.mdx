@@ -69,6 +69,10 @@ Cosine Similarity is computed on the raw (non-lemmatized) texts to preserve sema
 
 ## Benchmarking Results
 
+**GPT-6 Astra translates best.** Two blind LLM judges found the fewest errors in it on both clip sets, and the human references scored worse than every current model.
+
+![Best translation model: errors per 100 source words, sets A and B](/images/translation-best-model.svg)
+
 ### Which model is best? A 20-clip evaluation with blind judges
 
 Eleven current models (three runs each) were tested against six outputs committed by the University of Helsinki (HY) team and the human reference, on all 20 HY clips of Finnish dental-education speech. The clips form two sets that are never pooled: **set A** (10 historical clips with human references, used for the ranking) and **set B** (10 newer clips, used only to check that the order holds, because its reference resembles one machine-translation system's output). Every text was scored by two blind LLM judges (Claude Opus 5.5 and Gemini 3.1 Pro) that read only the Finnish source and one candidate, and by BLEU, chrF, TER and embedding cosine. The Finnish input is HY's corrected transcript, so this tests translation only.
@@ -103,21 +107,6 @@ Claude and Gemini models were scored by the other vendor's judge only (a judge n
 - **The human reference is not a clean gold standard** — the judges score it at 7.9 and 15.2 error points, above every current LLM; one set A reference is incomplete, and set B's reference is close to OpusBig's output, so OpusBig ranks first on set B by BLEU (68) while the judges rank it near the bottom
 - **The Helsinki-NLP models make more than ten times as many errors as the top four LLMs** (23-34 points against 0.3-1.4)
 - **Limits** — the judges are LLMs and no human has checked their annotations; differences of a few tenths of a point between the top models are within judge noise
-
-### Earlier 10-clip reference-based comparison
-
-The first evaluation compared four systems on 10 dental lecture transcripts with human references, using the four reference-based metrics. Four systems are in the table: the QAdental app's own translation (the data folder is named `gpt-5.1`; the model is not recorded, and it translated the app's own transcript), HY's runs of the Helsinki-NLP models `opus-mt-tc-big-fi-en` (OpusBig) and `opus-mt-fi-en` (Opus), and a T5 model. Earlier versions of this page mislabelled these as a domain-specialised tool and as Claude models.
-
-![Translation Model Comparison by Evaluation Metric](/images/translation-eval-comparison.png)
-
-| Model | BLEU ↑ | chrF ↑ | TER ↓ | Cosine Sim ↑ |
-|-------|-------:|-------:|------:|------------:|
-| **QADentalTool** (`gpt-5.1`) | **33.38** | **68.81** | **53.90** | **93.84** |
-| **OpusBig** | 28.01 | 66.52 | 62.80 | 92.59 |
-| **Opus** | 26.18 | 64.14 | 65.41 | 90.59 |
-| **T5** | 11.59 | 50.67 | 91.47 | 59.99 |
-
-*↑ higher is better; ↓ lower is better.* These numbers measure distance to one reference and, as the 20-clip evaluation shows, do not rank models reliably.
 
 ---
 
@@ -220,7 +209,7 @@ To run the evaluation on the provided sample data:
 
 1. Navigate to `evaluation_layer/eval_methods/translation_eval/`
 2. Install dependencies: `pip install -r requirements.txt && python -m spacy download en_core_web_sm`
-3. Run `python src/evaluate_standalone.py` — evaluates all 10 sample file pairs of one model folder (the QADentalTool outputs) and prints a metrics report with averages
+3. Run `python src/evaluate_standalone.py` — evaluates all 10 sample file pairs of the legacy sample folder and prints a metrics report with averages
 4. To evaluate multiple models, place outputs under `data/translation_results/<model_name>/` and run `python src/translation_evaluation.py`
 5. After batch evaluation, run `python src/generate_metrics_plot.py` to generate the comparison chart
 6. Review results in `evaluation_results/results.csv` and `evaluation_results/translation_metrics_plot.png`

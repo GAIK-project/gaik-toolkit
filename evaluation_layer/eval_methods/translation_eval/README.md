@@ -4,6 +4,16 @@ Translation quality assessment for Finnish-to-English speech translation. The sc
 
 ---
 
+## Result: which model translates best?
+
+**GPT-6 Astra.** In a 20-clip evaluation of Finnish dental-webinar speech, two blind LLM judges found the fewest translation errors in GPT-6 Astra on both clip sets, clearly ahead of every other model that was run. The human reference translations scored worse than every current model, and BLEU, chrF and cosine similarity ranked the models unrelated to the judges (or in reverse), so distance to a single reference should not choose the model.
+
+![Best translation model: errors per 100 source words, sets A and B](images/translation-best-model.svg)
+
+Details, the other models and the limits are in section 3.
+
+---
+
 ## 1. Evaluation Metrics
 
 ### 1.1 List of Metrics
@@ -14,7 +24,7 @@ The evaluation uses two families of metrics. Four **reference-based** metrics co
 - chrF (Character n-gram F-score)
 - TER (Translation Edit Rate)
 - Cosine Similarity
-- MQM error points from blind LLM judges (section 3.3; not computed by the scripts in `src/`)
+- MQM error points from blind LLM judges (section 3; not computed by the scripts in `src/`)
 
 ### 1.2 Metric Descriptions
 
@@ -130,7 +140,7 @@ All scripts are located in the `src/` folder.
 
 - **`src/evaluate_standalone.py`**
   - Evaluates all 10 ground-truth + translation pairs from one model folder using all 4 reference-based metrics and reports averages only. No external script dependencies — `clean_text_translation` is inlined.
-  - Input: `data/ground_truth/` and `data/translation_results/gpt-5.1/` (the QADentalTool outputs, see 3.1)
+  - Input: `data/ground_truth/` and `data/translation_results/gpt-5.1/` (a legacy sample folder that only demonstrates the script)
   - Output: Formatted console report with per-file scores and final averages
 
 - **`src/translation_evaluation.py`**
@@ -168,12 +178,10 @@ data/
 │   ├── Ajokortti.txt               — human reference translations (10 files)
 │   └── ...
 └── translation_results/
-    ├── gpt-5.1/                    — QADentalTool outputs (10 files), see 3.1
-    ├── Opus/, OpusBig/, T5/        — HY's committed outputs of three other systems
-    └── ...
+    └── <model_name>/               — one folder of outputs per model (legacy samples: gpt-5.1, Opus, OpusBig, T5)
 ```
 
-The sample data uses 10 dental lecture files. The `gpt-5.1` folder holds the QAdental app's own translations; the other folders hold three systems run by the University of Helsinki (HY) team. **Replace or extend these files with your own data** to evaluate your own translation pipeline. See the [Customization Guide](#customization-guide) below.
+The sample data (10 dental lecture files) only demonstrates the scripts. It is not the evaluation result: that is in section 3.
 
 ---
 
@@ -181,44 +189,14 @@ The sample data uses 10 dental lecture files. The `gpt-5.1` folder holds the QAd
 
 ### 3.1 Evaluation Setup / Context
 
-Evaluation context:
-- Domain: Dental education — lecture recordings transcribed and translated from Finnish to English
-- Language pair: Finnish → English
-- Dataset: 10 audio recording transcripts (HY's historical cohort, "data-old")
-- Ground truth: Human reference translations (single reference per clip)
-- AI workflow: Finnish transcript → AI translation → English output. The QADentalTool folder was translated from the app's own transcript, the others from the corrected Finnish transcript
-- Embedding model: `sentence-transformers/all-mpnet-base-v2`
-- Text normalization: spacy English lemmatization (alphabetic tokens only)
+- Domain: dental education, Finnish webinar speech translated into English
+- Dataset: 20 clips of about three minutes from the University of Helsinki (HY) QAD-1 task, in two sets that are never pooled. **Set A** (10 historical clips, human-made references) is used for the ranking. **Set B** (10 newer clips) only checks that the order holds, because its reference resembles one machine-translation system's output
+- Input: HY's corrected Finnish transcript, so this tests translation only, not speech recognition
+- Models: 11 current models, three runs each, with one plain translator prompt: GPT-6 Astra, Sol and Luna, GPT-5.5, GPT-5.4 mini, GPT-4.1, GPT-4o, Gemini 3.1 Pro, Gemini 3.5 Flash, Claude Opus 5.5 and Claude Sonnet 5.5. HY's committed outputs of six other systems (including the Helsinki-NLP `opus-mt` models Opus and OpusBig) and HY's human reference were scored the same way
+- Judges: Claude Opus 5.5 and Gemini 3.1 Pro annotate errors with MQM (section 1.2), each seeing only the Finnish source and one candidate. A judge never scores a candidate from its own vendor, so Claude and Gemini models are scored by one judge and converted to a common scale with the ratio fitted on the 12 candidates both judges scored
+- Reference-based metrics (BLEU, chrF, TER and embedding cosine to the reference) were computed as context. The 20-clip run used sacrebleu on the raw text and Azure `text-embedding-3-large`; the scripts in `src/` use spaCy lemmatization and `all-mpnet-base-v2` (section 1.2), so their numbers are not comparable
 
-Models compared:
-
-| Model | Description |
-|-------|-------------|
-| **QADentalTool** (folder `gpt-5.1`) | The QAdental app's own translation. HY's files name the folder `gpt-5.1` but do not record the model. It translated the app's own transcript, so transcription errors are part of its result and it is not comparable with the rows below |
-| **OpusBig** | Helsinki-NLP `opus-mt-tc-big-fi-en`, a neural machine translation model, run by HY |
-| **Opus** | Helsinki-NLP `opus-mt-fi-en`, the smaller sibling, run by HY |
-| **T5** | A T5 translation model (variant not recorded by HY) |
-
-The `Ajokortti` files in `data/translation_results/` are byte-identical to HY's committed outputs of these four systems (SHA-256 compared). Earlier versions of this page described "gpt-5.1" as a domain-specialised tool and Opus/OpusBig as Claude models; both were wrong.
-
-### 3.2 Results (reference-based)
-
-Average scores across all 10 evaluation files. These measure distance to one human reference and, as 3.3 shows, do not rank models reliably:
-
-| Model | BLEU ↑ | chrF ↑ | TER ↓ | Cosine Sim ↑ |
-|-------|-------:|-------:|------:|------------:|
-| **QADentalTool** (`gpt-5.1`) | **33.38** | **68.81** | **53.90** | **93.84** |
-| **OpusBig** | 28.01 | 66.52 | 62.80 | 92.59 |
-| **Opus** | 26.18 | 64.14 | 65.41 | 90.59 |
-| **T5** | 11.59 | 50.67 | 91.47 | 59.99 |
-
-*↑ higher is better; ↓ lower is better*
-
-![Translation Model Comparison by Evaluation Metric](evaluation_results/translation_metrics_plot.png)
-
-### 3.3 Which model is best? A 20-clip follow-up with blind judges
-
-The 10-clip table above ranks systems by distance to a single human reference. A follow-up tested 11 current models (three runs each) against HY's six committed outputs and the human reference on **all 20 HY clips**, in two sets that are never pooled: **set A** (10 historical clips with human references, used for the ranking) and **set B** (10 newer clips, used only to check that the order holds, because its reference resembles one MT system's output). Every text was scored by two blind LLM judges (Claude Opus 5.5 and Gemini 3.1 Pro, MQM, section 1.2) and by BLEU, chrF, TER and embedding cosine. The Finnish input is HY's corrected transcript, so this tests translation only.
+### 3.2 Results
 
 ![MQM error points per 100 source words by model, sets A and B](images/translation-mqm-by-model.svg)
 
@@ -239,17 +217,16 @@ Error points per 100 source words, lower is better, both judges on one scale (95
 | **Human reference** | **7.9** | **15.2** |
 | HY: OpusBig / Opus (Helsinki-NLP) | 23.5 / 26.4 | 26.5 / 33.7 |
 
-HY's own files of GPT-5.6-sol, GPT-5.4, Gemini-2.5-Flash and Gemini-3.5-Flash-lite were scored the same way and land where their model family does (0.6-4.8 on set A). Claude and Gemini models were scored by the other vendor's judge only, then converted to the common scale with the ratio fitted on the 12 candidates both judges scored.
+HY's own files of GPT-5.6-sol, GPT-5.4, Gemini-2.5-Flash and Gemini-3.5-Flash-lite land where their model family does (0.6-4.8 on set A).
 
 ![Rank by the judges versus chrF, BLEU and cosine, set A](images/translation-metric-disagreement.svg)
 
-### 3.4 Key Findings
+### 3.3 Key Findings
 
 - **GPT-6 Astra translated best on both sets and with both judges**, clearly ahead of every model run here. Its lead over HY's committed GPT-5.6-sol file is borderline (0.3 points).
 - **Reference-based metrics ranked the models almost unrelated to the judges on set A** (Spearman agreement -0.16 to -0.27; 1 means the same order) **and in reverse on set B** (-0.55 to -0.70). BLEU, chrF or cosine alone would have picked a different, worse model.
 - **The human reference is not a clean gold standard.** The judges score it at 7.9 (set A) and 15.2 (set B) error points, above every current LLM. One set A reference is 69 % of the length of every tool output and ends with a summary; set B's reference is close to OpusBig's output (chrF 82 and BLEU 68 for OpusBig against it, chrF 62-70 for the other five tools), so OpusBig ranks first on set B by BLEU while the judges rank it near the bottom.
 - **The Helsinki-NLP models make more than ten times as many errors as the top four LLMs** (23-34 points against 0.3-1.4), the largest gap in the study and consistent across both judges.
-- **The earlier 10-clip table cannot be used to rank models.** Its "gpt-5.1" row is the QAdental app's translation of the app's own transcript, and its Opus rows are not Claude models.
 - **Limits:** the judges are LLMs and no human has checked their annotations; differences of a few tenths of a point between the top models are within judge noise; speed and cost were not compared beyond a rough latency (Astra 16 s, Sol 13 s, Luna 10 s per three-minute clip).
 
 The full study (code, per-clip data, judge annotations) is kept in the project's private evaluation repository; ask the GAIK team for access.
@@ -263,7 +240,7 @@ The full study (code, per-clip data, judge annotations) is kept in the project's
 - **Word order divergence** — Finnish SOV structure causes word-order differences in translated output that increase TER even when meaning is preserved. Cosine Similarity is more robust to this than BLEU.
 - **Compound word splitting** — Finnish medical compounds (e.g. "periimplantiitti") are inconsistently split or merged across models, causing BLEU penalties even for correct translations.
 - **Fluency vs accuracy trade-off** — some models produce fluent-sounding English that diverges from the reference wording, scoring lower on BLEU/TER while maintaining high Cosine Similarity.
-- **Reference quality** — a human reference can be a loose paraphrase, incomplete, or resemble one machine-translation system's output. Every reference-based metric then rewards the wrong thing, and the judges' ranking can be the reverse of the metrics' (section 3.4).
+- **Reference quality** — a human reference can be a loose paraphrase, incomplete, or resemble one machine-translation system's output. Every reference-based metric then rewards the wrong thing, and the judges' ranking can be the reverse of the metrics' (section 3.3).
 
 ---
 
@@ -278,7 +255,7 @@ The full study (code, per-clip data, judge annotations) is kept in the project's
 | Low Cosine Similarity | Use a domain-adapted embedding model for evaluation; improve base translation model selection |
 | Proper noun garbling | Add named-entity pre/post-processing; use glossary injection in LLM translation prompts |
 | Compound word inconsistency | Add normalization rules for known compound forms before metric computation |
-| T5 and Opus-MT errors on specialist content | Replace with an LLM-based translation; the 20-clip evaluation shows more than a 10x lower error rate for the top LLMs |
+| Errors from older neural MT models (Opus-MT, T5) | Use a current LLM translator; the 20-clip evaluation shows more than a 10x lower error rate for the top LLMs |
 | Reference-based metrics disagree with quality | Add reference-free MQM judging, check each reference (length against several systems' outputs, similarity to any single system) and score the reference like any candidate |
 | LLM judge noise and vendor bias | Use judges from two vendors, never let a judge score its own vendor, repeat runs, and have a native reader check a sample of annotations |
 
@@ -293,7 +270,7 @@ cd evaluation_layer/eval_methods/translation_eval
 python src/evaluate_standalone.py
 ```
 
-Evaluates the 10 sample file pairs in `data/` (ground truth against the `gpt-5.1` folder) and prints one score block per file plus averages. No arguments needed. Edit `TRANSLATION_DIR` and `MODEL_NAME` at the top of the script to evaluate another folder.
+Evaluates the 10 sample file pairs in `data/` (ground truth against the legacy `gpt-5.1` sample folder) and prints one score block per file plus averages. No arguments needed. Edit `TRANSLATION_DIR` and `MODEL_NAME` at the top of the script to evaluate another folder.
 
 ### Running the batch evaluation (multiple models)
 
@@ -318,7 +295,7 @@ The script auto-discovers all model subdirectories under `data/translation_resul
 
 ### Reproducing the 20-clip evaluation
 
-The scripts in `src/` compute the four reference-based metrics only. The MQM judging in 3.3 needs a judge prompt built on the MQM categories in 1.2, one call per candidate to two judges from different vendors, and a check that every quoted span occurs in the candidate. The GAIK validators (`gaik.software_components.validators`, see the [LLM judge](../../../guidance_layer/docs/software_components/llm_judge.md) docs) provide the judge plumbing.
+The scripts in `src/` compute the four reference-based metrics only. The MQM judging in section 3 needs a judge prompt built on the MQM categories in 1.2, one call per candidate to two judges from different vendors, and a check that every quoted span occurs in the candidate. The GAIK validators (`gaik.software_components.validators`, see the [LLM judge](../../../guidance_layer/docs/software_components/llm_judge.md) docs) provide the judge plumbing.
 
 ### Generating the comparison chart
 
