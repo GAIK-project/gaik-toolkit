@@ -23,7 +23,7 @@
         "SKILL.md"
       ],
       "zip": "/downloads/skills/incident-report-writing.zip",
-      "zipBytes": 4689,
+      "zipBytes": 13855,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/incident-report-writing/incident-report-writing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/incident-report-writing"
     },
@@ -44,7 +44,7 @@
         "SKILL.md"
       ],
       "zip": "/downloads/skills/construction-diary-creation.zip",
-      "zipBytes": 5001,
+      "zipBytes": 14899,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/construction-diary-creation/construction-diary-creation",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/construction-diary-creation"
     },
@@ -72,7 +72,7 @@
         "SKILL.md"
       ],
       "zip": "/downloads/skills/purchase-order-processing.zip",
-      "zipBytes": 38570,
+      "zipBytes": 126786,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing"
     },
@@ -97,7 +97,7 @@
         "SKILL.md"
       ],
       "zip": "/downloads/skills/report-writing.zip",
-      "zipBytes": 17290,
+      "zipBytes": 46607,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/report-writing-skill"
     },
@@ -119,7 +119,7 @@
         "SKILL.md"
       ],
       "zip": "/downloads/skills/parsing-documents.zip",
-      "zipBytes": 7197,
+      "zipBytes": 16102,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/parsing-documents",
       "guideUrl": null
     },
@@ -141,7 +141,7 @@
         "SKILL.md"
       ],
       "zip": "/downloads/skills/extracting-structured-data.zip",
-      "zipBytes": 8934,
+      "zipBytes": 19891,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/extracting-structured-data",
       "guideUrl": null
     },
@@ -165,7 +165,7 @@
         "SKILL.md"
       ],
       "zip": "/downloads/skills/searching-documents.zip",
-      "zipBytes": 17764,
+      "zipBytes": 38815,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/searching-documents",
       "guideUrl": null
     }

@@ -12,7 +12,8 @@ Run it after any change under implementation_layer/no-code-assets:
     uv run python implementation_layer/toolkit_demo_app/scripts/build_no_code_catalog.py
 
 `--check` exits non-zero when the committed outputs are stale; a unit test runs it.
-The zips are byte-for-byte reproducible (sorted entries, fixed timestamps, LF line
+The zips are byte-for-byte reproducible (stored uncompressed, since deflate output varies
+with the zlib version; sorted entries, fixed timestamps, LF line
 endings), so a stale zip shows up as a diff instead of a checkout artefact.
 """
 
@@ -66,12 +67,12 @@ def _frontmatter(skill_dir: Path) -> dict:
 
 def _zip_skill(skill_dir: Path, name: str) -> bytes:
     buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_STORED) as archive:
         for path in _files(skill_dir):
             info = zipfile.ZipInfo(f"{name}/{path.relative_to(skill_dir).as_posix()}", ZIP_DATE)
-            info.compress_type = zipfile.ZIP_DEFLATED
+            info.compress_type = zipfile.ZIP_STORED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, _read_bytes(path), compresslevel=9)
+            archive.writestr(info, _read_bytes(path))
     return buffer.getvalue()
 
 
