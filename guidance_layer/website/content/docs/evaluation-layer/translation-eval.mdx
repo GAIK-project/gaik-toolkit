@@ -1,6 +1,6 @@
 ---
 title: Translation Evaluation
-description: Multi-metric translation quality assessment comparing AI models against human reference translations using BLEU, chrF, TER, and Cosine Similarity.
+description: Translation quality assessment comparing AI models with BLEU, chrF, TER and cosine similarity against human references, and with blind LLM-judge error annotation (MQM) that does not depend on the reference.
 ---
 
 ## The Problem
@@ -18,7 +18,7 @@ Key challenges include:
 
 ## How We Evaluate
 
-Translation quality is measured by comparing each AI-generated translation against a human reference translation using four complementary metrics. The figure below shows the evaluation pipeline.
+Translation quality is measured two ways. Four reference-based metrics compare each AI-generated translation against a human reference translation, and blind LLM judges annotate errors against the Finnish source without seeing the reference. The figure below shows the reference-based pipeline.
 
 ```mermaid
 graph LR
@@ -47,6 +47,7 @@ graph LR
 | **chrF** | Character n-gram F-score — handles morphological variation | Higher |
 | **TER** | Edit operations needed to transform hypothesis to reference | Lower |
 | **Cosine Similarity** | Semantic closeness via transformer embeddings | Higher |
+| **MQM error points** | Errors per 100 source words found by two blind LLM judges, weighted by severity (critical 10, major 5, minor 1); no reference needed | Lower |
 
 ### Text Normalization
 
@@ -68,28 +69,55 @@ Cosine Similarity is computed on the raw (non-lemmatized) texts to preserve sema
 
 ## Benchmarking Results
 
-The evaluation was conducted on 10 dental lecture transcripts translated from Finnish to English. Human-produced reference translations were used as ground truth. Four translation approaches were compared.
+### Which model is best? A 20-clip evaluation with blind judges
+
+Eleven current models (three runs each) were tested against six outputs committed by the University of Helsinki (HY) team and the human reference, on all 20 HY clips of Finnish dental-education speech. The clips form two sets that are never pooled: **set A** (10 historical clips with human references, used for the ranking) and **set B** (10 newer clips, used only to check that the order holds, because its reference resembles one machine-translation system's output). Every text was scored by two blind LLM judges (Claude Opus 5.5 and Gemini 3.1 Pro) that read only the Finnish source and one candidate, and by BLEU, chrF, TER and embedding cosine. The Finnish input is HY's corrected transcript, so this tests translation only.
+
+![MQM error points per 100 source words by model, sets A and B](/images/translation-mqm-by-model.svg)
+
+Error points per 100 source words, lower is better, both judges on one scale:
+
+| Model | Set A | Set B |
+|-------|------:|------:|
+| **GPT-6 Astra** | **0.3** | **0.6** |
+| GPT-6 Sol | 0.8 | 1.4 |
+| Claude Opus 5.5 | 1.2 | 2.2 |
+| GPT-6 Luna | 1.5 | 1.9 |
+| GPT-5.5 | 2.0 | 2.9 |
+| Gemini 3.1 Pro | 2.2 | 2.1 |
+| Gemini 3.5 Flash | 3.0 | 2.1 |
+| GPT-4.1 | 2.2 | 3.1 |
+| GPT-5.4 mini | 4.8 | 5.2 |
+| GPT-4o | 4.5 | 7.4 |
+| **Human reference** | **7.9** | **15.2** |
+| HY: OpusBig / Opus (Helsinki-NLP) | 23.5 / 26.4 | 26.5 / 33.7 |
+
+Claude and Gemini models were scored by the other vendor's judge only (a judge never scores its own vendor), then converted to the common scale with the ratio fitted on the 12 candidates both judges scored.
+
+![Rank by the judges versus chrF, BLEU and cosine, set A](/images/translation-metric-disagreement.svg)
+
+### Key Findings
+
+- **GPT-6 Astra translated best on both sets and with both judges**, clearly ahead of every model run here; its lead over HY's committed GPT-5.6-sol file is borderline (0.3 points)
+- **Reference-based metrics ranked the models almost unrelated to the judges on set A and in reverse on set B** (Spearman agreement -0.16 to -0.27 and -0.55 to -0.70; 1 means the same order), so BLEU, chrF or cosine alone would have picked a different, worse model
+- **The human reference is not a clean gold standard** — the judges score it at 7.9 and 15.2 error points, above every current LLM; one set A reference is incomplete, and set B's reference is close to OpusBig's output, so OpusBig ranks first on set B by BLEU (68) while the judges rank it near the bottom
+- **The Helsinki-NLP models make more than ten times as many errors as the top four LLMs** (23-34 points against 0.3-1.4)
+- **Limits** — the judges are LLMs and no human has checked their annotations; differences of a few tenths of a point between the top models are within judge noise
+
+### Earlier 10-clip reference-based comparison
+
+The first evaluation compared four systems on 10 dental lecture transcripts with human references, using the four reference-based metrics. Four systems are in the table: the QAdental app's own translation (the data folder is named `gpt-5.1`; the model is not recorded, and it translated the app's own transcript), HY's runs of the Helsinki-NLP models `opus-mt-tc-big-fi-en` (OpusBig) and `opus-mt-fi-en` (Opus), and a T5 model. Earlier versions of this page mislabelled these as a domain-specialised tool and as Claude models.
 
 ![Translation Model Comparison by Evaluation Metric](/images/translation-eval-comparison.png)
 
-### Model Performance
-
 | Model | BLEU ↑ | chrF ↑ | TER ↓ | Cosine Sim ↑ |
 |-------|-------:|-------:|------:|------------:|
-| **gpt-5.1** | **33.38** | **68.81** | **53.90** | **93.84** |
+| **QADentalTool** (`gpt-5.1`) | **33.38** | **68.81** | **53.90** | **93.84** |
 | **OpusBig** | 28.01 | 66.52 | 62.80 | 92.59 |
 | **Opus** | 26.18 | 64.14 | 65.41 | 90.59 |
 | **T5** | 11.59 | 50.67 | 91.47 | 59.99 |
 
-*↑ higher is better; ↓ lower is better*
-
-### Key Findings
-
-- **Domain specialization outperforms general models** — the domain-adapted tool leads on all four metrics, confirming that fine-tuning for specialized vocabulary makes a measurable difference
-- **Claude Opus variants preserve meaning well** — both Opus configurations achieve Cosine Similarity above 90%, showing strong semantic fidelity even when exact n-gram overlap is moderate
-- **Larger context improves quality** — OpusBig consistently outperforms base Opus across all metrics, indicating that more context helps translation coherence for technical content
-- **General-purpose NMT fails on specialist content** — T5 scores TER of 91.47% and Cosine Similarity of only 59.99%, indicating both surface-level and semantic failure on dental terminology
-- **BLEU scores are modest overall** — even the best model reaches only 33.38 BLEU, reflecting the difficulty of exactly matching human phrasing in a specialized domain
+*↑ higher is better; ↓ lower is better.* These numbers measure distance to one reference and, as the 20-clip evaluation shows, do not rank models reliably.
 
 ---
 
@@ -133,15 +161,15 @@ Translation evaluation supports the following GAIK workflows:
 
 ## Quality Considerations
 
-**Use multiple metrics together** — no single metric tells the full story. A model can score moderately on BLEU but excellently on Cosine Similarity if it paraphrases correctly. Reviewing all four gives a more accurate picture than any one alone.
+**Use multiple metrics together, and do not let the reference-based ones decide alone** — no single metric tells the full story. In the 20-clip evaluation the reference-based metrics ranked the models almost unrelated to the judges on one set and in reverse on the other.
 
-**Domain matters more than model size** — the results show a domain-adapted specialized tool outperforming large general models. For specialized content, domain adaptation or terminology injection is more valuable than raw model scale.
+**Model generation matters more than domain adaptation** — in the 20-clip evaluation the current LLMs made more than ten times fewer errors than the Helsinki-NLP translation models on dental speech, and the newest GPT-6 models led. Terminology injection can still help with names and specialist terms, but choose the model on judged quality, not on distance to a reference.
 
 **TER reflects real editing effort** — if post-editing by human translators is part of your workflow, TER is the most actionable metric: it directly estimates the number of corrections needed per document.
 
 **Cosine Similarity depends on the embedding model** — scores reflect semantic similarity as measured by the chosen transformer. For highly specialized domains, consider using a domain-adapted or multilingual embedding model for more reliable results.
 
-**Reference quality caps evaluation quality** — all metrics assume the human reference is the gold standard. If reference translations have inconsistencies or style variation, metric scores will reflect those differences too.
+**Reference quality caps reference-based evaluation** — BLEU, chrF, TER and cosine assume the human reference is the gold standard. In this data the judges scored the reference at 7.9 and 15.2 error points per 100 words, above every current LLM, one reference was incomplete, and another set's reference resembled one machine-translation system's output. Check each reference, and add reference-free judging before ranking models.
 
 ---
 
@@ -192,7 +220,7 @@ To run the evaluation on the provided sample data:
 
 1. Navigate to `evaluation_layer/eval_methods/translation_eval/`
 2. Install dependencies: `pip install -r requirements.txt && python -m spacy download en_core_web_sm`
-3. Run `python src/evaluate_standalone.py` — evaluates all 10 sample file pairs and prints a metrics report with averages
+3. Run `python src/evaluate_standalone.py` — evaluates all 10 sample file pairs of one model folder (the QADentalTool outputs) and prints a metrics report with averages
 4. To evaluate multiple models, place outputs under `data/translation_results/<model_name>/` and run `python src/translation_evaluation.py`
 5. After batch evaluation, run `python src/generate_metrics_plot.py` to generate the comparison chart
 6. Review results in `evaluation_results/results.csv` and `evaluation_results/translation_metrics_plot.png`
