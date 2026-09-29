@@ -109,7 +109,7 @@ def build() -> tuple[str, dict[str, bytes]]:
                 "input": entry["input"],
                 "output": entry["output"],
                 "needs": entry["needs"],
-                "tryPrompt": entry["tryPrompt"],
+                "tryPrompt": entry["tryPrompt"].replace("{url}", _tree_url(entry["path"])),
                 "files": [p.relative_to(skill_dir).as_posix() for p in _files(skill_dir)],
                 "zip": f"/downloads/skills/{entry['id']}.zip",
                 "zipBytes": len(payload),

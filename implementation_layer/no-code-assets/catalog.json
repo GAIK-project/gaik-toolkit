@@ -1,5 +1,5 @@
 {
-  "$comment": "Hand-written metadata for the no-code assets. Names and descriptions of skills come from each SKILL.md, prompt text from the prompt files; scripts/build_no_code_catalog.py merges all of it into the demo app. Paths are relative to this file.",
+  "$comment": "Hand-written metadata for the no-code assets. {url} in a tryPrompt becomes the skill's GitHub link, so the prompt also works where the skill is not installed. Names and descriptions of skills come from each SKILL.md, prompt text from the prompt files; scripts/build_no_code_catalog.py merges all of it into the demo app. Paths are relative to this file.",
   "skills": [
     {
       "id": "incident-report-writing",
@@ -10,7 +10,7 @@
       "tagline": "Turn a spoken incident or safety observation into a Word report.",
       "input": "Audio recording",
       "output": "Word (.docx)",
-      "needs": ["Claude Desktop", "gaik-transcriber MCP server"],
+      "needs": ["gaik-transcriber MCP server"],
       "tryPrompt": "Use the incident-report-writing skill to turn my audio recording into an incident report. I will attach the file next."
     },
     {
@@ -22,7 +22,7 @@
       "tagline": "Turn a site manager's spoken day into a Työmaapäiväkirja.",
       "input": "Audio recording (Finnish or English)",
       "output": "Word (.docx)",
-      "needs": ["Claude Desktop", "gaik-transcriber MCP server"],
+      "needs": ["gaik-transcriber MCP server"],
       "tryPrompt": "Use the construction-diary-creation skill to create today's Työmaapäiväkirja from my site recording. I will attach the audio next."
     },
     {
@@ -34,7 +34,7 @@
       "tagline": "Match a purchase order and its BOMs against a price list and produce a priced sales order.",
       "input": "PO, BOM PDFs and a price list",
       "output": "Word (.docx) and calculation breakdown",
-      "needs": ["Claude Desktop", "Filesystem MCP server"],
+      "needs": ["Filesystem MCP server"],
       "tryPrompt": "Use the purchase-order-processing skill to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next."
     },
     {
@@ -46,7 +46,7 @@
       "tagline": "Consolidate recordings, notes and documents into one structured Word report.",
       "input": "Recordings, notes, PDFs, spreadsheets",
       "output": "Word (.docx)",
-      "needs": ["Claude Desktop", "Filesystem MCP server", "gaik-transcriber MCP server"],
+      "needs": ["Filesystem MCP server", "gaik-transcriber MCP server"],
       "tryPrompt": "Use the report-writing skill to write a report from the materials I am about to attach. Infer the sections from the content."
     },
     {
@@ -57,8 +57,8 @@
       "tagline": "Pick a parser that keeps table structure, and catch pages that parsed to nothing.",
       "input": "PDF, scan or Word file",
       "output": "Text or markdown",
-      "needs": ["An AI coding agent", "gaik[parser]"],
-      "tryPrompt": "Use the parsing-documents skill to choose a parser for my PDFs and check that the tables came through intact."
+      "needs": ["gaik[parser]"],
+      "tryPrompt": "Use the parsing-documents skill ({url}) to choose a parser for my PDFs and check that the tables came through intact."
     },
     {
       "id": "extracting-structured-data",
@@ -68,8 +68,8 @@
       "tagline": "Design an extraction schema that stays inside provider limits and carries checkable evidence.",
       "input": "Invoices, forms, contracts, reports",
       "output": "Validated JSON or Pydantic model",
-      "needs": ["An AI coding agent", "gaik[extract]"],
-      "tryPrompt": "Use the extracting-structured-data skill to design a schema for the invoices in this folder and add page and quote evidence to each field."
+      "needs": ["gaik[extract]"],
+      "tryPrompt": "Use the extracting-structured-data skill ({url}) to design a schema for the invoices in this folder and add page and quote evidence to each field."
     },
     {
       "id": "searching-documents",
@@ -79,8 +79,8 @@
       "tagline": "Build hybrid pgvector and full-text search that fails visibly, including for Finnish text.",
       "input": "Document chunks in Postgres",
       "output": "Retrieval code and evals",
-      "needs": ["An AI coding agent", "Postgres with pgvector"],
-      "tryPrompt": "Use the searching-documents skill to add hybrid search over my document chunks and measure it with Hit@K."
+      "needs": ["Postgres with pgvector"],
+      "tryPrompt": "Use the searching-documents skill ({url}) to add hybrid search over my document chunks and measure it with Hit@K."
     }
   ],
   "prompts": [
