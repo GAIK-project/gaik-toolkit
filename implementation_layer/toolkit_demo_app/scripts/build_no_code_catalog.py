@@ -39,7 +39,9 @@ REPO_TREE = (
 )
 ZIP_DATE = (2026, 1, 1, 0, 0, 0)
 TEXT_SUFFIXES = {".md", ".txt", ".json", ".py", ".yaml", ".yml", ".toml", ".bat"}
-SKIP_NAMES = {"__pycache__", ".DS_Store", "Thumbs.db"}
+SKIP_NAMES = {"__pycache__", ".DS_Store", "Thumbs.db", ".env"}
+# Sample inputs and outputs next to a skill; too large for a setup kit and on GitHub.
+KIT_SKIP = {"data", "images", "ouput", "sample_data"}
 
 
 def _read_bytes(path: Path) -> bytes:
@@ -49,14 +51,14 @@ def _read_bytes(path: Path) -> bytes:
     return data
 
 
-def _files(skill_dir: Path) -> list[Path]:
+def _files(skill_dir: Path, skip: set[str] = frozenset()) -> list[Path]:
     # Sort by the POSIX string: Path ordering ignores case on Windows only, which
     # would make the output differ between a developer's machine and CI.
     return sorted(
         (
             p
             for p in skill_dir.rglob("*")
-            if p.is_file() and not (SKIP_NAMES & set(p.relative_to(skill_dir).parts))
+            if p.is_file() and not ((SKIP_NAMES | skip) & set(p.relative_to(skill_dir).parts))
         ),
         key=lambda p: p.relative_to(skill_dir).as_posix(),
     )
@@ -70,10 +72,10 @@ def _frontmatter(skill_dir: Path) -> dict:
     return yaml.safe_load(match.group(1))
 
 
-def _zip_skill(skill_dir: Path, name: str) -> bytes:
+def _zip_skill(skill_dir: Path, name: str, skip: set[str] = frozenset()) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_STORED) as archive:
-        for path in _files(skill_dir):
+        for path in _files(skill_dir, skip):
             info = zipfile.ZipInfo(f"{name}/{path.relative_to(skill_dir).as_posix()}", ZIP_DATE)
             info.compress_type = zipfile.ZIP_STORED
             info.create_system = 3  # Unix; the default differs by OS and would change the bytes
@@ -99,6 +101,12 @@ def build() -> tuple[str, dict[str, bytes]]:
             raise SystemExit(f"{entry['id']}: name, directory and catalog id must match")
         payload = _zip_skill(skill_dir, meta["name"])
         zips[f"{entry['id']}.zip"] = payload
+        kit = None
+        if entry.get("kit"):
+            kit_name = f"{entry['id']}-setup-kit"
+            kit_payload = _zip_skill(ASSETS_DIR / entry["guide"], kit_name, KIT_SKIP)
+            zips[f"{kit_name}.zip"] = kit_payload
+            kit = {"zip": f"/downloads/skills/{kit_name}.zip", "zipBytes": len(kit_payload)}
         skills.append(
             {
                 "id": entry["id"],
@@ -109,6 +117,8 @@ def build() -> tuple[str, dict[str, bytes]]:
                 "input": entry["input"],
                 "output": entry["output"],
                 "needs": entry["needs"],
+                "setup": entry.get("setup", []),
+                "kit": kit,
                 "tryPrompt": entry["tryPrompt"].replace(
                     "{url}", _tree_url(entry.get("guide", entry["path"]))
                 ),

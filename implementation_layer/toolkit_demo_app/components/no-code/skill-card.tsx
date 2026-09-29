@@ -33,6 +33,28 @@ export function SkillCard({
         )}
       </div>
 
+      {skill.setup.length > 0 && (
+        <Disclosure label="Set up first">
+          <ol className="text-muted-foreground list-decimal space-y-1.5 pl-5 text-sm">
+            {skill.setup.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+          {skill.kit && (
+            <Button asChild size="sm" variant="outline" className="mt-3">
+              <a
+                href={skill.kit.zip}
+                download
+                aria-label={`Download setup kit for ${skill.title}`}
+              >
+                <Download />
+                Setup kit · {formatBytes(skill.kit.zipBytes)}
+              </a>
+            </Button>
+          )}
+        </Disclosure>
+      )}
+
       <Disclosure label="Prompt to try">
         <p className="bg-muted/50 rounded-md p-3 text-sm">{skill.tryPrompt}</p>
       </Disclosure>
