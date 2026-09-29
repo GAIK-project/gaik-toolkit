@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { formatBytes, type Skill } from "@/lib/no-code/catalog";
 import { Download, ExternalLink } from "lucide-react";
+import Image from "next/image";
 import { AssetIcon } from "./asset-icon";
 import { Disclosure } from "./disclosure";
 import { TryMenu } from "./try-menu";
@@ -25,7 +26,18 @@ export function SkillCard({
 
       <div className="space-y-1 text-sm">
         <p>
-          {skill.input} <span aria-label="to">→</span> {skill.output}
+          {skill.input} <span aria-label="to">→</span>{" "}
+          {skill.output.includes("Word") && (
+            <Image
+              src="/icons/file-word.svg"
+              alt=""
+              width={16}
+              height={16}
+              unoptimized
+              className="mr-1 inline-block size-4 align-[-2px]"
+            />
+          )}
+          {skill.output}
         </p>
         {skill.needs.length > 0 && (
           <p className="text-muted-foreground">
