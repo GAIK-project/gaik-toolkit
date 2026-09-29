@@ -17,7 +17,7 @@
       "needs": [
         "gaik-transcriber MCP server"
       ],
-      "tryPrompt": "Use the incident-report-writing skill to turn my audio recording into an incident report. I will attach the file next.",
+      "tryPrompt": "Use the incident-report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/incident-report-writing) to turn my audio recording into an incident report. I will attach the file next.",
       "files": [
         "SKILL.md"
       ],
@@ -37,7 +37,7 @@
       "needs": [
         "gaik-transcriber MCP server"
       ],
-      "tryPrompt": "Use the construction-diary-creation skill to create today's Työmaapäiväkirja from my site recording. I will attach the audio next.",
+      "tryPrompt": "Use the construction-diary-creation skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/construction-diary-creation) to create today's Työmaapäiväkirja from my site recording. I will attach the audio next.",
       "files": [
         "SKILL.md"
       ],
@@ -57,7 +57,7 @@
       "needs": [
         "Filesystem MCP server"
       ],
-      "tryPrompt": "Use the purchase-order-processing skill to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next.",
+      "tryPrompt": "Use the purchase-order-processing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing) to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next.",
       "files": [
         "EVALUATION.md",
         "README.md",
@@ -85,7 +85,7 @@
         "Filesystem MCP server",
         "gaik-transcriber MCP server"
       ],
-      "tryPrompt": "Use the report-writing skill to write a report from the materials I am about to attach. Infer the sections from the content.",
+      "tryPrompt": "Use the report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/report-writing-skill) to write a report from the materials I am about to attach. Infer the sections from the content.",
       "files": [
         "EVALUATION.md",
         "SKILL.md",

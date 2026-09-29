@@ -11,7 +11,7 @@
       "input": "Audio recording",
       "output": "Word (.docx)",
       "needs": ["gaik-transcriber MCP server"],
-      "tryPrompt": "Use the incident-report-writing skill to turn my audio recording into an incident report. I will attach the file next."
+      "tryPrompt": "Use the incident-report-writing skill ({url}) to turn my audio recording into an incident report. I will attach the file next."
     },
     {
       "id": "construction-diary-creation",
@@ -23,7 +23,7 @@
       "input": "Audio recording (Finnish or English)",
       "output": "Word (.docx)",
       "needs": ["gaik-transcriber MCP server"],
-      "tryPrompt": "Use the construction-diary-creation skill to create today's Työmaapäiväkirja from my site recording. I will attach the audio next."
+      "tryPrompt": "Use the construction-diary-creation skill ({url}) to create today's Työmaapäiväkirja from my site recording. I will attach the audio next."
     },
     {
       "id": "purchase-order-processing",
@@ -35,7 +35,7 @@
       "input": "PO, BOM PDFs and a price list",
       "output": "Word (.docx) and calculation breakdown",
       "needs": ["Filesystem MCP server"],
-      "tryPrompt": "Use the purchase-order-processing skill to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next."
+      "tryPrompt": "Use the purchase-order-processing skill ({url}) to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next."
     },
     {
       "id": "report-writing",
@@ -47,7 +47,7 @@
       "input": "Recordings, notes, PDFs, spreadsheets",
       "output": "Word (.docx)",
       "needs": ["Filesystem MCP server", "gaik-transcriber MCP server"],
-      "tryPrompt": "Use the report-writing skill to write a report from the materials I am about to attach. Infer the sections from the content."
+      "tryPrompt": "Use the report-writing skill ({url}) to write a report from the materials I am about to attach. Infer the sections from the content."
     },
     {
       "id": "parsing-documents",
