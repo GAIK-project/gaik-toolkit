@@ -41,11 +41,7 @@
       "title": "Next Steps",
       "instructions": "Summarize the immediate next steps and follow-up actions the team should take. Include any scheduled follow-up meetings or deadlines mentioned.",
       "required_items": [],
-      "depends_on": [
-        "decisions_made",
-        "action_items",
-        "open_questions"
-      ]
+      "depends_on": []
     }
   ],
   "instructions": "Use only facts stated in the sources, and cite the source file of each fact. Use the sample report for structure and style only; never copy facts from it.",

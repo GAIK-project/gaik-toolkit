@@ -107,6 +107,7 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
     "review_attempts": 5,
     "strict_review": false,
     "docx": true,
+    "citations": true,
     "curator": {"reasoning_effort": null, "temperature": null},
     "writer": {"reasoning_effort": "medium", "temperature": null},
     "reviewer": {"reasoning_effort": null, "temperature": null}
@@ -132,6 +133,7 @@ duration-billed transcription models such as `whisper-1` report `audio_seconds`.
 | `settings.review_attempts` | Most reviewer requests per section, the first one included |
 | `settings.strict_review` | `true` fails `synthesize` when a reviewer edit cannot be applied, instead of logging it in `review_log.json` |
 | `settings.docx` | `false` skips `report.docx` and deletes one of an earlier run |
+| `settings.citations` | `true` (default) cites the source file and place of each fact, as the report instructions say. `false` writes plain statements with no file names, pages or references, even if the instructions ask for citations; the writers and the reviewer both follow it, and so does the `single_call` baseline |
 | `settings.curator` / `writer` / `reviewer` | `reasoning_effort` and `temperature` for every call of that step; `null` leaves the option unset. Where a model does not take `temperature` with reasoning on, it is dropped; an invalid effort raises before the call |
 
 Relative paths are resolved against the folder of the spec file. `ReportSpec.load(path)`

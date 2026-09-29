@@ -8,6 +8,7 @@ import time
 import gaik.software_components.knowledge_curator.knowledge_curator as kc
 import pytest
 from gaik.software_components.knowledge_curator import (
+    DroppedUnit,
     FactUnit,
     KnowledgeBase,
     KnowledgeCurator,
@@ -95,10 +96,10 @@ def fake(monkeypatch):
     return install
 
 
-def _curate(sections, **kwargs) -> KnowledgeBase:
-    return KnowledgeCurator({"provider": "openai", "model": "m"}).curate(
-        SOURCES, sections, **kwargs
-    )
+def _curate(sections, *, drop_unverified=True, **kwargs) -> KnowledgeBase:
+    return KnowledgeCurator(
+        {"provider": "openai", "model": "m"}, drop_unverified=drop_unverified
+    ).curate(SOURCES, sections, **kwargs)
 
 
 def test_happy_path_maps_ids_source_class_and_conflicts(fake):
@@ -208,19 +209,121 @@ def test_usage_and_chat_options_cover_every_call(fake):
     assert client.kwargs == [{"reasoning_effort": "low"}] * 3
 
 
-def test_second_bad_answer_raises(fake):
+def test_second_bad_answer_raises_when_not_dropping(fake):
     bad = _answer(_unit("The unit shakes"))
     fake({"a": [bad, bad]})
     with pytest.raises(ValueError, match=r"'a'.*The unit shakes"):
-        _curate([SectionSpec(id="a", title="A")])
+        _curate([SectionSpec(id="a", title="A")], drop_unverified=False)
 
 
 def test_unknown_source_file_is_a_failure(fake):
     bad = _answer(_unit("The supply-air unit vibrates", file="unknown.txt"))
     client = fake({"a": [bad, bad]})
     with pytest.raises(ValueError, match="unknown.txt"):
-        _curate([SectionSpec(id="a", title="A")])
+        _curate([SectionSpec(id="a", title="A")], drop_unverified=False)
     assert "unknown.txt" in client.calls[1][1][-1]["content"]
+
+
+def test_failing_units_are_dropped_after_the_retry_and_reported(fake):
+    good = _unit("The supply-air unit vibrates")
+    shaky = _unit("The unit shakes")
+    unknown = _unit("Design life 25 years", file="unknown.txt")
+    later = _unit("Mechanical ventilation installed in 1998.", file="report.pdf")
+    bad = _answer(good, shaky, unknown, later)
+    client = fake({"a": [bad, bad], "b": [GOOD]})
+    messages: list[str] = []
+
+    knowledge = _curate(
+        [SectionSpec(id="a", title="Alpha"), SectionSpec(id="b", title="B")],
+        progress_callback=messages.append,
+    )
+
+    assert len(client.calls) == 3  # one retry, no third attempt
+    kept = knowledge.get("a").units
+    assert [u.id for u in kept] == ["a-01", "a-02"]  # renumbered without gaps
+    assert [u.quote for u in kept] == [good.quote, later.quote]
+    assert knowledge.get("b").units[0].quote == GOOD.units[0].quote
+    assert knowledge.dropped == [
+        DroppedUnit(
+            section_id="a",
+            topic="ventilation",
+            summary="A fact.",
+            quote="The unit shakes",
+            file="notes.txt",
+            reason="quote not found in source",
+        ),
+        DroppedUnit(
+            section_id="a",
+            topic="ventilation",
+            summary="A fact.",
+            quote="Design life 25 years",
+            file="unknown.txt",
+            reason="file is not a source",
+        ),
+    ]
+    assert "Dropped 2 fact(s) of Alpha: the quote is not in its source" in messages
+    assert knowledge.verify_quotes(SOURCES) == []
+
+
+def test_conflicts_are_renumbered_and_one_sided_ones_removed(fake):
+    units = [
+        _unit("The supply-air unit vibrates"),
+        _unit("The unit shakes"),
+        _unit("Mechanical ventilation installed in 1998.", file="report.pdf"),
+    ]
+    conflicts = [
+        kc.CuratedConflict(
+            topic="kept", description="d", status="resolved", unit_numbers=[1, 2, 3]
+        ),
+        kc.CuratedConflict(topic="gone", description="d", status="unresolved", unit_numbers=[2, 3]),
+    ]
+    bad = _answer(*units, conflicts=conflicts)
+    fake({"a": [bad, bad]})
+
+    knowledge = _curate([SectionSpec(id="a", title="A")]).get("a")
+
+    assert [c.topic for c in knowledge.conflicts] == ["kept"]
+    assert knowledge.conflicts[0].unit_ids == ["a-01", "a-02"]
+
+
+def test_a_section_whose_units_all_fail_is_kept_empty(fake):
+    bad = _answer(_unit("The unit shakes"))
+    fake({"a": [bad, bad]})
+
+    knowledge = _curate([SectionSpec(id="a", title="A", required_items=["vibration"])])
+
+    assert knowledge.get("a").units == []
+    assert len(knowledge.dropped) == 1
+
+
+def test_a_retry_that_fixes_the_quotes_drops_nothing(fake):
+    fake({"a": [_answer(_unit("The unit shakes")), GOOD]})
+
+    assert _curate([SectionSpec(id="a", title="A")]).dropped == []
+
+
+def test_dropping_still_rejects_an_out_of_range_conflict(fake):
+    conflict = kc.CuratedConflict(
+        topic="t", description="d", status="unresolved", unit_numbers=[1, 3]
+    )
+    bad = _answer(
+        _unit("The unit shakes"), _unit("The supply-air unit vibrates"), conflicts=[conflict]
+    )
+    fake({"a": [bad, bad]})
+
+    with pytest.raises(ValueError, match=r"'a'.*\[3\]"):
+        _curate([SectionSpec(id="a", title="A")])
+
+
+def test_dropped_units_are_not_saved(fake, tmp_path):
+    bad = _answer(_unit("The unit shakes"), _unit("The supply-air unit vibrates"))
+    fake({"a": [bad, bad]})
+    knowledge = _curate([SectionSpec(id="a", title="A")])
+
+    knowledge.save(tmp_path)
+
+    assert KnowledgeBase.load(tmp_path).dropped == []
+    assert "dropped" not in (tmp_path / "a.json").read_text(encoding="utf-8")
 
 
 def test_out_of_range_conflict_index_raises(fake):

@@ -30,7 +30,7 @@ from gaik.software_components.llm import create_llm_client
 from gaik.software_components.llm.base import add_usage
 
 from .models import Report, ReportSection, ReviewEntry
-from .prompts import WRITER_SYSTEM_PROMPT, build_review_checks, build_writer_prompt
+from .prompts import build_review_checks, build_writer_prompt, writer_system_prompt
 
 
 def _merge(left: dict, right: dict) -> dict:
@@ -85,6 +85,7 @@ class ReportSynthesizer:
         review_attempts: int = 5,
         writer_options: dict | None = None,
         reviewer_options: dict | None = None,
+        citations: bool = True,
     ):
         """
         Args:
@@ -97,6 +98,9 @@ class ReportSynthesizer:
             writer_options: Extra options for every writer call, such as
                 `reasoning_effort` or `temperature`.
             reviewer_options: The same for every reviewer call.
+            citations: Cite the source file and locator of each fact. With `False` the
+                writers and the reviewer leave citations out, even if `instructions` ask
+                for them.
         """
         self.config = config
         self.model = model
@@ -105,6 +109,7 @@ class ReportSynthesizer:
         self.review_attempts = review_attempts
         self.writer_options = writer_options or {}
         self.reviewer_options = reviewer_options or {}
+        self.citations = citations
 
     def synthesize(
         self,
@@ -175,7 +180,7 @@ class ReportSynthesizer:
                 )
                 response = client.chat(
                     [
-                        {"role": "system", "content": WRITER_SYSTEM_PROMPT},
+                        {"role": "system", "content": writer_system_prompt(self.citations)},
                         {"role": "user", "content": prompt},
                     ],
                     **self.writer_options,
@@ -191,7 +196,7 @@ class ReportSynthesizer:
                 result = reviewer.review(
                     draft,
                     reference=material,
-                    instructions=build_review_checks(section, instructions),
+                    instructions=build_review_checks(section, instructions, self.citations),
                 )
                 if not result.text.strip():
                     raise RuntimeError(f"Section {section.id!r} is empty after review")

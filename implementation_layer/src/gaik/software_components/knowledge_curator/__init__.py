@@ -25,6 +25,7 @@ from gaik.software_components.llm import get_llm_config
 from .knowledge_curator import KnowledgeCurator
 from .models import (
     Conflict,
+    DroppedUnit,
     FactUnit,
     KnowledgeBase,
     SectionKnowledge,
@@ -41,6 +42,7 @@ __all__ = [
     "SourceRef",
     "FactUnit",
     "Conflict",
+    "DroppedUnit",
     "SectionKnowledge",
     "KnowledgeBase",
     "quote_in_text",

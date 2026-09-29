@@ -99,6 +99,20 @@ def quote_in_text(quote: str, text: str) -> bool:
     return bool(squashed) and squashed in " ".join(text.split())
 
 
+class DroppedUnit(BaseModel):
+    """A fact the curator dropped because its quote could not be verified."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    section_id: str
+    topic: str
+    summary: str
+    quote: str
+    file: str
+    """The source file the unit cited."""
+    reason: Literal["quote not found in source", "file is not a source"]
+
+
 class KnowledgeBase(BaseModel):
     """The curated knowledge of every non-derived section."""
 
@@ -107,6 +121,9 @@ class KnowledgeBase(BaseModel):
     sections: list[SectionKnowledge]
     usage: dict[str, int] = {}
     """Token usage of the curator calls. Not saved, so empty after :meth:`load`."""
+    dropped: list[DroppedUnit] = []
+    """Facts dropped after the retry because their quote failed the check. Not saved, so
+    empty after :meth:`load`."""
 
     def get(self, section_id: str) -> SectionKnowledge:
         for section in self.sections:

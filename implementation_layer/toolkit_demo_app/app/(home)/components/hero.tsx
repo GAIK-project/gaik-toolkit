@@ -4,7 +4,7 @@ import { useOnboarding } from "@/components/onboarding/onboarding-provider";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageTransition } from "@/components/demo/page-transition";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Wand2 } from "lucide-react";
+import { ArrowRight, Sparkles, Wand2 } from "lucide-react";
 import Link from "next/link";
 
 export function Hero({
@@ -46,6 +46,9 @@ export function Hero({
     </>
   );
 
+  const updateLinkClassName =
+    "font-semibold whitespace-nowrap text-amber-900 underline underline-offset-2 transition-colors hover:text-amber-700";
+
   return (
     <PageTransition className="bg-card relative overflow-hidden rounded-3xl border p-8 shadow-sm md:p-12">
       <div className="space-y-6">
@@ -78,6 +81,37 @@ export function Hero({
           >
             Explore All Demos
           </Button>
+        </div>
+
+        {/* Update: what is new. Edit the text here; link only to pages that exist. */}
+        <div
+          data-tour="update"
+          className="flex w-fit max-w-full flex-col gap-2 rounded-2xl border border-amber-300/80 bg-amber-50/70 px-4 py-3 sm:flex-row sm:items-center sm:gap-3"
+        >
+          <span className="flex w-fit shrink-0 items-center gap-1.5 rounded-full bg-amber-500 px-2.5 py-0.5 text-[11px] font-bold tracking-wider text-white uppercase">
+            <Sparkles className="size-3" />
+            Update
+          </span>
+          <p className="text-sm text-slate-700">
+            The{" "}
+            <Link href="/report-writer-v2" className={updateLinkClassName}>
+              Report Writer
+            </Link>{" "}
+            module is now available. Its stages also work as separate
+            components:{" "}
+            <Link href="/source-normalizer" className={updateLinkClassName}>
+              source normalization
+            </Link>
+            ,{" "}
+            <Link href="/knowledge-curator" className={updateLinkClassName}>
+              knowledge curation
+            </Link>{" "}
+            and{" "}
+            <Link href="/knowledge-synthesis" className={updateLinkClassName}>
+              knowledge synthesis
+            </Link>
+            .
+          </p>
         </div>
 
         {/* Solution Configuration Wizard — beta. Access holders go straight in;

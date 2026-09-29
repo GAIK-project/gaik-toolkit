@@ -56,6 +56,9 @@ class RunSettings(BaseModel):
     logging it in the review log."""
     docx: bool = True
     """Also write ``report.docx``; needs ``pypandoc`` and the Pandoc binary."""
+    citations: bool = True
+    """Cite the source file (and place) of each fact in the report. ``False`` writes the
+    facts without citations, even if the report instructions ask for them."""
     curator: StepOptions = StepOptions()
     writer: StepOptions = StepOptions()
     reviewer: StepOptions = StepOptions()

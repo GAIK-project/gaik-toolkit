@@ -23,7 +23,10 @@ export type DemoType =
   | "postgres-agent"
   | "tabular-agent"
   | "report-writer"
-  | "report-writer-v2";
+  | "report-writer-v2"
+  | "source-normalizer"
+  | "knowledge-curator"
+  | "knowledge-synthesis";
 
 /**
  * User feedback stored in the database

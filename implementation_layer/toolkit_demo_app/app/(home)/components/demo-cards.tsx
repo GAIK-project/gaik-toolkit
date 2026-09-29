@@ -22,6 +22,9 @@ import {
   FileBarChart,
   FileOutput,
   FilePen,
+  FileStack,
+  LibraryBig,
+  NotebookPen,
   FileSearch,
   FileText,
   FileUp,
@@ -245,6 +248,27 @@ const buildingBlocks: Demo[] = [
     icon: Scale,
   },
   {
+    title: "Source Normalizer",
+    description:
+      "Convert PDFs, Word files, spreadsheets, text, recordings and images to Markdown texts that keep their file names",
+    href: "/source-normalizer",
+    icon: FileStack,
+  },
+  {
+    title: "Knowledge Curator",
+    description:
+      "Collect verified facts for a fixed set of topics from normalized sources: each fact carries an exact quote, its file and location",
+    href: "/knowledge-curator",
+    icon: LibraryBig,
+  },
+  {
+    title: "Knowledge Synthesis",
+    description:
+      "Write a reviewed, source-grounded report from the facts of the Knowledge Curator: sections, dependencies, citations and every review edit visible",
+    href: "/knowledge-synthesis",
+    icon: NotebookPen,
+  },
+  {
     title: "Retriever",
     description: "Search and retrieve relevant documents from vector database",
     href: "#",
@@ -291,9 +315,9 @@ const newUseCases: Demo[] = [
     icon: FileBarChart,
   },
   {
-    title: "Report Writer V2",
+    title: "Construction Report Writing",
     description:
-      "Turn on-site voice notes and the customer's documents into a source-grounded house condition assessment report, stage by stage",
+      "Turn on-site voice notes and the customer's documents into a source-grounded construction report, stage by stage",
     href: "/report-writer-v2?example=house_condition_assessment",
     icon: House,
   },

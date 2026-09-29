@@ -1,4 +1,4 @@
-# Expected behaviours: synthetic house condition assessment
+# Expected behaviours: synthetic construction report (house)
 
 These are the checks from `use_cases/report_writing.md` for this dataset. Each item names the planted
 situation, the expected behaviour, and how to check it in a ReportWriter workspace

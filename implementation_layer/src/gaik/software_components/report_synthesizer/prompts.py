@@ -42,6 +42,32 @@ write in a clean, professional report format and cover all relevant material.
 communicate the same meaning."""
 
 
+_CITED_SOURCES_RULE = (
+    "- Sources: cite and attribute sources as the report instructions say. Each fact unit "
+    "gives source.file, source.locator, source_class and time_qualifier for this. If the "
+    "report instructions say nothing about citations, cite the file and locator in "
+    "parentheses, e.g. (renovation_report_1998.pdf, page 3)."
+)
+assert _CITED_SOURCES_RULE in WRITER_SYSTEM_PROMPT
+
+_UNCITED_SOURCES_RULE = (
+    "- Sources: do not cite sources. Give no file names, page numbers, sheet or row "
+    "references, footnotes, reference lists or bracketed or parenthesized citations, and "
+    'write no phrases such as "according to notes.txt". State each fact plainly; attribute '
+    "it in words (e.g. the 1998 renovation report) only when the report instructions ask "
+    "you to distinguish sources. Each fact unit still gives source_class and "
+    "time_qualifier: use them to word a fact correctly. This overrides any citation "
+    "instruction in the report instructions."
+)
+
+
+def writer_system_prompt(citations: bool = True) -> str:
+    """Return the writer system prompt; without ``citations`` the sources rule forbids them."""
+    if citations:
+        return WRITER_SYSTEM_PROMPT
+    return WRITER_SYSTEM_PROMPT.replace(_CITED_SOURCES_RULE, _UNCITED_SOURCES_RULE)
+
+
 def _required(section: SectionSpec) -> str:
     return "\n".join(f"- {item}" for item in section.required_items) or "(none listed)"
 
@@ -99,8 +125,23 @@ def build_writer_prompt(
     return "\n\n".join(parts)
 
 
-def build_review_checks(section: SectionSpec, instructions: str) -> str:
-    """Return the checks the reviewer applies to one section; they replace its defaults."""
+def build_review_checks(section: SectionSpec, instructions: str, citations: bool = True) -> str:
+    """Return the checks the reviewer applies to one section; they replace its defaults.
+
+    Without ``citations`` the reviewer removes source citations instead of checking their
+    format.
+    """
+    hierarchy_check = (
+        "- Hierarchy phrasing (e.g. narrated observations versus attributed documents) and "
+        "the citation format must follow the report instructions below."
+        if citations
+        else "- Hierarchy phrasing (e.g. narrated observations versus attributed documents) "
+        "must follow the report instructions below.\n"
+        "- The text must contain no source citations: remove file names, page numbers, sheet "
+        "or row references and bracketed or parenthesized citations, keeping the statement "
+        "itself. This applies even if the report instructions ask for citations. Keep every "
+        "(missing: <item>) marker."
+    )
     knowledge_checks = (
         ""
         if section.derived
@@ -117,8 +158,7 @@ contradict the reference.
 (missing: <item>) marker in the text. Add a marker that is absent, and never remove one \
 for an item the reference does not cover.
 {knowledge_checks}\
-- Hierarchy phrasing (e.g. narrated observations versus attributed documents) and the \
-citation format must follow the report instructions below.
+{hierarchy_check}
 - The text must follow the section instructions below.
 - Make only the changes these checks call for. Do not rewrite the style, do not reorder \
 the content and do not shorten or expand the text for any other reason.

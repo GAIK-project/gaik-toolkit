@@ -278,6 +278,7 @@ def test_synthesize(tmp_path, rec):
         "review_attempts": 2,
         "writer_options": {"reasoning_effort": "high"},
         "reviewer_options": {"temperature": 0.2},
+        "citations": True,
     }
     assert rec.args("synthesize") == {
         "knowledge": KnowledgeBase.load(workspace / "knowledge"),
@@ -467,3 +468,48 @@ def test_run_unknown_mode_raises(tmp_path, rec):
     with pytest.raises(ValueError, match="Unknown mode 'fast'"):
         ReportWriter(CONFIG).run(make_spec(tmp_path), tmp_path / "workspace", mode="fast")
     assert rec.calls == []
+
+
+def test_synthesize_passes_the_citations_setting(tmp_path, rec):
+    spec = make_spec(tmp_path)
+    spec.settings = RunSettings(citations=False)
+    workspace = tmp_path / "workspace"
+    writer = ReportWriter(CONFIG)
+    writer.normalize(spec, workspace)
+    writer.curate(spec, workspace)
+
+    writer.synthesize(spec, workspace)
+
+    assert rec.args("ReportSynthesizer")["citations"] is False
+
+
+def test_citations_default_on_and_are_saved_in_the_spec(tmp_path):
+    spec = make_spec(tmp_path)
+    assert spec.settings.citations is True
+    assert (
+        ReportSpec.model_validate_json(
+            '{"title": "T", "sections": [], "sources": {}}'.replace(
+                '"sources": {}', '"sources": {"primary": ["a.txt"]}'
+            )
+        ).settings.citations
+        is True
+    )
+    assert (
+        ReportSpec.model_validate(
+            {**spec.model_dump(mode="json"), "settings": {"citations": False}}
+        ).settings.citations
+        is False
+    )
+
+
+def test_single_call_prompt_follows_the_citations_setting(tmp_path, rec):
+    for citations in (True, False):
+        rec.calls.clear()
+        spec = make_spec(tmp_path)
+        spec.settings = RunSettings(citations=citations)
+
+        ReportWriter(CONFIG).run(spec, tmp_path / f"workspace_{citations}", mode="single_call")
+
+        system = rec.args("chat")["messages"][0]["content"]
+        assert ("cite the file and the place" in system) is citations
+        assert ("do not cite sources" in system) is (not citations)

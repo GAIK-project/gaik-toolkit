@@ -1,12 +1,12 @@
 # Report Writing Generic Use Case (Cross-Cutting Use Case)
 
-The report writing use case shows how the toolkit turns private material from several sources, such as field recordings and background documents, into a templated, source-grounded report that a professional signs. House condition assessment is the worked example. The design follows CURACT (Curation-Anchored, Governed, Traceable Reporting). CURACT adds a persisted, section-bound curation stage between reading the sources and writing the report.
+The report writing use case shows how the toolkit turns private material from several sources, such as field recordings and background documents, into a templated, source-grounded report that a professional signs. A construction report for a house is the worked example. The design follows CURACT (Curation-Anchored, Governed, Traceable Reporting). CURACT adds a persisted, section-bound curation stage between reading the sources and writing the report.
 
 ---
 
 ## Business layer – use case specification
 
-At the business layer, the use case is specified using the GenAI product canvas. The focus is on condition assessment reports for houses and apartments. A customer, typically a buyer, a seller or an owner planning a renovation, orders an assessment. An inspector visits the property and dictates observations as voice recordings while walking through it. The customer supplies the documentation they have: building and renovation reports, drawings, technical data and maintenance records. The inspector then writes the report on the company's fixed template, merging what was observed on site with what the documents say, and signs it. The main users are the inspector, who produces and signs the report, and the customer, who receives it. A senior inspector may also review reports as part of quality assurance.
+At the business layer, the use case is specified using the GenAI product canvas. The focus is on construction reports for houses and apartments, such as an inspector's report on the condition of a property. A customer, typically a buyer, a seller or an owner planning a renovation, orders a report. An inspector visits the property and dictates observations as voice recordings while walking through it. The customer supplies the documentation they have: building and renovation reports, drawings, technical data and maintenance records. The inspector then writes the report on the company's fixed template, merging what was observed on site with what the documents say, and signs it. The main users are the inspector, who produces and signs the report, and the customer, who receives it. A senior inspector may also review reports as part of quality assurance.
 
 Concrete example fragments reflected in the use case design include:
 - Observations are dictated on site, area by area, with the date and time spoken at the start of each recording
@@ -27,7 +27,7 @@ Example value fragments from the model include:
 
 Functional value (primary):
 "Faster report writing", "Less manual merging of sources", "Consistent template structure", "No required item silently left out"
-→ Outcome: More assessments completed per inspector, with fewer revision rounds
+→ Outcome: More reports completed per inspector, with fewer revision rounds
 
 Informational value:
 "Every statement traceable to a source", "Conflicts between observations and documents made visible", "Reusable section-bound knowledge"
@@ -43,7 +43,7 @@ Emotional value:
 
 Social value:
 "Clear, consistent reports for customers", "A transparent basis for property decisions"
-→ Outcome: Stronger customer trust in the assessment
+→ Outcome: Stronger customer trust in the report
 
 The same model can be used both before implementation (to evaluate expected value) and after deployment (to monitor realized value across different dimensions).
 
@@ -142,7 +142,7 @@ flowchart LR
 | 2 · Section-bound curation | For each technical section, a curation model extracts fact units with a verbatim quote. It also lists the required items that no source covers and the conflicts between sources. | KnowledgeCurator | `knowledge/`: one JSON file per section |
 | 3 · Governed synthesis | A writer model drafts each section from its knowledge file only, and a separate reviewer model checks the draft. The recommendations and the summary are written last, from the accepted drafts. | ReportSynthesizer | `report/`: section drafts, `review_log.json`, `report.md` and `report.docx` |
 
-The workspace of one assessment looks like this:
+The workspace of one report looks like this:
 
 ```
 workspace/
@@ -210,7 +210,7 @@ A fact unit pairs a short summary with the exact words of the source it came fro
 > - Human checkpoints are optional rather than mandatory.
 > - Site photos are left out, so no image descriptions are placed in the report. The floor plan is the only drawing, and the VisionParser converts it to text.
 
-How the use case realizes the seven CURACT principles, and which checks of the [example case](#example-case-synthetic-house-condition-assessment) verify each one:
+How the use case realizes the seven CURACT principles, and which checks of the [example case](#example-case-synthetic-construction-report-house) verify each one:
 
 | Principle | Realization in this use case | Verified by |
 |-----------|------------------------------|-------------|
@@ -341,7 +341,7 @@ The stage components reuse these toolkit components. The Parsers include the Spr
 
 ### Downstream tasks
 
-The generated report is a draft for the inspector. Checking it against the knowledge files, correcting it, signing it, delivering it to the customer and archiving it take place outside the GenAI pipeline. They follow the company's own quality system and document management and may need organisation-specific customisation. Because the workspace keeps the normalized sources, the knowledge files and the review log, the archived assessment shows which source supports each statement.
+The generated report is a draft for the inspector. Checking it against the knowledge files, correcting it, signing it, delivering it to the customer and archiving it take place outside the GenAI pipeline. They follow the company's own quality system and document management and may need organisation-specific customisation. Because the workspace keeps the normalized sources, the knowledge files and the review log, the archived report shows which source supports each statement.
 
 ---
 
@@ -350,7 +350,7 @@ The generated report is a draft for the inspector. Checking it against the knowl
 The report structure is defined in plain language. Each section has an identifier, a title and, optionally, the sections it depends on and the items it must cover:
 
 ```
-Report: House condition assessment
+Report: Construction report
 Sections, in report order:
 
 summary — Summary
@@ -484,11 +484,11 @@ Illustrative output for the building services section:
 
 The earlier Multi-Source Report Generator module remains available as the legacy report writer.
 
-To test the report writer, please visit the [GAIK demo link](https://gaik-demo.2.rahtiapp.fi/report-writer-v2). It runs the house condition assessment and a project meeting example. Every source and intermediate file can be downloaded, and the knowledge files and section drafts can be edited between stages. Access is available upon registration request.
+To test the report writer, please visit the [GAIK demo link](https://gaik-demo.2.rahtiapp.fi/report-writer-v2). It runs the construction report and a project meeting example. Every source and intermediate file can be downloaded, and the knowledge files and section drafts can be edited between stages. Access is available upon registration request.
 
 ---
 
-## Example Case: Synthetic House Condition Assessment
+## Example Case: Synthetic Construction Report (House)
 
 A synthetic dataset, [`house_condition_assessment/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/report_writer/house_condition_assessment), lets the pipeline be tested and demonstrated without personal data. It describes a fictional property and plants the situations CURACT is designed to handle.
 

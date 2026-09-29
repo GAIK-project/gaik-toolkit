@@ -810,9 +810,9 @@ flowchart TD
 `} />
 
 **Key features:**
-- `KnowledgeCurator(config, model=None, *, max_workers=4)` and `curate(sources, sections, *, instructions="")`: one structured-output call per section, run in parallel
+- `KnowledgeCurator(config, model=None, *, max_workers=4, chat_options=None, drop_unverified=True)` and `curate(sources, sections, *, instructions="")`: one structured-output call per section, run in parallel
 - Sections are `SectionSpec` objects with an id, a title, instructions and required items. Sections with `depends_on` are derived and are not curated
-- Verified quotes: a quote must occur in its cited source, and only whitespace may differ. A failing section is requested again once with the failing quotes as feedback; if it still fails, `curate()` raises `ValueError`
+- Verified quotes: a quote must occur in its cited source, and only whitespace may differ. A failing section is requested again once with the failing quotes as feedback; if a quote still fails, that fact is dropped, the rest of the section is kept and the dropped facts are listed in `KnowledgeBase.dropped`. With `drop_unverified=False`, `curate()` raises `ValueError` instead
 - Locators: `page N` for PDFs, `sheet <name>, row <n>` for spreadsheets, the nearest heading for other structured documents, and null for recordings and plain text
 - Editable output: `save()` writes one JSON file per section. `KnowledgeBase.load()` validates edited files and `verify_quotes(sources)` checks the quotes again
 - Texts that already exist can be wrapped with `NormalizedSources.from_texts(...)`, so the Source Normalizer is optional
@@ -913,11 +913,12 @@ flowchart TD
 `} />
 
 **Key features:**
-- `ReportSynthesizer(config, model=None, *, reviewer_model=None, strict_review=False, review_attempts=5, writer_options=None, reviewer_options=None)` and `synthesize(knowledge, sections, *, title, language="English", instructions="", sample_report=None)`, which returns a `Report`
+- `ReportSynthesizer(config, model=None, *, reviewer_model=None, strict_review=False, review_attempts=5, writer_options=None, reviewer_options=None, citations=True)` and `synthesize(knowledge, sections, *, title, language="English", instructions="", sample_report=None)`, which returns a `Report`
 - LangGraph workflow: sections without dependencies start in parallel, and a derived section starts once its prerequisites are reviewed
 - The writer uses only the facts in its material, writes `(missing: <item>)` for each required item the material does not cover, and states both sides of an unresolved conflict, marked `Unresolved:`
 - `sample_report` sets structure, length and tone only. It contributes no content and never goes to the reviewer
 - Before any LLM call, `synthesize()` raises `ValueError` for duplicate section ids, an unknown dependency, a dependency cycle, or knowledge that does not match the non-derived sections
+- `citations=False` writes the facts without source citations: the writers give no file names or locators and the reviewer removes any that remain
 - `strict_review=True` stops the run when a reviewer edit cannot be applied
 - `report.save(directory)` writes `sections/NN_<id>.md`, `review_log.json`, `report.md` and `report.docx`. Hand-edited section files are loaded with `Report.load()` and saved again, which rebuilds the report without a model call
 - `report.usage` counts the writer and reviewer calls

@@ -43,6 +43,8 @@ import {
   type Staleness,
   parseArtifacts,
   parseSpec,
+  settingsForSpec,
+  type SpecSettings,
   staleAfterEdit,
   staleAfterStage,
   staleHint,
@@ -62,6 +64,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -173,7 +176,7 @@ export default function ReportWriterV2Page() {
         if (!Array.isArray(data?.examples))
           throw new Error("The examples response has no examples list.");
         setExamples(data.examples);
-        // ?example=<id> opens an example, e.g. from the Report Writer V2 use case.
+        // ?example=<id> opens an example, e.g. from the Construction Report Writing use case.
         const id = new URLSearchParams(window.location.search).get("example");
         if (!id) return;
         const ex = (data.examples as ExampleInfo[]).find((e) => e.id === id);
@@ -187,7 +190,7 @@ export default function ReportWriterV2Page() {
 
   // -- Spec --
 
-  function buildSpec(): ReportSpec {
+  function buildSpec(): Omit<ReportSpec, "settings"> & { settings: SpecSettings } {
     return {
       title,
       description,
@@ -206,7 +209,7 @@ export default function ReportWriterV2Page() {
       },
       sample_report: sample?.name ?? null,
       models,
-      settings,
+      settings: settingsForSpec(settings),
     };
   }
 
@@ -627,24 +630,132 @@ export default function ReportWriterV2Page() {
 
         {/* ── RIGHT COLUMN ── */}
         <div className="space-y-4">
-          <HowItWorksCard description="The three stages and the workspace">
+          <HowItWorksCard description="What you define, what each stage does, and how to edit in between">
             <p>
-              <strong>1. Normalize</strong> parses every source (documents,
-              spreadsheets, images, audio) and the sample report to text.
+              <strong>Purpose.</strong> Writes a report from mixed sources (documents,
+              spreadsheets, images and recordings) that follows a template you define, so that every
+              statement can be traced to a source. The work runs in three stages. Each stage saves its
+              result as files in a <em>workspace</em>, so you can read and correct them before the next
+              stage runs.
+            </p>
+
+            <p>
+              <strong>What you define (the spec).</strong> Load an example, or fill in the cards on the
+              left. You can also download the whole spec as JSON and upload it again later.
+            </p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                <strong>Title, description and language.</strong> The title heads the report and the
+                language is the language it is written in. The description is for people only and is
+                never sent to a model.
+              </li>
+              <li>
+                <strong>Sections.</strong> The template, in report order. Each has a title,
+                instructions on what to write, and optional <em>required items</em>: things it must
+                cover. A required item that no source covers becomes a <em>(missing: …)</em> marker in
+                the report instead of a guess. At most 12 sections.
+              </li>
+              <li>
+                <strong>Dependencies.</strong> A section that depends on others is <em>derived</em>. It
+                is written only from the finished text of those sections, never from the sources, so
+                use it for summaries and recommendations. A fact that none of its prerequisite sections
+                mentions cannot appear in it. A section without dependencies is written from the
+                sources.
+              </li>
+              <li>
+                <strong>Report instructions.</strong> Rules for every section: which sources to trust
+                when they disagree, how to cite, tone, and what to do with missing data.
+              </li>
+              <li>
+                <strong>Sources.</strong> Each file is <em>primary</em> (your own first-hand evidence,
+                such as site notes or recordings) or <em>secondary</em> (background, such as older
+                reports). Click the label to switch it. It only matters through the report
+                instructions: if they say primary outranks secondary, a conflict is decided that way.
+              </li>
+              <li>
+                <strong>Sample report (optional).</strong> A finished report whose structure, length
+                and tone the new one copies. It contributes no facts.
+              </li>
+            </ul>
+
+            <p>
+              <strong>Stage 1: Normalize.</strong> Converts every source and the sample report to
+              Markdown text into <code>normalized/</code>. PDFs and Word files are parsed locally,
+              spreadsheets become tables, recordings are transcribed and images are described by a
+              vision model. A file that cannot be read fully, such as a scanned PDF or an unsupported
+              type, stops the stage and is named in the error. Files are 100 MB together at most:
+              compress long recordings first.
             </p>
             <p>
-              <strong>2. Curate</strong> picks the facts each section needs from
-              the normalized sources into <code>knowledge/</code>.
+              <strong>Stage 2: Curate.</strong> For every section that is not derived, a model reads the
+              normalized sources and collects <em>facts</em> into <code>knowledge/</code>: a short
+              summary, the exact quote it came from, the file and a location such as a page or a sheet
+              row. It also lists the required items no source covers and the conflicts between sources.
+              Every quote is checked against its source; a section that fails is asked again once, and
+              a fact whose quote is still not in the source is dropped (the progress log says so).
+              Together the normalized texts may hold about 200,000 characters.
             </p>
             <p>
-              <strong>3. Synthesize</strong> writes and reviews each section from
-              its knowledge file, then assembles <code>report.md</code> and{" "}
-              <code>report.docx</code>.
+              <strong>Stage 3: Synthesize.</strong> A writer drafts each section from its own facts
+              only. A second model reviews the draft against the same facts and proposes small
+              corrections, which are applied; <code>review_log.json</code> records them. Derived
+              sections are written last, from the reviewed text of their prerequisites. The result is in{" "}
+              <code>report/</code>: one file per section, <code>report.md</code> and, if switched on,{" "}
+              <code>report.docx</code>. The report follows the order of your sections, not the writing
+              order.
+            </p>
+
+            <p>
+              <strong>Running.</strong> <em>Run all</em> does the three stages in turn. You can also run
+              one stage at a time once its inputs exist, and cancel a run. Progress and the token usage
+              of each stage are shown as it goes.
             </p>
             <p>
-              Between stages you can edit the knowledge and section files. After
-              editing sections, <strong>Rebuild report</strong> reassembles the
-              report without calling a model.
+              <strong>Editing between stages.</strong> The Workspace card lists every file. The
+              normalized texts can only be read. <strong>Knowledge files</strong> (JSON) and{" "}
+              <strong>section texts</strong> can be edited. When a file is out of date because
+              something before it changed, it is marked <em>stale</em> with the stage to rerun.
+              Running a stage again replaces its files, so Synthesize asks before it overwrites your
+              section edits. After editing section texts, <strong>Rebuild report</strong> rebuilds{" "}
+              <code>report.md</code> and the .docx without calling a model.
+            </p>
+
+            <p>
+              <strong>Settings.</strong> Under Settings you can choose, for each stage, the model
+              (blank means the server default), the reasoning effort and the temperature, plus:
+            </p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>the language of the recordings (default: detected automatically);</li>
+              <li>how many sections are curated in parallel;</li>
+              <li>how many attempts the reviewer gets per section;</li>
+              <li>
+                <em>Strict review</em>: stop the run if a reviewer correction cannot be applied,
+                instead of logging it;
+              </li>
+              <li>
+                <em>Citations</em>: cite the source file and place of each fact, or write plain
+                statements even if the instructions ask for citations;
+              </li>
+              <li>whether to build the .docx.</li>
+            </ul>
+
+            <p>
+              <strong>Keeping your work.</strong> The workspace lives in this browser tab. Before you
+              close it, download the workspace .zip (all stage files, in the Workspace card) and, if
+              you changed the template, the spec. Each stage is also available on its own, to try in
+              isolation:{" "}
+              <Link href="/source-normalizer" className="underline">
+                Source Normalizer
+              </Link>
+              ,{" "}
+              <Link href="/knowledge-curator" className="underline">
+                Knowledge Curator
+              </Link>{" "}
+              and{" "}
+              <Link href="/knowledge-synthesis" className="underline">
+                Knowledge Synthesis
+              </Link>
+              .
             </p>
           </HowItWorksCard>
 

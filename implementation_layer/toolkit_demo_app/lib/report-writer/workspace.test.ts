@@ -9,6 +9,7 @@ import {
   knowledgeJsonError,
   parseArtifacts,
   parseSpec,
+  settingsForSpec,
   staleAfterEdit,
   staleAfterStage,
   staleHint,
@@ -70,6 +71,35 @@ describe("parseSpec", () => {
     expect(() =>
       parseSpec({ ...SPEC, settings: { ...SPEC.settings, curator: { reasoning_effort: null, temperature: "0" } } }),
     ).toThrow("settings.curator.temperature must be a number or null");
+  });
+
+  test("citations are optional and default to on", () => {
+    const { citations: _omitted, ...withoutCitations } = SPEC.settings;
+
+    expect(parseSpec({ ...SPEC, settings: withoutCitations }).settings.citations).toBe(true);
+    expect(parseSpec({ ...SPEC, settings: { ...SPEC.settings, citations: false } }).settings.citations).toBe(
+      false,
+    );
+    expect(() => parseSpec({ ...SPEC, settings: { ...SPEC.settings, citations: "no" } })).toThrow(
+      "settings.citations must be a boolean",
+    );
+    // Other settings stay required.
+    const { docx: _docx, ...withoutDocx } = withoutCitations;
+    expect(() => parseSpec({ ...SPEC, settings: withoutDocx })).toThrow("settings is missing docx");
+  });
+});
+
+describe("settingsForSpec", () => {
+  test("leaves citations out when they are on, so older gaik releases accept the spec", () => {
+    expect("citations" in settingsForSpec(DEFAULT_SETTINGS)).toBe(false);
+    expect(settingsForSpec(DEFAULT_SETTINGS).docx).toBe(true);
+  });
+
+  test("writes citations when they are off, and the spec parses back", () => {
+    const settings = settingsForSpec({ ...DEFAULT_SETTINGS, citations: false });
+
+    expect(settings.citations).toBe(false);
+    expect(parseSpec({ ...SPEC, settings }).settings.citations).toBe(false);
   });
 });
 

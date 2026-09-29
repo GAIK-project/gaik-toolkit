@@ -1324,7 +1324,8 @@
       "curator_workers",
       "review_attempts",
       "strict_review",
-      "docx"
+      "docx",
+      "citations"
     ],
     "supported_providers": [
       "openai",
@@ -1514,7 +1515,8 @@
       "model",
       "max_workers",
       "chat_options",
-      "instructions"
+      "instructions",
+      "drop_unverified"
     ],
     "supported_providers": [
       "openai",
@@ -1542,7 +1544,8 @@
     },
     "known_limitations": [
       "Input is NormalizedSources (from SourceNormalizer, NormalizedSources.load, or NormalizedSources.from_texts for text already in hand), not raw files.",
-      "Every quote must occur verbatim (whitespace aside) in the source it cites. A section still failing after one retry makes curate() raise ValueError; so does a conflict pointing at a unit that does not exist.",
+      "Every quote must occur verbatim (whitespace aside) in the source it cites. A fact whose quote still fails after one retry is dropped and listed in KnowledgeBase.dropped; with drop_unverified=False, curate() raises ValueError instead. A conflict pointing at a unit that does not exist always raises ValueError.",
+      "Dropping can leave the knowledge smaller than the sources support: a dropped fact may be true with a wrongly copied quote, and a required item covered only by a dropped fact is not added to missing. Check KnowledgeBase.dropped when completeness matters; dropped is not saved, so it is empty after KnowledgeBase.load.",
       "Derived sections (with depends_on) are not curated; a template with no other section raises ValueError.",
       "Conflicts are marked resolved only when the source hierarchy in instructions decides them -- state the hierarchy (e.g. primary site observations over older documents) in instructions.",
       "usage is not saved, so it is empty after KnowledgeBase.load.",
@@ -1610,7 +1613,8 @@
       "reviewer_options",
       "language",
       "instructions",
-      "sample_report"
+      "sample_report",
+      "citations"
     ],
     "supported_providers": [
       "openai",

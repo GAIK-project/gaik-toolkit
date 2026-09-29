@@ -40,7 +40,8 @@ sections = [
 ]
 
 curator = KnowledgeCurator(get_llm_config())
-# optional: model="...", max_workers=4, chat_options={"reasoning_effort": "low"}
+# optional: model="...", max_workers=4, chat_options={"reasoning_effort": "low"},
+# drop_unverified=False (raise instead of dropping a fact whose quote cannot be verified)
 knowledge = curator.curate(
     sources,
     sections,
@@ -126,9 +127,25 @@ Each section's knowledge file looks like this:
 A unit fails when its `source.file` is not one of the sources, or when its `quote` does
 not occur verbatim in that source's text. Only whitespace may differ (`quote_in_text`).
 If any unit of a section fails, the whole section is requested again once, with the
-failing quotes as feedback. If the second answer still fails, `curate()` raises
-`ValueError` naming the section and the quotes. A conflict that refers to a unit that
-does not exist also raises `ValueError`.
+failing quotes as feedback. If the second answer still fails, the failing units are
+dropped and the rest of the section is kept, so one bad quote does not stop the run:
+
+```python
+knowledge = curator.curate(sources, sections)
+for unit in knowledge.dropped:  # DroppedUnit: section_id, topic, summary, quote, file, reason
+    print(unit.section_id, unit.reason, unit.quote)
+```
+
+- The remaining units are renumbered without gaps. A conflict keeps only its remaining
+  units and is removed if fewer than two are left.
+- A required item that only a dropped unit covered is not added to `missing`; the writer
+  still marks an item the material does not cover.
+- `progress_callback` gets a "Dropped N fact(s) of ..." line, and each drop is logged as a
+  warning. `knowledge.dropped` is not saved, so it is empty after `KnowledgeBase.load`.
+- `KnowledgeCurator(config, drop_unverified=False)` restores the strict behaviour:
+  `curate()` raises `ValueError` naming the section and the quotes.
+
+A conflict that refers to a unit that does not exist always raises `ValueError`.
 
 ## Editing knowledge files
 

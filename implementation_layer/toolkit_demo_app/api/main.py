@@ -44,6 +44,8 @@ try:
         dental_transcription,
         diary,
         extractor,
+        knowledge_curator,
+        knowledge_synthesis,
         llm_judge,
         luvata_order,
         parser,
@@ -53,6 +55,7 @@ try:
         report_writer,
         report_writer_v2,
         schema_generator,
+        source_normalizer,
         tabular_agent,
         text_to_speech,
         transcriber,
@@ -66,6 +69,8 @@ except ImportError:
         dental_transcription,
         diary,
         extractor,
+        knowledge_curator,
+        knowledge_synthesis,
         llm_judge,
         luvata_order,
         parser,
@@ -75,6 +80,7 @@ except ImportError:
         report_writer,
         report_writer_v2,
         schema_generator,
+        source_normalizer,
         tabular_agent,
         text_to_speech,
         transcriber,
@@ -178,6 +184,15 @@ app.include_router(luvata_order.router, tags=["Luvata Order"])
 app.include_router(llm_judge.router, prefix="/llm-judge", tags=["LLM Judge"])
 app.include_router(report_writer.router, prefix="/report-writer", tags=["Report Writer"])
 app.include_router(report_writer_v2.router, prefix="/report-writer-v2", tags=["Report Writer v2"])
+app.include_router(
+    source_normalizer.router, prefix="/source-normalizer", tags=["Source Normalizer"]
+)
+app.include_router(
+    knowledge_curator.router, prefix="/knowledge-curator", tags=["Knowledge Curator"]
+)
+app.include_router(
+    knowledge_synthesis.router, prefix="/knowledge-synthesis", tags=["Knowledge Synthesis"]
+)
 if solution_wizard is not None:
     app.include_router(solution_wizard.router, prefix="/wizard", tags=["Solution Wizard"])
 

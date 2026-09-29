@@ -19,6 +19,7 @@ from gaik.software_components.knowledge_curator.models import (
 )
 from gaik.software_components.llm.base import ChatResponse, UsageCounter
 from gaik.software_components.report_synthesizer import Report, ReportSynthesizer
+from gaik.software_components.report_synthesizer.prompts import writer_system_prompt
 
 CONFIG = {"provider": "openai", "api_key": "x", "model": "base-model"}
 INSTRUCTIONS = "Cite observations as [field observation, date]. REPORT_RULES"
@@ -98,9 +99,10 @@ class _FakeClient:
         self.prompts: dict[str, str] = {}
         self.kwargs: list[dict] = []
         self.usage = UsageCounter()
+        self.system = writer_system_prompt(True)  # the system prompt every writer call gets
 
     def chat(self, messages, **kwargs):
-        assert messages[0]["content"] == rs.WRITER_SYSTEM_PROMPT
+        assert messages[0]["content"] == self.system
         prompt = messages[1]["content"]
         sid = re.search(r'<section_to_write id="([^"]+)">', prompt).group(1)
         self.prompts[sid] = prompt
@@ -405,3 +407,32 @@ def test_save_docx(fakes, tmp_path):
     paths = _synthesize().save(tmp_path)
     text = pypandoc.convert_file(str(paths["docx"]), "markdown")
     assert "Condition assessment" in text and "REVIEWED recommendations" in text
+
+
+def test_citations_are_on_by_default(fakes):
+    _synthesize()
+
+    # The fake client asserts the default system prompt on every writer call.
+    assert "cite the file and locator" in fakes.client.system
+    assert all("citation format" in c["instructions"] for c in fakes.reviewer.calls.values())
+    assert not any(
+        "no source citations" in c["instructions"] for c in fakes.reviewer.calls.values()
+    )
+
+
+def test_citations_off_change_the_writer_and_the_reviewer_prompts(fakes):
+    fakes.client.system = writer_system_prompt(False)  # asserted on every writer call
+
+    ReportSynthesizer(CONFIG, citations=False).synthesize(
+        KNOWLEDGE, SECTIONS, title="Condition assessment", instructions=INSTRUCTIONS
+    )
+
+    assert "do not cite sources" in fakes.client.system
+    assert "cite the file and locator" not in fakes.client.system
+    assert "(missing: <item>)" in fakes.client.system  # the marker rule is untouched
+    assert set(fakes.reviewer.calls) == {"summary", "structures", "services", "recommendations"}
+    for call in fakes.reviewer.calls.values():
+        assert "no source citations" in call["instructions"]
+        assert "citation format" not in call["instructions"]
+        assert "(missing: <item>) marker" in call["instructions"]
+        assert "REPORT_RULES" in call["instructions"]

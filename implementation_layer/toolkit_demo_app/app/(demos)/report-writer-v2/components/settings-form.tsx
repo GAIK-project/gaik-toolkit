@@ -168,6 +168,13 @@ export function SettingsForm({
           {step("reviewer")}
           <Row label="Review attempts">{count("review_attempts")}</Row>
           <SwitchRow
+            label="Citations"
+            description="Cite the source file and place of each fact. Off writes plain statements, even if the report instructions ask for citations"
+            checked={settings.citations}
+            onCheckedChange={(v) => set({ citations: v })}
+            disabled={disabled}
+          />
+          <SwitchRow
             label="Strict review"
             description="Fail the stage when a reviewer edit can't be applied"
             checked={settings.strict_review}

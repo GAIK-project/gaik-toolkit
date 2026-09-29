@@ -44,6 +44,30 @@ in a clean, professional report format and cover all relevant evidence.
 communicate the same meaning."""
 
 
+_CITED_SOURCES_RULE = (
+    "- Sources: cite and attribute sources as the report instructions say. If they say "
+    "nothing about citations, cite the file and the place in it in parentheses, e.g. "
+    "(renovation_report_1998.pdf, page 3)."
+)
+assert _CITED_SOURCES_RULE in SINGLE_CALL_SYSTEM_PROMPT
+
+_UNCITED_SOURCES_RULE = (
+    "- Sources: do not cite sources. Give no file names, page numbers, sheet or row "
+    "references, footnotes, reference lists or bracketed or parenthesized citations, and "
+    'write no phrases such as "according to notes.txt". State each fact plainly; attribute '
+    "it in words (e.g. the 1998 renovation report) only when the report instructions ask "
+    "you to distinguish sources. This overrides any citation instruction in the report "
+    "instructions."
+)
+
+
+def single_call_system_prompt(citations: bool = True) -> str:
+    """Return the single-call system prompt; without ``citations`` it forbids them."""
+    if citations:
+        return SINGLE_CALL_SYSTEM_PROMPT
+    return SINGLE_CALL_SYSTEM_PROMPT.replace(_CITED_SOURCES_RULE, _UNCITED_SOURCES_RULE)
+
+
 def build_single_call_prompt(
     spec: ReportSpec, sources: NormalizedSources, sample_report: str | None
 ) -> str:

@@ -2107,6 +2107,14 @@
         "infer_from": "output_format == word OR user requests .docx -> true (confirm Pandoc is installed); otherwise false so the PoC does not depend on Pandoc"
       },
       {
+        "name": "citations",
+        "type": "bool",
+        "default": true,
+        "effect": "RunSettings field. When true (default), each fact is cited by its source file and locator, in the format the report instructions give (in parentheses when they give none). When false, the writers and the reviewer leave every citation out -- no file names, pages, sheet or row references or footnotes -- even if the report instructions ask for them; (missing: ...) markers are kept. Also applies to run(mode='single_call'). Derived sections follow the same setting.",
+        "selection_relevant": true,
+        "infer_from": "the report must read as an independent text with no source references (customer-facing, published, or told not to cite the recordings or files) -> false; a traceability or audit requirement, or nothing said about citations -> leave true"
+      },
+      {
         "name": "transcription_language",
         "type": "str",
         "default": "auto",
@@ -2195,7 +2203,7 @@
     "construct": "curator = KnowledgeCurator(config=get_stage_config(config, 'extraction'), max_workers=4)",
     "call": "section_specs = [SectionSpec(**s) for s in sections]\n    knowledge = curator.curate(sources, section_specs, instructions=report_instructions, progress_callback=print)\n    knowledge.save(output_dir / 'knowledge')",
     "call_verify": "bad_units = knowledge.verify_quotes(sources)  # after hand-editing knowledge files reloaded with KnowledgeBase.load(dir); [] means every quote is verbatim in its source",
-    "returns": "KnowledgeBase(.sections [SectionKnowledge(.section_id, .units [FactUnit(.id, .topic, .time_qualifier, .summary, .quote, .source(.file, .locator), .source_class, .confidence)], .missing, .conflicts [Conflict(.topic, .description, .status, .unit_ids)])], .usage); .get(section_id), .save(dir) -> <section_id>.json per section, KnowledgeBase.load(dir), .verify_quotes(sources)",
+    "returns": "KnowledgeBase(.sections [SectionKnowledge(.section_id, .units [FactUnit(.id, .topic, .time_qualifier, .summary, .quote, .source(.file, .locator), .source_class, .confidence)], .missing, .conflicts [Conflict(.topic, .description, .status, .unit_ids)])], .usage, .dropped [DroppedUnit(.section_id, .topic, .summary, .quote, .file, .reason)]); .get(section_id), .save(dir) -> <section_id>.json per section, KnowledgeBase.load(dir), .verify_quotes(sources)",
     "install_extra": "knowledge-curator",
     "options": [
       {
@@ -2231,6 +2239,14 @@
         "infer_from": "blueprint.models reasoning_effort for the extraction stage, if set"
       },
       {
+        "name": "drop_unverified",
+        "type": "bool",
+        "default": true,
+        "effect": "What happens when a fact's quote still is not in its cited source after the one retry. True: the failing facts are dropped, the rest of the section is kept and the drops are listed in KnowledgeBase.dropped. False: curate() raises ValueError naming the section and the quotes. A dropped fact can be a true one whose quote was copied wrongly, so the knowledge can be smaller than the sources support.",
+        "selection_relevant": true,
+        "infer_from": "requirements say every fact must be verified and an incomplete result is worse than a failed run (audit, legal, due diligence) -> False; otherwise leave True and have the PoC report knowledge.dropped"
+      },
+      {
         "name": "config",
         "type": "dict",
         "default": null,
@@ -2239,7 +2255,7 @@
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
       }
     ],
-    "note": "Stage 2 of CURACT report writing. Reads NormalizedSources (SourceNormalizer output, NormalizedSources.load, or NormalizedSources.from_texts) and writes one editable JSON file per non-derived section: fact units with verbatim quotes, the required items no source covers (missing) and conflicts between sources. Sections with depends_on are skipped. ReportWriter already runs this stage -- add it separately only in a custom pipeline, e.g. when the curated knowledge itself is the deliverable."
+    "note": "Stage 2 of CURACT report writing. Reads NormalizedSources (SourceNormalizer output, NormalizedSources.load, or NormalizedSources.from_texts) and writes one editable JSON file per non-derived section: fact units with verbatim quotes, the required items no source covers (missing) and conflicts between sources. Sections with depends_on are skipped. A fact whose quote still fails after the one retry is dropped and listed in .dropped (not saved, so empty after KnowledgeBase.load); a required item covered only by a dropped fact is not added to missing. ReportWriter already runs this stage -- add it separately only in a custom pipeline, e.g. when the curated knowledge itself is the deliverable."
   },
   "ReportSynthesizer": {
     "import": "from gaik.software_components.report_synthesizer import ReportSynthesizer, Report",
@@ -2291,6 +2307,14 @@
         "effect": "Extra options for every writer call, such as reasoning_effort or temperature.",
         "selection_relevant": false,
         "infer_from": "blueprint.models reasoning_effort for the answer stage, if set"
+      },
+      {
+        "name": "citations",
+        "type": "bool",
+        "default": true,
+        "effect": "Constructor argument. True (default): each fact is cited by its source file and locator, as the report instructions say. False: the writers and the reviewer leave every citation out, even if the instructions ask for them; (missing: ...) markers are kept. Derived sections follow the same setting.",
+        "selection_relevant": true,
+        "infer_from": "the report must read as an independent text with no source references (customer-facing, published, or told not to cite the recordings or files) -> false; a traceability or audit requirement, or nothing said about citations -> leave true"
       },
       {
         "name": "reviewer_options",

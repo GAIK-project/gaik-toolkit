@@ -9,7 +9,7 @@ inspect and edit.
 
 | `EXAMPLE` | Report | Sources |
 |-----------|--------|---------|
-| `house_condition_assessment` | Condition assessment of a fictional house, with planted conflicts, gaps and distractors | 3 site recordings (primary), 2 PDFs, a DOCX, an XLSX and a floor plan image (secondary), and a sample report of another house |
+| `house_condition_assessment` | Construction report of a fictional house, with planted conflicts, gaps and distractors | 3 site recordings (primary), 2 PDFs, a DOCX, an XLSX and a floor plan image (secondary), and a sample report of another house |
 | `project_meeting` | Meeting report of a product roadmap review, the legacy multi-source report generator example ported to a spec | A recording and notes (primary), a PDF, an XLSX and a sketch (secondary), from `../multi_source_report_generator/sample_inputs/` |
 
 See [house_condition_assessment/README.md](house_condition_assessment/README.md), with

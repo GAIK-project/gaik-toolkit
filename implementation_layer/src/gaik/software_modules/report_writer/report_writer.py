@@ -24,7 +24,7 @@ from gaik.software_components.report_synthesizer import (
 )
 from gaik.software_components.source_normalizer import NormalizedSources, SourceNormalizer
 
-from .prompts import SINGLE_CALL_SYSTEM_PROMPT, build_single_call_prompt
+from .prompts import build_single_call_prompt, single_call_system_prompt
 from .spec import ReportSpec
 
 Progress = Callable[[str], None] | None
@@ -155,6 +155,7 @@ class ReportWriter:
             review_attempts=settings.review_attempts,
             writer_options=settings.writer.chat_kwargs(),
             reviewer_options=settings.reviewer.chat_kwargs(),
+            citations=settings.citations,
         )
         report = synthesizer.synthesize(
             knowledge,
@@ -207,7 +208,7 @@ class ReportWriter:
         prompt = build_single_call_prompt(spec, sources, _sample_text(spec, workspace))
         response = create_llm_client(config).chat(
             [
-                {"role": "system", "content": SINGLE_CALL_SYSTEM_PROMPT},
+                {"role": "system", "content": single_call_system_prompt(spec.settings.citations)},
                 {"role": "user", "content": prompt},
             ],
             **spec.settings.writer.chat_kwargs(),

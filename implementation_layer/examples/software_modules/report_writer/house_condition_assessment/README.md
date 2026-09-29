@@ -1,7 +1,7 @@
-# Synthetic house condition assessment
+# Synthetic construction report (house)
 
-A fictional test case for the ReportWriter, taken from `use_cases/report_writing.md`: a condition
-assessment of 12 Example Road, Sampleton, a 1½-storey timber-frame house built in 1978. It
+A fictional test case for the ReportWriter, taken from `use_cases/report_writing.md`: a construction
+report of 12 Example Road, Sampleton, a 1½-storey timber-frame house built in 1978. It
 consists of three site recordings and five customer documents. Planted situations test the source
 hierarchy, the missing-data markers, knowledge filtering and grounding. The people, companies,
 addresses and figures are all invented.

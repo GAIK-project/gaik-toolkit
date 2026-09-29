@@ -72,7 +72,8 @@ knowledge = KnowledgeBase(
 
 synthesizer = ReportSynthesizer(get_llm_config())
 # optional: model="...", reviewer_model="...", strict_review=True, review_attempts=5,
-#           writer_options={"reasoning_effort": "medium"}, reviewer_options={...}
+#           writer_options={"reasoning_effort": "medium"}, reviewer_options={...},
+#           citations=False (no source citations in the report)
 report = synthesizer.synthesize(
     knowledge,
     sections,
@@ -154,6 +155,16 @@ replace the reviewer's defaults and cover unsupported claims; numbers, dates and
 attributions; a `(missing: …)` marker for every uncovered required item; hierarchy
 phrasing and citation format per the report instructions; and the section's
 instructions. They tell the reviewer not to rewrite the style.
+
+## Citations
+
+By default each fact is cited by its source file and locator, in the format the report
+instructions give (in parentheses, e.g. `(report.pdf, page 3)`, when they give none).
+`ReportSynthesizer(config, citations=False)` writes the facts without citations: the
+writers are told to give no file names, pages, sheet or row references or footnotes, and
+the reviewer removes any that remain. This overrides a citation instruction in the report
+instructions. `(missing: …)` markers are kept. Derived sections are written from the
+prerequisite texts, so they follow the same setting.
 
 The reviewed text is the section text, and it is what derived sections are written from.
 Each section's applied and unresolved edits go into `report.review_log`. With

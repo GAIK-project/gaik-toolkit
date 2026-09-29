@@ -50,6 +50,8 @@ export interface RunSettings extends Record<StepKey, StepOptions> {
   review_attempts: number;
   strict_review: boolean;
   docx: boolean;
+  /** Cite the source file of each fact; a spec may omit it, which means true. */
+  citations: boolean;
 }
 
 /** The defaults of gaik's RunSettings. */
@@ -59,6 +61,7 @@ export const DEFAULT_SETTINGS: RunSettings = {
   review_attempts: 5,
   strict_review: false,
   docx: true,
+  citations: true,
   curator: { reasoning_effort: null, temperature: null },
   writer: { reasoning_effort: null, temperature: null },
   reviewer: { reasoning_effort: null, temperature: null },
@@ -76,11 +79,12 @@ function exactObject(
   v: unknown,
   what: string,
   keys: readonly string[],
+  optional: readonly string[] = [],
 ): Record<string, unknown> {
   if (!v || typeof v !== "object" || Array.isArray(v))
     fail(`${what} must be an object`);
   const o = v as Record<string, unknown>;
-  const missing = keys.filter((k) => !(k in o));
+  const missing = keys.filter((k) => !(k in o) && !optional.includes(k));
   const extra = Object.keys(o).filter((k) => !keys.includes(k));
   if (missing.length) fail(`${what} is missing ${missing.join(", ")}`);
   if (extra.length) fail(`${what} has unknown keys ${extra.join(", ")}`);
@@ -110,7 +114,8 @@ function bool(v: unknown, what: string): boolean {
 }
 
 function parseSettings(v: unknown): RunSettings {
-  const o = exactObject(v, "settings", Object.keys(DEFAULT_SETTINGS));
+  // Older specs, and specs for a gaik without the setting, have no `citations` key.
+  const o = exactObject(v, "settings", Object.keys(DEFAULT_SETTINGS), ["citations"]);
   const step = (k: StepKey): StepOptions => {
     const s = exactObject(o[k], `settings.${k}`, [
       "reasoning_effort",
@@ -135,10 +140,24 @@ function parseSettings(v: unknown): RunSettings {
     review_attempts: posInt(o.review_attempts, "settings.review_attempts"),
     strict_review: bool(o.strict_review, "settings.strict_review"),
     docx: bool(o.docx, "settings.docx"),
+    citations:
+      o.citations === undefined ? true : bool(o.citations, "settings.citations"),
     curator: step("curator"),
     writer: step("writer"),
     reviewer: step("reviewer"),
   };
+}
+
+/** The settings of a spec file: `citations` is left out when it is on. */
+export type SpecSettings = Omit<RunSettings, "citations"> & { citations?: false };
+
+/**
+ * The settings as a spec carries them. `citations` is written only when it is off: gaik
+ * releases before the setting reject the key, and on is the default everywhere.
+ */
+export function settingsForSpec(settings: RunSettings): SpecSettings {
+  const { citations, ...rest } = settings;
+  return citations ? rest : { ...rest, citations: false };
 }
 
 export function parseSpec(value: unknown): ReportSpec {

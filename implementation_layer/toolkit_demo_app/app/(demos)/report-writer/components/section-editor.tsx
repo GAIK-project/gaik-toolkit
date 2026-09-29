@@ -47,6 +47,10 @@ interface SectionEditorProps {
   disabled?: boolean;
   /** Show a one-per-line required_items field under Advanced. */
   withRequiredItems?: boolean;
+  /** Hide the depends_on chips, for pages whose sections are never derived. */
+  hideDependsOn?: boolean;
+  /** What a row is called in the labels: "Section" for a report, "Topic" for curation. */
+  noun?: string;
 }
 
 export function SectionEditor({
@@ -54,7 +58,10 @@ export function SectionEditor({
   onChange,
   disabled,
   withRequiredItems,
+  hideDependsOn,
+  noun = "Section",
 }: SectionEditorProps) {
+  const lower = noun.toLowerCase();
   const baseId = useId();
 
   function update(key: string, patch: Partial<SectionRow>) {
@@ -107,7 +114,7 @@ export function SectionEditor({
             </Badge>
             <Input
               id={`${baseId}-title-${row.key}`}
-              placeholder="Section title (e.g. Findings)"
+              placeholder={`${noun} title (e.g. Findings)`}
               value={row.title}
               onChange={(e) => update(row.key, { title: e.target.value })}
               disabled={disabled}
@@ -139,7 +146,7 @@ export function SectionEditor({
               className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
               onClick={() => remove(row.key)}
               disabled={disabled}
-              title="Remove section"
+              title={`Remove ${lower}`}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -148,7 +155,7 @@ export function SectionEditor({
           {/* Instructions */}
           <Textarea
             id={`${baseId}-instr-${row.key}`}
-            placeholder="Instructions: what should this section contain?"
+            placeholder={`Instructions: what should this ${lower} contain?`}
             value={row.instructions}
             onChange={(e) => update(row.key, { instructions: e.target.value })}
             disabled={disabled}
@@ -159,8 +166,9 @@ export function SectionEditor({
           <Accordion type="single" collapsible>
             <AccordionItem value="adv" className="border-none">
               <AccordionTrigger className="py-0 text-xs text-muted-foreground hover:no-underline">
-                Advanced (id · depends_on{withRequiredItems && " · required items"})
-                {row.depends_on.length > 0 && (
+                Advanced (id{!hideDependsOn && " · depends_on"}
+                {withRequiredItems && " · required items"})
+                {!hideDependsOn && row.depends_on.length > 0 && (
                   <span className="ml-2 text-primary font-medium">
                     {row.depends_on.length} dep{row.depends_on.length > 1 ? "s" : ""}
                   </span>
@@ -175,7 +183,7 @@ export function SectionEditor({
                 {/* Section id */}
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">
-                    Section id
+                    {noun} id
                     <span className="ml-1 font-normal opacity-60">
                       (auto: {slugifyTitle(row.title || "section")})
                     </span>
@@ -190,7 +198,7 @@ export function SectionEditor({
                 </div>
 
                 {/* Depends on — chip-based selection */}
-                {otherIds(row.key).length > 0 && (
+                {!hideDependsOn && otherIds(row.key).length > 0 && (
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground">
                       Depends on
@@ -240,7 +248,7 @@ export function SectionEditor({
                     <Label className="text-xs text-muted-foreground">
                       Required items
                       <span className="ml-1 font-normal opacity-60">
-                        — one per line; facts this section must cover
+                        — one per line; facts this {lower} must cover
                       </span>
                     </Label>
                     <Textarea
@@ -267,7 +275,7 @@ export function SectionEditor({
         className="w-full"
       >
         <Plus className="mr-2 h-4 w-4" />
-        Add Section
+        Add {noun}
       </Button>
     </div>
   );
