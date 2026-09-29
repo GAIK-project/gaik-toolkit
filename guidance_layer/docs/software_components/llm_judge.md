@@ -187,7 +187,7 @@ setups, Gemini 3.1 Flash Lite is the cheapest screener.
 | `AZURE_API_KEY`, `AZURE_RESOURCE_NAME`, `AZURE_API_VERSION`, `AZURE_DEPLOYMENT` | Azure OpenAI |
 | `OPENAI_API_KEY` | Direct OpenAI |
 | `ANTHROPIC_API_KEY` | Direct Anthropic |
-| `ANTHROPIC_FOUNDRY_RESOURCE` (+ `AZURE_API_KEY`) | Anthropic on Azure AI Foundry (auto-detected) |
+| `ANTHROPIC_FOUNDRY_RESOURCE` (+ `ANTHROPIC_FOUNDRY_API_KEY`, or `AZURE_API_KEY`) | Anthropic on Azure AI Foundry (auto-detected) |
 | `GOOGLE_VERTEXAI_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS` | Vertex AI (preferred) |
 | `GOOGLE_GEMINI_API_KEY` | Generative Language API (alternative) |
 

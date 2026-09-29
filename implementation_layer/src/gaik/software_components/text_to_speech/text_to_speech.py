@@ -77,7 +77,13 @@ class TextToSpeech:
         # ``provider`` nor ``use_azure``) means standard OpenAI, whatever LLM_PROVIDER says.
         provider = resolve_provider(config={"use_azure": False, **self.api_config})
         assert_openai_or_azure({"provider": provider}, component="TextToSpeech")
-        self.client = create_openai_client(self.api_config)
+        # Azure speech goes through _synthesize_with_azure_endpoint's raw HTTP call, which
+        # never touches this client; building it there would demand an unused AZURE_ENDPOINT.
+        self.client = (
+            None
+            if self.api_config.get("use_azure", False)
+            else create_openai_client(self.api_config)
+        )
         self.model = model or self._resolve_default_model()
         if language not in SUPPORTED_LANGUAGES:
             supported = ", ".join(SUPPORTED_LANGUAGES)

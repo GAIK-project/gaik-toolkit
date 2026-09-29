@@ -109,9 +109,11 @@ When discussing `output_types`, also ask whether the user wants a **formatted PD
 - **Multi-source report cases** (`multi_source_report`): the "fields" are the report sections, not a JSON schema. Collect:
   1. **Section list** — ask the user to list every section heading the report must contain, in order.
   2. **Per-section instructions** — for each section, ask: "What should the writer focus on for the *[Section Title]* section? Any specific points to cover, tone, depth, or constraints?" Record the answer as the section's `instructions` string. Do not skip this — instructions are the primary control over what each section says; a section without instructions will receive only a generic placeholder.
-  3. **Depends-on relationships** — after collecting all section instructions, ask: "Are there any sections that should only be written *after* another section is complete? For example, a Conclusions section that draws on Findings." If yes, record the `depends_on` list for each such section. In agentic mode, a section with `depends_on` receives the finalized content of its dependencies as additional context before drafting.
+  3. **Depends-on relationships** — after collecting all section instructions, ask: "Are there any sections that should only be written *after* another section is complete? For example, a Conclusions section that draws on Findings." If yes, record the `depends_on` list for each such section. The two report modules treat it differently: in `ReportWriter` a section with `depends_on` is *derived* — it is written **only** from the reviewed texts of its dependencies, never from the sources, so use it for summaries, conclusions and recommendations, not for sections that need their own evidence. In `MultiSourceReportGenerator` agentic mode it receives the finalized content of its dependencies as additional context before drafting.
+  4. **Required items** (`ReportWriter`) — for each non-derived section, ask: "Is there anything this section must always cover, even if no source mentions it?" (e.g. "latest sewer camera inspection"). Record the answers as `required_items`; each item no source covers is written as `(missing: <item>)` instead of being filled in.
+  5. **Sources and report-wide rules** (`ReportWriter`) — ask which inputs are *primary* (e.g. the user's own recordings or site notes) and which are *secondary* (e.g. older customer documents), and how conflicts between them are resolved, plus any citation/attribution style. Record the grouping in `technical_spec.data_sources` and the rules as `target_output_spec.report_instructions`; they become the spec's `sources` and `instructions`. Also ask whether a sample report fixes the expected structure and tone.
 
-  Store these as `target_output_spec.fields` — each field maps to one section: `{"id": "<slug>", "title": "<heading>", "instructions": "<prompt>", "depends_on": [...]}`. `depends_on` is omitted when empty.
+  Store these as `target_output_spec.fields` — each field maps to one section: `{"id": "<slug>", "title": "<heading>", "instructions": "<prompt>", "required_items": [...], "depends_on": [...]}`. `required_items` and `depends_on` are omitted when empty. Section ids must use only letters, digits, `_` and `-`.
 
 - **RAG / classification / transcript use cases**: this round is light — say so and record only the answer or output type instead.
 
@@ -351,7 +353,18 @@ Check whether a single GAIK software module covers the use case end-to-end:
 | Audio/video → structured JSON | `AudioToStructuredData` (subject to provenance override above) |
 | PDF/DOCX → structured JSON | `DocumentsToStructuredData` (subject to accuracy override above) |
 | Document collection → answer | `RAGWorkflow` |
-| Any mix of audio, documents, images, or text → narrative report (not structured JSON) | `MultiSourceReportGenerator` |
+| Any mix of audio, documents, images, or text → narrative report (not structured JSON) | `ReportWriter` (subject to the report-writer rule below) |
+
+**Report-writer rule.** `ReportWriter` (report writer v2, CURACT) is the default for `multi_source_report`: it curates section-bound fact units with verified verbatim quotes, marks uncovered required items as `(missing: …)`, applies a primary/secondary source hierarchy, reviews every section with a separate `DraftReviewer` call, and saves every stage as editable files so a human can correct `knowledge/*.json` or `report/sections/*.md` and rerun only the later stages. `module_for_pattern` may still return the legacy `multi_source_report_generator`; override it with this rule. Fall back to the legacy `MultiSourceReportGenerator` only when a `ReportWriter` limitation blocks the use case:
+
+- scanned or image-only PDFs (no text layer — `ReportWriter` raises; the legacy module has vision/multimodal/docling parsers via `parser_choice`);
+- source types only the legacy module reads: `.xls`, `.aac`, `.mov`/`.mkv`/`.avi` video, or `.tiff`/`.bmp`/`.gif` images (neither module reads `.pptx` or `.doc`);
+- audio sources while the text provider is not OpenAI/Azure — `ReportWriter` sends recordings through its single config, whereas the legacy module takes a separate `transcriber_options={'ctor': {'api_config': ...}}`;
+- structured extraction from images (legacy `image_options` with `VisionExtractor`).
+
+- the installed gaik has no `gaik.software_modules.report_writer` (it ships after gaik 0.8.1; check with `python -c "import gaik.software_modules.report_writer"` in the environment the PoC will run in) — a PoC that imports it would fail at startup.
+
+State the reason to the user when choosing the legacy module. Never select both.
 
 If the module's `input_artifact_types` and `output_artifact_types` match the use case, select it and note the components it contains (from `uses_components`). Stop here unless the user needs custom control over individual steps.
 
@@ -384,11 +397,13 @@ If no module covers the full chain, or the user needs to skip/add/reorder steps,
 - Image or visually complex PDF → `VisionExtractor` (note: could be more expensive; flag cost tradeoff — see accuracy override above)
 - Document type detection needed → `DocumentClassifier`
 - Natural-language questions over already-structured data → a text-to-SQL agent, **not** a parser/extractor/RAG chain: data in a PostgreSQL database → `PostgresAgent`; data in CSV/Excel/Parquet/JSON files → `TabularAgent` (loads files into DuckDB, one table per Excel sheet, handles messy report layouts). Both answer read-only analytical questions (aggregation, filtering, joins) and expose the SQL used; neither produces charts or statistical models.
+- Mixed source files (PDF with a text layer, DOCX, XLSX/CSV, TXT/MD, recordings, images) → Markdown texts with per-file provenance and a primary/secondary class → `SourceNormalizer`. Normalized sources + section specs → section-bound fact units with verbatim quotes, missing required items and source conflicts (`structured_json`) → `KnowledgeCurator`. Curated knowledge → reviewed report sections, `report.md`/`report.docx` → `ReportSynthesizer`. These are the three stages `ReportWriter` runs; compose them yourself only when a stage must be skipped or replaced (e.g. the curated knowledge itself is the deliverable, or the knowledge is written by hand).
+- Any generated text (summary, minutes, report section) must be fact-checked and **corrected** against reference material, with an auditable edit log → `DraftReviewer` (exact search-and-replace edits; returns the repaired text). Use `LLMJudge` instead when the goal is a score or pass/fail verdict rather than a corrected text. Do not add `DraftReviewer` after `ReportSynthesizer`/`ReportWriter`, which already use it.
 - Output validation required → `LLMJudge` (extraction patterns only — see Step 3)
 
 **Step 3 -- Add `LLMJudge` when appropriate**
 
-**Skip this step entirely when `pattern == multi_source_report`.** LLMJudge validates structured extraction output against a schema; it has no meaningful role when the output is a narrative report. Never include it in a report-writing pipeline.
+**Skip this step entirely when `pattern == multi_source_report`.** LLMJudge validates structured extraction output against a schema; it has no meaningful role when the output is a narrative report. Never include it in a report-writing pipeline. `ReportWriter` already fact-checks every section with its built-in `DraftReviewer`; for `human_review == yes` or accuracy-critical reports, tighten that review instead (`strict_review`, a separate `reviewer` model — see its card's `spec_settings`).
 
 For all other patterns: add `LLMJudge` if `human_review=yes` or the user explicitly wants output quality checking. Explain why: it pre-screens outputs before human review, reducing reviewer load. Note its limitation: it is not a substitute for human review in safety-critical workflows.
 
@@ -407,6 +422,7 @@ Every selected component exposes behaviour-changing options. Read each selected 
   - scanned/image PDFs → `DoclingParser.enable_ocr = True`, or `DocumentsToStructuredData.parser_choice = "docling"` (the accepted literals are `vision_parser`, `docling`, `pymupdf`, `docx` — only the first carries the `_parser` suffix; the registry component *ids* `docling_parser`/`pymupdf_parser`/`docx_parser` are a different namespace and raise `ValueError` if passed here)
   - access controls on a database → `PostgresAgent.table_allowlist = [...]`
   - source spreadsheets are human-facing reports (title rows, subtotals) → `TabularAgent.layout_inference = "auto"` (default; clean machine exports → `"never"` to skip the layout LLM call)
+  - `ReportWriter`: its behaviour knobs are `ReportSpec` fields, not constructor or `run()` kwargs, so its card lists them under `spec_fields` and `spec_settings` (same shape as `options`) — read both. `human_review == yes` or accuracy-critical → `strict_review = True` and a separate `reviewer` model; `.docx` output requested → `docx = True` (needs the Pandoc binary; otherwise `docx = False`); audio sources → `transcription_language` from the input language and a `transcription` model
 - **Ask the user** when an option is `selection_relevant` but cannot be inferred from the requirements.
 - **Conditional options**: when an option's `infer_from` field encodes a condition (e.g. `"diarization_required → ask for speaker count"`), only surface that option — either by inferring or asking — when the condition holds. If the condition does not hold, leave the option at its default silently.
 - **Record** every chosen non-default option in the corresponding `workflow.steps[].parameters` so the PoC scaffolder and BPMN reflect it.
@@ -414,7 +430,8 @@ Every selected component exposes behaviour-changing options. Read each selected 
 **Avoid redundant components (subsumption rule).** A card / registry entry may list `subsumes` or `uses_components`. If a capability is already provided internally by a selected component or module, do **not** add the inner component as a separate step:
 
 - `Transcriber(enhanced_transcript=True)` subsumes `TranscriptEnhancer` for audio — never add both.
-- A module (`AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow`) subsumes its `uses_components` — never add those as separate steps; configure the module's own options instead (e.g. `parser_choice`, `citations`).
+- A module (`AudioToStructuredData`, `DocumentsToStructuredData`, `RAGWorkflow`, `ReportWriter`, `MultiSourceReportGenerator`) subsumes its `uses_components` — never add those as separate steps; configure the module's own options instead (e.g. `parser_choice`, `citations`, the `ReportWriter` spec settings).
+- `SourceNormalizer` subsumes the parsers, `Transcriber` and `VisionParser` it dispatches to; `ReportSynthesizer` subsumes `DraftReviewer`.
 
 `validate_blueprint.py` emits a Rule-12 warning if a redundant sub-component slips through; treat it as a prompt to consolidate.
 
@@ -834,6 +851,7 @@ Always tell the user about high-impact unconfirmed assumptions before Gate 2.
 | AudioToStructuredData | module | audio → structured_json | spoken reports, voice forms |
 | DocumentsToStructuredData | module | pdf/docx → structured_json | document extraction |
 | RAGWorkflow | module | document_collection → answer | knowledge base Q&A |
+| ReportWriter | module | mixed sources → report (text/docx) | templated, source-grounded reports |
 | Transcriber | component | audio → transcript | audio to text |
 | TranscriptEnhancer | component | transcript → enhanced_transcript | Finnish ASR repair |
 | Extractor | component | text → structured_json | field extraction from text |

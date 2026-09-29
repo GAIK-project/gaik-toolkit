@@ -314,7 +314,7 @@ Transcription quality is measured using standard metrics such as **Word Error Ra
 
 ### Extractor Evaluation
 
-The quality of structured information extraction is evaluated through **cosine similarity ratio**, which measures how accurately the extracted fields match the expected values. This method assesses both the semantic correctness and completeness of the extracted data.
+The quality of structured information extraction is evaluated through **precision, recall, and F1 score**, using normalized exact matching for structured fields and embedding **cosine similarity** for descriptive fields. Together they measure how accurately the extracted fields match the expected values and assess both the semantic correctness and completeness of the extracted data.
 
 > 📊 **Extraction evaluation methods:** [`evaluation_layer/eval_methods/extraction_eval/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/extraction_eval)
 

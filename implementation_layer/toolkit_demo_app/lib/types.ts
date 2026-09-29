@@ -22,7 +22,8 @@ export type DemoType =
   | "text-to-speech"
   | "postgres-agent"
   | "tabular-agent"
-  | "report-writer";
+  | "report-writer"
+  | "report-writer-v2";
 
 /**
  * User feedback stored in the database

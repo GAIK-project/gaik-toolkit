@@ -1197,6 +1197,483 @@
     "install_extra": "multi-source-report-generator"
   },
   {
+    "id": "report_writer",
+    "name": "ReportWriter",
+    "type": "software_module",
+    "input_artifact_types": [
+      "pdf",
+      "docx",
+      "document",
+      "tabular",
+      "audio",
+      "video",
+      "image",
+      "text"
+    ],
+    "output_artifact_types": [
+      "text",
+      "word_document"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [
+      "SourceNormalizer",
+      "KnowledgeCurator",
+      "ReportSynthesizer",
+      "DraftReviewer",
+      "PyMuPDFParser",
+      "DocxParser",
+      "Transcriber",
+      "VisionParser"
+    ],
+    "required_parameters": [
+      "title",
+      "sections"
+    ],
+    "optional_parameters": [
+      "mode",
+      "description",
+      "language",
+      "instructions",
+      "required_items",
+      "depends_on",
+      "sample_report",
+      "models",
+      "transcription_language",
+      "curator_workers",
+      "review_attempts",
+      "strict_review",
+      "docx"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
+    ],
+    "cost_relevant_parameters": [
+      "models",
+      "mode",
+      "review_attempts"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "CURACT mode (default): one structured curation call per non-derived section, then one writer call plus one or more reviewer calls per section -- slower and costlier than a single call, but every fact carries a verified verbatim quote, each section is written only from its own knowledge, and a separate reviewer fact-checks every draft. mode='single_call' writes the whole report in one writer call from every source, with no curation and no review -- the cheap baseline.",
+      "cost_sensitivity": "high -- scales with sections (curation + writing + review per section) and with source size, since every curator call reads all normalized sources",
+      "degrades_on": [
+        "scanned_pdfs_without_text_layer",
+        "very_large_source_sets_in_single_call_mode",
+        "templates_without_per_section_instructions"
+      ]
+    },
+    "known_limitations": [
+      "Report and source set are defined by one ReportSpec (title, language, sections with instructions/required_items/depends_on, report-wide instructions, sources grouped as primary/secondary, optional sample_report, per-step models and settings). The spec holds model names only; any unknown key such as api_key raises.",
+      "A section with depends_on is DERIVED: it gets no knowledge file and is written only from the reviewed texts of the sections it depends on, never from the sources. Use it for summaries/recommendations, not for sections that need their own evidence.",
+      "Supported source files are those of SourceNormalizer: .pdf (text layer only -- a scanned PDF raises), .docx, .xlsx/.csv, .txt/.md, audio (.mp3 .wav .m4a .ogg .flac .webm .mp4 .mpeg .mpga) and images (.png .jpg .jpeg .webp). .pptx, .doc, .xls and other types raise; file names must be unique across all sources because the name is the citation key.",
+      "One config drives every stage. Recordings go to the Transcriber with that same config, so a spec with audio sources needs an OpenAI/Azure config; there is no separate audio stage config as in MultiSourceReportGenerator.",
+      "Recordings carry no timestamps, so the locator of a fact from a recording is null.",
+      "synthesize, rebuild and run save report.docx unless settings.docx is false; that needs the Pandoc system binary and raises without it.",
+      "usage is not saved, so a stage result read back with load, and the report that rebuild returns, have empty usage.",
+      "The single-call baseline sends every source in full; a large source set can exceed the writer model's context window, and the call then fails.",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
+    ],
+    "best_for": [
+      "templated_source_grounded_reports",
+      "multi_source_report_writing",
+      "condition_assessment_reports",
+      "meeting_report_writing",
+      "reports_with_required_items_and_missing_markers",
+      "primary_vs_secondary_source_hierarchy",
+      "human_editable_intermediate_stages"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "write_report",
+        "component": "ReportWriter",
+        "inputs": [
+          "source_files"
+        ],
+        "outputs": [
+          "markdown_report"
+        ],
+        "parameters": {
+          "title": "report title",
+          "sections": "section specs (id + title + instructions, optional required_items and depends_on)"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_modules/report_writer/",
+    "import_path": "gaik.software_modules.report_writer",
+    "example_script_path": "implementation_layer/examples/software_modules/report_writer/",
+    "readme_path": "implementation_layer/src/gaik/software_modules/report_writer/README.md",
+    "install_extra": "report-writer"
+  },
+  {
+    "id": "source_normalizer",
+    "name": "SourceNormalizer",
+    "type": "software_component",
+    "input_artifact_types": [
+      "pdf",
+      "docx",
+      "document",
+      "tabular",
+      "audio",
+      "video",
+      "image",
+      "text"
+    ],
+    "output_artifact_types": [
+      "parsed_text",
+      "text",
+      "normalized_evidence"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [
+      "PyMuPDFParser",
+      "DocxParser",
+      "Transcriber",
+      "VisionParser"
+    ],
+    "subsumes": [
+      "PyMuPDFParser",
+      "DocxParser",
+      "Transcriber",
+      "VisionParser"
+    ],
+    "required_parameters": [],
+    "optional_parameters": [
+      "config",
+      "vision_model",
+      "transcription_model",
+      "language"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
+    ],
+    "cost_relevant_parameters": [
+      "transcription_model",
+      "vision_model"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Documents and spreadsheets are parsed locally with no model call; only recordings (Transcriber) and images (VisionParser) cost API calls",
+      "cost_sensitivity": "low -- free for documents; one transcription per recording and one vision call per image",
+      "degrades_on": [
+        "scanned_pdfs_without_text_layer",
+        "noisy_recordings"
+      ]
+    },
+    "known_limitations": [
+      "Fixed dispatch per extension: .pdf -> PyMuPDFParser (text layer with a [Page N] line before each page), .docx -> DocxParser, .xlsx/.csv -> SpreadsheetParser (Markdown table per sheet with source row numbers), .txt/.md as UTF-8, audio -> Transcriber raw transcript, .png/.jpg/.jpeg/.webp -> VisionParser description. No parser choice.",
+      "Fails instead of skipping: an unsupported type (.pptx, .doc, .xls, ...), a missing path, two files with the same name (the name is the citation key), a recording or image without a config, a PDF with no text layer (e.g. a scan), a failed transcript segment, or a file yielding no text. All files are checked before the first conversion.",
+      "Recordings and images need an LLM config; recordings need an OpenAI/Azure config because they go to the Transcriber. Documents need none.",
+      "Transcripts carry no per-utterance timestamps (long recordings get one [Timestamp: start - end] line per chunk) and no speaker labels.",
+      "usage is not saved, so it is empty after NormalizedSources.load."
+    ],
+    "best_for": [
+      "mixed_sources_to_markdown_with_provenance",
+      "report_writing_ingestion",
+      "primary_secondary_source_tagging",
+      "spreadsheet_to_markdown_with_row_numbers"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "normalize_sources",
+        "component": "SourceNormalizer",
+        "inputs": [
+          "source_files"
+        ],
+        "outputs": [
+          "normalized_evidence"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/source_normalizer/",
+    "import_path": "gaik.software_components.source_normalizer",
+    "example_script_path": "implementation_layer/examples/software_components/source_normalizer/source_normalizer_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/source_normalizer/README.md",
+    "install_extra": "source-normalizer"
+  },
+  {
+    "id": "knowledge_curator",
+    "name": "KnowledgeCurator",
+    "type": "software_component",
+    "input_artifact_types": [
+      "normalized_evidence",
+      "parsed_text",
+      "text"
+    ],
+    "output_artifact_types": [
+      "structured_json"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "sections"
+    ],
+    "optional_parameters": [
+      "config",
+      "model",
+      "max_workers",
+      "chat_options",
+      "instructions"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
+    ],
+    "cost_relevant_parameters": [
+      "model",
+      "chat_options"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "One structured-output call per non-derived section, run in parallel (max_workers); a section whose quotes fail the verbatim check is requested once more",
+      "cost_sensitivity": "medium -- every section call reads all normalized sources",
+      "degrades_on": [
+        "very_large_source_sets_exceeding_context_window",
+        "sections_without_instructions_or_required_items"
+      ]
+    },
+    "known_limitations": [
+      "Input is NormalizedSources (from SourceNormalizer, NormalizedSources.load, or NormalizedSources.from_texts for text already in hand), not raw files.",
+      "Every quote must occur verbatim (whitespace aside) in the source it cites. A section still failing after one retry makes curate() raise ValueError; so does a conflict pointing at a unit that does not exist.",
+      "Derived sections (with depends_on) are not curated; a template with no other section raises ValueError.",
+      "Conflicts are marked resolved only when the source hierarchy in instructions decides them -- state the hierarchy (e.g. primary site observations over older documents) in instructions.",
+      "usage is not saved, so it is empty after KnowledgeBase.load.",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
+    ],
+    "best_for": [
+      "section_bound_fact_curation",
+      "verbatim_quote_grounding",
+      "missing_required_item_detection",
+      "source_conflict_detection",
+      "human_editable_knowledge_files"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "curate_knowledge",
+        "component": "KnowledgeCurator",
+        "inputs": [
+          "normalized_evidence"
+        ],
+        "outputs": [
+          "section_knowledge"
+        ],
+        "parameters": {
+          "sections": "section specs (id + title + instructions, optional required_items and depends_on)"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/knowledge_curator/",
+    "import_path": "gaik.software_components.knowledge_curator",
+    "example_script_path": "implementation_layer/examples/software_components/knowledge_curator/knowledge_curator_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/knowledge_curator/README.md",
+    "install_extra": "knowledge-curator"
+  },
+  {
+    "id": "report_synthesizer",
+    "name": "ReportSynthesizer",
+    "type": "software_component",
+    "input_artifact_types": [
+      "structured_json"
+    ],
+    "output_artifact_types": [
+      "text",
+      "word_document"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [
+      "DraftReviewer"
+    ],
+    "subsumes": [
+      "DraftReviewer"
+    ],
+    "required_parameters": [
+      "title",
+      "sections"
+    ],
+    "optional_parameters": [
+      "config",
+      "model",
+      "reviewer_model",
+      "strict_review",
+      "review_attempts",
+      "writer_options",
+      "reviewer_options",
+      "language",
+      "instructions",
+      "sample_report"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
+    ],
+    "cost_relevant_parameters": [
+      "model",
+      "reviewer_model",
+      "review_attempts",
+      "writer_options"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Independent sections are written in parallel (LangGraph), each followed by a DraftReviewer pass; derived sections wait for their prerequisites. A separate reviewer_model gives role separation at extra cost.",
+      "cost_sensitivity": "medium-high -- one writer call plus one to review_attempts reviewer calls per section",
+      "degrades_on": [
+        "thin_or_empty_knowledge_files",
+        "long_chains_of_derived_sections"
+      ]
+    },
+    "known_limitations": [
+      "Input is a KnowledgeBase holding exactly one entry per non-derived section and nothing else (usually from KnowledgeCurator; it can also be written by hand). A mismatch, duplicate or cyclic dependency raises ValueError before any LLM call.",
+      "A technical section is written only from its own knowledge JSON; a derived section (depends_on) only from the reviewed texts of its prerequisites.",
+      "Unapplied reviewer edits are logged in review_log; strict_review=True raises RuntimeError instead. An empty writer answer raises RuntimeError.",
+      "Report.save writes report.docx by default (docx=False skips it); DOCX needs the Pandoc system binary.",
+      "usage is not saved, so it is empty after Report.load.",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
+    ],
+    "best_for": [
+      "report_writing_from_curated_knowledge",
+      "section_by_section_governed_synthesis",
+      "reviewed_report_drafts_with_edit_log",
+      "derived_summary_and_recommendation_sections"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "write_report",
+        "component": "ReportSynthesizer",
+        "inputs": [
+          "section_knowledge"
+        ],
+        "outputs": [
+          "markdown_report"
+        ],
+        "parameters": {
+          "title": "report title",
+          "sections": "section specs (id + title + instructions, optional required_items and depends_on)"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/report_synthesizer/",
+    "import_path": "gaik.software_components.report_synthesizer",
+    "example_script_path": "implementation_layer/examples/software_components/report_synthesizer/report_synthesizer_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/report_synthesizer/README.md",
+    "install_extra": "report-synthesizer"
+  },
+  {
+    "id": "draft_reviewer",
+    "name": "DraftReviewer",
+    "type": "software_component",
+    "input_artifact_types": [
+      "text"
+    ],
+    "output_artifact_types": [
+      "text",
+      "validation_report"
+    ],
+    "knowledge_processes": [
+      "knowledge_synthesis"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "config",
+      "model",
+      "max_attempts",
+      "chat_options",
+      "instructions"
+    ],
+    "supported_providers": [
+      "openai",
+      "azure",
+      "azure_openai",
+      "anthropic",
+      "anthropic_foundry",
+      "google",
+      "vertex",
+      "aitta",
+      "openai_compatible",
+      "litellm"
+    ],
+    "cost_relevant_parameters": [
+      "model",
+      "max_attempts"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Exact search-and-replace edits keep the draft's style and make every correction auditable; edits that do not match exactly once are retried up to max_attempts",
+      "cost_sensitivity": "low-medium -- one structured call per review, plus retries for failed edits",
+      "degrades_on": [
+        "very_long_drafts_with_repeated_phrases",
+        "thin_reference_material"
+      ]
+    },
+    "known_limitations": [
+      "Checks against the reference text only; it fetches no sources and cannot detect an omission the reference does not reveal.",
+      "An edit applies only where its search text occurs exactly once -- no fuzzy or case-insensitive matching. Edits still failing after max_attempts are returned in unresolved, not raised; the caller decides whether they are fatal.",
+      "Empty draft or reference raises ValueError.",
+      "ReportSynthesizer and ReportWriter already review every section with it -- add it as a separate step only to fact-check other generated text.",
+      "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
+    ],
+    "best_for": [
+      "fact_checking_generated_text",
+      "summary_verification_against_source",
+      "auditable_edit_log",
+      "hallucination_repair"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "review_draft",
+        "component": "DraftReviewer",
+        "inputs": [
+          "draft_text",
+          "source_text"
+        ],
+        "outputs": [
+          "reviewed_text"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/draft_reviewer/",
+    "import_path": "gaik.software_components.draft_reviewer",
+    "example_script_path": "implementation_layer/examples/software_components/draft_reviewer/draft_reviewer_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/draft_reviewer/README.md",
+    "install_extra": "draft-reviewer"
+  },
+  {
     "id": "llm_judge_panel",
     "name": "LLMJudgePanel",
     "type": "software_component",

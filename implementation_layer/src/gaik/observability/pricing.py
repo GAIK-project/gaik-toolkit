@@ -3,7 +3,9 @@
 Rates are USD per million tokens in ``(input, output)`` order. Reasoning /
 thinking tokens are billed at the output rate across all three providers.
 
-GPT-6 rates verified 2026-09-25 (standard, short context; Azure contracts may differ).
+GPT-6 rates verified 2026-09-25, the other OpenAI rows 2026-09-27 (standard, short
+context; Azure contracts may differ).
+Claude rates verified 2026-09-27 (list price; Claude on Microsoft Foundry bills the same).
 Other sources (2026-03-25):
 - OpenAI: https://developers.openai.com/api/docs/pricing
 - Anthropic: https://platform.claude.com/docs/en/about-claude/pricing
@@ -38,7 +40,7 @@ OPENAI_PRICING_PER_M: dict[str, tuple[float, float]] = {
     "gpt-5.6-sol": (4.00, 20.00),
     "gpt-5.5-deployment": (5.00, 30.00),
     "gpt-5.5": (5.00, 30.00),
-    "gpt-5-mini": (0.75, 4.50),
+    "gpt-5-mini": (0.25, 2.00),
     "gpt-5.4-mini": (0.75, 4.50),
     "gpt-5.4-nano": (0.20, 1.25),
     "gpt-5.4": (2.50, 15.00),
@@ -53,7 +55,14 @@ OPENAI_PRICING_PER_M: dict[str, tuple[float, float]] = {
 }
 
 ANTHROPIC_PRICING_PER_M: dict[str, tuple[float, float]] = {
-    "claude-sonnet-5": (3.00, 15.00),
+    # "claude-fable-5" also covers Fable 5.1, which has the same price.
+    "claude-fable-5": (10.00, 50.00),
+    "claude-opus-5-5": (4.00, 20.00),
+    "claude-opus-5": (5.00, 25.00),
+    # Without these rows Opus 4.7 / 4.8 match "claude-opus-4" at 15 / 75.
+    "claude-opus-4-8": (5.00, 25.00),
+    "claude-opus-4-7": (5.00, 25.00),
+    "claude-sonnet-5": (2.00, 10.00),
     "claude-haiku-4-5": (1.00, 5.00),
     "claude-haiku-3-5": (0.80, 4.00),
     "claude-haiku-3": (0.25, 1.25),

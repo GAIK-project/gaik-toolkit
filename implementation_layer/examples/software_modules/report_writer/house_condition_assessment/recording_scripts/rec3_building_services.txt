@@ -1,0 +1,9 @@
+Recording three. The 14th of March 2026, the time is 11:20. Building services, in the technical room in the basement: heating, ventilation, water and sewer, and the electrical board.
+
+Heating first. The house is on district heating. The district heating unit, with the heat exchangers for the heating and the hot water, is on the wall here. It's working. The supply temperature on the gauge is about 55 degrees, and the hot water is about 58 degrees. No leaks at the valves. Heat is distributed by water radiators, and the radiators I checked upstairs and downstairs were warm and had thermostatic valves.
+
+Ventilation. The supply-air unit hangs from the basement ceiling. I let it run for a few minutes. The machine produced a steady hum but also an unusual vibration; surface rust was visible on the housing. The filter is in place and looks moderately dirty. The duct insulation is intact where I can see it.
+
+Water and sewer. The main water shut-off valve is next to the water meter, and it turns without problems. The visible water pipes are copper, with no leaks and no corrosion marks. The sewer cleanout is in the floor here. There's no smell and no sign of leaking around it. No sewer camera inspection was done as part of this visit, so I can't say anything about the condition of the sewer pipes under the house.
+
+Electrical. The main distribution board is on the wall next to the door. It has automatic circuit breakers, and the circuit labels are handwritten; two of them are faded and hard to read. No burn marks, no smell, and the cover closes properly. There's no electrical inspection record available. I looked for one by the board and in the technical room, and found nothing.

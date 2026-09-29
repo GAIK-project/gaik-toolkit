@@ -17,9 +17,18 @@ export function pickUsageFromEvents(
   for (const ev of events) {
     if (ev.type === "result") {
       sawResult = true;
-      const t = (ev.data as { usage?: { total_tokens?: number } }).usage
-        ?.total_tokens;
-      if (typeof t === "number") totalTokens = t;
+      const u = (
+        ev.data as {
+          usage?: {
+            total_tokens?: number;
+            prompt_tokens?: number;
+            completion_tokens?: number;
+          };
+        }
+      ).usage;
+      // Anthropic and Google report only prompt and completion counts.
+      totalTokens =
+        u?.total_tokens ?? (u?.prompt_tokens ?? 0) + (u?.completion_tokens ?? 0);
     }
   }
   return { sawResult, totalTokens };

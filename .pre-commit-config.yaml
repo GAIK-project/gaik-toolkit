@@ -1,0 +1,10 @@
+# Mirrors the "Ruff format check" step in .github/workflows/test.yml, so a
+# formatting slip fails at commit time instead of turning CI red.
+# Enable once per clone: uvx pre-commit install
+# Keep rev in step with the ruff version pinned in test.yml.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.10
+    hooks:
+      - id: ruff-format
+        files: ^implementation_layer/

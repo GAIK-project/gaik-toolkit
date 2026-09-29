@@ -11,6 +11,7 @@ from typing import Any
 
 try:
     from docx import Document
+    from docx.table import Table
 
     DOCX_AVAILABLE = True
 except ImportError:
@@ -19,6 +20,8 @@ except ImportError:
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+_HEADING_LEVELS = {"Title": 1, **{f"Heading {n}": n for n in range(1, 7)}}
 
 
 class DocxParser:
@@ -46,7 +49,9 @@ class DocxParser:
 
         self.supported_extensions = [".docx", ".doc"]
 
-    def parse_docx(self, file_path: str, use_markdown: bool = True) -> str:
+    def parse_docx(
+        self, file_path: str, use_markdown: bool = True, keep_structure: bool = False
+    ) -> str:
         """
         Parse DOCX file and extract text content.
 
@@ -54,21 +59,28 @@ class DocxParser:
             file_path: Path to the DOCX file
             use_markdown: If True, returns simple text.
                 If False, returns structured text with formatting
+            keep_structure: If True, returns Markdown in document order: heading styles
+                as ``#`` headings, paragraphs, and tables as Markdown tables
 
         Returns:
             Extracted text content as string
 
         Raises:
             FileNotFoundError: If file does not exist
+            ValueError: If keep_structure is used with structured text
             Exception: If DOCX parsing fails
         """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
+        if keep_structure and not use_markdown:
+            raise ValueError("keep_structure needs use_markdown=True")
 
         try:
             doc = Document(file_path)
 
-            if use_markdown:
+            if keep_structure:
+                text_content = self._extract_markdown_docx(doc)
+            elif use_markdown:
                 # Simple text extraction
                 text_content = ""
 
@@ -154,6 +166,24 @@ class DocxParser:
         """Check if file format is supported (.docx or .doc)."""
         extension = os.path.splitext(file_path)[1].lower()
         return extension in self.supported_extensions
+
+    def _extract_markdown_docx(self, doc) -> str:
+        """Walk the body in order: headings, paragraphs and tables as Markdown."""
+        blocks = []
+        for item in doc.iter_inner_content():
+            if isinstance(item, Table):
+                rows = [
+                    [" ".join(c.text.split()).replace("|", "\\|") for c in row.cells]
+                    for row in item.rows
+                ]
+                if rows:
+                    header, *body = rows
+                    lines = [header, ["---"] * len(header), *body]
+                    blocks.append("\n".join("| " + " | ".join(r) + " |" for r in lines))
+            elif text := item.text.strip():
+                level = _HEADING_LEVELS.get(item.style.name if item.style else "")
+                blocks.append(f"{'#' * level} {text}" if level else text)
+        return "\n\n".join(blocks)
 
     def _extract_structured_docx(self, doc) -> str:
         """

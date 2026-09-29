@@ -101,7 +101,12 @@ from gaik.software_components.evaluators import BatchEvaluationRunner
 
 def pipeline(item):
     # Replace with DataExtractor, RAGWorkflow, etc.
-    return DataExtractor(...).extract(item.input, schema=...).fields
+    return DataExtractor(config=config).extract(
+        extraction_model=Schema,
+        requirements=requirements,
+        user_requirements=user_requirements,
+        documents=[item.input],  # document text; parse files first
+    )[0]
 
 runner = BatchEvaluationRunner(pipeline, on_error="skip")
 runner_result = runner.run(dataset)
@@ -111,7 +116,9 @@ eval_result = ExtractionEvaluator().evaluate_dataset(dataset, runner_result.outp
 ```
 
 `on_error="skip"` records exceptions in `RunnerResult.failures` instead of
-re-raising — useful when one bad item shouldn't blow up the whole run.
+re-raising — useful when one bad item shouldn't blow up the whole run. A
+failed item's entry in `outputs` is `None`, which `ExtractionEvaluator`
+rejects, so handle failures before scoring.
 
 ## Dataset format
 

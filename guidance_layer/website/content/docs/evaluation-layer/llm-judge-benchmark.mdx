@@ -24,7 +24,7 @@ because it is open, peer-reviewed, and small enough to run cheaply.
 | | |
 | --- | --- |
 | **Dataset** | [`ScalerLab/JudgeBench`](https://hf.co/datasets/ScalerLab/JudgeBench) — 350 challenging response pairs with ground-truth A>B / B>A labels, MIT licence ([arXiv 2410.12784](https://arxiv.org/abs/2410.12784)) |
-| **Sample size** | 50 rows (seed=42) from the `gpt` split |
+| **Sample size** | 50 rows (seed=0, the loader default) from the `gpt` split |
 | **Judge model** | `gemini-3-flash-preview` via Vertex AI, thinking budget 0 |
 | **Prompt A — naive** | "Score response from 1-10. Pick the winner." No CoT, no bias guidance |
 | **Prompt B — research** | Likert 1-5, evaluate-before-scoring CoT, anti-verbosity / anti-formatting / anti-authority guidance |
@@ -40,7 +40,7 @@ response_a, response_b, label)` source into the in-script
 <Callout type="info">
 Numbers below come from
 `implementation_layer/examples/software_components/validators/judgebench-comparison/leaderboard.md`
-in the gaik-toolkit repository, run with seed `42` on the `gpt` split.
+in the gaik-toolkit repository, run with seed `0` on the `gpt` split.
 Re-run the demo against the same seed to reproduce.
 </Callout>
 
@@ -113,7 +113,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=<service-account.json>
 # Quick smoke (10 rows, ~$0.05)
 python implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py --n 10
 
-# Full run (50 rows, seed 42, writes leaderboard.md + summary.json)
+# Full run (50 rows, seed 0, writes leaderboard.md + summary.json)
 python implementation_layer/examples/software_components/validators/demo_judgebench_comparison.py \
     --n 50 \
     --provider google \
