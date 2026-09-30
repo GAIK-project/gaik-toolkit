@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 811" role="img" aria-labelledby="title desc" font-family="Segoe UI, Arial, sans-serif">
+<title id="title">Historical transcription WER before and after enhancement</title>
+<desc id="desc">13 models, sorted by raw WER. Blue is raw, green is enhanced. Lower is better. Values preserved from the previous README; raw benchmark inputs and run settings are unavailable.</desc>
+<rect width="960" height="811" rx="12" fill="#fcfcfb"/>
+<text x="24" y="32" font-size="20" fill="#17212b">Transcription WER: raw vs enhanced</text>
+<text x="24" y="55" font-size="13" fill="#536170">Historical reported results; not the QAD-1 rerun. Lower is better.</text>
+<rect x="24" y="73" width="12" height="12" fill="#2a78d6"/>
+<text x="43" y="84" font-size="13">Raw transcript</text>
+<rect x="174" y="73" width="12" height="12" fill="#168566"/>
+<text x="193" y="84" font-size="13">Enhanced transcript</text>
+<text x="363" y="128" text-anchor="end" font-size="12" fill="#17212b">whisper-large-finnish-v3-ct2-parameters</text>
+<rect x="375" y="105" width="96.16" height="17" rx="3" fill="#2a78d6"><title>whisper-large-finnish-v3-ct2-parameters: 14.57%</title></rect>
+<text x="478.16" y="118" font-size="12" fill="#536170">14.57%</text>
+<rect x="375" y="127" width="83.03" height="17" rx="3" fill="#168566"><title>whisper-large-finnish-v3-ct2-parameters: 12.58%</title></rect>
+<text x="465.03" y="140" font-size="12" fill="#536170">12.58%</text>
+<text x="363" y="180" text-anchor="end" font-size="12" fill="#17212b">WhisperX (large-parameters)</text>
+<rect x="375" y="157" width="114.31" height="17" rx="3" fill="#2a78d6"><title>WhisperX (large-parameters): 17.32%</title></rect>
+<text x="496.31" y="170" font-size="12" fill="#536170">17.32%</text>
+<rect x="375" y="179" width="99.86" height="17" rx="3" fill="#168566"><title>WhisperX (large-parameters): 15.13%</title></rect>
+<text x="481.86" y="192" font-size="12" fill="#536170">15.13%</text>
+<text x="363" y="232" text-anchor="end" font-size="12" fill="#17212b">WhisperX (large-v3-parameters)</text>
+<rect x="375" y="209" width="114.31" height="17" rx="3" fill="#2a78d6"><title>WhisperX (large-v3-parameters): 17.32%</title></rect>
+<text x="496.31" y="222" font-size="12" fill="#536170">17.32%</text>
+<rect x="375" y="231" width="99.73" height="17" rx="3" fill="#168566"><title>WhisperX (large-v3-parameters): 15.11%</title></rect>
+<text x="481.73" y="244" font-size="12" fill="#536170">15.11%</text>
+<text x="363" y="284" text-anchor="end" font-size="12" fill="#17212b">gpt-4o-transcribe</text>
+<rect x="375" y="261" width="118.21" height="17" rx="3" fill="#2a78d6"><title>gpt-4o-transcribe: 17.91%</title></rect>
+<text x="500.21" y="274" font-size="12" fill="#536170">17.91%</text>
+<rect x="375" y="283" width="113.65" height="17" rx="3" fill="#168566"><title>gpt-4o-transcribe: 17.22%</title></rect>
+<text x="495.65" y="296" font-size="12" fill="#536170">17.22%</text>
+<text x="363" y="336" text-anchor="end" font-size="12" fill="#17212b">whisper-openai</text>
+<rect x="375" y="313" width="153.05" height="17" rx="3" fill="#2a78d6"><title>whisper-openai: 23.19%</title></rect>
+<text x="535.05" y="326" font-size="12" fill="#536170">23.19%</text>
+<rect x="375" y="335" width="138.40" height="17" rx="3" fill="#168566"><title>whisper-openai: 20.97%</title></rect>
+<text x="520.40" y="348" font-size="12" fill="#536170">20.97%</text>
+<text x="363" y="388" text-anchor="end" font-size="12" fill="#17212b">WhisperX (large-v2-parameters)</text>
+<rect x="375" y="365" width="161.70" height="17" rx="3" fill="#2a78d6"><title>WhisperX (large-v2-parameters): 24.50%</title></rect>
+<text x="543.70" y="378" font-size="12" fill="#536170">24.50%</text>
+<rect x="375" y="387" width="147.44" height="17" rx="3" fill="#168566"><title>WhisperX (large-v2-parameters): 22.34%</title></rect>
+<text x="529.44" y="400" font-size="12" fill="#536170">22.34%</text>
+<text x="363" y="440" text-anchor="end" font-size="12" fill="#17212b">WhisperX (large-v1-parameters)</text>
+<rect x="375" y="417" width="166.78" height="17" rx="3" fill="#2a78d6"><title>WhisperX (large-v1-parameters): 25.27%</title></rect>
+<text x="548.78" y="430" font-size="12" fill="#536170">25.27%</text>
+<rect x="375" y="439" width="142.30" height="17" rx="3" fill="#168566"><title>WhisperX (large-v1-parameters): 21.56%</title></rect>
+<text x="524.30" y="452" font-size="12" fill="#536170">21.56%</text>
+<text x="363" y="492" text-anchor="end" font-size="12" fill="#17212b">gemini-2.5-pro</text>
+<rect x="375" y="469" width="167.11" height="17" rx="3" fill="#2a78d6"><title>gemini-2.5-pro: 25.32%</title></rect>
+<text x="549.11" y="482" font-size="12" fill="#536170">25.32%</text>
+<rect x="375" y="491" width="151.34" height="17" rx="3" fill="#168566"><title>gemini-2.5-pro: 22.93%</title></rect>
+<text x="533.34" y="504" font-size="12" fill="#536170">22.93%</text>
+<text x="363" y="544" text-anchor="end" font-size="12" fill="#17212b">WhisperX (medium-parameters)</text>
+<rect x="375" y="521" width="169.36" height="17" rx="3" fill="#2a78d6"><title>WhisperX (medium-parameters): 25.66%</title></rect>
+<text x="551.36" y="534" font-size="12" fill="#536170">25.66%</text>
+<rect x="375" y="543" width="140.98" height="17" rx="3" fill="#168566"><title>WhisperX (medium-parameters): 21.36%</title></rect>
+<text x="522.98" y="556" font-size="12" fill="#536170">21.36%</text>
+<text x="363" y="596" text-anchor="end" font-size="12" fill="#17212b">gemini-3-flash-preview</text>
+<rect x="375" y="573" width="181.70" height="17" rx="3" fill="#2a78d6"><title>gemini-3-flash-preview: 27.53%</title></rect>
+<text x="563.70" y="586" font-size="12" fill="#536170">27.53%</text>
+<rect x="375" y="595" width="174.77" height="17" rx="3" fill="#168566"><title>gemini-3-flash-preview: 26.48%</title></rect>
+<text x="556.77" y="608" font-size="12" fill="#536170">26.48%</text>
+<text x="363" y="648" text-anchor="end" font-size="12" fill="#17212b">WhisperX (small-parameters)</text>
+<rect x="375" y="625" width="219.12" height="17" rx="3" fill="#2a78d6"><title>WhisperX (small-parameters): 33.20%</title></rect>
+<text x="601.12" y="638" font-size="12" fill="#536170">33.20%</text>
+<rect x="375" y="647" width="162.36" height="17" rx="3" fill="#168566"><title>WhisperX (small-parameters): 24.60%</title></rect>
+<text x="544.36" y="660" font-size="12" fill="#536170">24.60%</text>
+<text x="363" y="700" text-anchor="end" font-size="12" fill="#17212b">aalto-asr</text>
+<rect x="375" y="677" width="325.84" height="17" rx="3" fill="#2a78d6"><title>aalto-asr: 49.37%</title></rect>
+<text x="707.84" y="690" font-size="12" fill="#536170">49.37%</text>
+<rect x="375" y="699" width="290.93" height="17" rx="3" fill="#168566"><title>aalto-asr: 44.08%</title></rect>
+<text x="672.93" y="712" font-size="12" fill="#536170">44.08%</text>
+<text x="363" y="752" text-anchor="end" font-size="12" fill="#17212b">WhisperX (tiny-parameters)</text>
+<rect x="375" y="729" width="459.76" height="17" rx="3" fill="#2a78d6"><title>WhisperX (tiny-parameters): 69.66%</title></rect>
+<text x="841.76" y="742" font-size="12" fill="#536170">69.66%</text>
+<rect x="375" y="751" width="367.55" height="17" rx="3" fill="#168566"><title>WhisperX (tiny-parameters): 55.69%</title></rect>
+<text x="749.55" y="764" font-size="12" fill="#536170">55.69%</text>
+</svg>

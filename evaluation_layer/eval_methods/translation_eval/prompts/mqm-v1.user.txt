@@ -1,0 +1,11 @@
+Finnish source:
+<source>
+{source}
+</source>
+
+Candidate translation:
+<candidate>
+{candidate}
+</candidate>
+
+Annotate every error in the candidate translation with MQM and score it, following your instructions.

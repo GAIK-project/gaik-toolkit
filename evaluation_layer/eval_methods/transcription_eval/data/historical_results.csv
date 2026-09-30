@@ -1,0 +1,14 @@
+model,original_wer,enhanced_wer,original_spelling,enhanced_spelling,original_substitution,enhanced_substitution,original_deletion,enhanced_deletion,original_insertion,enhanced_insertion
+aalto-asr,49.37,44.08,7.53,5.95,27.47,22.30,18.25,18.76,3.65,3.02
+gemini-2.5-pro,25.32,22.93,5.07,4.58,11.61,10.40,1.54,1.39,12.17,11.14
+gemini-3-flash-preview,27.53,26.48,6.48,6.00,15.88,15.00,2.44,2.37,9.21,9.11
+gpt-4o-transcribe,17.91,17.22,4.71,3.96,8.93,8.03,6.95,7.21,2.03,1.98
+whisper-large-finnish-v3-ct2-parameters,14.57,12.58,4.55,3.63,8.44,7.10,3.22,3.19,2.91,2.29
+whisper-openai,23.19,20.97,4.92,3.89,10.55,8.59,10.50,10.50,2.14,1.88
+WhisperX (large-parameters),17.32,15.13,4.50,3.53,9.08,7.26,5.66,5.74,2.57,2.14
+WhisperX (large-v1-parameters),25.27,21.56,6.54,4.71,12.87,9.75,9.98,9.86,2.42,1.96
+WhisperX (large-v2-parameters),24.50,22.34,4.73,3.94,10.47,8.49,11.53,11.66,2.50,2.19
+WhisperX (large-v3-parameters),17.32,15.11,4.50,3.47,9.08,7.21,5.66,5.66,2.57,2.24
+WhisperX (medium-parameters),25.66,21.36,6.12,3.71,12.40,8.44,10.76,10.55,2.50,2.37
+WhisperX (small-parameters),33.20,24.60,9.26,4.86,20.74,13.10,7.57,7.85,4.89,3.65
+WhisperX (tiny-parameters),69.66,55.69,10.45,5.69,46.86,30.83,12.09,11.94,10.71,12.92

@@ -25,7 +25,7 @@ Evaluation methods are organized by:
 | Folder | Evaluates |
 |--------|-----------|
 | [`extraction_eval/`](extraction_eval/README.md) | Structured data extraction |
-| [`transcription_eval/`](transcription_eval/README.md) | Speech transcription (WER, CER) |
+| [`transcription_eval/`](transcription_eval/README.md) | Speech transcription: WER/CER, aligned errors, raw vs enhanced chart and QAD-1 findings |
 | [`translation_eval/`](translation_eval/README.md) | Finnish-to-English translation: BLEU, chrF, TER, cosine and blind LLM-judge error points |
 | [`RAG_eval/`](RAG_eval/README.md) | Retrieval-augmented generation answers |
 | [`report_writing_eval/`](report_writing_eval/README.md) | Report writing |
@@ -42,4 +42,4 @@ Evaluation methods are used to:
 
 ---
 
-*Note: This directory is part of the Implementation Layer in GAIK's layer-based architecture.*
+*This directory is part of the Evaluation Layer in GAIK's layer-based architecture.*

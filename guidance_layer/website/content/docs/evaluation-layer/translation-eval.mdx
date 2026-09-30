@@ -1,6 +1,6 @@
 ---
 title: Translation Evaluation
-description: Translation quality assessment comparing AI models with BLEU, chrF, TER and cosine similarity against human references, and with blind LLM-judge error annotation (MQM) that does not depend on the reference.
+description: Translation quality assessment comparing AI models with BLEU, chrF, TER and cosine similarity against HY reference texts (authorship unconfirmed), and with blind LLM-judge error annotation (MQM) that does not depend on the reference.
 ---
 
 ## The Problem
@@ -10,7 +10,7 @@ When AI systems transcribe and translate domain-specific spoken content — such
 Key challenges include:
 - **Domain terminology** — specialized fields (medical, legal, engineering) use precise vocabulary that general-purpose translation models frequently get wrong or approximate
 - **Proper noun accuracy** — speaker names, product brands, and institution names are often garbled by AI translation
-- **Structural divergence** — source language syntax (e.g. Finnish verb-final order) causes word-order changes that penalize exact-match metrics even when meaning is preserved
+- **Structural divergence** — Finnish–English word-order differences can penalize exact-match metrics even when meaning is preserved
 - **Compound word handling** — morphologically complex languages form multi-part technical terms that AI models split or merge inconsistently
 - **Fluency vs accuracy trade-off** — a translation can read naturally in the target language while still departing from the reference wording in ways that matter for technical accuracy
 
@@ -18,11 +18,11 @@ Key challenges include:
 
 ## How We Evaluate
 
-Translation quality is measured two ways. Four reference-based metrics compare each AI-generated translation against a human reference translation, and blind LLM judges annotate errors against the Finnish source without seeing the reference. The figure below shows the reference-based pipeline.
+Translation quality is measured two ways. Four reference-based metrics compare each AI-generated translation against HY's reference texts (authorship unconfirmed), and blind LLM judges annotate errors against the Finnish source without seeing the reference. The figure below shows the reference-based pipeline.
 
 ```mermaid
 graph LR
-  A[/"Human Reference\nTranslation"/] --> C["Text Cleaning\n(spacy lemmatization)"]
+  A[/"Reference Text\nTranslation"/] --> C["Text Cleaning\n(spacy lemmatization)"]
   B[/"AI Translation\nOutput"/] --> C
   C --> D["BLEU\nn-gram overlap"]
   C --> E["chrF\ncharacter n-gram F-score"]
@@ -69,17 +69,17 @@ Cosine Similarity is computed on the raw (non-lemmatized) texts to preserve sema
 
 ## Benchmarking Results
 
-**GPT-6 Astra translates best.** Two blind LLM judges found the fewest errors in it on both clip sets, and the human references scored worse than every current model.
+**GPT-6 Astra translates best.** Two blind LLM judges found the fewest errors in it on both clip sets, and HY’s references scored worse than every current model.
 
 ![Best translation model: errors per 100 source words, sets A and B](/images/translation-best-model.svg)
 
 ### Which model is best? A 20-clip evaluation with blind judges
 
-Eleven current models (three runs each) were tested against six outputs committed by the University of Helsinki (HY) team and the human reference, on all 20 HY clips of Finnish dental-education speech. The clips form two sets that are never pooled: **set A** (10 historical clips with human references, used for the ranking) and **set B** (10 newer clips, used only to check that the order holds, because its reference resembles one machine-translation system's output). Every text was scored by two blind LLM judges (Claude Opus 5.5 and Gemini 3.1 Pro) that read only the Finnish source and one candidate, and by BLEU, chrF, TER and embedding cosine. The Finnish input is HY's corrected transcript, so this tests translation only.
+Eleven current models (three runs each) were tested against six outputs committed by the University of Helsinki (HY) team and HY’s reference text, on all 20 HY clips of Finnish dental-education speech. The clips form two sets that are never pooled: **set A** (10 historical clips with HY reference texts of unconfirmed authorship, used for the ranking) and **set B** (10 newer clips, used only to check that the order holds, because its reference resembles one machine-translation system's output). Every text was scored by two blind LLM judges (Claude Opus 5.5 and Gemini 3.1 Pro) that read only the Finnish source and one candidate, and by BLEU, chrF, TER and embedding cosine. The Finnish input is HY's corrected transcript, so this tests translation only.
 
 ![MQM error points per 100 source words by model, sets A and B](/images/translation-mqm-by-model.svg)
 
-Error points per 100 source words, lower is better, both judges on one scale:
+MQM points per 100 source words, lower is better, both judges on one scale:
 
 | Model | Set A | Set B |
 |-------|------:|------:|
@@ -93,7 +93,7 @@ Error points per 100 source words, lower is better, both judges on one scale:
 | GPT-4.1 | 2.2 | 3.1 |
 | GPT-5.4 mini | 4.8 | 5.2 |
 | GPT-4o | 4.5 | 7.4 |
-| **Human reference** | **7.9** | **15.2** |
+| **HY reference text** | **7.9** | **15.2** |
 | HY: OpusBig / Opus (Helsinki-NLP) | 23.5 / 26.4 | 26.5 / 33.7 |
 
 Claude and Gemini models were scored by the other vendor's judge only (a judge never scores its own vendor), then converted to the common scale with the ratio fitted on the 12 candidates both judges scored.
@@ -104,7 +104,7 @@ Claude and Gemini models were scored by the other vendor's judge only (a judge n
 
 The reference-based scores of `translation_evaluation.py` (means over the 10 set A clips), next to the judges' error rate, sorted by the judges' error rate:
 
-| Model | Errors per 100 words (judges) | BLEU ↑ | chrF ↑ | TER ↓ | Cosine ↑ |
+| Model | MQM points per 100 source words | BLEU ↑ | chrF ↑ | TER ↓ | Cosine ↑ |
 |-------|------:|------:|------:|------:|------:|
 | GPT-6 Astra | **0.3** | 30.4 | 69.3 | 60.9 | 93.1 |
 | GPT-6 Sol | **0.8** | 29.3 | 66.8 | 58.7 | 93.0 |
@@ -128,7 +128,7 @@ The reference-based columns do not follow the judges' order. The QAdental app's 
 
 - **GPT-6 Astra translated best on both sets and with both judges**, clearly ahead of every model run here; its lead over HY's committed GPT-5.6-sol file is borderline (0.3 points)
 - **Reference-based metrics ranked the models almost unrelated to the judges on set A and in reverse on set B** (Spearman agreement -0.16 to -0.27 and -0.55 to -0.70; 1 means the same order), so BLEU, chrF or cosine alone would have picked a different, worse model
-- **The human reference is not a clean gold standard** — the judges score it at 7.9 and 15.2 error points, above every current LLM; one set A reference is incomplete, and set B's reference is close to OpusBig's output, so OpusBig ranks first on set B by BLEU (68) while the judges rank it near the bottom
+- **HY’s reference is not a verified gold standard** — the judges score it at 7.9 and 15.2 error points, above every current LLM; one set A reference is incomplete, and set B's reference is close to OpusBig's output, so OpusBig ranks first on set B by BLEU (68) while the judges rank it near the bottom
 - **The Helsinki-NLP models make more than ten times as many errors as the top four LLMs** (23-34 points against 0.3-1.4)
 - **Limits** — the judges are LLMs and no human has checked their annotations; differences of a few tenths of a point between the top models are within judge noise
 
@@ -146,7 +146,29 @@ flowchart LR
   C --> G["Charts drawn by a script<br/>from the result files"]
 ```
 
-The judge is blind (it sees only the Finnish source and one text, with no model or vendor name, and HY's reference text is judged like any model). It returns every error with an MQM category, a severity and the quoted words; points are 10, 5 and 1 for critical, major and minor errors per 100 source words. Claude never judges Claude and Gemini never judges Gemini, and scores are put on one scale. The charts are plain SVG drawn by a script from the result files, not AI-generated images, so every bar is a number in a file.
+- **The judge is blind.** Each call gets the Finnish source and one text labelled only "Candidate translation": no model name, no vendor, and no hint that a human reference or other candidates exist. HY's reference text goes through the same call as any model.
+- **What the judge returns.** Every error with an MQM category (mistranslation, omission, addition, untranslated, terminology, names, grammar, unnatural phrasing, register), a severity, the exact words in the candidate and in the Finnish, and a suggested fix. Quoted target spans are checked against the candidate: 8,592 of 8,595 were found (99.97 %); the three missing spans remain flagged for review. Points are 10 for a critical, 5 for a major and 1 for a minor error, divided by the Finnish word count times 100.
+- **Two vendors, never their own.** Claude judges everything except Claude models and Gemini judges everything except Gemini models, so a model is never graded by its own vendor. The Gemini judge is about 1.2 times stricter, so scores are put on the Claude judge's scale with one ratio fitted on the 12 candidates both judges scored.
+- **Repeats and uncertainty.** Every fresh translation was run three times. Most candidates were judged on the first run; GPT-6 Astra, GPT-4o and the two Claude arms also have repeat-2/3 judgements. The unit is the clip. The 95 % intervals resample the clips 5,000 times with the fitted judge ratio held fixed; they do not measure judge correctness or uncertainty in the scale conversion.
+- **The charts are not AI-generated pictures.** A Python script writes plain SVG from the committed result files, so every bar is a number in a file and the pictures can be redrawn without an image model. The three charts are the best-model bar chart, the per-judge chart with intervals and the rank comparison against the reference-based metrics.
+- **Where the code is.** The full pipeline (translation runs, judge prompt, scoring, chart script and a checklist for a human to verify the judges' annotations) is in the project's private evaluation repository, folder `qadental-translation-multiclip`.
+
+### The exact judge prompt
+
+The [mqm-v1 prompt and worked example](https://github.com/GAIK-project/gaik-toolkit/blob/main/evaluation_layer/eval_methods/translation_eval/prompts/README.md) publish the exact
+[system rubric](https://github.com/GAIK-project/gaik-toolkit/blob/main/evaluation_layer/eval_methods/translation_eval/prompts/mqm-v1.system.txt), [user template](https://github.com/GAIK-project/gaik-toolkit/blob/main/evaluation_layer/eval_methods/translation_eval/prompts/mqm-v1.user.txt)
+and [JSON response schema](https://github.com/GAIK-project/gaik-toolkit/blob/main/evaluation_layer/eval_methods/translation_eval/prompts/mqm-v1.schema.json) used in this benchmark.
+The prompt asks for sentence-by-sentence error annotation, accepts faithful
+paraphrases and smoothing spoken fillers, and separates adequacy from fluency.
+The scorer computes the chart value from error severities; those two 0–100
+ratings do not set the ranking. A missing quoted span is flagged for review and
+still contributes to the saved score.
+
+The benchmark calls Claude and Gemini directly with this MQM contract. The
+toolkit's [LLMJudge](https://github.com/GAIK-project/gaik-toolkit/blob/main/guidance_layer/docs/software_components/llm_judge.md)
+validates structured extraction fields with a different rubric and output
+schema. Reproducing the translation scores needs this MQM prompt and scoring,
+with an adapter if using that component.
 
 ---
 
@@ -198,7 +220,7 @@ Translation evaluation supports the following GAIK workflows:
 
 **Cosine Similarity depends on the embedding model** — scores reflect semantic similarity as measured by the chosen transformer. For highly specialized domains, consider using a domain-adapted or multilingual embedding model for more reliable results.
 
-**Reference quality caps reference-based evaluation** — BLEU, chrF, TER and cosine assume the human reference is the gold standard. In this data the judges scored the reference at 7.9 and 15.2 error points per 100 words, above every current LLM, one reference was incomplete, and another set's reference resembled one machine-translation system's output. Check each reference, and add reference-free judging before ranking models.
+**Reference quality caps reference-based evaluation** — BLEU, chrF, TER and cosine assume the reference is the gold standard. In this data the judges scored the reference at 7.9 and 15.2 error points per 100 words, above every current LLM, one reference was incomplete, and another set's reference resembled one machine-translation system's output. Check each reference, and add reference-free judging before ranking models.
 
 ---
 
@@ -209,7 +231,7 @@ The figure below shows the complete evaluation workflow from data preparation to
 ```mermaid
 graph TD
   subgraph "Prepare Data"
-    A[/"Human Reference\nTranslations"/]
+    A[/"Reference Text\nTranslations"/]
     B[/"AI Translation\nOutputs"/]
   end
 

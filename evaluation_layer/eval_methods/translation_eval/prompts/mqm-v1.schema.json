@@ -1,0 +1,76 @@
+{
+  "type": "object",
+  "properties": {
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "target_span": {
+            "type": "string",
+            "description": "Minimal erroneous phrase, verbatim from the candidate."
+          },
+          "source_span": {
+            "type": "string",
+            "description": "Corresponding Finnish phrase, verbatim from the source."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "accuracy/mistranslation",
+              "accuracy/omission",
+              "accuracy/addition",
+              "accuracy/untranslated",
+              "terminology",
+              "names",
+              "fluency/grammar",
+              "fluency/unnatural",
+              "style/register"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "major",
+              "minor"
+            ]
+          },
+          "explanation": {
+            "type": "string"
+          },
+          "correction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_span",
+          "source_span",
+          "category",
+          "severity",
+          "explanation",
+          "correction"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "adequacy": {
+      "type": "integer",
+      "description": "0-100"
+    },
+    "fluency": {
+      "type": "integer",
+      "description": "0-100"
+    },
+    "summary": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "errors",
+    "adequacy",
+    "fluency",
+    "summary"
+  ],
+  "additionalProperties": false
+}
