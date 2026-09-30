@@ -78,7 +78,7 @@ export function Footer({ githubPreview }: FooterProps) {
             />
           </div>
 
-          <nav className="text-muted-foreground flex items-center gap-4 text-sm">
+          <nav className="text-muted-foreground flex flex-wrap items-center justify-center gap-4 text-sm">
             {mounted && githubPreview ? (
               <Glimpse>
                 <GlimpseTrigger asChild>{githubLink}</GlimpseTrigger>

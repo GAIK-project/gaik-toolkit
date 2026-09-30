@@ -116,6 +116,61 @@ def test_negative_and_invalid_usage_is_not_fabricated():
     assert tracing._counts({"input_tokens": -1, "output_tokens": True}) == {}
 
 
+def test_real_sdk_exports_readable_content_and_masks_credentials(enabled, monkeypatch):
+    from langfuse import Langfuse
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:private-password@db/demo")
+    exporter = InMemorySpanExporter()
+    client = Langfuse(
+        public_key="test-sdk-mask-contract",
+        secret_key="private-test-credential",
+        base_url="http://localhost:9",
+        mask=tracing.redact,
+        tracer_provider=TracerProvider(),
+        span_exporter=exporter,
+    )
+    with patch.object(tracing, "_client", return_value=client):
+        trace = tracing.WizardTrace("synthetic-sdk-session", True, "synthetic readable input")
+        trace.observe(
+            SimpleNamespace(
+                event={
+                    "type": "message_start",
+                    "message": {"model": "test-model", "usage": {"input_tokens": 2}},
+                }
+            )
+        )
+        trace.observe(
+            SimpleNamespace(
+                event={
+                    "type": "content_block_delta",
+                    "delta": {
+                        "text": "synthetic answer private-test-credential postgresql://user:private-password@db/demo"
+                    },
+                }
+            )
+        )
+        trace.observe(
+            SimpleNamespace(event={"type": "message_delta", "usage": {"output_tokens": 3}})
+        )
+        trace.finish()
+    client.flush()
+    spans = exporter.get_finished_spans()
+    assert len(spans) == 2
+    generation = next(s for s in spans if s.name == "Claude model call")
+    attributes = dict(generation.attributes)
+    assert "synthetic answer" in attributes["langfuse.observation.output"]
+    assert "private-password" not in str(attributes)
+    assert "private-test-credential" not in str(attributes)
+    assert attributes["langfuse.observation.model.name"] == "test-model"
+    assert attributes["session.id"] == "synthetic-sdk-session"
+    root = next(s for s in spans if s.name == "Solution Wizard turn")
+    assert "synthetic readable input" in root.attributes["langfuse.observation.input"]
+    assert generation.parent.span_id == root.context.span_id
+    client.shutdown()
+
+
 def test_session_recording_choice_is_fixed_on_first_message_and_turns_finish():
     from api.routers import solution_wizard as wizard
 

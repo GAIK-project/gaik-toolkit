@@ -443,7 +443,7 @@ export default function SolutionWizardPage() {
           from extra width on large screens. Centered on the viewport (the
           parent container is itself centered), capped at 1400px. */}
       <div className="relative left-1/2 w-[min(100vw-3rem,87.5rem)] -translate-x-1/2">
-      <div className="mb-4 flex items-center justify-between gap-4">
+      <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
             <Wand2 className="h-6 w-6 text-primary" />

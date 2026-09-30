@@ -17,9 +17,12 @@ from urllib.parse import urlparse
 _MAX_TEXT = 32_000
 _MAX_OBSERVATIONS = 200
 _KEY = re.compile(r"(?i)(?:sk-(?:ant-|proj-|lf-)?[\w-]{12,}|Bearer\s+[\w.=-]{12,})")
-_SECRET_NAME = re.compile(r"(?i)key|token|secret|password|credential")
+_SECRET_NAME = re.compile(
+    r"(?i)key|token|secret|password|credential|database_url|connection_string"
+)
 _SECRET_FIELD = re.compile(
     r"(?i)api[-_]?key|authorization|password|secret|access_token|refresh_token|credential"
+    r"|database_url|connection_string"
 )
 
 
@@ -34,8 +37,10 @@ def available() -> bool:
     )
 
 
-def redact(value: Any, **_kwargs: Any) -> Any:
+def redact(data: Any, **_kwargs: Any) -> Any:
     """Bound content and remove known runtime credentials before export."""
+    # The Langfuse SDK calls masks with the keyword ``data``.
+    value = data
     if isinstance(value, str):
         value = _KEY.sub("[redacted]", value[:_MAX_TEXT])
         for name, secret in os.environ.items():
