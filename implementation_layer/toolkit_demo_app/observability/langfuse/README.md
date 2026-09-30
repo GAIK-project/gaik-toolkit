@@ -4,6 +4,39 @@ An optional pilot for `/solution-wizard`. Other demos and GAIK Ops keep their ex
 behavior. Infrastructure lives beside the demo so its setup and instrumentation can
 be reviewed together; credentials belong in private env files and Kubernetes Secrets.
 
+## How it is connected
+
+Langfuse runs on Rahti using the upstream `langfuse/langfuse` and
+`langfuse/langfuse-worker` Docker images, pinned in [pilot.yaml](pilot.yaml).
+Its application source is in [langfuse/langfuse](https://github.com/langfuse/langfuse).
+This repository contains the Rahti configuration and the Wizard's tracing adapter.
+
+```mermaid
+flowchart TD
+    UI["Solution Wizard browser"] -->|"Message and recording choice"| API["Python API / Claude Agent SDK"]
+    API -->|"LLM request"| Model["Claude on Azure Foundry"]
+    Model -->|"Response and token usage"| API
+    API -->|"SSE reply"| UI
+    API -->|"Events when recording is enabled"| Trace["wizard_tracing.py / Langfuse SDK"]
+    Trace -.->|"Background export over internal HTTP"| LF["Langfuse web and worker on Rahti"]
+    Viewer["Signed-in Langfuse user"] -->|"HTTPS dashboard"| LF
+```
+
+1. The browser sends the recording choice with the first user message. The API keeps
+   that choice for the session; server-side tracing must also be configured and enabled.
+2. The [API route](../../api/routers/solution_wizard.py) creates one trace per user
+   turn. The [adapter](../../api/utils/wizard_tracing.py) observes the Claude Agent
+   SDK/CLI stream and adds child observations for model generations and tools.
+3. The Langfuse SDK masks known credentials, bounds the recorded content and exports
+   observations in background batches to `http://langfuse-pilot:3000`. In the dashboard,
+   the random session ID groups turns so you can inspect their inputs, outputs and usage.
+
+The Wizard agent calls Azure Foundry and streams replies to the browser. Its adapter
+uses a dedicated OpenTelemetry provider for diagnostics; export failures must not
+interrupt those replies. Runtime settings are `WIZARD_LANGFUSE_ENABLED`,
+`LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY`. The deployment
+script loads them into the API from the server-side `gaik-demo-langfuse` Secret.
+
 ## Try it
 
 1. Open Solution Wizard with your existing wizard access.
@@ -28,9 +61,10 @@ the demo login; no credentials or SDK keys belong in the browser or this reposit
 - The Claude CLI does **not** expose every internal model call's complete request
   prompt. Generations refer to their parent turn and preceding tools for context;
   an exact HTTP request/response audit is outside this pilot's scope.
-- Parsed attachment text can be recorded; original uploads, thinking/signature deltas
-  and binary payloads are not exported by this adapter. Known runtime credentials
-  and common secret fields are masked. Masking is not personal-data anonymization.
+- Parsed attachment text can be recorded; original uploaded files and thinking/signature
+  stream deltas are not exported. Tool results can include embedded data, subject to
+  masking and size limits. Known runtime credentials and common secret fields are
+  masked. Masking is not personal-data anonymization.
 - Exported text is capped at 32,000 characters per field and 200 child observations
   per turn. Long sessions can therefore have incomplete diagnostic content.
 - No email/user account identifier is exported, only a random wizard session ID.
