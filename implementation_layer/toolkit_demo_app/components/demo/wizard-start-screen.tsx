@@ -60,6 +60,7 @@ export function WizardStartScreen({
   onRetry,
   onPickExample,
   composer,
+  diagnostics,
 }: {
   connecting: boolean;
   disabled: boolean;
@@ -67,6 +68,7 @@ export function WizardStartScreen({
   onRetry: () => void;
   onPickExample: (prompt: string) => void;
   composer: ReactNode;
+  diagnostics?: ReactNode;
 }) {
   const reduce = useReducedMotion();
 
@@ -152,6 +154,7 @@ export function WizardStartScreen({
 
         {!connecting && !error && (
           <motion.div {...rise(0.16)} className="mt-6">
+            {diagnostics && <div className="mb-3 px-4">{diagnostics}</div>}
             {composer}
           </motion.div>
         )}

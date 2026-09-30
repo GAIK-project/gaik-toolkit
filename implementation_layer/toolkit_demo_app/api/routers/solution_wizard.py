@@ -39,9 +39,13 @@ from pydantic import BaseModel
 try:
     from utils import get_api_config, get_model_options, sse_event
     from utils.model_settings import provider_error_detail, request_model_settings
+    from utils.wizard_tracing import WizardTrace
+    from utils.wizard_tracing import available as tracing_available
 except ImportError:
     from api.utils import get_api_config, get_model_options, sse_event
     from api.utils.model_settings import provider_error_detail, request_model_settings
+    from api.utils.wizard_tracing import WizardTrace
+    from api.utils.wizard_tracing import available as tracing_available
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -119,6 +123,7 @@ class FileAttachment(BaseModel):
 class MessageRequest(BaseModel):
     text: str
     files: list[FileAttachment] = []
+    trace: bool = False
 
 
 def _parse_pdf_attachment(file_path: str, original_name: str) -> str:
@@ -389,9 +394,13 @@ async def _receive_with_heartbeat(client: ClaudeSDKClient):
     queue: asyncio.Queue = asyncio.Queue()
 
     async def _drain() -> None:
-        async for msg in client.receive_response():
-            await queue.put(msg)
-        await queue.put(StopAsyncIteration)  # sentinel: stream finished
+        try:
+            async for msg in client.receive_response():
+                await queue.put(msg)
+        except Exception as exc:
+            await queue.put(exc)
+        finally:
+            await queue.put(StopAsyncIteration)  # sentinel: stream finished
 
     async def _ping() -> None:
         while True:
@@ -405,13 +414,17 @@ async def _receive_with_heartbeat(client: ClaudeSDKClient):
             item = await queue.get()
             if item is StopAsyncIteration:
                 break
+            if isinstance(item, Exception):
+                raise item
             yield item  # None = heartbeat, anything else = real message
     finally:
         ping_task.cancel()
         drain_task.cancel()
 
 
-async def _stream_turn(session: dict, *, _silent_retries: int = 0) -> AsyncGenerator[str, None]:
+async def _stream_turn(
+    session: dict, *, _silent_retries: int = 0, trace: WizardTrace | None = None
+) -> AsyncGenerator[str, None]:
     """Stream one wizard turn as SSE. Ends at the turn's ResultMessage.
 
     * Emits an SSE comment (keep-alive ping) every 20 s during silent
@@ -430,6 +443,8 @@ async def _stream_turn(session: dict, *, _silent_retries: int = 0) -> AsyncGener
                 yield ": keep-alive\n\n"
                 continue
 
+            if trace is not None:
+                trace.observe(message)
             # Token-level partial deltas (preferred).
             if StreamEvent is not None and isinstance(message, StreamEvent):
                 delta = _extract_stream_text(message)
@@ -468,12 +483,16 @@ async def _stream_turn(session: dict, *, _silent_retries: int = 0) -> AsyncGener
                     # by an implicit wait for input). Nudge it to continue
                     # without surfacing anything to the user.
                     await client.query("Please continue.")
-                    async for chunk in _stream_turn(session, _silent_retries=_silent_retries + 1):
+                    async for chunk in _stream_turn(
+                        session, _silent_retries=_silent_retries + 1, trace=trace
+                    ):
                         yield chunk
                 else:
                     yield sse_event("done", {})
                 break
     except Exception as exc:  # noqa: BLE001
+        if trace is not None:
+            trace.error(type(exc).__name__)
         yield sse_event("error", {"message": str(exc)})
     finally:
         session["last_active"] = time.time()
@@ -560,7 +579,9 @@ async def start_session() -> StreamingResponse:
         # No model call here. Starting a session is now just spawning the CLI
         # subprocess above, so the page becomes usable immediately instead of
         # blocking on a turn whose output the UI discards anyway.
-        yield sse_event("session", {"session_id": session_id})
+        yield sse_event(
+            "session", {"session_id": session_id, "tracing_available": tracing_available()}
+        )
         yield sse_event("done", {})
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers=_sse_headers())
@@ -581,6 +602,8 @@ async def send_message(session_id: str, body: MessageRequest) -> StreamingRespon
             # First message of the session carries the wizard instructions.
             # The user only ever sees their own text; this rides underneath it.
             bootstrap = session.pop("pending_bootstrap", None)
+            if bootstrap is not None:
+                session["tracing"] = body.trace and tracing_available()
             if body.files:
                 file_sections = []
                 for f in body.files[:5]:
@@ -594,9 +617,18 @@ async def send_message(session_id: str, body: MessageRequest) -> StreamingRespon
                 message_text = "\n\n".join(file_sections) + "\n\n" + body.text
             if bootstrap:
                 message_text = f"{bootstrap}\n\n---\n\n{message_text}"
-            await session["client"].query(message_text)
-            async for chunk in _stream_turn(session):
-                yield chunk
+            trace = WizardTrace(session_id, session.get("tracing", False), message_text)
+            try:
+                await session["client"].query(message_text)
+                async for chunk in _stream_turn(session, trace=trace):
+                    yield chunk
+                if trace.trace_id:
+                    yield sse_event("trace", {"trace_id": trace.trace_id})
+            except BaseException as exc:
+                trace.error(type(exc).__name__)
+                raise
+            finally:
+                trace.finish()
 
     return StreamingResponse(gen(), media_type="text/event-stream", headers=_sse_headers())
 

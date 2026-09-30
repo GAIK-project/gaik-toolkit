@@ -33,6 +33,10 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 
 ### Solution Wizard
 
+Optional session diagnostics use a self-hosted Langfuse pilot. Users choose recording
+before their first message; it is off by default. See
+[the pilot setup and limits](observability/langfuse/README.md).
+
 - **Solution Configuration Wizard** - Natural-language use case → validated blueprint, BPMN diagram, Mermaid flow, and runnable PoC. Access is gated separately from the regular demos: anonymous visitors are sent to `/sign-in`, approved users need a per-user `wizard_access` grant from `/admin`, and the optional team shortcut `/solution-wizard?key=<WIZARD_ACCESS_SECRET>` sets a temporary access cookie.
 
 ### No-code Assets

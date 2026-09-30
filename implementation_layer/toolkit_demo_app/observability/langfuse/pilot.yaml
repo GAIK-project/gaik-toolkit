@@ -1,0 +1,273 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: langfuse-pilot-data
+  labels:
+    app.kubernetes.io/part-of: langfuse-pilot
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: standard-csi
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: langfuse-pilot-clickhouse
+  labels:
+    app.kubernetes.io/part-of: langfuse-pilot
+data:
+  config.xml: <clickhouse><logger><level>warning</level><console>true</console></logger><http_port>8123</http_port><tcp_port>9000</tcp_port><listen_host>0.0.0.0</listen_host><path>/var/lib/clickhouse/</path><tmp_path>/var/lib/clickhouse/tmp/</tmp_path><user_files_path>/var/lib/clickhouse/user_files/</user_files_path><format_schema_path>/var/lib/clickhouse/format_schemas/</format_schema_path><users_config>users.xml</users_config><max_server_memory_usage>3221225472</max_server_memory_usage><mark_cache_size>134217728</mark_cache_size><uncompressed_cache_size>67108864</uncompressed_cache_size></clickhouse>
+  users.xml: <clickhouse><profiles><default><max_memory_usage>2147483648</max_memory_usage><async_insert>1</async_insert><wait_for_async_insert>1</wait_for_async_insert></default></profiles><users><langfuse><password
+    from_env="CLICKHOUSE_PASSWORD"/><networks><ip>::/0</ip></networks><profile>default</profile><quota>default</quota><access_management>1</access_management><named_collection_control>1</named_collection_control></langfuse></users><quotas><default><interval><duration>3600</duration><queries>0</queries><errors>0</errors><result_rows>0</result_rows><read_rows>0</read_rows><execution_time>0</execution_time></interval></default></quotas></clickhouse>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-pilot-data
+  labels:
+    app.kubernetes.io/part-of: langfuse-pilot
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: langfuse-pilot-data
+  template:
+    metadata:
+      labels:
+        app: langfuse-pilot-data
+        app.kubernetes.io/part-of: langfuse-pilot
+    spec:
+      initContainers:
+      - name: storage-directories
+        image: docker.io/library/busybox@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e
+        command:
+        - sh
+        - -c
+        - mkdir -p /storage/clickhouse /storage/redis
+        volumeMounts:
+        - name: data
+          mountPath: /storage
+        resources:
+          requests:
+            cpu: 50m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
+      containers:
+      - name: clickhouse
+        image: docker.io/clickhouse/clickhouse-server@sha256:2964fa4690a6fdfd942e7d9e84aaabb82a85cc3d848e191a2bd8b94e1ff641a8
+        command:
+        - clickhouse-server
+        args:
+        - --config-file=/etc/clickhouse-server/config.xml
+        env:
+        - name: CLICKHOUSE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: langfuse-pilot
+              key: CLICKHOUSE_PASSWORD
+        ports:
+        - containerPort: 8123
+        - containerPort: 9000
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/clickhouse
+          subPath: clickhouse
+        - name: config
+          mountPath: /etc/clickhouse-server
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: '2'
+            memory: 4Gi
+        readinessProbe:
+          tcpSocket:
+            port: 8123
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      - name: valkey
+        image: docker.io/valkey/valkey@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
+        command:
+        - sh
+        - -c
+        - exec valkey-server --dir /data --appendonly yes --requirepass "$REDIS_AUTH"
+        env:
+        - name: REDIS_AUTH
+          valueFrom:
+            secretKeyRef:
+              name: langfuse-pilot
+              key: REDIS_AUTH
+        ports:
+        - containerPort: 6379
+        volumeMounts:
+        - name: data
+          mountPath: /data
+          subPath: redis
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        readinessProbe:
+          tcpSocket:
+            port: 6379
+          periodSeconds: 10
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: langfuse-pilot-data
+      - name: config
+        configMap:
+          name: langfuse-pilot-clickhouse
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-pilot-data
+  labels:
+    app.kubernetes.io/part-of: langfuse-pilot
+spec:
+  selector:
+    app: langfuse-pilot-data
+  ports:
+  - name: http
+    port: 8123
+  - name: native
+    port: 9000
+  - name: redis
+    port: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-pilot-web
+  labels:
+    app.kubernetes.io/part-of: langfuse-pilot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse-pilot-web
+  template:
+    metadata:
+      labels:
+        app: langfuse-pilot-web
+        app.kubernetes.io/part-of: langfuse-pilot
+    spec:
+      containers:
+      - name: web
+        image: docker.io/langfuse/langfuse@sha256:74376cff9caad24edb50bedce04053e1d2031942f14a5d6001e7046d825e2bd3
+        envFrom:
+        - secretRef:
+            name: langfuse-pilot
+        env:
+        - name: HOME
+          value: /tmp
+        - name: HOSTNAME
+          value: 0.0.0.0
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            cpu: 250m
+            memory: 1Gi
+          limits:
+            cpu: '2'
+            memory: 2Gi
+        startupProbe:
+          tcpSocket:
+            port: 3000
+          periodSeconds: 10
+          failureThreshold: 60
+        readinessProbe:
+          tcpSocket:
+            port: 3000
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-pilot
+  labels:
+    app.kubernetes.io/part-of: langfuse-pilot
+spec:
+  selector:
+    app: langfuse-pilot-web
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-pilot-worker
+  labels:
+    app.kubernetes.io/part-of: langfuse-pilot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse-pilot-worker
+  template:
+    metadata:
+      labels:
+        app: langfuse-pilot-worker
+        app.kubernetes.io/part-of: langfuse-pilot
+    spec:
+      containers:
+      - name: worker
+        image: docker.io/langfuse/langfuse-worker@sha256:3fe007098e3dcd89fe546256b2e1eec417e9e44b4366683cdc70dc63bbc6a59b
+        envFrom:
+        - secretRef:
+            name: langfuse-pilot
+        env:
+        - name: HOME
+          value: /tmp
+        - name: HOSTNAME
+          value: 0.0.0.0
+        ports:
+        - containerPort: 3030
+        resources:
+          requests:
+            cpu: 250m
+            memory: 1Gi
+          limits:
+            cpu: '1'
+            memory: 2Gi
+        startupProbe:
+          tcpSocket:
+            port: 3030
+          periodSeconds: 10
+          failureThreshold: 60
+        readinessProbe:
+          tcpSocket:
+            port: 3030
+          periodSeconds: 10
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: langfuse-pilot
+  labels:
+    app.kubernetes.io/part-of: langfuse-pilot
+spec:
+  host: langfuse-pilot.2.rahtiapp.fi
+  to:
+    kind: Service
+    name: langfuse-pilot
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

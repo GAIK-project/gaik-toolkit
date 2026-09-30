@@ -96,6 +96,18 @@ export function PrivacyContent() {
         </p>
       </Section>
 
+      <Section icon={Eye} title="Optional Wizard Diagnostics">
+        <p>
+          Solution Wizard offers optional session diagnostics, disabled by default.
+          If you enable it before the first message, prompts, extracted attachment
+          text, answers, tool activity and model usage are stored in our
+          login-protected Langfuse pilot on CSC Rahti and Allas in Finland.
+          Use synthetic examples without personal or confidential information.
+          Restart the wizard to start a session without diagnostics. Contact the
+          project team below to request deletion of an already recorded session.
+        </p>
+      </Section>
+
       <Section icon={Scale} title="Your Rights">
         <p className="mb-1">Under GDPR, you have the right to:</p>
         <ul className="list-inside list-disc space-y-1">

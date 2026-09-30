@@ -156,6 +156,8 @@ export default function SolutionWizardPage() {
   // Surfaced on the start screen with a retry, so a failed bootstrap does not
   // leave the user staring at a skeleton that never resolves.
   const [startError, setStartError] = useState<string | null>(null);
+  const [tracingAvailable, setTracingAvailable] = useState(false);
+  const [traceSession, setTraceSession] = useState(false);
 
   const sessionRef = useRef<string | null>(null);
   const streamRef = useRef("");
@@ -226,6 +228,7 @@ export default function SolutionWizardPage() {
             const sid = event.data.session_id as string;
             setSessionId(sid);
             sessionRef.current = sid;
+            setTracingAvailable(event.data.tracing_available === true);
           } else if (event.type === "text_delta") {
             // The bootstrap turn's visible text is the wizard restating its
             // own intro. The start screen already says that, better, so it is
@@ -279,6 +282,8 @@ export default function SolutionWizardPage() {
     // log is anything other than a real turn.
     setMessages([]);
     setStartError(null);
+    setTracingAvailable(false);
+    setTraceSession(false);
     try {
       const res = await apiFetch("/api/wizard/start", { method: "POST" });
       if (!res.ok) {
@@ -342,7 +347,7 @@ export default function SolutionWizardPage() {
         const res = await apiFetch(`/api/wizard/message/${sid}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, files }),
+          body: JSON.stringify({ text, files, trace: traceSession }),
         });
         if (!res.ok) {
           const detail = await res.text();
@@ -358,7 +363,7 @@ export default function SolutionWizardPage() {
         if (genRef.current === gen) setBusy(false);
       }
     },
-    [busy, consumeTurn],
+    [busy, consumeTurn, traceSession],
   );
 
   const downloadConversation = useCallback((format: "md" | "txt") => {
@@ -528,6 +533,23 @@ export default function SolutionWizardPage() {
                   void startSession();
                 }}
                 onPickExample={(prompt) => void sendMessage(prompt)}
+                diagnostics={tracingAvailable ? (
+                  <label className="flex items-start gap-2 text-left text-xs text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={traceSession}
+                      disabled={busy}
+                      onChange={(event) => setTraceSession(event.target.checked)}
+                      className="mt-0.5 accent-teal-600"
+                    />
+                    <span>
+                      Save this session for diagnostics. Prompts, parsed attachment
+                      text, answers and tool activity are stored in our private
+                      CSC-hosted Langfuse pilot. Use synthetic data without personal
+                      or confidential information.
+                    </span>
+                  </label>
+                ) : undefined}
                 composer={composer}
               />
             </div>
