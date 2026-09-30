@@ -52,6 +52,9 @@ containers. Only the TLS dashboard Route is public; data services are internal.
   `pgvector-demo` service. Langfuse migrations run only against this database.
 - ClickHouse and Valkey: separate subdirectories on a 10 GiB PVC, one replica with a
   Recreate strategy. This conserves PVC quota but couples their restart/storage.
+- ClickHouse's `system.query_log` is enabled for Langfuse v4's legacy API usage
+  background job, with a bounded memory buffer and a one-day TTL. This retention
+  applies to SQL diagnostics, not the recorded wizard traces.
 - CSC Allas: a private S3 bucket, separate `events/` and `media/` prefixes, `regionOne`
   and path-style addressing. Create the bucket before deployment; do not enable
   public access. S3 credentials must remain valid for the pilot's whole lifetime.

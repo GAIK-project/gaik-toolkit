@@ -19,7 +19,31 @@ metadata:
   labels:
     app.kubernetes.io/part-of: langfuse-pilot
 data:
-  config.xml: <clickhouse><logger><level>warning</level><console>true</console></logger><http_port>8123</http_port><tcp_port>9000</tcp_port><listen_host>0.0.0.0</listen_host><path>/var/lib/clickhouse/</path><tmp_path>/var/lib/clickhouse/tmp/</tmp_path><user_files_path>/var/lib/clickhouse/user_files/</user_files_path><format_schema_path>/var/lib/clickhouse/format_schemas/</format_schema_path><users_config>users.xml</users_config><max_server_memory_usage>3221225472</max_server_memory_usage><mark_cache_size>134217728</mark_cache_size><uncompressed_cache_size>67108864</uncompressed_cache_size></clickhouse>
+  config.xml: |
+    <clickhouse>
+      <logger><level>warning</level><console>true</console></logger>
+      <http_port>8123</http_port>
+      <tcp_port>9000</tcp_port>
+      <listen_host>0.0.0.0</listen_host>
+      <path>/var/lib/clickhouse/</path>
+      <tmp_path>/var/lib/clickhouse/tmp/</tmp_path>
+      <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
+      <format_schema_path>/var/lib/clickhouse/format_schemas/</format_schema_path>
+      <users_config>users.xml</users_config>
+      <max_server_memory_usage>3221225472</max_server_memory_usage>
+      <mark_cache_size>134217728</mark_cache_size>
+      <uncompressed_cache_size>67108864</uncompressed_cache_size>
+      <!-- Langfuse v4's legacy API usage job reads this system table. -->
+      <query_log>
+        <database>system</database>
+        <table>query_log</table>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_time + INTERVAL 1 DAY</engine>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <max_size_rows>8192</max_size_rows>
+        <reserved_size_rows>1024</reserved_size_rows>
+        <buffer_size_rows_flush_threshold>4096</buffer_size_rows_flush_threshold>
+      </query_log>
+    </clickhouse>
   users.xml: <clickhouse><profiles><default><max_memory_usage>2147483648</max_memory_usage><async_insert>1</async_insert><wait_for_async_insert>1</wait_for_async_insert></default></profiles><users><langfuse><password
     from_env="CLICKHOUSE_PASSWORD"/><networks><ip>::/0</ip></networks><profile>default</profile><quota>default</quota><access_management>1</access_management><named_collection_control>1</named_collection_control></langfuse></users><quotas><default><interval><duration>3600</duration><queries>0</queries><errors>0</errors><result_rows>0</result_rows><read_rows>0</read_rows><execution_time>0</execution_time></interval></default></quotas></clickhouse>
 ---
