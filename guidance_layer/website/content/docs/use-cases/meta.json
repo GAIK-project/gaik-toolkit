@@ -1,6 +1,7 @@
 {
   "title": "Use Cases",
   "pages": [
+    "index",
     "incident-reporting",
     "purchase-order-processing",
     "transcription-captioning-translation",

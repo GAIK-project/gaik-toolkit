@@ -1,0 +1,116 @@
+---
+title: Overview
+description: The GAIK use cases at a glance, with a link to the detailed page of each
+---
+
+A GAIK use case shows how the toolkit's software components and modules combine into a solution to a concrete knowledge-work problem. Each one starts from a business need and ends with a pipeline you can build with the toolkit. This page summarises them, and each summary links to the full description.
+
+---
+
+## How a use case page is organised
+
+Every detailed page follows the same path, from the business need to the code:
+
+- **Business layer:** the problem, the users and the expected outcomes, specified with the GenAI product canvas
+- **Strategy layer:** how the value of the solution is evaluated and monitored
+- **Implementation without code:** how to reach the result with ready-made prompts and skills
+- **Implementation with code:** the software components and module that build the pipeline, with examples
+- **Evaluation methods:** how the quality of the output is measured
+- **Related resources:** examples, code and further reading
+
+---
+
+## Use cases at a glance
+
+| Use case | From | To | Built with |
+|----------|------|----|------------|
+| [Incident Reporting](/use-cases/incident-reporting) | Spoken or written incident, near miss or observation | Structured incident report | Transcriber, Extractor (Audio to Structured Data) |
+| [Purchase Order Processing](/use-cases/purchase-order-processing) | Customer purchase orders, bills of material and price lists | Priced sales order ready for review | Parser, Schema Generator, DataExtractor (Documents to Structured Data), or VisionExtractor |
+| [Transcription, Captioning & Translation](/use-cases/transcription-captioning-translation) | Audio or video | Timestamped subtitles and translations | Transcriber, TranscriptEnhancer |
+| [Semantic Video Search](/use-cases/semantic-video-search) | A question in plain language | The matching moments in a video library | Embedder, PgVectorStore |
+| [Construction Site Diary Creation](/use-cases/construction-site-diary-creation) | Daily voice observations from the site | Structured construction site diary | Transcriber, Extractor (Audio to Structured Data) |
+| [Safety Observation Reporting](/use-cases/safety-observation-reporting) | Spoken or written safety observations | Structured safety report | Transcriber, Extractor (Audio to Structured Data) |
+| [Dental Learning Assistant](/use-cases/dental-learning-assistant) | A learner's question | An answer grounded in course material | Documentation coming soon |
+| [Report Writing](/use-cases/report-writing) | Recordings and background documents | Templated, source-grounded report | SourceNormalizer, KnowledgeCurator, ReportSynthesizer (ReportWriter) |
+
+---
+
+## Documents and records from speech
+
+### Incident Reporting
+
+Employees and supervisors report incidents, near misses and safety observations by voice or text. The transcript is cleaned up and the required fields are extracted, so a complete, standardized incident record is ready for review.
+
+[Read more →](/use-cases/incident-reporting) · [Try it live →](https://gaik-demo.2.rahtiapp.fi/incident-report)
+
+---
+
+### Construction Site Diary Creation
+
+Site supervisors record what happened during the day by voice instead of filling in a diary from memory in the evening. The recordings become a structured, standardized construction diary that the site manager reviews.
+
+[Read more →](/use-cases/construction-site-diary-creation) · [Try it live →](https://gaik-demo.2.rahtiapp.fi/diary)
+
+---
+
+### Safety Observation Reporting
+
+Near misses, hazards and deviations are often reported verbally or in short notes. This use case turns them into complete safety reports with all the fields of an official form, for faster and more consistent safety documentation.
+
+[Read more →](/use-cases/safety-observation-reporting)
+
+---
+
+## Documents and data from documents
+
+### Purchase Order Processing
+
+Incoming purchase orders (PDFs, scans and bills of material) are read, matched against material records and price lists, and turned into a priced sales order. The reviewer stays in control of the final order, and the manual reading and arithmetic go away.
+
+[Read more →](/use-cases/purchase-order-processing) · [Try it live →](https://gaik-demo.2.rahtiapp.fi/luvata-order) (a smaller version of the use case)
+
+---
+
+### Report Writing
+
+Recordings and background documents are turned into a report that follows a fixed template, and every statement can be traced to a source. Three stages (normalize the sources, curate the facts, write and review the report) save their results as files, so a professional can check and correct them before signing. A construction report for a house is the worked example.
+
+[Read more →](/use-cases/report-writing) · [Try it live →](https://gaik-demo.2.rahtiapp.fi/report-writer-v2)
+
+---
+
+## Video and learning content
+
+### Transcription, Captioning & Translation
+
+Video-based educational or professional content is converted into accurate, timestamped subtitles in the source language and translated into other languages. Domain vocabulary, such as medical or dental terms, is handled by the enhancement step, and people keep control of review and correction.
+
+[Read more →](/use-cases/transcription-captioning-translation) · [Try it live →](https://gaik-demo.2.rahtiapp.fi/dental-transcription)
+
+---
+
+### Semantic Video Search
+
+Users describe what they are looking for in plain language and jump straight to the right moment in a library of recorded lectures, webinars and training sessions. Transcript segments are indexed for semantic, keyword and hybrid search.
+
+[Read more →](/use-cases/semantic-video-search) · [Try it live →](https://gaik-demo.2.rahtiapp.fi/video-search)
+
+---
+
+### Dental Learning Assistant
+
+Contextual question answering and guided learning support for dental education, based on curated course content, textbooks and instructional videos. The detailed documentation is still being written.
+
+[Read more →](/use-cases/dental-learning-assistant)
+
+---
+
+## Where to go next
+
+- **Build one yourself:** the [software components](/toolkit/software-components) and [software modules](/toolkit/software-modules) behind every use case
+- **Try the demos:** the [toolkit demo](/demo) has an interactive version of most use cases
+- **Measure quality:** the [evaluation layer](/evaluation-layer) describes how the output of these solutions is evaluated
+
+<Callout type="info">
+To test the demos, visit the [GAIK demo link](https://gaik-demo.2.rahtiapp.fi/). Access is available upon registration request.
+</Callout>
