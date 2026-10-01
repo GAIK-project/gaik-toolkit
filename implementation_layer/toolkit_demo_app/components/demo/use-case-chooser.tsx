@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Check, ChevronDown, Play, Wand2 } from "lucide-react";
 import { useRef, useState, type ComponentType } from "react";
 
-type Choice = "example" | "create";
+export type Choice = "example" | "create";
 
 function Points({ items }: { items: string[] }) {
   return (
@@ -20,6 +20,8 @@ function Points({ items }: { items: string[] }) {
 }
 
 export interface UseCaseChooserProps {
+  /** Which section is open at first. Neither, by default. */
+  initialChoice?: Choice | null;
   exampleTitle?: string;
   exampleDescription: string;
   examplePoints: string[];
@@ -37,6 +39,7 @@ export interface UseCaseChooserProps {
  * has to scroll past one section to find the other.
  */
 export function UseCaseChooser({
+  initialChoice = null,
   exampleTitle = "See it work on an example",
   exampleDescription,
   examplePoints,
@@ -46,7 +49,7 @@ export function UseCaseChooser({
   ExampleSection,
   CreateSection,
 }: UseCaseChooserProps) {
-  const [open, setOpen] = useState<Choice | null>(null);
+  const [open, setOpen] = useState<Choice | null>(initialChoice);
   const contentRef = useRef<HTMLDivElement>(null);
 
   const choose = (choice: Choice) => {

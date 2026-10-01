@@ -29,14 +29,14 @@ function FileLine({
 }) {
   return (
     <li className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
-      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
       <span className="flex-1 truncate">{row.name}</span>
       {row.file ? (
-        <span className="text-xs text-muted-foreground shrink-0">
+        <span className="text-muted-foreground shrink-0 text-xs">
           {formatFileSize(row.file.size)}
         </span>
       ) : (
-        <span className="text-xs text-destructive shrink-0">
+        <span className="text-destructive shrink-0 text-xs">
           missing, add this file
         </span>
       )}
@@ -79,7 +79,7 @@ function PickFiles({
   return (
     <label
       className={cn(
-        "flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground hover:border-muted-foreground/50 transition-colors",
+        "text-muted-foreground hover:border-muted-foreground/50 flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm transition-colors",
         disabled && "pointer-events-none opacity-50",
       )}
     >
@@ -133,7 +133,9 @@ export function SourceList({
                 key={row.name}
                 row={row}
                 disabled={disabled}
-                onRemove={() => onSourcesChange(sources.filter((_, j) => j !== i))}
+                onRemove={() =>
+                  onSourcesChange(sources.filter((_, j) => j !== i))
+                }
               >
                 <button
                   type="button"
@@ -146,14 +148,16 @@ export function SourceList({
                           ? {
                               ...r,
                               sourceClass:
-                                r.sourceClass === "primary" ? "secondary" : "primary",
+                                r.sourceClass === "primary"
+                                  ? "secondary"
+                                  : "primary",
                             }
                           : r,
                       ),
                     )
                   }
                   className={cn(
-                    "rounded-full border px-2 py-0.5 text-xs font-mono transition-colors shrink-0",
+                    "shrink-0 rounded-full border px-2 py-0.5 font-mono text-xs transition-colors",
                     row.sourceClass === "primary"
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-border bg-muted text-muted-foreground",
@@ -166,7 +170,12 @@ export function SourceList({
             ))}
           </ul>
         )}
-        <PickFiles label="Add source files" multiple disabled={disabled} onPick={addFiles} />
+        <PickFiles
+          label="Add source files"
+          multiple
+          disabled={disabled}
+          onPick={addFiles}
+        />
       </div>
 
       <div className="space-y-1">
@@ -178,7 +187,11 @@ export function SourceList({
         </Label>
         {sample && (
           <ul>
-            <FileLine row={sample} disabled={disabled} onRemove={() => onSampleChange(null)} />
+            <FileLine
+              row={sample}
+              disabled={disabled}
+              onRemove={() => onSampleChange(null)}
+            />
           </ul>
         )}
         <PickFiles

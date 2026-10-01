@@ -14,7 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { ModelKey, RunSettings, StepKey } from "@/lib/report-writer/workspace";
+import type {
+  ModelKey,
+  RunSettings,
+  StepKey,
+} from "@/lib/report-writer/workspace";
 
 import { Row, SwitchRow } from "../../report-writer/components/options-form";
 
@@ -35,16 +39,19 @@ export function SettingsForm({
   onSettingsChange,
   disabled,
 }: SettingsFormProps) {
-  const set = (patch: Partial<RunSettings>) => onSettingsChange({ ...settings, ...patch });
+  const set = (patch: Partial<RunSettings>) =>
+    onSettingsChange({ ...settings, ...patch });
 
   const model = (key: ModelKey, label = "Model") => (
     <Row label={label}>
       <Input
         placeholder="server default"
         value={models[key] ?? ""}
-        onChange={(e) => onModelsChange({ ...models, [key]: e.target.value || null })}
+        onChange={(e) =>
+          onModelsChange({ ...models, [key]: e.target.value || null })
+        }
         disabled={disabled}
-        className="h-8 text-sm font-mono"
+        className="h-8 font-mono text-sm"
       />
     </Row>
   );
@@ -70,7 +77,12 @@ export function SettingsForm({
           <Select
             value={effort}
             onValueChange={(v) =>
-              set({ [key]: { ...opts, reasoning_effort: v === "default" ? null : v } })
+              set({
+                [key]: {
+                  ...opts,
+                  reasoning_effort: v === "default" ? null : v,
+                },
+              })
             }
             disabled={disabled}
           >
@@ -98,7 +110,8 @@ export function SettingsForm({
               set({
                 [key]: {
                   ...opts,
-                  temperature: e.target.value === "" ? null : Number(e.target.value),
+                  temperature:
+                    e.target.value === "" ? null : Number(e.target.value),
                 },
               })
             }
@@ -111,8 +124,10 @@ export function SettingsForm({
   };
 
   const panel = (value: string, title: string, children: React.ReactNode) => (
-    <AccordionItem value={value} className="border rounded-lg px-3">
-      <AccordionTrigger className="text-sm py-3 hover:no-underline">{title}</AccordionTrigger>
+    <AccordionItem value={value} className="rounded-lg border px-3">
+      <AccordionTrigger className="py-3 text-sm hover:no-underline">
+        {title}
+      </AccordionTrigger>
       <AccordionContent className="space-y-3 pb-3">{children}</AccordionContent>
     </AccordionItem>
   );
@@ -160,10 +175,10 @@ export function SettingsForm({
         "synthesize",
         "3. Synthesize",
         <>
-          <p className="text-xs font-medium text-muted-foreground">Writer</p>
+          <p className="text-muted-foreground text-xs font-medium">Writer</p>
           {model("writer")}
           {step("writer")}
-          <p className="text-xs font-medium text-muted-foreground">Reviewer</p>
+          <p className="text-muted-foreground text-xs font-medium">Reviewer</p>
           {model("reviewer")}
           {step("reviewer")}
           <Row label="Review attempts">{count("review_attempts")}</Row>
@@ -181,7 +196,7 @@ export function SettingsForm({
             onCheckedChange={(v) => set({ strict_review: v })}
             disabled={disabled}
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             GPT-6 models ignore temperature unless reasoning effort is none.
           </p>
         </>,
