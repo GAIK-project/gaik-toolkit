@@ -10,8 +10,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { STAGES, type Stage, type Staleness, staleHint } from "@/lib/report-writer/workspace";
-import { Download, Eye, EyeOff, FileText, Loader2, RefreshCw } from "lucide-react";
+import {
+  STAGES,
+  type Stage,
+  type Staleness,
+  staleHint,
+} from "@/lib/report-writer/workspace";
+import {
+  Download,
+  Eye,
+  EyeOff,
+  FileText,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
 import { useState } from "react";
 
 import { DOCX_MIME, downloadBlob } from "./artifact-browser";
@@ -24,6 +36,8 @@ interface FinalReportCardProps {
   stale: Staleness;
   running: Stage | null;
   onRebuild: () => void;
+  /** Show the preview from the start. */
+  defaultPreview?: boolean;
 }
 
 /** The finished report: its state, downloads and a preview. */
@@ -35,8 +49,9 @@ export function FinalReportCard({
   stale,
   running,
   onRebuild,
+  defaultPreview = false,
 }: FinalReportCardProps) {
-  const [preview, setPreview] = useState(false);
+  const [preview, setPreview] = useState(defaultPreview);
   const hint = staleHint(stale, "report/report.md");
   const name = title.replace(/[\\/:*?"<>|]+/g, "").trim() || "report";
   const ready = markdown !== undefined && !running;
@@ -58,7 +73,9 @@ export function FinalReportCard({
       Out of date
     </Badge>
   ) : (
-    <Badge className="bg-green-600 text-white hover:bg-green-600">Report ready</Badge>
+    <Badge className="bg-green-600 text-white hover:bg-green-600">
+      Report ready
+    </Badge>
   );
 
   return (
@@ -80,7 +97,9 @@ export function FinalReportCard({
       <CardContent className="space-y-3">
         {ready && hint && (
           <div className="flex items-center justify-between gap-2 text-xs text-amber-600">
-            <span>Inputs changed after this report was written. {hint} to update it.</span>
+            <span>
+              Inputs changed after this report was written. {hint} to update it.
+            </span>
             {hint === "Rebuild report" && (
               <Button size="xs" variant="outline" onClick={onRebuild}>
                 <RefreshCw className="h-3 w-3" />
@@ -91,7 +110,7 @@ export function FinalReportCard({
         )}
         <div className="flex flex-wrap gap-2">
           {ready && !docx ? (
-            <p className="w-full text-xs text-muted-foreground">
+            <p className="text-muted-foreground w-full text-xs">
               This run wrote no DOCX. Turn on Generate DOCX under Settings, then
               rebuild the report.
             </p>
@@ -108,13 +127,23 @@ export function FinalReportCard({
           <Button
             variant="outline"
             disabled={!ready}
-            onClick={() => downloadBlob(markdown!, `${name}.md`, "text/markdown")}
+            onClick={() =>
+              downloadBlob(markdown!, `${name}.md`, "text/markdown")
+            }
           >
             <Download className="mr-2 h-4 w-4" />
             .md
           </Button>
-          <Button variant="outline" disabled={!ready} onClick={() => setPreview((p) => !p)}>
-            {preview ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+          <Button
+            variant="outline"
+            disabled={!ready}
+            onClick={() => setPreview((p) => !p)}
+          >
+            {preview ? (
+              <EyeOff className="mr-2 h-4 w-4" />
+            ) : (
+              <Eye className="mr-2 h-4 w-4" />
+            )}
             Preview
           </Button>
         </div>

@@ -51,13 +51,14 @@ function ArtifactView({ path, text }: { path: string; text: string }) {
     pretty = JSON.stringify(JSON.parse(text), null, 2);
   } catch (e) {
     return (
-      <p className="text-xs text-destructive">
-        This file is not valid JSON: {e instanceof Error ? e.message : String(e)}
+      <p className="text-destructive text-xs">
+        This file is not valid JSON:{" "}
+        {e instanceof Error ? e.message : String(e)}
       </p>
     );
   }
   return (
-    <pre className="text-xs whitespace-pre-wrap break-words font-mono leading-relaxed">
+    <pre className="font-mono text-xs leading-relaxed break-words whitespace-pre-wrap">
       {pretty}
     </pre>
   );
@@ -78,7 +79,9 @@ export function ArtifactBrowser({
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   // The text an edit started from, so a save never overwrites a newer stage result.
-  const [edit, setEdit] = useState<{ base: string; draft: string } | null>(null);
+  const [edit, setEdit] = useState<{ base: string; draft: string } | null>(
+    null,
+  );
   const [editError, setEditError] = useState<string | null>(null);
 
   const paths = [...Object.keys(artifacts), ...(docx ? [DOCX_PATH] : [])];
@@ -87,14 +90,16 @@ export function ArtifactBrowser({
   const hint = selected && staleHint(stale, selected);
 
   function select(path: string) {
-    if (path === DOCX_PATH) return downloadBlob(docx!, "report.docx", DOCX_MIME);
+    if (path === DOCX_PATH)
+      return downloadBlob(docx!, "report.docx", DOCX_MIME);
     setSelected(path);
     setEdit(null);
     setEditError(null);
   }
 
   function download(path: string) {
-    if (path === DOCX_PATH) return downloadBlob(docx!, "report.docx", DOCX_MIME);
+    if (path === DOCX_PATH)
+      return downloadBlob(docx!, "report.docx", DOCX_MIME);
     downloadBlob(artifacts[path], path.split("/").pop()!, "text/plain");
   }
 
@@ -146,9 +151,9 @@ export function ArtifactBrowser({
           <div key={g.folder || "root"}>
             {g.folder && (
               <p className="mb-1 flex items-center gap-1.5 text-xs font-medium">
-                <Folder className="h-3.5 w-3.5 text-primary" />
+                <Folder className="text-primary h-3.5 w-3.5" />
                 {g.folder}/
-                <span className="font-normal text-muted-foreground">
+                <span className="text-muted-foreground font-normal">
                   ({FOLDER_NOTE[g.folder]})
                 </span>
               </p>
@@ -160,7 +165,7 @@ export function ArtifactBrowser({
                   <li
                     key={p}
                     className={cn(
-                      "flex items-center gap-1.5 rounded px-1.5 py-1 text-xs hover:bg-muted",
+                      "hover:bg-muted flex items-center gap-1.5 rounded px-1.5 py-1 text-xs",
                       p === selected && "bg-muted",
                     )}
                   >
@@ -169,16 +174,20 @@ export function ArtifactBrowser({
                       onClick={() => select(p)}
                       className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                     >
-                      <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <FileText className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                       <span className="truncate font-mono">
                         {g.folder ? p.slice(g.folder.length + 1) : p}
                       </span>
                       {p !== DOCX_PATH && classifyArtifact(p).editable && (
-                        <Pencil className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        <Pencil className="text-muted-foreground h-3 w-3 shrink-0" />
                       )}
                     </button>
                     {rowHint && (
-                      <Badge variant="outline" className="border-amber-500 text-[10px] text-amber-600" title={rowHint}>
+                      <Badge
+                        variant="outline"
+                        className="border-amber-500 text-[10px] text-amber-600"
+                        title={rowHint}
+                      >
                         stale
                       </Badge>
                     )}
@@ -200,9 +209,14 @@ export function ArtifactBrowser({
         {selected && text !== undefined && (
           <div className="rounded-md border">
             <div className="flex items-center gap-2 border-b px-3 py-2">
-              <span className="flex-1 truncate font-mono text-xs">{selected}</span>
+              <span className="flex-1 truncate font-mono text-xs">
+                {selected}
+              </span>
               {hint && (
-                <Badge variant="outline" className="border-amber-500 text-xs text-amber-600">
+                <Badge
+                  variant="outline"
+                  className="border-amber-500 text-xs text-amber-600"
+                >
                   Stale: {hint}
                 </Badge>
               )}
@@ -225,7 +239,9 @@ export function ArtifactBrowser({
                   onChange={(e) => setEdit({ ...edit, draft: e.target.value })}
                   className="min-h-[320px] font-mono text-xs"
                 />
-                {editError && <p className="text-xs text-destructive">{editError}</p>}
+                {editError && (
+                  <p className="text-destructive text-xs">{editError}</p>
+                )}
                 <div className="flex gap-2">
                   <Button size="sm" onClick={save} disabled={disabled}>
                     Save
