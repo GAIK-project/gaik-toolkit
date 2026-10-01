@@ -8,6 +8,7 @@ import importlib.util
 import io
 import json
 import logging
+import re
 from contextlib import redirect_stdout
 from decimal import Decimal
 from pathlib import Path
@@ -234,6 +235,26 @@ def _restore_decimal_annotations(
     return "\n".join(lines), aliases
 
 
+_DESCRIPTION_LINE = re.compile(r'^(?P<head>.*\bdescription=")(?P<text>.*)(?P<tail>"\)\s*)$')
+
+
+def _escape_description_quotes(schema_code: str) -> str:
+    """Escape double quotes inside ``description="..."``.
+
+    The schema printer writes a description between double quotes as it is, so a
+    description such as ``e.g., "8.600 LB"`` would end the string early and leave a
+    module that cannot be imported.
+    """
+    lines = []
+    for line in schema_code.splitlines(keepends=True):
+        match = _DESCRIPTION_LINE.match(line)
+        if match:
+            text = re.sub(r'(?<!\\)"', lambda _: '\\"', match.group("text"))
+            line = f"{match.group('head')}{text}{match.group('tail')}"
+        lines.append(line)
+    return "".join(lines)
+
+
 def schema_to_python_source(model: type[BaseModel]) -> str:
     """Render a model as importable Python without writing it to disk."""
     from gaik.software_components.extractor.schema import print_pydantic_schema
@@ -242,7 +263,9 @@ def schema_to_python_source(model: type[BaseModel]) -> str:
     with redirect_stdout(buffer):
         print_pydantic_schema(model, title="Saved Schema")
 
-    schema_code = _sanitize_schema_code(_clean_schema_dump(buffer.getvalue()))
+    schema_code = _escape_description_quotes(
+        _sanitize_schema_code(_clean_schema_dump(buffer.getvalue()))
+    )
     for model_type in _iter_model_types(model):
         schema_code = schema_code.replace(f"{model_type.__module__}.", "")
     schema_code, decimal_aliases = _restore_decimal_annotations(schema_code, model)
@@ -311,8 +334,13 @@ def save_requirements(
         "requirements": requirements.model_dump(),
     }
     if user_requirements is not None:
-        payload["user_requirements"] = user_requirements
+        payload["user_requirements"] = _unix_newlines(user_requirements)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _unix_newlines(text: str) -> str:
+    """Browsers send form text with CRLF line breaks; a saved prompt is kept with LF."""
+    return text.replace("\r\n", "\n")
 
 
 def load_saved_requirements(
@@ -329,9 +357,8 @@ def load_saved_requirements(
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("schema_format_version") != SCHEMA_FORMAT_VERSION:
         return None
-    if (
-        expected_user_requirements is not None
-        and data.get("user_requirements") != expected_user_requirements
+    if expected_user_requirements is not None and data.get("user_requirements") != _unix_newlines(
+        expected_user_requirements
     ):
         return None
 

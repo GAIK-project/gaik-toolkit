@@ -76,13 +76,11 @@ def test_provider_model_allowlists(monkeypatch) -> None:
         "openai": (
             "gpt-6-luna",
             "gpt-6-sol",
-            "gpt-6-astra",
             "gpt-5.6-terra",
         ),
         "azure": (
             "gpt-6-luna",
             "gpt-6-sol",
-            "gpt-6-astra",
             "gpt-5.6-terra",
         ),
         "claude": ("claude-sonnet-4.6", "claude-sonnet-5"),

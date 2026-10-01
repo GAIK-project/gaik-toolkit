@@ -94,7 +94,11 @@ def get_model_options(config: dict, *, schema: bool = False) -> dict:
     """Use only sampling options supported by the selected model family."""
     model = str(config.get("model", "")).lower()
     if model.startswith("gpt-6"):
-        effort = "low" if "astra" in model else "none"
+        # gpt-6.1 models reject "none"; the earlier gpt-6 ones accept it.
+        if model.startswith("gpt-6.1"):
+            effort = "medium"
+        else:
+            effort = "low" if "astra" in model else "none"
         return {"temperature": None, "reasoning_effort": effort}
     if request_model_settings() is not None or config.get("provider") not in {
         None,

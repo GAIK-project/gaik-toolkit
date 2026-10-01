@@ -23,21 +23,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  appendVisionSettings,
+  DEFAULT_VISION_SETTINGS,
+  HelpTooltip,
+  resolveVisionModel,
+  UsageStats,
+  type VerificationEntry,
+  type VisionUsage,
+  VisionSettingsFields,
+  useVisionModels,
+} from "@/components/demo/vision-settings";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { formatFieldName, formatFileSize } from "@/lib/utils";
 import {
@@ -45,7 +43,6 @@ import {
   File as FileIcon,
   FileCode2,
   FileStack,
-  Info,
   Loader2,
   ScanEye,
   Sparkles,
@@ -118,42 +115,13 @@ interface GeneratedSchema {
   }>;
 }
 
-type Provider = "openai" | "claude" | "google";
-type ReasoningEffort = "low" | "medium" | "high";
-
-const PROVIDER_MODELS: Record<Provider, readonly string[]> = {
-  openai: ["gpt-6-luna", "gpt-6-sol", "gpt-6-astra", "gpt-5.6-terra"],
-  claude: ["claude-sonnet-4.6", "claude-sonnet-5"],
-  google: ["gemini-3.1-flash-lite"],
-};
-
-const DEFAULT_MODELS: Record<Provider, string> = {
-  openai: "gpt-6-luna",
-  claude: "claude-sonnet-4.6",
-  google: "gemini-3.1-flash-lite",
-};
-
-interface VerificationEntry {
-  value: unknown;
-  confidence_score?: number;
-  confidence_reason?: string;
-}
-
 interface VisionExtractResult {
   data: Record<string, unknown>;
   verification: Record<string, VerificationEntry | VerificationEntry[]> | null;
   model: string;
   documents_processed: number;
   duration_s: number;
-  usage: {
-    provider?: string | null;
-    model?: string | null;
-    input_tokens?: number | null;
-    output_tokens?: number | null;
-    thinking_tokens?: number | null;
-    total_tokens?: number | null;
-    cost_usd?: number | null;
-  } | null;
+  usage: VisionUsage | null;
 }
 
 function validateFile(file: File): string | null {
@@ -181,25 +149,6 @@ function pluralize(
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-function HelpTooltip({ text }: { text: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label="More information"
-          className="text-muted-foreground hover:text-foreground inline-flex"
-        >
-          <Info className="h-3.5 w-3.5" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top" className="max-w-72">
-        {text}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
 interface FileListRowProps {
   file: File;
   disabled: boolean;
@@ -225,57 +174,6 @@ function FileListRow({ file, disabled, onRemove }: FileListRowProps) {
       >
         <X className="h-3.5 w-3.5" />
       </button>
-    </div>
-  );
-}
-
-interface UsageStatsProps {
-  usage: NonNullable<VisionExtractResult["usage"]>;
-}
-
-function UsageStats({ usage }: UsageStatsProps) {
-  const stats: Array<{
-    label: string;
-    value: string;
-    mono?: boolean;
-    bold?: boolean;
-  }> = [];
-  if (usage.total_tokens != null) {
-    stats.push({
-      label: "Tokens",
-      value: usage.total_tokens.toLocaleString(),
-      bold: true,
-    });
-  }
-  if (usage.input_tokens != null) {
-    stats.push({ label: "Input", value: usage.input_tokens.toLocaleString() });
-  }
-  if (usage.output_tokens != null) {
-    stats.push({
-      label: "Output",
-      value: usage.output_tokens.toLocaleString(),
-    });
-  }
-  if (usage.cost_usd != null) {
-    stats.push({
-      label: "Cost",
-      value: `$${usage.cost_usd.toFixed(4)}`,
-      bold: true,
-    });
-  }
-
-  if (stats.length === 0) return null;
-
-  return (
-    <div className="bg-muted/40 mb-4 grid grid-cols-2 gap-2 rounded-md border p-3 text-xs sm:grid-cols-4">
-      {stats.map((stat) => (
-        <div key={stat.label}>
-          <p className="text-muted-foreground">{stat.label}</p>
-          <p className={`font-mono ${stat.bold ? "font-medium" : ""}`}>
-            {stat.value}
-          </p>
-        </div>
-      ))}
     </div>
   );
 }
@@ -378,14 +276,10 @@ function SchemaPreview({ schema }: SchemaPreviewProps) {
 export default function VisionExtractorPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [userRequirements, setUserRequirements] = useState("");
-  const [provider, setProvider] = useState<Provider>("openai");
-  const [model, setModel] = useState(DEFAULT_MODELS.openai);
-  const [modelChoices, setModelChoices] = useState(PROVIDER_MODELS);
-  const [reasoningEffort, setReasoningEffort] =
-    useState<ReasoningEffort>("medium");
-  const [mergeTable, setMergeTable] = useState(false);
-  const [additionalInstructions, setAdditionalInstructions] = useState("");
-  const [includeVerification, setIncludeVerification] = useState(false);
+  const [settings, setSettings] = useState(DEFAULT_VISION_SETTINGS);
+  const catalogue = useVisionModels();
+  const model = resolveVisionModel(settings, catalogue);
+  const { includeVerification } = settings;
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingExample, setIsLoadingExample] = useState(false);
   const [isGeneratingSchema, setIsGeneratingSchema] = useState(false);
@@ -399,11 +293,6 @@ export default function VisionExtractorPage() {
   function handleRequirementsChange(value: string): void {
     setUserRequirements(value);
     setGeneratedSchema(null);
-  }
-
-  function handleProviderChange(value: Provider): void {
-    setProvider(value);
-    setModel(modelChoices[value][0] ?? DEFAULT_MODELS[value]);
   }
 
   async function handlePreviewSchema(): Promise<void> {
@@ -437,35 +326,7 @@ export default function VisionExtractorPage() {
   }
 
   useEffect(() => {
-    let active = true;
-    void apiFetch("/api/extract-vision/models")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((catalogue) => {
-        if (!active || !catalogue?.models) return;
-        const providers: Provider[] = ["openai", "claude", "google"];
-        if (
-          !providers.every(
-            (name) =>
-              Array.isArray(catalogue.models[name]) &&
-              catalogue.models[name].length > 0 &&
-              catalogue.models[name].every(
-                (value: unknown) => typeof value === "string",
-              ),
-          )
-        )
-          return;
-        setModelChoices(catalogue.models);
-        if (typeof catalogue.default === "string") {
-          setModel((current) =>
-            current === DEFAULT_MODELS.openai ? catalogue.default : current,
-          );
-        }
-      })
-      .catch(() => {
-        /* Keep bundled suggestions if the catalogue is unavailable. */
-      });
     return () => {
-      active = false;
       abortControllerRef.current?.abort();
     };
   }, []);
@@ -563,15 +424,7 @@ export default function VisionExtractorPage() {
       }
       formData.append("user_requirements", userRequirements);
       formData.append("schema_id", generatedSchema.schema_id);
-      formData.append("model_provider", provider);
-      formData.append("model", model);
-      formData.append("reasoning_effort", reasoningEffort);
-      formData.append("merge_table", mergeTable ? "true" : "false");
-      formData.append("additional_instructions", additionalInstructions);
-      formData.append(
-        "include_verification",
-        includeVerification ? "true" : "false",
-      );
+      appendVisionSettings(formData, settings, model);
 
       const response = await apiFetch("/api/extract-vision", {
         method: "POST",
@@ -588,7 +441,7 @@ export default function VisionExtractorPage() {
       setResult(data);
 
       posthog.capture("vision_extracted", {
-        provider,
+        provider: settings.provider,
         documents_processed: data.documents_processed,
         include_verification: includeVerification,
         total_tokens: data.usage?.total_tokens ?? 0,
@@ -765,129 +618,12 @@ export default function VisionExtractorPage() {
                 </p>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="provider">Model Provider</Label>
-                    <HelpTooltip text="Selects the service used for the document extraction call. OpenAI / Azure automatically uses Azure when Azure credentials are configured; Claude and Google use their configured provider credentials." />
-                  </div>
-                  <Select
-                    value={provider}
-                    onValueChange={(v) => handleProviderChange(v as Provider)}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger id="provider">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="openai">OpenAI / Azure</SelectItem>
-                      <SelectItem value="claude">Claude</SelectItem>
-                      <SelectItem value="google">Google</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="model">Extraction Model</Label>
-                    <HelpTooltip text="Selects the model or deployment used to read the uploaded documents. Available choices are limited to the selected provider." />
-                  </div>
-                  <Select
-                    value={model}
-                    onValueChange={setModel}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger id="model">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {modelChoices[provider].map((modelName) => (
-                        <SelectItem key={modelName} value={modelName}>
-                          {modelName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="reasoning-effort">Reasoning Effort</Label>
-                    <HelpTooltip text="Controls how much reasoning the model uses. Higher effort can improve difficult cross-document matching but usually increases latency and token usage." />
-                  </div>
-                  <Select
-                    value={reasoningEffort}
-                    onValueChange={(value) =>
-                      setReasoningEffort(value as ReasoningEffort)
-                    }
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger id="reasoning-effort">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="merge-table">Merge Split Tables</Label>
-                    <HelpTooltip text="Adds an instruction to combine a table that continues across pages into one logical table." />
-                  </div>
-                  <div className="flex h-9 items-center gap-3 rounded-md border px-3">
-                    <Switch
-                      id="merge-table"
-                      checked={mergeTable}
-                      onCheckedChange={setMergeTable}
-                      disabled={isLoading}
-                    />
-                    <span className="text-muted-foreground text-sm">
-                      {mergeTable ? "Merge tables" : "Off"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-2 sm:col-span-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="additional-instructions">
-                      Additional Instructions
-                    </Label>
-                    <HelpTooltip text="Appended to the extraction prompt to guide how values are read. To add or remove output fields, edit the extraction task and generate a new schema instead." />
-                  </div>
-                  <Textarea
-                    id="additional-instructions"
-                    value={additionalInstructions}
-                    onChange={(event) =>
-                      setAdditionalInstructions(event.target.value)
-                    }
-                    placeholder="Optional guidance, e.g. prefer the value in the final totals table."
-                    disabled={isLoading}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-2 sm:col-span-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="verification">Per-field Verification</Label>
-                    <HelpTooltip text="Adds a confidence score and explanation for each scalar field. This improves reviewability but uses more output tokens and may take longer." />
-                  </div>
-                  <div className="flex h-9 items-center gap-3 rounded-md border px-3">
-                    <Switch
-                      id="verification"
-                      checked={includeVerification}
-                      onCheckedChange={setIncludeVerification}
-                      disabled={isLoading}
-                    />
-                    <span className="text-muted-foreground text-sm">
-                      {includeVerification ? "Show confidence" : "Off"}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <VisionSettingsFields
+                settings={settings}
+                catalogue={catalogue}
+                disabled={isLoading}
+                onChange={setSettings}
+              />
 
               <div className="flex items-center justify-center gap-1.5">
                 <span className="text-muted-foreground text-xs">

@@ -133,3 +133,40 @@ def test_saved_requirements_include_current_format_version(tmp_path: Path):
     assert json.loads(path.read_text(encoding="utf-8"))["schema_format_version"] == (
         SCHEMA_FORMAT_VERSION
     )
+
+
+def test_descriptions_with_double_quotes_survive_saving_and_loading(tmp_path: Path):
+    """A prompt such as 'e.g., "8.600 LB"' must not break the saved schema module."""
+    from pydantic import Field, create_model
+
+    model = create_model(
+        "quoted_extraction",
+        quantity=(
+            str | None,
+            Field(default=None, description='Quantity as text, e.g., "8.600 LB".'),
+        ),
+        note=(str | None, Field(default=None, description="A plain description")),
+    )
+    schema_path = tmp_path / "schema.py"
+
+    save_schema_to_python(model, schema_path)
+    loaded = load_saved_schema(schema_path, model.__name__)
+
+    assert loaded.model_fields["quantity"].description == 'Quantity as text, e.g., "8.600 LB".'
+    assert loaded.model_fields["note"].description == "A plain description"
+
+
+def test_a_saved_prompt_matches_the_same_prompt_sent_with_crlf_line_breaks(tmp_path: Path):
+    # Browsers send multi-line form text with CRLF; the saved schema must still be found.
+    _, requirements = _decimal_model()
+    path = tmp_path / "requirements.json"
+    prompt = "Extract:\n- Date\n- Place"
+
+    save_requirements(requirements, "Decimal", path, user_requirements=prompt.replace("\n", "\r\n"))
+
+    assert load_saved_requirements(path, expected_user_requirements=prompt) is not None
+    assert (
+        load_saved_requirements(path, expected_user_requirements=prompt.replace("\n", "\r\n"))
+        is not None
+    )
+    assert load_saved_requirements(path, expected_user_requirements="Other") is None

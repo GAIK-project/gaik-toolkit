@@ -34,6 +34,11 @@ _PATHS = (
     "/classify",
     "/parse",
     "/postgres-agent/ask",
+    # Incident reporting: the schema, then text, scanned-form and audio extraction.
+    "/pipeline/schema",
+    "/pipeline/text/stream",
+    "/pipeline/document/stream",
+    "/pipeline/audio/stream",
     "/model-settings/test",
 )
 

@@ -78,12 +78,14 @@ def main():
         workflow.vector_store._documents,
         workflow.vector_store._embeddings,
     ):
-        chunks_data.append({
-            "page_content": doc.page_content,
-            # The index is served publicly; keep the file name, not the local path.
-            "metadata": {**doc.metadata, "source": EXAMPLE_PDF.name},
-            "embedding": embedding,
-        })
+        chunks_data.append(
+            {
+                "page_content": doc.page_content,
+                # The index is served publicly; keep the file name, not the local path.
+                "metadata": {**doc.metadata, "source": EXAMPLE_PDF.name},
+                "embedding": embedding,
+            }
+        )
 
     export_data = {
         "metadata": {

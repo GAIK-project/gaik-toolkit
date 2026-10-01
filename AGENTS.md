@@ -2,6 +2,18 @@
 
 This repo is public: never commit machine-local paths, usernames or secret-store locations.
 
+## software components and modules (ask first)
+
+Do not change the toolkit's software components or modules (`implementation_layer/src/gaik/`,
+for example the schema generator, extractor, transcriber or LLM layer) until the user
+has approved or permitted that change. Ask first and wait for the answer, whether the
+change is a fix, a refactor, a test-driven tweak or a workaround for something seen in a
+demo. Never commit such a change without asking either.
+
+If a demo problem seems to come from a component, describe the cause and propose the
+change, and offer a fix in the demo code (`toolkit_demo_app/`) that leaves the component
+as it is. Approval for one change does not cover later ones.
+
 ## formatting
 
 CI fails on `ruff format --check implementation_layer/` (ruff 0.14.10). Run

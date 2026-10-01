@@ -58,7 +58,13 @@ def test_unconfigured_server_has_actionable_error():
 
 
 @pytest.mark.parametrize(
-    "model,effort", [("gpt-6-luna", "none"), ("gpt-6-sol", "none"), ("gpt-6-astra", "low")]
+    "model,effort",
+    [
+        ("gpt-6-luna", "none"),
+        ("gpt-6-sol", "none"),
+        ("gpt-6-astra", "low"),
+        ("gpt-6.1-sol", "medium"),
+    ],
 )
 def test_gpt6_sampling_is_valid_for_chat_and_schema(model, effort):
     for schema in (False, True):
@@ -123,3 +129,19 @@ async def test_multimodal_parser_reads_reasoning_effort_from_its_config(
     assert result["text_content"] == "parsed"
     assert "reasoning_effort" not in captured
     assert captured["api_config"].get("reasoning_effort") == effort
+
+
+def test_incident_reporting_endpoints_accept_per_tab_model_settings():
+    from api.utils.model_settings import supports_model_settings
+
+    for path in (
+        "/pipeline/schema",
+        "/pipeline/text/stream",
+        "/pipeline/document/stream",
+        "/pipeline/audio/stream",
+    ):
+        assert supports_model_settings(path, "POST")
+    # The other demos that share the pipeline router keep the server's model.
+    assert not supports_model_settings("/pipeline/audio", "POST")
+    assert not supports_model_settings("/pipeline/pdf/abc", "POST")
+    assert not supports_model_settings("/pipeline/schema", "GET")

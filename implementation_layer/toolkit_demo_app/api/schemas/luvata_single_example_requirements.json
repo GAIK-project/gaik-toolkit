@@ -1,0 +1,154 @@
+{
+  "schema_format_version": 2,
+  "model_name": "purchase_order_header_fields_Extraction",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "purchase_order_header_fields",
+      "fields": [
+        {
+          "field_name": "purchase_order_date",
+          "field_type": "date",
+          "description": "Purchase order date (DD/MM/YYYY format when unambiguous)",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": "%d/%m/%Y"
+        },
+        {
+          "field_name": "delivery_date",
+          "field_type": "date",
+          "description": "Delivery date (DD/MM/YYYY format when unambiguous)",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": "%d/%m/%Y"
+        },
+        {
+          "field_name": "purchase_order_number",
+          "field_type": "str",
+          "description": "Purchase order number (separated by a dash after every 4 digits)",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "supplier_number",
+          "field_type": "str",
+          "description": "Supplier number",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "shipping_address",
+          "field_type": "str",
+          "description": "Shipping address (Format: company name, street number, postal code, city, country)",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "line_items",
+        "container_description": "Repeated structured line item records in the purchase order.",
+        "requirements": {
+          "use_case_name": "purchase_order_line_item",
+          "fields": [
+            {
+              "field_name": "item_number",
+              "field_type": "str",
+              "description": "Item number (e.g., 010, 020). Preserve leading zeros if present.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "description",
+              "field_type": "str",
+              "description": "Description (the item's name, not its technical specification).",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "quantity",
+              "field_type": "str",
+              "description": "Quantity as a text string including the unit, e.g., \"8.600 LB\".",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "price_per_currency",
+              "field_type": "decimal",
+              "description": "Price per currency.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "material_number",
+              "field_type": "str",
+              "description": "Material number.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "user_requirements": "Extract purchase order data.\n\nThe output will include the following top-level fields:\n- Purchase order date (DD/MM/YYYY format when unambiguous)\n- Delivery date (DD/MM/YYYY format when unambiguous)\n- Purchase order number (separated by a dash after every 4 digits)\n- Supplier number\n- Shipping address (Format: company name, street number, postal code, city, country)\n\nAlso, the output will include the data for each line item.\n\nFor each line item, extract these scalar fields:\n- Item number (e.g., 010, 020)\n- Description (the item's name, not its technical specification)\n- Quantity (text string including the unit, e.g., \"8.600 LB\")\n- Price per currency\n- Material number"
+}

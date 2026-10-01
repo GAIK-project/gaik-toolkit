@@ -31,6 +31,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
+import { ACCESS, CAPTURE, SYNTHESIS } from "@/lib/knowledge-processes";
 import { cn } from "@/lib/utils";
 import {
   AudioWaveform,
@@ -92,11 +93,6 @@ interface NavGroup {
   icon: LucideIcon;
   items: NavItem[];
 }
-
-// The three knowledge processes the toolkit is organised around.
-const CAPTURE = "Knowledge capture";
-const ACCESS = "Knowledge access";
-const SYNTHESIS = "Knowledge synthesis";
 
 const navGroups: NavGroup[] = [
   {
@@ -223,7 +219,7 @@ const navGroups: NavGroup[] = [
         section: SYNTHESIS,
       },
       {
-        label: "Knowledge Synthesis",
+        label: "Knowledge Synthesizer",
         href: "/knowledge-synthesis",
         icon: NotebookPen,
         section: SYNTHESIS,

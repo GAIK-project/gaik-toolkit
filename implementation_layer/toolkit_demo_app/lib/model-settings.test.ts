@@ -24,6 +24,11 @@ test("settings only apply to supported POST operations", () => {
   expect(supportsModelSettings("/api/wizard/message/abc")).toBe(true);
   expect(supportsModelSettings("/api/wizard/start")).toBe(false);
   expect(supportsModelSettings("/api/extract", "GET")).toBe(false);
+  expect(supportsModelSettings("/api/pipeline/text/stream")).toBe(true);
+  expect(supportsModelSettings("/api/pipeline/schema")).toBe(true);
+  // Other demos share /api/pipeline but are not part of this.
+  expect(supportsModelSettings("/api/pipeline/audio")).toBe(false);
+  expect(supportsModelSettings("/api/pipeline/pdf/abc")).toBe(false);
   expect(supportsModelSettings("/api/report-writer/run")).toBe(false);
 });
 

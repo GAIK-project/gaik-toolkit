@@ -1,0 +1,293 @@
+{
+  "schema_format_version": 2,
+  "model_name": "purchase_order_header_extraction_Extraction",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "purchase_order_header_extraction",
+      "fields": [
+        {
+          "field_name": "po_number",
+          "field_type": "str",
+          "description": "PO Number from the purchase order.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "customer",
+          "field_type": "str",
+          "description": "Customer from the PO: the company that issues the PO, not the individual buyer.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "order_date",
+          "field_type": "date",
+          "description": "Order Date from the PO (Format: DD/MM/YYYY).",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": "%d/%m/%Y"
+        },
+        {
+          "field_name": "buyer",
+          "field_type": "str",
+          "description": "Buyer from the PO.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "sales_person",
+          "field_type": "str",
+          "description": "Sales Person from the PO.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "shipping_address",
+          "field_type": "str",
+          "description": "Shipping Address from the PO.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "payment_terms",
+          "field_type": "str",
+          "description": "Payment Terms from the PO.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "shipping_cost",
+          "field_type": "decimal",
+          "description": "Shipping Cost from the PO: amount charged for shipping, number only.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "tax_rate",
+          "field_type": "float",
+          "description": "Tax Rate from the PO: percent, number only.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "po_items",
+        "container_description": "One entry per PO item, containing PO item fields plus BOM technical details matched by Material Number.",
+        "requirements": {
+          "use_case_name": "po_item_record",
+          "fields": [
+            {
+              "field_name": "material_number",
+              "field_type": "str",
+              "description": "Material Number from the PO item; use this value to match the BOM where the same Material Number is represented as 'ID'.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "quantity",
+              "field_type": "int",
+              "description": "Quantity from the PO item.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "description",
+              "field_type": "str",
+              "description": "Description from the PO item.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "delivery_date",
+              "field_type": "date",
+              "description": "Delivery Date from the PO item (Format: DD/MM/YYYY).",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": "%d/%m/%Y"
+            },
+            {
+              "field_name": "type_part_designation",
+              "field_type": "str",
+              "description": "Type/Part Designation from the matching BOM.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "dimensions",
+              "field_type": "str",
+              "description": "Dimensions from the matching BOM, exactly as stated, e.g., 50 x 50 x 5 mm x 6000 mm.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "material_grade",
+              "field_type": "str",
+              "description": "Material Grade from the matching BOM.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "additional_fees",
+        "container_description": "One entry per applicable fee from the matching BOM's Additional Services & Fees table where Applies is Yes, extracting Material Number, Fee name, Charge basis, and Quantity.",
+        "requirements": {
+          "use_case_name": "additional_fees_record",
+          "fields": [
+            {
+              "field_name": "material_number",
+              "field_type": "str",
+              "description": "Material Number for the PO item and matching BOM to which this additional fee entry applies.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "fee_name",
+              "field_type": "str",
+              "description": "Fee name as written in the 'Additional Services & Fees' table, e.g., Cutting Fee.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "charge_basis",
+              "field_type": "str",
+              "description": "Charge basis as written in the table, e.g., per cut, per pipe, per crate.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "quantity",
+              "field_type": "int",
+              "description": "Quantity for the additional fee as number only, e.g., 200 for '200 cuts'.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "user_requirements": "The task is to extract key fields from customer documents (Purchase Order (PO) and Bill of\nMaterial (BOM)), and align them so that each PO item is enriched with the correct technical\ndetails and the additional fees that apply to it. Begin with the customer's purchase order,\nwhich may include multiple items. Each item is linked to its BOM via a Material Number.\n\nFor every item in the PO, extract the Material Number along with the basic item details:\nQuantity, Description, and Delivery Date (Format: DD/MM/YYYY). Use the item's Material Number\nfrom the PO to find the BOM having the same Material Number (represented as 'ID'). From the\nmatching BOM, extract the part's 'Type/Part Designation', its 'Dimensions' (exactly as stated,\ne.g., 50 x 50 x 5 mm x 6000 mm) and its 'Material Grade'.\n\nThe final output should contain as many lines as the number of items in the PO. Each line\nshould have:\n- Material Number\n- Quantity, Description\n- Delivery Date (from PO)\n- Type/Part Designation,\n- Dimensions,\n- Material Grade (from BOM).\n\nAlso, extract the additional fees from the 'Additional Services & Fees' table of each matching\nBOM. Create one entry for every fee whose 'Applies' column is Yes, and skip the fees marked No.\nFor each fee entry, extract: Material Number, Fee name (as written in the table, e.g.,\nCutting Fee), Charge basis (e.g., per cut, per pipe, per crate), and Quantity (number only,\ne.g., 200 for '200 cuts').\n\nAlso, extract the following header information from the PO:\nPO Number, Customer (the company that issues the PO, not the individual buyer), Order Date (Format: DD/MM/YYYY), Buyer, Sales Person, Shipping Address, Payment Terms, Shipping Cost (amount charged for shipping, number only), and Tax Rate (percent, number only)."
+}

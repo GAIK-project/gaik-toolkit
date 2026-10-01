@@ -28,7 +28,7 @@ def normalize_chat_kwargs(
     if "reasoning_effort" not in result and config.get("reasoning_effort") is not None:
         result["reasoning_effort"] = config["reasoning_effort"]
     family = str(config.get("model_family") or model).rsplit("/", 1)[-1].lower()
-    is_gpt6 = family.startswith("gpt-6-")
+    is_gpt6 = family.startswith(("gpt-6-", "gpt-6."))
     is_reasoning_family = is_gpt6 or family.startswith("gpt-5.6-")
     is_openai_reasoning = _is_openai_api(config) and family.startswith(_REASONING_PREFIXES)
     if "max_tokens" in result and (is_reasoning_family or is_openai_reasoning):
@@ -39,7 +39,8 @@ def normalize_chat_kwargs(
         return result
     effort = result.get("reasoning_effort")
     allowed = {"low", "medium", "high", "xhigh", "max"}
-    if not family.startswith("gpt-6-astra"):
+    # Astra and the gpt-6.x generation always reason: they reject "none".
+    if not family.startswith(("gpt-6-astra", "gpt-6.")):
         allowed.add("none")
     if is_gpt6 and effort is not None and effort not in allowed:
         raise ValueError(f"{family} reasoning_effort must be one of {sorted(allowed)}")

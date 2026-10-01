@@ -19,6 +19,11 @@ const SUPPORTED_PATHS = [
   "/api/classify",
   "/api/parse",
   "/api/postgres-agent/ask",
+  // Incident reporting: the schema, then text, scanned-form and audio extraction.
+  "/api/pipeline/schema",
+  "/api/pipeline/text/stream",
+  "/api/pipeline/document/stream",
+  "/api/pipeline/audio/stream",
   "/api/model-settings/test",
 ];
 
@@ -40,6 +45,8 @@ export function pageUsesModelSettings(path: string): boolean {
     "/classifier",
     "/parser",
     "/postgres-agent",
+    "/incident-report",
+    "/diary",
     "/solution-wizard",
   ].includes(path);
 }

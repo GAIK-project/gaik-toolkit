@@ -2,7 +2,10 @@ import pytest
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 
-@pytest.mark.parametrize("model", ["gpt-6-luna", "gpt-6-sol", "azure/gpt-6-astra", "gpt-5.6-terra"])
+@pytest.mark.parametrize(
+    "model",
+    ["gpt-6-luna", "gpt-6-sol", "azure/gpt-6-astra", "gpt-5.6-terra", "gpt-6.1-sol"],
+)
 @pytest.mark.parametrize("effort", [None, "low", "medium", "high", "xhigh", "max"])
 def test_reasoning_omits_incompatible_sampling_and_preserves_effort(model, effort):
     options = {"temperature": 0, "top_p": 1, "max_tokens": 128}
@@ -21,10 +24,11 @@ def test_nonreasoning_sol_keeps_sampling():
     assert normalize_chat_kwargs("gpt-6-sol", options) == options
 
 
+@pytest.mark.parametrize("model", ["gpt-6-astra", "gpt-6.1-sol"])
 @pytest.mark.parametrize("effort", ["none", "minimal", "typo"])
-def test_invalid_astra_effort_fails_before_network(effort):
+def test_invalid_always_reasoning_effort_fails_before_network(model, effort):
     with pytest.raises(ValueError, match="reasoning_effort"):
-        normalize_chat_kwargs("gpt-6-astra", {"reasoning_effort": effort})
+        normalize_chat_kwargs(model, {"reasoning_effort": effort})
 
 
 def test_deployment_alias_uses_explicit_family_and_effort():

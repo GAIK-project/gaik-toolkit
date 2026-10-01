@@ -21,7 +21,7 @@ export const TOUR_STEPS: DriveStep[] = [
     popover: {
       title: "Real-world use cases",
       description:
-        "End-to-end demos like incident reporting, construction diaries, and video transcription. Click any card to try it.",
+        "End-to-end demos like purchase order processing, construction diaries, and video transcription. Click any card to try it.",
       side: "top",
       align: "start",
     },

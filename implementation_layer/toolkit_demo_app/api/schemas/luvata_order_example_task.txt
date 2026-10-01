@@ -1,0 +1,28 @@
+The task is to extract key fields from customer documents (Purchase Order (PO) and Bill of
+Material (BOM)), and align them so that each PO item is enriched with the correct technical
+details and the additional fees that apply to it. Begin with the customer's purchase order,
+which may include multiple items. Each item is linked to its BOM via a Material Number.
+
+For every item in the PO, extract the Material Number along with the basic item details:
+Quantity, Description, and Delivery Date (Format: DD/MM/YYYY). Use the item's Material Number
+from the PO to find the BOM having the same Material Number (represented as 'ID'). From the
+matching BOM, extract the part's 'Type/Part Designation', its 'Dimensions' (exactly as stated,
+e.g., 50 x 50 x 5 mm x 6000 mm) and its 'Material Grade'.
+
+The final output should contain as many lines as the number of items in the PO. Each line
+should have:
+- Material Number
+- Quantity, Description
+- Delivery Date (from PO)
+- Type/Part Designation,
+- Dimensions,
+- Material Grade (from BOM).
+
+Also, extract the additional fees from the 'Additional Services & Fees' table of each matching
+BOM. Create one entry for every fee whose 'Applies' column is Yes, and skip the fees marked No.
+For each fee entry, extract: Material Number, Fee name (as written in the table, e.g.,
+Cutting Fee), Charge basis (e.g., per cut, per pipe, per crate), and Quantity (number only,
+e.g., 200 for '200 cuts').
+
+Also, extract the following header information from the PO:
+PO Number, Customer (the company that issues the PO, not the individual buyer), Order Date (Format: DD/MM/YYYY), Buyer, Sales Person, Shipping Address, Payment Terms, Shipping Cost (amount charged for shipping, number only), and Tax Rate (percent, number only).

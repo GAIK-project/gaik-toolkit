@@ -63,9 +63,7 @@ ReasoningEffort = Literal["low", "medium", "high"]
 
 _OPENAI_MODELS = tuple(
     value.strip()
-    for value in os.getenv(
-        "DEMO_OPENAI_MODELS", "gpt-6-luna,gpt-6-sol,gpt-6-astra,gpt-5.6-terra"
-    ).split(",")
+    for value in os.getenv("DEMO_OPENAI_MODELS", "gpt-6-luna,gpt-6-sol,gpt-5.6-terra").split(",")
     if value.strip()
 )
 PROVIDER_MODELS: dict[str, tuple[str, ...]] = {

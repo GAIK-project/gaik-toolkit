@@ -26,6 +26,16 @@ try:
         validate_vision_page_limit,
         wrap_schema_with_numeric_normalizers,
     )
+    from utils.field_names import (
+        field_name_mapping,
+        rename_described_fields,
+        rename_keys,
+    )
+    from utils.session_schemas import (
+        find_session_schema,
+        shorten_schema_name,
+        store_session_schema,
+    )
 except ImportError:
     from api.utils import (
         AUDIO_TOO_LARGE_DETAIL,
@@ -41,6 +51,16 @@ except ImportError:
         validate_file_size,
         validate_vision_page_limit,
         wrap_schema_with_numeric_normalizers,
+    )
+    from api.utils.field_names import (
+        field_name_mapping,
+        rename_described_fields,
+        rename_keys,
+    )
+    from api.utils.session_schemas import (
+        find_session_schema,
+        shorten_schema_name,
+        store_session_schema,
     )
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -115,9 +135,17 @@ def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config
 
 
 def _get_or_create_schema(
-    config, user_requirements: str, schema_key: str | None, regenerate_schema: bool
+    config,
+    user_requirements: str,
+    schema_key: str | None,
+    regenerate_schema: bool,
+    schema_id: str | None = None,
 ):
     from gaik.software_components.extractor.schema import SchemaGenerator
+
+    if schema_id:
+        entry = find_session_schema(schema_id, user_requirements)
+        return entry.schema, entry.requirements, False
 
     loaded = None
     if schema_key:
@@ -441,6 +469,10 @@ async def document_pipeline(
             user_requirements=user_requirements,
             documents=[parsed_content],
         )
+        # The generator drops letters such as ä and ö from field names: put them back.
+        extracted_data = rename_keys(
+            extracted_data, field_name_mapping(extraction_model, user_requirements)
+        )
 
         steps[2].status = "completed"
         steps[2].message = f"Extracted {len(extracted_data)} items"
@@ -557,6 +589,10 @@ async def text_pipeline(
             user_requirements=user_requirements,
             documents=[text],
         )
+        # The generator drops letters such as ä and ö from field names: put them back.
+        extracted_data = rename_keys(
+            extracted_data, field_name_mapping(extraction_model, user_requirements)
+        )
 
         steps[1].status = "completed"
         steps[1].message = f"Extracted {len(extracted_data)} items"
@@ -624,6 +660,7 @@ async def audio_pipeline_stream(
     compress_audio: bool = Form(True),
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
+    schema_id: str | None = Form(None),
 ):
     """
     Run the audio pipeline with SSE streaming progress updates.
@@ -727,6 +764,7 @@ async def audio_pipeline_stream(
                 user_requirements=user_requirements,
                 schema_key=schema_key,
                 regenerate_schema=regenerate_schema,
+                schema_id=schema_id,
             )
 
             steps[1]["status"] = "completed"
@@ -749,6 +787,10 @@ async def audio_pipeline_stream(
                 requirements=requirements,
                 user_requirements=user_requirements,
                 documents=documents,
+            )
+            # The generator drops letters such as ä and ö from field names: put them back.
+            extracted_data = rename_keys(
+                extracted_data, field_name_mapping(extraction_model, user_requirements)
             )
 
             steps[2]["status"] = "completed"
@@ -836,6 +878,7 @@ async def text_pipeline_stream(
     pdf_title: str = Form("Extracted Data Report"),
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
+    schema_id: str | None = Form(None),
 ):
     """
     Run the text extraction pipeline with SSE streaming progress updates.
@@ -873,6 +916,7 @@ async def text_pipeline_stream(
                 user_requirements=user_requirements,
                 schema_key=schema_key,
                 regenerate_schema=regenerate_schema,
+                schema_id=schema_id,
             )
 
             steps[0]["status"] = "completed"
@@ -893,6 +937,10 @@ async def text_pipeline_stream(
                 requirements=requirements,
                 user_requirements=user_requirements,
                 documents=[text],
+            )
+            # The generator drops letters such as ä and ö from field names: put them back.
+            extracted_data = rename_keys(
+                extracted_data, field_name_mapping(extraction_model, user_requirements)
             )
 
             steps[1]["status"] = "completed"
@@ -976,6 +1024,7 @@ async def document_pipeline_stream(
     pdf_title: str = Form("Extracted Data Report"),
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
+    schema_id: str | None = Form(None),
 ):
     """
     Run the document pipeline with SSE streaming progress updates.
@@ -1067,6 +1116,7 @@ async def document_pipeline_stream(
                 user_requirements=user_requirements,
                 schema_key=schema_key,
                 regenerate_schema=regenerate_schema,
+                schema_id=schema_id,
             )
 
             steps[1]["status"] = "completed"
@@ -1088,6 +1138,10 @@ async def document_pipeline_stream(
                 requirements=requirements,
                 user_requirements=user_requirements,
                 documents=[parsed_content],
+            )
+            # The generator drops letters such as ä and ö from field names: put them back.
+            extracted_data = rename_keys(
+                extracted_data, field_name_mapping(extraction_model, user_requirements)
             )
 
             steps[2]["status"] = "completed"
@@ -1164,9 +1218,58 @@ async def document_pipeline_stream(
     )
 
 
+MAX_SCHEMA_PROMPT_CHARS = 4000
+
+
+@router.post("/schema")
+async def generate_session_schema(user_requirements: str = Form(...)):
+    """Generate a schema for this session from a prompt, to be reused by the stream endpoints.
+
+    The schema lives in memory only and is not saved.
+    """
+    prompt = user_requirements.strip()
+    if len(prompt) < 10:
+        raise HTTPException(400, "Write what to extract first.")
+    if len(prompt) > MAX_SCHEMA_PROMPT_CHARS:
+        raise HTTPException(400, f"The prompt is limited to {MAX_SCHEMA_PROMPT_CHARS} characters.")
+
+    try:
+        from gaik.software_components.extractor.schema import SchemaGenerator
+    except ImportError as e:
+        raise HTTPException(503, f"Required components not installed: {e}") from e
+
+    try:
+        from routers.luvata_order import describe_schema
+    except ImportError:
+        from api.routers.luvata_order import describe_schema
+
+    config = get_api_config()
+
+    def generate():
+        generator = SchemaGenerator(
+            config=config, model=config["model"], **get_model_options(config)
+        )
+        schema = generator.generate_schema(prompt)
+        return schema, generator.item_requirements
+
+    try:
+        schema, requirements = await asyncio.to_thread(generate)
+    except Exception as e:
+        logger.exception("Schema generation failed")
+        raise HTTPException(502, "The schema could not be generated. Try again.") from e
+
+    schema = shorten_schema_name(wrap_schema_with_numeric_normalizers(schema))
+    return {
+        "schema_id": store_session_schema(prompt, schema, requirements),
+        "fields": rename_described_fields(
+            describe_schema(schema), field_name_mapping(schema, prompt)
+        ),
+    }
+
+
 @router.get("/pdf/{job_id}")
-async def download_pdf(job_id: str):
-    """Download a generated PDF by job ID."""
+async def download_pdf(job_id: str, inline: bool = False):
+    """Download a generated PDF by job ID, or show it in the page with ?inline=true."""
     if job_id not in PDF_STORAGE:
         raise HTTPException(status_code=404, detail="PDF not found")
 
@@ -1179,4 +1282,5 @@ async def download_pdf(job_id: str):
         path=pdf_path,
         media_type="application/pdf",
         filename=f"extracted_data_{job_id[:8]}.pdf",
+        content_disposition_type="inline" if inline else "attachment",
     )
