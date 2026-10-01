@@ -155,3 +155,42 @@ async def test_extract_passes_reviewed_schema_and_all_options(monkeypatch) -> No
     assert captured["extract"]["requirements"] is expected_requirements
     assert "schema_dir" not in captured["extract"]
     assert all(not Path(path).exists() for path in captured["extract"]["file_paths"])
+
+
+def test_example_schema_comes_with_a_field_table_and_its_real_structure() -> None:
+    task, schema, requirements = route._load_example_schema()
+    response = route._schema_response(
+        schema, requirements, route.EXAMPLE_SCHEMA_ID, "example", task
+    )
+
+    assert response.structure_type == "parent_with_nested_list"
+    items = next(f for f in response.field_table if f["type"] == "list of records")
+    assert {child["name"] for child in items["children"]} >= {"material_number", "quantity"}
+
+
+@pytest.mark.asyncio
+async def test_vision_models_default_to_the_servers_model(monkeypatch) -> None:
+    monkeypatch.setattr(route, "get_api_config", lambda: {"model": "server-model-x"})
+
+    catalogue = await route.model_catalogue()
+
+    assert catalogue["default"] == "server-model-x"
+    assert catalogue["models"]["openai"][0] == "server-model-x"
+    assert catalogue["models"]["azure"][0] == "server-model-x"
+    assert "server-model-x" not in catalogue["models"]["claude"]
+    assert route._provider_settings("openai", "server-model-x")[0] == "openai"
+
+
+def test_schema_response_carries_the_requirements_json() -> None:
+    import json
+
+    task, schema, requirements = route._load_example_schema()
+    response = route._schema_response(
+        schema, requirements, route.EXAMPLE_SCHEMA_ID, "example", task
+    )
+    payload = json.loads(response.requirements_json)
+
+    assert payload["model_name"] == schema.__name__
+    assert payload["requirements_type"] == response.structure_type
+    assert payload["user_requirements"] == task
+    assert "parent_requirements" in payload["requirements"]

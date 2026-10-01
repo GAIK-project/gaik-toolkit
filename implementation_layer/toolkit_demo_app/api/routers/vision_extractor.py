@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import tempfile
@@ -40,8 +41,12 @@ from pydantic import BaseModel
 
 try:
     from utils.model_settings import get_request_api_config, provider_error_detail
+    from utils.schema import SCHEMA_FORMAT_VERSION
+    from utils.schema_view import describe_fields, specs_by_name, structure_of
 except ImportError:
     from api.utils.model_settings import get_request_api_config, provider_error_detail
+    from api.utils.schema import SCHEMA_FORMAT_VERSION
+    from api.utils.schema_view import describe_fields, specs_by_name, structure_of
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -152,6 +157,10 @@ class GenerateSchemaResponse(BaseModel):
     schema_id: str
     schema_source: Literal["example", "temporary"]
     user_requirements: str
+    # The schema for people: every field with its plain type, rule and nested records.
+    field_table: list[dict] = []
+    # The requirements the schema was built from, as the file the demo would save.
+    requirements_json: str = ""
 
 
 class UsageMetadata(BaseModel):
@@ -190,8 +199,27 @@ def _usage_from(usage: Any) -> UsageMetadata | None:
     return UsageMetadata(**{name: getattr(usage, name, None) for name in _USAGE_FIELDS})
 
 
-def _structure_type(requirements: Any) -> str:
-    return getattr(requirements, "structure_type", "object")
+def _field_table(schema: type[BaseModel], requirements: Any) -> list[dict]:
+    dump = getattr(requirements, "model_dump", None)
+    specs = specs_by_name(dump(mode="json")) if dump else None
+    return describe_fields(schema, specs)
+
+
+def _requirements_json(
+    schema: type[BaseModel],
+    requirements: Any,
+    structure_type: str,
+    user_requirements: str,
+) -> str:
+    dump = getattr(requirements, "model_dump", None)
+    payload = {
+        "schema_format_version": SCHEMA_FORMAT_VERSION,
+        "model_name": schema.__name__,
+        "requirements_type": structure_type,
+        "user_requirements": _normalize_task_text(user_requirements),
+        "requirements": dump(mode="json") if dump else None,
+    }
+    return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
 def _schema_response(
@@ -201,14 +229,20 @@ def _schema_response(
     schema_source: Literal["example", "temporary"],
     user_requirements: str,
 ) -> GenerateSchemaResponse:
+    table = _field_table(schema, requirements)
+    structure_type = structure_of(table)
     return GenerateSchemaResponse(
         schema_code=schema_to_python_source(schema),
         schema_name=schema.__name__,
-        structure_type=_structure_type(requirements),
+        structure_type=structure_type,
         fields=_field_descriptors(schema),
         schema_id=schema_id,
         schema_source=schema_source,
         user_requirements=user_requirements,
+        field_table=table,
+        requirements_json=_requirements_json(
+            schema, requirements, structure_type, user_requirements
+        ),
     )
 
 
@@ -281,8 +315,26 @@ def _resolve_requested_schema(schema_id: str, user_requirements: str):
     return cached.schema, cached.requirements
 
 
+def _server_model() -> str:
+    """The model the server is configured with, the same one the other demos use."""
+    try:
+        return str(get_api_config()["model"])
+    except Exception:
+        return MODEL
+
+
+def _offered_models(provider: str) -> tuple[str, ...]:
+    """The models of a provider; the server's own model is always among the OpenAI/Azure ones."""
+    models = PROVIDER_MODELS[provider]
+    if provider in {"openai", "azure"}:
+        server_model = _server_model()
+        if server_model not in models:
+            return (server_model, *models)
+    return models
+
+
 def _provider_settings(provider: Provider, model: str) -> tuple[str, bool, bool]:
-    if model not in PROVIDER_MODELS[provider]:
+    if model not in _offered_models(provider):
         raise HTTPException(
             status_code=422,
             detail=f"Model '{model}' is not available for provider '{provider}'.",
@@ -353,7 +405,7 @@ async def extract_vision(
     user_requirements: str = Form(..., description="Natural-language extraction task"),
     schema_id: str = Form(..., description="Reviewed example or temporary schema ID"),
     model_provider: Provider = Form("openai"),
-    model: str = Form(MODEL),
+    model: str | None = Form(None, description="Defaults to the server's model"),
     reasoning_effort: ReasoningEffort = Form("medium"),
     merge_table: bool = Form(False),
     additional_instructions: str | None = Form(None),
@@ -369,6 +421,7 @@ async def extract_vision(
     extraction_model, requirements = _resolve_requested_schema(
         schema_id, normalized_user_requirements
     )
+    model = model or _server_model()
     request_config = get_request_api_config()
     if request_config is not None:
         model = request_config["model"]
@@ -455,6 +508,6 @@ async def extract_vision(
 @router.get("/models")
 async def model_catalogue():
     return {
-        "models": {name: list(values) for name, values in PROVIDER_MODELS.items()},
-        "default": MODEL,
+        "models": {name: list(_offered_models(name)) for name in PROVIDER_MODELS},
+        "default": _server_model(),
     }

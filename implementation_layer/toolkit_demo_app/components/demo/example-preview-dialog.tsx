@@ -20,8 +20,10 @@ interface ExamplePreviewDialogProps {
   /** Called directly without fetching file (for API-based flows like RAG) */
   onUseExampleDirect?: () => void | Promise<void>;
   disabled?: boolean;
+  /** The text of the button that opens the preview. */
+  label?: string;
   buttonVariant?: "ghost" | "outline" | "default";
-  buttonSize?: "sm" | "default" | "lg";
+  buttonSize?: "xs" | "sm" | "default" | "lg";
 }
 
 export function ExamplePreviewDialog({
@@ -30,6 +32,7 @@ export function ExamplePreviewDialog({
   onUseExample,
   onUseExampleDirect,
   disabled = false,
+  label = "Example",
   buttonVariant = "ghost",
   buttonSize = "sm",
 }: ExamplePreviewDialogProps) {
@@ -81,7 +84,7 @@ export function ExamplePreviewDialog({
         disabled={disabled}
       >
         <Eye className="mr-2 h-4 w-4" />
-        Example
+        {label}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

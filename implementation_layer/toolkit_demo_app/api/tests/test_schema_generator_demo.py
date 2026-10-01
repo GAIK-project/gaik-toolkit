@@ -81,6 +81,13 @@ async def test_generate_schema_returns_preview_and_downloadable_artifacts(monkey
     assert requirements_payload["user_requirements"] == "Extract invoice number."
     assert requirements_payload["requirements"] == requirements.model_dump(mode="json")
 
+    # The schema for people: a field table, and the schema as JSON Schema.
+    assert [field["name"] for field in response.fields] == ["invoice_number"]
+    assert response.fields[0]["type"] == "text"
+    assert json.loads(response.json_schema)["properties"]["invoice_number"]["description"] == (
+        "Invoice number"
+    )
+
     with zipfile.ZipFile(io.BytesIO(base64.b64decode(response.archive_base64))) as bundle:
         folder = schema.__name__
         assert set(bundle.namelist()) == {

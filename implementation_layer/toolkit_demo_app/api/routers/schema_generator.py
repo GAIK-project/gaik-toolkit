@@ -17,8 +17,10 @@ from pydantic import BaseModel, Field
 
 try:
     from utils.model_settings import provider_error_detail
+    from utils.schema_view import describe_fields, specs_by_name
 except ImportError:
     from api.utils.model_settings import provider_error_detail
+    from api.utils.schema_view import describe_fields, specs_by_name
 
 try:
     from utils import (
@@ -71,6 +73,9 @@ class GenerateSchemaResponse(BaseModel):
     model: str
     duration_s: float
     usage: UsageMetadata | None = None
+    # The schema for people: a field table, and the schema as JSON Schema.
+    fields: list[dict[str, Any]] = Field(default_factory=list)
+    json_schema: str = ""
 
 
 _USAGE_FIELDS = (
@@ -173,6 +178,9 @@ async def generate_schema(request: GenerateSchemaRequest) -> GenerateSchemaRespo
             model=generator.model,
             duration_s=getattr(generator, "last_duration_s", 0.0) or elapsed_s,
             usage=_usage_from(getattr(generator, "last_usage", None)),
+            fields=describe_fields(schema, specs_by_name(requirements_payload["requirements"])),
+            json_schema=json.dumps(schema.model_json_schema(), indent=2, ensure_ascii=False)
+            + chr(10),
         )
     except HTTPException:
         raise

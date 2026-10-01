@@ -7,6 +7,7 @@ try:
         load_schema,
         save_schema,
         schema_id_from_requirements,
+        schema_to_python_source,
         wrap_schema_with_numeric_normalizers,
     )
 except ImportError:
@@ -16,6 +17,7 @@ except ImportError:
         load_schema,
         save_schema,
         schema_id_from_requirements,
+        schema_to_python_source,
         wrap_schema_with_numeric_normalizers,
     )
 
@@ -28,8 +30,10 @@ from pydantic import BaseModel
 
 try:
     from utils.model_settings import provider_error_detail
+    from utils.schema_view import describe_fields, specs_by_name, structure_of
 except ImportError:
     from api.utils.model_settings import provider_error_detail
+    from api.utils.schema_view import describe_fields, specs_by_name, structure_of
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -37,49 +41,6 @@ logger = logging.getLogger(__name__)
 # In-memory cache for temporary/generated schemas.
 # Key: hash of user_requirements, Value: (schema_class, item_requirements)
 _schema_cache: dict[str, tuple[Any, Any]] = {}
-
-
-def _field_descriptors(requirements) -> list[dict]:
-    return [
-        {
-            "name": field.field_name,
-            "type": field.field_type,
-            "description": field.description,
-            "required": field.required,
-        }
-        for field in requirements.fields
-    ]
-
-
-_KNOWN_TYPES = {"decimal.Decimal", "int", "float", "bool"}
-
-
-def _schema_code_from_requirements(schema: type[BaseModel], requirements) -> str:
-    schema_lines = [
-        "from pydantic import BaseModel, Field",
-        "from typing import Literal",
-        "import decimal",
-        "",
-        f"class {schema.__name__}(BaseModel):",
-        f'    """Extraction model for {requirements.use_case_name}"""',
-        "",
-    ]
-
-    for field in requirements.fields:
-        field_type = field.field_type
-        if field_type not in _KNOWN_TYPES and not field_type.startswith("Literal["):
-            field_type = "str"
-
-        if not field.required:
-            field_type = f"{field_type} | None"
-
-        default_value = "None" if not field.required else "..."
-        desc = field.description.replace('"', '\\"')
-        schema_lines.append(
-            f'    {field.field_name}: {field_type} = Field({default_value}, description="{desc}")'
-        )
-
-    return "\n".join(schema_lines)
 
 
 def _schema_key_for(user_requirements: str) -> str:
@@ -108,6 +69,8 @@ class GenerateSchemaResponse(BaseModel):
     structure_type: str
     fields: list[dict]
     schema_id: str
+    # The schema for people: every field with its plain type, rule and nested records.
+    field_table: list[dict] = []
 
 
 @router.post("/generate-schema", response_model=GenerateSchemaResponse)
@@ -147,12 +110,19 @@ async def generate_schema(request: GenerateSchemaRequest):
             _schema_cache[sid] = (schema, requirements)
             logger.info("Generated temporary extractor schema for requirements hash %s", sid)
 
+        # Read the schema itself: it also holds nested lists, which a flat list of
+        # requirements cannot show.
+        table = describe_fields(schema, specs_by_name(requirements.model_dump(mode="json")))
         return GenerateSchemaResponse(
-            schema_code=_schema_code_from_requirements(schema, requirements),
+            schema_code=schema_to_python_source(schema),
             schema_name=schema.__name__,
-            structure_type="object",
-            fields=_field_descriptors(requirements),
+            structure_type=structure_of(table),
+            fields=[
+                {key: field[key] for key in ("name", "type", "description", "required")}
+                for field in table
+            ],
             schema_id=sid,
+            field_table=table,
         )
 
     except ImportError as e:

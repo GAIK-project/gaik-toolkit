@@ -31,12 +31,12 @@ export const VISION_PROVIDERS: VisionProvider[] = [
   "google",
 ];
 
-// Suggestions used until the server's catalogue arrives.
+// The models come from the server's catalogue: none is named here.
 export const VISION_PROVIDER_MODELS: Record<VisionProvider, readonly string[]> =
   {
-    openai: ["gpt-6-luna", "gpt-6-sol", "gpt-5.6-terra"],
-    claude: ["claude-sonnet-4.6", "claude-sonnet-5"],
-    google: ["gemini-3.1-flash-lite"],
+    openai: [],
+    claude: [],
+    google: [],
   };
 
 export interface VisionSettings {
@@ -101,7 +101,7 @@ export function useVisionModels(): VisionModelCatalogue {
   return catalogue;
 }
 
-/** The model to use: the chosen one, else the default of the provider. */
+/** The model to use: the chosen one, else the default of the provider, else none. */
 export function resolveVisionModel(
   settings: VisionSettings,
   catalogue: VisionModelCatalogue,
@@ -109,10 +109,7 @@ export function resolveVisionModel(
   if (settings.model) return settings.model;
   if (settings.provider === "openai" && catalogue.defaultModel)
     return catalogue.defaultModel;
-  return (
-    catalogue.choices[settings.provider][0] ??
-    VISION_PROVIDER_MODELS[settings.provider][0]
-  );
+  return catalogue.choices[settings.provider][0] ?? "";
 }
 
 /** Adds the settings to the request of POST /api/extract-vision. */
@@ -122,7 +119,8 @@ export function appendVisionSettings(
   model: string,
 ): void {
   formData.append("model_provider", settings.provider);
-  formData.append("model", model);
+  // With no model the server uses its own.
+  if (model) formData.append("model", model);
   formData.append("reasoning_effort", settings.reasoningEffort);
   formData.append("merge_table", settings.mergeTable ? "true" : "false");
   formData.append("additional_instructions", settings.additionalInstructions);
