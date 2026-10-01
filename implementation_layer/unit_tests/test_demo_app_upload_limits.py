@@ -24,9 +24,13 @@ AUDIO_PAGES = [
     DEMO_APP / "app" / "(demos)" / "transcriber" / "page.tsx",
     DEMO_APP / "app" / "(demos)" / "dental-transcription" / "page.tsx",
     DEMO_APP / "app" / "(demos)" / "audio-structured" / "page.tsx",
-    DEMO_APP / "app" / "(demos)" / "incident-report" / "page.tsx",
-    DEMO_APP / "app" / "(demos)" / "diary" / "page.tsx",
 ]
+
+# The incident and diary pages share one upload section; it also takes photos, which
+# have their own limit, so only its audio widget is checked.
+SHARED_EXTRACTION_SECTION = (
+    DEMO_APP / "components" / "demo" / "extraction" / "extraction-create-section.tsx"
+)
 
 
 def _api_limit_mb() -> int:
@@ -65,3 +69,17 @@ def test_audio_upload_widgets_match_the_api_limit(page: Path) -> None:
     }
     assert sizes, f"no FileUpload maxSize found in {page.name}"
     assert sizes == {_api_limit_mb()}
+
+
+def test_shared_extraction_section_audio_widget_matches_the_api_limit() -> None:
+    """The audio widget of the incident and diary pages is in one shared component."""
+    source = SHARED_EXTRACTION_SECTION.read_text(encoding="utf-8")
+    audio_widgets = [
+        block
+        for block in re.findall(r"<FileUpload.*?/>", source, flags=re.DOTALL)
+        if ".mp3" in block
+    ]
+    assert audio_widgets, "no audio FileUpload found in the shared extraction section"
+    for widget in audio_widgets:
+        sizes = {int(value) for value in re.findall(r"maxSize=\{(\d+)\}", widget)}
+        assert sizes == {_api_limit_mb()}
