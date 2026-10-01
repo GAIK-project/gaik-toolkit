@@ -118,7 +118,7 @@ Verification uses `api/scripts/verify_video_search_deployment.py` and fails if:
 | `CLAUDE_CODE_USE_FOUNDRY`   | Solution Wizard: route Claude Agent SDK via Azure Foundry (`1`) | Secret: `gaik-demo-api-keys` |
 | `ANTHROPIC_FOUNDRY_API_KEY` | Solution Wizard: Azure Foundry API key | Secret: `gaik-demo-api-keys` |
 | `ANTHROPIC_FOUNDRY_RESOURCE`| Solution Wizard: Azure Foundry resource name | Secret: `gaik-demo-api-keys` |
-| `ANTHROPIC_DEFAULT_SONNET_MODEL` | Solution Wizard: model id (e.g. `claude-sonnet-4-6`) | Secret: `gaik-demo-api-keys` |
+| `ANTHROPIC_DEFAULT_SONNET_MODEL` | Solution Wizard: model id (e.g. `claude-sonnet-5-5`) | Secret: `gaik-demo-api-keys` |
 
 ## Route Annotations
 

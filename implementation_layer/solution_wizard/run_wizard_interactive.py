@@ -37,7 +37,7 @@ Required variables:
 
 Recommended (model selection):
 
-    ANTHROPIC_DEFAULT_SONNET_MODEL=claude-sonnet-4-6
+    ANTHROPIC_DEFAULT_SONNET_MODEL=claude-sonnet-5-5
 
 Optional (timeouts / telemetry):
 
@@ -61,7 +61,7 @@ Run the preflight check to verify credentials before a full session:
     python run_wizard_interactive.py --env-file path/to/.env
 
     # Override the model:
-    python run_wizard_interactive.py --model claude-sonnet-4-6
+    python run_wizard_interactive.py --model claude-sonnet-5-5
 
 See also: run_wizard_sdk.py for a headless smoke-test (no user interaction).
 """
@@ -93,7 +93,7 @@ REQUIRED_ENV_VARS = [
     "ANTHROPIC_FOUNDRY_API_KEY",
     "ANTHROPIC_FOUNDRY_RESOURCE",
 ]
-DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_MODEL = "claude-sonnet-5-5"
 
 # ── ANSI colours (suppressed on non-TTY / Windows without ANSI support) ──────
 

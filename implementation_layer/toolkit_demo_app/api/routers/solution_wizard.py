@@ -103,7 +103,7 @@ REQUIRED_FOUNDRY_VARS = [
     "ANTHROPIC_FOUNDRY_API_KEY",
     "ANTHROPIC_FOUNDRY_RESOURCE",
 ]
-DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_MODEL = "claude-sonnet-5-5"
 SESSION_IDLE_SECONDS = 30 * 60  # reap sessions idle longer than this
 
 # ---------------------------------------------------------------------------
