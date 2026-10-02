@@ -6,6 +6,7 @@ from gaik.observability.pricing import lookup_price
 def test_gpt6_standard_short_context_estimate(provider):
     assert lookup_price(provider, "gpt-6-luna") == (0.10, 0.50)
     assert lookup_price(provider, "gpt-6-sol") == (2.0, 10.0)
+    assert lookup_price(provider, "gpt-6.1-sol") == (2.0, 10.0)
     assert lookup_price(provider, "gpt-6-astra") == (10.0, 50.0)
 
 

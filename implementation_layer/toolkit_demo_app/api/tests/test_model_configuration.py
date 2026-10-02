@@ -117,7 +117,7 @@ async def test_multimodal_parser_reads_reasoning_effort_from_its_config(
             captured.update(kwargs)
 
         def parse(self, path):
-            return SimpleNamespace(usage=None, clean_markdown="parsed")
+            return SimpleNamespace(usage=None, clean_markdown="parsed", html=None)
 
     monkeypatch.delenv("AZURE_MULTIMODAL_DEPLOYMENT", raising=False)
     monkeypatch.setattr(parsers, "MultimodalParser", FakeParser)
