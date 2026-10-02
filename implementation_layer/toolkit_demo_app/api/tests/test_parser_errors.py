@@ -90,3 +90,56 @@ def test_a_pdf_still_falls_back_to_pymupdf(
     body = response.json()
     assert "Page 1" in body["text_content"]
     assert body["metadata"]["parser"] == "pymupdf"
+
+
+def test_output_shows_the_uploaded_name_not_the_temporary_one(client, monkeypatch) -> None:
+    from pathlib import Path
+
+    class NamingParser:
+        def parse_document(self, path):
+            # The HH Parser puts the name of the file it was given in the output.
+            return {
+                "text_content": f"# {Path(path).name}\n\nBody",
+                "metadata": {"source": Path(path).name, "pages": 1},
+            }
+
+    monkeypatch.setattr("gaik.software_components.parsers.PyMuPDFParser", NamingParser)
+
+    response = _post(client, "my report.pdf", _pdf(1), "application/pdf", "pymupdf")
+
+    body = response.json()
+    assert body["text_content"].startswith("# my report.pdf")
+    assert body["metadata"] == {"source": "my report.pdf", "pages": 1}
+
+
+def test_multimodal_parser_returns_its_html_page(client, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    created: dict = {}
+
+    class FakeMultimodal:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+
+        def parse(self, path):
+            return SimpleNamespace(
+                clean_markdown="# Title",
+                html="<html><body><h1>Title</h1></body></html>",
+                usage=None,
+            )
+
+    monkeypatch.setattr("gaik.software_components.parsers.MultimodalParser", FakeMultimodal)
+    monkeypatch.setattr(route, "get_api_config", lambda: {"model": "m", "provider": "azure"})
+    monkeypatch.setattr(route, "get_request_api_config", lambda: None)
+
+    response = _post(client, "doc.pdf", _pdf(1), "application/pdf", "multimodal")
+
+    assert response.status_code == 200
+    assert response.json()["html"] == "<html><body><h1>Title</h1></body></html>"
+    assert created["create_html"] is True
+
+
+def test_other_parsers_return_no_html(client) -> None:
+    response = _post(client, "doc.pdf", _pdf(1), "application/pdf", "pymupdf")
+
+    assert "html" not in response.json()

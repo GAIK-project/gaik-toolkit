@@ -22,37 +22,37 @@ export const PARSERS: ParserOption[] = [
   {
     id: "auto",
     label: "Auto-detect",
-    hint: "Chooses by file type: PyMuPDF for a PDF, DOCX for a Word file, Vision for an image. A scanned PDF needs another parser.",
+    hint: "This parser is good for any file when you are not sure which parser to choose: it picks PyMuPDF for a PDF, DOCX for a Word file and Vision for an image. A scanned PDF has no text layer, so choose another parser for it.",
   },
   {
     id: "pymupdf",
     label: "PyMuPDF (Fast, text-based)",
-    hint: "Fast and local. Reads the text layer of a PDF, so it finds nothing in a scan.",
+    hint: "This parser is good for fast, text-only extraction from PDFs with a simple layout and a text layer. It runs locally, with no model calls or costs, and finds nothing in a scanned PDF.",
   },
   {
     id: "docx",
     label: "DOCX (Word documents)",
-    hint: "Reads the text and tables of a Word file.",
+    hint: "This parser is good for Word documents. It reads their text and tables quickly and locally, and keeps headings and tables in document order.",
   },
   {
     id: "vision",
     label: "Vision (AI-powered, handles images)",
-    hint: "A vision model reads each page or image. Good for scans and photos. At most 10 pages.",
+    hint: "This parser is good for scanned PDFs, photos and other images, and for complex layouts where accurate tables matter. A vision model reads each page, so it is slower than a text parser, and it reads at most 10 pages.",
   },
   {
     id: "vision_plus",
     label: "Vision+ (Text+Image Parsing)",
-    hint: "Reads the text and describes the images in the same document. At most 10 pages.",
+    hint: "This parser is good for documents where the images matter as well as the text. It combines Docling parsing with a vision model that describes each image at its place in the output, and it handles advanced tables. At most 10 pages.",
   },
   {
     id: "docling_api",
     label: "HH Parser (HH's fast Docling Parser)",
-    hint: "Haaga-Helia's remote Docling parser: high-quality layout and tables.",
+    hint: "This parser is good for fast, high-quality parsing of PDFs with headings and tables. It uses the GPU-accelerated Docling service hosted by Haaga-Helia and returns markdown with metadata.",
   },
   {
     id: "multimodal",
     label: "Multimodal (Layout-aware, PDF only)",
-    hint: "Sends the PDF to the model in one call for layout-aware markdown. PDF only.",
+    hint: "This parser is good for PDFs with messy, irregular or multi-page tables, when accurate layout matters more than speed or cost. It sends the whole PDF to a vision-capable model in one call, reads PDF files only, and also gives an HTML view.",
   },
 ];
 
