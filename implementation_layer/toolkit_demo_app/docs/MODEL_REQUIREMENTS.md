@@ -88,5 +88,11 @@ that is *Loading* can take minutes on the first request.
 ## Models listed in the UI today
 
 OpenAI/Azure: `gpt-6-sol` (default), `gpt-6.1-sol`, `gpt-6-luna`, `gpt-6-astra`,
-`gpt-5.6-terra`. Aitta: `google/gemma-4-31b-it`, `Qwen/Qwen3.6-27B`,
-`openai/gpt-oss-120b`, `LumiOpen/Llama-Poro-2-70B-Instruct`.
+`gpt-5.6-terra`. Aitta: `google/gemma-4-31b-it` (tested, vision),
+`openai/gpt-oss-120b` (text only), `LumiOpen/Llama-Poro-2-70B-Instruct`.
+
+Checked directly against Aitta on 2026-10-02: Gemma 4 31B answered an image request with a
+strict JSON schema in 8 s and gpt-oss 120B a text one in 5 s. `Qwen/Qwen3.6-27B`,
+`google/gemma-4-26B-A4B-it` and `google/gemma-3-27b-it` did not answer within 75 s (the
+model was probably not running), so they are not in the list. Aitta also lists embedding
+models (`intfloat/multilingual-e5-large`, `lightonai/modernbert-embed-large`).

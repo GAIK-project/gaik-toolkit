@@ -16,6 +16,23 @@ Templates for deploying GAIK Demo to CSC Rahti 2 (OpenShift).
   gaik-demo.2.rahtiapp.fi
 ```
 
+## Staging
+
+A copy of the app for trying changes before production: `https://gaik-demo-staging.2.rahtiapp.fi`.
+Push any branch to `deploy/demo-staging` to build and roll it out:
+
+```bash
+git push origin <branch>:deploy/demo-staging   # add --force-with-lease after a rebase
+```
+
+`staging.yaml` holds the image streams, builds, services and route. The two
+`-staging` deployments were created once from the production ones (the live env vars are
+not committed) with `BACKEND_URL` pointing at `gaik-demo-api-staging`, the ops and
+Langfuse reporting off and a smaller API request. Staging shares Supabase (accounts and
+approvals), the database and the model keys with production; sign-in works as in
+production and the app's own-key path works without an account. The branch is only a
+build trigger, so force-pushing it is fine.
+
 ## Deploy on push
 
 Push to the `deploy/demo-app` branch to release both services:

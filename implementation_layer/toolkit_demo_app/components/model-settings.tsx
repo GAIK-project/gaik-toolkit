@@ -10,7 +10,6 @@ import { Azure } from "@/components/ui/svgs/azure";
 import { Openai } from "@/components/ui/svgs/openai";
 import { Gemma } from "@/components/ui/svgs/gemma";
 import { Meta } from "@/components/ui/svgs/meta";
-import { Qwen } from "@/components/ui/svgs/qwen";
 import {
   Dialog,
   DialogContent,
@@ -64,12 +63,11 @@ const PRESETS: Record<ModelProvider, Preset[]> = {
       Icon: Gemma,
     },
     {
-      id: "Qwen/Qwen3.6-27B",
-      label: "Qwen 3.6 27B",
-      note: "vision",
-      Icon: Qwen,
+      id: "openai/gpt-oss-120b",
+      label: "gpt-oss 120B",
+      note: "text only",
+      Icon: Openai,
     },
-    { id: "openai/gpt-oss-120b", label: "gpt-oss 120B", Icon: Openai },
     {
       id: "LumiOpen/Llama-Poro-2-70B-Instruct",
       label: "Poro 2 70B",

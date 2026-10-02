@@ -1,0 +1,149 @@
+# Staging copy of the demo app, next to production in the gaik namespace.
+# Pushing to the deploy/demo-staging branch rebuilds both images and rolls out
+# the -staging deployments, which production never sees:
+#
+#   git push origin <branch>:deploy/demo-staging
+#
+# This file holds only what is safe to commit: image streams, builds, services and
+# the route. The two deployments are not here because they carry the live env
+# vars (keys, DATABASE_URL). They were created once from the production
+# deployments with the names, BACKEND_URL and image trigger changed, and with the
+# ops and Langfuse reporting switched off; see README.md, "Staging".
+#
+#   oc apply -f staging.yaml -n gaik
+#
+# Staging uses the same Supabase project, database and model keys as production,
+# so its users, approvals and the demo schema are shared with production.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: gaik-demo-staging
+  labels:
+    app: gaik-demo-staging
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: gaik-demo-api-staging
+  labels:
+    app: gaik-demo-api-staging
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: gaik-demo-api-staging-git
+  labels:
+    app: gaik-demo-api-staging
+spec:
+  runPolicy: SerialLatestOnly
+  source:
+    type: Git
+    git:
+      uri: https://github.com/GAIK-project/gaik-toolkit.git
+      ref: deploy/demo-staging
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: implementation_layer/toolkit_demo_app/api/Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: gaik-demo-api-staging:latest
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "4"
+      memory: 6Gi
+  triggers:
+    - type: GitHub
+      github:
+        secretReference:
+          name: gaik-demo-webhook
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: gaik-demo-staging-git
+  labels:
+    app: gaik-demo-staging
+spec:
+  runPolicy: SerialLatestOnly
+  source:
+    type: Git
+    git:
+      uri: https://github.com/GAIK-project/gaik-toolkit.git
+      ref: deploy/demo-staging
+    contextDir: implementation_layer/toolkit_demo_app
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: gaik-demo-staging:latest
+  resources:
+    requests:
+      cpu: "1"
+      memory: 3Gi
+    limits:
+      cpu: "4"
+      memory: 8Gi
+  triggers:
+    - type: GitHub
+      github:
+        secretReference:
+          name: gaik-demo-webhook
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gaik-demo-staging
+  labels:
+    app: gaik-demo-staging
+spec:
+  selector:
+    app: gaik-demo-staging
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gaik-demo-api-staging
+  labels:
+    app: gaik-demo-api-staging
+spec:
+  selector:
+    app: gaik-demo-api-staging
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: gaik-demo-staging
+  labels:
+    app: gaik-demo-staging
+  annotations:
+    haproxy.router.openshift.io/disable-cookies: "true"
+    haproxy.router.openshift.io/proxy-body-size: 128m
+    haproxy.router.openshift.io/response-buffering: "off"
+    haproxy.router.openshift.io/timeout: 15m
+spec:
+  host: gaik-demo-staging.2.rahtiapp.fi
+  port:
+    targetPort: 3000
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: gaik-demo-staging
+    weight: 100
