@@ -3,7 +3,7 @@
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageTransition } from "@/components/demo/page-transition";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Sparkles, Wand2 } from "lucide-react";
+import { ArrowRight, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { OwnDataCallout } from "./own-data-callout";
 import { ProcessOverview } from "./process-overview";
@@ -20,31 +20,26 @@ export function Hero({
     document.getElementById("demos")?.scrollIntoView({ behavior: "smooth" });
   }
 
-  const pillClassName =
-    "group flex w-fit max-w-full items-center gap-3 rounded-3xl border border-teal-200/80 bg-teal-50/60 py-2 pr-3 pl-2.5 text-left transition-colors hover:border-teal-300 hover:bg-teal-50";
-  const pillContent = (
+  const wizardClassName =
+    "text-muted-foreground hover:text-foreground group inline-flex w-fit max-w-full items-center gap-2 text-left text-sm transition-colors";
+  const wizardContent = (
     <>
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-teal-600/10">
-        <Wand2 className="size-3.5 text-teal-700" />
-      </span>
-      <span className="min-w-0 text-sm text-slate-700">
-        <span className="font-semibold text-teal-800">
+      <Wand2 className="text-primary size-4 shrink-0" />
+      <span>
+        <span className="text-foreground font-medium underline-offset-4 group-hover:underline">
           Solution Configuration Wizard
-        </span>
-        <span className="text-muted-foreground hidden sm:inline">
-          {" "}
-          designs a proof of concept for you.
-        </span>
+        </span>{" "}
+        <span className="hidden sm:inline">
+          designs a proof of concept for your use case
+        </span>{" "}
+        (beta)
       </span>
-      <span className="shrink-0 rounded-full bg-teal-600/15 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-teal-800 uppercase">
-        Beta
-      </span>
-      <ArrowRight className="size-3.5 shrink-0 text-teal-700 transition-transform group-hover:translate-x-0.5" />
+      <ArrowRight className="size-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
     </>
   );
 
   const newLinkClassName =
-    "bg-primary/10 text-primary hover:bg-primary/20 rounded-md px-1.5 py-0.5 font-semibold underline underline-offset-2 transition-colors";
+    "text-foreground font-medium underline underline-offset-4 decoration-border hover:decoration-foreground transition-colors";
 
   return (
     <PageTransition className="bg-card relative overflow-hidden rounded-2xl border p-6 shadow-sm md:p-10">
@@ -55,32 +50,24 @@ export function Hero({
       />
       <div className="relative space-y-6">
         {/* Update: what is new. Edit the text here; link only to pages that exist. */}
-        <div
-          data-tour="update"
-          className="bg-background/70 flex w-fit max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border py-1 pr-3 pl-1 text-sm sm:rounded-full"
-        >
-          <span className="bg-primary text-primary-foreground flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wider uppercase">
-            <Sparkles className="size-3" />
-            New
-          </span>
+        <p data-tour="update" className="text-muted-foreground text-sm">
+          <span className="text-foreground font-medium">New:</span>{" "}
           <Link href="/report-writer-v2" className={newLinkClassName}>
             Report Writer
+          </Link>{" "}
+          and its stages{" "}
+          <Link href="/source-normalizer" className={newLinkClassName}>
+            Source Normalizer
           </Link>
-          <span className="text-muted-foreground">with its stages:</span>
-          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-            <Link href="/source-normalizer" className={newLinkClassName}>
-              Source Normalizer
-            </Link>
-            <span className="text-muted-foreground">·</span>
-            <Link href="/knowledge-curator" className={newLinkClassName}>
-              Knowledge Curator
-            </Link>
-            <span className="text-muted-foreground">·</span>
-            <Link href="/knowledge-synthesis" className={newLinkClassName}>
-              Knowledge Synthesizer
-            </Link>
-          </span>
-        </div>
+          ,{" "}
+          <Link href="/knowledge-curator" className={newLinkClassName}>
+            Knowledge Curator
+          </Link>{" "}
+          and{" "}
+          <Link href="/knowledge-synthesis" className={newLinkClassName}>
+            Knowledge Synthesizer
+          </Link>
+        </p>
 
         <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_21rem]">
           <div className="space-y-6">
@@ -121,9 +108,9 @@ export function Hero({
               hasWizardAccess={hasWizardAccess}
               isAuthenticated={isAuthenticated}
               tour="wizard"
-              className={pillClassName}
+              className={wizardClassName}
             >
-              {pillContent}
+              {wizardContent}
             </WizardEntry>
           </div>
 
