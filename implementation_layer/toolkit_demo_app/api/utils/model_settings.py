@@ -169,8 +169,31 @@ def get_request_api_config() -> dict | None:
     return get_llm_config(settings.provider, **overrides)
 
 
+def unsupported_option_detail(exc: BaseException) -> str | None:
+    """Explain a provider 400 that rejects one request option, such as ``temperature``.
+
+    Only the option name is read from the error body, so this is safe to show for
+    requests that use a user's credential.
+    """
+    body = getattr(exc, "body", None)
+    error = body.get("error") if isinstance(body, dict) else None
+    if not isinstance(error, dict) or error.get("code") not in {
+        "unsupported_value",
+        "unsupported_parameter",
+    }:
+        return None
+    param = str(error.get("param") or "an option")
+    return (
+        f"The selected model does not accept the '{param}' option as sent. "
+        f"Clear '{param}' (use \"model default\") in the settings of the step that "
+        "failed, or choose another model."
+    )
+
+
 def provider_error_detail(exc: Exception) -> str:
     """Do not expose remote error bodies from requests using a user's credential."""
+    if (detail := unsupported_option_detail(exc)) is not None:
+        return detail
     if _settings.get() is not None:
         if isinstance(exc, HTTPException):
             return str(exc.detail)

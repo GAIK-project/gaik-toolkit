@@ -190,6 +190,16 @@ def test_provider_errors_cannot_echo_the_submitted_secret():
         settings._settings.reset(token)
 
 
+def test_unsupported_option_error_names_the_option_and_the_fix():
+    class Rejected(Exception):
+        body = {"error": {"code": "unsupported_value", "param": "temperature"}}
+
+    detail = settings.provider_error_detail(Rejected("raw provider text"))
+    assert "'temperature'" in detail and "model default" in detail
+    assert "raw provider text" not in detail
+    assert settings.unsupported_option_detail(RuntimeError("other")) is None
+
+
 @pytest.mark.asyncio
 async def test_unexpected_provider_exception_is_sanitized_before_leaving_context():
     app = FastAPI()

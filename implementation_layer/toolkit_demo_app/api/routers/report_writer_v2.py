@@ -26,8 +26,10 @@ from pydantic import TypeAdapter, ValidationError
 
 try:
     from utils import get_api_config, sse_event
+    from utils.model_settings import unsupported_option_detail
 except ImportError:
     from api.utils import get_api_config, sse_event
+    from api.utils.model_settings import unsupported_option_detail
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -266,7 +268,7 @@ async def run_stage(
             outcome["result"] = _result(stage, workspace, result)
         except Exception as exc:
             logger.exception("Report Writer v2 %s failed", stage)
-            outcome["error"] = f"{type(exc).__name__}: {exc}"
+            outcome["error"] = unsupported_option_detail(exc) or f"{type(exc).__name__}: {exc}"
         finally:
             try:
                 shutil.rmtree(tmp)
