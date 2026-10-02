@@ -97,6 +97,8 @@ function isPreset(provider: ModelProvider, model: string): boolean {
 
 export function ModelSettingsButton() {
   const settings = useModelSettings();
+  const pathname = usePathname();
+  const usedHere = pageUsesModelSettings(pathname);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<ModelSettings>(EMPTY);
   const [custom, setCustom] = useState(false);
@@ -226,12 +228,20 @@ export function ModelSettingsButton() {
         aria-label={
           settings ? "Model settings (own model in use)" : "Model settings"
         }
-        title={settings ? "Own model in use" : "Use your own model"}
+        title={
+          settings
+            ? usedHere
+              ? "Own model in use"
+              : "Your own model is not used on this page"
+            : "Use your own model"
+        }
       >
         <KeyRound className="h-4 w-4 shrink-0" />
         {settings && (
           <span className="hidden truncate text-xs font-medium lg:inline">
-            Own: {settings.model.split("/").pop()}
+            {usedHere
+              ? `Own: ${settings.model.split("/").pop()}`
+              : "Own key: not used here"}
           </span>
         )}
       </Button>

@@ -46,6 +46,7 @@ export function pageUsesModelSettings(path: string): boolean {
     "/parser",
     "/postgres-agent",
     "/incident-report",
+    "/document-structured",
     "/diary",
     "/solution-wizard",
   ].includes(path);
