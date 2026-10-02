@@ -66,7 +66,7 @@ curator / synthesis, Luvata order or the judge panel.
 | A speech-to-text model | Audio demos, transcriber, Report Writer sources | **Blocked in code**: audio classes refuse Aitta configs, even for local Whisper. Aitta config has no transcription model setting |
 | An embedding model | RAG, Video search | `AITTA_EMBEDDING_MODEL` is empty by default. The RAG example index (3072 dimensions) and the Video search table (1536) would need re-embedding |
 | A text-to-speech model | Text to speech | **Blocked in code**, same check |
-| One model per call | Report Writer v2 and the judge panel use several models | One Aitta model serves every step, so steps cannot use different models |
+| Several models per demo | Report Writer v2 and the judge panel use a different model per step | Aitta can serve several models, but the demo sends every call to the one model the user picks, so steps cannot use different models. That is a demo limit, not an Aitta one |
 | Claude | Solution Wizard conversation | Not available on Aitta |
 
 Catalog status also matters: a model that is *Offline* does not answer, and a model
