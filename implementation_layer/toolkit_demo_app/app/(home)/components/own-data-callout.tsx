@@ -1,50 +1,58 @@
-import { buttonVariants } from "@/components/ui/button";
+"use client";
+
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { FlaskConical, Mail, Rocket } from "lucide-react";
+import { Check, Copy, Mail } from "lucide-react";
+import { useState } from "react";
 
 const CONTACT_EMAIL = "info@gaik.ai";
 
-/** Highlights that every demo can be tried with your own data, and the free PoC offer. */
+/** The free PoC offer. Copying the address works even without a mail app. */
 export function OwnDataCallout() {
+  const [copied, setCopied] = useState(false);
+
+  async function copyEmail(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(CONTACT_EMAIL);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked: the mailto link and the visible address still work.
+    }
+  }
+
   return (
     <section
-      aria-label="Try with your own data"
-      className="border-primary/40 bg-primary/10 grid gap-6 rounded-xl border-2 p-5 md:grid-cols-2"
+      aria-label="Proof of concept"
+      className="bg-muted/40 flex flex-col gap-4 rounded-xl border p-5 md:flex-row md:items-center md:justify-between"
     >
-      <div className="flex gap-4">
-        <span className="bg-primary text-primary-foreground flex size-11 shrink-0 items-center justify-center rounded-xl shadow-sm">
-          <FlaskConical className="size-6" />
-        </span>
-        <div className="space-y-1.5">
-          <h2 className="font-serif text-xl font-semibold text-balance md:text-2xl">
-            Try it hands-on with your own data
-          </h2>
-          <p className="text-muted-foreground">
-            Get a hands-on experience with the components and use cases of the
-            GAIK GenAI toolkit using <strong>your own documents</strong>,
-            recordings and data, right in your browser.
-          </p>
-        </div>
+      <div className="space-y-1">
+        <h2 className="font-serif text-xl font-semibold text-balance">
+          Try it with your own data
+        </h2>
+        <p className="text-muted-foreground max-w-xl text-sm">
+          Every demo accepts your own documents and recordings. Companies in
+          Finland can get <strong>free proof-of-concept development</strong>{" "}
+          from GAIK&apos;s team.
+        </p>
       </div>
-
-      <div className="bg-card/80 flex flex-col justify-between gap-4 rounded-xl border p-5">
-        <div className="flex gap-3">
-          <Rocket className="text-primary mt-0.5 size-5 shrink-0" />
-          <div className="space-y-1">
-            <h3 className="font-semibold">Want to build your own PoC?</h3>
-            <p className="text-muted-foreground text-sm">
-              Companies in Finland can contact GAIK&apos;s team for{" "}
-              <strong>free proof-of-concept development</strong>.
-            </p>
-          </div>
-        </div>
+      <div className="flex shrink-0 items-center gap-2">
         <a
           href={`mailto:${CONTACT_EMAIL}`}
-          className={cn(buttonVariants(), "w-fit gap-2")}
+          className={cn(buttonVariants(), "gap-2")}
         >
           <Mail className="size-4" />
-          Contact GAIK&apos;s team: {CONTACT_EMAIL}
+          {CONTACT_EMAIL}
         </a>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={copyEmail}
+          aria-label="Copy email address"
+        >
+          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+        </Button>
       </div>
     </section>
   );

@@ -228,20 +228,10 @@ function ImageCard({ demo, isUnlocked }: { demo: Demo; isUnlocked: boolean }) {
 
 function ComingSoonLine({ items }: { items: ComingSoon[] }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="bg-primary/10 text-primary rounded-full px-3 py-1 text-sm font-semibold tracking-wide uppercase">
-        Coming soon
-      </span>
-      {items.map(({ title, icon: Icon }) => (
-        <span
-          key={title}
-          className="bg-muted/60 text-foreground/80 inline-flex items-center gap-2 rounded-lg border border-dashed px-2.5 py-1.5 text-[15px]"
-        >
-          <Icon className="text-primary size-4" />
-          {title}
-        </span>
-      ))}
-    </div>
+    <p className="text-muted-foreground text-sm">
+      <span className="text-foreground font-medium">Coming soon:</span>{" "}
+      {items.map(({ title }) => title).join(" · ")}
+    </p>
   );
 }
 

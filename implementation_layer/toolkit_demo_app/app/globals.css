@@ -461,3 +461,22 @@
   .driver-popover-arrow-side-bottom.driver-popover-arrow {
   border-bottom-color: var(--popover);
 }
+
+/* Marker classes: no styles of their own. PostHog reads ph-*; ai-elements
+   styles descendants through the is-* group variants; not-prose opts out of
+   typography styles. Declared so @shadcn/lint knows they are intentional. */
+@utility ph-no-capture {
+  --marker: ph-no-capture;
+}
+@utility ph-mask {
+  --marker: ph-mask;
+}
+@utility is-user {
+  --marker: is-user;
+}
+@utility is-assistant {
+  --marker: is-assistant;
+}
+@utility not-prose {
+  --marker: not-prose;
+}

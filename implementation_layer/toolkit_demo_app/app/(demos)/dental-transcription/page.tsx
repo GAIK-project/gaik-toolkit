@@ -17,13 +17,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -71,22 +65,6 @@ function exampleResultPayload(demo: ExampleDemo): TranscriptionResult {
     demo;
   return { job_id, raw_transcript, srt_content, vtt_content, segments_count };
 }
-
-const workflowItems = [
-  {
-    title: "Upload or open the example",
-    description: "Use your own file or inspect the ready-made lecture clip.",
-  },
-  {
-    title: "Whisper turns speech into text",
-    description:
-      "The backend produces transcript, SRT, and VTT subtitle files.",
-  },
-  {
-    title: "Reuse it in video search",
-    description: "The same subtitle output can power searchable video moments.",
-  },
-];
 
 export default function DentalTranscriptionPage() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -286,28 +264,13 @@ export default function DentalTranscriptionPage() {
         icon={Mic}
         iconClassName="text-primary h-8 w-8"
         title="Video Transcription & Subtitles"
-        description="Upload a recording or open the ready-made example. Whisper turns speech into a transcript and subtitle files (SRT & VTT)."
-      >
-        <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          {workflowItems.map((item, i) => (
-            <span key={item.title} className="flex items-center gap-1.5">
-              <span className="bg-primary/10 text-primary inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold">
-                {i + 1}
-              </span>
-              {item.title}
-            </span>
-          ))}
-        </div>
-      </DemoPageHeader>
+        description="Turn a recording into a transcript and subtitle files (SRT and VTT), or open the ready-made example."
+      />
 
       <div className="space-y-6">
         <Card className="shadow-md">
           <CardHeader className="pb-4">
-            <CardTitle>Upload Your Own File</CardTitle>
-            <CardDescription>
-              Add an audio or video file and the app will generate transcript,
-              SRT, and VTT subtitle files.
-            </CardDescription>
+            <CardTitle>Upload an audio or video file</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-6 sm:grid-cols-[1fr_auto]">
@@ -386,14 +349,10 @@ export default function DentalTranscriptionPage() {
 
               <TabsContent value="transcript">
                 <ResultCard
-                  title={
-                    result.job_id === "example-demo"
-                      ? "Example Transcript"
-                      : "Transcript"
-                  }
+                  title="Transcript"
                   description={
                     result.job_id === "example-demo"
-                      ? "Pre-generated result from the example lecture video."
+                      ? "From the example lecture clip."
                       : undefined
                   }
                   copyContent={result.raw_transcript}
@@ -404,7 +363,7 @@ export default function DentalTranscriptionPage() {
 
               <TabsContent value="subtitles">
                 <ResultCard
-                  title={`SRT Subtitles (${result.segments_count} segments)`}
+                  title={`${result.segments_count} subtitle segments`}
                   copyContent={result.srt_content}
                 >
                   <pre className="bg-muted max-h-96 overflow-auto rounded-lg p-4 font-mono text-sm wrap-break-word whitespace-pre-wrap">
@@ -414,57 +373,51 @@ export default function DentalTranscriptionPage() {
               </TabsContent>
             </Tabs>
 
-            <Card className="shadow-md">
-              <CardContent className="flex flex-wrap gap-3 pt-6">
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    downloadFile(
-                      result.raw_transcript,
-                      "transcript.txt",
-                      "text/plain",
-                    )
-                  }
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Transcript (.txt)
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    downloadFile(
-                      result.srt_content,
-                      "subtitles.srt",
-                      "text/plain",
-                    )
-                  }
-                  disabled={!result.srt_content}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Subtitles (.srt)
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    downloadFile(
-                      result.vtt_content,
-                      "subtitles.vtt",
-                      "text/vtt",
-                    )
-                  }
-                  disabled={!result.vtt_content}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Subtitles (.vtt)
-                </Button>
-                <Button variant="ghost" asChild>
-                  <Link href="/video-search">
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Open Semantic Video Search
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="outline"
+                onClick={() =>
+                  downloadFile(
+                    result.raw_transcript,
+                    "transcript.txt",
+                    "text/plain",
+                  )
+                }
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Transcript (.txt)
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  downloadFile(
+                    result.srt_content,
+                    "subtitles.srt",
+                    "text/plain",
+                  )
+                }
+                disabled={!result.srt_content}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Subtitles (.srt)
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  downloadFile(result.vtt_content, "subtitles.vtt", "text/vtt")
+                }
+                disabled={!result.vtt_content}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Subtitles (.vtt)
+              </Button>
+              <Button variant="ghost" asChild>
+                <Link href="/video-search">
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Search videos by meaning
+                </Link>
+              </Button>
+            </div>
           </div>
         )}
 
@@ -472,8 +425,7 @@ export default function DentalTranscriptionPage() {
           <EmptyStateCard
             icon={Subtitles}
             title="No transcription yet"
-            description="Upload a file or load the example to see transcript and subtitle output."
-            feedbackSlot={<FeedbackButton demoType="dental-transcription" />}
+            description="Upload a file or load the example below."
           />
         )}
 
@@ -487,10 +439,7 @@ export default function DentalTranscriptionPage() {
             <AccordionTrigger className="px-4 py-3 hover:no-underline">
               <span className="flex items-center gap-2">
                 <Video className="text-primary h-4 w-4" />
-                <span className="font-semibold">Ready-made Example</span>
-                <span className="text-muted-foreground font-normal">
-                  — lecture clip with pre-generated subtitles
-                </span>
+                <span className="font-semibold">Example lecture clip</span>
                 {exampleLoading && (
                   <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
                 )}
@@ -506,10 +455,6 @@ export default function DentalTranscriptionPage() {
                   <p className="text-sm font-medium">Example unavailable</p>
                   <p className="text-muted-foreground mt-1 text-sm">
                     {exampleError}
-                  </p>
-                  <p className="text-muted-foreground mt-2 text-xs">
-                    For local development, verify that the FastAPI backend is
-                    running and that the Allas environment variables are loaded.
                   </p>
                   <Button
                     variant="outline"
@@ -543,13 +488,12 @@ export default function DentalTranscriptionPage() {
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    <div className="bg-muted/35 border-border/70 rounded-xl border p-3">
+                    <div>
                       <p className="text-sm font-semibold">
                         {exampleDemo.title}
                       </p>
                       <p className="text-muted-foreground mt-1 text-sm">
-                        {exampleDemo.segments_count} subtitle segments &middot;
-                        Transcript + SRT + VTT
+                        {exampleDemo.segments_count} subtitle segments
                       </p>
                     </div>
 
@@ -584,20 +528,9 @@ export default function DentalTranscriptionPage() {
                           target="_blank"
                           rel="noopener noreferrer"
                         >
-                          YouTube Source
+                          Open on YouTube
                           <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
                         </a>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        asChild
-                        className="flex-1"
-                      >
-                        <Link href="/video-search">
-                          Video Search
-                          <Sparkles className="ml-1.5 h-3.5 w-3.5" />
-                        </Link>
                       </Button>
                     </div>
                   </div>
@@ -609,6 +542,6 @@ export default function DentalTranscriptionPage() {
 
         <FeedbackButton demoType="dental-transcription" />
       </div>
-  </PageTransition>
-);
+    </PageTransition>
+  );
 }

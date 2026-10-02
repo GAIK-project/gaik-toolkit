@@ -3,7 +3,6 @@
 import { apiFetch } from "@/lib/api-client";
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { FeedbackButton } from "@/components/feedback";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,18 +28,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import {
   AlertCircle,
   Clock,
-  Database,
   Film,
   Loader2,
   Play,
@@ -85,24 +77,21 @@ function formatMatchScore(score: number, topScore: number): string {
 
 const SEARCH_TYPE_INFO: Record<
   string,
-  { icon: typeof Zap; label: string; helper: string; desc: string }
+  { icon: typeof Zap; label: string; desc: string }
 > = {
   hybrid: {
     icon: Zap,
     label: "Hybrid",
-    helper: "AI + keywords",
     desc: "Combines AI understanding with keyword matching for best results.",
   },
   semantic: {
     icon: Sparkles,
     label: "AI meaning",
-    helper: "Understands intent",
     desc: "AI finds results by meaning — useful when you don't remember the exact words.",
   },
   keyword: {
     icon: Type,
     label: "Exact words",
-    helper: "Traditional search",
     desc: "Classic keyword search — finds the exact words you type.",
   },
 };
@@ -303,7 +292,7 @@ export default function VideoSearchPage() {
   const ActiveSearchIcon = activeSearchType.icon;
 
   return (
-    <TooltipProvider>
+    <>
       <motion.div
         initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -315,22 +304,7 @@ export default function VideoSearchPage() {
           iconClassName="text-primary h-8 w-8"
           title="Semantic Video Search"
           description="Search your indexed videos with normal language and jump straight to the relevant moment."
-        >
-          <div className="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-            {[
-              "Describe what you want to find",
-              "Search compares meaning & wording",
-              "Play from the matching timestamp",
-            ].map((step, i) => (
-              <span key={step} className="flex items-center gap-1.5">
-                <span className="bg-primary/10 text-primary inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold">
-                  {i + 1}
-                </span>
-                {step}
-              </span>
-            ))}
-          </div>
-        </DemoPageHeader>
+        />
 
         {statusLoading ? (
           <div className="mb-6 flex items-center gap-2 text-sm">
@@ -339,7 +313,6 @@ export default function VideoSearchPage() {
           </div>
         ) : status ? (
           <div className="mb-6 flex items-center gap-2 text-sm">
-            <Database className="text-muted-foreground h-4 w-4" />
             <span
               className={cn(
                 "inline-block h-2 w-2 rounded-full",
@@ -517,11 +490,6 @@ export default function VideoSearchPage() {
                 <p className="text-muted-foreground text-sm font-medium">
                   {results.length} result{results.length !== 1 ? "s" : ""} found
                 </p>
-                <span className="text-muted-foreground/70 flex items-center gap-1 text-xs">
-                  <ActiveSearchIcon className="h-3 w-3" />
-                  {activeSearchType.label}:{" "}
-                  {activeSearchType.helper.toLowerCase()}
-                </span>
               </div>
 
               {results.map((result, index) => {
@@ -600,30 +568,13 @@ export default function VideoSearchPage() {
                             <span className="truncate text-sm font-semibold">
                               {result.video_title}
                             </span>
-                            <Badge
-                              variant="secondary"
-                              className="shrink-0 gap-1 font-mono text-xs"
-                            >
+                            <span className="text-muted-foreground flex shrink-0 items-center gap-1 font-mono text-xs">
                               <Clock className="h-3 w-3" />
                               {result.timestamp}
-                            </Badge>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge
-                                  variant="outline"
-                                  className="border-primary/20 bg-primary/5 text-primary shrink-0 font-mono text-xs"
-                                >
-                                  {formatMatchScore(result.score, topScore)}
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="text-xs">
-                                  Relative match{" "}
-                                  {formatMatchScore(result.score, topScore)}
-                                  {" · "}raw {result.score.toFixed(4)}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
+                            </span>
+                            <span className="text-muted-foreground shrink-0 text-xs">
+                              {formatMatchScore(result.score, topScore)} match
+                            </span>
                           </div>
                           <p className="text-muted-foreground line-clamp-2 text-sm leading-relaxed">
                             {result.text}
@@ -663,14 +614,10 @@ export default function VideoSearchPage() {
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-base">
                         <Film className="h-4 w-4" />
-                        Indexed Videos
-                        <Badge variant="secondary" className="ml-1">
-                          {videos.length}
-                        </Badge>
+                        Indexed videos
                       </CardTitle>
                       <CardDescription>
-                        These videos already have subtitles and can be searched
-                        by topic or wording.
+                        Select a video to search only within it.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -693,12 +640,9 @@ export default function VideoSearchPage() {
                                 {video.video_title}
                               </span>
                             </div>
-                            <Badge
-                              variant="outline"
-                              className="ml-2 shrink-0 text-xs"
-                            >
+                            <span className="text-muted-foreground ml-2 shrink-0 text-xs">
                               {video.segment_count} segments
-                            </Badge>
+                            </span>
                           </button>
                         ))}
                       </div>
@@ -778,6 +722,6 @@ export default function VideoSearchPage() {
           </DialogContent>
         </Dialog>
       </motion.div>
-    </TooltipProvider>
+    </>
   );
 }

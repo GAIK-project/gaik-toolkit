@@ -33,7 +33,7 @@ export function Hero({
         </span>
         <span className="text-muted-foreground hidden sm:inline">
           {" "}
-          builds a proof of concept from your use case.
+          designs a proof of concept for you.
         </span>
       </span>
       <span className="shrink-0 rounded-full bg-teal-600/15 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-teal-800 uppercase">
@@ -66,9 +66,7 @@ export function Hero({
           <Link href="/report-writer-v2" className={newLinkClassName}>
             Report Writer
           </Link>
-          <span className="text-muted-foreground">
-            and its stages as components:
-          </span>
+          <span className="text-muted-foreground">with its stages:</span>
           <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
             <Link href="/source-normalizer" className={newLinkClassName}>
               Source Normalizer
@@ -87,17 +85,13 @@ export function Hero({
         <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_21rem]">
           <div className="space-y-6">
             <div className="space-y-4" data-tour="hero">
-              <p className="text-primary text-sm font-semibold tracking-wider uppercase">
-                GAIK Toolkit · Interactive demos
-              </p>
               <h1 className="max-w-3xl font-serif text-4xl leading-[1.1] font-semibold tracking-tight text-balance sm:text-[2.75rem]">
                 Generative AI building blocks for knowledge work
               </h1>
               <p className="text-muted-foreground max-w-2xl text-base md:text-lg">
                 Capture knowledge from documents and recordings, find answers in
-                it, and turn it into source-grounded reports. Try every
-                component, module and use case of the GAIK toolkit in your
-                browser.
+                it, and write source-grounded reports. Every component, module
+                and use case runs in your browser.
               </p>
             </div>
 

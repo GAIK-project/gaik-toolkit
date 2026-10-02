@@ -226,10 +226,8 @@ export default function DocumentStructuredPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Document Input</CardTitle>
-                  <CardDescription>
-                    Upload a document or image to parse and extract data from
-                  </CardDescription>
+                  <CardTitle>Document</CardTitle>
+                  <CardDescription>PDF, DOCX or image, up to 20 MB</CardDescription>
                 </div>
                 <ExamplePreviewDialog
                   exampleUrl="/GAIK_Test_Document_Demo.pdf"
@@ -253,10 +251,7 @@ export default function DocumentStructuredPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Extraction Requirements</CardTitle>
-              <CardDescription>
-                Describe what data you want to extract from the document
-              </CardDescription>
+              <CardTitle>Fields to extract</CardTitle>
             </CardHeader>
             <CardContent>
               <Textarea
@@ -267,9 +262,8 @@ export default function DocumentStructuredPage() {
                 rows={10}
               />
               <p className="text-muted-foreground mt-2 text-xs">
-                If you edit the extraction requirements, enable Regenerate
-                Schema before extraction. Custom regenerated schemas are used
-                only for the current run and are not saved.
+                After editing, turn on Regenerate Schema in Advanced Settings.
+                Custom schemas apply to this run only.
               </p>
             </CardContent>
           </Card>
@@ -319,9 +313,6 @@ export default function DocumentStructuredPage() {
                         </SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-muted-foreground text-xs">
-                      Choose how to parse your document
-                    </p>
                     {(parserType === "vision" ||
                       parserType === "vision_plus") && (
                       <p className="text-muted-foreground text-xs">
@@ -337,8 +328,7 @@ export default function DocumentStructuredPage() {
                         Regenerate Schema
                       </Label>
                       <p className="text-muted-foreground text-xs">
-                        Required when you edit the default extraction
-                        requirements. Regenerated schemas are not persisted.
+                        Required when you edit the default fields
                       </p>
                     </div>
                     <Switch
@@ -384,18 +374,12 @@ export default function DocumentStructuredPage() {
             ) : (
               <>
                 <Sparkles className="mr-2 h-4 w-4" />
-                Process Document
+                Extract data
               </>
             )}
           </Button>
 
           <HowItWorksCard description="Parse the document, load or regenerate the schema, and extract structured business data.">
-            <p>
-              This module parses uploaded documents and extracts structured
-              information from them. The extraction task is defined in plain
-              language, and the default example is configured for business KPI
-              extraction from reports or similar documents.
-            </p>
             <p>
               <strong>1. Upload a document:</strong> Add a PDF, DOCX, or
               supported image file. The selected parser reads the document
@@ -434,9 +418,6 @@ export default function DocumentStructuredPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Processing</CardTitle>
-                <CardDescription>
-                  Running document to structured data pipeline
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <StepIndicator steps={pipelineSteps} />
@@ -463,7 +444,6 @@ export default function DocumentStructuredPage() {
               {result.parsed_content && (
                 <ResultCard
                   title="Parsed Content"
-                  description="Document text extracted from file"
                   copyContent={result.parsed_content}
                   delay={0}
                 >
@@ -481,7 +461,6 @@ export default function DocumentStructuredPage() {
               {result.extracted_data && result.extracted_data.length > 0 && (
                 <ResultCard
                   title="Extracted Data"
-                  description="Structured data from document"
                   copyContent={JSON.stringify(result.extracted_data, null, 2)}
                   feedbackSlot={
                     <FeedbackButton demoType="document-structured" />
@@ -496,7 +475,7 @@ export default function DocumentStructuredPage() {
                             Item {index + 1}
                           </p>
                         )}
-                        <div className="divide-y rounded-md border">
+                        <div className="divide-y">
                           {Object.entries(item).map(([key, value]) => (
                             <div
                               key={key}
@@ -535,18 +514,14 @@ export default function DocumentStructuredPage() {
 
               {/* PDF Download */}
               {result.pdf_available && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <Button
-                      onClick={handleDownloadPdf}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Download PDF Report
-                    </Button>
-                  </CardContent>
-                </Card>
+                <Button
+                  onClick={handleDownloadPdf}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download PDF report
+                </Button>
               )}
             </>
           )}
@@ -555,7 +530,7 @@ export default function DocumentStructuredPage() {
             <EmptyStateCard
               icon={FileOutput}
               title="No structured data yet"
-              description="Upload a document and click Process to see results."
+              description="Upload a document and click Extract data."
               feedbackSlot={<FeedbackButton demoType="document-structured" />}
             />
           )}

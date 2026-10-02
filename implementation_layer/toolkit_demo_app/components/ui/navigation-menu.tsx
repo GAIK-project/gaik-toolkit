@@ -86,7 +86,7 @@ const NavigationMenuContent = React.forwardRef<
   <NavigationMenuPrimitive.Content
     ref={ref}
     className={cn(
-      "data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:fade-in data-[motion^=to-]:fade-out bg-popover text-popover-foreground absolute top-full z-50 mt-1.5 w-auto rounded-md border shadow-lg",
+      "data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:fade-in data-[motion^=to-]:fade-out bg-popover text-popover-foreground absolute top-full z-50 mt-1.5 w-auto rounded-md border shadow-lg before:absolute before:inset-x-0 before:-top-2 before:h-2 before:content-['']",
       align === "start" && "left-0",
       align === "center" && "left-1/2 -translate-x-1/2",
       align === "end" && "right-0",

@@ -350,10 +350,7 @@ export function ModelSettingsButton() {
               </p>
             )}
             <p className="text-muted-foreground text-xs">
-              Used by Extractor, Vision Extractor, Schema Generator, Classifier,
-              Parser (vision), LLM Judge, PostgreSQL Agent, Incident Reporting
-              and Wizard images. Pick a model with structured output; images
-              need vision.
+              Needs structured output; image inputs need vision.
             </p>
             {message && (
               <p role="status" className="text-sm">

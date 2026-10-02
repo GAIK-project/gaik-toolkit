@@ -7,12 +7,14 @@ import next from "eslint-config-next";
 
 const eslintConfig = [
   ...next,
-  // @shadcn/lint design-system rules: registered, none enabled yet. Add them to
-  // `rules` here (https://github.com/shadcn-ui/lint#rules), or try one with
-  // `bunx eslint . --rule "shadcn/no-unknown-classes: error"`.
+  // @shadcn/lint design-system rules (https://github.com/shadcn-ui/lint#rules).
+  // Only no-unknown-classes is on: it catches classes Tailwind cannot generate.
+  // The stricter rules (no-raw-colors, no-restyle, ...) would flag most of the
+  // existing code; add them here as the design system is tightened.
   {
     files: ["**/*.{js,jsx,ts,tsx}"],
     plugins: { shadcn },
+    rules: { "shadcn/no-unknown-classes": "error" },
   },
   {
     ignores: [

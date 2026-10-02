@@ -31,7 +31,13 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
-import { ACCESS, CAPTURE, SYNTHESIS } from "@/lib/knowledge-processes";
+import {
+  ACCESS,
+  CAPTURE,
+  type KnowledgeProcess,
+  processStyle,
+  SYNTHESIS,
+} from "@/lib/knowledge-processes";
 import { cn } from "@/lib/utils";
 import {
   AudioWaveform,
@@ -454,13 +460,14 @@ function SectionedMenu({ group, ctx }: { group: NavGroup; ctx: ItemContext }) {
     sections.find((section) => section.name === selected) ?? sections[0];
 
   return (
-    <div className="grid w-[420px] md:w-[600px] md:grid-cols-[15rem_1fr] lg:w-[760px]">
+    <div className="grid w-[420px] md:w-[560px] md:grid-cols-[13rem_1fr] lg:w-[640px]">
       <ul
         aria-label={group.label}
         className="border-border/60 space-y-1 border-r p-3"
       >
         {sections.map((section) => {
           const isShown = section.name === shown.name;
+          const style = processStyle(section.name as KnowledgeProcess);
           return (
             <li key={section.name}>
               <button
@@ -470,12 +477,20 @@ function SectionedMenu({ group, ctx }: { group: NavGroup; ctx: ItemContext }) {
                 onFocus={() => setSelected(section.name)}
                 onClick={() => setSelected(section.name)}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm font-medium transition-colors outline-none",
+                  "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium transition-colors outline-none",
                   isShown
-                    ? "bg-primary/10 text-primary"
+                    ? cn("bg-muted", style.accent)
                     : "text-foreground hover:bg-muted focus:bg-muted",
                 )}
               >
+                <span
+                  className={cn(
+                    "flex size-7 shrink-0 items-center justify-center rounded-md",
+                    style.tile,
+                  )}
+                >
+                  <style.icon className="size-4" />
+                </span>
                 <span className="flex-1">{section.name}</span>
                 <span className="text-muted-foreground text-xs font-normal">
                   {section.items.length}
