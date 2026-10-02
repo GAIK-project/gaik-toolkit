@@ -1,35 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// All demo routes require login + approval. The Solution Wizard is intentionally
-// NOT here — it has its own finer gate in proxy.ts (login + wizard_access / team
-// key), which also admits still-pending users who hold a grant.
-// IMPORTANT: when adding a new page under app/(demos)/, add its route here.
-const PROTECTED_ROUTES = [
-  "/audio-structured",
-  "/classifier",
-  "/dental-transcription",
-  "/diary",
-  "/document-structured",
-  "/extractor",
-  "/knowledge-curator",
-  "/knowledge-synthesis",
-  "/incident-report",
-  "/llm-judge",
-  "/luvata-order",
-  "/parser",
-  "/postgres-agent",
-  "/tabular-agent",
-  "/rag",
-  "/report-writer",
-  "/report-writer-v2",
-  "/schema-generator",
-  "/source-normalizer",
-  "/text-to-speech",
-  "/transcriber",
-  "/video-search",
-  "/vision-extractor",
-];
+// Demo pages are open to look at. Running a demo needs a signed-in, approved
+// account or the user's own model key, and that is enforced on the API requests
+// in proxy.ts (see lib/api-access.ts), not by redirecting here. The demo layout
+// shows a "View only" notice to visitors who cannot run yet. The Solution Wizard
+// has its own finer gate in proxy.ts.
 
 // Default route for authenticated users
 const DEFAULT_DEMO_ROUTE = "/";
@@ -43,10 +19,6 @@ function matchesRoute(pathname: string, routes: readonly string[]): boolean {
   return routes.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
-}
-
-function isProtectedRoute(pathname: string): boolean {
-  return matchesRoute(pathname, PROTECTED_ROUTES);
 }
 
 function isAuthRoute(pathname: string): boolean {
@@ -68,7 +40,8 @@ export interface AccessState {
 export async function getAccessState(
   request: NextRequest,
 ): Promise<AccessState> {
-  if (BYPASS_AUTH) return { loggedIn: true, approved: true, wizardAccess: true };
+  if (BYPASS_AUTH)
+    return { loggedIn: true, approved: true, wizardAccess: true };
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -143,34 +116,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  // Handle protected demo routes
-  if (isProtectedRoute(pathname)) {
-    if (!user) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/sign-in";
-      return NextResponse.redirect(url);
-    }
-
-    // Check access request status
-    const { data: accessRequest } = await supabase
-      .from("access_requests")
-      .select("status")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!accessRequest || accessRequest.status === "pending") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/access-pending";
-      return NextResponse.redirect(url);
-    }
-
-    if (accessRequest.status === "rejected") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/sign-in";
-      return NextResponse.redirect(url);
-    }
-  }
 
   // Redirect logged-in users with approved access away from auth routes
   if (isAuthRoute(pathname) && user) {
