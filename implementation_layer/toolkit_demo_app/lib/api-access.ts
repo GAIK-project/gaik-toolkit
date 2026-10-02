@@ -11,7 +11,20 @@ export function isStateChanging(method: string): boolean {
   return !READ_METHODS.has(method.toUpperCase());
 }
 
-export function needsApprovedUser(method: string, pathname: string): boolean {
+/**
+ * `ownModelKey` is true when the request carries the user's own model key for a
+ * route that supports it. That call runs on the user's credential, so it does not
+ * need a signed-in, approved account.
+ */
+export function needsApprovedUser(
+  method: string,
+  pathname: string,
+  ownModelKey = false,
+): boolean {
   // The wizard API has its own gate, including the team-key path.
-  return isStateChanging(method) && !pathname.startsWith("/api/wizard");
+  return (
+    isStateChanging(method) &&
+    !pathname.startsWith("/api/wizard") &&
+    !ownModelKey
+  );
 }

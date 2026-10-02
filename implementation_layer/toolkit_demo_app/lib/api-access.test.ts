@@ -18,3 +18,11 @@ test("the wizard API keeps its own gate", () => {
   expect(needsApprovedUser("POST", "/api/wizard/start")).toBe(false);
   expect(needsApprovedUser("DELETE", "/api/wizard/end/abc")).toBe(false);
 });
+
+test("a request with the user's own model key needs no account", () => {
+  expect(needsApprovedUser("POST", "/api/extract", true)).toBe(false);
+  expect(needsApprovedUser("POST", "/api/extract", false)).toBe(true);
+  expect(needsApprovedUser("DELETE", "/api/video-search/clear", false)).toBe(
+    true,
+  );
+});

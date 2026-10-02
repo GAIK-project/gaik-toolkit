@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ComponentType } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { KeyRound, Loader2, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ import { setModelSettings, useModelSettings } from "@/lib/model-settings-store";
 
 const LABELS = { openai: "OpenAI", azure: "Azure OpenAI", aitta: "CSC Aitta" };
 const CUSTOM = "__custom__";
+const OPEN_EVENT = "gaik:open-model-settings";
 
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 type Preset = { id: string; label: string; note?: string; Icon?: IconType };
@@ -108,6 +110,7 @@ export function ModelSettingsButton() {
   const activeRequest = useRef<AbortController | null>(null);
   const customInput = useRef<HTMLInputElement>(null);
   const focusCustom = useRef(false);
+  const changeOpenRef = useRef<(next: boolean) => void>(() => {});
 
   useEffect(() => {
     const clear = () => {
@@ -128,6 +131,12 @@ export function ModelSettingsButton() {
     };
   }, []);
 
+  useEffect(() => {
+    const openDialog = () => changeOpenRef.current(true);
+    window.addEventListener(OPEN_EVENT, openDialog);
+    return () => window.removeEventListener(OPEN_EVENT, openDialog);
+  }, []);
+
   function changeOpen(next: boolean) {
     // Closing remains possible during an Aitta cold start. Its eventual result
     // must not update a fresh draft if the dialog is opened again.
@@ -142,6 +151,8 @@ export function ModelSettingsButton() {
     );
     setMessage("");
   }
+
+  changeOpenRef.current = changeOpen;
 
   function updateDraft(changes: Partial<ModelSettings>) {
     setDraft((previous) => ({ ...previous, ...changes }));
@@ -457,6 +468,53 @@ export function ModelSettingsNotice() {
       <Button variant="ghost" size="sm" onClick={() => setModelSettings(null)}>
         Clear own key
       </Button>
+    </div>
+  );
+}
+
+/** Tells visitors who cannot run a demo yet how to: sign in or use their own key. */
+export function AccessNotice({
+  loggedIn,
+  unlocked,
+}: {
+  loggedIn: boolean;
+  unlocked: boolean;
+}) {
+  const settings = useModelSettings();
+  const pathname = usePathname();
+  if (unlocked) return null;
+  const ownKeyWorks = pageUsesModelSettings(pathname);
+  if (ownKeyWorks && settings) return null;
+  return (
+    <div
+      role="status"
+      className="border-border bg-muted/40 mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm"
+    >
+      <p>
+        <strong>View only.</strong>{" "}
+        {loggedIn
+          ? "Your access is pending approval, so running demos is off for now."
+          : "Sign in to run this demo."}
+        {ownKeyWorks
+          ? " You can also run it with your own model key, without an account."
+          : ""}
+      </p>
+      <div className="flex gap-2">
+        {!loggedIn && (
+          <Button asChild size="sm">
+            <Link href="/sign-in">Sign in</Link>
+          </Button>
+        )}
+        {ownKeyWorks && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
+          >
+            Use own key
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
