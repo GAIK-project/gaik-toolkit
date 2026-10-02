@@ -139,7 +139,7 @@ async def parse_document(
                 api_config={**config, "reasoning_effort": effort} if effort else config,
                 model=config["model"],
                 merge_table=True,
-                create_html=False,
+                create_html=True,
             )
             parse_result = await run_in_threadpool(parser.parse, tmp_path)
             usage = parse_result.usage
@@ -160,6 +160,8 @@ async def parse_document(
             result = {
                 "text_content": parse_result.clean_markdown,
                 "metadata": metadata,
+                # The parser's own styled page: only this parser makes one.
+                "html": parse_result.html,
             }
         elif parser_type == "docling_api":
             from gaik.software_components.parsers import PyMuPDFParser
@@ -207,12 +209,30 @@ async def parse_document(
         else:
             raise HTTPException(status_code=400, detail=f"Unknown parser: {parser_type}")
 
-        return {
+        # Some parsers write the name of the file they were given into the output; that
+        # is the temporary file, so show the name the user uploaded instead.
+        temp_name = Path(tmp_path).name
+        text_content = result.get("text_content", "")
+        metadata = result.get("metadata", {})
+        if file.filename:
+            text_content = text_content.replace(temp_name, file.filename)
+            metadata = {
+                key: value.replace(temp_name, file.filename) if isinstance(value, str) else value
+                for key, value in metadata.items()
+            }
+
+        response = {
             "filename": file.filename,
             "parser": parser_type,
-            "text_content": result.get("text_content", ""),
-            "metadata": result.get("metadata", {}),
+            "text_content": text_content,
+            "metadata": metadata,
         }
+        html_output = result.get("html")
+        if html_output:
+            response["html"] = (
+                html_output.replace(temp_name, file.filename) if file.filename else html_output
+            )
+        return response
 
     except HTTPException:
         # Keep the status this router chose; the catch-all below would turn a

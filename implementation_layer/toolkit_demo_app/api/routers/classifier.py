@@ -23,7 +23,7 @@ router = APIRouter()
 async def classify_document(
     file: UploadFile = File(...),
     classes: str = Form("invoice,receipt,contract,report"),
-    parser: Literal["auto", "pymupdf", "docx"] = Form("auto"),
+    parser: Literal["auto", "pymupdf", "docx", "vision"] = Form("auto"),
 ):
     """
     Classify a document into predefined categories.
