@@ -450,6 +450,13 @@ function DesktopMenuItem({
  * at first; choosing one (by hover, focus or click) lists its components, so the whole
  * catalogue is never on screen at once.
  */
+/** Width of a sectioned dropdown at the current viewport, matching its responsive classes. */
+function sectionedMenuWidth(viewport: number): number {
+  if (viewport >= 1024) return 640;
+  if (viewport >= 768) return 560;
+  return 420;
+}
+
 function SectionedMenu({ group, ctx }: { group: NavGroup; ctx: ItemContext }) {
   const sections = groupBySection(group.items);
   const current = sections.find((section) =>
@@ -886,6 +893,23 @@ export function SiteNav({
 
   const { openWizardAccess } = useOnboarding();
 
+  // A sectioned dropdown opens to the right of its trigger; when it would run off the
+  // screen it is shifted left by just the overflow.
+  const [menuShift, setMenuShift] = useState<Record<string, number>>({});
+  function trackMenuShift(
+    group: NavGroup,
+    event: React.SyntheticEvent<HTMLElement>,
+  ): void {
+    if (!isSectioned(group)) return;
+    const left = event.currentTarget.getBoundingClientRect().left;
+    const overflow =
+      left + sectionedMenuWidth(window.innerWidth) - (window.innerWidth - 16);
+    const shift = overflow > 0 ? -Math.min(overflow, left - 8) : 0;
+    setMenuShift((prev) =>
+      prev[group.label] === shift ? prev : { ...prev, [group.label]: shift },
+    );
+  }
+
   // Suppress hydration mismatch: GlimpseTrigger (Radix HoverCard asChild) renders
   // a different element on SSR vs client. Only pass the preview after mount so that
   // the server and client both render the plain <a> fallback on first render.
@@ -938,6 +962,8 @@ export function SiteNav({
                   return (
                     <NavigationMenuItem key={group.label}>
                       <NavigationMenuTrigger
+                        onPointerEnter={(event) => trackMenuShift(group, event)}
+                        onFocus={(event) => trackMenuShift(group, event)}
                         className={cn(
                           "h-9 rounded-full bg-transparent px-3 text-sm font-medium whitespace-nowrap transition-colors lg:h-10 lg:px-4",
                           isGroupActive
@@ -959,7 +985,14 @@ export function SiteNav({
                                   : group.label}
                         </span>
                       </NavigationMenuTrigger>
-                      <NavigationMenuContent align={dropdownAlign}>
+                      <NavigationMenuContent
+                        align={isSectioned(group) ? "start" : dropdownAlign}
+                        style={
+                          isSectioned(group)
+                            ? { left: menuShift[group.label] ?? 0 }
+                            : undefined
+                        }
+                      >
                         {isSectioned(group) ? (
                           <SectionedMenu group={group} ctx={itemContext} />
                         ) : (

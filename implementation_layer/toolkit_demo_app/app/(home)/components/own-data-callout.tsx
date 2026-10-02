@@ -1,13 +1,20 @@
 "use client";
 
-import { Button, buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { Check, Copy, Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Check, ChevronDown, Copy, ExternalLink, Mail } from "lucide-react";
 import { useState } from "react";
 
 const CONTACT_EMAIL = "info@gaik.ai";
+const OUTLOOK_URL = `https://outlook.office.com/mail/deeplink/compose?to=${CONTACT_EMAIL}`;
+const GMAIL_URL = `https://mail.google.com/mail/?view=cm&to=${CONTACT_EMAIL}`;
 
-/** The free PoC offer. Copying the address works even without a mail app. */
+/** The free PoC offer. The address opens in a mail app, a web mailer or the clipboard. */
 export function OwnDataCallout() {
   const [copied, setCopied] = useState(false);
 
@@ -36,24 +43,48 @@ export function OwnDataCallout() {
           from GAIK&apos;s team.
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <a
-          href={`mailto:${CONTACT_EMAIL}`}
-          className={cn(buttonVariants(), "gap-2")}
-        >
-          <Mail className="size-4" />
-          {CONTACT_EMAIL}
-        </a>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={copyEmail}
-          aria-label="Copy email address"
-        >
-          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-        </Button>
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button className="shrink-0 gap-2">
+            <Mail className="size-4" />
+            Contact GAIK
+            <ChevronDown className="size-4 opacity-70" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuItem asChild>
+            <a href={`mailto:${CONTACT_EMAIL}`}>
+              <Mail className="size-4" />
+              Open in your mail app
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <a href={OUTLOOK_URL} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="size-4" />
+              Write in Outlook on the web
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <a href={GMAIL_URL} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="size-4" />
+              Write in Gmail
+            </a>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              void copyEmail();
+            }}
+          >
+            {copied ? (
+              <Check className="size-4" />
+            ) : (
+              <Copy className="size-4" />
+            )}
+            {copied ? "Copied" : `Copy ${CONTACT_EMAIL}`}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </section>
   );
 }

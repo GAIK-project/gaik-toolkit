@@ -21,25 +21,19 @@ export function Hero({
   }
 
   const wizardClassName =
-    "text-muted-foreground hover:text-foreground group inline-flex w-fit max-w-full items-center gap-2 text-left text-sm transition-colors";
+    "text-primary group inline-flex w-fit max-w-full items-center gap-2 text-left text-sm font-medium";
   const wizardContent = (
     <>
-      <Wand2 className="text-primary size-4 shrink-0" />
-      <span>
-        <span className="text-foreground font-medium underline-offset-4 group-hover:underline">
-          Solution Configuration Wizard
-        </span>{" "}
-        <span className="hidden sm:inline">
-          designs a proof of concept for your use case
-        </span>{" "}
-        (beta)
+      <Wand2 className="size-4 shrink-0" />
+      <span className="underline underline-offset-4">
+        Solution Configuration Wizard (beta)
       </span>
-      <ArrowRight className="size-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
+      <ArrowRight className="size-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
     </>
   );
 
   const newLinkClassName =
-    "text-foreground font-medium underline underline-offset-4 decoration-border hover:decoration-foreground transition-colors";
+    "text-primary font-medium underline underline-offset-4 hover:text-primary/80 transition-colors";
 
   return (
     <PageTransition className="bg-card relative overflow-hidden rounded-2xl border p-6 shadow-sm md:p-10">
@@ -49,26 +43,6 @@ export function Hero({
         className="bg-primary/10 pointer-events-none absolute -top-32 -right-32 hidden size-[28rem] rounded-full blur-3xl lg:block"
       />
       <div className="relative space-y-6">
-        {/* Update: what is new. Edit the text here; link only to pages that exist. */}
-        <p data-tour="update" className="text-muted-foreground text-sm">
-          <span className="text-foreground font-medium">New:</span>{" "}
-          <Link href="/report-writer-v2" className={newLinkClassName}>
-            Report Writer
-          </Link>{" "}
-          and its stages{" "}
-          <Link href="/source-normalizer" className={newLinkClassName}>
-            Source Normalizer
-          </Link>
-          ,{" "}
-          <Link href="/knowledge-curator" className={newLinkClassName}>
-            Knowledge Curator
-          </Link>{" "}
-          and{" "}
-          <Link href="/knowledge-synthesis" className={newLinkClassName}>
-            Knowledge Synthesizer
-          </Link>
-        </p>
-
         <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_21rem]">
           <div className="space-y-6">
             <div className="space-y-4" data-tour="hero">
@@ -104,14 +78,36 @@ export function Hero({
             </div>
 
             {/* Solution Configuration Wizard — beta. */}
-            <WizardEntry
-              hasWizardAccess={hasWizardAccess}
-              isAuthenticated={isAuthenticated}
-              tour="wizard"
-              className={wizardClassName}
-            >
-              {wizardContent}
-            </WizardEntry>
+            <div className="flex flex-col gap-2.5">
+              <WizardEntry
+                hasWizardAccess={hasWizardAccess}
+                isAuthenticated={isAuthenticated}
+                tour="wizard"
+                className={wizardClassName}
+              >
+                {wizardContent}
+              </WizardEntry>
+
+              {/* Update: what is new. Edit the text here; link only to pages that exist. */}
+              <p data-tour="update" className="text-muted-foreground text-sm">
+                <span className="text-foreground font-medium">New:</span>{" "}
+                <Link href="/report-writer-v2" className={newLinkClassName}>
+                  Report Writer
+                </Link>
+                ,{" "}
+                <Link href="/source-normalizer" className={newLinkClassName}>
+                  Source Normalizer
+                </Link>
+                ,{" "}
+                <Link href="/knowledge-curator" className={newLinkClassName}>
+                  Knowledge Curator
+                </Link>{" "}
+                and{" "}
+                <Link href="/knowledge-synthesis" className={newLinkClassName}>
+                  Knowledge Synthesizer
+                </Link>
+              </p>
+            </div>
           </div>
 
           <ProcessOverview className="hidden lg:flex" />
