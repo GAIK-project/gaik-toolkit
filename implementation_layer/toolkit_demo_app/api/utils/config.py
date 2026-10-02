@@ -33,7 +33,7 @@ MAX_VISION_PAGES = 10
 # Shared OpenAI settings for the demo website. Passing ``temperature=None``
 # omits that unsupported parameter for newer models while ``reasoning_effort``
 # remains available to models that accept it.
-MODEL = os.getenv("DEMO_LLM_MODEL", "gpt-6-luna")
+MODEL = os.getenv("DEMO_LLM_MODEL", "gpt-6-sol")
 MODEL_OPTIONS = {
     "temperature": None,
     "reasoning_effort": "none",

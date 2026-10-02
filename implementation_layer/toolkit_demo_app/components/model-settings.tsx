@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Azure } from "@/components/ui/svgs/azure";
 import { Openai } from "@/components/ui/svgs/openai";
+import { Gemma } from "@/components/ui/svgs/gemma";
+import { Meta } from "@/components/ui/svgs/meta";
+import { Qwen } from "@/components/ui/svgs/qwen";
 import {
   Dialog,
   DialogContent,
@@ -37,23 +40,38 @@ import { setModelSettings, useModelSettings } from "@/lib/model-settings-store";
 const LABELS = { openai: "OpenAI", azure: "Azure OpenAI", aitta: "CSC Aitta" };
 const CUSTOM = "__custom__";
 
-type Preset = { id: string; label: string; note?: string };
+type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+type Preset = { id: string; label: string; note?: string; Icon?: IconType };
 const GPT_PRESETS: Preset[] = [
-  { id: "gpt-6-luna", label: "GPT-6 Luna", note: "default" },
-  { id: "gpt-6-sol", label: "GPT-6 Sol" },
-  { id: "gpt-6-astra", label: "GPT-6 Astra" },
-  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
+  { id: "gpt-6-sol", label: "GPT-6 Sol", note: "default", Icon: Openai },
+  { id: "gpt-6.1-sol", label: "GPT-6.1 Sol", note: "newest", Icon: Openai },
+  { id: "gpt-6-luna", label: "GPT-6 Luna", Icon: Openai },
+  { id: "gpt-6-astra", label: "GPT-6 Astra", Icon: Openai },
+  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", Icon: Openai },
 ];
 // Azure deployment names are chosen per resource; these match the model names.
 const PRESETS: Record<ModelProvider, Preset[]> = {
   openai: GPT_PRESETS,
   azure: GPT_PRESETS,
   aitta: [
-    { id: "google/gemma-4-31b-it", label: "Gemma 4 31B", note: "tested" },
+    {
+      id: "google/gemma-4-31b-it",
+      label: "Gemma 4 31B",
+      note: "tested",
+      Icon: Gemma,
+    },
+    {
+      id: "Qwen/Qwen3.6-27B",
+      label: "Qwen 3.6 27B",
+      note: "vision",
+      Icon: Qwen,
+    },
+    { id: "openai/gpt-oss-120b", label: "gpt-oss 120B", Icon: Openai },
     {
       id: "LumiOpen/Llama-Poro-2-70B-Instruct",
       label: "Poro 2 70B",
       note: "Finnish, simple schemas",
+      Icon: Meta,
     },
   ],
 };
@@ -61,7 +79,7 @@ const PRESETS: Record<ModelProvider, Preset[]> = {
 const PROVIDERS: {
   id: ModelProvider;
   label: string;
-  Icon: ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+  Icon: IconType;
 }[] = [
   { id: "openai", label: "OpenAI", Icon: Openai },
   { id: "azure", label: "Azure", Icon: Azure },
@@ -197,21 +215,24 @@ export function ModelSettingsButton() {
   return (
     <>
       <Button
-        variant="ghost"
-        size="icon"
-        className="text-muted-foreground hover:text-foreground relative"
+        variant={settings ? "secondary" : "ghost"}
+        size={settings ? "sm" : "icon"}
+        className={
+          settings
+            ? "text-primary relative max-w-48 gap-1.5"
+            : "text-muted-foreground hover:text-foreground relative"
+        }
         onClick={() => changeOpen(true)}
         aria-label={
           settings ? "Model settings (own model in use)" : "Model settings"
         }
         title={settings ? "Own model in use" : "Use your own model"}
       >
-        <KeyRound className="h-4 w-4" />
+        <KeyRound className="h-4 w-4 shrink-0" />
         {settings && (
-          <span
-            aria-hidden="true"
-            className="bg-primary ring-card absolute top-1.5 right-1.5 size-2 rounded-full ring-2"
-          />
+          <span className="hidden truncate text-xs font-medium lg:inline">
+            Own: {settings.model.split("/").pop()}
+          </span>
         )}
       </Button>
       <Dialog open={open} onOpenChange={changeOpen}>
@@ -227,6 +248,15 @@ export function ModelSettingsButton() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {settings && (
+              <p
+                role="status"
+                className="bg-primary/10 text-primary rounded-md px-3 py-2 text-sm"
+              >
+                In use: <strong>{LABELS[settings.provider]}</strong> ·{" "}
+                {settings.model}
+              </p>
+            )}
             <ToggleGroup
               type="single"
               variant="outline"
@@ -273,6 +303,9 @@ export function ModelSettingsButton() {
                 >
                   {PRESETS[draft.provider].map((preset) => (
                     <SelectItem key={preset.id} value={preset.id}>
+                      {preset.Icon && (
+                        <preset.Icon className="size-4" aria-hidden />
+                      )}
                       {preset.label}
                       {preset.note && (
                         <span className="text-muted-foreground">
@@ -345,8 +378,11 @@ export function ModelSettingsButton() {
             </div>
             {draft.provider === "aitta" && (
               <p className="text-muted-foreground text-xs">
-                The first request can take a few minutes while Aitta starts the
-                model.
+                Experimental. The first request can take a few minutes while
+                Aitta starts the model, and models that are offline in the Aitta
+                catalog do not answer. One model serves every call, so demos
+                that need several models, or audio transcription, stay on the
+                server settings.
               </p>
             )}
             <p className="text-muted-foreground text-xs">
