@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api-client";
 import {
   MODEL_SETTINGS_HEADER,
@@ -228,32 +229,32 @@ export function ModelSettingsButton() {
   return (
     <>
       <Button
-        variant={settings ? "secondary" : "ghost"}
-        size={settings ? "sm" : "icon"}
-        className={
-          settings
-            ? "text-primary relative max-w-48 gap-1.5"
-            : "text-muted-foreground hover:text-foreground relative"
-        }
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-foreground relative"
         onClick={() => changeOpen(true)}
         aria-label={
-          settings ? "Model settings (own model in use)" : "Model settings"
+          settings
+            ? `Model settings, own model on${usedHere ? "" : " (not used on this page)"}`
+            : "Model settings"
         }
         title={
           settings
             ? usedHere
-              ? "Own model in use"
-              : "Your own model is not used on this page"
+              ? "Own model on"
+              : "Own model set, not used on this page"
             : "Use your own model"
         }
       >
-        <KeyRound className="h-4 w-4 shrink-0" />
+        <KeyRound className="h-4 w-4" />
         {settings && (
-          <span className="hidden truncate text-xs font-medium lg:inline">
-            {usedHere
-              ? `Own: ${settings.model.split("/").pop()}`
-              : "Own key: not used here"}
-          </span>
+          <span
+            aria-hidden="true"
+            className={cn(
+              "ring-card absolute top-1.5 right-1.5 size-2 rounded-full ring-2",
+              usedHere ? "bg-emerald-500" : "bg-muted-foreground/50",
+            )}
+          />
         )}
       </Button>
       <Dialog open={open} onOpenChange={changeOpen}>
@@ -264,8 +265,7 @@ export function ModelSettingsButton() {
           <DialogHeader>
             <DialogTitle>Use your own model</DialogTitle>
             <DialogDescription>
-              Optional. Your key stays in this tab, is sent only with supported
-              requests and is cleared on reload.
+              Your key stays in this tab and is cleared on reload.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -399,16 +399,11 @@ export function ModelSettingsButton() {
             </div>
             {draft.provider === "aitta" && (
               <p className="text-muted-foreground text-xs">
-                Experimental. The first request can take a few minutes while
-                Aitta starts the model, and models that are offline in the Aitta
-                catalog do not answer. One model serves every call, so demos
-                that need several models, or audio transcription, stay on the
-                server settings.
+                Experimental. A model that is starting can take minutes to
+                answer, and one model serves every call, so demos that need
+                several models stay on the server.
               </p>
             )}
-            <p className="text-muted-foreground text-xs">
-              Needs structured output; image inputs need vision.
-            </p>
             {message && (
               <p role="status" className="text-sm">
                 {message}
@@ -416,16 +411,20 @@ export function ModelSettingsButton() {
             )}
           </div>
           <DialogFooter className="flex-wrap gap-2 sm:justify-between">
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setModelSettings(null);
-                changeOpen(false);
-              }}
-              disabled={testing}
-            >
-              Use server defaults
-            </Button>
+            {settings ? (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setModelSettings(null);
+                  changeOpen(false);
+                }}
+                disabled={testing}
+              >
+                Clear own model
+              </Button>
+            ) : (
+              <span />
+            )}
             <div className="flex gap-2">
               <Button
                 variant="outline"
