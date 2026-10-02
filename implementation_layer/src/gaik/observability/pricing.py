@@ -35,6 +35,7 @@ Provider = Literal[
 
 OPENAI_PRICING_PER_M: dict[str, tuple[float, float]] = {
     "gpt-6-astra": (10.00, 50.00),
+    "gpt-6.1-sol": (2.00, 10.00),
     "gpt-6-sol": (2.00, 10.00),
     "gpt-6-luna": (0.10, 0.50),
     "gpt-5.6-sol": (4.00, 20.00),

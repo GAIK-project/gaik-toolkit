@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { KeyRound, Loader2, Server } from "lucide-react";
+import { KeyRound, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Azure } from "@/components/ui/svgs/azure";
 import { Openai } from "@/components/ui/svgs/openai";
+import { Csc } from "@/components/ui/svgs/csc";
 import { Gemma } from "@/components/ui/svgs/gemma";
 import { Meta } from "@/components/ui/svgs/meta";
 import {
@@ -84,7 +85,7 @@ const PROVIDERS: {
 }[] = [
   { id: "openai", label: "OpenAI", Icon: Openai },
   { id: "azure", label: "Azure", Icon: Azure },
-  { id: "aitta", label: "CSC Aitta", Icon: Server },
+  { id: "aitta", label: "CSC Aitta", Icon: Csc },
 ];
 
 function emptyDraft(provider: ModelProvider = "openai"): ModelSettings {
