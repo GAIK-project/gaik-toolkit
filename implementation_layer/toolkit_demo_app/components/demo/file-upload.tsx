@@ -25,6 +25,8 @@ interface FileUploadProps {
   onFileRemove?: () => void;
   disabled?: boolean;
   className?: string;
+  /** A lower drop area, for a page that is short of room. */
+  compact?: boolean;
 }
 
 export function FileUpload({
@@ -35,6 +37,7 @@ export function FileUpload({
   onFileRemove,
   disabled = false,
   className,
+  compact = false,
 }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [internalFile, setInternalFile] = useState<File | null>(null);
@@ -170,7 +173,9 @@ export function FileUpload({
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               className={cn(
-                "flex min-h-[176px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 transition-all",
+                compact
+                  ? "flex min-h-[104px] cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed p-4 transition-all"
+                  : "flex min-h-[176px] cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 transition-all",
                 isDragging
                   ? "border-primary bg-primary/5 scale-[1.02]"
                   : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50",
@@ -186,7 +191,7 @@ export function FileUpload({
               >
                 <Upload
                   className={cn(
-                    "h-10 w-10",
+                    compact ? "h-7 w-7" : "h-10 w-10",
                     isDragging ? "text-primary" : "text-muted-foreground",
                   )}
                 />

@@ -1,7 +1,10 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import type { QuoteFailure, SectionKnowledge } from "@/lib/knowledge-curator/workspace";
+import type {
+  QuoteFailure,
+  SectionKnowledge,
+} from "@/lib/knowledge-curator/workspace";
 import { cn } from "@/lib/utils";
 
 /**
@@ -23,7 +26,7 @@ export function SectionView({
       {knowledge.missing.length > 0 && (
         <div>
           <p className="mb-1 font-medium">Missing (no source covers)</p>
-          <ul className="list-inside list-disc text-muted-foreground">
+          <ul className="text-muted-foreground list-inside list-disc">
             {knowledge.missing.map((m, i) => (
               <li key={i}>{m}</li>
             ))}
@@ -41,7 +44,9 @@ export function SectionView({
                   {c.status}
                 </Badge>
                 <p className="text-muted-foreground">{c.description}</p>
-                <p className="font-mono text-muted-foreground">{c.unit_ids.join(", ")}</p>
+                <p className="text-muted-foreground font-mono">
+                  {c.unit_ids.join(", ")}
+                </p>
               </li>
             ))}
           </ul>
@@ -62,10 +67,12 @@ export function SectionView({
               )}
             >
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="font-mono text-muted-foreground">{u.id}</span>
+                <span className="text-muted-foreground font-mono">{u.id}</span>
                 <span className="font-medium">{u.topic}</span>
                 {u.time_qualifier && (
-                  <span className="text-muted-foreground">({u.time_qualifier})</span>
+                  <span className="text-muted-foreground">
+                    ({u.time_qualifier})
+                  </span>
                 )}
                 <Badge variant="outline" className="text-[10px]">
                   {u.confidence}
@@ -77,10 +84,10 @@ export function SectionView({
                 )}
               </div>
               <p>{u.summary}</p>
-              <blockquote className="border-l-2 pl-2 text-muted-foreground">
+              <blockquote className="text-muted-foreground border-l-2 pl-2">
                 {u.quote}
               </blockquote>
-              <p className="font-mono text-muted-foreground">
+              <p className="text-muted-foreground font-mono">
                 {u.source.file}
                 {u.source.locator ? `, ${u.source.locator}` : ""}
                 {u.source_class ? ` · ${u.source_class}` : ""}

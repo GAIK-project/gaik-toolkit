@@ -2,16 +2,10 @@
 
 import { MessageResponse } from "@/components/ai-elements/message";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
-import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
+import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { FeedbackButton } from "@/components/feedback";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,8 +18,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { downloadBlob as download } from "@/lib/download";
 import {
   AUDIO_COMPRESS_COMMAND,
   isMediaFile,
@@ -33,14 +29,12 @@ import {
   REPORT_UPLOAD_MAX_MB,
   totalFileBytes,
 } from "@/lib/report-writer/upload-limit";
-import { downloadBlob as download } from "@/lib/download";
 import { processSSEStream } from "@/lib/sse";
 import { putHandoff } from "@/lib/source-normalizer/handoff";
 import {
   ACCEPT,
   buildManifest,
   DEFAULT_OPTIONS,
-  FILE_KINDS,
   isSupportedFile,
   MANIFEST_PATH,
   MAX_FILES,
@@ -54,30 +48,74 @@ import {
 import { cn, formatFileSize } from "@/lib/utils";
 import {
   AlertTriangle,
+  Check,
+  Copy,
   Download,
   FileArchive,
   FileStack,
   FileText,
+  Layers,
   LibraryBig,
   Loader2,
   Pencil,
+  RotateCcw,
+  Search,
   Sparkles,
   Upload,
+  Wand2,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { countMatches, splitByQuery } from "../parser/parser-data";
+import {
+  countByClass,
+  describeText,
+  EXAMPLES,
+  hasImages,
+  hasRecordings,
+  kindOf,
+  progressShare,
+  type SourceExample,
+} from "./normalizer-data";
 
 const API = "/api/source-normalizer";
-// The example reuses the Report Writer v2 house condition assessment inputs. It picks
-// one file of each kind: a recording, a PDF, a spreadsheet and an image.
-const EXAMPLE_API = "/api/report-writer-v2/examples/house_condition_assessment";
-const EXAMPLE_FILES = [
+// The house example reuses the Report Writer v2 house condition assessment inputs. It
+// picks one file of each kind: a recording, a PDF, a spreadsheet and an image.
+const HOUSE_API = "/api/report-writer-v2/examples/house_condition_assessment";
+const HOUSE_FILES = [
   "rec1_exterior_attic.mp3",
   "renovation_report_1998.pdf",
   "maintenance_log.xlsx",
   "floor_plan.png",
+];
+
+const GUIDE_STEPS: GuideStep[] = [
+  {
+    icon: Upload,
+    title: "Add the sources",
+    text: "PDFs, Word files, spreadsheets, text, recordings and images, or start from a ready-made set.",
+  },
+  {
+    icon: Layers,
+    title: "Label them",
+    text: "Mark each file primary (first-hand evidence) or secondary (background).",
+  },
+  {
+    icon: Sparkles,
+    title: "Normalize",
+    text: "Each file becomes Markdown that keeps its file name and label. Progress shows file by file.",
+  },
+  {
+    icon: Search,
+    title: "Explore and use the texts",
+    text: "Search across all texts, read them, fix errors, then download them or send them to the Knowledge Curator.",
+  },
+];
+const GUIDE_NOTES = [
+  "Documents are converted locally. Only recordings and images call a model. A scanned PDF with no text layer stops the run, and recordings carry no timestamps for each utterance.",
+  "The result lives in this browser tab. Reloading or closing the tab loses it, so download the .zip first.",
 ];
 
 interface Row {
@@ -107,38 +145,95 @@ async function httpError(res: Response): Promise<Error> {
   );
 }
 
+/** The Markdown as it is written, with line numbers and the search marked. */
+function Source({ text, query }: { text: string; query: string }) {
+  return (
+    <pre className="font-mono text-xs leading-5">
+      {text.split("\n").map((line, index) => (
+        <div key={index} className="flex gap-3">
+          <span className="text-muted-foreground w-8 shrink-0 text-right select-none">
+            {index + 1}
+          </span>
+          <span className="min-w-0 break-words whitespace-pre-wrap">
+            {splitByQuery(line, query).map((part, partIndex) =>
+              part.hit ? (
+                <mark
+                  key={partIndex}
+                  className="rounded bg-amber-200 px-0.5 text-inherit"
+                >
+                  {part.text}
+                </mark>
+              ) : (
+                part.text
+              ),
+            )}
+          </span>
+        </div>
+      ))}
+    </pre>
+  );
+}
+
 export default function SourceNormalizerPage() {
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
   const [options, setOptions] = useState(DEFAULT_OPTIONS);
+  const [exampleId, setExampleId] = useState<string | null>(null);
   const [loadingExample, setLoadingExample] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [artifacts, setArtifacts] = useState<Record<string, string>>({});
+  const [original, setOriginal] = useState<Record<string, string>>({});
   const [usage, setUsage] = useState<Record<string, number> | null>(null);
   const [edited, setEdited] = useState<Set<string>>(new Set());
 
   const [selected, setSelected] = useState<string | null>(null);
   const [draft, setDraft] = useState<string | null>(null);
+  const [tab, setTab] = useState("rendered");
+  const [query, setQuery] = useState("");
+  const [copied, setCopied] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const entries: NormalizedEntry[] = (() => {
+  const entries: NormalizedEntry[] = useMemo(() => {
     try {
       return readManifest(artifacts);
     } catch {
       return [];
     }
-  })();
+  }, [artifacts]);
   const hasResult = MANIFEST_PATH in artifacts;
 
+  const names = rows.map((r) => r.name);
   const uploadBytes = totalFileBytes(rows.map((r) => r.file));
   const uploadTooLarge = uploadBytes > REPORT_UPLOAD_MAX_BYTES;
   const mediaFiles = rows.filter((r) => isMediaFile(r.name));
   const busy = running || loadingExample;
+  const recordings = hasRecordings(names);
+  const images = hasImages(names);
+
+  const mdPaths = Object.keys(artifacts)
+    .filter((p) => p.endsWith(".md"))
+    .sort();
+  const text = selected ? artifacts[selected] : undefined;
+  const entryOf = (path: string) =>
+    entries.find(
+      (e) => e.id === path.slice("normalized/".length, -".md".length),
+    );
+  const matchCounts = Object.fromEntries(
+    mdPaths.map((path) => [path, countMatches(artifacts[path], query)]),
+  );
+  const totalMatches = Object.values(matchCounts).reduce((a, b) => a + b, 0);
+  const filesWithMatches = Object.values(matchCounts).filter(Boolean).length;
+  const totals = describeText(mdPaths.map((p) => artifacts[p]).join("\n"));
+  const classCounts = countByClass(entries);
+  const selectedEntry = selected ? entryOf(selected) : undefined;
+  const selectedKind = selectedEntry ? kindOf(selectedEntry.file) : null;
+  const done = progressShare(progress.length, rows.length);
 
   function addFiles(files: File[], sourceClass: SourceClass = "primary") {
     const unsupported = files.filter((f) => !isSupportedFile(f.name));
@@ -158,50 +253,82 @@ export default function SourceNormalizerPage() {
       return;
     }
     setRows(next);
+    setExampleId(null);
   }
 
   function resetResult() {
     setArtifacts({});
+    setOriginal({});
     setUsage(null);
     setEdited(new Set());
     setSelected(null);
     setDraft(null);
     setProgress([]);
     setError(null);
+    setQuery("");
+    setTab("rendered");
   }
 
   function clearAll() {
-    if (hasResult && !window.confirm("Clearing removes the current result. Continue?"))
+    if (
+      hasResult &&
+      !window.confirm("Clearing removes the current result. Continue?")
+    )
       return;
     setRows([]);
     setOptions(DEFAULT_OPTIONS);
+    setExampleId(null);
     resetResult();
   }
 
-  async function loadExample() {
-    if (hasResult && !window.confirm("Loading the example replaces the current result. Continue?"))
+  async function pickExample(example: SourceExample | "house") {
+    if (busy) return;
+    if (
+      hasResult &&
+      !window.confirm(
+        "Loading an example replaces the current result. Continue?",
+      )
+    )
       return;
     setLoadingExample(true);
     try {
-      const specRes = await fetch(`${EXAMPLE_API}/spec`);
-      if (!specRes.ok) throw new Error(`GET spec failed (${specRes.status})`);
-      const spec = (await specRes.json()) as {
-        sources: Record<SourceClass, string[]>;
-      };
       const loaded: Row[] = [];
-      for (const sourceClass of ["primary", "secondary"] as const) {
-        for (const name of spec.sources[sourceClass]) {
-          if (!EXAMPLE_FILES.includes(name)) continue;
-          const res = await fetch(`${EXAMPLE_API}/files/${encodeURIComponent(name)}`);
-          if (!res.ok) throw new Error(`GET ${name} failed (${res.status})`);
-          loaded.push({ name, sourceClass, file: new File([await res.blob()], name) });
+      if (example === "house") {
+        const specRes = await fetch(`${HOUSE_API}/spec`);
+        if (!specRes.ok) throw new Error(`GET spec failed (${specRes.status})`);
+        const spec = (await specRes.json()) as {
+          sources: Record<SourceClass, string[]>;
+        };
+        for (const sourceClass of ["primary", "secondary"] as const) {
+          for (const name of spec.sources[sourceClass]) {
+            if (!HOUSE_FILES.includes(name)) continue;
+            const res = await fetch(
+              `${HOUSE_API}/files/${encodeURIComponent(name)}`,
+            );
+            if (!res.ok) throw new Error(`GET ${name} failed (${res.status})`);
+            loaded.push({
+              name,
+              sourceClass,
+              file: new File([await res.blob()], name),
+            });
+          }
+        }
+        if (loaded.length !== HOUSE_FILES.length)
+          throw new Error("The example is missing files.");
+      } else {
+        for (const entry of example.files) {
+          const res = await fetch(entry.url);
+          if (!res.ok) throw new Error(`Failed to load ${entry.name}`);
+          loaded.push({
+            name: entry.name,
+            sourceClass: entry.sourceClass,
+            file: new File([await res.blob()], entry.name),
+          });
         }
       }
-      if (loaded.length !== EXAMPLE_FILES.length)
-        throw new Error("The example is missing files.");
       setRows(loaded);
+      setExampleId(example === "house" ? "house" : example.id);
       resetResult();
-      toast.success("Example loaded. Click Normalize.");
     } catch (e) {
       toast.error(`Loading the example failed: ${message(e)}`);
     } finally {
@@ -212,7 +339,9 @@ export default function SourceNormalizerPage() {
   async function normalize() {
     if (busy || rows.length === 0) return;
     if (uploadTooLarge) {
-      toast.error(`Uploads exceed the ${REPORT_UPLOAD_MAX_MB} MB limit. See the note under Files.`);
+      toast.error(
+        `Uploads exceed the ${REPORT_UPLOAD_MAX_MB} MB limit. See the note under Files.`,
+      );
       return;
     }
     abortRef.current?.abort();
@@ -239,7 +368,8 @@ export default function SourceNormalizerPage() {
         onCustomEvent: (event) => {
           if (event.type === "progress")
             setProgress((p) => [...p, String(event.data.message)]);
-          else errors.push(`Unexpected "${event.type}" event from the backend.`);
+          else
+            errors.push(`Unexpected "${event.type}" event from the backend.`);
         },
       });
       const result = results.at(-1);
@@ -248,6 +378,7 @@ export default function SourceNormalizerPage() {
           throw new Error("The result has no usage.");
         const next = parseArtifacts(result.artifacts);
         setArtifacts(next);
+        setOriginal(next);
         setUsage(result.usage);
         setSelected(Object.keys(next).find((p) => p.endsWith(".md")) ?? null);
       }
@@ -288,8 +419,27 @@ export default function SourceNormalizerPage() {
     toast.success(`Saved ${selected}`);
   }
 
-  const mdPaths = Object.keys(artifacts).filter((p) => p.endsWith(".md")).sort();
-  const text = selected ? artifacts[selected] : undefined;
+  function resetText() {
+    if (selected === null) return;
+    setArtifacts((a) => ({ ...a, [selected]: original[selected] }));
+    setEdited((s) => {
+      const next = new Set(s);
+      next.delete(selected);
+      return next;
+    });
+    setDraft(null);
+  }
+
+  async function copyText() {
+    if (text === undefined) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Could not copy");
+    }
+  }
 
   return (
     <PageTransition>
@@ -298,96 +448,130 @@ export default function SourceNormalizerPage() {
         title="Source Normalizer"
         description="Transform data (PDFs, Word files, spreadsheets, text, recordings and images) in a uniform Markdown format."
         className="mb-6"
-      >
-        <p className="mt-1 text-xs text-muted-foreground">
-          Note: The result lives in this browser tab. Reloading or closing the
-          tab loses it, so download the .zip first.
-        </p>
-      </DemoPageHeader>
+      />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* ── LEFT COLUMN ── */}
-        <div className="space-y-5">
+      <div className="space-y-6">
+        <SectionGuide
+          heading="How to use the Source Normalizer"
+          steps={GUIDE_STEPS}
+          notes={GUIDE_NOTES}
+        />
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">
+            Start from a ready-made set of sources
+          </h2>
+          <div
+            role="radiogroup"
+            aria-label="Ready-made sets"
+            className="grid gap-3 sm:grid-cols-2"
+          >
+            {EXAMPLES.map((example) => (
+              <button
+                key={example.id}
+                type="button"
+                role="radio"
+                aria-checked={exampleId === example.id}
+                disabled={busy}
+                onClick={() => void pickExample(example)}
+                className={cn(
+                  "flex flex-col gap-1.5 rounded-xl border-2 p-3 text-left transition-all",
+                  exampleId === example.id
+                    ? "border-primary bg-primary/5"
+                    : "bg-card hover:border-primary/40",
+                )}
+              >
+                <span className="font-semibold">{example.title}</span>
+                <span className="text-muted-foreground text-sm">
+                  {example.summary}
+                </span>
+                <span className="flex flex-wrap gap-1">
+                  {example.tags.map((tag) => (
+                    <Badge key={tag} variant="outline" className="font-normal">
+                      {tag}
+                    </Badge>
+                  ))}
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={exampleId === "house"}
+              disabled={busy}
+              onClick={() => void pickExample("house")}
+              className={cn(
+                "flex flex-col gap-1.5 rounded-xl border-2 p-3 text-left transition-all",
+                exampleId === "house"
+                  ? "border-primary bg-primary/5"
+                  : "bg-card hover:border-primary/40",
+              )}
+            >
+              <span className="font-semibold">
+                A house condition assessment
+              </span>
+              <span className="text-muted-foreground text-sm">
+                A recording, an old report, a maintenance log and a floor plan:
+                one source of every kind. The recording and the image call a
+                model, so this takes longer.
+              </span>
+              <span className="flex flex-wrap gap-1">
+                {["recording", "PDF", "spreadsheet", "image"].map((tag) => (
+                  <Badge key={tag} variant="outline" className="font-normal">
+                    {tag}
+                  </Badge>
+                ))}
+              </span>
+            </button>
+          </div>
+        </section>
+
+        <div className="grid items-stretch gap-6 md:gap-8 lg:grid-cols-2">
           <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
+            <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
               <div>
-                <CardTitle className="text-base">Files</CardTitle>
+                <CardTitle>1. The sources</CardTitle>
                 <CardDescription>
-                  Up to {MAX_FILES} files, {REPORT_UPLOAD_MAX_MB} MB together. File
-                  names must be unique.
+                  Up to {MAX_FILES} files, {REPORT_UPLOAD_MAX_MB} MB together.
+                  File names must be unique.
                 </CardDescription>
               </div>
-              <div className="flex max-w-full flex-wrap gap-1">
-                <Button size="sm" variant="outline" onClick={loadExample} disabled={busy}>
-                  {loadingExample && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-                  Load example
-                </Button>
-                <Button size="sm" variant="ghost" onClick={clearAll} disabled={busy}>
-                  Clear
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearAll}
+                disabled={busy || rows.length === 0}
+              >
+                Clear
+              </Button>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {rows.length > 0 && (
-                <ul className="space-y-1">
-                  {rows.map((row, i) => (
-                    <li
-                      key={row.name}
-                      className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm"
-                    >
-                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span className="flex-1 truncate">{row.name}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatFileSize(row.file.size)}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        title="Primary sources are the evidence; secondary sources give background"
-                        onClick={() =>
-                          setRows(
-                            rows.map((r, j) =>
-                              j === i
-                                ? {
-                                    ...r,
-                                    sourceClass:
-                                      r.sourceClass === "primary" ? "secondary" : "primary",
-                                  }
-                                : r,
-                            ),
-                          )
-                        }
-                        className={cn(
-                          "shrink-0 rounded-full border px-2 py-0.5 font-mono text-xs transition-colors",
-                          row.sourceClass === "primary"
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border bg-muted text-muted-foreground",
-                          busy && "pointer-events-none opacity-50",
-                        )}
-                      >
-                        {row.sourceClass}
-                      </button>
-                      <button
-                        type="button"
-                        title="Remove"
-                        disabled={busy}
-                        onClick={() => setRows(rows.filter((_, j) => j !== i))}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <CardContent className="space-y-3">
               <label
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  if (!busy) addFiles(Array.from(e.dataTransfer.files));
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!busy) setIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                }}
                 className={cn(
-                  "flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground transition-colors hover:border-muted-foreground/50",
+                  "flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed px-3 py-5 text-sm transition-all",
+                  isDragging
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "text-muted-foreground hover:border-primary/50 hover:bg-muted/50",
                   busy && "pointer-events-none opacity-50",
                 )}
               >
                 <Upload className="h-4 w-4" />
-                Add files
+                {isDragging
+                  ? "Drop the files here"
+                  : "Drag & drop or click to add files"}
                 <input
                   type="file"
                   multiple
@@ -401,19 +585,88 @@ export default function SourceNormalizerPage() {
                 />
               </label>
 
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">Accepted file types</p>
-                <ul className="space-y-0.5">
-                  {FILE_KINDS.map((k) => (
-                    <li key={k.kind}>
-                      <span className="font-medium">{k.kind}</span>{" "}
-                      <span className="font-mono">{k.extensions.join(" ")}</span>
-                      <span> ({k.note})</span>
-                    </li>
-                  ))}
+              {loadingExample && (
+                <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading the sources…
+                </p>
+              )}
+
+              {rows.length > 0 && (
+                <ul className="max-h-80 space-y-1.5 overflow-auto">
+                  {rows.map((row, i) => {
+                    const kind = kindOf(row.name);
+                    return (
+                      <li
+                        key={row.name}
+                        className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                      >
+                        <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate">{row.name}</p>
+                          <p className="text-muted-foreground text-xs">
+                            {kind.label} · {kind.tool} ·{" "}
+                            {formatFileSize(row.file.size)}
+                            {kind.usesModel && (
+                              <span className="ml-1 text-amber-700">
+                                · calls a model
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          title="Primary sources are the evidence; secondary sources give background"
+                          onClick={() =>
+                            setRows(
+                              rows.map((r, j) =>
+                                j === i
+                                  ? {
+                                      ...r,
+                                      sourceClass:
+                                        r.sourceClass === "primary"
+                                          ? "secondary"
+                                          : "primary",
+                                    }
+                                  : r,
+                              ),
+                            )
+                          }
+                          className={cn(
+                            "shrink-0 rounded-full border px-2 py-0.5 font-mono text-xs transition-colors",
+                            row.sourceClass === "primary"
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-muted text-muted-foreground",
+                            busy && "pointer-events-none opacity-50",
+                          )}
+                        >
+                          {row.sourceClass}
+                        </button>
+                        <button
+                          type="button"
+                          title="Remove"
+                          aria-label={`Remove ${row.name}`}
+                          disabled={busy}
+                          onClick={() => {
+                            setRows(rows.filter((_, j) => j !== i));
+                            setExampleId(null);
+                          }}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
-                <p>{UNSUPPORTED_HINT}</p>
-              </div>
+              )}
+              <p className="text-muted-foreground text-xs">
+                Click primary or secondary to switch a label. Primary sources
+                are your own first-hand evidence, such as site notes or
+                recordings. Secondary sources are background, such as older
+                reports. {UNSUPPORTED_HINT}
+              </p>
 
               {uploadTooLarge && (
                 <Alert variant="destructive">
@@ -430,12 +683,15 @@ export default function SourceNormalizerPage() {
                           speech-quality MP3 (about 14 MB per hour) with ffmpeg,
                           replacing <code>input.mp4</code> with your file:
                         </p>
-                        <pre className="whitespace-pre-wrap break-all rounded bg-muted px-2 py-1.5 text-xs text-foreground">
+                        <pre className="bg-muted text-foreground rounded px-2 py-1.5 text-xs break-all whitespace-pre-wrap">
                           {AUDIO_COMPRESS_COMMAND}
                         </pre>
                       </>
                     ) : (
-                      <p>Remove some files or split large documents, then try again.</p>
+                      <p>
+                        Remove some files or split large documents, then try
+                        again.
+                      </p>
                     )}
                   </AlertDescription>
                 </Alert>
@@ -443,146 +699,156 @@ export default function SourceNormalizerPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="options" className="border-none">
-                <AccordionTrigger className="px-6 py-4 text-left text-sm font-medium text-muted-foreground hover:text-foreground hover:no-underline">
-                  <div>
-                    Options
-                    <p className="mt-1 text-sm font-normal text-muted-foreground">
-                      Only recordings and images call a model
-                    </p>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="space-y-3 px-6 pb-5">
-                  <div className="space-y-1">
-                    <Label htmlFor="sn-language" className="text-sm">
-                      Recording language
-                    </Label>
-                    <Input
-                      id="sn-language"
-                      value={options.language}
-                      disabled={busy}
-                      onChange={(e) => setOptions({ ...options, language: e.target.value })}
-                      placeholder="auto, en, fi, ..."
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="sn-transcription" className="text-sm">
-                      Transcription model
-                    </Label>
-                    <Input
-                      id="sn-transcription"
-                      value={options.transcription_model ?? ""}
-                      disabled={busy}
-                      onChange={(e) =>
-                        setOptions({ ...options, transcription_model: e.target.value })
-                      }
-                      placeholder="Server default, e.g. gpt-4o-transcribe"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="sn-vision" className="text-sm">
-                      Image model
-                    </Label>
-                    <Input
-                      id="sn-vision"
-                      value={options.vision_model ?? ""}
-                      disabled={busy}
-                      onChange={(e) => setOptions({ ...options, vision_model: e.target.value })}
-                      placeholder="Server default"
-                    />
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </Card>
+          <Card className="flex flex-col">
+            <CardHeader>
+              <CardTitle>2. Options</CardTitle>
+              <CardDescription>
+                Only recordings and images call a model. The other files are
+                converted locally, whatever you choose here.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="sn-language">Recording language</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {["auto", "fi", "en"].map((code) => (
+                    <button
+                      key={code}
+                      type="button"
+                      disabled={busy || (rows.length > 0 && !recordings)}
+                      aria-pressed={options.language === code}
+                      onClick={() => setOptions({ ...options, language: code })}
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-sm transition-colors disabled:opacity-50",
+                        options.language === code
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "hover:border-primary/40",
+                      )}
+                    >
+                      {code === "auto"
+                        ? "Auto-detect"
+                        : code === "fi"
+                          ? "Finnish"
+                          : "English"}
+                    </button>
+                  ))}
+                  <Input
+                    id="sn-language"
+                    value={options.language}
+                    disabled={busy || (rows.length > 0 && !recordings)}
+                    onChange={(e) =>
+                      setOptions({ ...options, language: e.target.value })
+                    }
+                    placeholder="auto, en, fi, …"
+                    className="w-32"
+                  />
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  {rows.length > 0 && !recordings
+                    ? "There are no recordings in the sources, so the language is not used."
+                    : "The language of the speech in the recordings, or a language code of your own."}
+                </p>
+              </div>
 
-          <div className="flex gap-2">
-            <Button
-              size="lg"
-              className="flex-1"
-              onClick={normalize}
-              disabled={busy || rows.length === 0 || uploadTooLarge}
-            >
-              {running ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="mr-2 h-4 w-4" />
-              )}
-              Normalize
-            </Button>
-            {running && (
-              <Button variant="outline" size="lg" onClick={() => abortRef.current?.abort()}>
-                <X className="mr-2 h-4 w-4" />
-                Cancel
-              </Button>
-            )}
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="sn-transcription">Transcription model</Label>
+                <Input
+                  id="sn-transcription"
+                  value={options.transcription_model ?? ""}
+                  disabled={busy || (rows.length > 0 && !recordings)}
+                  onChange={(e) =>
+                    setOptions({
+                      ...options,
+                      transcription_model: e.target.value,
+                    })
+                  }
+                  placeholder="The server's model"
+                />
+                <p className="text-muted-foreground text-xs">
+                  {rows.length > 0 && !recordings
+                    ? "There are no recordings in the sources."
+                    : "Leave it empty to use the server's transcription model."}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sn-vision">Image model</Label>
+                <Input
+                  id="sn-vision"
+                  value={options.vision_model ?? ""}
+                  disabled={busy || (rows.length > 0 && !images)}
+                  onChange={(e) =>
+                    setOptions({ ...options, vision_model: e.target.value })
+                  }
+                  placeholder="The server's model"
+                />
+                <p className="text-muted-foreground text-xs">
+                  {rows.length > 0 && !images
+                    ? "There are no images in the sources."
+                    : "Leave it empty to use the server's model for describing images."}
+                </p>
+              </div>
+
+              <div className="mt-auto flex gap-2 pt-2">
+                <Button
+                  size="lg"
+                  className="flex-1"
+                  onClick={normalize}
+                  disabled={busy || rows.length === 0 || uploadTooLarge}
+                >
+                  {running ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  {running ? "Normalizing…" : "Normalize"}
+                </Button>
+                {running && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => abortRef.current?.abort()}
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* ── RIGHT COLUMN ── */}
-        <div className="space-y-4">
-          <HowItWorksCard description="Why sources are normalized, and what happens next">
-            <p>
-              <strong>Purpose.</strong> Sources come in many formats: a PDF, a
-              spreadsheet, a recording and a photo cannot be read, searched or
-              checked in the same way. Normalizing turns each of them into plain
-              Markdown text, so every source can be read by a person or a model
-              in one uniform format. Each text keeps its original file name and
-              its primary or secondary label, so later steps can say where a
-              fact came from.
-            </p>
-            <p>
-              <strong>How each file is converted.</strong> PDFs and Word files
-              are parsed locally, spreadsheets become tables, recordings are
-              transcribed and images are described by a vision model.
-            </p>
-            <p>
-              <strong>Primary and secondary sources.</strong> Mark each file as
-              primary or secondary by clicking its label in the file list; new
-              files start as primary. Primary sources are your own first-hand
-              evidence, such as site notes or recordings. Secondary sources are
-              background, such as older reports or customer documents. The label
-              does not change how a file is converted. It is saved with the text
-              so that later steps know how far to trust each source: when
-              sources disagree, the Knowledge Curator can prefer primary over
-              secondary if its instructions say so.
-            </p>
-            <p>
-              A file that cannot be converted fully, such as a scanned PDF with
-              no text layer or an unsupported type, stops the run and is named
-              in the error. Recordings carry no per-utterance timestamps.
-            </p>
-            <p>
-              <strong>What you can do with the result.</strong> Read and edit
-              the texts to fix a transcription error, then download them, one
-              Markdown file each or everything as a .zip, or click{" "}
-              <strong>Send to Knowledge Curator</strong> to carry them to the
-              next step in this tab.
-            </p>
-            <p>
-              <strong>What the Knowledge Curator does.</strong> It reads the
-              normalized texts and, for the topics you define, collects the
-              facts that matter. Each fact is a short summary with the exact
-              quote it came from, its source file and its location. It also
-              lists what no source covers and where the sources disagree, so the
-              facts can be checked and reused, for example as the basis of a
-              report.
-            </p>
-          </HowItWorksCard>
-
+        <div className="space-y-4" aria-live="polite">
           {progress.length > 0 && (
             <Card>
-              <CardContent className="max-h-40 space-y-0.5 overflow-y-auto py-3 text-xs">
-                {progress.map((m, i) => (
-                  <p key={i} className="flex items-center gap-1.5">
-                    {running && i === progress.length - 1 && (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    )}
-                    {m}
-                  </p>
-                ))}
+              <CardContent className="space-y-2 py-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-medium">
+                    {running ? "Converting…" : "Converted"}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {Math.min(progress.length, rows.length)} of {rows.length}{" "}
+                    sources
+                  </span>
+                </div>
+                <div className="bg-muted h-2 overflow-hidden rounded-full">
+                  <div
+                    className="bg-primary h-full rounded-full transition-all"
+                    style={{ width: `${(running ? done : 1) * 100}%` }}
+                  />
+                </div>
+                <div className="max-h-28 space-y-0.5 overflow-y-auto text-xs">
+                  {progress.map((m, i) => (
+                    <p key={i} className="flex items-center gap-1.5">
+                      {running && i === progress.length - 1 ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Check className="h-3 w-3 text-emerald-600" />
+                      )}
+                      {m}
+                    </p>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           )}
@@ -590,104 +856,197 @@ export default function SourceNormalizerPage() {
           {error && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
-              <AlertDescription className="whitespace-pre-wrap text-xs">
+              <AlertDescription className="text-xs whitespace-pre-wrap">
                 {error}
               </AlertDescription>
             </Alert>
           )}
 
-          {usage && (
-            <p className="text-xs text-muted-foreground">
-              <span className="font-medium">Usage:</span>{" "}
-              {Object.entries(usage)
-                .map(([k, v]) => `${k} ${v.toLocaleString()}`)
-                .join(" · ") || "no model calls"}
-            </p>
-          )}
-
           {hasResult ? (
             <Card>
-              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0 pb-3">
-                <div className="min-w-[12rem] flex-1">
-                  <CardTitle className="text-base">Normalized texts</CardTitle>
-                  <CardDescription>
-                    Select a text to read it. Edit it before you download.
-                  </CardDescription>
+              <CardHeader className="gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle>Normalized texts</CardTitle>
+                  <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                    <Button size="sm" onClick={sendToCurator}>
+                      <LibraryBig className="mr-1 h-3.5 w-3.5" />
+                      Send to Knowledge Curator
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        download(
+                          new Uint8Array(zipArtifacts(artifacts)),
+                          "normalized.zip",
+                          "application/zip",
+                        )
+                      }
+                    >
+                      <FileArchive className="mr-1 h-3.5 w-3.5" />
+                      Download all (.zip)
+                    </Button>
+                    <FeedbackButton demoType="source-normalizer" />
+                  </div>
                 </div>
-                <div className="flex max-w-full flex-wrap items-center justify-end gap-1">
-                  <Button size="sm" onClick={sendToCurator}>
-                    <LibraryBig className="mr-1 h-3.5 w-3.5" />
-                    Send to Knowledge Curator
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                      download(new Uint8Array(zipArtifacts(artifacts)), "normalized.zip", "application/zip")
-                    }
-                  >
-                    <FileArchive className="mr-1 h-3.5 w-3.5" />
-                    Download all (.zip)
-                  </Button>
-                  <FeedbackButton demoType="source-normalizer" />
+                <div className="flex flex-wrap gap-1.5 text-xs">
+                  <Badge variant="outline" className="font-normal">
+                    {mdPaths.length} {mdPaths.length === 1 ? "text" : "texts"}
+                  </Badge>
+                  <Badge variant="outline" className="font-normal">
+                    {totals.words.toLocaleString()} words
+                  </Badge>
+                  <Badge variant="outline" className="font-normal">
+                    {totals.chars.toLocaleString()} characters
+                  </Badge>
+                  {Object.entries(classCounts).map(([name, count]) => (
+                    <Badge key={name} variant="outline" className="font-normal">
+                      {count} {name}
+                    </Badge>
+                  ))}
+                  <Badge variant="outline" className="font-normal">
+                    {usage && Object.keys(usage).length > 0
+                      ? Object.entries(usage)
+                          .map(([k, v]) => `${k} ${v.toLocaleString()}`)
+                          .join(" · ")
+                      : "no model calls"}
+                  </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <ul className="space-y-0.5">
-                  {mdPaths.map((path) => {
-                    const id = path.slice("normalized/".length, -".md".length);
-                    const entry = entries.find((e) => e.id === id);
-                    return (
-                      <li
-                        key={path}
-                        className={cn(
-                          "flex items-center gap-1.5 rounded px-1.5 py-1 text-xs hover:bg-muted",
-                          path === selected && "bg-muted",
-                        )}
+              <CardContent className="grid gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
+                    <Input
+                      value={query}
+                      onChange={(e) => {
+                        setQuery(e.target.value);
+                        if (e.target.value.trim()) setTab("markdown");
+                      }}
+                      placeholder="Search in all texts"
+                      aria-label="Search in all texts"
+                      className="pr-8 pl-8"
+                    />
+                    {query && (
+                      <button
+                        type="button"
+                        aria-label="Clear the search"
+                        onClick={() => setQuery("")}
+                        className="text-muted-foreground hover:text-foreground absolute top-2.5 right-2.5"
                       >
-                        <button
-                          type="button"
-                          onClick={() => selectPath(path)}
-                          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-                        >
-                          <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                          <span className="truncate font-mono">{entry?.file ?? id}</span>
-                          {entry && (
-                            <span className="shrink-0 text-muted-foreground">
-                              {entry.source_type} · {entry.tool} ·{" "}
-                              {artifacts[path].length.toLocaleString()} chars
+                        <X className="size-4" />
+                      </button>
+                    )}
+                  </div>
+                  {query.trim() && (
+                    <p className="text-muted-foreground text-xs">
+                      {totalMatches === 0
+                        ? "No matches."
+                        : `${totalMatches} ${totalMatches === 1 ? "match" : "matches"} in ${filesWithMatches} ${filesWithMatches === 1 ? "text" : "texts"}`}
+                    </p>
+                  )}
+                  <ul className="space-y-1">
+                    {mdPaths.map((path) => {
+                      const entry = entryOf(path);
+                      const matches = matchCounts[path];
+                      return (
+                        <li key={path}>
+                          <button
+                            type="button"
+                            onClick={() => selectPath(path)}
+                            aria-current={path === selected}
+                            className={cn(
+                              "hover:bg-muted flex w-full flex-col gap-1 rounded-md border px-2.5 py-2 text-left text-xs transition-colors",
+                              path === selected &&
+                                "border-primary bg-primary/5",
+                              query.trim() && matches === 0 && "opacity-50",
+                            )}
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <FileText className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate font-mono">
+                                {entry?.file ?? path}
+                              </span>
+                              {query.trim() && matches > 0 && (
+                                <Badge className="ml-auto px-1.5 text-[10px]">
+                                  {matches}
+                                </Badge>
+                              )}
                             </span>
-                          )}
-                        </button>
-                        {entry?.source_class && (
-                          <Badge variant="outline" className="text-[10px]">
-                            {entry.source_class}
-                          </Badge>
-                        )}
-                        {edited.has(path) && (
-                          <Badge variant="outline" className="border-amber-500 text-[10px] text-amber-600">
-                            edited
-                          </Badge>
-                        )}
-                        <button
-                          type="button"
-                          title="Download"
-                          onClick={() => download(artifacts[path], `${id}.md`, "text/markdown")}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                            <span className="text-muted-foreground flex flex-wrap items-center gap-1">
+                              {entry && (
+                                <>
+                                  <span>{entry.source_type}</span>·
+                                  <span>{entry.tool}</span>·
+                                </>
+                              )}
+                              <span>
+                                {artifacts[path].length.toLocaleString()} chars
+                              </span>
+                              {entry?.source_class && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px]"
+                                >
+                                  {entry.source_class}
+                                </Badge>
+                              )}
+                              {edited.has(path) && (
+                                <Badge
+                                  variant="outline"
+                                  className="border-amber-500 text-[10px] text-amber-600"
+                                >
+                                  edited
+                                </Badge>
+                              )}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
 
                 {selected && text !== undefined && (
-                  <div className="rounded-md border">
-                    <div className="flex items-center gap-2 border-b px-3 py-2">
-                      <span className="flex-1 truncate font-mono text-xs">{selected}</span>
+                  <div className="min-w-0 rounded-md border">
+                    <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+                      <span className="flex-1 truncate font-mono text-xs">
+                        {selectedEntry?.file ?? selected}
+                      </span>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        onClick={() => void copyText()}
+                      >
+                        {copied ? <Check /> : <Copy />}
+                        Copy
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        onClick={() =>
+                          download(
+                            text,
+                            `${selected.slice("normalized/".length)}`,
+                            "text/markdown",
+                          )
+                        }
+                      >
+                        <Download />
+                        .md
+                      </Button>
+                      {edited.has(selected) && draft === null && (
+                        <Button size="xs" variant="outline" onClick={resetText}>
+                          <RotateCcw />
+                          Reset
+                        </Button>
+                      )}
                       {draft === null && (
-                        <Button size="xs" variant="outline" onClick={() => setDraft(text)}>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          onClick={() => setDraft(text)}
+                        >
                           <Pencil />
                           Edit
                         </Button>
@@ -704,27 +1063,91 @@ export default function SourceNormalizerPage() {
                           <Button size="sm" onClick={saveDraft}>
                             Save
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setDraft(null)}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDraft(null)}
+                          >
                             Cancel
                           </Button>
                         </div>
                       </div>
                     ) : (
-                      <div className="max-h-[480px] overflow-y-auto p-3">
-                        <MessageResponse className="text-sm">{text}</MessageResponse>
-                      </div>
+                      <Tabs value={tab} onValueChange={setTab} className="p-3">
+                        <TabsList>
+                          <TabsTrigger value="rendered">Rendered</TabsTrigger>
+                          <TabsTrigger value="markdown">Markdown</TabsTrigger>
+                          <TabsTrigger value="about">
+                            About this text
+                          </TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="rendered" className="mt-3">
+                          <div className="max-h-[32rem] overflow-y-auto">
+                            <MessageResponse className="text-sm">
+                              {text}
+                            </MessageResponse>
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="markdown" className="mt-3">
+                          <div className="max-h-[32rem] overflow-auto">
+                            <Source text={text} query={query} />
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="about" className="mt-3">
+                          <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[9rem_1fr]">
+                            <dt className="text-muted-foreground">
+                              Source file
+                            </dt>
+                            <dd className="font-mono">
+                              {selectedEntry?.file ?? "–"}
+                            </dd>
+                            <dt className="text-muted-foreground">Label</dt>
+                            <dd>{selectedEntry?.source_class ?? "none"}</dd>
+                            <dt className="text-muted-foreground">Type</dt>
+                            <dd>{selectedEntry?.source_type ?? "–"}</dd>
+                            <dt className="text-muted-foreground">
+                              Converted by
+                            </dt>
+                            <dd>
+                              <span className="font-mono">
+                                {selectedEntry?.tool ?? "–"}
+                              </span>
+                              {selectedKind?.usesModel && (
+                                <span className="ml-2 text-amber-700">
+                                  (calls a model)
+                                </span>
+                              )}
+                            </dd>
+                            <dt className="text-muted-foreground">The text</dt>
+                            <dd>{selectedKind?.text}</dd>
+                            <dt className="text-muted-foreground">Size</dt>
+                            <dd>
+                              {describeText(text).words.toLocaleString()} words
+                              · {describeText(text).lines.toLocaleString()}{" "}
+                              lines ·{" "}
+                              {describeText(text).chars.toLocaleString()}{" "}
+                              characters
+                            </dd>
+                            <dt className="text-muted-foreground">Saved as</dt>
+                            <dd className="font-mono">{selected}</dd>
+                          </dl>
+                        </TabsContent>
+                      </Tabs>
                     )}
                   </div>
                 )}
               </CardContent>
             </Card>
           ) : (
-            <EmptyStateCard
-              icon={FileStack}
-              title="No result yet"
-              description="Load the example or add files, then click Normalize."
-              feedbackSlot={<FeedbackButton demoType="source-normalizer" />}
-            />
+            !running &&
+            progress.length === 0 && (
+              <EmptyStateCard
+                icon={Wand2}
+                title="No result yet"
+                description="Load a ready-made set or add files, then click Normalize. The texts appear here, where you can search all of them at once."
+                feedbackSlot={<FeedbackButton demoType="source-normalizer" />}
+              />
+            )
           )}
         </div>
       </div>

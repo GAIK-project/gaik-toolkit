@@ -47,6 +47,14 @@ class TranscribeResponse(BaseModel):
     used_fallback: bool = False
     fallback_reason: str | None = None
     transcription_model: str | None = None
+    # How long the recording is, and how long the transcription took, in seconds.
+    audio_duration_s: float | None = None
+    duration_s: float | None = None
+    # Subtitle files made from the timed segments (the HH server only).
+    srt_content: str | None = None
+    vtt_content: str | None = None
+    # Token counts, or audio seconds, of the transcription requests.
+    usage: dict[str, int] | None = None
 
 
 @router.post("", response_model=TranscribeResponse)
@@ -165,10 +173,16 @@ async def transcribe_audio(
             correction_summary=correction_summary,
             diff_chunks=diff_chunks,
             job_id=result.job_id,
-            segments=result.segments if diarization else None,
+            # The HH server times every segment, with or without speaker detection.
+            segments=result.segments or None,
             used_fallback=used_fallback,
             fallback_reason=fallback_reason,
             transcription_model=transcription_model_used,
+            audio_duration_s=result.audio_duration_s,
+            duration_s=result.duration_s,
+            srt_content=result.srt_content,
+            vtt_content=result.vtt_content,
+            usage=result.usage or None,
         )
     except ImportError as e:
         raise HTTPException(status_code=500, detail=f"Transcriber not installed: {e}") from e

@@ -1,22 +1,12 @@
 "use client";
 
-import { apiFetch, RateLimitError } from "@/lib/api-client";
-import { FileUpload } from "@/components/demo/file-upload";
-import {
-  EmptyStateCard,
-  LoadingCard,
-  ResultCard,
-  ResultText,
-} from "@/components/demo/result-card";
-import { FeedbackButton } from "@/components/feedback";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
-import { HowItWorksCard } from "@/components/demo/how-it-works-card";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { FileUpload } from "@/components/demo/file-upload";
+import { PageTransition } from "@/components/demo/page-transition";
+import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
+import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
+import { FeedbackButton } from "@/components/feedback";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -27,269 +17,198 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Download, Mic, Sparkles } from "lucide-react";
+import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
+import {
+  AudioLines,
+  Languages,
+  Loader2,
+  Mic,
+  Sparkles,
+  Users,
+  Wand2,
+} from "lucide-react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { PageTransition } from "@/components/demo/page-transition";
+import { TranscriptView, type TranscribeResult } from "./transcript-view";
+import {
+  DEFAULT_OPTIONS,
+  EXAMPLES,
+  LANGUAGES,
+  type TranscriberExample,
+  type TranscriberOptions,
+} from "./transcriber-data";
 
-interface TranscriptSegment {
-  start: number | null;
-  end: number | null;
-  speaker: string | null;
-  text: string | null;
-}
+const GUIDE_STEPS: GuideStep[] = [
+  {
+    icon: AudioLines,
+    title: "Add a recording",
+    text: "Upload an audio or video file, or start from a ready-made recording that comes with the options that suit it.",
+  },
+  {
+    icon: Languages,
+    title: "Choose how to transcribe",
+    text: "Language, the Finnish HH server or the cloud model, speaker detection, hints and error fixing.",
+  },
+  {
+    icon: Sparkles,
+    title: "Transcribe",
+    text: "The text comes with timestamps and speakers when the HH server reads it.",
+  },
+  {
+    icon: Users,
+    title: "Explore the result",
+    text: "Play the recording and follow the text, search it, see who spoke, and accept or reject each correction.",
+  },
+];
+const GUIDE_NOTES = [
+  "Only the HH server (the Finnish transcriber) times the text and detects speakers. The cloud model returns the text alone.",
+  "Nothing is saved: the recording and its transcript stay in this session.",
+];
 
-interface CorrectionSummary {
-  total_changes: number;
-  insertions: number;
-  deletions: number;
-  substitutions: number;
-}
+const ACCEPT = ".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac";
+const IS_VIDEO = /\.(mp4|webm)$/i;
 
-interface DiffChunk {
-  kind: "equal" | "delete" | "insert" | "replace";
-  original: string;
-  corrected: string;
-}
-
-interface TranscribeResult {
-  filename: string;
-  raw_transcript: string;
-  enhanced_transcript: string | null;
-  corrected_transcript: string | null;
-  correction_summary: CorrectionSummary | null;
-  diff_chunks: DiffChunk[] | null;
-  job_id: string;
-  segments: TranscriptSegment[] | null;
-  used_fallback: boolean;
-  fallback_reason: string | null;
-  transcription_model: string | null;
+function Option({
+  title,
+  description,
+  htmlFor,
+  control,
+  disabled,
+}: {
+  title: string;
+  description: string;
+  htmlFor: string;
+  control: React.ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start justify-between gap-4",
+        disabled && "opacity-60",
+      )}
+    >
+      <div className="space-y-0.5">
+        <Label htmlFor={htmlFor}>{title}</Label>
+        <p className="text-muted-foreground text-xs">{description}</p>
+      </div>
+      {control}
+    </div>
+  );
 }
 
 export default function TranscriberPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [additionalContext, setAdditionalContext] = useState("");
-  const [enhancedTranscriptInstructions, setEnhancedTranscriptInstructions] =
-    useState("");
-  const [fixTranscriptionErrors, setFixTranscriptionErrors] = useState(false);
-  const [compressAudio, setCompressAudio] = useState(true);
-  const [language, setLanguage] = useState("auto");
-  const [diarization, setDiarization] = useState(false);
-  const [speakerCount, setSpeakerCount] = useState("");
-  const [minSpeakers, setMinSpeakers] = useState("");
-  const [maxSpeakers, setMaxSpeakers] = useState("");
-  const [preferLocalFirst, setPreferLocalFirst] = useState(true);
-  const [selectedTranscriptView, setSelectedTranscriptView] = useState<
-    "corrected" | "diff" | "diarized" | "raw"
-  >("raw");
-  const rawDiffRef = useRef<HTMLDivElement | null>(null);
-  const correctedDiffRef = useRef<HTMLDivElement | null>(null);
-  const syncingPaneRef = useRef<"raw" | "corrected" | null>(null);
+  const [options, setOptions] = useState<TranscriberOptions>(DEFAULT_OPTIONS);
+  const [exampleId, setExampleId] = useState<string | null>(null);
+  const [isLoadingExample, setIsLoadingExample] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<TranscribeResult | null>(null);
+  const [resultFile, setResultFile] = useState<File | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Cleanup on unmount
+  const busy = isLoading || isLoadingExample;
+  const set = (patch: Partial<TranscriberOptions>) =>
+    setOptions((previous) => ({ ...previous, ...patch }));
+  const language =
+    LANGUAGES.find((entry) => entry.id === options.language) ?? LANGUAGES[0];
+  const speakersNeedServer = options.diarization && !options.preferLocalFirst;
+
   useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-    };
+    return () => abortControllerRef.current?.abort();
   }, []);
 
-  const diarizedContent = result?.segments?.length
-    ? result.segments
-        .map((segment) => {
-          const start =
-            typeof segment.start === "number"
-              ? `${segment.start.toFixed(1)}s`
-              : "?";
-          const end =
-            typeof segment.end === "number"
-              ? `${segment.end.toFixed(1)}s`
-              : "?";
-          const speaker = segment.speaker || "UNK";
-          const text = segment.text?.trim() || "";
-          return `[${start} - ${end}] ${speaker}: ${text}`;
-        })
-        .join("\n")
-    : "";
+  // The recordings are played from the browser's own copy.
+  useEffect(() => {
+    if (!file) {
+      setFileUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setFileUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   useEffect(() => {
-    if (!result) {
-      setSelectedTranscriptView("raw");
+    if (!resultFile) {
+      setResultUrl(null);
       return;
     }
+    const url = URL.createObjectURL(resultFile);
+    setResultUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [resultFile]);
 
-    if (result.corrected_transcript) {
-      setSelectedTranscriptView("corrected");
-    } else if (diarizedContent) {
-      setSelectedTranscriptView("diarized");
-    } else {
-      setSelectedTranscriptView("raw");
-    }
-  }, [result, diarizedContent]);
-
-  const selectedTranscriptContent =
-    selectedTranscriptView === "corrected"
-      ? result?.corrected_transcript || result?.raw_transcript || ""
-      : selectedTranscriptView === "diff"
-        ? result?.corrected_transcript || result?.raw_transcript || ""
-        : selectedTranscriptView === "diarized"
-          ? diarizedContent || result?.raw_transcript || ""
-          : result?.raw_transcript || "";
-
-  const availableTabCount = [
-    Boolean(result?.corrected_transcript),
-    Boolean(result?.corrected_transcript && result?.diff_chunks?.length),
-    Boolean(diarizedContent),
-    true,
-  ].filter(Boolean).length;
-
-  function renderDiffColumn(side: "original" | "corrected") {
-    if (!result?.diff_chunks?.length) return null;
-
-    return result.diff_chunks.map((chunk, index) => {
-      const text = side === "original" ? chunk.original : chunk.corrected;
-      if (!text) return null;
-
-      let className = "";
-      if (chunk.kind === "replace") {
-        className =
-          side === "original"
-            ? "bg-red-100 text-red-900"
-            : "bg-green-100 text-green-900";
-      } else if (chunk.kind === "delete" && side === "original") {
-        className = "bg-red-100 text-red-900";
-      } else if (chunk.kind === "insert" && side === "corrected") {
-        className = "bg-green-100 text-green-900";
-      }
-
-      return (
-        <span
-          key={`${side}-${index}`}
-          className={className ? `${className} rounded px-1 py-0.5` : undefined}
-        >
-          {text}{" "}
-        </span>
-      );
-    });
+  function clearResult(): void {
+    setResult(null);
+    setResultFile(null);
   }
 
-  function syncDiffScroll(source: "raw" | "corrected"): void {
-    const sourceEl =
-      source === "raw" ? rawDiffRef.current : correctedDiffRef.current;
-    const targetEl =
-      source === "raw" ? correctedDiffRef.current : rawDiffRef.current;
-    if (!sourceEl || !targetEl) return;
-
-    if (syncingPaneRef.current && syncingPaneRef.current !== source) {
-      syncingPaneRef.current = null;
-      return;
-    }
-
-    syncingPaneRef.current = source;
-    const sourceMax = sourceEl.scrollHeight - sourceEl.clientHeight;
-    const targetMax = targetEl.scrollHeight - targetEl.clientHeight;
-    const ratio = sourceMax > 0 ? sourceEl.scrollTop / sourceMax : 0;
-    targetEl.scrollTop = ratio * Math.max(targetMax, 0);
-    targetEl.scrollLeft = sourceEl.scrollLeft;
-    requestAnimationFrame(() => {
-      if (syncingPaneRef.current === source) {
-        syncingPaneRef.current = null;
-      }
-    });
-  }
-
-  function handleDownloadTranscript(): void {
-    if (!result || !selectedTranscriptContent.trim()) return;
-
-    const stem = result.filename.replace(/\.[^.]+$/, "") || "transcript";
-    const blob = new Blob([selectedTranscriptContent], {
-      type: "text/plain;charset=utf-8",
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${stem}_transcript.txt`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  async function loadExampleAudio(): Promise<void> {
+  async function pickExample(example: TranscriberExample): Promise<void> {
+    if (busy) return;
+    setIsLoadingExample(true);
     try {
-      const response = await fetch("/Sample11.m4a");
-      if (!response.ok) {
-        throw new Error(`Failed to load example data (${response.status})`);
-      }
-
+      const response = await fetch(example.url);
+      if (!response.ok) throw new Error("Could not load the recording");
       const blob = await response.blob();
-      const sampleFile = new File([blob], "Sample11.m4a", {
-        type: blob.type || "audio/mp4",
-      });
-      setFile(sampleFile);
-      setResult(null);
-      toast.success("Example audio loaded");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to load example data",
+      setFile(
+        new File([blob], example.fileName, {
+          type: blob.type || "audio/mpeg",
+        }),
       );
+      setOptions({ ...DEFAULT_OPTIONS, ...example.options });
+      setExampleId(example.id);
+      clearResult();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed");
+    } finally {
+      setIsLoadingExample(false);
     }
   }
 
   async function handleSubmit(): Promise<void> {
-    if (isLoading) return; // Prevent double-click
-
+    if (busy) return;
     if (!file) {
       toast.error("Please select an audio/video file first");
       return;
     }
 
-    // Abort previous request if any
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
-    setResult(null);
+    clearResult();
 
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("custom_context", additionalContext);
-      formData.append(
-        "fix_transcription_errors",
-        String(fixTranscriptionErrors),
-      );
-      if (enhancedTranscriptInstructions.trim() !== "")
+      formData.append("custom_context", options.context);
+      formData.append("fix_transcription_errors", String(options.fixErrors));
+      if (options.fixInstructions.trim() !== "")
         formData.append(
           "enhanced_transcript_instructions",
-          enhancedTranscriptInstructions.trim(),
+          options.fixInstructions.trim(),
         );
-      formData.append("compress_audio", String(compressAudio));
-      formData.append("language", language);
-      formData.append("diarization", String(diarization));
-      formData.append("prefer_local_first", String(preferLocalFirst));
-      if (speakerCount.trim() !== "")
-        formData.append("speaker_count", speakerCount.trim());
-      if (minSpeakers.trim() !== "")
-        formData.append("min_speakers", minSpeakers.trim());
-      if (maxSpeakers.trim() !== "")
-        formData.append("max_speakers", maxSpeakers.trim());
-      if (additionalContext.trim() !== "")
-        formData.append("initial_prompt", additionalContext.trim());
+      formData.append("compress_audio", String(options.compress));
+      formData.append("language", options.language);
+      formData.append("diarization", String(options.diarization));
+      formData.append("prefer_local_first", String(options.preferLocalFirst));
+      if (options.diarization) {
+        if (options.speakerCount.trim() !== "")
+          formData.append("speaker_count", options.speakerCount.trim());
+        if (options.minSpeakers.trim() !== "")
+          formData.append("min_speakers", options.minSpeakers.trim());
+        if (options.maxSpeakers.trim() !== "")
+          formData.append("max_speakers", options.maxSpeakers.trim());
+      }
+      if (options.context.trim() !== "")
+        formData.append("initial_prompt", options.context.trim());
 
       const response = await apiFetch("/api/transcribe", {
         method: "POST",
@@ -308,37 +227,35 @@ export default function TranscriberPage() {
         throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as TranscribeResult;
       setResult(data);
+      setResultFile(file);
 
       posthog.capture("audio_transcribed", {
         file_type: file.type,
         file_size: file.size,
-        fix_transcription_errors: fixTranscriptionErrors,
+        fix_transcription_errors: options.fixErrors,
         has_enhanced_transcript_instructions:
-          enhancedTranscriptInstructions.trim().length > 0,
-        compress_audio: compressAudio,
-        has_custom_context: additionalContext.length > 0,
-        language: language,
-        diarization: diarization,
-        prefer_local_first: preferLocalFirst,
+          options.fixInstructions.trim().length > 0,
+        compress_audio: options.compress,
+        has_custom_context: options.context.length > 0,
+        language: options.language,
+        diarization: options.diarization,
+        prefer_local_first: options.preferLocalFirst,
         used_fallback: data.used_fallback,
         fallback_reason: data.fallback_reason,
         transcription_model: data.transcription_model,
+        example: exampleId,
       });
 
-      if (data.used_fallback) {
-        toast.success("Transcription complete (cloud fallback)");
-      } else {
-        toast.success("Transcription complete!");
-      }
+      toast.success(
+        data.used_fallback
+          ? "Transcription complete (cloud fallback)"
+          : "Transcription complete!",
+      );
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        return; // Request was aborted, don't show error
-      }
-      if (error instanceof RateLimitError) {
-        return; // Toast already shown by apiFetch
-      }
+      if (error instanceof Error && error.name === "AbortError") return;
+      if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
@@ -351,422 +268,362 @@ export default function TranscriberPage() {
         icon={Mic}
         title="Transcriber"
         description="Convert voice recordings and videos into clear, written text"
-        className="mb-8"
+        className="mb-6"
       />
 
-      <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
-        {/* Input Section */}
-        <div className="space-y-6">
-          <Card className="overflow-hidden">
-            <CardHeader>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <CardTitle>Upload Media</CardTitle>
-                  <CardDescription>
-                    Select an audio or video file to transcribe
-                  </CardDescription>
-                </div>
-                <Button
+      <div className="space-y-6">
+        <SectionGuide
+          heading="How to use the Transcriber"
+          steps={GUIDE_STEPS}
+          notes={GUIDE_NOTES}
+        />
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">
+            Start from a ready-made recording
+          </h2>
+          <div
+            role="radiogroup"
+            aria-label="Ready-made recordings"
+            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          >
+            {EXAMPLES.map((example) => (
+              <div
+                key={example.id}
+                className={cn(
+                  "flex flex-col gap-2 rounded-xl border-2 p-3 transition-all",
+                  exampleId === example.id
+                    ? "border-primary bg-primary/5"
+                    : "bg-card hover:border-primary/40",
+                )}
+              >
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={loadExampleAudio}
-                  disabled={isLoading}
+                  role="radio"
+                  aria-checked={exampleId === example.id}
+                  disabled={busy}
+                  onClick={() => void pickExample(example)}
+                  className="flex flex-1 flex-col gap-1.5 text-left"
                 >
-                  Load Example
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <FileUpload
-                file={file}
-                accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac"
-                maxSize={50}
-                onFileSelect={setFile}
-                onFileRemove={() => {
-                  setFile(null);
-                  setResult(null);
-                }}
-                disabled={isLoading}
-              />
-
-              <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="settings" className="border-none">
-                  <AccordionTrigger className="text-muted-foreground hover:text-foreground py-2 text-sm font-medium">
-                    Processing Settings
-                  </AccordionTrigger>
-                  <AccordionContent className="space-y-6 pt-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="language">Language</Label>
-                      <Select
-                        value={language}
-                        onValueChange={setLanguage}
-                        disabled={isLoading}
+                  <span className="font-semibold">{example.title}</span>
+                  <span className="text-muted-foreground text-sm">
+                    {example.summary}
+                  </span>
+                  <span className="flex flex-wrap gap-1">
+                    {example.tags.map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="font-normal"
                       >
-                        <SelectTrigger id="language">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="auto">auto</SelectItem>
-                          <SelectItem value="fi">fi</SelectItem>
-                          <SelectItem value="en">en</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                        {tag}
+                      </Badge>
+                    ))}
+                  </span>
+                </button>
+                <audio
+                  src={example.url}
+                  controls
+                  preload="none"
+                  className="h-8 w-full"
+                  aria-label={`Listen to ${example.title}`}
+                />
+              </div>
+            ))}
+          </div>
+        </section>
 
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label htmlFor="fix-transcription-errors">
-                            Fix Transcription Errors (Beta). Finnish Only.
-                          </Label>
-                          <p className="text-muted-foreground text-xs">
-                            Finnish-focused correction for spelling and ASR
-                            errors
-                          </p>
-                        </div>
-                        <Switch
-                          id="fix-transcription-errors"
-                          checked={fixTranscriptionErrors}
-                          onCheckedChange={setFixTranscriptionErrors}
-                          disabled={isLoading}
-                        />
-                      </div>
+        <div className="grid items-stretch gap-6 md:gap-8 lg:grid-cols-2">
+          <div className="flex flex-col gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>1. The recording</CardTitle>
+                <CardDescription>
+                  An audio or video file: MP3, WAV, M4A, MP4, WEBM, OGG or FLAC.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FileUpload
+                  compact
+                  file={file}
+                  accept={ACCEPT}
+                  maxSize={50}
+                  onFileSelect={(next) => {
+                    setFile(next);
+                    setExampleId(null);
+                    clearResult();
+                  }}
+                  onFileRemove={() => {
+                    setFile(null);
+                    setExampleId(null);
+                    clearResult();
+                  }}
+                  disabled={busy}
+                />
+                {isLoadingExample && (
+                  <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading the recording…
+                  </p>
+                )}
+                {fileUrl && file && !IS_VIDEO.test(file.name) && (
+                  <audio
+                    src={fileUrl}
+                    controls
+                    className="w-full"
+                    aria-label="Listen to the recording"
+                  />
+                )}
+                {fileUrl && file && IS_VIDEO.test(file.name) && (
+                  <video
+                    src={fileUrl}
+                    controls
+                    className="max-h-64 w-full rounded-md"
+                    aria-label="Watch the recording"
+                  />
+                )}
+              </CardContent>
+            </Card>
 
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label htmlFor="compress">Compress Audio</Label>
-                          <p className="text-muted-foreground text-xs">
-                            Compress before sending (faster upload)
-                          </p>
-                        </div>
-                        <Switch
-                          id="compress"
-                          checked={compressAudio}
-                          onCheckedChange={setCompressAudio}
-                          disabled={isLoading}
-                        />
-                      </div>
+            <Card className="flex-1">
+              <CardHeader>
+                <CardTitle>Hints and corrections (optional)</CardTitle>
+                <CardDescription>
+                  Help the model with the words of this recording, and let it
+                  correct the text afterwards.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="additional-context">Hints (context)</Label>
+                  <Textarea
+                    id="additional-context"
+                    value={options.context}
+                    onChange={(e) => set({ context: e.target.value })}
+                    placeholder="Names, technical terms, the topic…"
+                    disabled={busy}
+                    rows={3}
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Sent to the model with the recording, so that it spells
+                    names and terms the way you wrote them.
+                  </p>
+                </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label htmlFor="prefer-local-first">
-                            Finnish Transcriber
-                          </Label>
-                          <p className="text-muted-foreground text-xs">
-                            Finnish fine-tuned transcriber at HH&apos;s FastAPI
-                            server
-                          </p>
-                        </div>
-                        <Switch
-                          id="prefer-local-first"
-                          checked={preferLocalFirst}
-                          onCheckedChange={setPreferLocalFirst}
-                          disabled={isLoading}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label htmlFor="diarization">Diarization</Label>
-                          <p className="text-muted-foreground text-xs">
-                            Enable speaker diarization for the local transcriber
-                          </p>
-                        </div>
-                        <Switch
-                          id="diarization"
-                          checked={diarization}
-                          onCheckedChange={setDiarization}
-                          disabled={isLoading}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      {diarization ? (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="speaker-count">Speaker Count</Label>
-                            <Input
-                              id="speaker-count"
-                              type="number"
-                              min="1"
-                              value={speakerCount}
-                              onChange={(e) => setSpeakerCount(e.target.value)}
-                              placeholder="Optional"
-                              disabled={isLoading}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="min-speakers">Min Speakers</Label>
-                            <Input
-                              id="min-speakers"
-                              type="number"
-                              min="1"
-                              value={minSpeakers}
-                              onChange={(e) => setMinSpeakers(e.target.value)}
-                              placeholder="Optional"
-                              disabled={isLoading}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="max-speakers">Max Speakers</Label>
-                            <Input
-                              id="max-speakers"
-                              type="number"
-                              min="1"
-                              value={maxSpeakers}
-                              onChange={(e) => setMaxSpeakers(e.target.value)}
-                              placeholder="Optional"
-                              disabled={isLoading}
-                            />
-                          </div>
-                        </>
-                      ) : null}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="additional-context">
-                        Additional Context
-                      </Label>
-                      <Textarea
-                        id="additional-context"
-                        value={additionalContext}
-                        onChange={(e) => setAdditionalContext(e.target.value)}
-                        placeholder="Speaker names, technical terms, topic, or other hints to improve accuracy..."
-                        disabled={isLoading}
-                        rows={3}
+                <div className="space-y-3">
+                  <Option
+                    title="Fix transcription errors (Beta, Finnish only)"
+                    htmlFor="fix-transcription-errors"
+                    description="A second pass corrects spelling and recognition errors in Finnish text. You then review every change and accept or reject it."
+                    control={
+                      <Switch
+                        id="fix-transcription-errors"
+                        checked={options.fixErrors}
+                        onCheckedChange={(value) => set({ fixErrors: value })}
+                        disabled={busy}
                       />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="enhanced-transcript-instructions">
-                        Enhancement Instructions
+                    }
+                  />
+                  {options.fixErrors && options.language === "en" && (
+                    <p className="text-xs text-amber-700">
+                      Error fixing is made for Finnish. For English text it may
+                      change things that were right.
+                    </p>
+                  )}
+                  {options.fixErrors && (
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="enhanced-transcript-instructions"
+                        className="text-xs"
+                      >
+                        Instructions for the fixing
                       </Label>
                       <Textarea
                         id="enhanced-transcript-instructions"
-                        value={enhancedTranscriptInstructions}
+                        value={options.fixInstructions}
                         onChange={(e) =>
-                          setEnhancedTranscriptInstructions(e.target.value)
+                          set({ fixInstructions: e.target.value })
                         }
-                        placeholder="Optional Finnish correction instructions, e.g. keep company names exactly as written..."
-                        disabled={isLoading || !fixTranscriptionErrors}
-                        rows={3}
+                        placeholder="For example: keep company names exactly as written…"
+                        disabled={busy}
+                        rows={2}
                       />
-                      <p className="text-muted-foreground text-xs">
-                        Used only when Fix Transcription Errors is enabled.
-                      </p>
                     </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <Card className="flex flex-col">
+            <CardHeader>
+              <CardTitle>2. How to transcribe</CardTitle>
+              <CardDescription>
+                Each choice says what it does. The defaults suit most
+                recordings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col gap-5">
+              <div className="space-y-2">
+                <Label>Language</Label>
+                <div
+                  role="radiogroup"
+                  aria-label="Language"
+                  className="grid grid-cols-3 gap-2"
+                >
+                  {LANGUAGES.map((entry) => (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={options.language === entry.id}
+                      disabled={busy}
+                      onClick={() => set({ language: entry.id })}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-sm transition-colors",
+                        options.language === entry.id
+                          ? "border-primary bg-primary/10 text-primary font-medium"
+                          : "hover:border-primary/40",
+                      )}
+                    >
+                      {entry.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-muted-foreground text-xs">{language.hint}</p>
+              </div>
+
+              <Option
+                title="Finnish transcriber (HH server)"
+                htmlFor="prefer-local-first"
+                description="Try the Whisper server of Haaga-Helia first. It is the more accurate for Finnish, and it times the text and can tell speakers apart. If it cannot be reached, the cloud model is used instead."
+                control={
+                  <Switch
+                    id="prefer-local-first"
+                    checked={options.preferLocalFirst}
+                    onCheckedChange={(value) =>
+                      set({ preferLocalFirst: value })
+                    }
+                    disabled={busy}
+                  />
+                }
+              />
+
+              <div className="space-y-3">
+                <Option
+                  title="Speaker detection"
+                  htmlFor="diarization"
+                  description="Tells who speaks when, and shows each speaker's share of the talk. Works with the HH server only."
+                  disabled={!options.preferLocalFirst}
+                  control={
+                    <Switch
+                      id="diarization"
+                      checked={options.diarization}
+                      onCheckedChange={(value) => set({ diarization: value })}
+                      disabled={busy}
+                    />
+                  }
+                />
+                {speakersNeedServer && (
+                  <p className="text-xs text-amber-700">
+                    Speaker detection needs the HH server. Turn it on above, or
+                    the cloud model will return the text without speakers.
+                  </p>
+                )}
+                {options.diarization && (
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {(
+                      [
+                        ["speakerCount", "Exact number", "speaker-count"],
+                        ["minSpeakers", "At least", "min-speakers"],
+                        ["maxSpeakers", "At most", "max-speakers"],
+                      ] as const
+                    ).map(([field, label, id]) => (
+                      <div key={id} className="space-y-1">
+                        <Label htmlFor={id} className="text-xs">
+                          {label}
+                        </Label>
+                        <Input
+                          id={id}
+                          type="number"
+                          min="1"
+                          value={options[field]}
+                          onChange={(e) => set({ [field]: e.target.value })}
+                          placeholder="Optional"
+                          disabled={busy}
+                        />
+                      </div>
+                    ))}
+                    <p className="text-muted-foreground text-xs sm:col-span-3">
+                      Leave them empty to let the server decide. If you know the
+                      exact number of speakers, give it.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <Option
+                title="Compress audio"
+                htmlFor="compress"
+                description="Kept for compatibility. It has no effect at the moment: the file is sent as it is."
+                disabled
+                control={
+                  <Switch
+                    id="compress"
+                    checked={options.compress}
+                    onCheckedChange={(value) => set({ compress: value })}
+                    disabled={busy}
+                  />
+                }
+              />
 
               <Button
-                onClick={handleSubmit}
-                disabled={!file || isLoading}
-                className="w-full"
+                onClick={() => void handleSubmit()}
+                disabled={!file || busy}
+                className="mt-auto w-full"
                 size="lg"
               >
-                <Sparkles className="mr-2 h-4 w-4" />
-                {isLoading ? "Converting..." : "Transcribe"}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Transcribing…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Transcribe
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
-
-          <HowItWorksCard>
-            <p>
-              <strong>1. Upload media:</strong> Add an audio or video file. The
-              demo accepts common speech and meeting formats.
-            </p>
-            <p>
-              <strong>2. Adjust settings:</strong> Optionally select the
-              language, enable the Finnish transcriber, turn on diarization, or
-              provide additional context to improve accuracy.
-            </p>
-            <p>
-              <strong>3. Transcribe:</strong> The demo first tries the Finnish
-              transcriber when enabled. If unavailable, it falls back to the
-              configured OpenAI/Azure model.
-            </p>
-            <p>
-              <strong>4. Review results:</strong> The result view can show raw
-              text, diarized output, corrected text, and a side-by-side diff
-              when correction is enabled.
-            </p>
-          </HowItWorksCard>
         </div>
 
-        {/* Results Section */}
-        <div className="space-y-4">
+        <div className="space-y-4" aria-live="polite">
           {isLoading && (
             <LoadingCard
-              message="Transcribing audio..."
+              message="Transcribing audio…"
               subMessage="This may take a while for longer files"
             />
           )}
 
           {result && !isLoading && (
-            <ResultCard
-              title="Result"
-              description={`File: ${result.filename} \u00b7 Model: ${result.transcription_model || "unknown"}`}
-              feedbackSlot={<FeedbackButton demoType="transcriber" />}
-              delay={0}
-            >
-              {result.used_fallback && (
-                <Alert className="mb-4 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <AlertTitle>Fallback transcription used</AlertTitle>
-                  <AlertDescription>
-                    {result.fallback_reason ||
-                      "The local transcriber was unavailable. Cloud model was used instead."}
-                  </AlertDescription>
-                </Alert>
-              )}
-              <div className="mb-4 flex justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadTranscript}
-                  disabled={!selectedTranscriptContent.trim()}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download Transcript (.txt)
-                </Button>
-              </div>
-
-              {result.correction_summary ? (
-                <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-lg border p-3">
-                    <div className="text-muted-foreground text-xs tracking-wide uppercase">
-                      Total changes
-                    </div>
-                    <div className="text-lg font-semibold">
-                      {result.correction_summary.total_changes}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <div className="text-muted-foreground text-xs tracking-wide uppercase">
-                      Insertions
-                    </div>
-                    <div className="text-lg font-semibold">
-                      {result.correction_summary.insertions}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <div className="text-muted-foreground text-xs tracking-wide uppercase">
-                      Deletions
-                    </div>
-                    <div className="text-lg font-semibold">
-                      {result.correction_summary.deletions}
-                    </div>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <div className="text-muted-foreground text-xs tracking-wide uppercase">
-                      Substitutions
-                    </div>
-                    <div className="text-lg font-semibold">
-                      {result.correction_summary.substitutions}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {result.corrected_transcript || diarizedContent ? (
-                <Tabs
-                  value={selectedTranscriptView}
-                  onValueChange={(value) =>
-                    setSelectedTranscriptView(
-                      value as "corrected" | "diff" | "diarized" | "raw",
-                    )
-                  }
-                  className="w-full"
-                >
-                  <TabsList
-                    className={`grid w-full ${availableTabCount === 4 ? "grid-cols-4" : availableTabCount === 3 ? "grid-cols-3" : "grid-cols-2"}`}
-                  >
-                    {result.corrected_transcript ? (
-                      <TabsTrigger value="corrected">Corrected</TabsTrigger>
-                    ) : null}
-                    {result.corrected_transcript &&
-                    result.diff_chunks?.length ? (
-                      <TabsTrigger value="diff">Diff</TabsTrigger>
-                    ) : null}
-                    {diarizedContent ? (
-                      <TabsTrigger value="diarized">Diarized</TabsTrigger>
-                    ) : null}
-                    <TabsTrigger value="raw">Raw</TabsTrigger>
-                  </TabsList>
-                  {result.corrected_transcript ? (
-                    <TabsContent value="corrected" className="mt-4">
-                      <ResultText
-                        content={result.corrected_transcript}
-                        maxHeight="400px"
-                      />
-                    </TabsContent>
-                  ) : null}
-                  {result.corrected_transcript && result.diff_chunks?.length ? (
-                    <TabsContent value="diff" className="mt-4">
-                      <div className="grid gap-4 lg:grid-cols-2">
-                        <div className="rounded-lg border p-4">
-                          <div className="mb-3 text-sm font-semibold">Raw</div>
-                          <div
-                            ref={rawDiffRef}
-                            onScroll={() => syncDiffScroll("raw")}
-                            className="max-h-[400px] overflow-auto text-sm leading-6 whitespace-pre-wrap"
-                          >
-                            {renderDiffColumn("original")}
-                          </div>
-                        </div>
-                        <div className="rounded-lg border p-4">
-                          <div className="mb-3 text-sm font-semibold">
-                            Corrected
-                          </div>
-                          <div
-                            ref={correctedDiffRef}
-                            onScroll={() => syncDiffScroll("corrected")}
-                            className="max-h-[400px] overflow-auto text-sm leading-6 whitespace-pre-wrap"
-                          >
-                            {renderDiffColumn("corrected")}
-                          </div>
-                        </div>
-                      </div>
-                    </TabsContent>
-                  ) : null}
-                  {diarizedContent ? (
-                    <TabsContent value="diarized" className="mt-4">
-                      <ResultText content={diarizedContent} maxHeight="400px" />
-                    </TabsContent>
-                  ) : null}
-                  <TabsContent value="raw" className="mt-4">
-                    <ResultText
-                      content={
-                        result.raw_transcript || "No transcript generated"
-                      }
-                      maxHeight="400px"
-                    />
-                  </TabsContent>
-                </Tabs>
-              ) : (
-                <ResultText
-                  content={result.raw_transcript || "No transcript generated"}
-                  maxHeight="400px"
-                />
-              )}
-            </ResultCard>
+            <TranscriptView
+              key={result.job_id}
+              result={result}
+              audioUrl={resultUrl}
+            />
           )}
 
           {!result && !isLoading && (
             <EmptyStateCard
-              icon={Mic}
+              icon={Wand2}
               title="No transcription yet"
-              description="Upload an audio or video file and click Transcribe to see results."
+              description="Add a recording and click Transcribe. The text appears here with a player that follows it."
               feedbackSlot={<FeedbackButton demoType="transcriber" />}
             />
           )}
         </div>
       </div>
-  </PageTransition>
-);
+    </PageTransition>
+  );
 }
