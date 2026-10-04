@@ -4,9 +4,10 @@ import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
-import { FieldsTable } from "@/components/demo/schema-fields-table";
 import type { SchemaField } from "@/components/demo/schema-fields-table";
+import { schemaTabs, SchemaTabsView } from "@/components/demo/schema-views";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
+import { TaskChangeNotice } from "@/components/demo/task-change-notice";
 import {
   appendVisionSettings,
   DEFAULT_VISION_SETTINGS,
@@ -88,7 +89,7 @@ const GUIDE_STEPS: GuideStep[] = [
 ];
 const GUIDE_NOTES = [
   "One model call sees every file at once, so it can match values across documents, for example an invoice against its purchase order. There is no parsing step before it.",
-  "Nothing is saved. A generated schema lives for this session only.",
+  "Nothing you enter is saved. The examples come with a ready-made schema. A schema generated for your own task, or for an edited example, lives in this session only and is used again while the task stays the same.",
 ];
 
 const STRUCTURE_TEXT: Record<string, string> = {
@@ -186,12 +187,18 @@ export default function VisionExtractorPage() {
   const model = resolveVisionModel(settings, catalogue);
   const { includeVerification } = settings;
   const [exampleId, setExampleId] = useState<string | null>(null);
+  // The task of the example that was picked: editing the text does not change it.
+  const [exampleTask, setExampleTask] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingExample, setIsLoadingExample] = useState(false);
   const [isGeneratingSchema, setIsGeneratingSchema] = useState(false);
   const [generatedSchema, setGeneratedSchema] =
     useState<GeneratedSchema | null>(null);
   const [result, setResult] = useState<VisionExtractResult | null>(null);
+  // The schema the result was extracted with: it stays with the result when the task changes.
+  const [resultSchema, setResultSchema] = useState<GeneratedSchema | null>(
+    null,
+  );
   const [isDragging, setIsDragging] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -200,6 +207,18 @@ export default function VisionExtractorPage() {
     generatedSchema !== null &&
     normalizeTask(generatedSchema.user_requirements) ===
       normalizeTask(userRequirements);
+  // The text no longer matches the schema in hand (or, before any schema, the picked
+  // example): a new schema is generated at the next run.
+  // The text is exactly an example's task that has a committed schema (also after the
+  // text was edited and put back).
+  const readyMade = EXAMPLES.some(
+    (e) =>
+      e.readyMade && normalizeTask(e.task) === normalizeTask(userRequirements),
+  );
+  const taskChanged = generatedSchema
+    ? !schemaCurrent
+    : exampleTask !== null &&
+      normalizeTask(userRequirements) !== normalizeTask(exampleTask);
 
   function handleRequirementsChange(value: string): void {
     setUserRequirements(value);
@@ -297,6 +316,7 @@ export default function VisionExtractorPage() {
       );
       setFiles(fetched);
       setUserRequirements(example.task);
+      setExampleTask(example.task);
       setGeneratedSchema(null);
       setExampleId(example.id);
       setResult(null);
@@ -338,19 +358,32 @@ export default function VisionExtractorPage() {
       const schema = schemaCurrent ? generatedSchema : await generateSchema();
       if (!schema) return;
 
-      const formData = new FormData();
-      for (const file of files) {
-        formData.append("files", file);
-      }
-      formData.append("user_requirements", userRequirements);
-      formData.append("schema_id", schema.schema_id);
-      appendVisionSettings(formData, settings, model);
+      const send = (current: GeneratedSchema): Promise<Response> => {
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append("files", file);
+        }
+        formData.append("user_requirements", userRequirements);
+        formData.append("schema_id", current.schema_id);
+        appendVisionSettings(formData, settings, model);
+        return apiFetch("/api/extract-vision", {
+          method: "POST",
+          body: formData,
+          signal: abortControllerRef.current?.signal,
+        });
+      };
 
-      const response = await apiFetch("/api/extract-vision", {
-        method: "POST",
-        body: formData,
-        signal: abortControllerRef.current.signal,
-      });
+      let response = await send(schema);
+      // The server forgot the schema of the earlier run (it restarted, or made many
+      // newer ones): make it again and retry once.
+      if (
+        (response.status === 410 || response.status === 409) &&
+        schemaCurrent
+      ) {
+        const fresh = await generateSchema();
+        if (!fresh) return;
+        response = await send(fresh);
+      }
 
       if (!response.ok) {
         const error = await response.json().catch(() => null);
@@ -359,6 +392,7 @@ export default function VisionExtractorPage() {
 
       const data = (await response.json()) as VisionExtractResult;
       setResult(data);
+      setResultSchema(schema);
 
       posthog.capture("vision_extracted", {
         provider: settings.provider,
@@ -377,8 +411,6 @@ export default function VisionExtractorPage() {
       setIsLoading(false);
     }
   }
-
-  const hasTable = (generatedSchema?.field_table?.length ?? 0) > 0;
 
   return (
     <PageTransition>
@@ -562,10 +594,18 @@ export default function VisionExtractorPage() {
                   disabled={busy}
                   rows={8}
                 />
-                <p className="text-muted-foreground text-xs">
-                  Be specific about field names and types. The clearer your
-                  description, the better the generated schema.
-                </p>
+                {taskChanged ? (
+                  <TaskChangeNotice />
+                ) : (
+                  <p className="text-muted-foreground text-xs">
+                    {generatedSchema?.schema_source === "example" ||
+                    (!generatedSchema && readyMade)
+                      ? "This task has a ready-made schema, so only the extraction runs. Change the text and a new schema is generated."
+                      : schemaCurrent
+                        ? "The schema for this task is ready, so only the extraction runs. Change the text and a new schema is generated."
+                        : "Be specific about field names and types. The clearer your description, the better the generated schema. It is generated once for a task, then used again while the text stays the same."}
+                  </p>
+                )}
               </div>
 
               <Accordion type="single" collapsible className="w-full">
@@ -630,69 +670,39 @@ export default function VisionExtractorPage() {
           </Card>
         </div>
 
-        {generatedSchema && !isLoading && (
-          <Card>
-            <CardContent className="space-y-3 pt-6">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-base">
-                  The extraction schema
-                </CardTitle>
-                <span className="font-mono text-xs">
-                  {generatedSchema.schema_name}
-                </span>
-                <Badge variant="secondary" className="font-mono font-normal">
-                  {generatedSchema.structure_type}
-                </Badge>
-                {generatedSchema.schema_source === "example" && (
-                  <Badge variant="outline" className="font-normal">
-                    built-in example schema
-                  </Badge>
-                )}
-                {!schemaCurrent && (
-                  <Badge
-                    variant="outline"
-                    className="border-amber-500 text-amber-700"
-                  >
-                    The task changed: generate again
-                  </Badge>
-                )}
-              </div>
-              {STRUCTURE_TEXT[generatedSchema.structure_type] && (
-                <p className="text-muted-foreground text-xs">
-                  {STRUCTURE_TEXT[generatedSchema.structure_type]}
-                </p>
-              )}
-              <Tabs defaultValue={hasTable ? "fields" : "code"}>
-                <TabsList>
-                  {hasTable && <TabsTrigger value="fields">Fields</TabsTrigger>}
-                  <TabsTrigger value="code">Python code</TabsTrigger>
-                  {generatedSchema.requirements_json && (
-                    <TabsTrigger value="requirements">
-                      requirements.json
-                    </TabsTrigger>
+        {generatedSchema &&
+          !isLoading &&
+          (!result ||
+            generatedSchema.schema_id !== resultSchema?.schema_id) && (
+            <Card>
+              <CardContent className="space-y-3 pt-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="text-base">
+                    The extraction schema
+                  </CardTitle>
+                  {generatedSchema.schema_source === "example" && (
+                    <Badge variant="outline" className="font-normal">
+                      built-in example schema
+                    </Badge>
                   )}
-                </TabsList>
-                {hasTable && (
-                  <TabsContent value="fields" className="pt-2">
-                    <FieldsTable fields={generatedSchema.field_table ?? []} />
-                  </TabsContent>
-                )}
-                <TabsContent value="code" className="pt-2">
-                  <pre className="bg-muted/40 max-h-72 overflow-auto rounded p-3 text-xs">
-                    <code>{generatedSchema.schema_code}</code>
-                  </pre>
-                </TabsContent>
-                {generatedSchema.requirements_json && (
-                  <TabsContent value="requirements" className="pt-2">
-                    <pre className="bg-muted/40 max-h-72 overflow-auto rounded p-3 text-xs">
-                      <code>{generatedSchema.requirements_json}</code>
-                    </pre>
-                  </TabsContent>
-                )}
-              </Tabs>
-            </CardContent>
-          </Card>
-        )}
+                  {!schemaCurrent && (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-500 text-amber-700"
+                    >
+                      The task changed: a new schema will be generated
+                    </Badge>
+                  )}
+                </div>
+                <SchemaTabsView
+                  tabs={schemaTabs(
+                    generatedSchema,
+                    STRUCTURE_TEXT[generatedSchema.structure_type],
+                  )}
+                />
+              </CardContent>
+            </Card>
+          )}
 
         <div className="space-y-6" aria-live="polite">
           {isLoading && (
@@ -713,6 +723,14 @@ export default function VisionExtractorPage() {
               seconds={result.duration_s}
               detail={result.model}
               verification={includeVerification ? result.verification : null}
+              extraTabs={
+                resultSchema
+                  ? schemaTabs(
+                      resultSchema,
+                      STRUCTURE_TEXT[resultSchema.structure_type],
+                    )
+                  : []
+              }
             >
               {result.usage && <UsageStats usage={result.usage} />}
             </ResultView>

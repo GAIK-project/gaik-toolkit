@@ -1,0 +1,91 @@
+{
+  "schema_format_version": 2,
+  "model_name": "safety_observation_Extraction",
+  "requirements": {
+    "use_case_name": "safety_observation",
+    "fields": [
+      {
+        "field_name": "reporter_name",
+        "field_type": "str",
+        "description": "Name of the person who reported the safety observation.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "date",
+        "field_type": "date",
+        "description": "Date of the safety observation.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "place",
+        "field_type": "str",
+        "description": "Place of the safety observation.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "problem",
+        "field_type": "str",
+        "description": "Problem identified in the safety observation.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "effect_on_workers",
+        "field_type": "str",
+        "description": "How the observed problem affects the workers.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "needs_repair",
+        "field_type": "str",
+        "description": "Whether the observed problem needs a repair; use yes or no.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": [
+          "yes",
+          "no"
+        ],
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  },
+  "user_requirements": "Extract a safety observation: who reported it (name), the date, the place, the problem, how it affects the workers, and whether it needs a repair (yes or no). Write the values in English."
+}

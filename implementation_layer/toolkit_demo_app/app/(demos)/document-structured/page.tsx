@@ -1,23 +1,20 @@
 "use client";
 
-import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
 import { FileUpload } from "@/components/demo/file-upload";
+import { PageTransition } from "@/components/demo/page-transition";
+import { EmptyStateCard } from "@/components/demo/result-card";
 import {
-  EmptyStateCard,
-  ResultCard,
-  ResultText,
-} from "@/components/demo/result-card";
-import { FeedbackButton } from "@/components/feedback";
+  schemaTabs,
+  type ExtraTab,
+  type SchemaViewData,
+} from "@/components/demo/schema-views";
+import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { StepIndicator } from "@/components/demo/step-indicator";
-import { DemoPageHeader } from "@/components/demo/demo-page-header";
-import { HowItWorksCard } from "@/components/demo/how-it-works-card";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { TaskChangeNotice } from "@/components/demo/task-change-notice";
+import { FeedbackButton } from "@/components/feedback";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,139 +33,230 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { apiFetch, RateLimitError } from "@/lib/api-client";
+import {
+  reusableSchemaId,
+  savedSchemaKey,
+  type MadeSchema,
+} from "@/lib/schema-reuse";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
-import { Download, FileOutput, Loader2, Sparkles } from "lucide-react";
-import { formatFieldName } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import {
+  ClipboardList,
+  Download,
+  FileOutput,
+  FileSearch,
+  FileText,
+  Loader2,
+  ScanText,
+  Sparkles,
+  Wand2,
+} from "lucide-react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { PageTransition } from "@/components/demo/page-transition";
+import { PARSERS, type ParserType } from "../extractor/extractor-data";
+import { ResultView } from "../extractor/result-view";
+import { ParsedPane } from "../parser/parsed-pane";
+import {
+  DEFAULT_OPTIONS,
+  EXAMPLES,
+  formFields,
+  isPageLimited,
+  parserAccepts,
+  timingText,
+  type DocumentExample,
+  type DocumentOptions,
+  type Timings,
+} from "./document-data";
 
-const DEFAULT_REQUIREMENTS = `Extract the following from the document:
-- Document name 
-- Document number
-- change in annual revenue
-- Net income
-- Active customers
-- Customer retention rate  
-- Net promoter score
-- Total employees
-- Employees satisfaction index
-- key milestones achieved (few keywords)`;
+const STRUCTURE_TEXT: Record<string, string> = {
+  flat: "One record: one set of fields for the document.",
+  nested_list:
+    "A list of records: the document holds several records of one kind.",
+  parent_with_nested_list:
+    "A header with a list inside: document fields plus repeated rows.",
+};
 
-const DEFAULT_SCHEMA_KEY = "document_structured_business_default";
-
-interface DocumentStructuredResult {
+type DocumentResult = SchemaViewData & {
   job_id: string;
   parsed_content: string | null;
   extracted_data: Record<string, unknown>[] | null;
   pdf_available: boolean;
-  error?: string | null;
-}
+  parser: string;
+  parsed_html?: string | null;
+  parse_metadata?: Record<string, unknown>;
+  schema_source?: "saved" | "generated" | "reused";
+  schema_id?: string | null;
+  timings?: Timings;
+};
+
+const GUIDE_STEPS: GuideStep[] = [
+  {
+    icon: FileText,
+    title: "Add a document",
+    text: "Upload a PDF, Word file or image, or start from a ready-made document with the parser and task that suit it.",
+  },
+  {
+    icon: ScanText,
+    title: "Choose the parser",
+    text: "The parser turns the file into text. A text PDF needs a fast one; a scan or a photo needs a vision model.",
+  },
+  {
+    icon: ClipboardList,
+    title: "Say what to extract",
+    text: "Describe the fields in plain words, including lists. The task decides the shape of the result.",
+  },
+  {
+    icon: FileSearch,
+    title: "Check the result",
+    text: "Read the data, then the text it came from, and the schema that was made for it.",
+  },
+];
+const GUIDE_NOTES = [
+  "Three steps run in turn: the document is parsed to text, a schema is made from your task, and the data is extracted from the text. If the parser misses something, the data does too, so read the parsed text.",
+  "Nothing you enter is saved. The examples come with a ready-made schema. A schema made for your own task, or for an edited example, lives in this session only and is used again while the task stays the same.",
+];
+
+const ACCEPT = ".pdf,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.tif,.webp";
 
 export default function DocumentStructuredPage() {
-  const [documentFile, setDocumentFile] = useState<File | null>(null);
-  const [userRequirements, setUserRequirements] =
-    useState(DEFAULT_REQUIREMENTS);
-  const [parserType, setParserType] = useState<
-    "auto" | "pymupdf" | "docx" | "vision" | "vision_plus" | "docling_api"
-  >("docling_api");
-  const [generatePdf, setGeneratePdf] = useState(false);
-  const [regenerateSchema, setRegenerateSchema] = useState(false);
-
-  const [result, setResult] = useState<DocumentStructuredResult | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [example, setExample] = useState<DocumentExample | null>(EXAMPLES[0]);
+  const [task, setTask] = useState(EXAMPLES[0].task);
+  const [options, setOptions] = useState<DocumentOptions>({
+    ...DEFAULT_OPTIONS,
+    ...EXAMPLES[0].options,
+  });
+  const [isLoadingExample, setIsLoadingExample] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [pipelineSteps, setPipelineSteps] = useState<SSEStep[]>([]);
+  const [steps, setSteps] = useState<SSEStep[]>([]);
+  const [result, setResult] = useState<DocumentResult | null>(null);
+  const [resultName, setResultName] = useState("");
+  const [seconds, setSeconds] = useState<number | null>(null);
+  // The schema of the last run: while the task is unchanged it is used again.
+  const [madeSchema, setMadeSchema] = useState<MadeSchema | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  const busy = isLoading || isLoadingExample;
+  const set = (patch: Partial<DocumentOptions>) =>
+    setOptions((previous) => ({ ...previous, ...patch }));
+  const parser =
+    PARSERS.find((entry) => entry.id === options.parser) ?? PARSERS[0];
+  const wrongType = file !== null && !parserAccepts(options.parser, file.name);
+  const reusable = reusableSchemaId(madeSchema, task) !== null;
+  // The text differs from the one the schema in hand was made from: the example's own
+  // (ready-made) task, or the task of the last run. A new schema is made for it.
+  const changed =
+    !reusable &&
+    (example ? task.trim() !== example.task.trim() : madeSchema !== null);
+
+  useEffect(() => () => abortControllerRef.current?.abort(), []);
+
+  // The first example is loaded and selected when the page opens.
   useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort();
-    };
+    void pickExample(EXAMPLES[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const hasInput = !!documentFile;
-
-  function handleUseExample(exampleFile: File): void {
-    setDocumentFile(exampleFile);
+  function clearResult(): void {
     setResult(null);
+    setSteps([]);
+    setSeconds(null);
+  }
+
+  async function pickExample(next: DocumentExample): Promise<void> {
+    if (isLoading) return;
+    setIsLoadingExample(true);
+    try {
+      const response = await fetch(next.url);
+      if (!response.ok) throw new Error("Could not load the document");
+      const blob = await response.blob();
+      setFile(
+        new File([blob], next.fileName, {
+          type: blob.type || "application/octet-stream",
+        }),
+      );
+      setExample(next);
+      setTask(next.task);
+      setOptions({ ...DEFAULT_OPTIONS, ...next.options });
+      setMadeSchema(null);
+      clearResult();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "An error occurred");
+    } finally {
+      setIsLoadingExample(false);
+    }
   }
 
   async function handleSubmit(): Promise<void> {
-    if (isLoading || !hasInput) return;
-
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
-
-    const usingDefaultRequirements =
-      userRequirements.trim() === DEFAULT_REQUIREMENTS.trim();
-    if (!usingDefaultRequirements && !regenerateSchema) {
+    if (busy || !file) return;
+    if (!task.trim()) {
+      toast.error("Describe what to extract");
+      return;
+    }
+    if (wrongType) {
       toast.error(
-        "If you edit the extraction requirements, enable Regenerate Schema before extraction.",
+        `The ${parser.label.split(" (")[0]} parser cannot read this type of file`,
       );
       return;
     }
 
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
     setIsLoading(true);
-    setResult(null);
-    setPipelineSteps([]);
+    clearResult();
+    const started = performance.now();
 
     try {
       const formData = new FormData();
-      formData.append("file", documentFile!);
-      formData.append("user_requirements", userRequirements);
-      formData.append("parser_type", parserType);
-      formData.append("generate_pdf", String(generatePdf));
-      formData.append("pdf_title", "Document Structured Data");
-      formData.append(
-        "schema_key",
-        usingDefaultRequirements ? DEFAULT_SCHEMA_KEY : "",
-      );
-      formData.append(
-        "regenerate_schema",
-        String(!usingDefaultRequirements && regenerateSchema),
-      );
+      formData.append("file", file);
+      for (const [key, value] of formFields(
+        options,
+        task,
+        savedSchemaKey(example, task),
+        reusableSchemaId(madeSchema, task),
+      ))
+        formData.append(key, value);
 
       const response = await apiFetch("/api/pipeline/document/stream", {
         method: "POST",
         body: formData,
         signal: abortControllerRef.current.signal,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to process document");
-      }
+      if (!response.ok) throw new Error("Failed to process the document");
 
       let streamError: Error | null = null;
-
-      await processSSEStream<DocumentStructuredResult>(response, {
-        onSteps: (steps) => setPipelineSteps(steps),
-        onStepUpdate: (update) => {
-          setPipelineSteps((prev) =>
-            prev.map((s) => (s.step === update.step ? update : s)),
-          );
-        },
+      await processSSEStream<DocumentResult>(response, {
+        onSteps: (next) => setSteps(next),
+        onStepUpdate: (update) =>
+          setSteps((previous) =>
+            previous.map((step) => (step.step === update.step ? update : step)),
+          ),
         onResult: (data) => {
+          setResultName(file.name);
           setResult(data);
+          setSeconds((performance.now() - started) / 1000);
+          setMadeSchema(data.schema_id ? { id: data.schema_id, task } : null);
           posthog.capture("document_structured_executed", {
-            parser_type: parserType,
-            generate_pdf: generatePdf,
+            parser_type: options.parser,
+            generate_pdf: options.generatePdf,
+            items: data.extracted_data?.length ?? 0,
+            schema_source: data.schema_source,
+            example: example?.id ?? null,
           });
-          toast.success("Document processed successfully!");
+          toast.success("Document processed");
         },
         onError: (message) => {
           streamError = new Error(message);
         },
       });
-
       if (streamError) throw streamError;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       if (error instanceof RateLimitError) return;
-
-      // Mark current step as error
-      setPipelineSteps((prev) =>
-        prev.map((step) =>
+      setSteps((previous) =>
+        previous.map((step) =>
           step.status === "in_progress"
             ? {
                 ...step,
@@ -179,7 +267,6 @@ export default function DocumentStructuredPage() {
             : step,
         ),
       );
-
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       setIsLoading(false);
@@ -188,354 +275,376 @@ export default function DocumentStructuredPage() {
 
   async function handleDownloadPdf(): Promise<void> {
     if (!result?.job_id) return;
-
     try {
       const response = await apiFetch(`/api/pipeline/pdf/${result.job_id}`);
-
       if (!response.ok) throw new Error("Failed to download PDF");
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `document_structured_${result.job_id.slice(0, 8)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `document_structured_${result.job_id.slice(0, 8)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
-
-      toast.success("PDF downloaded!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to download PDF");
     }
   }
+
+  // After Readable and JSON: the schema in three forms, then the text the data came from.
+  const extraTabs: ExtraTab[] = result
+    ? [
+        ...schemaTabs(result, STRUCTURE_TEXT[result.structure_type]),
+        ...(result.parsed_content
+          ? [
+              {
+                value: "parsed",
+                label: "Parsed document",
+                content: (
+                  <ParsedPane
+                    key={result.job_id}
+                    idPrefix="doc-"
+                    run={{
+                      id: result.parser,
+                      parser: result.parser,
+                      text: result.parsed_content,
+                      metadata: result.parse_metadata ?? {},
+                      seconds: result.timings?.parse_s ?? 0,
+                      filename: resultName,
+                      html: result.parsed_html ?? undefined,
+                    }}
+                  />
+                ),
+              },
+            ]
+          : []),
+      ]
+    : [];
 
   return (
     <PageTransition>
       <DemoPageHeader
         icon={FileOutput}
         title="Document → Structured Data"
-        description="Parse documents and images to extract structured data automatically"
-        className="mb-8"
+        description="Turn a document or an image into structured data: it is parsed to text, and the fields you describe are extracted from it"
+        className="mb-6"
       />
 
-      <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
-        {/* Input Section */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Document</CardTitle>
-                  <CardDescription>PDF, DOCX or image, up to 20 MB</CardDescription>
-                </div>
+      <div className="space-y-6">
+        <SectionGuide
+          heading="How to use Document → Structured Data"
+          steps={GUIDE_STEPS}
+          notes={GUIDE_NOTES}
+        />
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">
+            Start from a ready-made document
+          </h2>
+          <div
+            role="radiogroup"
+            aria-label="Ready-made documents"
+            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          >
+            {EXAMPLES.map((entry) => (
+              <div
+                key={entry.id}
+                className={cn(
+                  "flex flex-col gap-2 rounded-xl border-2 p-3 transition-all",
+                  example?.id === entry.id
+                    ? "border-primary bg-primary/5"
+                    : "bg-card hover:border-primary/40",
+                )}
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={example?.id === entry.id}
+                  disabled={busy}
+                  onClick={() => void pickExample(entry)}
+                  className="flex flex-1 flex-col gap-1.5 text-left"
+                >
+                  <span className="font-semibold">{entry.title}</span>
+                  <span className="text-primary text-xs font-medium">
+                    {entry.shape}
+                  </span>
+                  <span className="text-muted-foreground text-sm">
+                    {entry.summary}
+                  </span>
+                  <span className="flex flex-wrap gap-1">
+                    {entry.tags.map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="outline"
+                        className="font-normal"
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </span>
+                </button>
                 <ExamplePreviewDialog
-                  exampleUrl="/GAIK_Test_Document_Demo.pdf"
-                  exampleName="GAIK_Test_Document_Demo.pdf"
-                  onUseExample={handleUseExample}
-                  disabled={isLoading}
+                  exampleUrl={entry.url}
+                  exampleName={entry.fileName}
+                  onUseExample={() => void pickExample(entry)}
+                  disabled={busy}
+                  label="View document"
+                  buttonSize="xs"
                 />
               </div>
-            </CardHeader>
-            <CardContent>
-              <FileUpload
-                accept=".pdf,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.tif,.webp"
-                maxSize={20}
-                file={documentFile}
-                onFileSelect={setDocumentFile}
-                onFileRemove={() => setDocumentFile(null)}
-                disabled={isLoading}
-              />
-            </CardContent>
-          </Card>
+            ))}
+          </div>
+        </section>
+
+        <div className="grid items-start gap-6 md:gap-8 lg:grid-cols-2">
+          <div className="flex flex-col gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>1. The document</CardTitle>
+                <CardDescription>
+                  A PDF, Word file or image, up to 20 MB.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FileUpload
+                  compact
+                  file={file}
+                  accept={ACCEPT}
+                  maxSize={20}
+                  onFileSelect={(next) => {
+                    setFile(next);
+                    setExample(null);
+                    clearResult();
+                  }}
+                  onFileRemove={() => {
+                    setFile(null);
+                    setExample(null);
+                    clearResult();
+                  }}
+                  disabled={busy}
+                />
+                {isLoadingExample && (
+                  <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading the document…
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>2. The parser</CardTitle>
+                <CardDescription>
+                  How the file is turned into text. The ready-made documents set
+                  the one that suits them.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Label htmlFor="parser-type">Parser</Label>
+                <Select
+                  value={options.parser}
+                  onValueChange={(value) =>
+                    set({ parser: value as ParserType })
+                  }
+                  disabled={busy}
+                >
+                  <SelectTrigger id="parser-type">
+                    <SelectValue placeholder="Select parser" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PARSERS.map((entry) => (
+                      <SelectItem key={entry.id} value={entry.id}>
+                        {entry.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-muted-foreground text-xs">{parser.hint}</p>
+                {isPageLimited(options.parser) && (
+                  <p className="text-xs text-amber-700">
+                    This parser reads at most 10 pages of a document.
+                  </p>
+                )}
+                {wrongType && (
+                  <p className="text-destructive text-xs">
+                    This parser cannot read the type of the file you added.
+                    Choose another one.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Fields to extract</CardTitle>
+              <CardTitle>3. What to extract</CardTitle>
+              <CardDescription>
+                Describe the fields in plain words. Ask for a list, and you get
+                one row for each item.
+              </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
               <Textarea
-                value={userRequirements}
-                onChange={(e) => setUserRequirements(e.target.value)}
-                placeholder="Describe what data to extract..."
-                disabled={isLoading}
-                rows={10}
+                aria-label="What to extract"
+                value={task}
+                onChange={(e) => setTask(e.target.value)}
+                placeholder="Describe what data to extract…"
+                disabled={busy}
+                rows={12}
               />
-              <p className="text-muted-foreground mt-2 text-xs">
-                After editing, turn on Regenerate Schema in Advanced Settings.
-                Custom schemas apply to this run only.
-              </p>
+              {changed ? (
+                <TaskChangeNotice />
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  {reusable
+                    ? "The schema of the last run is used again, so only the parsing and the extraction run. Change the text and a new schema is generated."
+                    : example
+                      ? "This task has a ready-made schema, so no time goes on making one. Change the text and a new schema is generated."
+                      : "A schema is generated from this text the first time you run it, and used again while the text stays the same. Name the type of a field (number, yes or no, date) and the allowed values to get them exactly."}
+                </p>
+              )}
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="generate-pdf">Make a PDF report</Label>
+                  <p className="text-muted-foreground text-xs">
+                    A PDF with the extracted data, to download after the run.
+                  </p>
+                </div>
+                <Switch
+                  id="generate-pdf"
+                  checked={options.generatePdf}
+                  onCheckedChange={(value) => set({ generatePdf: value })}
+                  disabled={busy}
+                />
+              </div>
+
+              <Button
+                onClick={() => void handleSubmit()}
+                disabled={!file || busy || wrongType}
+                className="w-full"
+                size="lg"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Extract data
+                  </>
+                )}
+              </Button>
+              {!file && (
+                <p className="text-muted-foreground text-center text-xs">
+                  Add a document first.
+                </p>
+              )}
             </CardContent>
           </Card>
-
-          {/* Advanced Settings */}
-          <Accordion
-            type="single"
-            collapsible
-            className="bg-card rounded-xl border shadow-sm"
-          >
-            <AccordionItem value="advanced" className="border-0">
-              <AccordionTrigger className="px-4 py-3 text-sm font-medium hover:no-underline">
-                Advanced Settings
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="parser-type" className="text-sm">
-                      Parser Type
-                    </Label>
-                    <Select
-                      value={parserType}
-                      onValueChange={(value: typeof parserType) =>
-                        setParserType(value)
-                      }
-                      disabled={isLoading}
-                    >
-                      <SelectTrigger id="parser-type">
-                        <SelectValue placeholder="Select parser" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto-detect</SelectItem>
-                        <SelectItem value="pymupdf">
-                          PyMuPDF (Fast, text-based)
-                        </SelectItem>
-                        <SelectItem value="vision">
-                          Vision (AI-powered, handles images)
-                        </SelectItem>
-                        <SelectItem value="vision_plus">
-                          Vision+ (Text+Image Parsing)
-                        </SelectItem>
-                        <SelectItem value="docling_api">
-                          HH Parser (HH&apos;s fast Docling Parser)
-                        </SelectItem>
-                        <SelectItem value="docx">
-                          DOCX (Word documents)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {(parserType === "vision" ||
-                      parserType === "vision_plus") && (
-                      <p className="text-muted-foreground text-xs">
-                        Vision and Vision+ parsers are limited to a maximum of
-                        10 pages per document.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="regenerate-schema" className="text-sm">
-                        Regenerate Schema
-                      </Label>
-                      <p className="text-muted-foreground text-xs">
-                        Required when you edit the default fields
-                      </p>
-                    </div>
-                    <Switch
-                      id="regenerate-schema"
-                      checked={regenerateSchema}
-                      onCheckedChange={setRegenerateSchema}
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="generate-pdf" className="text-sm">
-                        Generate PDF Report
-                      </Label>
-                      <p className="text-muted-foreground text-xs">
-                        Create a downloadable PDF with extracted data
-                      </p>
-                    </div>
-                    <Switch
-                      id="generate-pdf"
-                      checked={generatePdf}
-                      onCheckedChange={setGeneratePdf}
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-
-          <Button
-            onClick={handleSubmit}
-            disabled={isLoading || !hasInput}
-            className="w-full"
-            size="lg"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Extract data
-              </>
-            )}
-          </Button>
-
-          <HowItWorksCard description="Parse the document, load or regenerate the schema, and extract structured business data.">
-            <p>
-              <strong>1. Upload a document:</strong> Add a PDF, DOCX, or
-              supported image file. The selected parser reads the document
-              content before extraction.
-            </p>
-            <p>
-              <strong>2. Define extraction requirements:</strong> The default
-              business requirements use a persistent saved schema. If you edit
-              the requirements, enable <em>Regenerate Schema</em> before
-              extraction.
-            </p>
-            <p>
-              <strong>3. Choose the parser:</strong> Use HH Parser for remote
-              high-quality parsing, PyMuPDF for text-based PDFs, DOCX for Word
-              files, Vision for scanned/image-heavy documents, and Vision+ when
-              both text and images matter in the same document. Vision and
-              Vision+ are limited to 10 pages per PDF.
-            </p>
-            <p>
-              <strong>4. Parse and extract:</strong> The backend parses the
-              document, loads the saved schema when available, or generates a
-              temporary new schema for custom requirements, and then extracts
-              structured fields from the parsed text.
-            </p>
-            <p>
-              <strong>5. Review the result:</strong> The result panel shows the
-              parsed content, extracted data, and an optional PDF download when
-              enabled.
-            </p>
-          </HowItWorksCard>
         </div>
 
-        {/* Results Section */}
-        <div className="space-y-4">
-          {isLoading && pipelineSteps.length > 0 && (
+        <div className="space-y-4" aria-live="polite">
+          {isLoading && (
             <Card>
               <CardHeader>
                 <CardTitle>Processing</CardTitle>
+                <CardDescription>
+                  Parsing, making the schema, then extracting. A scan read by a
+                  vision model takes the longest.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <StepIndicator steps={pipelineSteps} />
+                {steps.length > 0 ? (
+                  <StepIndicator steps={steps} />
+                ) : (
+                  <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Starting…
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}
 
-          {isLoading && pipelineSteps.length === 0 && (
+          {!isLoading && !result && steps.some((s) => s.status === "error") && (
             <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" />
-                  <p className="text-muted-foreground mt-2">
-                    Starting document processing...
-                  </p>
-                </div>
+              <CardHeader>
+                <CardTitle>Processing stopped</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StepIndicator steps={steps} />
               </CardContent>
             </Card>
           )}
 
           {result && !isLoading && (
-            <>
-              {/* Parsed Content */}
-              {result.parsed_content && (
-                <ResultCard
-                  title="Parsed Content"
-                  copyContent={result.parsed_content}
-                  delay={0}
-                >
-                  <ResultText
-                    content={
-                      result.parsed_content.length > 500
-                        ? result.parsed_content.slice(0, 500) + "..."
-                        : result.parsed_content
-                    }
-                  />
-                </ResultCard>
+            <ResultView
+              results={result.extracted_data ?? []}
+              documentCount={1}
+              noun="document"
+              seconds={seconds}
+              detail={timingText(result.timings)}
+              extraTabs={extraTabs}
+            >
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <Badge variant="outline" className="font-normal">
+                  {resultName}
+                </Badge>
+                {result.parser && (
+                  <Badge variant="outline" className="font-normal">
+                    {PARSERS.find(
+                      (entry) => entry.id === result.parser,
+                    )?.label.split(" (")[0] ?? result.parser}
+                  </Badge>
+                )}
+                {result.schema_source === "saved" && (
+                  <Badge variant="outline" className="font-normal">
+                    ready-made schema
+                  </Badge>
+                )}
+                {result.schema_source === "reused" && (
+                  <Badge variant="outline" className="font-normal">
+                    schema from the last run
+                  </Badge>
+                )}
+                {result.pdf_available && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void handleDownloadPdf()}
+                  >
+                    <Download />
+                    Download PDF report
+                  </Button>
+                )}
+                <FeedbackButton demoType="document-structured" />
+              </div>
+              {(result.extracted_data?.length ?? 0) === 0 && (
+                <p className="text-muted-foreground text-sm">
+                  Nothing was extracted. Open the parsed document: the parser
+                  may have missed the text, or the document may not say what the
+                  task asks for.
+                </p>
               )}
-
-              {/* Extracted Data */}
-              {result.extracted_data && result.extracted_data.length > 0 && (
-                <ResultCard
-                  title="Extracted Data"
-                  copyContent={JSON.stringify(result.extracted_data, null, 2)}
-                  feedbackSlot={
-                    <FeedbackButton demoType="document-structured" />
-                  }
-                  delay={0.1}
-                >
-                  <div className="space-y-4">
-                    {result.extracted_data.map((item, index) => (
-                      <div key={index} className="space-y-2">
-                        {result.extracted_data!.length > 1 && (
-                          <p className="text-muted-foreground text-sm font-medium">
-                            Item {index + 1}
-                          </p>
-                        )}
-                        <div className="divide-y">
-                          {Object.entries(item).map(([key, value]) => (
-                            <div
-                              key={key}
-                              className="grid grid-cols-[180px_1fr] gap-4 p-3"
-                            >
-                              <span className="text-sm font-medium text-amber-700 dark:text-amber-500">
-                                {formatFieldName(key)}
-                              </span>
-                              <div className="text-muted-foreground text-sm">
-                                {value === null || value === undefined ? (
-                                  "-"
-                                ) : Array.isArray(value) ? (
-                                  <ul className="list-inside list-disc space-y-1">
-                                    {value.map((item, i) => (
-                                      <li key={i}>{String(item)}</li>
-                                    ))}
-                                  </ul>
-                                ) : typeof value === "object" ? (
-                                  <pre className="bg-muted/50 rounded p-2 text-xs whitespace-pre-wrap">
-                                    {JSON.stringify(value, null, 2)}
-                                  </pre>
-                                ) : (
-                                  <span className="wrap-break-word">
-                                    {String(value)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ResultCard>
-              )}
-
-              {/* PDF Download */}
-              {result.pdf_available && (
-                <Button
-                  onClick={handleDownloadPdf}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download PDF report
-                </Button>
-              )}
-            </>
+            </ResultView>
           )}
 
-          {!result && !isLoading && (
-            <EmptyStateCard
-              icon={FileOutput}
-              title="No structured data yet"
-              description="Upload a document and click Extract data."
-              feedbackSlot={<FeedbackButton demoType="document-structured" />}
-            />
-          )}
+          {!result &&
+            !isLoading &&
+            !steps.some((s) => s.status === "error") && (
+              <EmptyStateCard
+                icon={Wand2}
+                title="No structured data yet"
+                description="Add a document and click Extract data. The data appears here, with the text it came from."
+                feedbackSlot={<FeedbackButton demoType="document-structured" />}
+              />
+            )}
         </div>
       </div>
-  </PageTransition>
-);
+    </PageTransition>
+  );
 }

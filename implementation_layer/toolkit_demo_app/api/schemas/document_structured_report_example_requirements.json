@@ -1,0 +1,140 @@
+{
+  "schema_format_version": 2,
+  "model_name": "document_metrics_extraction_Extraction",
+  "requirements": {
+    "use_case_name": "document_metrics_extraction",
+    "fields": [
+      {
+        "field_name": "document_name",
+        "field_type": "str",
+        "description": "Document name",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "document_number",
+        "field_type": "str",
+        "description": "Document number",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": "",
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "change_in_annual_revenue",
+        "field_type": "float",
+        "description": "Change in annual revenue (percent, as a number)",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "net_income",
+        "field_type": "decimal",
+        "description": "Net income",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "active_customers",
+        "field_type": "int",
+        "description": "Active customers",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "customer_retention_rate",
+        "field_type": "float",
+        "description": "Customer retention rate (percent, as a number)",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "net_promoter_score",
+        "field_type": "float",
+        "description": "Net promoter score",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "total_employees",
+        "field_type": "int",
+        "description": "Total employees",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "employee_satisfaction_index",
+        "field_type": "float",
+        "description": "Employee satisfaction index",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "key_milestones_achieved",
+        "field_type": "list[str]",
+        "description": "Key milestones achieved (a list of short phrases)",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  },
+  "user_requirements": "Extract the following from the document:\n- Document name\n- Document number\n- Change in annual revenue (percent, as a number)\n- Net income\n- Active customers\n- Customer retention rate (percent, as a number)\n- Net promoter score\n- Total employees\n- Employee satisfaction index\n- Key milestones achieved (a list of short phrases)"
+}

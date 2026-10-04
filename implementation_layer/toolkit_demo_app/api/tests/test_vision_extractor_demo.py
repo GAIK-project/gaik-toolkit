@@ -194,3 +194,48 @@ def test_schema_response_carries_the_requirements_json() -> None:
     assert payload["requirements_type"] == response.structure_type
     assert payload["user_requirements"] == task
     assert "parent_requirements" in payload["requirements"]
+
+
+def test_each_demo_example_has_a_ready_made_schema_bound_to_its_task() -> None:
+    ids = route._demo_example_ids()
+    assert ids, "no ready-made example schemas are committed"
+    for example_id in ids:
+        task, schema, requirements = route._load_demo_example(example_id)
+        assert route._demo_example_for_task(task) == example_id
+        # Transport newlines and edge whitespace do not change which task it is.
+        assert route._demo_example_for_task(f"{task.replace(chr(10), chr(13) + chr(10))}\n") == (
+            example_id
+        )
+        assert route._resolve_requested_schema(f"example:{example_id}", task) == (
+            schema,
+            requirements,
+        )
+
+
+def test_an_edited_example_gets_no_ready_made_schema_and_saves_nothing() -> None:
+    example_id = route._demo_example_ids()[0]
+    task = route._load_demo_example(example_id)[0]
+    before = sorted(path.name for path in route.DEMO_EXAMPLES_DIR.rglob("*"))
+
+    assert route._demo_example_for_task(f"{task}\nAlso the weather.") is None
+    with pytest.raises(HTTPException, match="task changed"):
+        route._resolve_requested_schema(f"example:{example_id}", f"{task}\nAlso the weather.")
+    with pytest.raises(HTTPException) as unknown:
+        route._resolve_requested_schema("example:no-such-example", task)
+    assert unknown.value.status_code == 410
+    assert sorted(path.name for path in route.DEMO_EXAMPLES_DIR.rglob("*")) == before
+
+
+@pytest.mark.asyncio
+async def test_generating_the_schema_of_an_example_task_makes_no_model_call(monkeypatch) -> None:
+    example_id = route._demo_example_ids()[0]
+    task = route._load_demo_example(example_id)[0]
+
+    def no_model(*args, **kwargs):  # pragma: no cover - must not run
+        raise AssertionError("the example's schema must not be generated again")
+
+    monkeypatch.setattr(route, "get_api_config", no_model)
+    response = await route.generate_schema(route.GenerateSchemaRequest(user_requirements=task))
+
+    assert response.schema_source == "example"
+    assert response.schema_id == f"example:{example_id}"

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ExtraTab } from "@/components/demo/schema-views";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -260,6 +261,8 @@ export function ResultView({
   seconds,
   verification,
   detail,
+  noun = "document",
+  extraTabs = [],
   children,
 }: {
   results: Record<string, unknown>[];
@@ -269,6 +272,10 @@ export function ResultView({
   verification?: Verification | null;
   /** Extra text under the heading, for example the model used. */
   detail?: string;
+  /** What the data was read from, in the heading: "document" or "recording". */
+  noun?: string;
+  /** More tabs after Readable and JSON, for example the schema the data was extracted with. */
+  extraTabs?: ExtraTab[];
   /** Shown under the summary bar, for example the token usage. */
   children?: ReactNode;
 }) {
@@ -294,8 +301,8 @@ export function ResultView({
         </span>
         <div className="min-w-0 flex-1">
           <p className="font-semibold">
-            Extracted from {documentCount}{" "}
-            {documentCount === 1 ? "document" : "documents"}
+            Extracted from {documentCount} {noun}
+            {documentCount === 1 ? "" : "s"}
           </p>
           {seconds !== null && (
             <p className="text-muted-foreground text-xs">
@@ -329,6 +336,11 @@ export function ResultView({
             <TabsList>
               <TabsTrigger value="readable">Readable</TabsTrigger>
               <TabsTrigger value="json">JSON</TabsTrigger>
+              {extraTabs.map((tab) => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  {tab.label}
+                </TabsTrigger>
+              ))}
             </TabsList>
             <label className="text-muted-foreground ml-auto flex items-center gap-2 text-sm">
               <input
@@ -420,6 +432,12 @@ export function ResultView({
               <code>{json}</code>
             </pre>
           </TabsContent>
+
+          {extraTabs.map((tab) => (
+            <TabsContent key={tab.value} value={tab.value} className="pt-3">
+              {tab.content}
+            </TabsContent>
+          ))}
         </Tabs>
       )}
     </div>

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import {
   EXAMPLES,
   PARSERS,
@@ -72,4 +73,21 @@ test("every example is a real file in public/ with a real task", () => {
     expect(example.url.endsWith(example.fileName)).toBe(true);
     expect(existsSync(`public${example.url}`)).toBe(true);
   }
+});
+
+describe("ready-made schemas", () => {
+  test("every example has a committed schema, named by the hash of its task", () => {
+    for (const example of EXAMPLES) {
+      const hash = createHash("sha256")
+        .update(example.task)
+        .digest("hex")
+        .slice(0, 16);
+      const base = `api/schemas/extractor_${hash}`;
+      expect(existsSync(`${base}_schema.py`)).toBe(true);
+      const saved = JSON.parse(
+        readFileSync(`${base}_requirements.json`, "utf-8"),
+      );
+      expect(saved.user_requirements).toBe(example.task);
+    }
+  });
 });

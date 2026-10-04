@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import tempfile
+import time
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
@@ -31,6 +32,7 @@ try:
         rename_described_fields,
         rename_keys,
     )
+    from utils.schema_view import schema_summary
     from utils.session_schemas import (
         find_session_schema,
         shorten_schema_name,
@@ -57,10 +59,27 @@ except ImportError:
         rename_described_fields,
         rename_keys,
     )
+    from api.utils.schema_view import schema_summary
     from api.utils.session_schemas import (
         find_session_schema,
         shorten_schema_name,
         store_session_schema,
+    )
+try:
+    from routers.parser import run_parser
+except ImportError:
+    from api.routers.parser import run_parser
+try:
+    from routers.transcriber import (
+        _build_diff_chunks,
+        _categorize_fallback_reason,
+        _summarize_corrections,
+    )
+except ImportError:
+    from api.routers.transcriber import (
+        _build_diff_chunks,
+        _categorize_fallback_reason,
+        _summarize_corrections,
     )
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -661,12 +680,23 @@ async def audio_pipeline_stream(
     schema_key: str | None = Form(None),
     regenerate_schema: bool = Form(False),
     schema_id: str | None = Form(None),
+    # Transcription options, the same as the Transcriber demo's. All optional, so that
+    # the other demos that call this endpoint are unchanged.
+    language: str = Form("auto"),
+    diarization: bool = Form(False),
+    speaker_count: int | None = Form(None),
+    min_speakers: int | None = Form(None),
+    max_speakers: int | None = Form(None),
+    custom_context: str = Form(""),
+    fix_transcription_errors: bool = Form(False),
+    prefer_local_first: bool = Form(True),
 ):
     """
     Run the audio pipeline with SSE streaming progress updates.
 
     Returns Server-Sent Events with progress updates and final result.
     """
+    enhanced = enhanced or fix_transcription_errors
     job_id = str(uuid.uuid4())
 
     # Validate file first
@@ -727,26 +757,60 @@ async def audio_pipeline_stream(
 
             transcriber_kwargs = {
                 "api_config": config,
+                "output_dir": tempfile.gettempdir(),
                 "enhanced_transcript": enhanced,
                 "compress_audio": compress_audio,
+                "language": language,
+                "diarization": diarization,
+                "speaker_count": speaker_count,
+                "min_speakers": min_speakers,
+                "max_speakers": max_speakers,
+                "initial_prompt": custom_context.strip() or None,
                 "local_api_base": local_api_base,
                 "local_api_key": local_api_key,
             }
 
-            if local_api_base and local_api_key:
+            # The provider calls run in a worker thread: a long recording must not stall
+            # the event loop, and with it every other request.
+            def transcribe_with(**extra):
+                return Transcriber(**transcriber_kwargs, **extra).transcribe(
+                    file_path=tmp_path, custom_context=custom_context
+                )
+
+            used_fallback = False
+            fallback_reason = None
+            cloud_model = config.get("transcription_model", "whisper")
+            model_used = cloud_model
+            transcribe_started = time.monotonic()
+            if prefer_local_first and local_api_base and local_api_key:
                 try:
-                    transcriber = Transcriber(
-                        **transcriber_kwargs,
-                        transcription_model="whisper_local",
+                    transcription = await asyncio.to_thread(
+                        transcribe_with, transcription_model="whisper_local"
                     )
-                    transcription = transcriber.transcribe(file_path=tmp_path)
+                    model_used = "whisper_local"
                 except Exception as exc:
                     logger.warning("Local transcription failed: %s — falling back", exc)
-                    transcriber = Transcriber(**transcriber_kwargs)
-                    transcription = transcriber.transcribe(file_path=tmp_path)
+                    used_fallback = True
+                    fallback_reason = _categorize_fallback_reason(exc)
+                    transcription = await asyncio.to_thread(transcribe_with)
             else:
-                transcriber = Transcriber(**transcriber_kwargs)
-                transcription = transcriber.transcribe(file_path=tmp_path)
+                transcription = await asyncio.to_thread(transcribe_with)
+            transcribe_seconds = time.monotonic() - transcribe_started
+
+            corrected_transcript = None
+            correction_summary = None
+            diff_chunks = None
+            if fix_transcription_errors and transcription.enhanced_transcript:
+                corrected_transcript = transcription.enhanced_transcript
+                correction_summary = _summarize_corrections(
+                    transcription.raw_transcript, corrected_transcript
+                ).model_dump()
+                diff_chunks = [
+                    chunk.model_dump()
+                    for chunk in _build_diff_chunks(
+                        transcription.raw_transcript, corrected_transcript
+                    )
+                ]
 
             steps[0]["status"] = "completed"
             steps[0]["message"] = "Transcription complete"
@@ -759,35 +823,61 @@ async def audio_pipeline_stream(
 
             from gaik.software_components.extractor import DataExtractor
 
-            extraction_model, requirements, generated_new_schema = _get_or_create_schema(
+            # A schema made earlier in this session for exactly this task is reused: the
+            # schema is made again only when the task changes (or the server forgot it).
+            reuse_id = schema_id
+            if reuse_id:
+                try:
+                    find_session_schema(reuse_id, user_requirements)
+                except ValueError:
+                    reuse_id = None
+            schema_started = time.monotonic()
+            extraction_model, requirements, generated_new_schema = await asyncio.to_thread(
+                _get_or_create_schema,
                 config=config,
                 user_requirements=user_requirements,
                 schema_key=schema_key,
                 regenerate_schema=regenerate_schema,
-                schema_id=schema_id,
+                schema_id=reuse_id,
             )
+            schema_seconds = time.monotonic() - schema_started
+            if generated_new_schema:
+                schema_source = "generated"
+                if not schema_key:
+                    reuse_id = store_session_schema(
+                        user_requirements, extraction_model, requirements
+                    )
+            else:
+                schema_source = "reused" if reuse_id else "saved"
+            # The schema itself, for people: every field with its plain type and rule.
+            summary = schema_summary(extraction_model, requirements, user_requirements)
 
             steps[1]["status"] = "completed"
-            steps[1]["message"] = (
-                "Generated new schema" if generated_new_schema else "Loaded saved schema"
-            )
+            steps[1]["message"] = {
+                "generated": "Generated new schema",
+                "reused": "Reused the schema of the earlier run",
+                "saved": "Loaded saved schema",
+            }[schema_source]
             yield sse_event("step_update", steps[1])
 
             # Step 3: Data Extraction
             steps[2]["status"] = "in_progress"
-            steps[2]["message"] = "Extracting incident data..."
+            steps[2]["message"] = "Extracting the data..."
             yield sse_event("step_update", steps[2])
 
             documents = [transcription.enhanced_transcript or transcription.raw_transcript]
             extractor = DataExtractor(
                 config=config, model=config["model"], **get_model_options(config)
             )
-            extracted_data = extractor.extract(
+            extract_started = time.monotonic()
+            extracted_data = await asyncio.to_thread(
+                extractor.extract,
                 extraction_model=extraction_model,
                 requirements=requirements,
                 user_requirements=user_requirements,
                 documents=documents,
             )
+            extract_seconds = time.monotonic() - extract_started
             # The generator drops letters such as ä and ö from field names: put them back.
             extracted_data = rename_keys(
                 extracted_data, field_name_mapping(extraction_model, user_requirements)
@@ -843,6 +933,29 @@ async def audio_pipeline_stream(
                     "enhanced_transcript": transcription.enhanced_transcript,
                     "extracted_data": extracted_data,
                     "pdf_available": pdf_available,
+                    # What the Transcriber demo shows, so that its view can be reused.
+                    "corrected_transcript": corrected_transcript,
+                    "correction_summary": correction_summary,
+                    "diff_chunks": diff_chunks,
+                    "segments": transcription.segments or None,
+                    "used_fallback": used_fallback,
+                    "fallback_reason": fallback_reason,
+                    "transcription_model": model_used,
+                    "audio_duration_s": transcription.audio_duration_s,
+                    "duration_s": transcription.duration_s,
+                    "srt_content": transcription.srt_content,
+                    "vtt_content": transcription.vtt_content,
+                    "usage": transcription.usage or None,
+                    # The schema, how it was got, and how long each step took.
+                    **summary,
+                    "schema_source": schema_source,
+                    # To send with the next run of the same task, so that it is not made again.
+                    "schema_id": reuse_id if schema_source != "saved" else None,
+                    "timings": {
+                        "transcription_s": round(transcribe_seconds, 1),
+                        "schema_s": round(schema_seconds, 1),
+                        "extraction_s": round(extract_seconds, 1),
+                    },
                 },
             )
 
@@ -1017,9 +1130,9 @@ async def text_pipeline_stream(
 async def document_pipeline_stream(
     file: UploadFile = File(...),
     user_requirements: str = Form(...),
-    parser_type: Literal["auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api"] = Form(
-        "docling_api"
-    ),
+    parser_type: Literal[
+        "auto", "pymupdf", "docx", "vision", "vision_plus", "docling_api", "multimodal"
+    ] = Form("docling_api"),
     generate_pdf: bool = Form(False),
     pdf_title: str = Form("Extracted Data Report"),
     schema_key: str | None = Form(None),
@@ -1073,6 +1186,8 @@ async def document_pipeline_stream(
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
+    file_name = file.filename
+
     # Save uploaded file
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
@@ -1098,7 +1213,16 @@ async def document_pipeline_stream(
             steps[0]["message"] = "Parsing document content..."
             yield sse_event("step_update", steps[0])
 
-            parsed_content = _parse_document_content(tmp_path, suffix, actual_parser_type, config)
+            # The same parsers, run the same way, as in the Parser demo. A model or a remote
+            # service reads the file in a worker thread, so that it cannot stall the event loop.
+            parse_started = time.monotonic()
+            parsed = await run_parser(tmp_path, suffix, actual_parser_type)
+            parse_seconds = time.monotonic() - parse_started
+            temp_name = Path(tmp_path).name
+            parsed_content = (parsed.get("text_content") or "").replace(temp_name, file_name)
+            if not parsed_content.strip():
+                raise ValueError("The parser found no text in the document. Try another parser.")
+            parsed_html = parsed.get("html")
 
             steps[0]["status"] = "completed"
             steps[0]["message"] = "Document parsed"
@@ -1111,18 +1235,40 @@ async def document_pipeline_stream(
 
             from gaik.software_components.extractor import DataExtractor
 
-            extraction_model, requirements, generated_new_schema = _get_or_create_schema(
+            # A schema made earlier in this session for exactly this task is reused: the
+            # schema is made again only when the task changes (or the server forgot it).
+            reuse_id = schema_id
+            if reuse_id:
+                try:
+                    find_session_schema(reuse_id, user_requirements)
+                except ValueError:
+                    reuse_id = None
+            schema_started = time.monotonic()
+            extraction_model, requirements, generated_new_schema = await asyncio.to_thread(
+                _get_or_create_schema,
                 config=config,
                 user_requirements=user_requirements,
                 schema_key=schema_key,
                 regenerate_schema=regenerate_schema,
-                schema_id=schema_id,
+                schema_id=reuse_id,
             )
+            schema_seconds = time.monotonic() - schema_started
+            if generated_new_schema:
+                schema_source = "generated"
+                if not schema_key:
+                    reuse_id = store_session_schema(
+                        user_requirements, extraction_model, requirements
+                    )
+            else:
+                schema_source = "reused" if reuse_id else "saved"
+            summary = schema_summary(extraction_model, requirements, user_requirements)
 
             steps[1]["status"] = "completed"
-            steps[1]["message"] = (
-                "Generated new schema" if generated_new_schema else "Loaded saved schema"
-            )
+            steps[1]["message"] = {
+                "generated": "Generated new schema",
+                "reused": "Reused the schema of the earlier run",
+                "saved": "Loaded saved schema",
+            }[schema_source]
             yield sse_event("step_update", steps[1])
 
             # Step 3: Data Extraction
@@ -1133,12 +1279,15 @@ async def document_pipeline_stream(
             extractor = DataExtractor(
                 config=config, model=config["model"], **get_model_options(config)
             )
-            extracted_data = extractor.extract(
+            extract_started = time.monotonic()
+            extracted_data = await asyncio.to_thread(
+                extractor.extract,
                 extraction_model=extraction_model,
                 requirements=requirements,
                 user_requirements=user_requirements,
                 documents=[parsed_content],
             )
+            extract_seconds = time.monotonic() - extract_started
             # The generator drops letters such as ä and ö from field names: put them back.
             extracted_data = rename_keys(
                 extracted_data, field_name_mapping(extraction_model, user_requirements)
@@ -1191,19 +1340,35 @@ async def document_pipeline_stream(
                     "parsed_content": parsed_content,
                     "extracted_data": extracted_data,
                     "pdf_available": pdf_available,
+                    # The parsed file as the parser shows it, and what it said about itself.
+                    "parser": actual_parser_type,
+                    "parsed_html": parsed_html,
+                    "parse_metadata": parsed.get("metadata") or {},
+                    # The schema, how it was got, and how long each step took.
+                    **summary,
+                    "schema_source": schema_source,
+                    # To send with the next run of the same task, so that it is not made again.
+                    "schema_id": reuse_id if schema_source != "saved" else None,
+                    "timings": {
+                        "parse_s": round(parse_seconds, 1),
+                        "schema_s": round(schema_seconds, 1),
+                        "extraction_s": round(extract_seconds, 1),
+                    },
                 },
             )
 
         except ImportError as e:
             yield sse_event("error", {"message": f"Required components not installed: {e}"})
         except Exception as e:
+            # A parser reports its problems as HTTP errors: show the reason, not the status.
+            message = str(e.detail) if isinstance(e, HTTPException) else str(e)
             for step in steps:
                 if step["status"] == "in_progress":
                     step["status"] = "error"
-                    step["message"] = str(e)
+                    step["message"] = message
                     yield sse_event("step_update", step)
                     break
-            yield sse_event("error", {"message": str(e)})
+            yield sse_event("error", {"message": message})
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 

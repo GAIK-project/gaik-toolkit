@@ -1,0 +1,8 @@
+Extract the data of an employment application form (two pages).
+Applicant and application: the date of the application, the position applied for, the applicant's full name, phone, email, street address, city, state, ZIP code, desired pay rate per hour (numeric), the date available to start, whether the applicant is eligible to work in the U.S., and whether the applicant was previously employed here. Dates should be MM/DD/YYYY. The two yes/no questions are true or false according to the ticked box.
+Return the availability as a list. For each marked cell of the weekly grid, give the day (Mon, Tue, Wed, Thu, Fri, Sat, Sun) and the part of the day (morning, afternoon, evening).
+Return the education history as a list. For each row, extract the level, school name, location, years attended, whether the applicant graduated (true or false), and the diploma or degree.
+Return the employment history as a list. For each row, extract the employer, position, start date and end date (MM/YYYY, as written), start pay and end pay per hour (numeric), and the reason for leaving.
+Return the references as a list. For each, extract the name, relationship, phone number, and the years known (numeric).
+Also extract the skills and qualifications text exactly as written, and the answers to the five additional questions (at least 18 years of age, can work weekends and holidays, can lift 25 lbs, reliable transportation, employed under another name) as true or false.
+Extract the emergency contact (name, relationship, phone), the name and date of the applicant's signature, and the office-use section (interviewed by, interview date, decision). Leave a value null when the form leaves it blank.

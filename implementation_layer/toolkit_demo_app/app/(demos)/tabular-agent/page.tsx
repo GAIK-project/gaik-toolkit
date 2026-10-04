@@ -2,14 +2,9 @@
 
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { FileUpload } from "@/components/demo/file-upload";
-import { HowItWorksCard } from "@/components/demo/how-it-works-card";
 import { PageTransition } from "@/components/demo/page-transition";
-import {
-  EmptyStateCard,
-  LoadingCard,
-  ResultCard,
-  ResultText,
-} from "@/components/demo/result-card";
+import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
+import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { FeedbackButton } from "@/components/feedback";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,23 +16,31 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
-import { AlertTriangle, Sparkles, Table2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  AlertTriangle,
+  Database,
+  Loader2,
+  MessageSquareText,
+  ShieldCheck,
+  Sparkles,
+  Table2,
+  Trash2,
+  Upload,
+  Wand2,
+} from "lucide-react";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-
-interface AskResponse {
-  question: string;
-  answer: string;
-  succeeded: boolean;
-  sql: string | null;
-  reasoning: string | null;
-  rows: Record<string, unknown>[];
-  row_count: number;
-  attempts: number;
-  error: string | null;
-}
+import { AnswerCard, type Asked, type AskResponse } from "./answer-card";
+import {
+  EXAMPLES,
+  percent,
+  type ExampleQuestion,
+  type TabularExample,
+} from "./tabular-data";
 
 interface ColumnInfo {
   name: string;
@@ -72,70 +75,119 @@ interface StatusResponse {
   detail: string | null;
 }
 
-const EXAMPLE_QUESTIONS = [
-  "How many rows are there in total?",
-  "Which category has the highest total?",
-  "Show the top 5 rows by value.",
-  "Are there any missing values?",
+const GUIDE_STEPS: GuideStep[] = [
+  {
+    icon: Upload,
+    title: "Load a file",
+    text: "A CSV, Excel, Parquet or JSON file, or one of the examples. Each Excel sheet becomes its own table.",
+  },
+  {
+    icon: Database,
+    title: "Check what the agent sees",
+    text: "The agent profiles every column: its type, its gaps and the values it really holds.",
+  },
+  {
+    icon: MessageSquareText,
+    title: "Ask in plain language",
+    text: "Ask about totals, rankings, comparisons or trends, in any language the model reads.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Check the answer",
+    text: "Read the answer, then the SQL behind it and the rows it came from. Sort them, chart them, download them.",
+  },
+];
+const GUIDE_NOTES = [
+  "The agent writes read-only SQL and runs it on your file in memory. It cannot change the file, and it does no calculations outside SQL. If the SQL fails it sees the error and tries again.",
+  "Every question is answered on its own: the agent does not remember the earlier ones, so name what you mean. Your file is deleted when you close the session or leave the page.",
 ];
 
-// Synthetic files in public/. Both hold the same sales figures; the Excel one
-// adds title rows, subtotals and notes that the agent cleans up.
-const SAMPLES = [
+const OWN_FILE_QUESTIONS: ExampleQuestion[] = [
+  { question: "How many rows are there in total?", shows: "counts" },
   {
-    file: "gaik_tabular_demo_sales.csv",
-    label: "Sales CSV",
-    questions: [
-      "Which region had the highest revenue?",
-      "Compare Widget and Gadget revenue by quarter.",
-      "How many units were sold in Q3?",
-    ],
+    question: "Which category has the highest total?",
+    shows: "groups and ranks",
   },
-  {
-    file: "gaik_tabular_demo_report.xlsx",
-    label: "Messy Excel report",
-    questions: [
-      "What was the total revenue in Q1?",
-      "Which region had the highest revenue?",
-      "Show units by product and region.",
-    ],
-  },
-] as const;
+  { question: "Show the top 5 rows by value.", shows: "sorts and limits" },
+  { question: "Are there any missing values?", shows: "checks the gaps" },
+];
 
-type Sample = (typeof SAMPLES)[number];
-
-function RowsTable({ rows }: { rows: Record<string, unknown>[] }) {
-  const columns = Object.keys(rows[0] ?? {});
+/** What the agent knows of each column of each table. */
+function Profile({ tables }: { tables: TableInfo[] }) {
   return (
-    <div
-      className="overflow-auto rounded-md border"
-      style={{ maxHeight: "320px" }}
-    >
-      <table className="w-full text-sm">
-        <thead className="bg-muted sticky top-0">
-          <tr>
-            {columns.map((c) => (
-              <th key={c} className="px-3 py-2 text-left font-medium">
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} className="border-t">
-              {columns.map((c) => (
-                <td key={c} className="px-3 py-2 font-mono text-xs">
-                  {row[c] === null || row[c] === undefined
-                    ? "—"
-                    : String(row[c])}
-                </td>
-              ))}
-            </tr>
+    <Tabs defaultValue={tables[0]?.name}>
+      {tables.length > 1 && (
+        <TabsList className="h-auto flex-wrap">
+          {tables.map((table) => (
+            <TabsTrigger key={table.name} value={table.name}>
+              {table.name}
+              <span className="text-muted-foreground ml-1.5 text-xs">
+                {table.row_count}
+              </span>
+            </TabsTrigger>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TabsList>
+      )}
+      {tables.map((table) => (
+        <TabsContent
+          key={table.name}
+          value={table.name}
+          className={cn(tables.length > 1 && "mt-3")}
+        >
+          <p className="text-muted-foreground mb-2 text-xs">
+            {table.name}: {table.row_count.toLocaleString()} rows,{" "}
+            {table.columns.length} columns
+          </p>
+          <div className="max-h-72 overflow-auto rounded-md border">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-muted sticky top-0">
+                <tr>
+                  <th className="px-2.5 py-2 font-medium">Column</th>
+                  <th className="px-2.5 py-2 font-medium">Type</th>
+                  <th className="px-2.5 py-2 font-medium">Empty</th>
+                  <th className="px-2.5 py-2 font-medium">Holds</th>
+                </tr>
+              </thead>
+              <tbody>
+                {table.columns.map((column) => (
+                  <tr key={column.name} className="border-t align-top">
+                    <td className="px-2.5 py-1.5 font-mono">{column.name}</td>
+                    <td className="px-2.5 py-1.5">
+                      <Badge
+                        variant="secondary"
+                        className="font-mono text-[10px] font-normal"
+                      >
+                        {column.data_type}
+                      </Badge>
+                    </td>
+                    <td
+                      className={cn(
+                        "px-2.5 py-1.5",
+                        column.null_fraction > 0 && "text-amber-700",
+                      )}
+                    >
+                      {column.null_fraction > 0
+                        ? percent(column.null_fraction)
+                        : "–"}
+                    </td>
+                    <td className="text-muted-foreground px-2.5 py-1.5">
+                      {column.min_value !== null && column.max_value !== null
+                        ? `${column.min_value} … ${column.max_value}`
+                        : column.top_values.length > 0
+                          ? column.top_values.slice(0, 4).join(", ")
+                          : column.samples.slice(0, 3).join(", ")}
+                      <span className="ml-1 opacity-70">
+                        · {column.distinct_count} distinct
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+      ))}
+    </Tabs>
   );
 }
 
@@ -145,10 +197,11 @@ export default function TabularAgentPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [upload, setUpload] = useState<UploadResponse | null>(null);
-  const [result, setResult] = useState<AskResponse | null>(null);
+  const [asked, setAsked] = useState<Asked[]>([]);
   const [status, setStatus] = useState<StatusResponse | null>(null);
-  const [sample, setSample] = useState<Sample | null>(null);
+  const [example, setExample] = useState<TabularExample | null>(null);
   const uploadRequest = useRef(0);
+  const counter = useRef(0);
 
   useEffect(() => {
     async function loadStatus(): Promise<void> {
@@ -170,15 +223,16 @@ export default function TabularAgentPage() {
 
   async function handleUpload(
     selected: File,
-    fromSample: Sample | null = null,
+    fromExample: TabularExample | null = null,
   ): Promise<void> {
     // Only the latest upload may update the page; an older one that finishes
     // later drops its server session instead of overwriting the newer file.
     const request = ++uploadRequest.current;
+    if (upload) discardSession(upload.session_id);
     setFile(selected);
-    setSample(fromSample);
+    setExample(fromExample);
     setUpload(null);
-    setResult(null);
+    setAsked([]);
     setIsUploading(true);
 
     try {
@@ -205,31 +259,28 @@ export default function TabularAgentPage() {
       posthog.capture("tabular_agent_upload", {
         tables: data.tables.length,
         rows: data.tables.reduce((n, t) => n + t.row_count, 0),
+        example: fromExample?.id ?? null,
       });
-      toast.success(
-        data.tables.length === 1
-          ? `Loaded ${data.tables[0].row_count} rows`
-          : `Loaded ${data.tables.length} tables`,
-      );
     } catch (error) {
       if (error instanceof RateLimitError || request !== uploadRequest.current)
         return;
       setFile(null);
-      setSample(null);
+      setExample(null);
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
       if (request === uploadRequest.current) setIsUploading(false);
     }
   }
 
-  async function loadSample(next: Sample): Promise<void> {
-    setIsUploading(true); // disables the drop zone and sample buttons during the fetch
+  async function pickExample(next: TabularExample): Promise<void> {
+    if (isUploading || isAsking) return;
+    setIsUploading(true); // disables the drop zone and the cards during the fetch
     try {
-      const response = await fetch(`/${next.file}`);
-      if (!response.ok) throw new Error("Could not load the sample file");
+      const response = await fetch(next.url);
+      if (!response.ok) throw new Error("Could not load the example file");
       const blob = await response.blob();
       await handleUpload(
-        new File([blob], next.file, { type: blob.type }),
+        new File([blob], next.fileName, { type: blob.type }),
         next,
       );
     } catch (error) {
@@ -243,9 +294,9 @@ export default function TabularAgentPage() {
     if (upload) discardSession(upload.session_id);
     setIsUploading(false);
     setFile(null);
-    setSample(null);
+    setExample(null);
     setUpload(null);
-    setResult(null);
+    setAsked([]);
   }
 
   async function handleAsk(override?: string): Promise<void> {
@@ -257,7 +308,7 @@ export default function TabularAgentPage() {
     }
 
     setIsAsking(true);
-    setResult(null);
+    const started = performance.now();
 
     try {
       const response = await apiFetch("/api/tabular-agent/ask", {
@@ -275,17 +326,23 @@ export default function TabularAgentPage() {
       }
 
       const data: AskResponse = await response.json();
-      setResult(data);
+      counter.current += 1;
+      setAsked((previous) => [
+        {
+          id: counter.current,
+          response: data,
+          seconds: (performance.now() - started) / 1000,
+        },
+        ...previous,
+      ]);
+      setQuestion("");
 
       posthog.capture("tabular_agent_query", {
         succeeded: data.succeeded,
         attempts: data.attempts,
         row_count: data.row_count,
+        example: example?.id ?? null,
       });
-
-      if (data.succeeded) {
-        toast.success("Query completed");
-      }
     } catch (error) {
       if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
@@ -294,13 +351,10 @@ export default function TabularAgentPage() {
     }
   }
 
-  function handleExample(q: string): void {
-    setQuestion(q);
-    void handleAsk(q);
-  }
-
   const accept = status?.allowed_extensions.join(",") ?? ".csv,.xlsx,.xls";
   const maxSize = status?.max_file_size_mb ?? 20;
+  const questions = example?.questions ?? OWN_FILE_QUESTIONS;
+  const busy = isUploading || isAsking;
 
   return (
     <PageTransition>
@@ -308,100 +362,89 @@ export default function TabularAgentPage() {
         icon={Table2}
         title="Tabular Agent"
         description="Ask your own CSV or Excel file questions in plain language — the agent writes and runs read-only SQL"
+        className="mb-6"
       />
 
-      <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
-        {/* Input Section */}
-        <div className="space-y-6">
+      <div className="space-y-6">
+        <SectionGuide
+          heading="How to use the Tabular Agent"
+          steps={GUIDE_STEPS}
+          notes={GUIDE_NOTES}
+        />
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">Start from an example file</h2>
+          <div
+            role="radiogroup"
+            aria-label="Example files"
+            className="grid gap-3 md:grid-cols-3"
+          >
+            {EXAMPLES.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                role="radio"
+                aria-checked={example?.id === entry.id}
+                disabled={busy}
+                onClick={() => void pickExample(entry)}
+                className={cn(
+                  "flex flex-col gap-1.5 rounded-xl border-2 p-3 text-left transition-all",
+                  example?.id === entry.id
+                    ? "border-primary bg-primary/5"
+                    : "bg-card hover:border-primary/40",
+                )}
+              >
+                <span className="font-semibold">{entry.title}</span>
+                <span className="text-muted-foreground text-sm">
+                  {entry.summary}
+                </span>
+                <span className="flex flex-wrap gap-1">
+                  {entry.tags.map((tag) => (
+                    <Badge key={tag} variant="outline" className="font-normal">
+                      {tag}
+                    </Badge>
+                  ))}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <div className="grid items-start gap-6 md:gap-8 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Upload a spreadsheet</CardTitle>
+              <CardTitle>1. The data</CardTitle>
               <CardDescription>
-                Messy report sheets (title rows, subtotals, notes) are cleaned
-                up automatically. The file is deleted when you close the
-                session.
+                Upload your own file, or use an example above. Messy report
+                sheets (title rows, subtotals, notes) are cleaned up.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <FileUpload
+                compact
                 accept={accept}
                 maxSize={maxSize}
                 file={file}
                 onFileSelect={(f) => void handleUpload(f)}
                 onFileRemove={handleRemove}
-                disabled={isUploading || isAsking}
+                disabled={busy}
               />
 
-              {!upload && (
-                <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-                  <span>No file? Try synthetic sample data:</span>
-                  {SAMPLES.map((s) => (
-                    <Button
-                      key={s.file}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void loadSample(s)}
-                      disabled={isUploading || isAsking}
-                    >
-                      {s.label}
-                    </Button>
-                  ))}
-                </div>
+              {isUploading && (
+                <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading, cleaning up and profiling the columns…
+                </p>
               )}
-
-              {upload && (
-                <div className="flex flex-wrap gap-2">
-                  {upload.tables.map((t) => (
-                    <Badge key={t.name} variant="secondary">
-                      {t.name} · {t.row_count} rows · {t.columns.length} columns
-                    </Badge>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <Input
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void handleAsk();
-                    }
-                  }}
-                  placeholder={
-                    upload
-                      ? "e.g. Which region had the highest total?"
-                      : "Upload a file first"
-                  }
-                  disabled={!upload || isAsking || isUploading}
-                />
-                <Button
-                  onClick={() => void handleAsk()}
-                  disabled={!upload || isAsking || !question.trim()}
-                >
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  {isAsking ? "Asking..." : "Ask"}
-                </Button>
-              </div>
 
               {upload && (
                 <div className="space-y-2">
-                  <p className="text-muted-foreground text-xs font-medium">
-                    Example questions
+                  <p className="text-sm font-semibold">What the agent sees</p>
+                  <Profile tables={upload.tables} />
+                  <p className="text-muted-foreground text-xs">
+                    Types, gaps and real values stop the model from inventing
+                    filters. A column with many empty cells is marked.
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {(sample?.questions ?? EXAMPLE_QUESTIONS).map((q) => (
-                      <Badge
-                        key={q}
-                        variant="outline"
-                        className="hover:bg-muted cursor-pointer transition-colors"
-                        onClick={() => !isAsking && handleExample(q)}
-                      >
-                        {q}
-                      </Badge>
-                    ))}
-                  </div>
                 </div>
               )}
 
@@ -422,117 +465,124 @@ export default function TabularAgentPage() {
             </CardContent>
           </Card>
 
-          {upload && (
-            <ResultCard
-              title="What the model sees"
-              description="Column types, ranges and the values each column actually holds"
-              copyContent={upload.schema_text}
-            >
-              <ResultText content={upload.schema_text} maxHeight="240px" />
-            </ResultCard>
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>2. Ask a question</CardTitle>
+              <CardDescription>
+                {upload
+                  ? "Type your own, or click one of the questions below."
+                  : "Load a file first."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleAsk();
+                    }
+                  }}
+                  placeholder={
+                    upload ? "Ask about your data…" : "Load a file first"
+                  }
+                  aria-label="Your question"
+                  disabled={!upload || busy}
+                />
+                <Button
+                  onClick={() => void handleAsk()}
+                  disabled={!upload || busy || !question.trim()}
+                >
+                  {isAsking ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  {isAsking ? "Asking…" : "Ask"}
+                </Button>
+              </div>
 
-          <HowItWorksCard description="The agent loads your file into DuckDB, profiles every column, generates validated read-only SQL, runs it, and explains the result.">
-            <p>
-              <strong>1. Upload:</strong> CSV, Excel, Parquet or JSON. Each
-              Excel sheet becomes its own table, so questions can span sheets.
-            </p>
-            <p>
-              <strong>2. Clean-up:</strong> Title rows, blank spacers, subtotal
-              lines and trailing notes are removed. Nordic number formats (
-              <code>1 234,56</code>) become real numbers.
-            </p>
-            <p>
-              <strong>3. Profiling:</strong> Every column is described — its
-              type, how many values are missing, and which values it actually
-              contains. This is what stops the model inventing filters.
-            </p>
-            <p>
-              <strong>4. Safe execution:</strong> The SQL is validated as
-              read-only and the engine is locked so it cannot reach the
-              filesystem. If a query fails, the error is fed back and retried.
-            </p>
-            <p>
-              <strong>5. Plain-language answer:</strong> The rows are summarized
-              into an answer — with the SQL shown, so you can check it.
-            </p>
-          </HowItWorksCard>
+              {upload && (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">
+                    {example ? "Questions to try" : "Some questions to start"}
+                  </p>
+                  <ul className="space-y-1.5">
+                    {questions.map((entry) => (
+                      <li key={entry.question}>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void handleAsk(entry.question)}
+                          className="hover:border-primary/40 hover:bg-muted/40 flex w-full flex-col items-start gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors disabled:opacity-50"
+                        >
+                          <span className="text-sm">{entry.question}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {entry.shows}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Results Section */}
-        <div className="space-y-4">
-          {isUploading && (
-            <LoadingCard
-              message="Reading your file..."
-              subMessage="Loading, cleaning up and profiling the columns"
-            />
-          )}
-
+        <div className="space-y-4" aria-live="polite">
           {isAsking && (
             <LoadingCard
-              message="Answering your question..."
+              message="Answering your question…"
               subMessage="Generating and running SQL"
             />
           )}
 
-          {result && !isAsking && !isUploading && (
+          {asked.length > 0 && (
             <>
-              <ResultCard
-                title="Answer"
-                description={`Question: ${result.question}`}
-                copyContent={result.answer}
-                feedbackSlot={<FeedbackButton demoType="tabular-agent" />}
-                delay={0}
-              >
-                <p className="text-sm leading-relaxed">{result.answer}</p>
-                {result.attempts > 1 && (
-                  <p className="text-muted-foreground mt-2 text-xs">
-                    The agent corrected its SQL — {result.attempts} attempts.
-                  </p>
-                )}
-              </ResultCard>
-
-              {result.sql && (
-                <ResultCard
-                  title="Generated SQL"
-                  description="The read-only query the agent ran"
-                  copyContent={result.sql}
-                  delay={0.1}
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-sm font-semibold">Answers</h2>
+                <Badge variant="outline" className="font-normal">
+                  {asked.length}
+                </Badge>
+                <span className="text-muted-foreground text-xs">
+                  The newest is first.
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="ml-auto"
+                  onClick={() => setAsked([])}
                 >
-                  <ResultText content={result.sql} maxHeight="200px" />
-                </ResultCard>
-              )}
-
-              {result.succeeded && result.rows.length > 0 && (
-                <ResultCard title={`Rows (${result.row_count})`} delay={0.15}>
-                  <RowsTable rows={result.rows} />
-                </ResultCard>
-              )}
-
-              {result.succeeded && result.rows.length === 0 && (
-                <ResultCard title="Rows" delay={0.15}>
-                  <p className="text-muted-foreground text-sm">
-                    The query ran successfully but returned no rows.
-                  </p>
-                </ResultCard>
-              )}
-
-              {!result.succeeded && result.error && (
-                <ResultCard title="Query error" delay={0.1}>
-                  <p className="text-destructive text-sm">{result.error}</p>
-                </ResultCard>
-              )}
+                  <Trash2 />
+                  Remove all
+                </Button>
+                <FeedbackButton demoType="tabular-agent" />
+              </div>
+              {asked.map((entry) => (
+                <AnswerCard
+                  key={entry.id}
+                  asked={entry}
+                  onRemove={() =>
+                    setAsked((previous) =>
+                      previous.filter((item) => item.id !== entry.id),
+                    )
+                  }
+                />
+              ))}
             </>
           )}
 
-          {!result && !isAsking && !isUploading && (
+          {asked.length === 0 && !isAsking && (
             <EmptyStateCard
-              icon={Table2}
+              icon={Wand2}
               title={upload ? "No question yet" : "No file yet"}
               description={
                 upload
-                  ? "Ask a question to see the answer, the generated SQL, and the result rows."
-                  : "Upload a CSV or Excel file to get started."
+                  ? "Ask a question to see the answer, the SQL behind it, and the rows it came from."
+                  : "Pick an example file, or upload a CSV or Excel file, to get started."
               }
               feedbackSlot={<FeedbackButton demoType="tabular-agent" />}
             />

@@ -27,6 +27,11 @@ export interface VisionExample {
   summary: string;
   files: ExampleFile[];
   task: string;
+  /**
+   * The task has a committed schema (api/schemas/vision_extractor_examples/<id>), so only
+   * the extraction runs. Without one, the schema is generated at the first run.
+   */
+  readyMade: boolean;
 }
 
 const DIR = "/vision-extractor-example";
@@ -34,6 +39,7 @@ const DIR = "/vision-extractor-example";
 export const EXAMPLES: VisionExample[] = [
   {
     id: "application",
+    readyMade: true,
     title: "Employment application form",
     shape: "form + 5 lists",
     summary:
@@ -50,6 +56,7 @@ Extract the emergency contact (name, relationship, phone), the name and date of 
   },
   {
     id: "blueprint",
+    readyMade: true,
     title: "Construction blueprint",
     shape: "title block + 6 lists",
     summary:
@@ -109,6 +116,7 @@ Rules:
   },
   {
     id: "inspection",
+    readyMade: true,
     title: "Site safety inspection",
     shape: "header + checklist + findings",
     summary:
@@ -124,6 +132,7 @@ Only fill values that are shown. Return null when a value is missing.`,
   },
   {
     id: "receipt",
+    readyMade: true,
     title: "Shop receipt (Finnish)",
     shape: "header + items",
     summary:

@@ -228,9 +228,14 @@ export function ModelSettingsButton() {
   return (
     <>
       <Button
-        variant="ghost"
-        size="icon"
-        className="text-muted-foreground hover:text-foreground relative"
+        variant="outline"
+        size="sm"
+        className={cn(
+          "relative gap-1.5",
+          settings
+            ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15"
+            : "text-foreground",
+        )}
         onClick={() => changeOpen(true)}
         aria-label={
           settings
@@ -246,6 +251,11 @@ export function ModelSettingsButton() {
         }
       >
         <KeyRound className="h-4 w-4" />
+        <span className="hidden sm:inline">
+          {settings
+            ? `Model settings · ${LABELS[settings.provider]}`
+            : "Model settings"}
+        </span>
         {settings && (
           <span
             aria-hidden="true"

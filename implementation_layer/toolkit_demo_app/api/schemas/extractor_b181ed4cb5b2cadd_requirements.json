@@ -1,0 +1,245 @@
+{
+  "schema_format_version": 2,
+  "model_name": "invoice_details_Extraction",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "invoice_details",
+      "fields": [
+        {
+          "field_name": "invoice_number",
+          "field_type": "str",
+          "description": "Invoice number.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "sender_name",
+          "field_type": "str",
+          "description": "Sender name.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "receiver_name",
+          "field_type": "str",
+          "description": "Receiver name.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "purchase_order_number",
+          "field_type": "str",
+          "description": "Purchase order number.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "date_of_invoice",
+          "field_type": "date",
+          "description": "Date of invoice.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "due_date",
+          "field_type": "date",
+          "description": "Invoice due date.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "payment_terms",
+          "field_type": "str",
+          "description": "Invoice payment terms.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "currency",
+          "field_type": "str",
+          "description": "Invoice currency.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "subtotal",
+          "field_type": "decimal",
+          "description": "Invoice subtotal, as a numeric amount.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "discount",
+          "field_type": "decimal",
+          "description": "Invoice discount, as a numeric amount; can be null if the invoice has none.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "tax",
+          "field_type": "decimal",
+          "description": "Invoice tax, as a numeric amount.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "grand_total",
+          "field_type": "decimal",
+          "description": "Invoice grand total, as a numeric amount.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "invoice_lines",
+        "container_description": "Repeated invoice line records containing description, quantity, unit, unit price, and line amount.",
+        "requirements": {
+          "use_case_name": "invoice_lines",
+          "fields": [
+            {
+              "field_name": "description",
+              "field_type": "str",
+              "description": "Description of the invoice line.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "quantity",
+              "field_type": "float",
+              "description": "Quantity of the invoice line, expressed as a numeric value.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "unit",
+              "field_type": "str",
+              "description": "Unit of the invoice line.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "unit_price",
+              "field_type": "decimal",
+              "description": "Unit price of the invoice line, expressed as a numeric value.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "line_amount",
+              "field_type": "decimal",
+              "description": "Amount of the invoice line, expressed as a numeric value.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "user_requirements": "Extract the invoice details: invoice number, sender name, receiver name, purchase order number, date of invoice, due date, payment terms, currency, subtotal, discount, tax, and grand total.\nAlso return a list of the invoice lines. For each line, extract the description, quantity, unit, unit price, and line amount.\nAmounts and quantities should be numeric. The discount can be null if the invoice has none."
+}

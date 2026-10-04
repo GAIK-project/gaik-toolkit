@@ -5,9 +5,10 @@ import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
 import { FileUpload } from "@/components/demo/file-upload";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
-import { FieldsTable } from "@/components/demo/schema-fields-table";
 import type { SchemaField } from "@/components/demo/schema-fields-table";
+import { schemaTabs, SchemaTabsView } from "@/components/demo/schema-views";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
+import { TaskChangeNotice } from "@/components/demo/task-change-notice";
 import { FeedbackButton } from "@/components/feedback";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,10 @@ interface GeneratedSchema {
   }>;
   /** Newer servers: every field with its plain type, rule and nested records. */
   field_table?: SchemaField[];
+  /** The requirements the schema was built from, as JSON. */
+  requirements_json?: string;
+  /** saved: the ready-made schema of an example. reused: made earlier in this session. */
+  schema_source?: "saved" | "reused" | "generated";
 }
 
 type Phase = "schema" | "extracting" | null;
@@ -108,7 +113,7 @@ const GUIDE_STEPS: GuideStep[] = [
 ];
 const GUIDE_NOTES = [
   "Auto-detect reads a PDF with PyMuPDF, a Word file with DOCX and an image with Vision. A scanned PDF has no text layer: choose Vision, Vision+, Multimodal or the HH Parser.",
-  "Nothing is saved. A generated schema lives for this session only.",
+  "Nothing you enter is saved. The examples come with a ready-made schema. A schema generated for your own task, or for an edited example, lives in this session only and is used again while the task stays the same.",
 ];
 
 const STRUCTURE_TEXT: Record<string, string> = {
@@ -150,9 +155,15 @@ export default function ExtractorPage() {
   const [isGeneratingSchema, setIsGeneratingSchema] = useState(false);
 
   const [exampleId, setExampleId] = useState<string | null>(null);
+  // The task of the example that was picked: editing the text does not change it.
+  const [exampleTask, setExampleTask] = useState<string | null>(DEFAULT_TASK);
   const [isLoading, setIsLoading] = useState(false);
   const [phase, setPhase] = useState<Phase>(null);
   const [result, setResult] = useState<ExtractResult | null>(null);
+  // The schema the result was extracted with: it stays with the result when the task changes.
+  const [resultSchema, setResultSchema] = useState<GeneratedSchema | null>(
+    null,
+  );
   const [seconds, setSeconds] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const ownModel = useModelSettings();
@@ -162,6 +173,14 @@ export default function ExtractorPage() {
   }, []);
 
   const schemaCurrent = schema !== null && schema.task === task.trim();
+  // The text no longer matches the schema in hand (or, before any schema, the picked
+  // example): a new schema is generated at the next run.
+  // The text is exactly the task of an example, which has a committed schema (also after
+  // the text was edited and put back).
+  const readyMade = EXAMPLES.some((e) => e.task.trim() === task.trim());
+  const taskChanged = schema
+    ? !schemaCurrent
+    : exampleTask !== null && task.trim() !== exampleTask.trim();
   const busy = isLoading || isParsing || isGeneratingSchema;
   const hasInput =
     inputMode === "text" ? documentText.trim().length > 0 : Boolean(file);
@@ -171,6 +190,7 @@ export default function ExtractorPage() {
     setExampleId(example.id);
     setMode("plain-language");
     setTask(example.task);
+    setExampleTask(example.task);
     setSchema(null);
     setResult(null);
     try {
@@ -324,6 +344,7 @@ export default function ExtractorPage() {
     setSeconds(null);
     const started = performance.now();
 
+    let usedSchema: GeneratedSchema | null = null;
     try {
       let response: Response;
       if (mode === "fields") {
@@ -349,6 +370,7 @@ export default function ExtractorPage() {
           current = await generateSchema();
           if (!current) return;
         }
+        usedSchema = current;
         setPhase("extracting");
         response = await apiFetch("/api/extract/plain-language", {
           method: "POST",
@@ -368,6 +390,7 @@ export default function ExtractorPage() {
       }
       const data = (await response.json()) as ExtractResult;
       setResult(data);
+      setResultSchema(usedSchema);
       setSeconds((performance.now() - started) / 1000);
       posthog.capture("data_extracted", {
         input_mode: inputMode,
@@ -578,10 +601,18 @@ export default function ExtractorPage() {
                       </>
                     )}
                   </Button>
-                  <p className="text-muted-foreground text-xs">
-                    The schema is generated when you extract, if there is none
-                    for this task. It is not saved.
-                  </p>
+                  {taskChanged ? (
+                    <TaskChangeNotice />
+                  ) : (
+                    <p className="text-muted-foreground text-xs">
+                      {schema?.schema_source === "saved" ||
+                      (!schema && readyMade)
+                        ? "This task has a ready-made schema, so only the extraction runs. Change the text and a new schema is generated."
+                        : schemaCurrent
+                          ? "The schema for this task is ready, so only the extraction runs. Change the text and a new schema is generated."
+                          : "The schema is generated once for a task, when you extract (or earlier, with the button), and used again while the text stays the same. It is not saved."}
+                    </p>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="fields" className="space-y-4">
@@ -695,62 +726,39 @@ export default function ExtractorPage() {
           </Card>
         </div>
 
-        {mode === "plain-language" && schema && !isLoading && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-3">
+        {mode === "plain-language" &&
+          schema &&
+          !isLoading &&
+          (!result || schema.schema_id !== resultSchema?.schema_id) && (
+            <Card>
+              <CardContent className="space-y-3 pt-6">
                 <div className="flex flex-wrap items-center gap-2">
                   <CardTitle className="text-base">
                     The extraction schema
                   </CardTitle>
-                  <span className="font-mono text-xs">
-                    {schema.schema_name}
-                  </span>
-                  <Badge variant="secondary" className="font-mono font-normal">
-                    {schema.structure_type}
-                  </Badge>
+                  {schema.schema_source === "saved" && (
+                    <Badge variant="outline" className="font-normal">
+                      ready-made schema
+                    </Badge>
+                  )}
                   {!schemaCurrent && (
                     <Badge
                       variant="outline"
                       className="border-amber-500 text-amber-700"
                     >
-                      The task changed: generate again
+                      The task changed: a new schema will be generated
                     </Badge>
                   )}
                 </div>
-                {STRUCTURE_TEXT[schema.structure_type] && (
-                  <p className="text-muted-foreground text-xs">
-                    {STRUCTURE_TEXT[schema.structure_type]}
-                  </p>
-                )}
-                <Tabs
-                  defaultValue={
-                    schema.field_table && schema.field_table.length > 0
-                      ? "fields"
-                      : "code"
-                  }
-                >
-                  <TabsList>
-                    {schema.field_table && schema.field_table.length > 0 && (
-                      <TabsTrigger value="fields">Fields</TabsTrigger>
-                    )}
-                    <TabsTrigger value="code">Python code</TabsTrigger>
-                  </TabsList>
-                  {schema.field_table && schema.field_table.length > 0 && (
-                    <TabsContent value="fields" className="pt-2">
-                      <FieldsTable fields={schema.field_table} />
-                    </TabsContent>
+                <SchemaTabsView
+                  tabs={schemaTabs(
+                    schema,
+                    STRUCTURE_TEXT[schema.structure_type],
                   )}
-                  <TabsContent value="code" className="pt-2">
-                    <pre className="bg-muted/40 max-h-64 overflow-auto rounded p-3 text-xs">
-                      <code>{schema.schema_code}</code>
-                    </pre>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                />
+              </CardContent>
+            </Card>
+          )}
 
         <div className="space-y-6" aria-live="polite">
           {(isLoading || isParsing) && (
@@ -775,6 +783,14 @@ export default function ExtractorPage() {
               results={result.results}
               documentCount={result.document_count}
               seconds={seconds}
+              extraTabs={
+                resultSchema
+                  ? schemaTabs(
+                      resultSchema,
+                      STRUCTURE_TEXT[resultSchema.structure_type],
+                    )
+                  : []
+              }
             />
           )}
 

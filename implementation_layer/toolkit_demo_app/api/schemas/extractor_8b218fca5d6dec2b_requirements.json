@@ -1,0 +1,199 @@
+{
+  "schema_format_version": 2,
+  "model_name": "laboratory_report_patient_and_report_information_Extraction",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "laboratory_report_patient_and_report_information",
+      "fields": [
+        {
+          "field_name": "patient_name",
+          "field_type": "str",
+          "description": "Patient name from the laboratory report.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "patient_identifier",
+          "field_type": "str",
+          "description": "Patient identifier from the laboratory report.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "date_of_birth",
+          "field_type": "date",
+          "description": "Patient date of birth.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "sample_collection_date",
+          "field_type": "date",
+          "description": "Sample collection date.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "report_date",
+          "field_type": "date",
+          "description": "Report date.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "laboratory_name",
+          "field_type": "str",
+          "description": "Laboratory name.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "requesting_physician",
+          "field_type": "str",
+          "description": "Requesting physician; can be null if not provided.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "test_results",
+        "container_description": "Laboratory test result records, each containing test name, measured value, unit, reference-range minimum, reference-range maximum, and interpretation.",
+        "requirements": {
+          "use_case_name": "laboratory_test_results",
+          "fields": [
+            {
+              "field_name": "test_name",
+              "field_type": "str",
+              "description": "Name of the laboratory test.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "measured_value",
+              "field_type": "float",
+              "description": "Measured test value, numeric when possible.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "unit",
+              "field_type": "str",
+              "description": "Unit of the measured test value; can be null if not shown.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "reference_range_minimum",
+              "field_type": "float",
+              "description": "Reference-range minimum, numeric when possible; can be null if not shown.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "reference_range_maximum",
+              "field_type": "float",
+              "description": "Reference-range maximum, numeric when possible; can be null if not shown.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "interpretation",
+              "field_type": "str",
+              "description": "Interpretation stated in the report. Must be low, normal, high, abnormal, or unknown; do not provide a medical interpretation beyond what the report states.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": [
+                "low",
+                "normal",
+                "high",
+                "abnormal",
+                "unknown"
+              ],
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "user_requirements": "Extract the patient and report information from a laboratory report.\nReturn the patient name, patient identifier, date of birth, sample collection date, report date, laboratory name, and requesting physician.\nThe requesting physician can be null if not provided.\nAlso return a list of laboratory test results.\nFor each result, extract the test name, measured value, unit, reference-range minimum, reference-range maximum, and interpretation.\nThe measured value and reference limits should be numeric when possible.\nInterpretation must be low, normal, high, abnormal, or unknown.\nThe unit and reference limits can be null if they are not shown.\nDo not provide a medical interpretation beyond what the report states."
+}

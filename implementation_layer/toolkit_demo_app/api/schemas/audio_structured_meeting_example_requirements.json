@@ -1,0 +1,135 @@
+{
+  "schema_format_version": 2,
+  "model_name": "site_meeting_Extraction",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "site_meeting",
+      "fields": [
+        {
+          "field_name": "meeting_topic",
+          "field_type": "str",
+          "description": "The topic of the site meeting.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "summary",
+          "field_type": "str",
+          "description": "A short summary of the site meeting in English.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "schedule_status",
+          "field_type": "str",
+          "description": "Whether the schedule is on time or delayed, using one of: on_time, delayed.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": [
+            "on_time",
+            "delayed"
+          ],
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "delay_in_weeks",
+          "field_type": "int",
+          "description": "The schedule delay in weeks as a number; null if the schedule is on time.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "action_items",
+        "container_description": "Repeated action-item records with task, person responsible, deadline as stated in the recording (may be null), and category (booking, delivery, confirmation). Values are in English.",
+        "requirements": {
+          "use_case_name": "action_items",
+          "fields": [
+            {
+              "field_name": "task",
+              "field_type": "str",
+              "description": "The action item task, written in English.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "person_responsible",
+              "field_type": "str",
+              "description": "The person responsible for the action item, written in English.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "deadline",
+              "field_type": "date",
+              "description": "The deadline as said in the recording, written in English. Can be null.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "action_type",
+              "field_type": "str",
+              "description": "Whether the action item is a booking, a delivery or a confirmation. Allowed values: booking, delivery, confirmation.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": [
+                "booking",
+                "delivery",
+                "confirmation"
+              ],
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "user_requirements": "Extract the details of a site meeting. Return the meeting topic, a short summary in English, and whether the schedule is on time (on_time or delayed) with the delay in weeks as a number (null if on time).\nAlso return a list of the action items. For each, extract the task, the person responsible, the deadline (as said in the recording) and whether it is a booking, a delivery or a confirmation (booking, delivery, confirmation). The deadline can be null.\nWrite the values in English."
+}

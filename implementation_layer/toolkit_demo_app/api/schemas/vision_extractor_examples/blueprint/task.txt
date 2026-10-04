@@ -1,0 +1,51 @@
+Extract compliance-relevant information from the construction blueprint.
+
+Top-level fields:
+- Project address
+- Drawing title
+- Drawing number
+- Sheet number
+- Project number
+- Scale
+- Drawing date
+- Architect
+- General contractor
+- Surveyor
+
+Repeated records:
+1. General construction notes:
+   - Note number
+   - Note text
+   - Compliance category: Dimensions, Structural reference, Utilities/fixtures, Survey/benchmarks, Specifications, Safety/compliance, Other
+
+2. Revision history:
+   - Revision number
+   - Revision date
+   - Revision description
+
+3. Visible dimensions:
+   - Dimension value exactly as written
+   - Unit
+   - Direction or orientation
+   - Related element or view
+
+4. Elevation references:
+   - Elevation value exactly as written
+   - Related element or section
+
+5. Material and legend references:
+   - Symbol or pattern name
+   - Meaning
+   - Location or view
+
+6. Drawing views, grid lines, and callouts:
+   - Label
+   - Type
+   - View title or related drawing element
+   - Compliance-relevant information shown
+
+Rules:
+- Extract only explicitly visible information.
+- Do not infer compliance decisions.
+- Preserve original wording, dimensions, dates, and labels.
+- Do not guess or infer. If the value of a field is not found, return null.

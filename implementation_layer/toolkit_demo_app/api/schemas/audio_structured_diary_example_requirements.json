@@ -1,0 +1,127 @@
+{
+  "schema_format_version": 2,
+  "model_name": "Construction_site_diary_Extraction",
+  "requirements": {
+    "use_case_name": "Construction site diary",
+    "fields": [
+      {
+        "field_name": "site_address",
+        "field_type": "str",
+        "description": "The construction site address.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "date",
+        "field_type": "str",
+        "description": "The date as said, as text; it may have no month or year.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "number_of_subcontractors",
+        "field_type": "int",
+        "description": "The number of subcontractors on site.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "number_of_own_machine_operators",
+        "field_type": "int",
+        "description": "The number of own machine operators on site.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "work_in_progress",
+        "field_type": "str",
+        "description": "The work in progress at the construction site.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "upper_floor_interior_demolition_progress",
+        "field_type": "float",
+        "description": "The progress of the interior demolition on the upper floor, expressed as percent done, as a number.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "lower_floor_interior_demolition_progress",
+        "field_type": "float",
+        "description": "The progress of the interior demolition on the lower floor, expressed as percent done, as a number.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "utilities_cut_off",
+        "field_type": "list[str]",
+        "description": "The utilities cut off at the construction site.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      },
+      {
+        "field_name": "calls_made",
+        "field_type": "list[str]",
+        "description": "The calls made.",
+        "required_in_output": true,
+        "nullable": false,
+        "enum": null,
+        "default": null,
+        "has_explicit_default": false,
+        "required": true,
+        "pattern": null,
+        "format": null
+      }
+    ]
+  },
+  "user_requirements": "Extract the entries of a construction site diary: the site address, the date as said (as text: it may have no month or year), the number of subcontractors and the number of own machine operators on site, the work in progress, the progress of the interior demolition on the upper and the lower floor (percent done, as a number), the utilities cut off, and the calls made. Write the values in English."
+}

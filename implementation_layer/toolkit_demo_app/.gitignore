@@ -47,7 +47,7 @@ rahti.md
 
 .mcp.json
 
-# Auto-generated extractor schemas
-api/schemas/extractor_*
+# The Extractor demo saves no schema at run time: the extractor_* files in api/schemas are the
+# committed, ready-made schemas of its examples (named by the hash of the task).
 # Solution Wizard per-session workspaces
 .wizard_workspaces/

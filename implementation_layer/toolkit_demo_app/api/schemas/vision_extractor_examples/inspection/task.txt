@@ -1,0 +1,7 @@
+Extract the data of a site safety inspection report.
+Report details: the report number, report type, form number and revision, company, site, project number, inspection date, start time, end time, inspector, site manager, main contractor, construction phase, number of workers on site, number of subcontractors, areas covered, weather, and the previous report number.
+Summary: the number of items checked, the number OK, the number not OK, the safety index in percent (numeric), the overall result, and the date of the next inspection. The overall result must be approved, approved_with_remarks, or work_stopped, according to the box that is ticked.
+Return the checklist as a list. For each item, extract the section heading it is under, the item text, the result (ok, not_ok, or not_applicable, according to the ticked box), and the remark. The remark can be null.
+Return the findings and corrective actions as a list. For each, extract the number, the finding, the severity (low, medium, or high), the person or party responsible, the due date, and the status.
+Also extract the signature dates of the inspector and of the site manager.
+Only fill values that are shown. Return null when a value is missing.

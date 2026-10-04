@@ -153,3 +153,29 @@ def describe_fields(
             entry["children"] = describe_fields(child, specs)
         fields.append(entry)
     return fields
+
+
+def schema_summary(schema: Any, requirements: Any, user_requirements: str) -> dict[str, Any]:
+    """The schema in the forms the demos show: a field table, Python schema and requirements.json."""
+    import json
+
+    from .schema import SCHEMA_FORMAT_VERSION, schema_to_python_source
+
+    dump = getattr(requirements, "model_dump", None)
+    dumped = dump(mode="json") if dump else None
+    table = describe_fields(schema, specs_by_name(dumped) if dumped else None)
+    structure_type = structure_of(table)
+    payload = {
+        "schema_format_version": SCHEMA_FORMAT_VERSION,
+        "model_name": schema.__name__,
+        "requirements_type": structure_type,
+        "user_requirements": user_requirements,
+        "requirements": dumped,
+    }
+    return {
+        "schema_name": schema.__name__,
+        "field_table": table,
+        "structure_type": structure_type,
+        "schema_code": schema_to_python_source(schema),
+        "requirements_json": json.dumps(payload, indent=2, ensure_ascii=False),
+    }

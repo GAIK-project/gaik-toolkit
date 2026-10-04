@@ -3,6 +3,7 @@
 import asyncio
 import os
 import tempfile
+import time
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
@@ -49,16 +50,37 @@ async def _cleanup_old_subtitles():
             SRT_TIMESTAMPS.pop(jid, None)
 
 
+def _segment_payload(segment: dict) -> dict:
+    """One segment for the page: its time, text, speaker and the timed words."""
+    return {
+        "start": segment.get("start"),
+        "end": segment.get("end"),
+        "text": (segment.get("text") or "").strip(),
+        "speaker": segment.get("speaker"),
+        "words": [
+            {"start": word.get("start"), "end": word.get("end"), "text": word.get("text", "")}
+            for word in segment.get("words") or []
+            if word.get("start") is not None and word.get("end") is not None
+        ],
+    }
+
+
 @router.post("/stream")
 async def dental_transcription_stream(
     file: UploadFile = File(...),
     language: str = Form("auto"),
+    diarization: bool = Form(False),
+    speaker_count: int | None = Form(None),
+    min_speakers: int | None = Form(None),
+    max_speakers: int | None = Form(None),
 ):
     """
     Transcribe audio/video and generate SRT/VTT subtitles with SSE progress.
 
     - **file**: Audio or video file
     - **language**: Language code (auto, fi, en, sv)
+    - **diarization**: Tell the speakers apart (the segments then name them)
+    - **speaker_count**, **min_speakers**, **max_speakers**: What is known about how many speak
     """
     job_id = str(uuid.uuid4())
 
@@ -107,13 +129,19 @@ async def dental_transcription_stream(
                 transcribe as whisper_local_transcribe,
             )
 
+            started = time.monotonic()
             result = await asyncio.to_thread(
                 whisper_local_transcribe,
                 audio_path=tmp_path,
                 api_base=local_api_base,
                 key=local_api_key,
                 language=language,
+                diarization=diarization,
+                speaker_count=speaker_count if diarization else None,
+                min_speakers=min_speakers if diarization else None,
+                max_speakers=max_speakers if diarization else None,
             )
+            elapsed_s = time.monotonic() - started
 
             segments = result.get("segments", [])
             raw_text = (result.get("text") or "").strip()
@@ -156,6 +184,12 @@ async def dental_transcription_stream(
                     "srt_content": srt_content,
                     "vtt_content": vtt_content,
                     "segments_count": len(segments),
+                    # The timed segments (with the words and speakers the service found), so
+                    # that the page can regroup them into subtitles of another length.
+                    "segments": [_segment_payload(segment) for segment in segments],
+                    "language": result.get("language"),
+                    "duration_s": max((seg.get("end") or 0 for seg in segments), default=0),
+                    "elapsed_s": round(elapsed_s, 1),
                 },
             )
 
@@ -211,6 +245,7 @@ async def dental_transcription_example():
             "srt_content": srt_content,
             "vtt_content": vtt_content,
             "segments_count": len(segments),
+            "segments": [_segment_payload(segment) for segment in segments],
         }
     except HTTPException:
         raise

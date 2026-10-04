@@ -87,6 +87,12 @@ EXAMPLE_TASK_PATH = EXAMPLE_SCHEMA_DIR / "task.txt"
 EXAMPLE_SCHEMA_PATH = EXAMPLE_SCHEMA_DIR / "schema.py"
 EXAMPLE_REQUIREMENTS_PATH = EXAMPLE_SCHEMA_DIR / "requirements.json"
 
+# The ready-made schemas of the demo's examples: one folder each, with the task they were
+# made from. A task that is exactly an example's uses it; any other task, an edited example
+# included, gets a schema made for the session only.
+DEMO_EXAMPLES_DIR = Path(__file__).parent.parent / "schemas" / "vision_extractor_examples"
+DEMO_EXAMPLE_PREFIX = "example:"
+
 TEMPORARY_SCHEMA_LIMIT = 32
 
 
@@ -268,6 +274,38 @@ def _load_example_schema() -> tuple[str, type[BaseModel], Any]:
     return user_requirements, schema, requirements
 
 
+def _demo_example_ids() -> list[str]:
+    """The ids of the committed demo examples that have a complete schema folder."""
+    if not DEMO_EXAMPLES_DIR.is_dir():
+        return []
+    return sorted(
+        folder.name
+        for folder in DEMO_EXAMPLES_DIR.iterdir()
+        if all((folder / name).is_file() for name in ("task.txt", "schema.py", "requirements.json"))
+    )
+
+
+@lru_cache(maxsize=32)
+def _load_demo_example(example_id: str) -> tuple[str, type[BaseModel], Any]:
+    """Load the committed schema of one demo example: (task, schema, requirements)."""
+    folder = DEMO_EXAMPLES_DIR / example_id
+    task = _normalize_task_text((folder / "task.txt").read_text(encoding="utf-8"))
+    loaded = load_saved_requirements(folder / "requirements.json", expected_user_requirements=task)
+    if loaded is None:
+        raise RuntimeError(f"The schema of the example '{example_id}' is stale")
+    model_name, requirements = loaded
+    return task, load_saved_schema(folder / "schema.py", model_name), requirements
+
+
+def _demo_example_for_task(user_requirements: str) -> str | None:
+    """The id of the demo example whose task is exactly this text, if there is one."""
+    wanted = _normalize_task_text(user_requirements)
+    for example_id in _demo_example_ids():
+        if _load_demo_example(example_id)[0] == wanted:
+            return example_id
+    return None
+
+
 def _remember_temporary_schema(
     user_requirements: str,
     schema: type[BaseModel],
@@ -288,6 +326,17 @@ def _remember_temporary_schema(
 
 def _resolve_requested_schema(schema_id: str, user_requirements: str):
     normalized_requirements = _normalize_task_text(user_requirements)
+    if schema_id.startswith(DEMO_EXAMPLE_PREFIX):
+        example_id = schema_id.removeprefix(DEMO_EXAMPLE_PREFIX)
+        if example_id not in _demo_example_ids():
+            raise HTTPException(status_code=410, detail="That example schema does not exist.")
+        example_task, schema, requirements = _load_demo_example(example_id)
+        if normalized_requirements != example_task:
+            raise HTTPException(
+                status_code=409,
+                detail="The extraction task changed. Generate and preview a new schema first.",
+            )
+        return schema, requirements
     if schema_id == EXAMPLE_SCHEMA_ID:
         example_task, schema, requirements = _load_example_schema()
         if normalized_requirements != example_task:
@@ -374,6 +423,14 @@ async def generate_schema(request: GenerateSchemaRequest):
         raise HTTPException(status_code=400, detail="No requirements provided")
 
     try:
+        # The task of an example, unchanged: its ready-made schema, no model call.
+        example_id = _demo_example_for_task(user_requirements)
+        if example_id is not None:
+            task, schema, requirements = _load_demo_example(example_id)
+            return _schema_response(
+                schema, requirements, f"{DEMO_EXAMPLE_PREFIX}{example_id}", "example", task
+            )
+
         from gaik.software_components.extractor import SchemaGenerator
 
         config = get_api_config()

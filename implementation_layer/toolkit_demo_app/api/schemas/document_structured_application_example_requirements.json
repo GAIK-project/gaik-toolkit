@@ -1,0 +1,661 @@
+{
+  "schema_format_version": 2,
+  "model_name": "employment_application_form_Extraction",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "employment_application_form",
+      "fields": [
+        {
+          "field_name": "application_date",
+          "field_type": "date",
+          "description": "Date of the application (MM/DD/YYYY).",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "position_applied_for",
+          "field_type": "str",
+          "description": "Position applied for.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "applicant_full_name",
+          "field_type": "str",
+          "description": "Applicant's full name.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "applicant_phone",
+          "field_type": "str",
+          "description": "Applicant's phone number.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "applicant_email",
+          "field_type": "str",
+          "description": "Applicant's email address.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "street_address",
+          "field_type": "str",
+          "description": "Applicant's street address.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "city",
+          "field_type": "str",
+          "description": "City in the applicant's address.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "state",
+          "field_type": "str",
+          "description": "State in the applicant's address.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "zip_code",
+          "field_type": "str",
+          "description": "ZIP code in the applicant's address.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "desired_pay_rate_per_hour",
+          "field_type": "decimal",
+          "description": "Desired pay rate per hour, expressed as a numeric value.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "date_available_to_start",
+          "field_type": "date",
+          "description": "Date the applicant is available to start (MM/DD/YYYY).",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "eligible_to_work_in_us",
+          "field_type": "bool",
+          "description": "Whether the applicant is eligible to work in the U.S.; true or false according to the ticked box.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "previously_employed_here",
+          "field_type": "bool",
+          "description": "Whether the applicant was previously employed here; true or false according to the ticked box.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "skills_and_qualifications",
+          "field_type": "str",
+          "description": "Skills and qualifications text exactly as written.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "at_least_18_years_of_age",
+          "field_type": "bool",
+          "description": "Answer to whether the applicant is at least 18 years of age, as true or false.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "can_work_weekends_and_holidays",
+          "field_type": "bool",
+          "description": "Answer to whether the applicant can work weekends and holidays, as true or false.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "can_lift_25_lbs",
+          "field_type": "bool",
+          "description": "Answer to whether the applicant can lift 25 lbs, as true or false.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "has_reliable_transportation",
+          "field_type": "bool",
+          "description": "Answer to whether the applicant has reliable transportation, as true or false.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "employed_under_another_name",
+          "field_type": "bool",
+          "description": "Answer to whether the applicant was employed under another name, as true or false.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "emergency_contact_name",
+          "field_type": "str",
+          "description": "Emergency contact's name.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "emergency_contact_relationship",
+          "field_type": "str",
+          "description": "Emergency contact's relationship to the applicant.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "emergency_contact_phone",
+          "field_type": "str",
+          "description": "Emergency contact's phone number.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "applicant_signature_name",
+          "field_type": "str",
+          "description": "Name in the applicant's signature.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "applicant_signature_date",
+          "field_type": "date",
+          "description": "Date of the applicant's signature (MM/DD/YYYY).",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "interviewed_by",
+          "field_type": "str",
+          "description": "Interviewer identified in the office-use section.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "interview_date",
+          "field_type": "date",
+          "description": "Interview date in the office-use section (MM/DD/YYYY).",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "decision",
+          "field_type": "str",
+          "description": "Decision recorded in the office-use section.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "availability",
+        "container_description": "Marked weekly-grid cells, each containing a day and part of day.",
+        "requirements": {
+          "use_case_name": "availability_record",
+          "fields": [
+            {
+              "field_name": "day",
+              "field_type": "str",
+              "description": "Day of the weekly grid for each marked cell. Allowed values: Mon, Tue, Wed, Thu, Fri, Sat, Sun.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": [
+                "Mon",
+                "Tue",
+                "Wed",
+                "Thu",
+                "Fri",
+                "Sat",
+                "Sun"
+              ],
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "part_of_day",
+              "field_type": "str",
+              "description": "Part of the day for each marked cell of the weekly grid. Allowed values: morning, afternoon, evening.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": [
+                "morning",
+                "afternoon",
+                "evening"
+              ],
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "education_history",
+        "container_description": "Education rows containing level, school name, location, years attended, graduation status, and diploma or degree.",
+        "requirements": {
+          "use_case_name": "education_history",
+          "fields": [
+            {
+              "field_name": "level",
+              "field_type": "str",
+              "description": "Education level for the education history row.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "school_name",
+              "field_type": "str",
+              "description": "School name for the education history row.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "location",
+              "field_type": "str",
+              "description": "School location for the education history row.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "years_attended",
+              "field_type": "str",
+              "description": "Years attended for the education history row, represented as a scalar value.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "graduated",
+              "field_type": "bool",
+              "description": "Whether the applicant graduated, expressed as true or false.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "diploma_or_degree",
+              "field_type": "str",
+              "description": "Diploma or degree for the education history row.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "employment_history",
+        "container_description": "Employment rows containing employer, position, start and end dates, starting and ending hourly pay, and reason for leaving.",
+        "requirements": {
+          "use_case_name": "employment_history",
+          "fields": [
+            {
+              "field_name": "employer",
+              "field_type": "str",
+              "description": "Employer for the employment history record.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "position",
+              "field_type": "str",
+              "description": "Position for the employment history record.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "start_date",
+              "field_type": "date",
+              "description": "Employment start date (MM/YYYY, as written).",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "end_date",
+              "field_type": "date",
+              "description": "Employment end date (MM/YYYY, as written).",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "start_pay",
+              "field_type": "decimal",
+              "description": "Start pay per hour (numeric).",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "end_pay",
+              "field_type": "decimal",
+              "description": "End pay per hour (numeric).",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "reason_for_leaving",
+              "field_type": "str",
+              "description": "Reason for leaving the employment.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "references",
+        "container_description": "References containing name, relationship, phone number, and years known.",
+        "requirements": {
+          "use_case_name": "employment_application_references",
+          "fields": [
+            {
+              "field_name": "name",
+              "field_type": "str",
+              "description": "Name of the reference.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "relationship",
+              "field_type": "str",
+              "description": "Reference's relationship to the applicant.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "phone_number",
+              "field_type": "str",
+              "description": "Phone number of the reference.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "years_known",
+              "field_type": "int",
+              "description": "Years the applicant has known the reference, expressed as a numeric value.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "user_requirements": "Extract the data of an employment application form (two pages).\nApplicant and application: the date of the application, the position applied for, the applicant's full name, phone, email, street address, city, state, ZIP code, desired pay rate per hour (numeric), the date available to start, whether the applicant is eligible to work in the U.S., and whether the applicant was previously employed here. Dates should be MM/DD/YYYY. The two yes/no questions are true or false according to the ticked box.\nReturn the availability as a list. For each marked cell of the weekly grid, give the day (Mon, Tue, Wed, Thu, Fri, Sat, Sun) and the part of the day (morning, afternoon, evening).\nReturn the education history as a list. For each row, extract the level, school name, location, years attended, whether the applicant graduated (true or false), and the diploma or degree.\nReturn the employment history as a list. For each row, extract the employer, position, start date and end date (MM/YYYY, as written), start pay and end pay per hour (numeric), and the reason for leaving.\nReturn the references as a list. For each, extract the name, relationship, phone number, and the years known (numeric).\nAlso extract the skills and qualifications text exactly as written, and the answers to the five additional questions (at least 18 years of age, can work weekends and holidays, can lift 25 lbs, reliable transportation, employed under another name) as true or false.\nExtract the emergency contact (name, relationship, phone), the name and date of the applicant's signature, and the office-use section (interviewed by, interview date, decision). Leave a value null when the form leaves it blank."
+}

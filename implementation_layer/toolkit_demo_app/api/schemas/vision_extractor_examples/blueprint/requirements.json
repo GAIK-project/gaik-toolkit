@@ -1,0 +1,455 @@
+{
+  "schema_format_version": 2,
+  "model_name": "construction_blueprint_compliance_Extraction",
+  "requirements_type": "parent_with_nested_list",
+  "user_requirements": "Extract compliance-relevant information from the construction blueprint.\n\nTop-level fields:\n- Project address\n- Drawing title\n- Drawing number\n- Sheet number\n- Project number\n- Scale\n- Drawing date\n- Architect\n- General contractor\n- Surveyor\n\nRepeated records:\n1. General construction notes:\n   - Note number\n   - Note text\n   - Compliance category: Dimensions, Structural reference, Utilities/fixtures, Survey/benchmarks, Specifications, Safety/compliance, Other\n\n2. Revision history:\n   - Revision number\n   - Revision date\n   - Revision description\n\n3. Visible dimensions:\n   - Dimension value exactly as written\n   - Unit\n   - Direction or orientation\n   - Related element or view\n\n4. Elevation references:\n   - Elevation value exactly as written\n   - Related element or section\n\n5. Material and legend references:\n   - Symbol or pattern name\n   - Meaning\n   - Location or view\n\n6. Drawing views, grid lines, and callouts:\n   - Label\n   - Type\n   - View title or related drawing element\n   - Compliance-relevant information shown\n\nRules:\n- Extract only explicitly visible information.\n- Do not infer compliance decisions.\n- Preserve original wording, dimensions, dates, and labels.\n- Do not guess or infer. If the value of a field is not found, return null.",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "construction_blueprint_compliance",
+      "fields": [
+        {
+          "field_name": "project_address",
+          "field_type": "str",
+          "description": "Project address.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "drawing_title",
+          "field_type": "str",
+          "description": "Drawing title.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "drawing_number",
+          "field_type": "str",
+          "description": "Drawing number.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "sheet_number",
+          "field_type": "str",
+          "description": "Sheet number.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "project_number",
+          "field_type": "str",
+          "description": "Project number.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "scale",
+          "field_type": "str",
+          "description": "Drawing scale.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "drawing_date",
+          "field_type": "date",
+          "description": "Drawing date.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "architect",
+          "field_type": "str",
+          "description": "Architect.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "general_contractor",
+          "field_type": "str",
+          "description": "General contractor.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "surveyor",
+          "field_type": "str",
+          "description": "Surveyor.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "general_construction_notes",
+        "container_description": "Repeated construction notes with note number, note text, and compliance category.",
+        "requirements": {
+          "use_case_name": "general_construction_notes",
+          "fields": [
+            {
+              "field_name": "note_number",
+              "field_type": "str",
+              "description": "Note number identifying the general construction note.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "note_text",
+              "field_type": "str",
+              "description": "Text of the general construction note.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "compliance_category",
+              "field_type": "str",
+              "description": "Compliance category: Dimensions, Structural reference, Utilities/fixtures, Survey/benchmarks, Specifications, Safety/compliance, Other.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": [
+                "Dimensions",
+                "Structural reference",
+                "Utilities/fixtures",
+                "Survey/benchmarks",
+                "Specifications",
+                "Safety/compliance",
+                "Other"
+              ],
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "revision_history",
+        "container_description": "Repeated revisions with revision number, revision date, and revision description.",
+        "requirements": {
+          "use_case_name": "revision_history",
+          "fields": [
+            {
+              "field_name": "revision_number",
+              "field_type": "str",
+              "description": "Revision number.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "revision_date",
+              "field_type": "date",
+              "description": "Revision date, preserving the original date.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "revision_description",
+              "field_type": "str",
+              "description": "Revision description, preserving the original wording.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "visible_dimensions",
+        "container_description": "Repeated visible dimensions with dimension value exactly as written, unit, direction or orientation, and related element or view.",
+        "requirements": {
+          "use_case_name": "visible_dimensions",
+          "fields": [
+            {
+              "field_name": "dimension_value",
+              "field_type": "str",
+              "description": "Dimension value exactly as written.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "unit",
+              "field_type": "str",
+              "description": "Unit of the visible dimension.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "direction_or_orientation",
+              "field_type": "str",
+              "description": "Direction or orientation of the visible dimension.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "related_element_or_view",
+              "field_type": "str",
+              "description": "Related element or view for the visible dimension.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "elevation_references",
+        "container_description": "Repeated elevation references with elevation value exactly as written and related element or section.",
+        "requirements": {
+          "use_case_name": "elevation_references",
+          "fields": [
+            {
+              "field_name": "elevation_value",
+              "field_type": "str",
+              "description": "Elevation value exactly as written.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "related_element_or_section",
+              "field_type": "str",
+              "description": "Related element or section.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "material_and_legend_references",
+        "container_description": "Repeated material and legend references with symbol or pattern name, meaning, and location or view.",
+        "requirements": {
+          "use_case_name": "material_and_legend_references",
+          "fields": [
+            {
+              "field_name": "symbol_or_pattern_name",
+              "field_type": "str",
+              "description": "Symbol or pattern name.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "meaning",
+              "field_type": "str",
+              "description": "Meaning.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "location_or_view",
+              "field_type": "str",
+              "description": "Location or view.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "drawing_views_grid_lines_and_callouts",
+        "container_description": "Repeated drawing views, grid lines, and callouts with label, type, view title or related drawing element, and compliance-relevant information shown.",
+        "requirements": {
+          "use_case_name": "drawing_views_grid_lines_and_callouts",
+          "fields": [
+            {
+              "field_name": "label",
+              "field_type": "str",
+              "description": "Label of the drawing view, grid line, or callout.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "type",
+              "field_type": "str",
+              "description": "Type of the drawing view, grid line, or callout.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "view_title_or_related_drawing_element",
+              "field_type": "str",
+              "description": "View title or related drawing element.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "compliance_relevant_information_shown",
+              "field_type": "str",
+              "description": "Compliance-relevant information shown in the drawing view, grid line, or callout.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

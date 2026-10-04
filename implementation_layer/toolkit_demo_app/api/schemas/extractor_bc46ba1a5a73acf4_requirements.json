@@ -1,0 +1,237 @@
+{
+  "schema_format_version": 2,
+  "model_name": "meeting_minutes_Extraction",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "meeting_minutes",
+      "fields": [
+        {
+          "field_name": "meeting_title",
+          "field_type": "str",
+          "description": "Title of the meeting.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "date",
+          "field_type": "date",
+          "description": "Date of the meeting.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "start_time",
+          "field_type": "date",
+          "description": "Start time of the meeting.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "end_time",
+          "field_type": "date",
+          "description": "End time of the meeting; can be null.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "location_or_online_platform",
+          "field_type": "str",
+          "description": "Meeting location or online platform; can be null.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "chairperson",
+          "field_type": "str",
+          "description": "Chairperson of the meeting; can be null.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "summary",
+          "field_type": "str",
+          "description": "Summary of the meeting.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "participants",
+        "container_description": "Repeated participant records containing name, organization, and role in the meeting. Organization and role may be null.",
+        "requirements": {
+          "use_case_name": "participants",
+          "fields": [
+            {
+              "field_name": "name",
+              "field_type": "str",
+              "description": "Participant's name.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "organization",
+              "field_type": "str",
+              "description": "Participant's organization.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "role",
+              "field_type": "str",
+              "description": "Participant's role in the meeting.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": "",
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      },
+      {
+        "container_name": "action_items",
+        "container_description": "Repeated action-item records containing task, responsible person, deadline, priority, and status. Responsible person and deadline may be null. Priority must be low, medium, or high; status must be not_started, in_progress, completed, or unknown.",
+        "requirements": {
+          "use_case_name": "action_items",
+          "fields": [
+            {
+              "field_name": "task",
+              "field_type": "str",
+              "description": "The task for the action item.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "responsible_person",
+              "field_type": "str",
+              "description": "The person responsible for the action item.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "deadline",
+              "field_type": "date",
+              "description": "The deadline for the action item.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "priority",
+              "field_type": "str",
+              "description": "The action item's priority. Must be low, medium, or high.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": [
+                "low",
+                "medium",
+                "high"
+              ],
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "status",
+              "field_type": "str",
+              "description": "The action item's status. Must be not_started, in_progress, completed, or unknown.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": [
+                "not_started",
+                "in_progress",
+                "completed",
+                "unknown"
+              ],
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "user_requirements": "Extract structured information from meeting minutes. Return the meeting title, date, start time, end time, location or online platform, chairperson, and summary.\nThe end time, location or platform, and chairperson can be null.\nReturn a list of participants containing each participant's name, organization, and role in the meeting. Also return a separate list of action items. For each action item, extract the task, responsible person, deadline, priority, and status.\nPriority must be low, medium, or high. Status must be not_started, in_progress, completed, or unknown. The organization, participant role, responsible person, and deadline can be null."
+}

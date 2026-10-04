@@ -1,0 +1,222 @@
+{
+  "schema_format_version": 2,
+  "model_name": "residential_lease_agreement_Extraction",
+  "requirements": {
+    "structure_type": "parent_with_nested_list",
+    "parent_requirements": {
+      "use_case_name": "residential_lease_agreement",
+      "fields": [
+        {
+          "field_name": "landlord",
+          "field_type": "str",
+          "description": "The landlord of the residential lease agreement.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "tenant",
+          "field_type": "str",
+          "description": "The tenant of the residential lease agreement.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "apartment_address",
+          "field_type": "str",
+          "description": "The apartment address.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "size_in_square_metres",
+          "field_type": "float",
+          "description": "The apartment size in square metres.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "lease_type",
+          "field_type": "str",
+          "description": "The lease type: fixed_term or open_ended.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": [
+            "fixed_term",
+            "open_ended"
+          ],
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "start_date",
+          "field_type": "date",
+          "description": "The lease start date.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "end_date",
+          "field_type": "date",
+          "description": "The lease end date; should be null for an open-ended lease.",
+          "required_in_output": true,
+          "nullable": true,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": false,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "monthly_rent",
+          "field_type": "decimal",
+          "description": "The monthly rent, numeric and in euros.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "security_deposit",
+          "field_type": "decimal",
+          "description": "The security deposit, numeric and in euros.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "tenant_notice_period",
+          "field_type": "str",
+          "description": "The tenant's notice period.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": "",
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "smoking_allowed",
+          "field_type": "bool",
+          "description": "Whether smoking is allowed.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        },
+        {
+          "field_name": "pets_allowed",
+          "field_type": "bool",
+          "description": "Whether pets are allowed. Pets are allowed only if the text says so without a condition.",
+          "required_in_output": true,
+          "nullable": false,
+          "enum": null,
+          "default": null,
+          "has_explicit_default": false,
+          "required": true,
+          "pattern": null,
+          "format": null
+        }
+      ]
+    },
+    "children": [
+      {
+        "container_name": "additional_charges",
+        "container_description": "Charges in addition to the rent, each with its name, monthly amount in euros, and whether it is included in the rent. The monthly amount may be null if the tenant pays the supplier directly.",
+        "requirements": {
+          "use_case_name": "additional_charges",
+          "fields": [
+            {
+              "field_name": "name",
+              "field_type": "str",
+              "description": "Name of the charge in addition to the rent.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "amount_per_month",
+              "field_type": "decimal",
+              "description": "Amount per month, numeric and in euros. Can be null if the tenant pays the supplier directly.",
+              "required_in_output": true,
+              "nullable": true,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": false,
+              "pattern": null,
+              "format": null
+            },
+            {
+              "field_name": "included_in_rent",
+              "field_type": "bool",
+              "description": "Whether the charge is included in the rent.",
+              "required_in_output": true,
+              "nullable": false,
+              "enum": null,
+              "default": null,
+              "has_explicit_default": false,
+              "required": true,
+              "pattern": null,
+              "format": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "user_requirements": "Extract the key terms of a residential lease agreement. Return the landlord, the tenant, the apartment address, the size in square metres, the lease type (fixed_term or open_ended), the start date, the end date, the monthly rent, the security deposit, the tenant's notice period, whether smoking is allowed, and whether pets are allowed.\nThe end date should be null for an open-ended lease. Pets are allowed only if the text says so without a condition.\nAlso return a list of the charges in addition to the rent. For each charge, extract its name, the amount per month, and whether it is included in the rent. The amount can be null if the tenant pays the supplier directly.\nMonetary amounts should be numeric, in euros."
+}
