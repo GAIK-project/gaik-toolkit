@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 try:
@@ -31,6 +32,13 @@ logger = logging.getLogger(__name__)
 
 # How a natural-language query becomes a tsquery. See `gaik_tsquery` in SQL.
 _TSQUERY_MODES = frozenset({"websearch", "or", "prefix"})
+
+# pgvector column types and the most dimensions an HNSW index takes for each.
+# `halfvec` stores 16-bit floats: half the space, and room for the 3,072
+# dimensions of the large embedding models.
+_VECTOR_TYPES = {"vector": 2000, "halfvec": 4000}
+
+_ITERATIVE_SCAN_MODES = frozenset({"off", "relaxed_order", "strict_order"})
 
 # One shared SQL helper rather than the same expression inlined at five call
 # sites, so the three modes cannot drift apart between the keyword arm and the
@@ -113,6 +121,25 @@ def _build_filter_clause(filters: dict | None) -> tuple[str, list[Any]]:
     return "AND metadata @> %s::jsonb", [json.dumps(filters)]
 
 
+@dataclass(frozen=True)
+class HealthReport:
+    """What :meth:`PgVectorStore.health` found.
+
+    ``ok`` is ``True`` when ``problems`` is empty. Each problem is one sentence
+    naming what is wrong and what it costs. ``details`` holds the raw readings
+    (row counts, column types, versions) for logging or a status endpoint.
+    """
+
+    ok: bool
+    problems: list[str] = field(default_factory=list)
+    details: dict[str, Any] = field(default_factory=dict)
+
+    def __str__(self) -> str:
+        if self.ok:
+            return "ok"
+        return "\n".join(f"- {problem}" for problem in self.problems)
+
+
 class PgVectorStore:
     """PostgreSQL vector store with semantic, keyword, and hybrid search.
 
@@ -137,13 +164,32 @@ class PgVectorStore:
             Queries are lemmatized through the same processor before being
             handed to ``websearch_to_tsquery``. This dramatically improves
             recall on inflected / compound Finnish terms.
+        tsquery_mode: How a query becomes a tsquery: ``"or"`` (default),
+            ``"websearch"`` or ``"prefix"``. ``"or"`` lets a passage match on
+            some of the query's words and leaves the ranking to ``ts_rank_cd``.
+            ``"websearch"`` requires every word, which suits short keyword input
+            and matches nothing for a full question.
+        hnsw_ef_search: pgvector's ``hnsw.ef_search`` for this store's
+            connection. ``None`` keeps the database's setting (pgvector's own
+            default is 40).
+        vector_type: ``"vector"`` (default, up to 2,000 dimensions) or
+            ``"halfvec"`` (up to 4,000, half the storage, pgvector 0.7+). It is
+            part of the table's schema: a table created with one cannot be
+            searched with the other.
+        hnsw_iterative_scan: pgvector's ``hnsw.iterative_scan`` for this store's
+            connection: ``"relaxed_order"``, ``"strict_order"`` or ``"off"``.
+            With a selective ``filters`` argument an HNSW scan otherwise returns
+            fewer rows than asked, or none. Needs pgvector 0.8+. ``None`` keeps
+            the database's setting.
 
     Example::
 
         from gaik.software_components.RAG.pg_vector_store import PgVectorStore
         from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor
 
-        processor = FinnishTextProcessor(backend="auto")  # voikko/spacy/uralic/simple
+        # Name the backend and the decompound setting: the index and every
+        # query must lemmatize the same way.
+        processor = FinnishTextProcessor(backend="pyvoikko", decompound=False)
         with PgVectorStore(
             "postgresql://postgres:postgres@localhost/mydb",
             text_processor=processor,
@@ -151,6 +197,7 @@ class PgVectorStore:
             store.setup()
             ids = store.add(documents, embeddings)
             results = store.search_hybrid(query_vec, "kerrostalon kissoilla", top_k=5)
+            print(store.health())  # "ok", or what stops either arm from working
     """
 
     def __init__(
@@ -161,8 +208,10 @@ class PgVectorStore:
         embedding_dim: int = 1536,
         fts_language: str = "simple",
         text_processor: FinnishTextProcessor | None = None,
-        tsquery_mode: str = "websearch",
+        tsquery_mode: str = "or",
         hnsw_ef_search: int | None = None,
+        vector_type: str = "vector",
+        hnsw_iterative_scan: str | None = None,
     ) -> None:
         if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", table_name):
             raise ValueError(
@@ -174,6 +223,27 @@ class PgVectorStore:
                 f"Invalid tsquery_mode {tsquery_mode!r}: expected one of "
                 f"{', '.join(sorted(_TSQUERY_MODES))}"
             )
+        if vector_type not in _VECTOR_TYPES:
+            raise ValueError(
+                f"Invalid vector_type {vector_type!r}: expected one of "
+                f"{', '.join(sorted(_VECTOR_TYPES))}"
+            )
+        if embedding_dim > _VECTOR_TYPES[vector_type]:
+            hint = (
+                ' Pass vector_type="halfvec", which indexes up to 4,000, or use'
+                if vector_type == "vector" and embedding_dim <= _VECTOR_TYPES["halfvec"]
+                else " Use"
+            )
+            raise ValueError(
+                f"embedding_dim={embedding_dim} is more than the "
+                f"{_VECTOR_TYPES[vector_type]:,} dimensions pgvector's HNSW index takes "
+                f"for {vector_type!r}.{hint} an embedding model with a smaller output."
+            )
+        if hnsw_iterative_scan is not None and hnsw_iterative_scan not in _ITERATIVE_SCAN_MODES:
+            raise ValueError(
+                f"Invalid hnsw_iterative_scan {hnsw_iterative_scan!r}: expected one of "
+                f"{', '.join(sorted(_ITERATIVE_SCAN_MODES))}"
+            )
         self.connection_string = connection_string
         self.table_name = table_name
         self.embedding_dim = embedding_dim
@@ -181,7 +251,14 @@ class PgVectorStore:
         self.text_processor = text_processor
         self.tsquery_mode = tsquery_mode
         self.hnsw_ef_search = hnsw_ef_search
+        self.vector_type = vector_type
+        self.hnsw_iterative_scan = hnsw_iterative_scan
         self._conn: psycopg.Connection | None = None
+
+    @property
+    def _vec(self) -> str:
+        """The embedding column's SQL type, e.g. ``vector(1536)``."""
+        return f"{self.vector_type}({self.embedding_dim})"
 
     # ------------------------------------------------------------------
     # Connection lifecycle
@@ -195,23 +272,30 @@ class PgVectorStore:
         return self._conn
 
     def _apply_session_settings(self, conn: psycopg.Connection) -> None:
-        """Apply per-session GUCs. Currently just ``hnsw.ef_search``.
+        """Apply per-session GUCs: ``hnsw.ef_search`` and ``hnsw.iterative_scan``.
 
         pgvector defaults ``hnsw.ef_search`` to 40, which trades recall for a
         latency saving most RAG workloads would rather not take: measured on one
         1500-dimension corpus, raising it to 100 moved recall@20 against an exact
         scan from 96.2% to 99.2% for +0.7 ms median.
 
-        The GUC only exists once pgvector's library has loaded into the session,
-        which a freshly opened connection may not have done, so a failure here is
-        swallowed rather than allowed to break connecting.
+        A setting the server rejects is logged as a warning and skipped, with the
+        transaction rolled back so the connection stays usable. That happens for
+        ``hnsw.iterative_scan`` on pgvector before 0.8.
         """
-        if self.hnsw_ef_search is None:
-            return
-        try:
-            conn.execute(f"SET hnsw.ef_search = {int(self.hnsw_ef_search)}")
-        except Exception:  # pragma: no cover - extension not loaded yet
-            logger.debug("Could not set hnsw.ef_search; pgvector may not be loaded yet")
+        settings = (
+            ("hnsw.ef_search", None if self.hnsw_ef_search is None else int(self.hnsw_ef_search)),
+            ("hnsw.iterative_scan", self.hnsw_iterative_scan),
+        )
+        for name, value in settings:
+            if value is None:
+                continue
+            try:
+                conn.execute(f"SET {name} = {value}")
+                conn.commit()
+            except Exception as exc:
+                conn.rollback()
+                logger.warning("Could not set %s = %s: %s", name, value, exc)
 
     def close(self) -> None:
         """Close the database connection."""
@@ -243,7 +327,7 @@ class PgVectorStore:
         """
         conn = self._get_conn()
         table = self.table_name
-        dim = self.embedding_dim
+        vec = self._vec
         lang = self.fts_language
 
         # 1. Extensions (skip on managed DBs where user lacks CREATE privileges)
@@ -264,7 +348,7 @@ class PgVectorStore:
                     content TEXT NOT NULL,
                     content_lemmatized TEXT,
                     metadata JSONB DEFAULT '{{}}'::JSONB,
-                    embedding vector({dim}),
+                    embedding {vec},
                     text_search tsvector GENERATED ALWAYS AS (
                         to_tsvector(
                             '{lang}',
@@ -281,7 +365,7 @@ class PgVectorStore:
                     title TEXT,
                     content TEXT NOT NULL,
                     metadata JSONB DEFAULT '{{}}'::JSONB,
-                    embedding vector({dim}),
+                    embedding {vec},
                     text_search tsvector GENERATED ALWAYS AS (
                         to_tsvector('{lang}', COALESCE(content, ''))
                     ) STORED,
@@ -292,7 +376,7 @@ class PgVectorStore:
         # 3. Indexes
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS {table}_embedding_hnsw_idx
-            ON {table} USING hnsw (embedding vector_cosine_ops)
+            ON {table} USING hnsw (embedding {self.vector_type}_cosine_ops)
         """)
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS {table}_text_search_gin_idx
@@ -321,11 +405,11 @@ class PgVectorStore:
         for name, mode_args in (
             (
                 f"hybrid_search_fts_{table}",
-                f"vector({dim}), TEXT, INTEGER, INTEGER, FLOAT, FLOAT, regconfig, JSONB, TEXT",
+                f"{vec}, TEXT, INTEGER, INTEGER, FLOAT, FLOAT, regconfig, JSONB, TEXT",
             ),
             (
                 f"hybrid_search_weighted_{table}",
-                f"vector({dim}), TEXT, INTEGER, FLOAT, FLOAT, regconfig, JSONB, TEXT",
+                f"{vec}, TEXT, INTEGER, FLOAT, FLOAT, regconfig, JSONB, TEXT",
             ),
         ):
             conn.execute(f"DROP FUNCTION IF EXISTS {name}({mode_args})")
@@ -339,10 +423,10 @@ class PgVectorStore:
     def _create_match_function(self, conn: psycopg.Connection) -> None:
         """Create the pure semantic search SQL function."""
         table = self.table_name
-        dim = self.embedding_dim
+        vec = self._vec
         conn.execute(f"""
             CREATE OR REPLACE FUNCTION match_{table}(
-                query_embedding vector({dim}),
+                query_embedding {vec},
                 match_threshold FLOAT DEFAULT 0.7,
                 match_count INTEGER DEFAULT 10,
                 filter_metadata JSONB DEFAULT NULL
@@ -374,11 +458,11 @@ class PgVectorStore:
     def _create_hybrid_fts_function(self, conn: psycopg.Connection) -> None:
         """Create the RRF-based hybrid search SQL function."""
         table = self.table_name
-        dim = self.embedding_dim
+        vec = self._vec
         lang = self.fts_language
         conn.execute(f"""
             CREATE OR REPLACE FUNCTION hybrid_search_fts_{table}(
-                query_embedding vector({dim}),
+                query_embedding {vec},
                 query_text TEXT,
                 result_limit INTEGER,
                 rrf_k INTEGER,
@@ -467,7 +551,7 @@ class PgVectorStore:
         # setup() fails to `CREATE OR REPLACE` it.
         conn.execute(f"""
             CREATE OR REPLACE FUNCTION hybrid_search_fts_{table}(
-                query_embedding vector({dim}),
+                query_embedding {vec},
                 query_text TEXT,
                 result_limit INTEGER DEFAULT 20,
                 rrf_k INTEGER DEFAULT 60,
@@ -498,11 +582,11 @@ class PgVectorStore:
     def _create_hybrid_weighted_function(self, conn: psycopg.Connection) -> None:
         """Create the weighted linear combination hybrid search SQL function."""
         table = self.table_name
-        dim = self.embedding_dim
+        vec = self._vec
         lang = self.fts_language
         conn.execute(f"""
             CREATE OR REPLACE FUNCTION hybrid_search_weighted_{table}(
-                query_embedding vector({dim}),
+                query_embedding {vec},
                 query_text TEXT,
                 result_limit INTEGER,
                 sem_weight FLOAT,
@@ -573,7 +657,7 @@ class PgVectorStore:
         # The pre-tsquery_mode signature, for older gaik releases (see setup()).
         conn.execute(f"""
             CREATE OR REPLACE FUNCTION hybrid_search_weighted_{table}(
-                query_embedding vector({dim}),
+                query_embedding {vec},
                 query_text TEXT,
                 result_limit INTEGER DEFAULT 20,
                 sem_weight FLOAT DEFAULT 0.5,
@@ -644,7 +728,7 @@ class PgVectorStore:
                         INSERT INTO {self.table_name}
                             (title, content, content_lemmatized, metadata, embedding)
                         VALUES (
-                            %s, %s, %s, %s::jsonb, %s::vector({self.embedding_dim})
+                            %s, %s, %s, %s::jsonb, %s::{self._vec}
                         )
                         RETURNING id
                         """,
@@ -660,7 +744,7 @@ class PgVectorStore:
                     cur.execute(
                         f"""
                         INSERT INTO {self.table_name} (title, content, metadata, embedding)
-                        VALUES (%s, %s, %s::jsonb, %s::vector({self.embedding_dim}))
+                        VALUES (%s, %s, %s::jsonb, %s::{self._vec})
                         RETURNING id
                         """,
                         (title, doc.page_content, json.dumps(metadata), vec_str),
@@ -740,7 +824,7 @@ class PgVectorStore:
         rows = conn.execute(
             f"""
             SELECT * FROM match_{self.table_name}(
-                %s::vector({self.embedding_dim}), %s, %s, %s::jsonb
+                %s::{self._vec}, %s, %s, %s::jsonb
             )
             """,
             (vec_str, threshold, top_k, filter_json),
@@ -814,7 +898,12 @@ class PgVectorStore:
             filters: Optional JSONB metadata filter.
 
         Returns:
-            List of ``(Document, rrf_score)`` tuples, highest first.
+            List of ``(Document, rrf_score)`` tuples, highest first. Each
+            document's metadata carries ``semantic_rank`` and ``keyword_rank``
+            (absent when that arm did not find the row) and
+            ``semantic_similarity``, the row's cosine similarity to the query.
+            The RRF score is built from rank positions and cannot tell a real
+            match from the nearest neighbour of gibberish; the similarity can.
         """
         conn = self._get_conn()
         vec_str = _format_vector(query_embedding)
@@ -823,15 +912,21 @@ class PgVectorStore:
 
         rows = conn.execute(
             f"""
-            SELECT * FROM hybrid_search_fts_{self.table_name}(
-                %s::vector({self.embedding_dim}),
+            SELECT
+                h.*,
+                (1 - (t.embedding <=> %s::{self._vec}))::FLOAT AS semantic_similarity
+            FROM hybrid_search_fts_{self.table_name}(
+                %s::{self._vec},
                 %s, %s, %s, %s, %s,
                 '{self.fts_language}'::regconfig,
                 %s::jsonb,
                 %s
-            )
+            ) h
+            JOIN {self.table_name} t ON t.id = h.id
+            ORDER BY h.rrf_score DESC, h.id
             """,
             (
+                vec_str,
                 vec_str,
                 effective_query,
                 top_k,
@@ -846,7 +941,7 @@ class PgVectorStore:
         return self._rows_to_results(
             rows,
             score_key="rrf_score",
-            extra_keys=("semantic_rank", "keyword_rank"),
+            extra_keys=("semantic_rank", "keyword_rank", "semantic_similarity"),
         )
 
     def search_hybrid_weighted(
@@ -883,7 +978,7 @@ class PgVectorStore:
         rows = conn.execute(
             f"""
             SELECT * FROM hybrid_search_weighted_{self.table_name}(
-                %s::vector({self.embedding_dim}),
+                %s::{self._vec},
                 %s, %s, %s, %s,
                 '{self.fts_language}'::regconfig,
                 %s::jsonb,
@@ -906,6 +1001,304 @@ class PgVectorStore:
             score_key="combined_score",
             extra_keys=("semantic_score", "keyword_score"),
         )
+
+    # ------------------------------------------------------------------
+    # Health
+    # ------------------------------------------------------------------
+
+    def health(self, *, sample_rows: int = 5) -> HealthReport:
+        """Check, against the live database, that both search arms can work.
+
+        Either arm of a hybrid search can stop contributing without an error,
+        because the other keeps filling the page. This reads the table as it
+        really is and compares it with how this store is configured:
+
+        - the embedding column's type and dimension;
+        - whether ``text_search`` is a generated column, and which text search
+          configuration it was built with;
+        - whether the index holds lemmas and this store lemmatizes queries the
+          same way: the stored lemmas of a few rows are compared with what the
+          current ``text_processor`` produces for the same text, which catches
+          a changed backend, a changed ``decompound`` setting and a missing
+          lemmatizer library alike;
+        - rows without an embedding, an empty ``text_search`` or missing lemmas;
+        - the vector and full-text indexes, and the vector index's operator class;
+        - whether ``hnsw.ef_search`` and ``hnsw.iterative_scan`` took effect on
+          this connection, which they do not behind a transaction pooler.
+
+        Nothing is written. The row counts scan the table once, so call this at
+        startup or from a status endpoint, not per request.
+
+        Args:
+            sample_rows: How many rows to take from each end of the table for the
+                lemma comparison. ``0`` skips it.
+
+        Returns:
+            A :class:`HealthReport`; ``report.ok`` is ``True`` when nothing is
+            wrong and ``str(report)`` lists the problems otherwise.
+        """
+        conn = self._get_conn()
+        table = self.table_name
+        problems: list[str] = []
+        details: dict[str, Any] = {"table": table}
+
+        columns = conn.execute(
+            """
+            SELECT
+                a.attname AS name,
+                format_type(a.atttypid, a.atttypmod) AS type,
+                a.attgenerated AS generated,
+                pg_get_expr(d.adbin, d.adrelid) AS expression
+            FROM pg_attribute a
+            LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+            WHERE a.attrelid = to_regclass(%s) AND a.attnum > 0 AND NOT a.attisdropped
+            """,
+            (table,),
+        ).fetchall()
+        if not columns:
+            return HealthReport(
+                False, [f"table {table!r} does not exist: call setup() first"], details
+            )
+        column = {row["name"]: row for row in columns}
+
+        # Embedding column
+        embedding_type = column["embedding"]["type"] if "embedding" in column else None
+        details["embedding_type"] = embedding_type
+        if embedding_type is None:
+            problems.append("the table has no embedding column: the vector arm cannot work")
+        elif embedding_type != self._vec:
+            problems.append(
+                f"the embedding column is {embedding_type}, this store is configured for "
+                f"{self._vec}: inserts and vector searches fail"
+            )
+
+        # Full-text column
+        text_search = column.get("text_search")
+        index_holds_lemmas = False
+        if text_search is None:
+            problems.append("the table has no text_search column: the keyword arm cannot work")
+        else:
+            generated = text_search["generated"] == "s"
+            details["text_search_generated"] = generated
+            expression = text_search["expression"] or ""
+            if not generated:
+                problems.append(
+                    "text_search is a plain column, not a generated one: nothing fills it "
+                    "when a row is inserted or changed, so the keyword arm sees only what "
+                    "was written to it by hand"
+                )
+            else:
+                index_holds_lemmas = "content_lemmatized" in expression
+                found = re.search(r"to_tsvector\('([^']+)'::regconfig", expression)
+                details["fts_language"] = found.group(1) if found else None
+                if found and found.group(1).lower() != self.fts_language.lower():
+                    problems.append(
+                        f"the full-text index was built with the {found.group(1)!r} "
+                        f"configuration, queries are parsed with {self.fts_language!r}: "
+                        "the two produce different word forms, so keyword matches are lost"
+                    )
+
+        # Lemmas: the index and the query must agree
+        if self.text_processor is not None and not index_holds_lemmas:
+            problems.append(
+                "this store has a text_processor but the table was created without one: "
+                "queries are lemmatized and the index is not, so the keyword arm misses"
+            )
+        if self.text_processor is not None and index_holds_lemmas:
+            if getattr(self.text_processor, "backend_name", None) == "simple":
+                problems.append(
+                    "the text_processor's backend is 'simple', a tokenizer and not a "
+                    "lemmatizer: inflected words are indexed and searched as typed"
+                )
+            if sample_rows > 0:
+                sample = conn.execute(
+                    f"""
+                    (SELECT id, content, content_lemmatized FROM {table}
+                     WHERE content_lemmatized IS NOT NULL ORDER BY id LIMIT %s)
+                    UNION
+                    (SELECT id, content, content_lemmatized FROM {table}
+                     WHERE content_lemmatized IS NOT NULL ORDER BY id DESC LIMIT %s)
+                    """,
+                    (sample_rows, sample_rows),
+                ).fetchall()
+                differing = [
+                    row["id"]
+                    for row in sample
+                    if self.text_processor.to_tsvector_text(row["content"])
+                    != row["content_lemmatized"]
+                ]
+                details["lemma_sample"] = {"rows": len(sample), "differing": len(differing)}
+                if differing:
+                    problems.append(
+                        f"{len(differing)} of {len(sample)} sampled rows hold lemmas that "
+                        "differ from what this text_processor produces for the same text "
+                        f"(for example id {differing[0]}): the index and the query "
+                        "lemmatize differently, so the keyword arm misses. Restore the "
+                        "backend and decompound setting the table was built with, or call "
+                        "relemmatize()"
+                    )
+
+        # Rows either arm cannot see
+        counted = ["count(*) AS total"]
+        if embedding_type is not None:
+            counted.append("count(*) FILTER (WHERE embedding IS NULL) AS without_embedding")
+        if text_search is not None:
+            counted.append(
+                "count(*) FILTER (WHERE text_search IS NULL OR text_search = ''::tsvector) "
+                "AS without_keywords"
+            )
+        if "content_lemmatized" in column:
+            counted.append("count(content_lemmatized) AS with_lemmas")
+        counts = conn.execute(f"SELECT {', '.join(counted)} FROM {table}").fetchone()
+        total = counts["total"]
+        details["rows"] = total
+        for key in ("without_embedding", "without_keywords", "with_lemmas"):
+            if key in counts:
+                details[key] = counts[key]
+        if counts.get("without_embedding"):
+            problems.append(
+                f"{counts['without_embedding']} of {total} rows have no embedding: "
+                "the vector arm cannot return them"
+            )
+        if counts.get("without_keywords"):
+            problems.append(
+                f"{counts['without_keywords']} of {total} rows have an empty text_search: "
+                "the keyword arm cannot return them"
+            )
+        with_lemmas = counts.get("with_lemmas", 0)
+        if self.text_processor is not None and index_holds_lemmas and with_lemmas < total:
+            problems.append(
+                f"{total - with_lemmas} of {total} rows have no lemmas and are indexed as "
+                "raw text: call relemmatize()"
+            )
+        if self.text_processor is None and index_holds_lemmas and with_lemmas:
+            problems.append(
+                f"{with_lemmas} of {total} rows are indexed as lemmas but this store has no "
+                "text_processor: queries are not lemmatized, so inflected words miss"
+            )
+
+        # Indexes
+        indexes = conn.execute(
+            """
+            SELECT a.attname AS column_name, am.amname AS method, opc.opcname AS opclass
+            FROM pg_index x
+            JOIN pg_class i ON i.oid = x.indexrelid
+            JOIN pg_am am ON am.oid = i.relam
+            JOIN pg_opclass opc ON opc.oid = x.indclass[0]
+            JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = x.indkey[0]
+            WHERE x.indrelid = to_regclass(%s) AND x.indisvalid
+            """,
+            (table,),
+        ).fetchall()
+        vector_indexes = [row for row in indexes if row["column_name"] == "embedding"]
+        details["vector_index"] = [f"{row['method']} {row['opclass']}" for row in vector_indexes]
+        wanted = f"{self.vector_type}_cosine_ops"
+        if embedding_type is not None and not vector_indexes:
+            problems.append("there is no index on embedding: every vector search scans the table")
+        elif (
+            vector_indexes
+            and embedding_type == self._vec
+            and not any(row["opclass"] == wanted for row in vector_indexes)
+        ):
+            problems.append(
+                f"the vector index uses {vector_indexes[0]['opclass']}, searches use cosine "
+                f"distance ({wanted}): the index is ignored and every search scans the table"
+            )
+        if text_search is not None and not any(
+            row["column_name"] == "text_search" and row["method"] == "gin" for row in indexes
+        ):
+            problems.append("there is no GIN index on text_search: keyword search scans the table")
+
+        # pgvector and the session settings this store asked for
+        settings = conn.execute(
+            """
+            SELECT
+                (SELECT extversion FROM pg_extension WHERE extname = 'vector') AS pgvector,
+                current_setting('hnsw.ef_search', true) AS ef_search,
+                current_setting('hnsw.iterative_scan', true) AS iterative_scan
+            """
+        ).fetchone()
+        details["pgvector"] = settings["pgvector"]
+        details["hnsw_ef_search"] = settings["ef_search"]
+        details["hnsw_iterative_scan"] = settings["iterative_scan"]
+        if self.hnsw_ef_search is not None and settings["ef_search"] != str(self.hnsw_ef_search):
+            problems.append(
+                f"hnsw.ef_search is {settings['ef_search'] or 'unset'} on this connection, "
+                f"the store asked for {self.hnsw_ef_search}: a transaction pooler drops "
+                "session settings, so set it as a database default instead"
+            )
+        if (
+            self.hnsw_iterative_scan is not None
+            and settings["iterative_scan"] != self.hnsw_iterative_scan
+        ):
+            problems.append(
+                f"hnsw.iterative_scan is {settings['iterative_scan'] or 'unset'} on this "
+                f"connection, the store asked for {self.hnsw_iterative_scan}: it needs "
+                "pgvector 0.8 or newer, and a transaction pooler drops session settings"
+            )
+
+        return HealthReport(not problems, problems, details)
+
+    def relemmatize(self, *, batch_size: int = 500) -> int:
+        """Recompute the lemma column for every row with the current ``text_processor``.
+
+        Use it after changing the processor's backend or its ``decompound``
+        setting, or to fill rows whose lemmas are missing. The index and the
+        query must lemmatize the same way, and this is what brings an existing
+        table back in step. Embeddings are not touched; the generated
+        ``text_search`` column follows the new lemmas by itself.
+
+        Args:
+            batch_size: Rows read and committed at a time.
+
+        Returns:
+            Number of rows updated.
+
+        Raises:
+            ValueError: If the store has no ``text_processor``, or the table was
+                created without one and so has no lemma column.
+        """
+        if self.text_processor is None:
+            raise ValueError("relemmatize() needs a text_processor")
+        conn = self._get_conn()
+        table = self.table_name
+        has_column = conn.execute(
+            """
+            SELECT 1 FROM pg_attribute
+            WHERE attrelid = to_regclass(%s)
+              AND attname = 'content_lemmatized'
+              AND NOT attisdropped
+            """,
+            (table,),
+        ).fetchone()
+        if has_column is None:
+            raise ValueError(
+                f"table {table!r} was created without a text_processor and has no "
+                "content_lemmatized column; create a new table with one"
+            )
+
+        last_id, updated = 0, 0
+        while True:
+            rows = conn.execute(
+                f"SELECT id, content FROM {table} WHERE id > %s ORDER BY id LIMIT %s",
+                (last_id, batch_size),
+            ).fetchall()
+            if not rows:
+                break
+            with conn.cursor() as cur:
+                cur.executemany(
+                    f"UPDATE {table} SET content_lemmatized = %s WHERE id = %s",
+                    [
+                        (self.text_processor.to_tsvector_text(row["content"]), row["id"])
+                        for row in rows
+                    ],
+                )
+            conn.commit()
+            last_id = rows[-1]["id"]
+            updated += len(rows)
+
+        logger.info("Relemmatized %d rows in '%s'", updated, table)
+        return updated
 
     # ------------------------------------------------------------------
     # Internal helpers

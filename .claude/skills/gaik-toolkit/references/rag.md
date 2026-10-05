@@ -38,7 +38,8 @@ embedder = Embedder(config=config, model="text-embedding-3-large", batch_size=10
 | `batch_size` | int | 100 | Batch size for embedding calls |
 
 The default model depends on the config helper, and so does the vector size `PgVectorStore`
-must be given as `embedding_dim` (pgvector's HNSW index takes at most 2,000):
+must be given as `embedding_dim` (pgvector's HNSW index takes at most 2,000 for
+`vector`; pass `vector_type="halfvec"` for up to 4,000, in gaik after 0.8.3):
 
 | Config | Default model | Dimensions |
 |---|---|---|
@@ -190,7 +191,8 @@ results = store.search_hybrid_weighted(
 #   doc.metadata["id"]     -- the row's primary key; this is what lets Ranker.fuse()
 #                             match the same row across two result lists
 #   doc.metadata["title"]  -- the title column
-# search_hybrid also sets metadata["semantic_rank"] / ["keyword_rank"],
+# search_hybrid also sets metadata["semantic_rank"] / ["keyword_rank"], and after
+# gaik 0.8.3 ["semantic_similarity"] (cosine, the value to gate on),
 # search_hybrid_weighted sets metadata["semantic_score"] / ["keyword_score"].
 # A key is OMITTED (not None) when that arm did not return the row.
 ```

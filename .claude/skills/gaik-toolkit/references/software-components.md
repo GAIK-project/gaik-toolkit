@@ -318,7 +318,8 @@ result = pipeline.run(
 from gaik.software_components.RAG.pg_vector_store import PgVectorStore
 from gaik.software_components.RAG.retriever import Retriever
 
-# embedding_dim must equal the embedder's output and be at most 2,000 (HNSW):
+# embedding_dim must equal the embedder's output and be at most 2,000 (HNSW);
+# after gaik 0.8.3, vector_type="halfvec" takes up to 4,000:
 # e.g. Embedder(config, model="text-embedding-3-small") -> 1536
 store = PgVectorStore("postgresql://user:pass@host/db", embedding_dim=1536)
 store.setup()
