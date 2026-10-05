@@ -58,7 +58,7 @@ store = PgVectorStore(
     "postgresql://postgres:postgres@localhost:5432/search",
     embedding_dim=1536,
     fts_language="finnish",    # "simple" when a text_processor supplies lemmas (below)
-    tsquery_mode="or",         # a sentence query still matches; ts_rank_cd ranks
+    tsquery_mode="or",         # a sentence query still matches (default from 0.8.4)
     hnsw_ef_search=100,
 )
 store.setup()                                  # table, HNSW + GIN indexes, SQL functions
@@ -112,6 +112,9 @@ Fuse the two lists yourself instead of calling `store.search_hybrid()`:
   `websearch` mode, which ANDs every term, and `search_hybrid_weighted()` fails on every
   call with `column reference "id" is ambiguous`.
 
+From gaik 0.8.4 `search_hybrid()` also writes `semantic_similarity` (cosine) into every
+hit's metadata, so one call is enough when the ranks it returns are all you need.
+
 **Tune the weights and the RRF constant, do not assume them.** Where the keyword arm alone
 reached 33.7% recall@15, equal weights at k=60 scored 8.7 points below vectors weighted 3×
 at k=20 (`Ranker(rrf_k=...)` sets k).
@@ -122,9 +125,9 @@ HNSW index on `vector(N)`, which pgvector refuses above 2,000 dimensions. Withou
 are too large: `get_openai_config()` gives `text-embedding-3-large` (3,072) and
 `get_llm_config("google")` or `"vertex"` gives `gemini-embedding-001` (3,072).
 `get_llm_config("openai")` or `"azure"` gives `EMBEDDING_MODEL`, else
-`text-embedding-3-small` (1,536). Pass `model=` explicitly, pick a model (or a
-deployment) that outputs 2,000 or fewer, or build the schema yourself with `halfvec`,
-which indexes up to 4,000: `references/postgres-without-gaik.md`.
+`text-embedding-3-small` (1,536). Pass `model=` explicitly, and for a model above 2,000
+pass `vector_type="halfvec"`, which indexes up to 4,000 (gaik 0.8.4+; before that, pick
+a smaller model or build the schema yourself: `references/postgres-without-gaik.md`).
 
 ## Three ways the keyword arm returns nothing, silently
 
@@ -147,8 +150,11 @@ Postgres does not treat them as whitespace, so the word stays unstemmed and neve
 Strip them at ingest and at query time.
 
 **Check the arms are alive, against the live database.** A unit test cannot see a column
-the migration declared correctly and the database never got. Run these from a health
-endpoint or a startup check:
+the migration declared correctly and the database never got. With gaik 0.8.4+,
+`report = store.health()` does it in one call: `report.ok`, and `str(report)` names each
+problem (a `text_search` column nothing fills, another `fts_language` than the index,
+lemmas built with other settings, rows either arm cannot see, missing indexes, session
+settings that did not stick). By hand, from a health endpoint or a startup check:
 
 - rows with a NULL tsvector: 0, or exactly the rows deliberately left unindexed;
 - a word copied out of a random stored chunk, searched in keyword mode, returns that chunk;
@@ -184,7 +190,9 @@ session:
   everywhere, including images where libvoikko is not packaged.
 - **Start with `decompound=False`** — gaik defaults to `True`. With both sides lemmatized,
   whole compounds already match, and splitting adds noise: `arvonlisävero` yields `arvo`,
-  which reaches `arvopaperi`. Index and query must agree; changing it means re-indexing.
+  which reaches `arvopaperi`. Index and query must agree; after changing it,
+  `store.relemmatize()` (0.8.4+) rebuilds the lemmas without re-embedding. Through 0.8.3
+  `backend="auto"` ignored `decompound=False` and split anyway.
 - **Long questions flood the lemma arm.** A 25-word question became ~20 OR-ed lemmas that
   matched 78–79% of one corpus, and Hit@1 fell from 3/5 to 2/5 while short-term queries
   improved sharply. Split long questions into short topic queries before searching.
@@ -270,8 +278,9 @@ around one.
   scan at 96.2% → 99.2% for +0.7 ms on one 1,500-dimension corpus. On a few thousand rows
   it changes nothing — the index already returns exact neighbours.
 - A filtered vector query returns fewer rows than asked unless iterative scans are on
-  (pgvector 0.8+): `SET hnsw.iterative_scan = relaxed_order`, per connection or as a
-  database default.
+  (pgvector 0.8+): `PgVectorStore(..., hnsw_iterative_scan="relaxed_order")` from gaik
+  0.8.4, or `SET hnsw.iterative_scan = relaxed_order` per connection or as a database
+  default.
 - The HNSW operator class must match the query operator. An index built with `*_l2_ops` and
   queried with `<=>` is ignored, and every search scans the table.
 - `ts_rank_cd` has no IDF: in a two-word query where one word is common, that word decides
