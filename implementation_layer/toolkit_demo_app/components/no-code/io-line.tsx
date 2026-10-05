@@ -5,8 +5,11 @@ const fileTypes: [RegExp, string][] = [
   [/audio|recording/i, "audio"],
   [/pdf/i, "pdf"],
   [/word|\.docx/i, "word"],
+  [/spreadsheet/i, "excel"],
+  [/postgres/i, "postgres"],
   [/json/i, "json"],
   [/markdown/i, "markdown"],
+  [/retrieval code/i, "python"],
 ];
 
 function Icons({ text }: { text: string }) {

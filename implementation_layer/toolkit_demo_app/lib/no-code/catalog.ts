@@ -84,6 +84,12 @@ export const chatApps = {
 
 export const installTabs = [
   {
+    name: "Claude Desktop",
+    language: "bash",
+    code: `# Customize → Plugins → Add → Add marketplace → Add from a repository\n${plugin.marketplace}\n# Sync, then add Gaik toolkit from the Discover tab`,
+    copy: plugin.marketplace,
+  },
+  {
     name: "Claude Code",
     language: "bash",
     code: `/plugin marketplace add ${plugin.marketplace}\n/plugin install ${plugin.name}@${plugin.name}`,

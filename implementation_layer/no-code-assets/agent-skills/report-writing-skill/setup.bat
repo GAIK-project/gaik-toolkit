@@ -282,8 +282,8 @@ echo STEP C: Install the Skill in Claude Desktop
 echo ----------------------------------------------------------------------------
 echo.
 echo    1. Open Claude Desktop
-echo    2. Go to Settings (gear icon) then Capabilities
-echo    3. Click "+ Add"
+echo    2. Go to Customize then Skills
+echo    3. Click Add then Upload skill
 echo    4. Upload: %SCRIPT_DIR%report-writing.zip
 echo.
 echo ----------------------------------------------------------------------------
