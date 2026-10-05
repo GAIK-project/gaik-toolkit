@@ -1,0 +1,248 @@
+---
+title: Hybrid Search on PostgreSQL
+description: Set up semantic, keyword and hybrid search over your own documents with pgvector and Postgres full-text search, including Finnish text.
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Mermaid } from '@/components/mdx/mermaid';
+
+Hybrid search runs two searches over the same table and merges the results. The **vector arm** finds passages that answer in other words. The **keyword arm** finds exact tokens an embedding blurs: a form number, a section reference, a product code. Reciprocal Rank Fusion (RRF) combines the two by rank position, so a cosine similarity and a full-text score never have to share a scale.
+
+`PgVectorStore` gives you all of it in one PostgreSQL table: the schema, the indexes, and the three search modes. This page takes you from an empty database to a search you can trust, and shows how to tell when one of the two arms has stopped working.
+
+<Mermaid chart={`
+flowchart LR
+    D("📄 Document chunks") --> E["Embedder"]
+    E -->|"text + vectors"| S
+    Q("❓ Query") --> S
+
+    subgraph S["PgVectorStore · one Postgres table"]
+        direction TB
+        V["Vector arm<br/>pgvector, cosine similarity"]
+        K["Keyword arm<br/>Postgres full-text search"]
+    end
+
+    V -->|"ranked list"| F["Rank fusion<br/>(RRF)"]
+    K -->|"ranked list"| F
+    F --> R("📋 Results")
+
+    style D fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style Q fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style R fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style S fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+## What you need
+
+- **PostgreSQL with the pgvector extension.** pgvector 0.8 or newer is recommended.
+- **An embedding model** that outputs at most 2,000 dimensions, for example `text-embedding-3-small` (1,536).
+- **Python 3.11+** and the toolkit extras below.
+
+```bash
+pip install "gaik[pg-vector-store,embedder,ranker]"
+```
+
+## 1. Start a database
+
+For local development, the official pgvector image is enough:
+
+```bash
+docker run -d --name pgvector-db -p 5432:5432 \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=search \
+  pgvector/pgvector:pg17
+```
+
+On a managed database, ask for the `vector`, `pg_trgm` and `unaccent` extensions to be installed, and call `store.setup(create_extensions=False)` in the next step.
+
+## 2. Create the store and index documents
+
+```python
+from langchain_core.documents import Document
+
+from gaik.software_components.config import get_openai_config
+from gaik.software_components.RAG.embedder import Embedder
+from gaik.software_components.RAG.pg_vector_store import PgVectorStore
+
+# model= is the deployment name on Azure. Its output size must equal embedding_dim.
+embedder = Embedder(get_openai_config(use_azure=True), model="text-embedding-3-small")
+
+store = PgVectorStore(
+    "postgresql://postgres:postgres@localhost:5432/search",
+    table_name="handbook_chunks",
+    embedding_dim=1536,
+    fts_language="english",   # the Postgres text search configuration for your corpus
+    tsquery_mode="or",        # a full question still matches; see below
+    hnsw_ef_search=100,
+)
+store.setup()                 # table, HNSW and GIN indexes, SQL functions; safe to call again
+
+chunks = [
+    Document(
+        page_content="Travel expense claims are filed within two months of the trip. "
+        "Mileage is claimed on form ML-204.",
+        metadata={"title": "Travel expenses", "category": "finance"},
+    ),
+    # ... the rest of your chunks
+]
+embeddings, chunks = embedder.embed(chunks)
+store.add(chunks, embeddings)
+```
+
+`Embedder` also accepts `get_llm_config()` for Google, CSC Aitta and other providers; see [Multi-Provider LLM Client](/toolkit/multi-provider-llm).
+
+<Callout type="warn" title="Name the embedding model">
+Without `model=`, `Embedder` falls back to a default that depends on the configuration helper, and `get_openai_config()` gives `text-embedding-3-large`, which outputs 3,072 dimensions. Inserting those into a 1,536-dimension table fails with `expected 1536 dimensions, not 3072`, and `setup()` cannot index a 3,072-dimension column at all: pgvector's HNSW index takes at most 2,000.
+</Callout>
+
+Three constructor arguments decide how well the search works:
+
+| Argument | What to pass | Why |
+| --- | --- | --- |
+| `tsquery_mode` | `"or"` | The default, `"websearch"`, requires **every** word of the query to be in a passage. A nine-word question then matches nothing, and the keyword arm goes quiet without an error. `"or"` lets partial matches through and ranks them by how many words matched and how close together. |
+| `fts_language` | `"english"`, `"finnish"`, ... | Selects stemming and stop words. The default, `"simple"`, only lowercases, so `claims` does not find `claim`. |
+| `hnsw_ef_search` | `100` | pgvector's default of 40 trades recall for a latency saving most document search would rather not take. |
+
+## 3. Search
+
+The store has one method per mode. Keep all three reachable in your application behind one parameter: comparing them is the cheapest way to see what each arm contributes.
+
+```python
+def search(query: str, mode: str = "hybrid", top_k: int = 10, filters: dict | None = None):
+    if mode == "keyword":
+        return store.search_keyword(query, top_k=top_k, filters=filters)
+    vector = embedder.embed_query(query)
+    if mode == "vector":
+        return store.search_semantic(vector, top_k=top_k, threshold=0.0, filters=filters)
+    return store.search_hybrid(vector, query, top_k=top_k, filters=filters)
+
+for document, score in search("When do I get my holiday pay?"):
+    print(document.metadata["title"], round(score, 4))
+```
+
+Every method returns `(Document, score)` pairs, best first. On a ten-chunk handbook the three modes return:
+
+| Query | Hybrid | Vector | Keyword |
+| --- | --- | --- | --- |
+| `When do I get my holiday pay?` | Holiday pay, Overtime, Night work | Holiday pay, Overtime, Night work | Holiday pay |
+| `ML-204` | Travel expenses, Annual accounts, Remote work | Travel expenses, Annual accounts, Remote work | Travel expenses |
+| `working from home` | Remote work, Night work, Onboarding | Remote work, Sick leave, Night work | Night work, Remote work, Onboarding |
+
+The keyword arm returns only passages that contain the words, which is why it is the precise one for a form number such as `ML-204`. The vector arm always returns its nearest neighbours, relevant or not.
+
+- **`filters`** restricts any mode to rows whose metadata contains the given keys, for example `filters={"category": "finance"}`.
+- **`search_semantic()` defaults to `threshold=0.7`**, which cuts most results for many embedding models. Pass `threshold=0.0` and apply your own floor (step 5).
+- **`search_hybrid()`** takes `semantic_weight`, `keyword_weight` and `rrf_k`. Tune them on your own queries; equal weights are a starting point, not a recommendation.
+- Each hybrid result carries `semantic_rank` and `keyword_rank` in its metadata. A missing key means that arm did not find the row.
+
+## 4. Check that both arms are alive
+
+Either arm can stop contributing without an error, because the other one keeps filling the page. Run these three checks at startup or from a health endpoint, against the live database:
+
+```python
+import psycopg
+
+with psycopg.connect(DATABASE_URL) as conn:
+    unindexed = conn.execute(
+        "SELECT count(*) FROM handbook_chunks "
+        "WHERE text_search IS NULL OR text_search = ''::tsvector"
+    ).fetchone()[0]
+
+assert unindexed == 0                       # rows the keyword arm cannot see
+assert search("probationary", "keyword")    # a word copied from a stored chunk is found
+```
+
+Then compare `hybrid` and `vector` on a handful of queries that contain literal terms from your documents. If the two lists are always identical, the keyword arm is adding nothing: check `tsquery_mode`, `fts_language` and the count above.
+
+## 5. Decide whether anything relevant was found
+
+A result count is not evidence. The vector arm returns ten results for gibberish as readily as for a real question. What separates the two is the similarity of the **closest** chunk, and the threshold depends on your embedding model and your corpus, so take a reading:
+
+```python
+from gaik.software_components.RAG.relevance_gate import RelevanceGate
+
+def best_similarity(query: str) -> float:
+    hits = store.search_semantic(embedder.embed_query(query), top_k=1, threshold=0.0)
+    return hits[0][1]
+
+answerable = [best_similarity(q) for q in questions_your_corpus_answers]
+unanswerable = [best_similarity(q) for q in sensible_questions_about_other_topics]
+
+reading = RelevanceGate.calibrate(answerable, unanswerable, lower_is_better=False)
+print(reading)   # separated: answerable ≥ 0.559, unanswerable ≤ 0.114, margin 0.445 → floor 0.337
+
+gate = RelevanceGate(reading.floor, lower_is_better=False)
+hits = store.search_semantic(embedder.embed_query(query), top_k=10, threshold=0.0)
+if not gate.is_answerable(hits, key=lambda hit: hit[1]):
+    ...          # tell the user nothing in the library covers this
+```
+
+Put ordinary questions about the wrong subject into the unanswerable set, not only gibberish: that is what users type. Never gate on the hybrid score. It is built from rank positions, so the top hit for gibberish scores exactly what the top hit for a real question does. Take the reading again whenever the embedding model or the corpus changes.
+
+## Finnish text
+
+Finnish inflects heavily, so the keyword arm needs help to match `lomarahan` with `lomaraha`. There are two levels; start with the first.
+
+**Level 1: Postgres' own stemmer.** Pass `fts_language="finnish"`. Nothing else to install, and any application that can query Postgres gets the same matching, whatever language it is written in.
+
+```python
+store = PgVectorStore(dsn, embedding_dim=1536, fts_language="finnish", tsquery_mode="or")
+```
+
+**Level 2: lemmas on both sides.** The stemmer is not consistent across every word form. `FinnishTextProcessor` reduces words to their dictionary form at indexing time and again at query time:
+
+```bash
+pip install "gaik[finnish-rag]"
+```
+
+```python
+from gaik.software_components.RAG.finnish_text_processor import FinnishTextProcessor
+
+processor = FinnishTextProcessor(backend="pyvoikko", decompound=False)
+store = PgVectorStore(
+    dsn,
+    embedding_dim=1536,
+    fts_language="simple",        # the lemmas are already normalised
+    text_processor=processor,
+    tsquery_mode="or",
+)
+```
+
+On a twelve-passage Finnish test corpus, keyword search for five inflected words found:
+
+| Query | `fts_language="finnish"` | Lemmas on both sides |
+| --- | --- | --- |
+| `tilinpäätöksen` | found | found |
+| `yötyölisästä` | found | found |
+| `koeajalla` | found | found |
+| `arvonlisäveron` | found | found |
+| `lomarahojen` | **missed** | found |
+
+Level 2 costs more than it looks, so measure before you adopt it:
+
+- **Every reader of the table must lemmatise queries with the same settings.** A table indexed with lemmas is only searchable through the same processor, which rules out querying it straight from a TypeScript application.
+- **Pin the backend by name.** `backend="auto"` picks whichever library happens to be installed, so a laptop and a container can index and query with different lemmas, and the keyword arm then matches nothing. `pyvoikko` is pure Python and runs everywhere.
+- **Pass `decompound=False`.** The default splits compound words, and the parts match too much: `arvonlisävero` yields `arvo`, which also finds `arvopaperi`. Changing the setting means re-indexing.
+- **It helps short queries, not long questions.** In the project's own measurements the lemma arm matched more on short inflected terms, but a 25-word question became about 20 OR-ed lemmas that matched most of the corpus, and the top result got worse. Split long questions into a few short topic queries, or keep level 1 for them.
+
+Two rules apply to both levels. Do not use `unaccent` for Finnish: `ä`/`a` and `ö`/`o` are different letters (`sää` and `saa`). And size chunks in tokens, not characters: Finnish runs about 2.5 characters per token, so an English-based estimate is twice too generous and an oversized chunk is rejected by the embedding endpoint.
+
+## Filtered searches on large tables
+
+When a `filters` argument matches only a small share of a large table, the vector arm can return fewer rows than you asked for, or none: the HNSW index picks its nearest candidates first and the filter is applied afterwards. With pgvector 0.8 or newer, turn on iterative scans for the database once:
+
+```sql
+ALTER DATABASE search SET hnsw.iterative_scan = relaxed_order;
+```
+
+Postgres does not always answer a filtered query through the HNSW index, but when it does the difference is large: on a 20,000-row test table with a filter matching 40 rows, a top-20 search through the index returned 0 rows without this setting and 20 with it.
+
+## An existing table, or an application that is not Python
+
+`PgVectorStore` creates and owns its table. If you already have a schema, or the application is written in TypeScript, build the same design in plain SQL instead: a generated `tsvector` column, an HNSW index, and an RRF query. The toolkit's coding-agent plugin carries a reference for it, [postgres-without-gaik.md](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/no-code-assets/agent-plugin/skills/searching-documents/references/postgres-without-gaik.md), and its `searching-documents` skill guides an agent through either route. See [Skills for coding agents](/toolkit/no-code-assets#skills-for-coding-agents) for how to install it.
+
+## Resources
+
+- **Runnable example**: [hybrid_search_example.py](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/RAG/hybrid_search_example.py)
+- **Implementation code**: [pg_vector_store](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG/pg_vector_store), [finnish_text_processor](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG/finnish_text_processor), [ranker](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG/ranker), [relevance_gate](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG/relevance_gate)
+- **In a use case**: [Semantic Video Search](/use-cases/semantic-video-search)

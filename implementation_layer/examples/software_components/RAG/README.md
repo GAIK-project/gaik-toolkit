@@ -9,6 +9,7 @@ This folder contains examples for each of the six RAG (Retrieval-Augmented Gener
 - `embedder_example.py` - Generate vector embeddings from text chunks
 - `vector_store_example.py` - Store and manage document embeddings in ChromaDB
 - `pg_vector_store_example.py` - PostgreSQL vector store with semantic, keyword, and hybrid search
+- `hybrid_search_example.py` - Hybrid search end to end: index, three search modes, health checks, and deciding whether anything relevant was found
 - `retriever_example.py` - Search and retrieve relevant document chunks (with optional reranking)
 - `ranker_example.py` - Fuse, rerank and reorder result lists (weighted RRF, asc/desc ordering) -- runs with no database, API key or model download
 - `answer_generator_example.py` - Generate contextual answers with citations from retrieved chunks
@@ -32,6 +33,7 @@ python rag_parser_docling_example.py
 python embedder_example.py
 python vector_store_example.py
 python pg_vector_store_example.py  # requires PostgreSQL with pgvector
+python hybrid_search_example.py    # requires PostgreSQL with pgvector
 python retriever_example.py
 python ranker_example.py           # no external services needed
 python answer_generator_example.py
@@ -41,4 +43,5 @@ python answer_generator_example.py
 
 - [RAG Components](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG)
 - [Software Components Overview](https://gaik-project.github.io/gaik-toolkit/toolkit/software-components#rag-components)
+- [Hybrid Search on PostgreSQL](https://gaik-project.github.io/gaik-toolkit/toolkit/hybrid-search/)
 - [RAG-Workflow Module](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/RAG_workflow)

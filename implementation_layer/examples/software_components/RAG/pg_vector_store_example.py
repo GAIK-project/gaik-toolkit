@@ -49,12 +49,15 @@ DATABASE_URL = os.getenv(
 
 
 def main() -> None:
-    # 1. Set up the embedder (uses Azure OpenAI by default)
+    # 1. Set up the embedder (uses Azure OpenAI by default). Name the model: the
+    # default, text-embedding-3-large, outputs 3,072 dimensions, which neither
+    # matches the store below nor fits pgvector's 2,000-dimension HNSW limit.
+    # On Azure, model= is your deployment name.
     config = get_openai_config(use_azure=True)
-    embedder = Embedder(config=config)
+    embedder = Embedder(config=config, model="text-embedding-3-small")
 
     # 2. Connect to PostgreSQL and set up schema
-    with PgVectorStore(DATABASE_URL) as store:
+    with PgVectorStore(DATABASE_URL, embedding_dim=1536) as store:
         store.setup()
         print("Database schema created successfully.\n")
 

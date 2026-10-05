@@ -43,6 +43,7 @@ guidance_layer/website/
 │   ├── toolkit/                # Implementation layer docs
 │   │   ├── meta.json
 │   │   ├── software-components.mdx
+│   │   ├── hybrid-search.mdx
 │   │   ├── software-modules.mdx
 │   │   └── no-code-assets.mdx
 │   ├── evaluation-layer/       # Evaluation layer docs
@@ -77,6 +78,7 @@ guidance_layer/website/
 | File | Topic |
 |------|-------|
 | `software-components.mdx` | Building blocks documentation |
+| `hybrid-search.mdx` | Setup guide for PgVectorStore hybrid search, including Finnish |
 | `software-modules.mdx` | Software modules documentation |
 | `no-code-assets.mdx` | Prompt templates and agent skills |
 
