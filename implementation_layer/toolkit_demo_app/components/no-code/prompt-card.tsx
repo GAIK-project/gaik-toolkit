@@ -60,6 +60,7 @@ export function PromptCard({ prompt }: { prompt: Prompt }) {
           text={variant.text}
           href={chatApps.chatgpt(variant.text)}
           message={`Sent to ChatGPT. ${prompt.then}`}
+          title="ChatGPT sends the prompt at once"
         >
           <OpenAIIcon />
           Open in ChatGPT
@@ -74,9 +75,7 @@ export function PromptCard({ prompt }: { prompt: Prompt }) {
         </CopyAndOpen>
       </div>
 
-      <p className="text-muted-foreground -mt-1 text-xs">
-        ChatGPT sends it at once. {prompt.then}
-      </p>
+      <p className="text-muted-foreground -mt-1 text-xs">{prompt.then}</p>
 
       <Disclosure label="Read the prompt">
         <pre

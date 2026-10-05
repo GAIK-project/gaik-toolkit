@@ -13,7 +13,7 @@ export function Disclosure({
   label,
   children,
 }: {
-  label: string;
+  label: ReactNode;
   children: ReactNode;
 }) {
   return (

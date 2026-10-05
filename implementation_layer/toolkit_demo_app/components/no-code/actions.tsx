@@ -50,17 +50,20 @@ export function CopyAndOpen({
   text,
   href,
   message,
+  title,
   children,
 }: {
   text: string;
   href: string;
   message: string;
+  title?: string;
   children: ReactNode;
 }) {
   return (
     <Button variant="outline" size="sm" asChild>
       <a
         href={href}
+        title={title}
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => {

@@ -79,8 +79,8 @@ Before setting up, please install:
 
 1. Zip the `purchase-order-processing` folder (this entire folder)
 2. Open Claude Desktop
-3. Click the **Settings** icon (gear) → **Capabilities**
-4. Click **"+ Add"**
+3. Open **Customize** → **Skills**
+4. Click **Add** → **Upload skill**
 5. Select the zip file you just created
 
 ✅ **Setup complete!** You're ready to use the skill.
@@ -565,7 +565,7 @@ Cert Fee: $25.00
 
 ### Claude doesn't recognize the skill
 
-- Go to Settings → Capabilities and verify the skill is listed
+- Go to Customize → Skills and verify the skill is listed
 - Try removing and re-adding the skill
 - Make sure to mention "purchase-order-processing skill" in your request
 - Restart Claude Desktop

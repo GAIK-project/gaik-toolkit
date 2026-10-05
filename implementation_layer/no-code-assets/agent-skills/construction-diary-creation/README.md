@@ -67,7 +67,7 @@ Before setting up, please install:
 **Step 4: Install the Skill**
 
 1. Open Claude Desktop
-2. Settings (gear icon) → **Capabilities** → **+ Add**
+2. **Customize** → **Skills** → **Add** → **Upload skill**
 3. Upload `construction-diary-creation.zip` (created by setup script)
 
 ✅ **Setup complete!**
@@ -189,7 +189,7 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 
 **Install Skill:**
 1. Zip the `construction-diary-creation` folder (inner one with SKILL.md)
-2. Upload to Claude Desktop: Settings → Capabilities → + Add
+2. Upload to Claude Desktop: Customize → Skills → Add → Upload skill
 
 ---
 

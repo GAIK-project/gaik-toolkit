@@ -32,10 +32,10 @@ export default function SkillsPage() {
             Claude Desktop
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            Add the .zip under Settings, Capabilities.
+            Upload the .zip in Customize → Skills.
           </p>
           <AgentLogos
-            lead="Also plain Agent Skills in"
+            lead="Also works in"
             which={["codex", "gemini", "copilot", "cursor"]}
           />
         </div>

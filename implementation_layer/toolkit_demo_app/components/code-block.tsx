@@ -8,6 +8,8 @@ import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 type Tab = {
   name: string;
   code: string;
+  /** Copied instead of `code`, for a tab that shows steps around one value. */
+  copy?: string;
   language?: string;
   highlightLines?: number[];
 };
@@ -33,7 +35,9 @@ export function CodeBlock({
   const hasTabs = tabs.length > 0;
 
   const copyToClipboard = async () => {
-    const textToCopy = hasTabs ? tabs[activeTab].code : code;
+    const textToCopy = hasTabs
+      ? (tabs[activeTab].copy ?? tabs[activeTab].code)
+      : code;
     if (textToCopy) {
       await navigator.clipboard.writeText(textToCopy);
       setCopied(true);

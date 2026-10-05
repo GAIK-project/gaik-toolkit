@@ -2,6 +2,7 @@
   "title": "Implementation Layer",
   "pages": [
     "software-components",
+    "hybrid-search",
     "multi-provider-llm",
     "software-modules",
     "evaluators",

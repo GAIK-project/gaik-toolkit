@@ -23,19 +23,25 @@ loaded only when the task needs it.
 ## Installing
 
 One package serves every client. The repository root carries a marketplace file,
-`.claude-plugin/marketplace.json`, that Claude Code, Codex, Copilot CLI and VS Code all read.
+`.claude-plugin/marketplace.json`, that Claude, Claude Code, Codex, Copilot CLI and VS Code
+all read.
 
 | Client | Commands |
 |---|---|
+| Claude Desktop, claude.ai | **Customize → Plugins → Add → Add marketplace → Add from a repository**, enter `GAIK-project/gaik-toolkit`, **Sync**, then **Add** the plugin on the Discover tab |
 | Claude Code | `/plugin marketplace add GAIK-project/gaik-toolkit`, then `/plugin install gaik-toolkit@gaik-toolkit` |
 | Codex | `codex plugin marketplace add GAIK-project/gaik-toolkit`, then `codex plugin add gaik-toolkit@gaik-toolkit` |
 | Copilot CLI | `copilot plugin marketplace add GAIK-project/gaik-toolkit`, then `copilot plugin install gaik-toolkit@gaik-toolkit` |
 | VS Code | add `GAIK-project/gaik-toolkit` to the `chat.plugins.marketplaces` setting, or run **Chat: Install Plugin From Source** |
+| ChatGPT workspace | an admin opens **Admin Console → Plugins → Add → Import marketplace** and enters `https://github.com/GAIK-project/gaik-toolkit` as the source |
 | Other Agent Plugins v1 clients | point the client at this directory |
 | No plugin support | copy the directories under `skills/` into the agent's skills directory — they are ordinary [Agent Skills](https://agentskills.io/specification) |
 
-Claude Code 2.1.278 and Codex 0.149.1 were tested end to end (September 2026); the other
-rows follow those clients' documentation.
+Claude Code 2.1.278 and Codex 0.149.1 were tested end to end (September 2026), and the
+Claude Desktop route on claude.ai in October 2026: the marketplace synced as it is and the
+plugin listed its three skills. The other rows follow those clients' documentation. Claude's
+**Sync automatically** option, on by default, keeps the plugin up to date as this repository
+changes.
 
 ## Layout
 

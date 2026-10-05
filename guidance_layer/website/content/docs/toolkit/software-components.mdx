@@ -521,7 +521,7 @@ flowchart LR
 
 > **Example:** A product documentation knowledge base is indexed once and reused across hundreds of daily queries without reprocessing the source documents.
 
-Two backends are available: **in-memory / ChromaDB** for quick prototyping, and **PostgreSQL + pgvector** (`PgVectorStore`) for production use with semantic, keyword, and hybrid search (RRF).
+Two backends are available: **in-memory / ChromaDB** for quick prototyping, and **PostgreSQL + pgvector** (`PgVectorStore`) for production use with semantic, keyword, and hybrid search (RRF). See [Hybrid Search (PostgreSQL)](#hybrid-search-postgresql) below.
 
 ---
 
@@ -635,6 +635,56 @@ flowchart LR
 
 - **Implementation code**: [software_components/RAG](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG)
 - **Usage examples**: [examples/RAG](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/RAG)
+
+---
+
+### Hybrid Search (PostgreSQL)
+
+Hybrid search answers a query with two searches over one PostgreSQL table and merges the results. The vector arm finds passages that answer in other words; the keyword arm finds exact tokens an embedding blurs, such as a form number or a section reference. `PgVectorStore` holds the documents, their embeddings and a full-text index in the same table, so there is no second system to keep in step, and it offers semantic, keyword and hybrid search behind one interface. For Finnish text the keyword arm can use Postgres' own stemmer or, through the `FinnishTextProcessor`, dictionary forms on both the indexing and the query side.
+
+<Mermaid chart={`
+flowchart LR
+    Q("❓ Query") --> B
+    DB[("🗄️ PostgreSQL + pgvector")] --> B
+
+    subgraph B["Hybrid Search"]
+        direction TB
+        V["Vector Arm<br/>cosine similarity (HNSW)"]
+        K["Keyword Arm<br/>full-text search, optional Finnish lemmas"]
+        F["Rank Fusion<br/>weighted RRF"]
+        V --> F
+        K --> F
+    end
+
+    B --> R("📋 Ranked Chunks<br/>+ rank per arm")
+    B --> G("🚦 Relevance Gate<br/>anything relevant at all?")
+
+    style Q fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style DB fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style R fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style G fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style B fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+> **Example:** An HR handbook is indexed once. *"When do I get my holiday pay?"* is answered by the vector arm, which matches the meaning; a search for *"ML-204"* is answered by the keyword arm, which returns the one passage that names that form.
+
+**Key features:**
+- Three modes over the same data — `hybrid`, `vector` and `keyword` — so each arm's contribution can be compared
+- One `setup()` call creates the table, the HNSW and full-text indexes and the SQL functions; it is safe to run again
+- JSONB metadata filters on every mode
+- Each hybrid result reports its rank in both arms, so an arm that contributes nothing is visible per result
+- Finnish support at two levels: Postgres' built-in stemmer, or lemmatization on both sides with a pinned backend
+- `RelevanceGate` calibrates a similarity floor from your own queries, to tell "nothing relevant" apart from a weak match
+
+**Potential applications:**
+- Document and policy search where users type both questions and exact codes
+- The retrieval step of a RAG assistant that must say when the library has no answer
+- Search over Finnish-language material
+- Transcript and video-segment search with metadata filters
+
+- **Setup guide**: [Hybrid Search on PostgreSQL](/toolkit/hybrid-search)
+- **Implementation code**: [RAG/pg_vector_store](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/RAG/pg_vector_store)
+- **Usage example**: [hybrid_search_example.py](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/RAG/hybrid_search_example.py)
 
 ---
 

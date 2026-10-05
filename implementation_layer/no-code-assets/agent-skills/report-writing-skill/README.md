@@ -81,8 +81,8 @@ The script will create a configuration file. You need to copy it to Claude Deskt
 **Step 4: Install the Skill**
 
 1. Open Claude Desktop
-2. Click the **Settings** icon (gear) → **Capabilities**
-3. Click **"+ Add"**
+2. Open **Customize** → **Skills**
+3. Click **Add** → **Upload skill**
 4. Select the `report-writing.zip` file (created by the setup script)
 
 ✅ **Setup complete!** You're ready to use the skill.
@@ -143,7 +143,7 @@ Open `%APPDATA%\Claude\claude_desktop_config.json` and add:
 **Step 4: Install the Skill**
 
 1. Zip the `report-writing` folder
-2. Open Claude Desktop → Settings → Capabilities → + Add
+2. Open Claude Desktop → Customize → Skills → Add → Upload skill
 3. Upload the zip file
 
 **Step 5: Restart Claude Desktop**
@@ -306,7 +306,7 @@ The skill automatically detects what sections to include based on your content:
 
 ### Claude doesn't recognize the skill
 
-- Go to Settings → Capabilities and verify the skill is listed
+- Go to Customize → Skills and verify the skill is listed
 - Try removing and re-adding the skill
 - Restart Claude Desktop
 

@@ -137,7 +137,38 @@ flowchart TD
 
 #### Skills for coding agents
 
-The same folder holds a plugin, [`agent-plugin`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin), with three skills for developers building document pipelines with the `gaik` package: parsing documents, extracting structured data and searching documents. It installs in Claude Code, Codex and Copilot CLI with `/plugin marketplace add GAIK-project/gaik-toolkit`; the demo app's skills page lists the command for each client.
+The same folder holds a plugin, [`agent-plugin`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin), with three skills for developers building document pipelines with the `gaik` package: parsing documents, extracting structured data and searching documents. The skills carry the decisions and failure modes that are expensive to rediscover, such as which parser keeps a table's structure or why a hybrid search quietly became vector-only.
+
+**Claude Desktop and claude.ai.** The repository is a plugin marketplace, so Claude installs it straight from GitHub:
+
+1. Open **Customize → Plugins**, select **Add**, then **Add marketplace** and **Add from a repository**.
+2. Enter `GAIK-project/gaik-toolkit` and select **Sync**. Leave **Sync automatically** on to receive updates.
+
+   ![Claude's Add marketplace dialog with GAIK-project/gaik-toolkit entered](/images/claude-plugin-add-marketplace.png)
+
+3. On the **Discover** tab, select **Add** next to **Gaik toolkit**.
+
+The plugin then lists its three skills. Claude uses them when a task calls for one, or you can start one by typing `/` in a chat.
+
+![The Gaik toolkit plugin in Claude with its three skills](/images/claude-plugin-installed.png)
+
+**Claude Code, Codex and Copilot CLI** add the same marketplace from the command line:
+
+```bash
+# Claude Code
+/plugin marketplace add GAIK-project/gaik-toolkit
+/plugin install gaik-toolkit@gaik-toolkit
+
+# Codex
+codex plugin marketplace add GAIK-project/gaik-toolkit
+codex plugin add gaik-toolkit@gaik-toolkit
+
+# Copilot CLI
+copilot plugin marketplace add GAIK-project/gaik-toolkit
+copilot plugin install gaik-toolkit@gaik-toolkit
+```
+
+The [plugin README](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin#installing) covers VS Code, ChatGPT workspaces and clients without plugin support.
 
 ---
 

@@ -86,8 +86,8 @@ Before setting up, please install:
 
 1. Zip the `purchase-order-processing` folder (this entire folder)
 2. Open Claude Desktop
-3. Click the **Settings** icon (gear) → **Capabilities**
-4. Click **"+ Add"**
+3. Open **Customize** → **Skills**
+4. Click **Add** → **Upload skill**
 5. Select the zip file you just created
 
 ✅ **Setup complete!** You're ready to use the skill.
@@ -280,7 +280,7 @@ Include these fields for accurate fee calculations:
 | **File not found** | Use full Windows path (C:\Orders\...), check files are in correct subfolders (customer_data/, price_list/) |
 | **Price not found** | Type/Part Designation in BOM must EXACTLY match Price List, check for typos |
 | **BOM not found** | Material_Number from PO must match BOM_ID in BOM, BOMs optional if PO has all details |
-| **Skill not recognized** | Settings → Capabilities, verify listed, mention "purchase-order-processing skill" in request |
+| **Skill not recognized** | Customize → Skills, verify listed, mention "purchase-order-processing skill" in request |
 | **Wrong calculations** | Review `Calculation_Breakdown.txt`, verify fee fields are numeric, check discount tiers |
 | **PDF reading fails** | PDFs must be text-based (not scanned), not password-protected, use OCR if needed |
 
