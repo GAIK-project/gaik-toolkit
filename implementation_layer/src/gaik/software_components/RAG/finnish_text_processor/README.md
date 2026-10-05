@@ -118,6 +118,13 @@ reaches `arvopaperi` and `arvostus` as readily as `arvonlisävero`. Because both
 sides are lemmatized consistently, whole-compound matching already works with
 `decompound=False` — turn splitting on only if your evaluation set says it helps.
 
+**Pass `decompound` explicitly.** Left out it is `True` for now, with a
+`FutureWarning` on the backends that can split: the default will become `False`.
+The index and the query must use the same value, so changing it on an existing
+table means recomputing the stored lemmas, which
+`PgVectorStore.relemmatize()` does; `PgVectorStore.health()` reports a table
+whose lemmas no longer match the processor.
+
 ## API
 
 | Method | Returns |

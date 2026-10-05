@@ -66,22 +66,31 @@ PgVectorStore(
     embedding_dim: int = 1536,
     fts_language: str = "simple",
     text_processor: FinnishTextProcessor | None = None,
-    tsquery_mode: str = "websearch",
+    tsquery_mode: str = "or",
     hnsw_ef_search: int | None = None,
+    vector_type: str = "vector",
+    hnsw_iterative_scan: str | None = None,
 )
 ```
 
+> **Upgrading from 0.8.3.** `tsquery_mode` now defaults to `"or"`; pass
+> `tsquery_mode="websearch"` to keep requiring every query word. A `vector`
+> column above 2,000 dimensions is refused in the constructor (it could never be
+> indexed); pass `vector_type="halfvec"` for those. Hybrid results gain a
+> `semantic_similarity` metadata key. Nothing changes in an existing table.
+
 ### `tsquery_mode` — how a query becomes a tsquery
 
-**`"websearch"` (default) conjoins every term.** That is right for short keyword
-input and wrong for a sentence: a nine-word question only matches a passage
-containing all nine stems, which on real prose is never, so the keyword arm
-contributes nothing and does so silently.
+**`"or"` (default) lets a passage match on some of the query's words** and leaves
+the ranking to `ts_rank_cd`. `"websearch"`, the default through 0.8.3, conjoins
+every term. That is right for short keyword input and wrong for a sentence: a
+nine-word question only matches a passage containing all nine stems, which on
+real prose is never, so the keyword arm contributes nothing and does so silently.
 
 | Mode | Behaviour | Use when |
 | --- | --- | --- |
-| `"websearch"` | Postgres' parser as-is (implicit AND) | short keyword queries |
-| `"or"` | same parse, `&` rewritten to `\|` | natural-language questions |
+| `"or"` | Postgres' parse, `&` rewritten to `\|` | natural-language questions, and by default |
+| `"websearch"` | Postgres' parser as-is (implicit AND) | short keyword queries where every term must appear |
 | `"prefix"` | each term prefix-matched, OR-ed | agglutinative suffixing on an **unstemmed** index |
 
 `"or"` keeps stemming, stop-word removal and quoted phrases — only the operator
@@ -126,9 +135,37 @@ for +0.7 ms median**.
 PgVectorStore(dsn, hnsw_ef_search=100)
 ```
 
-Applied per connection. The GUC only exists once pgvector's library has loaded
-into the session, so a failure to set it is logged at debug level rather than
-allowed to break connecting.
+Applied per connection. A setting the server rejects is logged as a warning and
+skipped, and the connection stays usable. Behind a transaction pooler a session
+setting does not stick; `health()` reports that, and the fix is a database
+default (`ALTER DATABASE ... SET hnsw.ef_search = 100`).
+
+### `vector_type`
+
+`"vector"` (default) stores 32-bit floats and is indexed up to **2,000**
+dimensions. `"halfvec"` stores 16-bit floats, takes half the space and is indexed
+up to **4,000**, which is what the 3,072-dimension models need
+(`text-embedding-3-large`, `gemini-embedding-001`). Needs pgvector 0.7+.
+
+```python
+PgVectorStore(dsn, embedding_dim=3072, vector_type="halfvec")
+```
+
+The type is part of the table's schema. A table created with one cannot be
+searched with the other, and `health()` names the mismatch.
+
+### `hnsw_iterative_scan`
+
+With a selective `filters` argument, an HNSW scan picks its nearest candidates
+first and applies the filter afterwards, so it returns fewer rows than asked, or
+none. On a 20,000-row table with a filter matching 40 rows, a top-20 search
+through the index returned 0 rows; with iterative scans it returned 20.
+
+```python
+PgVectorStore(dsn, hnsw_iterative_scan="relaxed_order")   # or "strict_order", "off"
+```
+
+Needs pgvector 0.8+. Applied per connection, like `hnsw_ef_search`.
 
 ### Methods
 
@@ -143,7 +180,41 @@ allowed to break connecting.
 | `search_keyword(query_text, *, top_k, filters)` | Pure FTS keyword search |
 | `search_hybrid(query_embedding, query_text, *, top_k, rrf_k, semantic_weight, keyword_weight, filters)` | RRF hybrid search |
 | `search_hybrid_weighted(query_embedding, query_text, *, top_k, semantic_weight, keyword_weight, filters)` | Weighted hybrid search |
+| `health(*, sample_rows=5)` | Check the live table against this store's configuration; returns a `HealthReport` |
+| `relemmatize(*, batch_size=500)` | Recompute the lemma column with the current `text_processor`; returns rows updated |
 | `close()` | Close database connection |
+
+### `health()` — is each arm of the search alive?
+
+Either arm of a hybrid search can stop contributing without an error, because the
+other keeps filling the page. `health()` reads the table as it really is and
+compares it with how the store is configured. Call it at startup or from a status
+endpoint:
+
+```python
+report = store.health()
+if not report.ok:
+    raise RuntimeError(f"search index is not healthy:\n{report}")
+```
+
+It reports, one sentence each:
+
+- an embedding column of another type or dimension than the store's;
+- a `text_search` column that is not generated, so nothing fills it;
+- a full-text index built with another `fts_language` than queries are parsed with;
+- lemmas in the index that differ from what the current `text_processor` produces
+  for the same text (a changed backend, a changed `decompound`, a missing
+  library), or a lemma index read without a processor, or the reverse;
+- rows without an embedding, with an empty `text_search`, or without lemmas;
+- a missing vector or full-text index, or a vector index whose operator class is
+  not the cosine one the searches use;
+- `hnsw.ef_search` or `hnsw.iterative_scan` not in effect on the connection.
+
+`report.details` holds the raw readings (row counts, column type, pgvector
+version) for logging. Nothing is written. The row counts scan the table once.
+
+`relemmatize()` is the repair for the lemma findings: it recomputes the lemma
+column for every row with the current processor and leaves the embeddings alone.
 
 ### Return Type
 
@@ -167,12 +238,18 @@ The hybrid methods additionally surface each arm's contribution:
 
 | Method | Extra keys |
 |--------|-----------|
-| `search_hybrid` | `semantic_rank`, `keyword_rank` |
+| `search_hybrid` | `semantic_rank`, `keyword_rank`, `semantic_similarity` |
 | `search_hybrid_weighted` | `semantic_score`, `keyword_score` |
 
 A key is **omitted** (not set to `None`) when that arm did not return the row,
 so `"keyword_rank" in doc.metadata` answers "did the keyword arm find this at
 all".
+
+`semantic_similarity` is the row's cosine similarity to the query, and it is set
+for every row that has an embedding, including rows only the keyword arm found.
+The RRF score cannot tell a real match from the nearest neighbour of gibberish,
+because it is built from rank positions; the similarity can, so this is the value
+to hold against a `RelevanceGate` floor.
 
 ## Configuration
 

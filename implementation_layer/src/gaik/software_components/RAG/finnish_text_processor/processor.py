@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import warnings
 from typing import Literal
 
 from .backends import (
@@ -42,7 +43,13 @@ class FinnishTextProcessor:
             ``"fi_core_news_md"``.
         decompound: When the active backend supports compound splitting (the two
             Voikko backends), split compound words into parts. No effect for
-            backends that don't support it.
+            backends that don't support it. **Pass it explicitly**, and prefer
+            ``False``: with lemmas on both sides whole compounds already match,
+            and the parts match too much (``arvonlisävero`` yields ``arvo``,
+            which also finds ``arvopaperi``). Left out, it is ``True`` for now,
+            with a ``FutureWarning``: the default will become ``False``. The
+            index and the query must use the same value, so changing it means
+            re-lemmatizing the stored rows (``PgVectorStore.relemmatize()``).
 
     Example::
 
@@ -72,13 +79,23 @@ class FinnishTextProcessor:
         backend: BackendName = "auto",
         *,
         spacy_model: str = "fi_core_news_md",
-        decompound: bool = True,
+        decompound: bool | None = None,
     ) -> None:
         self.requested_backend = backend
-        self.decompound = decompound
+        explicit = decompound is not None
+        self.decompound = True if decompound is None else decompound
         self._backend: LemmatizationBackend = self._resolve_backend(
-            backend, spacy_model=spacy_model, decompound=decompound
+            backend, spacy_model=spacy_model, decompound=self.decompound
         )
+        if not explicit and self._backend.supports_compound_splitting:
+            warnings.warn(
+                "FinnishTextProcessor(decompound=...) was not given and is True for now; "
+                "the default will become False. Pass decompound=False (recommended) or "
+                "decompound=True explicitly. The index and the query must use the same "
+                "value, so changing it means re-lemmatizing the stored rows.",
+                FutureWarning,
+                stacklevel=2,
+            )
 
     @property
     def backend_name(self) -> str:

@@ -176,8 +176,14 @@ class TestTsQueryMode:
             store = PgVectorStore("postgresql://localhost/x", tsquery_mode=mode)
             assert store.tsquery_mode == mode
 
-    def test_the_default_preserves_existing_behaviour(self):
+    def test_the_default_lets_a_question_match(self):
+        """The default was "websearch" until 0.8.3, to preserve behaviour. It
+        requires every word of the query in one passage, so a full question
+        matched nothing (0 of 67 on one evaluation set) and the keyword arm of a
+        hybrid search went quiet without an error. Session settings still
+        default to the database's own."""
         from gaik.software_components.RAG.pg_vector_store import PgVectorStore
 
-        assert PgVectorStore("postgresql://localhost/x").tsquery_mode == "websearch"
+        assert PgVectorStore("postgresql://localhost/x").tsquery_mode == "or"
         assert PgVectorStore("postgresql://localhost/x").hnsw_ef_search is None
+        assert PgVectorStore("postgresql://localhost/x").hnsw_iterative_scan is None

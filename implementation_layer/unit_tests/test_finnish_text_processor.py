@@ -122,3 +122,19 @@ class TestBackendHonesty:
     def test_an_unknown_backend_name_is_refused(self):
         with pytest.raises(ValueError, match="Unknown backend"):
             FinnishTextProcessor(backend="klingon")  # type: ignore[arg-type]
+
+
+class TestDecompoundSetting:
+    def test_leaving_decompound_out_warns_and_keeps_todays_behaviour(self):
+        """The index and the query must agree on it, and the better value is not
+        the current default, so the choice has to be made in the open."""
+        with pytest.warns(FutureWarning, match="decompound"):
+            implicit = FinnishTextProcessor(backend="pyvoikko")
+        assert implicit.decompound is True
+        assert implicit.lemmatize("kerrostalon") == ["kerros", "talo"]
+
+    def test_no_warning_when_the_choice_is_explicit_or_has_no_effect(self, recwarn):
+        FinnishTextProcessor(backend="pyvoikko", decompound=False)
+        FinnishTextProcessor(backend="pyvoikko", decompound=True)
+        FinnishTextProcessor(backend="simple")  # cannot split compounds either way
+        assert not [w for w in recwarn if issubclass(w.category, FutureWarning)]
