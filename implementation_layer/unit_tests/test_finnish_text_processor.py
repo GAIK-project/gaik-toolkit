@@ -125,6 +125,17 @@ class TestBackendHonesty:
 
 
 class TestDecompoundSetting:
+    def test_the_auto_backend_honours_decompound(self):
+        """``backend="auto"`` built its backend without the argument, so
+        ``decompound=False`` split compounds all the same, and the processor
+        still reported ``decompound`` as ``False``."""
+        whole = FinnishTextProcessor(backend="auto", decompound=False)
+        split = FinnishTextProcessor(backend="auto", decompound=True)
+        if not whole.supports_compound_splitting:
+            pytest.skip("the auto backend on this machine cannot split compounds")
+        assert whole.lemmatize("kerrostalon") == ["kerrostalo"]
+        assert split.lemmatize("kerrostalon") == ["kerros", "talo"]
+
     def test_leaving_decompound_out_warns_and_keeps_todays_behaviour(self):
         """The index and the query must agree on it, and the better value is not
         the current default, so the choice has to be made in the open."""

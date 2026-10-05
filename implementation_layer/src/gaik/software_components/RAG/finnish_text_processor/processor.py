@@ -190,7 +190,7 @@ class FinnishTextProcessor:
         decompound: bool,
     ) -> LemmatizationBackend:
         if backend == "auto":
-            return discover_auto_backend()
+            return discover_auto_backend(decompound=decompound)
         if backend == "voikko":
             return VoikkoBackend(decompound=decompound)
         if backend == "pyvoikko":
