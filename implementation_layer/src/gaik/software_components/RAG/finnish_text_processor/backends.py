@@ -294,8 +294,13 @@ class PyVoikkoBackend(LemmatizationBackend):
         return out
 
 
-def discover_auto_backend() -> LemmatizationBackend:
-    """Try backends in best-to-worst order; return the first that imports cleanly."""
+def discover_auto_backend(decompound: bool = True) -> LemmatizationBackend:
+    """Try backends in best-to-worst order; return the first that imports cleanly.
+
+    ``decompound`` reaches the backends that can split compounds. It used to be
+    dropped here, so ``FinnishTextProcessor(backend="auto", decompound=False)``
+    split compounds all the same.
+    """
     candidates: list[type[LemmatizationBackend]] = [
         VoikkoBackend,
         PyVoikkoBackend,
@@ -304,7 +309,7 @@ def discover_auto_backend() -> LemmatizationBackend:
     ]
     for cls in candidates:
         try:
-            backend = cls()
+            backend = cls(decompound=decompound) if cls.supports_compound_splitting else cls()
         except ImportError as exc:
             logger.debug("FinnishTextProcessor: backend %s not available (%s)", cls.name, exc)
             continue

@@ -935,6 +935,8 @@
       "text_processor",
       "tsquery_mode",
       "hnsw_ef_search",
+      "vector_type",
+      "hnsw_iterative_scan",
       "create_extensions"
     ],
     "supported_providers": [],

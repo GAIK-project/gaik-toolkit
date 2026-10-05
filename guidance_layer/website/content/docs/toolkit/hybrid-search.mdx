@@ -35,7 +35,8 @@ flowchart LR
 ## What you need
 
 - **PostgreSQL with the pgvector extension.** pgvector 0.8 or newer is recommended.
-- **An embedding model** that outputs at most 2,000 dimensions, for example `text-embedding-3-small` (1,536).
+- **An embedding model.** Up to 2,000 dimensions fit the default column type, for example `text-embedding-3-small` (1,536); larger ones need `vector_type="halfvec"` (below).
+- **gaik 0.8.4 or newer** for `health()`, `vector_type` and `hnsw_iterative_scan`.
 - **Python 3.11+** and the toolkit extras below.
 
 ```bash
@@ -92,14 +93,22 @@ store.add(chunks, embeddings)
 `Embedder` also accepts `get_llm_config()` for Google, CSC Aitta and other providers; see [Multi-Provider LLM Client](/toolkit/multi-provider-llm).
 
 <Callout type="warn" title="Name the embedding model">
-Without `model=`, `Embedder` falls back to a default that depends on the configuration helper, and `get_openai_config()` gives `text-embedding-3-large`, which outputs 3,072 dimensions. Inserting those into a 1,536-dimension table fails with `expected 1536 dimensions, not 3072`, and `setup()` cannot index a 3,072-dimension column at all: pgvector's HNSW index takes at most 2,000.
+Without `model=`, `Embedder` falls back to a default that depends on the configuration helper, and `get_openai_config()` gives `text-embedding-3-large`, which outputs 3,072 dimensions. Inserting those into a 1,536-dimension table fails with `expected 1536 dimensions, not 3072`.
 </Callout>
+
+For a model above 2,000 dimensions, store 16-bit floats. pgvector indexes `halfvec` up to 4,000 dimensions at half the storage:
+
+```python
+store = PgVectorStore(dsn, embedding_dim=3072, vector_type="halfvec")
+```
+
+The column type is part of the table: choose it before the first `setup()`.
 
 Three constructor arguments decide how well the search works:
 
 | Argument | What to pass | Why |
 | --- | --- | --- |
-| `tsquery_mode` | `"or"` | The default, `"websearch"`, requires **every** word of the query to be in a passage. A nine-word question then matches nothing, and the keyword arm goes quiet without an error. `"or"` lets partial matches through and ranks them by how many words matched and how close together. |
+| `tsquery_mode` | `"or"` | Lets a passage match on some of the query's words and ranks by how many matched and how close together. It is the default from 0.8.4. Before that the default was `"websearch"`, which requires **every** word: a nine-word question matches nothing, and the keyword arm goes quiet without an error. |
 | `fts_language` | `"english"`, `"finnish"`, ... | Selects stemming and stop words. The default, `"simple"`, only lowercases, so `claims` does not find `claim`. |
 | `hnsw_ef_search` | `100` | pgvector's default of 40 trades recall for a latency saving most document search would rather not take. |
 
@@ -133,11 +142,28 @@ The keyword arm returns only passages that contain the words, which is why it is
 - **`filters`** restricts any mode to rows whose metadata contains the given keys, for example `filters={"category": "finance"}`.
 - **`search_semantic()` defaults to `threshold=0.7`**, which cuts most results for many embedding models. Pass `threshold=0.0` and apply your own floor (step 5).
 - **`search_hybrid()`** takes `semantic_weight`, `keyword_weight` and `rrf_k`. Tune them on your own queries; equal weights are a starting point, not a recommendation.
-- Each hybrid result carries `semantic_rank` and `keyword_rank` in its metadata. A missing key means that arm did not find the row.
+- Each hybrid result carries `semantic_rank` and `keyword_rank` in its metadata. A missing key means that arm did not find the row. It also carries `semantic_similarity`, the cosine similarity to the query, which is the value to hold against a relevance floor (step 5).
 
 ## 4. Check that both arms are alive
 
-Either arm can stop contributing without an error, because the other one keeps filling the page. Run these three checks at startup or from a health endpoint, against the live database:
+Either arm can stop contributing without an error, because the other one keeps filling the page. `health()` reads the live table and compares it with how the store is configured:
+
+```python
+report = store.health()
+if not report.ok:
+    raise RuntimeError(f"search index is not healthy:\n{report}")
+```
+
+Each problem is one sentence, for example:
+
+```text
+- text_search is a plain column, not a generated one: nothing fills it when a row is inserted or changed, so the keyword arm sees only what was written to it by hand
+- the full-text index was built with the 'finnish' configuration, queries are parsed with 'english': the two produce different word forms, so keyword matches are lost
+```
+
+It also reports an embedding column of another type or size, rows without an embedding or with an empty `text_search`, lemmas built with other settings than the current `text_processor`, missing indexes, and session settings that did not take effect. Call it at startup or from a status endpoint; it writes nothing.
+
+The same checks by hand, for a table the store did not create:
 
 ```python
 import psycopg
@@ -222,14 +248,18 @@ Level 2 costs more than it looks, so measure before you adopt it:
 
 - **Every reader of the table must lemmatise queries with the same settings.** A table indexed with lemmas is only searchable through the same processor, which rules out querying it straight from a TypeScript application.
 - **Pin the backend by name.** `backend="auto"` picks whichever library happens to be installed, so a laptop and a container can index and query with different lemmas, and the keyword arm then matches nothing. `pyvoikko` is pure Python and runs everywhere.
-- **Pass `decompound=False`.** The default splits compound words, and the parts match too much: `arvonlisävero` yields `arvo`, which also finds `arvopaperi`. Changing the setting means re-indexing.
+- **Pass `decompound=False`.** The default splits compound words, and the parts match too much: `arvonlisävero` yields `arvo`, which also finds `arvopaperi`. After changing the backend or this setting, `store.relemmatize()` rebuilds the stored lemmas without re-embedding, and `store.health()` reports a table that is out of step.
 - **It helps short queries, not long questions.** In the project's own measurements the lemma arm matched more on short inflected terms, but a 25-word question became about 20 OR-ed lemmas that matched most of the corpus, and the top result got worse. Split long questions into a few short topic queries, or keep level 1 for them.
 
 Two rules apply to both levels. Do not use `unaccent` for Finnish: `ä`/`a` and `ö`/`o` are different letters (`sää` and `saa`). And size chunks in tokens, not characters: Finnish runs about 2.5 characters per token, so an English-based estimate is twice too generous and an oversized chunk is rejected by the embedding endpoint.
 
 ## Filtered searches on large tables
 
-When a `filters` argument matches only a small share of a large table, the vector arm can return fewer rows than you asked for, or none: the HNSW index picks its nearest candidates first and the filter is applied afterwards. With pgvector 0.8 or newer, turn on iterative scans for the database once:
+When a `filters` argument matches only a small share of a large table, the vector arm can return fewer rows than you asked for, or none: the HNSW index picks its nearest candidates first and the filter is applied afterwards. With pgvector 0.8 or newer, turn on iterative scans, per store or for the database once:
+
+```python
+store = PgVectorStore(dsn, embedding_dim=1536, hnsw_iterative_scan="relaxed_order")
+```
 
 ```sql
 ALTER DATABASE search SET hnsw.iterative_scan = relaxed_order;

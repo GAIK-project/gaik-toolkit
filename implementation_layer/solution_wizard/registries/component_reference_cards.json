@@ -784,12 +784,14 @@
     "call": "with store:\n        store.setup()\n        store.add(documents, embeddings)\n        hits = store.search_hybrid(query_embedding, query_text, top_k=5)",
     "returns": "list[tuple(Document, float)]",
     "install_extra": "pg-vector-store",
+    "hybrid_metadata": "each hit's doc.metadata carries semantic_rank and keyword_rank (absent when that arm did not find the row) and semantic_similarity, the cosine similarity to the query. The float in the tuple is an RRF score built from rank positions; hold semantic_similarity, not that score, against a RelevanceGate floor.",
+    "check_health": "report = store.health()   # after indexing and at startup: names a text_search column nothing fills, a different fts_language than the index, lemmas built with other settings, rows either arm cannot see, missing indexes\n        assert report.ok, str(report)",
     "options": [
       {
         "name": "embedding_dim",
         "type": "int",
         "default": 1536,
-        "effect": "Vector column width. MUST equal the output dimension of the Embedder's model -- the default 1536 matches text-embedding-3-small/ada-002, but text-embedding-3-large emits 3072. A mismatch is a schema-level error, not a quality degradation: the table is created with the wrong width and inserts fail.",
+        "effect": "Vector column width. MUST equal the output dimension of the Embedder's model -- the default 1536 matches text-embedding-3-small/ada-002, but text-embedding-3-large emits 3072. A mismatch is a schema-level error, not a quality degradation: the table is created with the wrong width and inserts fail. Above 2,000 the constructor raises unless vector_type='halfvec'.",
         "selection_relevant": true,
         "infer_from": "the embedding model chosen for the Embedder step -- read its dimension and set this to match; never leave at default when a non-default embedding model is selected"
       },
@@ -804,10 +806,10 @@
       {
         "name": "tsquery_mode",
         "type": "str",
-        "default": "websearch",
-        "effect": "How the keyword arm turns query text into a tsquery, for search_keyword and both hybrid searches. 'websearch' is Postgres' own parser and ANDs every term, so a sentence query only matches a passage containing every stem -- on real prose none, and hybrid silently degrades to vector-only. 'or' keeps the same parse (stemming, stop words, quoted phrases) but ORs the terms and lets ts_rank_cd rank; a leading '-' is read as text, not NOT. 'prefix' ORs prefix matches and suits only an UNSTEMMED index.",
+        "default": "or",
+        "effect": "How the keyword arm turns query text into a tsquery, for search_keyword and both hybrid searches. The default is 'or' (it was 'websearch' through gaik 0.8.3). 'websearch' is Postgres' own parser and ANDs every term, so a sentence query only matches a passage containing every stem -- on real prose none, and hybrid silently degrades to vector-only. 'or' keeps the same parse (stemming, stop words, quoted phrases) but ORs the terms and lets ts_rank_cd rank; a leading '-' is read as text, not NOT. 'prefix' ORs prefix matches and suits only an UNSTEMMED index.",
         "selection_relevant": true,
-        "infer_from": "users type natural-language questions -> 'or'; short keyword or code lookups where every term must appear -> 'websearch'; 'prefix' only for an unstemmed, suffix-heavy corpus, never lemmatized Finnish"
+        "infer_from": "users type natural-language questions -> leave at 'or'; short keyword or code lookups where every term must appear -> 'websearch'; 'prefix' only for an unstemmed, suffix-heavy corpus, never lemmatized Finnish"
       },
       {
         "name": "table_name",
@@ -821,7 +823,7 @@
         "name": "text_processor",
         "type": "FinnishTextProcessor | None",
         "default": null,
-        "effect": "Optional lemmatiser applied to text before indexing, which improves Finnish keyword matching beyond what the fts_language stemmer does alone (it decompounds). Import from gaik.software_components.RAG.finnish_text_processor -- it is NOT re-exported from pg_vector_store. Constructor: FinnishTextProcessor(backend='auto', spacy_model='fi_core_news_md', decompound=True).",
+        "effect": "Optional lemmatiser applied to text before indexing, which improves Finnish keyword matching beyond what the fts_language stemmer does alone (it decompounds). Import from gaik.software_components.RAG.finnish_text_processor -- it is NOT re-exported from pg_vector_store. Constructor: FinnishTextProcessor(backend='pyvoikko', decompound=False); pass decompound explicitly, leaving it out raises a FutureWarning.",
         "selection_relevant": true,
         "infer_from": "technical_spec.language == 'fi' AND keyword or hybrid search is used -> supply a FinnishTextProcessor; otherwise leave null"
       },
@@ -840,6 +842,22 @@
         "effect": "Per-connection hnsw.ef_search for the vector arm. None keeps pgvector's default of 40, which trades recall for latency: on one 1,500-dimension corpus, 100 raised recall@20 against an exact scan from 96.2% to 99.2% for +0.7 ms. On a few thousand rows it changes nothing.",
         "selection_relevant": false,
         "infer_from": "a corpus beyond tens of thousands of chunks, or recall mattering more than a millisecond -> 100; otherwise leave None"
+      },
+      {
+        "name": "vector_type",
+        "type": "str",
+        "default": "vector",
+        "effect": "pgvector column type for the embedding. 'vector' stores 32-bit floats and is indexed up to 2,000 dimensions; 'halfvec' stores 16-bit floats, takes half the space and is indexed up to 4,000 (pgvector 0.7+). Part of the table's schema: a table created with one cannot be searched with the other. With 'vector' and embedding_dim above 2,000 the constructor raises ValueError.",
+        "selection_relevant": true,
+        "infer_from": "the Embedder's model outputs more than 2,000 dimensions (text-embedding-3-large, gemini-embedding-001: 3,072) -> 'halfvec'; otherwise leave 'vector'"
+      },
+      {
+        "name": "hnsw_iterative_scan",
+        "type": "str | None",
+        "default": null,
+        "effect": "Per-connection hnsw.iterative_scan ('relaxed_order', 'strict_order' or 'off'; pgvector 0.8+). Without it, a search with a selective filters argument can return fewer rows than asked, or none: the HNSW index picks its nearest candidates first and the filter is applied afterwards. Measured: 0 of 20 rows on a 20,000-row table where 40 rows matched, 20 of 20 with 'relaxed_order'.",
+        "selection_relevant": true,
+        "infer_from": "searches pass filters (per-tenant, per-document, per-category retrieval) -> 'relaxed_order'; unfiltered search -> leave None"
       }
     ]
   },
