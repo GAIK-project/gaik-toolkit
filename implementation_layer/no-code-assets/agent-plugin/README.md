@@ -2,7 +2,8 @@
 
 A portable [Agent Plugins v1](https://agent-plugins.org) package containing the skills an
 AI coding agent needs to build document pipelines with the
-[`gaik`](https://pypi.org/project/gaik/) Python toolkit.
+[`gaik`](https://pypi.org/project/gaik/) Python toolkit, and one skill that turns a brief into
+an editable slide deck.
 
 The skills carry decisions and failure modes that are expensive to rediscover — which
 parser preserves a table's structure, why an extraction request is refused, why a hybrid
@@ -16,9 +17,11 @@ agent can read from the package itself.
 | `parsing-documents` | Converting PDFs, scans, or Word files to text or markdown; tables come out wrong; parsing costs more than expected |
 | `extracting-structured-data` | Pulling fields or line items into a schema; a request fails with a 400 or truncates; adding page/quote evidence; measuring accuracy |
 | `searching-documents` | Adding semantic or hybrid (pgvector + full-text) search over documents; Finnish text; deciding whether a search found anything; measuring retrieval |
+| `brief-to-slides` | Making an editable PowerPoint deck with speaker notes, exact timing and citations from a topic, an audience and a length, using only your material or adding web research; changing a deck it made |
 
 Each skill is self-contained: `SKILL.md` holds the workflow, and `references/` holds detail
-loaded only when the task needs it.
+loaded only when the task needs it. `brief-to-slides` also carries `assets/` and `scripts/`, and
+its own README; unlike the other three it does not use the gaik package.
 
 ## Installing
 
@@ -51,6 +54,7 @@ agent-plugin/   (implementation_layer/no-code-assets/)
 ├── .claude-plugin/
 │   └── plugin.json      # Claude Code's own manifest
 └── skills/
+    ├── brief-to-slides/        # also assets/, scripts/ and a README
     ├── parsing-documents/
     ├── extracting-structured-data/
     └── searching-documents/

@@ -1,7 +1,7 @@
 {
   "plugin": {
     "name": "gaik-toolkit",
-    "version": "0.2.7",
+    "version": "0.3.0",
     "marketplace": "GAIK-project/gaik-toolkit",
     "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin"
   },
