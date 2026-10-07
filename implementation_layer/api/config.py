@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     AZURE_API_KEY: str | None = None
     AZURE_ENDPOINT: str | None = None
     AZURE_API_VERSION: str = "2025-04-01-preview"
-    AZURE_DEPLOYMENT: str = "gpt-5.1"
+    AZURE_DEPLOYMENT: str = "gpt-6-luna"
     AZURE_TRANSCRIPTION_MODEL: str = "gpt-4o-transcribe"
 
     # CORS
@@ -65,6 +65,6 @@ def get_openai_config() -> dict:
         return {
             "use_azure": False,
             "api_key": settings.OPENAI_API_KEY,
-            "model": "gpt-5.1",
+            "model": "gpt-6-luna",
             "transcription_model": "gpt-4o-transcribe",
         }
