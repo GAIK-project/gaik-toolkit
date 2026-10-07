@@ -1,6 +1,7 @@
 {
   "name": "gaik-toolkit",
-  "version": "0.3.0",
+  "displayName": "GAIK Toolkit",
+  "version": "0.3.1",
   "description": "Skills for building document pipelines with the gaik Python toolkit: choosing a document parser that preserves table structure, designing extraction schemas that stay inside provider limits, and building hybrid pgvector search whose failures are visible instead of silent, and turning a short brief into an editable slide deck with speaker notes, timing and citations.",
   "author": {
     "name": "GAIK project",
@@ -8,5 +9,8 @@
   },
   "homepage": "https://gaik-project.github.io/gaik-toolkit/",
   "repository": "https://github.com/GAIK-project/gaik-toolkit",
-  "license": "MIT"
+  "license": "MIT",
+  "icon": "./icon.png",
+  "documentationUrl": "https://gaik-project.github.io/gaik-toolkit/",
+  "supportUrl": "https://github.com/GAIK-project/gaik-toolkit/issues"
 }
