@@ -22,7 +22,11 @@ class Settings(BaseSettings):
     AZURE_API_KEY: str | None = None
     AZURE_ENDPOINT: str | None = None
     AZURE_API_VERSION: str = "2025-04-01-preview"
-    AZURE_DEPLOYMENT: str = "gpt-6-luna"
+    AZURE_DEPLOYMENT: str = "gpt-6-sol"
+    # Reasoning effort for the form routes. "none" suits field extraction: it is
+    # the fastest setting and needs GPT-6 Sol or Luna. Leave empty for a model
+    # that always reasons (GPT-6.1 Sol, GPT-6 Astra).
+    FORM_REASONING_EFFORT: str = "none"
     AZURE_TRANSCRIPTION_MODEL: str = "gpt-4o-transcribe"
 
     # CORS
@@ -65,6 +69,15 @@ def get_openai_config() -> dict:
         return {
             "use_azure": False,
             "api_key": settings.OPENAI_API_KEY,
-            "model": "gpt-6-luna",
+            "model": "gpt-6-sol",
             "transcription_model": "gpt-4o-transcribe",
         }
+
+
+def get_form_config() -> dict:
+    """OpenAI configuration for the form routes, with their reasoning effort."""
+    config = get_openai_config()
+    effort = settings.FORM_REASONING_EFFORT.strip()
+    if effort:
+        config["reasoning_effort"] = effort
+    return config

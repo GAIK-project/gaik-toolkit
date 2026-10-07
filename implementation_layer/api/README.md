@@ -42,7 +42,8 @@ cp implementation_layer/api/.env.example implementation_layer/api/.env
 | `AZURE_API_KEY` | — | Required when `USE_AZURE=true` |
 | `AZURE_ENDPOINT` | — | Azure resource endpoint, e.g. `https://<resource>.openai.azure.com/` |
 | `AZURE_API_VERSION` | `2025-04-01-preview` | Azure OpenAI API version |
-| `AZURE_DEPLOYMENT` | `gpt-6-luna` | Chat/completion deployment name |
+| `AZURE_DEPLOYMENT` | `gpt-6-sol` | Chat/completion deployment name |
+| `FORM_REASONING_EFFORT` | `none` | Reasoning effort for `/extract/form` and `/form/understand`. `none` is fastest and needs GPT-6 Sol or Luna; leave empty for a model that always reasons |
 | `AZURE_TRANSCRIPTION_MODEL` | `gpt-4o-transcribe` | Whisper-compatible transcription deployment |
 | `OPENAI_API_KEY` | — | Required when `USE_AZURE=false` |
 | `HOST` | `0.0.0.0` | Server bind address |
