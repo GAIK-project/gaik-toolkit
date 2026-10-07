@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from gaik.software_components.form_understander import FormUnderstander
 from pydantic import BaseModel
 
-from implementation_layer.api.config import get_openai_config
+from implementation_layer.api.config import get_form_config
 from implementation_layer.api.dependencies import verify_api_key
 
 router = APIRouter()
@@ -54,7 +54,7 @@ async def understand_form(payload: UnderstandRequest):
         return UnderstandResponse(mapping={})
 
     try:
-        config = get_openai_config()
+        config = get_form_config()
         understander = FormUnderstander(config=config)
         mapping = understander.clean_labels(
             fields=[

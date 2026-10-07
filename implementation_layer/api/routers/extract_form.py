@@ -24,7 +24,7 @@ from gaik.software_components.extractor import (
 )
 from pydantic import BaseModel, Field
 
-from implementation_layer.api.config import get_openai_config
+from implementation_layer.api.config import get_form_config
 from implementation_layer.api.dependencies import verify_api_key
 
 router = APIRouter()
@@ -150,7 +150,7 @@ async def extract_form(payload: ExtractFormRequest):
 
     try:
         extraction_model = create_extraction_model(requirements)
-        config = get_openai_config()
+        config = get_form_config()
         extractor = DataExtractor(config=config)
         results = extractor.extract(
             extraction_model=extraction_model,
