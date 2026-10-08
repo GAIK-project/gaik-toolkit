@@ -52,7 +52,9 @@ changes.
 agent-plugin/   (implementation_layer/no-code-assets/)
 ├── plugin.json          # Agent Plugins v1 manifest
 ├── .claude-plugin/
-│   └── plugin.json      # Claude Code's own manifest
+│   └── plugin.json      # Claude Code's own manifest; also the directory listing fields
+├── icon.png             # shown in Claude's plugin directory, named by `icon` in that manifest
+├── LICENSE
 └── skills/
     ├── brief-to-slides/        # also assets/, scripts/ and a README
     ├── parsing-documents/
