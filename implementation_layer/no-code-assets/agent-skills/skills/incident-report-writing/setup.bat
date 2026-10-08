@@ -210,13 +210,13 @@ echo [Bonus] Creating skill ZIP file...
 echo ----------------------------------------------------------------------------
 
 :: Check if PowerShell can create zip
-powershell -Command "Compress-Archive -Path '%SCRIPT_DIR%incident-report-writing\*' -DestinationPath '%SCRIPT_DIR%incident-report-writing.zip' -Force" >nul 2>&1
+powershell -Command "Compress-Archive -Path '%SCRIPT_DIR%SKILL.md' -DestinationPath '%SCRIPT_DIR%incident-report-writing.zip' -Force" >nul 2>&1
 
 if %errorlevel% equ 0 (
     echo [OK] Created incident-report-writing.zip
 ) else (
     echo [INFO] Could not create ZIP automatically.
-    echo       Please manually zip the 'incident-report-writing' folder.
+    echo       Please manually zip SKILL.md.
 )
 
 :: ============================================================================

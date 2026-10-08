@@ -269,7 +269,7 @@ Postgres does not always answer a filtered query through the HNSW index, but whe
 
 ## An existing table, or an application that is not Python
 
-`PgVectorStore` creates and owns its table. If you already have a schema, or the application is written in TypeScript, build the same design in plain SQL instead: a generated `tsvector` column, an HNSW index, and an RRF query. The toolkit's coding-agent plugin carries a reference for it, [postgres-without-gaik.md](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/no-code-assets/agent-plugin/skills/searching-documents/references/postgres-without-gaik.md), and its `searching-documents` skill guides an agent through either route. See [Skills for coding agents](/toolkit/no-code-assets#skills-for-coding-agents) for how to install it.
+`PgVectorStore` creates and owns its table. If you already have a schema, or the application is written in TypeScript, build the same design in plain SQL instead: a generated `tsvector` column, an HNSW index, and an RRF query. The toolkit's coding-agent plugin carries a reference for it, [postgres-without-gaik.md](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/no-code-assets/agent-skills/skills/searching-documents/references/postgres-without-gaik.md), and its `searching-documents` skill guides an agent through either route. See [Skills for coding agents](/toolkit/no-code-assets#skills-for-coding-agents) for how to install it.
 
 ## Resources
 

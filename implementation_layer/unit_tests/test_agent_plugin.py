@@ -1,4 +1,4 @@
-"""Checks for the published agent plugin (implementation_layer/no-code-assets/agent-plugin).
+"""Checks for the published agent plugin (implementation_layer/no-code-assets/agent-skills).
 
 Clients install the plugin from .claude-plugin/marketplace.json, and its skills
 quote gaik's API. Nothing else in CI reads either, so a malformed manifest or a
@@ -20,7 +20,7 @@ import pytest
 yaml = pytest.importorskip("yaml")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_DIR = REPO_ROOT / "implementation_layer" / "no-code-assets" / "agent-plugin"
+PLUGIN_DIR = REPO_ROOT / "implementation_layer" / "no-code-assets" / "agent-skills"
 MARKETPLACE = REPO_ROOT / ".claude-plugin" / "marketplace.json"
 SKILL_DIRS = sorted(p.parent for p in (PLUGIN_DIR / "skills").glob("*/SKILL.md"))
 SKILL_FILES = sorted((PLUGIN_DIR / "skills").rglob("*.md"))
@@ -153,7 +153,7 @@ def _resolve(module_name: str, dotted: str):
         pytest.skip(f"{module_name} needs an optional dependency: {exc}")
     for part in dotted.split("."):
         assert hasattr(obj, part), (
-            f"{module_name}.{dotted} is quoted by an agent-plugin skill but does not exist. "
+            f"{module_name}.{dotted} is quoted by an agent skill but does not exist. "
             "If it was renamed, update the plugin's skills in the same change. If it should "
             "exist, its optional dependency is missing: run `uv sync --all-extras`."
         )

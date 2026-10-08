@@ -38,9 +38,9 @@ Components swallow a missing optional dependency in `__init__.py`, so a missing 
 makes a class silently absent: the audit reports false `removed` drift and the tests skip
 checks they appear to run.
 
-## agent-plugin (the published agent skills)
+## agent-skills (the published agent plugin)
 
-`implementation_layer/no-code-assets/agent-plugin/` is installed by Claude Code, Codex, Copilot and VS Code through
+`implementation_layer/no-code-assets/agent-skills/` holds every agent skill under `skills/` as one plugin, installed by Claude Code, Codex, Copilot and VS Code through
 `.claude-plugin/marketplace.json`, and its skills quote gaik's API.
 
 - Bump `version` in both `plugin.json` and
@@ -52,8 +52,8 @@ checks they appear to run.
 
 ## no-code assets (skills and prompts)
 
-`implementation_layer/no-code-assets/` holds the prompts, the Claude Desktop skills and
-`agent-plugin/`. The demo app's `/skills` and `/prompts` pages serve a generated copy of
+`implementation_layer/no-code-assets/` holds the prompts and the agent skills plugin,
+`agent-skills/`. The demo app's `/skills` and `/prompts` pages serve a generated copy of
 them, because its image is built from `toolkit_demo_app/` alone. After changing a skill,
 a prompt, the plugin or `no-code-assets/catalog.json`, run
 `uv run python implementation_layer/toolkit_demo_app/scripts/build_no_code_catalog.py` and

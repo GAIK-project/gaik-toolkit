@@ -77,7 +77,7 @@ Before setting up, please install:
 
 **Step 3: Install the Skill**
 
-1. Zip the `purchase-order-processing` folder (this entire folder)
+1. Zip `SKILL.md`, `EVALUATION.md` and the `reference` folder
 2. Open Claude Desktop
 3. Open **Customize** → **Skills**
 4. Click **Add** → **Upload skill**

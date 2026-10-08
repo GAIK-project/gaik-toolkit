@@ -4,8 +4,8 @@
     {
       "id": "incident-report-writing",
       "group": "no-code",
-      "path": "agent-skills/incident-report-writing/incident-report-writing",
-      "guide": "agent-skills/incident-report-writing",
+      "path": "agent-skills/skills/incident-report-writing",
+      "guide": "agent-skills/skills/incident-report-writing",
       "title": "Incident report writing",
       "tagline": "Turn a spoken incident or safety observation into a Word report.",
       "input": "Audio recording",
@@ -23,8 +23,8 @@
     {
       "id": "construction-diary-creation",
       "group": "no-code",
-      "path": "agent-skills/construction-diary-creation/construction-diary-creation",
-      "guide": "agent-skills/construction-diary-creation",
+      "path": "agent-skills/skills/construction-diary-creation",
+      "guide": "agent-skills/skills/construction-diary-creation",
       "title": "Construction diary creation",
       "tagline": "Turn a site manager's spoken day into a Työmaapäiväkirja.",
       "input": "Audio recording (Finnish or English)",
@@ -42,8 +42,8 @@
     {
       "id": "purchase-order-processing",
       "group": "no-code",
-      "path": "agent-skills/purchase-order-processing/purchase-order-processing",
-      "guide": "agent-skills/purchase-order-processing",
+      "path": "agent-skills/skills/purchase-order-processing",
+      "guide": "agent-skills/skills/purchase-order-processing",
       "title": "Purchase order processing",
       "tagline": "Match a purchase order and its BOMs against a price list and produce a priced sales order.",
       "input": "PO, BOM PDFs and a price list",
@@ -58,8 +58,8 @@
     {
       "id": "report-writing",
       "group": "no-code",
-      "path": "agent-skills/report-writing-skill/report-writing",
-      "guide": "agent-skills/report-writing-skill",
+      "path": "agent-skills/skills/report-writing",
+      "guide": "agent-skills/skills/report-writing",
       "title": "Report writing",
       "tagline": "Consolidate recordings, notes and documents into one structured Word report.",
       "input": "Recordings, notes, PDFs, spreadsheets",
@@ -77,7 +77,7 @@
     {
       "id": "parsing-documents",
       "group": "developer",
-      "path": "agent-plugin/skills/parsing-documents",
+      "path": "agent-skills/skills/parsing-documents",
       "title": "Parsing documents",
       "tagline": "Pick a parser that keeps table structure, and catch pages that parsed to nothing.",
       "input": "PDF, scan or Word file",
@@ -88,7 +88,7 @@
     {
       "id": "extracting-structured-data",
       "group": "developer",
-      "path": "agent-plugin/skills/extracting-structured-data",
+      "path": "agent-skills/skills/extracting-structured-data",
       "title": "Extracting structured data",
       "tagline": "Design an extraction schema that stays inside provider limits and carries checkable evidence.",
       "input": "Invoices, forms, contracts, reports",
@@ -99,7 +99,7 @@
     {
       "id": "searching-documents",
       "group": "developer",
-      "path": "agent-plugin/skills/searching-documents",
+      "path": "agent-skills/skills/searching-documents",
       "title": "Searching documents",
       "tagline": "Build hybrid pgvector and full-text search that fails visibly, including for Finnish text.",
       "input": "Document chunks in Postgres",

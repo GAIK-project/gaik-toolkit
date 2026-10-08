@@ -1,0 +1,26 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "gaik-toolkit",
+  "version": "0.4.0",
+  "description": "GAIK agent skills. For developers building document pipelines with the gaik Python toolkit: choosing a document parser that preserves table structure, designing extraction schemas that stay inside provider limits, and building hybrid pgvector search whose failures are visible instead of silent. Ready-to-run use cases: turning a short brief into an editable slide deck with speaker notes, timing and citations, and Claude Desktop skills that write incident reports, construction site diaries, priced sales orders and structured reports.",
+  "author": {
+    "name": "GAIK project",
+    "url": "https://github.com/GAIK-project"
+  },
+  "homepage": "https://gaik-project.github.io/gaik-toolkit/",
+  "repository": "https://github.com/GAIK-project/gaik-toolkit",
+  "license": "MIT",
+  "keywords": [
+    "document-parsing",
+    "structured-extraction",
+    "pdf",
+    "ocr",
+    "rag",
+    "hybrid-search",
+    "pgvector",
+    "finnish",
+    "presentations",
+    "pptx",
+    "gaik"
+  ]
+}

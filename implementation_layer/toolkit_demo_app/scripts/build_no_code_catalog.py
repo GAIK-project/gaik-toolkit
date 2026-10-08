@@ -42,6 +42,9 @@ TEXT_SUFFIXES = {".md", ".txt", ".json", ".py", ".yaml", ".yml", ".toml", ".bat"
 SKIP_NAMES = {"__pycache__", ".DS_Store", "Thumbs.db", ".env"}
 # Sample inputs and outputs next to a skill; too large for a setup kit and on GitHub.
 KIT_SKIP = {"data", "images", "ouput", "sample_data"}
+# A Claude Desktop skill keeps its setup files beside SKILL.md; the uploadable skill
+# zip leaves them out, the setup kit carries them.
+SKILL_SKIP = KIT_SKIP | {"README.md", "USER_GUIDE.md", "setup.bat", "transcription-MCP"}
 
 
 def _read_bytes(path: Path) -> bytes:
@@ -99,7 +102,8 @@ def build() -> tuple[str, dict[str, bytes]]:
         meta = _frontmatter(skill_dir)
         if meta["name"] != skill_dir.name or meta["name"] != entry["id"]:
             raise SystemExit(f"{entry['id']}: name, directory and catalog id must match")
-        payload = _zip_skill(skill_dir, meta["name"])
+        skip = SKILL_SKIP if "guide" in entry else frozenset()
+        payload = _zip_skill(skill_dir, meta["name"], skip)
         zips[f"{entry['id']}.zip"] = payload
         kit = None
         if entry.get("kit"):
@@ -122,7 +126,7 @@ def build() -> tuple[str, dict[str, bytes]]:
                 "tryPrompt": entry["tryPrompt"].replace(
                     "{url}", _tree_url(entry.get("guide", entry["path"]))
                 ),
-                "files": [p.relative_to(skill_dir).as_posix() for p in _files(skill_dir)],
+                "files": [p.relative_to(skill_dir).as_posix() for p in _files(skill_dir, skip)],
                 "zip": f"/downloads/skills/{entry['id']}.zip",
                 "zipBytes": len(payload),
                 "githubUrl": _tree_url(entry["path"]),
@@ -151,13 +155,13 @@ def build() -> tuple[str, dict[str, bytes]]:
             }
         )
 
-    plugin = json.loads((ASSETS_DIR / "agent-plugin" / "plugin.json").read_text(encoding="utf-8"))
+    plugin = json.loads((ASSETS_DIR / "agent-skills" / "plugin.json").read_text(encoding="utf-8"))
     catalog = {
         "plugin": {
             "name": plugin["name"],
             "version": plugin["version"],
             "marketplace": "GAIK-project/gaik-toolkit",
-            "githubUrl": _tree_url("agent-plugin"),
+            "githubUrl": _tree_url("agent-skills"),
         },
         "skills": skills,
         "prompts": prompts,

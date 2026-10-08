@@ -260,7 +260,7 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 ```
 
 **Install Skill:**
-1. Zip the `incident-report-writing` folder (inner one with SKILL.md)
+1. Zip `SKILL.md`
 2. Upload to Claude Desktop: Customize → Skills → Add → Upload skill
 
 ---
@@ -272,8 +272,7 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 ```
 incident-report-writing/
 ├── setup.bat                      # Automated setup wizard
-├── incident-report-writing/       # Skill definition
-│   └── SKILL.md                   # Extraction workflow & field specifications
+├── SKILL.md                       # Skill definition: extraction workflow & field specifications
 ├── transcription-MCP/             # Audio transcription MCP server
 │   ├── server.py                  # FastMCP server implementation
 │   └── .env                       # API credentials

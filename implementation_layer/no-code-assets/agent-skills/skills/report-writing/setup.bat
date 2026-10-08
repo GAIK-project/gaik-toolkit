@@ -2,24 +2,24 @@
 setlocal enabledelayedexpansion
 
 :: ============================================================================
-:: Construction Diary Creation Skill - Setup Script
+:: Report Writing Skill - Setup Script
 :: ============================================================================
-:: This script helps you set up the Construction Diary Creation skill and MCP server
+:: This script helps you set up the Report Writing skill and MCP server
 :: ============================================================================
 
-title Construction Diary Creation - Setup
+title Report Writing Skill - Setup
 
 echo.
 echo ============================================================================
-echo        CONSTRUCTION DIARY CREATION SKILL - SETUP WIZARD
+echo            REPORT WRITING SKILL - SETUP WIZARD
 echo ============================================================================
 echo.
-echo This script will help you set up the Construction Diary Creation skill.
+echo This script will help you set up the Report Writing skill.
 echo.
 echo PREREQUISITES (install these first if you haven't):
 echo   1. Claude Desktop - https://claude.ai/download
-echo   2. Python 3.8+ - https://www.python.org/downloads/
-echo   3. OpenAI API key OR Azure OpenAI credentials (REQUIRED for transcription)
+echo   2. Node.js - https://nodejs.org/
+echo   3. OpenAI API key OR Azure OpenAI credentials
 echo.
 echo ============================================================================
 echo.
@@ -30,7 +30,7 @@ pause
 :: Step 1: Check Python
 :: ============================================================================
 echo.
-echo [Step 1/5] Checking Python installation...
+echo [Step 1/6] Checking Python installation...
 echo ----------------------------------------------------------------------------
 
 python --version >nul 2>&1
@@ -48,10 +48,32 @@ for /f "tokens=2" %%i in ('python --version 2^>^&1') do set PYTHON_VERSION=%%i
 echo [OK] Python %PYTHON_VERSION% found.
 
 :: ============================================================================
-:: Step 2: Install Python dependencies
+:: Step 2: Check Node.js
 :: ============================================================================
 echo.
-echo [Step 2/5] Installing Python dependencies...
+echo [Step 2/6] Checking Node.js installation...
+echo ----------------------------------------------------------------------------
+
+node --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [WARNING] Node.js is not installed or not in PATH.
+    echo.
+    echo Node.js is required for the filesystem MCP server.
+    echo Please install from https://nodejs.org/
+    echo.
+    echo You can continue, but filesystem access won't work until Node.js is installed.
+    echo.
+    pause
+) else (
+    for /f "tokens=1" %%i in ('node --version 2^>^&1') do set NODE_VERSION=%%i
+    echo [OK] Node.js !NODE_VERSION! found.
+)
+
+:: ============================================================================
+:: Step 3: Install Python dependencies
+:: ============================================================================
+echo.
+echo [Step 3/6] Installing Python dependencies...
 echo ----------------------------------------------------------------------------
 echo Installing: fastmcp, gaik[transcriber], python-dotenv
 echo This may take a few minutes...
@@ -69,22 +91,20 @@ if %errorlevel% neq 0 (
 echo [OK] Dependencies installed successfully.
 
 :: ============================================================================
-:: Step 3: Configure API Key (REQUIRED)
+:: Step 4: Configure API Key
 :: ============================================================================
 echo.
-echo [Step 3/5] Configuring API credentials for audio transcription...
+echo [Step 4/6] Configuring API credentials...
 echo ----------------------------------------------------------------------------
 echo.
-echo IMPORTANT: Audio transcription is REQUIRED for construction diary extraction.
-echo You must provide an OpenAI or Azure OpenAI API key to use this skill.
-echo.
-echo Which API provider do you want to use?
+echo Which API provider do you want to use for audio transcription?
 echo.
 echo   1. OpenAI (recommended)
 echo   2. Azure OpenAI
+echo   3. Skip (I don't need audio transcription)
 echo.
 
-set /p API_CHOICE="Enter your choice (1 or 2): "
+set /p API_CHOICE="Enter your choice (1, 2, or 3): "
 
 set "TRANSCRIPTION_MCP_PATH=%~dp0transcription-MCP"
 
@@ -99,8 +119,6 @@ if "%API_CHOICE%"=="1" (
     if "!OPENAI_KEY!"=="" (
         echo [WARNING] No API key provided. You can add it later to:
         echo %TRANSCRIPTION_MCP_PATH%\.env
-        echo.
-        echo NOTE: The skill will NOT work without an API key.
     ) else (
         echo.
         echo Creating .env file...
@@ -126,8 +144,6 @@ if "%API_CHOICE%"=="1" (
     if "!AZURE_KEY!"=="" (
         echo [WARNING] No API key provided. You can add it later to:
         echo %TRANSCRIPTION_MCP_PATH%\.env
-        echo.
-        echo NOTE: The skill will NOT work without an API key.
     ) else (
         echo.
         echo Creating .env file...
@@ -144,16 +160,16 @@ if "%API_CHOICE%"=="1" (
 
 ) else (
     echo.
-    echo [ERROR] Invalid choice. Please run the script again and select 1 or 2.
-    pause
-    exit /b 1
+    echo Skipping API configuration.
+    echo You can process documents without audio transcription.
+    set API_TYPE=none
 )
 
 :: ============================================================================
-:: Step 4: Check FFmpeg (optional)
+:: Step 5: Check FFmpeg (optional)
 :: ============================================================================
 echo.
-echo [Step 4/5] Checking FFmpeg (optional, for large audio files)...
+echo [Step 5/6] Checking FFmpeg (optional, for large audio files)...
 echo ----------------------------------------------------------------------------
 
 ffmpeg -version >nul 2>&1
@@ -168,10 +184,10 @@ if %errorlevel% neq 0 (
 )
 
 :: ============================================================================
-:: Step 5: Generate Claude Desktop Configuration
+:: Step 6: Generate Claude Desktop Configuration
 :: ============================================================================
 echo.
-echo [Step 5/5] Generating Claude Desktop configuration...
+echo [Step 6/6] Generating Claude Desktop configuration...
 echo ----------------------------------------------------------------------------
 echo.
 
@@ -195,6 +211,14 @@ echo     "gaik-transcriber": {
 echo       "command": "python",
 echo       "args": ["%SERVER_PATH_JSON%"],
 echo       "timeout": 600000
+echo     },
+echo     "filesystem": {
+echo       "command": "npx",
+echo       "args": [
+echo         "-y",
+echo         "@modelcontextprotocol/server-filesystem",
+echo         "C:\\"
+echo       ]
 echo     }
 echo   }
 echo }
@@ -203,20 +227,20 @@ echo }
 echo [OK] Configuration file generated.
 
 :: ============================================================================
-:: Bonus: Create Skill ZIP file
+:: Step 7: Create Skill ZIP file
 :: ============================================================================
 echo.
 echo [Bonus] Creating skill ZIP file...
 echo ----------------------------------------------------------------------------
 
 :: Check if PowerShell can create zip
-powershell -Command "Compress-Archive -Path '%SCRIPT_DIR%construction-diary-creation\*' -DestinationPath '%SCRIPT_DIR%construction-diary-creation.zip' -Force" >nul 2>&1
+powershell -Command "Compress-Archive -Path '%SCRIPT_DIR%SKILL.md','%SCRIPT_DIR%EVALUATION.md','%SCRIPT_DIR%reference' -DestinationPath '%SCRIPT_DIR%report-writing.zip' -Force" >nul 2>&1
 
 if %errorlevel% equ 0 (
-    echo [OK] Created construction-diary-creation.zip
+    echo [OK] Created report-writing.zip
 ) else (
     echo [INFO] Could not create ZIP automatically.
-    echo       Please manually zip the 'construction-diary-creation' folder.
+    echo       Please manually zip SKILL.md, EVALUATION.md and the 'reference' folder.
 )
 
 :: ============================================================================
@@ -260,17 +284,14 @@ echo.
 echo    1. Open Claude Desktop
 echo    2. Go to Customize then Skills
 echo    3. Click Add then Upload skill
-echo    4. Upload: %SCRIPT_DIR%construction-diary-creation.zip
+echo    4. Upload: %SCRIPT_DIR%report-writing.zip
 echo.
 echo ----------------------------------------------------------------------------
 echo STEP D: Test the Setup
 echo ----------------------------------------------------------------------------
 echo.
 echo    In Claude Desktop, try:
-echo    "Process construction diary from C:\path\to\your\audio-file.mp3"
-echo.
-echo    Example with sample data:
-echo    "Process construction diary from %SCRIPT_DIR%data\fin-example-1.mp3"
+echo    "Create a report from the materials in C:\path\to\your\folder"
 echo.
 echo ============================================================================
 echo.
@@ -301,7 +322,7 @@ if /i "%OPEN_CLAUDE%"=="Y" (
 
 echo.
 echo ============================================================================
-echo Setup script finished. Thank you for using Construction Diary Creation!
+echo Setup script finished. Thank you for using Report Writing Skill!
 echo ============================================================================
 echo.
 

@@ -1,9 +1,9 @@
 {
   "plugin": {
     "name": "gaik-toolkit",
-    "version": "0.3.1",
+    "version": "0.4.0",
     "marketplace": "GAIK-project/gaik-toolkit",
-    "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin"
+    "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills"
   },
   "skills": [
     {
@@ -25,16 +25,16 @@
       ],
       "kit": {
         "zip": "/downloads/skills/incident-report-writing-setup-kit.zip",
-        "zipBytes": 37612
+        "zipBytes": 37423
       },
-      "tryPrompt": "Use the incident-report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/incident-report-writing) to turn my audio recording into an incident report. I will attach the file next.",
+      "tryPrompt": "Use the incident-report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing) to turn my audio recording into an incident report. I will attach the file next.",
       "files": [
         "SKILL.md"
       ],
       "zip": "/downloads/skills/incident-report-writing.zip",
       "zipBytes": 13855,
-      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/incident-report-writing/incident-report-writing",
-      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/incident-report-writing"
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing",
+      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing"
     },
     {
       "id": "construction-diary-creation",
@@ -55,16 +55,16 @@
       ],
       "kit": {
         "zip": "/downloads/skills/construction-diary-creation-setup-kit.zip",
-        "zipBytes": 35801
+        "zipBytes": 35592
       },
-      "tryPrompt": "Use the construction-diary-creation skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/construction-diary-creation) to create today's Työmaapäiväkirja from my site recording. I will attach the audio next.",
+      "tryPrompt": "Use the construction-diary-creation skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation) to create today's Työmaapäiväkirja from my site recording. I will attach the audio next.",
       "files": [
         "SKILL.md"
       ],
       "zip": "/downloads/skills/construction-diary-creation.zip",
       "zipBytes": 14899,
-      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/construction-diary-creation/construction-diary-creation",
-      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/construction-diary-creation"
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation",
+      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation"
     },
     {
       "id": "purchase-order-processing",
@@ -82,10 +82,9 @@
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": null,
-      "tryPrompt": "Use the purchase-order-processing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing) to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next.",
+      "tryPrompt": "Use the purchase-order-processing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing) to turn my purchase order, its BOMs and the price list into a priced sales order. I will attach the files next.",
       "files": [
         "EVALUATION.md",
-        "README.md",
         "SKILL.md",
         "reference/CALCULATION_BREAKDOWN_TEMPLATE.md",
         "reference/CALCULATION_LOGIC.md",
@@ -94,9 +93,9 @@
         "reference/PRICING_RULES.md"
       ],
       "zip": "/downloads/skills/purchase-order-processing.zip",
-      "zipBytes": 126776,
-      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing/purchase-order-processing",
-      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/purchase-order-processing"
+      "zipBytes": 106734,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing",
+      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing"
     },
     {
       "id": "report-writing",
@@ -118,9 +117,9 @@
       ],
       "kit": {
         "zip": "/downloads/skills/report-writing-setup-kit.zip",
-        "zipBytes": 72221
+        "zipBytes": 72120
       },
-      "tryPrompt": "Use the report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/report-writing-skill) to write a report from the materials I am about to attach. Infer the sections from the content.",
+      "tryPrompt": "Use the report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing) to write a report from the materials I am about to attach. Infer the sections from the content.",
       "files": [
         "EVALUATION.md",
         "SKILL.md",
@@ -129,8 +128,8 @@
       ],
       "zip": "/downloads/skills/report-writing.zip",
       "zipBytes": 46607,
-      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/report-writing-skill/report-writing",
-      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/report-writing-skill"
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing",
+      "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing"
     },
     {
       "id": "parsing-documents",
@@ -145,14 +144,15 @@
       ],
       "setup": [],
       "kit": null,
-      "tryPrompt": "Use the parsing-documents skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/parsing-documents) to choose a parser for my PDFs and check that the tables came through intact.",
+      "tryPrompt": "Use the parsing-documents skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/parsing-documents) to choose a parser for my PDFs and check that the tables came through intact.",
       "files": [
+        "README.md",
         "SKILL.md",
         "references/parser-selection.md"
       ],
       "zip": "/downloads/skills/parsing-documents.zip",
-      "zipBytes": 16102,
-      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/parsing-documents",
+      "zipBytes": 17713,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/parsing-documents",
       "guideUrl": null
     },
     {
@@ -168,14 +168,15 @@
       ],
       "setup": [],
       "kit": null,
-      "tryPrompt": "Use the extracting-structured-data skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/extracting-structured-data) to design a schema for the invoices in this folder and add page and quote evidence to each field.",
+      "tryPrompt": "Use the extracting-structured-data skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/extracting-structured-data) to design a schema for the invoices in this folder and add page and quote evidence to each field.",
       "files": [
+        "README.md",
         "SKILL.md",
         "references/measuring-extraction.md"
       ],
       "zip": "/downloads/skills/extracting-structured-data.zip",
-      "zipBytes": 19891,
-      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/extracting-structured-data",
+      "zipBytes": 21685,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/extracting-structured-data",
       "guideUrl": null
     },
     {
@@ -191,16 +192,17 @@
       ],
       "setup": [],
       "kit": null,
-      "tryPrompt": "Use the searching-documents skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/searching-documents) to add hybrid search over my document chunks and measure it with Hit@K.",
+      "tryPrompt": "Use the searching-documents skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/searching-documents) to add hybrid search over my document chunks and measure it with Hit@K.",
       "files": [
+        "README.md",
         "SKILL.md",
         "references/evaluating-retrieval.md",
         "references/finnish.md",
         "references/postgres-without-gaik.md"
       ],
       "zip": "/downloads/skills/searching-documents.zip",
-      "zipBytes": 39549,
-      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin/skills/searching-documents",
+      "zipBytes": 41514,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/searching-documents",
       "guideUrl": null
     }
   ],

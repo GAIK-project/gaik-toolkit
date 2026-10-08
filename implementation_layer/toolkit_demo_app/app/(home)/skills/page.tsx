@@ -56,8 +56,8 @@ export default function SkillsPage() {
             Coding agents
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            For building document pipelines with the gaik package. Install all
-            three as one plugin.
+            For building document pipelines with the gaik package. The plugin
+            installs these and the Claude Desktop skills above in one go.
           </p>
           <AgentLogos
             lead="Works with"

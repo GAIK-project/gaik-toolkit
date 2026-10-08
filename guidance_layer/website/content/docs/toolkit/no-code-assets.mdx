@@ -123,7 +123,10 @@ flowchart TD
 - Construction diary creation
 - Incident report writing
 - Purchase-order processing
-- Report writing skill
+- Report writing
+- Brief to slides (presentation generation)
+
+Every skill is a folder under `agent-skills/skills/` with a `SKILL.md` that the agent follows and a `README.md` that explains what the skill does and how to set it up.
 
 **Potential applications:**
 - Operational deployment of incident and safety reporting in industrial settings
@@ -137,7 +140,7 @@ flowchart TD
 
 #### Skills for coding agents
 
-The same folder holds a plugin, [`agent-plugin`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin), with three skills for developers building document pipelines with the `gaik` package: parsing documents, extracting structured data and searching documents. The skills carry the decisions and failure modes that are expensive to rediscover, such as which parser keeps a table's structure or why a hybrid search quietly became vector-only.
+The [`agent-skills`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills) folder is also a plugin in the [Agent Plugins](https://agent-plugins.org) format, so one install brings every skill in it: the use-case skills above and three skills for developers building document pipelines with the `gaik` package: parsing documents, extracting structured data and searching documents. The developer skills carry the decisions and failure modes that are expensive to rediscover, such as which parser keeps a table's structure or why a hybrid search quietly became vector-only.
 
 **Claude Desktop and claude.ai.** The repository is a plugin marketplace, so Claude installs it straight from GitHub:
 
@@ -148,9 +151,9 @@ The same folder holds a plugin, [`agent-plugin`](https://github.com/GAIK-project
 
 3. On the **Discover** tab, select **Add** next to **Gaik toolkit**.
 
-The plugin then lists its three skills. Claude uses them when a task calls for one, or you can start one by typing `/` in a chat.
+The plugin then lists its skills. Claude uses them when a task calls for one, or you can start one by typing `/` in a chat.
 
-![The Gaik toolkit plugin in Claude with its three skills](/images/claude-plugin-installed.png)
+![The GAIK Toolkit plugin in Claude with its skills](/images/claude-plugin-installed.png)
 
 **Claude Code, Codex and Copilot CLI** add the same marketplace from the command line:
 
@@ -168,7 +171,7 @@ copilot plugin marketplace add GAIK-project/gaik-toolkit
 copilot plugin install gaik-toolkit@gaik-toolkit
 ```
 
-The [plugin README](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-plugin#installing) covers VS Code, ChatGPT workspaces and clients without plugin support.
+The [plugin README](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills#installing) covers VS Code, ChatGPT workspaces and clients without plugin support.
 
 ---
 

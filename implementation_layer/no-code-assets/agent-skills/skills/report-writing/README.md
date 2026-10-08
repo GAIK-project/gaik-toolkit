@@ -127,7 +127,7 @@ Open `%APPDATA%\Claude\claude_desktop_config.json` and add:
   "mcpServers": {
     "gaik-transcriber": {
       "command": "python",
-      "args": ["C:\\path\\to\\report-writing-skill\\transcription-MCP\\server.py"],
+      "args": ["C:\\path\\to\\report-writing\\transcription-MCP\\server.py"],
       "timeout": 600000
     },
     "filesystem": {
@@ -142,7 +142,7 @@ Open `%APPDATA%\Claude\claude_desktop_config.json` and add:
 
 **Step 4: Install the Skill**
 
-1. Zip the `report-writing` folder
+1. Zip `SKILL.md`, `EVALUATION.md` and the `reference` folder
 2. Open Claude Desktop → Customize → Skills → Add → Upload skill
 3. Upload the zip file
 
@@ -329,7 +329,7 @@ The `sample_data/` folder contains example files you can use to test the skill:
 
 **Try it:**
 ```
-Create a report from C:\path\to\report-writing-skill\sample_data
+Create a report from C:\path\to\report-writing\sample_data
 ```
 
 ---
@@ -358,12 +358,11 @@ For developers and advanced users interested in how this works:
 ### Project Structure
 
 ```
-report-writing-skill/
+report-writing/
 ├── setup.bat                 # Setup wizard script
-├── report-writing/           # Claude skill definition
-│   ├── SKILL.md              # Main workflow specification
-│   ├── EVALUATION.md         # Test scenarios
-│   └── reference/            # Detailed handling guides
+├── SKILL.md                  # Claude skill definition: main workflow
+├── EVALUATION.md             # Test scenarios
+├── reference/                # Detailed handling guides
 ├── transcription-MCP/        # Audio transcription server
 │   ├── server.py             # FastMCP implementation
 │   └── .env                  # API configuration

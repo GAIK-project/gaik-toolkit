@@ -1,27 +1,41 @@
-# gaik-toolkit agent plugin
+# GAIK agent skills
 
-A portable [Agent Plugins v1](https://agent-plugins.org) package containing the skills an
-AI coding agent needs to build document pipelines with the
-[`gaik`](https://pypi.org/project/gaik/) Python toolkit, and one skill that turns a brief into
-an editable slide deck.
-
-The skills carry decisions and failure modes that are expensive to rediscover — which
-parser preserves a table's structure, why an extraction request is refused, why a hybrid
-search quietly became vector-only — rather than restating the API reference, which the
-agent can read from the package itself.
+All GAIK agent skills live here, packaged as one portable
+[Agent Plugins v1](https://agent-plugins.org) plugin, `gaik-toolkit`. Add the repository as a
+plugin marketplace and every skill below is available in Claude, Claude Code, Codex, Copilot
+and VS Code. Each skill is also an ordinary [Agent Skill](https://agentskills.io/specification)
+that can be copied or uploaded on its own.
 
 ## Skills
 
+Every skill is a directory under `skills/` with a `SKILL.md` (the workflow the agent follows)
+and a `README.md` (what the skill does, for people).
+
+**For developers building with the [`gaik`](https://pypi.org/project/gaik/) package.** These
+carry decisions and failure modes that are expensive to rediscover — which parser preserves a
+table's structure, why an extraction request is refused, why a hybrid search quietly became
+vector-only — rather than restating the API reference.
+
 | Skill | Use it when |
 |---|---|
-| `parsing-documents` | Converting PDFs, scans, or Word files to text or markdown; tables come out wrong; parsing costs more than expected |
-| `extracting-structured-data` | Pulling fields or line items into a schema; a request fails with a 400 or truncates; adding page/quote evidence; measuring accuracy |
-| `searching-documents` | Adding semantic or hybrid (pgvector + full-text) search over documents; Finnish text; deciding whether a search found anything; measuring retrieval |
-| `brief-to-slides` | Making an editable PowerPoint deck with speaker notes, exact timing and citations from a topic, an audience and a length, using only your material or adding web research; changing a deck it made |
+| [`parsing-documents`](skills/parsing-documents) | Converting PDFs, scans, or Word files to text or markdown; tables come out wrong; parsing costs more than expected |
+| [`extracting-structured-data`](skills/extracting-structured-data) | Pulling fields or line items into a schema; a request fails with a 400 or truncates; adding page/quote evidence; measuring accuracy |
+| [`searching-documents`](skills/searching-documents) | Adding semantic or hybrid (pgvector + full-text) search over documents; Finnish text; deciding whether a search found anything; measuring retrieval |
 
-Each skill is self-contained: `SKILL.md` holds the workflow, and `references/` holds detail
-loaded only when the task needs it. `brief-to-slides` also carries `assets/` and `scripts/`, and
-its own README; unlike the other three it does not use the gaik package.
+**Ready-to-run use cases.** No code needed. `brief-to-slides` runs anywhere; the other four
+are written for Claude Desktop and need a local MCP server, which each skill's README sets up.
+
+| Skill | What it does | Needs |
+|---|---|---|
+| [`brief-to-slides`](skills/brief-to-slides) | Builds an editable PowerPoint deck with speaker notes, exact timing and citations from a topic, an audience and a length | — |
+| [`incident-report-writing`](skills/incident-report-writing) | Turns a spoken incident or safety observation into a Word report | gaik-transcriber MCP server |
+| [`construction-diary-creation`](skills/construction-diary-creation) | Turns a site manager's spoken day into a Työmaapäiväkirja | gaik-transcriber MCP server |
+| [`purchase-order-processing`](skills/purchase-order-processing) | Matches a purchase order and its BOMs against a price list and writes a priced sales order | Filesystem MCP server |
+| [`report-writing`](skills/report-writing) | Consolidates recordings, notes and documents into one structured Word report | Filesystem and gaik-transcriber MCP servers |
+
+Long detail sits in `references/` (or `reference/`) and is loaded only when the task needs it.
+The Claude Desktop skills also carry their setup files beside `SKILL.md`: `setup.bat`,
+`transcription-MCP/` and sample data.
 
 ## Installing
 
@@ -38,30 +52,40 @@ all read.
 | VS Code | add `GAIK-project/gaik-toolkit` to the `chat.plugins.marketplaces` setting, or run **Chat: Install Plugin From Source** |
 | ChatGPT workspace | an admin opens **Admin Console → Plugins → Add → Import marketplace** and enters `https://github.com/GAIK-project/gaik-toolkit` as the source |
 | Other Agent Plugins v1 clients | point the client at this directory |
-| No plugin support | copy the directories under `skills/` into the agent's skills directory — they are ordinary [Agent Skills](https://agentskills.io/specification) |
+| No plugin support | copy the directories under `skills/` into the agent's skills directory |
+| One skill only | download its `.zip` from the [demo app](https://gaik-demo.2.rahtiapp.fi/skills) and upload it in Claude: **Customize → Skills → Add → Upload skill** |
 
 Claude Code 2.1.278 and Codex 0.149.1 were tested end to end (September 2026), and the
-Claude Desktop route on claude.ai in October 2026: the marketplace synced as it is and the
-plugin listed its three skills. The other rows follow those clients' documentation. Claude's
-**Sync automatically** option, on by default, keeps the plugin up to date as this repository
-changes.
+Claude Desktop route on claude.ai in October 2026. The other rows follow those clients'
+documentation. Claude's **Sync automatically** option, on by default, keeps the plugin up to
+date as this repository changes.
 
 ## Layout
 
 ```text
-agent-plugin/   (implementation_layer/no-code-assets/)
+agent-skills/   (implementation_layer/no-code-assets/)
 ├── plugin.json          # Agent Plugins v1 manifest
 ├── .claude-plugin/
 │   └── plugin.json      # Claude Code's own manifest; also the directory listing fields
 ├── icon.png             # shown in Claude's plugin directory, named by `icon` in that manifest
 ├── LICENSE
 └── skills/
-    ├── brief-to-slides/        # also assets/, scripts/ and a README
     ├── parsing-documents/
     ├── extracting-structured-data/
-    └── searching-documents/
+    ├── searching-documents/
+    │   ├── SKILL.md
+    │   ├── README.md
+    │   └── references/
+    ├── brief-to-slides/        # also assets/ and scripts/
+    ├── incident-report-writing/
+    ├── construction-diary-creation/
+    ├── purchase-order-processing/
+    └── report-writing/
         ├── SKILL.md
-        └── references/
+        ├── README.md           # setup guide
+        ├── reference/
+        ├── setup.bat           # installs the MCP servers for Claude Desktop
+        └── transcription-MCP/
 ```
 
 ## How the clients read it
@@ -145,13 +169,13 @@ Claude Code's Discover view browses, accepts third-party plugins through its
 
 ```bash
 claude plugin validate .
-claude plugin validate ./implementation_layer/no-code-assets/agent-plugin
-uvx --from skills-ref agentskills validate implementation_layer/no-code-assets/agent-plugin/skills/searching-documents
+claude plugin validate ./implementation_layer/no-code-assets/agent-skills
+uvx --from skills-ref agentskills validate implementation_layer/no-code-assets/agent-skills/skills/searching-documents
 uv run pytest implementation_layer/unit_tests/test_agent_plugin.py
 ```
 
 To try a change in Claude Code without installing it, run
-`claude --plugin-dir ./implementation_layer/no-code-assets/agent-plugin`; it loads the plugin for that session only.
+`claude --plugin-dir ./implementation_layer/no-code-assets/agent-skills`; it loads the plugin for that session only.
 
 ## License
 
