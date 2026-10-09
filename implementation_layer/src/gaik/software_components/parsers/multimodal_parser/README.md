@@ -1,5 +1,8 @@
 # Multimodal Parser
 
+> **Read first:** for the detailed implementation and the background of this parser, read the
+> article [How to Accurately Extract Everything from Documents Using AI](https://medium.com/ai-advances/how-to-accurately-extract-everything-from-documents-using-ai-cf12d0125238).
+
 Multi-provider PDF-to-markdown parser that sends PDFs to OpenAI, Claude, or Google Gemini for layout-aware extraction. Produces raw markdown with layout metadata, cleaned markdown, and optionally styled HTML.
 
 ## Installation
