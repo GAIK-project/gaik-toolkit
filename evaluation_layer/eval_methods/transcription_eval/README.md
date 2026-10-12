@@ -19,7 +19,9 @@ calls an LLM.
   the fewest meaning errors; plain Whisper large-v3 is the best open model; the
   Finnish-NLP fine-tune keeps the lowest WER but garbles more names. On the public
   FLEURS and VoxPopuli sets the Finnish fine-tunes lead, and our own fine-tuning pilot
-  improved them but not the webinar clip.
+  improved them but not the webinar clip. On dialect speech (SKN, 10 held-out
+  municipalities) every ready-made model has 40–67 % WER; our Whisper large-v3 fine-tune
+  with open dialect data reaches 22 % ([Dialects](#october-2026-current-models-and-an-llm-judge)).
 - **Interpretation:** WER measures textual differences, including spoken/written
   style and compound spelling. Check names, numbers and missing content directly
   before drawing a conclusion about usefulness.
@@ -138,11 +140,32 @@ the two judges disagree on its meaning errors (Claude 2.7 → 2.2 points, Gemini
 The Finnish fine-tunes above follow the same pattern. Public benchmark numbers therefore
 say little about spontaneous speech; measure a candidate on your own audio.
 
-**Dialects.** This clip does not test them. A dialect test needs dialect audio with
-a checked transcript, for example from Lahjoita puhetta (Donate Speech) or Suomen
-kielen näytteitä at Kielipankki, both under their own licence terms, and a decision
-on whether the transcript keeps dialect forms or normalises them. The same data is
-what a fine-tune of Whisper large-v3 would use.
+**Dialects.** The clip does not test them, so they were measured on Suomen kielen
+näytteitä (SKN; Kotus / Kielipankki, CC BY 4.0): dialect interviews from 50
+municipalities with a normalised standard-Finnish transcript. The test is 600 segments
+(2.5 h) from 10 municipalities across all dialect regions; the reference is the
+normalised text, so a model must hear dialect and write standard Finnish.
+
+| Model | SKN dialects WER % | FLEURS WER % | VoxPopuli WER % |
+|---|--:|--:|--:|
+| Whisper large-v3 + LoRA on SKN, FLEURS and VoxPopuli (ours) †‡§ | **22.2** | 7.8 | 10.6 |
+| Whisper large-v3 | 40.4 | 7.4 | 12.7 |
+| Whisper large-v3 turbo | 42.5 | 8.4 | 13.5 |
+| NVIDIA Canary 1B v2 | 45.6 | 8.7 | 11.4 |
+| RASMUS Finnish-ASR-Canary-v2 + KenLM †‡ | 47.6 | 7.6 | 7.7 |
+| RASMUS Finnish-ASR-Canary-v2, greedy †‡ | 50.1 | 8.4 | 6.8 |
+| Finnish-NLP whisper-large-finnish-v3 † | 56.6 | 7.1 | 6.6 |
+| Qwen3-ASR 1.7B | 66.7 | 25.1 | 27.5 |
+
+† trained on FLEURS, ‡ on VoxPopuli, § on SKN from 38 other municipalities (62 h,
+2 h on one GPU); no test
+municipality is heard in training. Every ready-made model struggles with dialects, and
+the Finnish fine-tunes trained on read speech do worst. Dialect training data nearly
+halves the error rate, in all 10 test municipalities, while FLEURS and VoxPopuli stay
+about level. It did not help the webinar clip (17.9 % WER, more name errors than base
+Whisper). The test shares SKN's transcription conventions with the training data, which
+favours the fine-tune; a dialect test from a second corpus would confirm the size of the
+gain. The fine-tuned model is not published.
 
 ## Input → method → output
 
