@@ -13,6 +13,13 @@ calls an LLM.
   WhisperX gets **11.9% WER** and `gpt-4o-mini-transcribe` **13.9%**. HY's saved
   2025 WhisperX output gets **10.4%**, with its model settings unrecorded.
   These are raw transcripts, not the enhanced results below.
+- **October 2026 model comparison, same clip:** 20 speech-to-text set-ups, 12 of them
+  open models run locally on a GPU, scored with WER and with two blind LLM judges
+  (see [below](#october-2026-current-models-and-an-llm-judge)). Gemini 3.5 Flash has
+  the fewest meaning errors; plain Whisper large-v3 is the best open model; the
+  Finnish-NLP fine-tune keeps the lowest WER but garbles more names. On the public
+  FLEURS and VoxPopuli sets the Finnish fine-tunes lead, and our own fine-tuning pilot
+  improved them but not the webinar clip.
 - **Interpretation:** WER measures textual differences, including spoken/written
   style and compound spelling. Check names, numbers and missing content directly
   before drawing a conclusion about usefulness.
@@ -51,6 +58,91 @@ reference audit in the private
 [gaik-evals project](https://github.com/GAIK-project/gaik-evals/tree/main/projects/qadental-transcription-translation).
 Its Finnish reference has unresolved review flags. Different datasets, references,
 settings and enhancement stages prevent direct comparison with the historical table.
+
+## October 2026: current models and an LLM judge
+
+Raw transcripts of the 180 s Ajokortti clip ([`data/Ajokortti.mp3`](data/Ajokortti.mp3))
+against [`data/reference.txt`](data/reference.txt), Finnish set as the language, no
+prompt or word list. The clip is standard spoken Finnish with many names; it is not
+dialect speech, and one clip cannot rank models that are close.
+
+| Model | Type | WER % | CER % | Claude pts | Gemini pts | Names (Claude / Gemini) |
+|---|---|--:|--:|--:|--:|--:|
+| Gemini 3.5 Flash | API | 14.2 (14.2–17.9) | 5.0 | 0.8 | 1.2 | 14 / 14 of 14 |
+| Google Chirp 3 | API | 19.6 | 6.6 | 1.2 | 3.7 | 14 / 11 of 14 |
+| Whisper large-v3 | open | 14.7 | 6.0 | 2.7 | 5.2 | 14 / 13 of 14 |
+| ElevenLabs Scribe v2 | API | 18.2 (17.2–18.4) | 4.9 | 1.2 | 7.0 | 14 / 12 of 14 |
+| Whisper large-v3 turbo | open | 18.4 | 7.7 | 1.5 | 8.5 | 14 / 13 of 14 |
+| OpenAI gpt-transcribe | API | 18.4 (18.4–19.1) | 8.5 | 4.2 | 8.5 | 12 / 12 of 14 |
+| WhisperX + Finnish-NLP whisper-large-finnish-v3 | open | 11.9 | 3.5 | 4.5 | 8.7 | 13 / 11 of 14 |
+| OpenAI gpt-4o-transcribe | API | 16.9 (16.2–18.4) | 6.7 | 6.0 | 7.5 | 11 / 10 of 14 |
+| OpenAI whisper-1 | API | 23.1 | 11.2 | 3.0 | 10.4 | 14 / 14 of 14 |
+| Finnish-NLP whisper-large-finnish-v3 (plain transformers) | open | 13.2 | 4.3 | 5.2 | 8.5 | 13 / 11 of 14 |
+| OpenAI gpt-4o-mini-transcribe | API | 13.9 (13.9–14.7) | 4.4 | 3.2 | 11.4 | 13 / 10 of 14 |
+| Orukeet (Parakeet v3 fine-tune) | open | 26.4 | 10.2 | 6.2 | 10.7 | 13 / 11 of 14 |
+| RASMUS Finnish-ASR-Canary-v2, greedy | open | 23.9 | 8.1 | 6.5 | 13.7 | 11 / 8 of 14 |
+| RASMUS Finnish-ASR-Canary-v2 + KenLM | open | 22.1 | 8.5 | 8.5 | 15.4 | 11 / 7 of 14 |
+| Gemini 3.1 Pro | API | 22.4 (15.4–22.4) | 9.3 | 7.0 | 18.4 | 12 / 10 of 14 |
+| NVIDIA Canary 1B v2 | open | 24.1 | 10.3 | 9.0 | 17.9 | 13 / 10 of 14 |
+| NVIDIA Parakeet TDT 0.6B v3 | open | 31.1 | 13.8 | 12.7 | 17.4 | 13 / 12 of 14 |
+| Finnish-NLP wav2vec2 XLS-R 1B (no LM) | open | 31.6 | 9.1 | 6.2 | 26.1 | 13 / 10 of 14 |
+| Qwen3-ASR 1.7B | open | 58.0 | 23.2 | 20.6 | 33.6 | 9 / 7 of 14 |
+| Qwen3-ASR 0.6B | open | 77.9 | 33.9 | 28.1 | 41.0 | 7 / 4 of 14 |
+
+Sorted by the mean of the two judges. WER and CER use the normalisation described
+[below](#what-the-metrics-mean); a range is over three runs. "open" means the weights
+can be downloaded and run on your own GPU; these ran on one AMD MI250X on LUMI.
+
+**The LLM judge.** WER charges a dropped filler or "mä" for "minä" as much as a wrong
+brand name. Claude Opus 5.5 and Gemini 3.1 Pro each read the reference and one
+transcript, without the model's name, and report only what would mislead a reader:
+a wrong word, name or number, missing content, invented content. Fillers, spoken
+against written forms, compound spacing and punctuation are not errors. **pts** is
+error points per 100 reference words (critical 10, major 5, minor 1; lower is better).
+**Names** is how many of the clip's 14 names and terms each judge found right or
+recognisable. The judges are noisy: an identical transcript scored twice differed by
+1.0–1.5 points, so read gaps under about 2 points as ties.
+
+**What it shows.** WER and the judges disagree where a model writes what was said
+instead of the reference's standard forms (ElevenLabs: 18.2 % WER, five minor errors
+for Claude), and where a model matches the reference's wording but garbles names
+(the Finnish-NLP fine-tune: "Nobel-Baker" for Nobel Biocare). For a locally run model
+on this kind of audio, Whisper large-v3 is the one to start from. Qwen3-ASR lists
+Finnish as supported and is not usable for it here.
+
+**Public test sets.** The open models also ran on the two Finnish test sets that model
+cards report: FLEURS (918 sentences read aloud) and VoxPopuli (478 European Parliament
+segments). Same normalisation as model cards: lower-case, punctuation removed.
+
+| Model | FLEURS WER % | VoxPopuli WER % |
+|---|--:|--:|
+| Finnish-NLP whisper-large-finnish-v3 † | 7.1 | 6.6 |
+| Whisper large-v3 + LoRA on FLEURS and VoxPopuli (our pilot) †‡ | 7.1 | 10.8 |
+| Whisper large-v3 | 7.4 | 12.7 |
+| RASMUS Finnish-ASR-Canary-v2 + KenLM †‡ | 7.6 | 7.7 |
+| Whisper large-v3 turbo | 8.4 | 13.5 |
+| RASMUS Finnish-ASR-Canary-v2, greedy †‡ | 8.4 | 6.8 |
+| NVIDIA Canary 1B v2 | 8.7 | 11.4 |
+| Orukeet | 11.6 | 15.9 |
+| NVIDIA Parakeet TDT 0.6B v3 | 13.0 | 17.5 |
+| Finnish-NLP wav2vec2 XLS-R 1B (no LM) | 16.2 | 9.4 |
+| Qwen3-ASR 1.7B | 25.1 | 27.5 |
+
+† trained on FLEURS, ‡ on VoxPopuli training data, so those numbers are on familiar
+material. The RASMUS model card's FLEURS numbers (8.39 % and 7.75 %) reproduce here.
+
+**Fine-tuning on open data does not fix webinar speech.** A LoRA fine-tune of Whisper
+large-v3 on the FLEURS and VoxPopuli training sets (10 208 recordings, 51 minutes on one
+GPU) improved both public sets but raised WER on the Ajokortti clip from 14.7 % to 17.9 %;
+the two judges disagree on its meaning errors (Claude 2.7 → 2.2 points, Gemini 5.2 → 8.2).
+The Finnish fine-tunes above follow the same pattern. Public benchmark numbers therefore
+say little about spontaneous speech; measure a candidate on your own audio.
+
+**Dialects.** This clip does not test them. A dialect test needs dialect audio with
+a checked transcript, for example from Lahjoita puhetta (Donate Speech) or Suomen
+kielen näytteitä at Kielipankki, both under their own licence terms, and a decision
+on whether the transcript keeps dialect forms or normalises them. The same data is
+what a fine-tune of Whisper large-v3 would use.
 
 ## Input → method → output
 
