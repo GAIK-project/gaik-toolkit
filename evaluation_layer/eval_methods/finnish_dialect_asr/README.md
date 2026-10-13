@@ -5,6 +5,12 @@ records how the GAIK project trained a Whisper large-v3 model for Finnish dialec
 open data, how it was measured, and where it falls short. The runners, per-segment outputs
 and judge records are in the project's private evaluation repository.
 
+**Published on Hugging Face (13 Oct 2026):** the model
+[GAIK-project/whisper-large-v3-fi-dialects](https://huggingface.co/GAIK-project/whisper-large-v3-fi-dialects)
+(Apache 2.0; "Ours, round 2" below) and its training and test segments
+[GAIK-project/skn-finnish-dialects-asr](https://huggingface.co/datasets/GAIK-project/skn-finnish-dialects-asr)
+(CC BY 4.0). The model card has the decoding code.
+
 ## TL;DR
 
 - On dialect interviews from 10 municipalities that no model was trained on, plain Whisper
