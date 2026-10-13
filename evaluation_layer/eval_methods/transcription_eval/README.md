@@ -140,7 +140,8 @@ the two judges disagree on its meaning errors (Claude 2.7 → 2.2 points, Gemini
 The Finnish fine-tunes above follow the same pattern. Public benchmark numbers therefore
 say little about spontaneous speech; measure a candidate on your own audio.
 
-**Dialects.** The clip does not test them, so they were measured on Suomen kielen
+**Dialects.** Training and results of the dialect model have their own page:
+[`finnish_dialect_asr/`](../finnish_dialect_asr/README.md). In short: the clip does not test them, so they were measured on Suomen kielen
 näytteitä (SKN; Kotus / Kielipankki, CC BY 4.0): dialect interviews from 50
 municipalities with a normalised standard-Finnish transcript. The test is 600 segments
 (2.5 h) from 10 municipalities across all dialect regions; the reference is the
