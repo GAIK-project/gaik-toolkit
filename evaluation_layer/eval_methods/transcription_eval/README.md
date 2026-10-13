@@ -21,7 +21,7 @@ calls an LLM.
   FLEURS and VoxPopuli sets the Finnish fine-tunes lead, and our own fine-tuning pilot
   improved them but not the webinar clip. On dialect speech (SKN, 10 held-out
   municipalities) every ready-made model has 40–67 % WER; our Whisper large-v3 fine-tune
-  with open dialect data reaches 22 % ([Dialects](#october-2026-current-models-and-an-llm-judge)).
+  with open dialect data reaches 22 %, and a second dialect corpus confirms the gain ([Dialects](#october-2026-current-models-and-an-llm-judge)).
 - **Interpretation:** WER measures textual differences, including spoken/written
   style and compound spelling. Check names, numbers and missing content directly
   before drawing a conclusion about usefulness.
@@ -164,8 +164,21 @@ the Finnish fine-tunes trained on read speech do worst. Dialect training data ne
 halves the error rate, in all 10 test municipalities, while FLEURS and VoxPopuli stay
 about level. It did not help the webinar clip (17.9 % WER, more name errors than base
 Whisper). The test shares SKN's transcription conventions with the training data, which
-favours the fine-tune; a dialect test from a second corpus would confirm the size of the
-gain. The fine-tuned model is not published.
+favours the fine-tune, so the model was also run on a second corpus it never saw: 583
+segments from 10 other localities in the Finnish Dialect Syntax Archive (LA-murre,
+University of Turku / Kotus, Kielipankki, CC BY-ND 4.0). Its reference is written in
+dialect, so WER charges standard-Finnish output (52–73 % for every model) and a blind
+judge (Claude Opus 5.5) counted meaning errors instead:
+
+| Model | Meaning-error points / 100 words | Segments with no error |
+|---|--:|--:|
+| Whisper large-v3 + LoRA incl. SKN dialects (ours) | **13.9** | 108 of 564 |
+| Finnish-NLP whisper-large-finnish-v3 | 21.6 | 49 |
+| Whisper large-v3 | 22.7 | 55 |
+
+The fine-tune is ahead in all 10 localities: about 40 % fewer meaning-error points than
+base Whisper, a smaller gain than the WER on SKN suggests. One judge, itself a model.
+The fine-tuned model is not published.
 
 ## Input → method → output
 
