@@ -162,8 +162,9 @@ normalised text, so a model must hear dialect and write standard Finnish.
 municipality is heard in training. Every ready-made model struggles with dialects, and
 the Finnish fine-tunes trained on read speech do worst. Dialect training data nearly
 halves the error rate, in all 10 test municipalities, while FLEURS and VoxPopuli stay
-about level. It did not help the webinar clip (17.9 % WER, more name errors than base
-Whisper). The test shares SKN's transcription conventions with the training data, which
+about level. On the webinar clip it spells rare names and dental terms worse than base
+Whisper (its first, higher WER came from Whisper's long-form decoding loop; decoded in
+15-25 s chunks it is 14.9 % against 15.7 %). The test shares SKN's transcription conventions with the training data, which
 favours the fine-tune, so the model was also run on a second corpus it never saw: 583
 segments from 10 other localities in the Finnish Dialect Syntax Archive (LA-murre,
 University of Turku / Kotus, Kielipankki, CC BY-ND 4.0). Its reference is written in
@@ -178,7 +179,22 @@ judge (Claude Opus 5.5) counted meaning errors instead:
 
 The fine-tune is ahead in all 10 localities: about 40 % fewer meaning-error points than
 base Whisper, a smaller gain than the WER on SKN suggests. One judge, itself a model.
-The fine-tuned model is not published.
+
+A second round kept the method and changed the data. An LLM (Claude Opus 5.5, text only,
+with a word-for-word check) put punctuation and capitals back into SKN's training text, so the
+model writes sentences again (round 1 wrote none); training stops at the epoch with the lowest
+validation loss, because four epochs overfit. Judged together on the same 583 LA-murre segments:
+
+| Model | SKN dialect WER % | LA-murre meaning points / 100 words |
+|---|--:|--:|
+| Whisper large-v3 | 40.4 | 25.9 |
+| Ours, round 1 | 22.2 | 13.8 |
+| Ours, round 2 with punctuation | 21.1 | 13.6 |
+| Ours, round 2 + 56 h of LA-murre, internal only | **19.7** | **11.4** |
+
+More dialect speech helps on both tests; LA-murre's licence (CC BY-ND) keeps that model
+internal. No model is published; base Whisper large-v3 stays the better choice for
+standard-Finnish audio full of brand names.
 
 ## Input → method → output
 
