@@ -9,7 +9,7 @@ and judge records are in the project's private evaluation repository.
 [GAIK-project/whisper-large-v3-fi-dialects](https://huggingface.co/GAIK-project/whisper-large-v3-fi-dialects)
 (Apache 2.0; "Ours, round 2" below) and its training and test segments
 [GAIK-project/skn-finnish-dialects-asr](https://huggingface.co/datasets/GAIK-project/skn-finnish-dialects-asr)
-(CC BY 4.0). The model card has the decoding code. Developed by Akseli Leskinen, Haaga-Helia
+(CC BY 4.0). The model card has the decoding code. Developed by Akseli Leskinen ([laguagu](https://github.com/laguagu)), Haaga-Helia
 University of Applied Sciences.
 
 ## TL;DR
