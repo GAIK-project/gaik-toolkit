@@ -3,7 +3,7 @@
 <text x="278" y="114" font-size="13" font-weight="400" fill="#1f2328" text-anchor="end">Finnish-NLP whisper-large-finnish-v3</text>
 <text x="278" y="148" font-size="13" font-weight="400" fill="#1f2328" text-anchor="end">Whisper large-v3</text>
 <text x="278" y="182" font-size="13" font-weight="600" fill="#1f2328" text-anchor="end">Ours, round 1</text>
-<text x="278" y="216" font-size="13" font-weight="600" fill="#1f2328" text-anchor="end">Ours, round 2 (publishable)</text>
+<text x="278" y="216" font-size="13" font-weight="600" fill="#1f2328" text-anchor="end">Ours, round 2 (published)</text>
 <text x="278" y="250" font-size="13" font-weight="600" fill="#1f2328" text-anchor="end">Ours, round 2 + LA-murre (internal)</text>
 <text x="290" y="46" font-size="15" font-weight="600" fill="#1f2328">SKN dialect test: word error rate %</text>
 <text x="290" y="66" font-size="12" fill="#59636e">600 segments, 10 held-out municipalities</text>

@@ -57,11 +57,11 @@ The CSV also retains spelling, substitution, deletion and insertion rates.
 
 <!-- historical-results:end -->
 
-The QAD-1 rerun's transcripts, the scoring code and the reference's 42 disputed spans are
-public, with the October 2026 comparison below, in
-[GAIK-project/finnish-asr](https://github.com/GAIK-project/finnish-asr).
-Its Finnish reference was reviewed at its 42 disputed spans on 14 Oct 2026 (below); the rest is unverified. Different datasets, references,
-settings and enhancement stages prevent direct comparison with the historical table.
+The QAD-1 rerun's transcripts and scoring code are public, with the October 2026 comparison
+below, in [GAIK-project/finnish-asr](https://github.com/GAIK-project/finnish-asr). Its Finnish
+reference was reviewed at its 42 disputed spans on 14 Oct 2026 ([below](#reviewed-reference)); the
+rest is unverified. Different datasets, references, settings and enhancement stages prevent direct
+comparison with the historical table.
 
 ## October 2026: current models and an LLM judge
 

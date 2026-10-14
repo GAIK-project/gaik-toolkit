@@ -15,7 +15,8 @@ calls an LLM.
 - **Separate QAD-1 rerun:** on one 180 s Ajokortti clip, QAdental's Finnish-NLP
   WhisperX gets **11.9% WER** and `gpt-4o-mini-transcribe` **13.9%**. HY's saved
   2025 WhisperX output gets **10.4%**, with its model settings unrecorded.
-  These are raw transcripts, not the enhanced results below.
+  These are raw transcripts, not the enhanced results below. After a listener reviewed
+  the reference's 42 disputed spans, the WhisperX numbers become **15.7%** and **14.0%**.
 - **Interpretation:** WER measures textual differences, including spoken/written
   style and compound spelling. Check names, numbers and missing content directly
   before drawing a conclusion about usefulness.
@@ -49,11 +50,13 @@ The CSV also retains spelling, substitution, deletion and insertion rates.
 
 
 
-The QAD-1 rerun has model outputs, repeat ranges, scoring code and an audio-linked
-reference audit in the private
-[gaik-evals project](https://github.com/GAIK-project/gaik-evals/tree/main/projects/qadental-transcription-translation).
-Its Finnish reference has unresolved review flags. Different datasets, references,
-settings and enhancement stages prevent direct comparison with the historical table.
+The QAD-1 rerun's transcripts and scoring code are public in
+[GAIK-project/finnish-asr](https://github.com/GAIK-project/finnish-asr). Its Finnish reference
+was reviewed at its 42 disputed spans on 14 Oct 2026; the rest is unverified. The
+[transcription_eval README](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/transcription_eval)
+has the October 2026 comparison of 20 set-ups and the scores against the reviewed reference.
+Different datasets, references, settings and enhancement stages prevent direct comparison with
+the historical table.
 
 ## Input → method → output
 

@@ -6,7 +6,9 @@ open data, how it was measured, and where it falls short. The code, the model an
 cards and the results are public in
 [GAIK-project/finnish-asr](https://github.com/GAIK-project/finnish-asr) (code MIT, results and
 documentation CC BY 4.0); texts from the LA-murre corpus, including its judge records, are not
-published, because its licence allows no derivatives.
+published, because its licence allows no derivatives. A short illustrated walk-through, with audio:
+[suomeksi](https://gaik-project.github.io/finnish-asr/story/story.fi.html) ·
+[in English](https://gaik-project.github.io/finnish-asr/story/story.en.html).
 
 **Published on Hugging Face (13 Oct 2026):** the model
 [GAIK-project/whisper-large-v3-fi-dialects](https://huggingface.co/GAIK-project/whisper-large-v3-fi-dialects)
@@ -31,7 +33,7 @@ University of Applied Sciences, GAIK project.
 - For sentence timestamps, or long audio without manual chunking, the model's `timestamps`
   branch keeps about the same dialect accuracy ([Timestamp variant](#timestamp-variant)).
 
-![Two panels, lower is better. SKN dialect test WER: Finnish-NLP 56.6, Whisper large-v3 40.4, ours round 1 22.2, round 2 publishable 21.1, round 2 with LA-murre 19.7. LA-murre meaning-error points per 100 words, blind judge: Whisper large-v3 25.9, round 1 13.8, round 2 publishable 13.6, round 2 with LA-murre 11.4.](images/dialect-finetune.svg)
+![Two panels, lower is better. SKN dialect test WER: Finnish-NLP 56.6, Whisper large-v3 40.4, ours round 1 22.2, round 2 published 21.1, round 2 with LA-murre 19.7. LA-murre meaning-error points per 100 words, blind judge: Whisper large-v3 25.9, round 1 13.8, round 2 published 13.6, round 2 with LA-murre 11.4.](images/dialect-finetune.svg)
 
 ## Data
 
@@ -95,9 +97,9 @@ dialect corpus would be the next step.
 **Open-model judges agree.** The LA-murre judging was repeated with the same prompt, labels and
 order by open models on CSC's Aitta inference service. gpt-oss-120b, on all 583 segments, gives
 Whisper large-v3 20.5, round 1 13.4, the published model 13.2 and the internal model 12.9 points,
-and prefers the same transcript as Claude in 81 % of pairs. Gemma 4 31B and Qwen3.6-27B, on a
-sample of up to 200 segments, give the same order and agree with Claude in 90–94 % of pairs. All
-four judges rank internal < published ≈ round 1 << Whisper large-v3. Their point scales differ, so
+and prefers the same transcript as Claude in 81 % of pairs. Gemma 4 31B and Qwen3.6-27B, on
+the same sample of 200 segments (198 and 197 answered), agree with Claude in 92–93 % of pairs; Gemma
+puts round 1 just ahead of the published model. All four judges rank internal < published ≈ round 1 << Whisper large-v3. Their point scales differ, so
 compare scores within one judge.
 
 ## Timestamp variant
@@ -118,8 +120,8 @@ best epoch 2. It is on the model's `timestamps` branch; load it with `revision="
 | Same audio in quiet chunks: WER % | 39.4 | 17.3 | 17.1 |
 
 The third judging round put the three models side by side on 577 of the 583 LA-murre segments:
-the variant gets fewer points than the published model in 96 segments and more in 97, so no
-difference. The long interviews are 10 windows of about 4 minutes from the SKN test
+the variant gets fewer points than the published model in 98 segments and more in 100 (sign test
+p = 0.94), so no difference. The long interviews are 10 windows of about 4 minutes from the SKN test
 municipalities, decoded with Whisper's own sequential long-form mode. Without temperature
 fallback the published model loops in one window (21.5 % WER) and the variant in three (25.2 %);
 with OpenAI's fallback settings neither loops. On the webinar clip the variant decodes long-form
