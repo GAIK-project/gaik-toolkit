@@ -8,7 +8,8 @@ cards and the results are public in
 documentation CC BY 4.0); texts from the LA-murre corpus, including its judge records, are not
 published, because its licence allows no derivatives. A short illustrated walk-through, with audio:
 [suomeksi](https://gaik-project.github.io/finnish-asr/story/story.fi.html) ·
-[in English](https://gaik-project.github.io/finnish-asr/story/story.en.html).
+[in English](https://gaik-project.github.io/finnish-asr/story/story.en.html); the models side by side, with
+audio: [listen and compare](https://gaik-project.github.io/finnish-asr/listen.html).
 
 **Published on Hugging Face (13 Oct 2026):** the model
 [GAIK-project/whisper-large-v3-fi-dialects](https://huggingface.co/GAIK-project/whisper-large-v3-fi-dialects)
@@ -21,7 +22,8 @@ University of Applied Sciences, GAIK project.
 ## TL;DR
 
 - On dialect interviews from 10 municipalities that no model was trained on, plain Whisper
-  large-v3 has a 40.4 % word error rate and the Finnish fine-tunes on read speech 48–57 %.
+  large-v3 has a 40.4 % word error rate, the Finnish fine-tunes on read speech 48–57 % and the paid
+  Gemini 3.5 Flash 34.7 % when asked for standard Finnish (Google Chirp 3: 41.3 %).
   Our LoRA fine-tune of Whisper large-v3 on 62 h of open dialect interviews brings it to
   **21.1 %**, and still writes punctuated sentences.
 - On a second dialect corpus it was never trained on, a blind LLM judge gives it about half the
