@@ -57,9 +57,9 @@ The CSV also retains spelling, substitution, deletion and insertion rates.
 
 <!-- historical-results:end -->
 
-The QAD-1 rerun has model outputs, repeat ranges, scoring code and an audio-linked
-reference audit in the private
-[gaik-evals project](https://github.com/GAIK-project/gaik-evals/tree/main/projects/qadental-transcription-translation).
+The QAD-1 rerun's transcripts, the scoring code and the reference's 42 disputed spans are
+public, with the October 2026 comparison below, in
+[GAIK-project/finnish-asr](https://github.com/GAIK-project/finnish-asr).
 Its Finnish reference was reviewed at its 42 disputed spans on 14 Oct 2026 (below); the rest is unverified. Different datasets, references,
 settings and enhancement stages prevent direct comparison with the historical table.
 
@@ -68,7 +68,9 @@ settings and enhancement stages prevent direct comparison with the historical ta
 Raw transcripts of the 180 s Ajokortti clip ([`data/Ajokortti.mp3`](data/Ajokortti.mp3))
 against [`data/reference.txt`](data/reference.txt), Finnish set as the language, no
 prompt or word list. The clip is standard spoken Finnish with many names; it is not
-dialect speech, and one clip cannot rank models that are close.
+dialect speech, and one clip cannot rank models that are close. The code, every transcript,
+the scores and the clip's judge records are in
+[GAIK-project/finnish-asr](https://github.com/GAIK-project/finnish-asr).
 
 | Model | Type | WER % | CER % | Claude pts | Gemini pts | Names (Claude / Gemini) |
 |---|---|--:|--:|--:|--:|--:|
@@ -185,7 +187,7 @@ normalised text, so a model must hear dialect and write standard Finnish.
 | Qwen3-ASR 1.7B | 66.7 | 25.1 | 27.5 |
 
 † trained on FLEURS, ‡ on VoxPopuli, § on SKN from 38 other municipalities (62 h,
-2 h on one GPU); no test
+2 h 2 min on one GPU); no test
 municipality is heard in training. Every ready-made model struggles with dialects, and
 the Finnish fine-tunes trained on read speech do worst. Dialect training data nearly
 halves the error rate, in all 10 test municipalities, while FLEURS and VoxPopuli stay
@@ -226,6 +228,11 @@ internal. Round 2 with punctuation is published as
 (dataset [GAIK-project/skn-finnish-dialects-asr](https://huggingface.co/datasets/GAIK-project/skn-finnish-dialects-asr);
 details in [finnish_dialect_asr](../finnish_dialect_asr/README.md)). Base Whisper large-v3 stays the
 better choice for standard-Finnish audio full of brand names.
+
+**Acknowledgement.** The open models and the fine-tunes ran on LUMI. We acknowledge CSC – IT Center
+for Science, Finland for awarding this project access to the LUMI supercomputer, owned by the
+EuroHPC Joint Undertaking, hosted by CSC (Finland) and the LUMI consortium through CSC – IT Center
+for Science, Finland.
 
 ## Input → method → output
 

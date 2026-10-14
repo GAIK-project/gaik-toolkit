@@ -2,15 +2,19 @@
 
 Ready-made speech-to-text models handle standard Finnish well and dialects badly. This page
 records how the GAIK project trained a Whisper large-v3 model for Finnish dialect speech on
-open data, how it was measured, and where it falls short. The runners, per-segment outputs
-and judge records are in the project's private evaluation repository.
+open data, how it was measured, and where it falls short. The code, the model and dataset
+cards and the results are public in
+[GAIK-project/finnish-asr](https://github.com/GAIK-project/finnish-asr) (code MIT, results and
+documentation CC BY 4.0); texts from the LA-murre corpus, including its judge records, are not
+published, because its licence allows no derivatives.
 
 **Published on Hugging Face (13 Oct 2026):** the model
 [GAIK-project/whisper-large-v3-fi-dialects](https://huggingface.co/GAIK-project/whisper-large-v3-fi-dialects)
-(Apache 2.0; "Ours, round 2" below) and its training and test segments
+(Apache 2.0 like Whisper large-v3; "Ours, round 2" below, tagged `v1.0`) and its training and test segments
 [GAIK-project/skn-finnish-dialects-asr](https://huggingface.co/datasets/GAIK-project/skn-finnish-dialects-asr)
-(CC BY 4.0). The model card has the decoding code. Developed by Akseli Leskinen ([laguagu](https://github.com/laguagu)), Haaga-Helia
-University of Applied Sciences.
+(CC BY 4.0). The model card has the decoding code. A variant trained with timestamps is on the
+model's `timestamps` branch ([below](#timestamp-variant)). Developed by Akseli Leskinen ([laguagu](https://github.com/laguagu)), Haaga-Helia
+University of Applied Sciences, GAIK project.
 
 ## TL;DR
 
@@ -24,6 +28,8 @@ University of Applied Sciences.
 - Read and formal speech stays at plain Whisper's level (FLEURS 7.6 %, VoxPopuli 10.8 %).
 - Weakness: rare names and technical terms in standard-Finnish audio are spelled worse than
   by plain Whisper. For that kind of audio, use plain Whisper large-v3.
+- For sentence timestamps, or long audio without manual chunking, the model's `timestamps`
+  branch keeps about the same dialect accuracy ([Timestamp variant](#timestamp-variant)).
 
 ![Two panels, lower is better. SKN dialect test WER: Finnish-NLP 56.6, Whisper large-v3 40.4, ours round 1 22.2, round 2 publishable 21.1, round 2 with LA-murre 19.7. LA-murre meaning-error points per 100 words, blind judge: Whisper large-v3 25.9, round 1 13.8, round 2 publishable 13.6, round 2 with LA-murre 11.4.](images/dialect-finetune.svg)
 
@@ -59,10 +65,12 @@ flowchart LR
   answer was kept only if its words were exactly the input's (15 024 of 15 042). Test
   references are the corpora's own human transcripts.
 - **Training.** LoRA rank 64 on the attention query and value projections (about 2 % of the
-  weights), learning rate 1e-4, batch 8, 25 250 segments, 3 h 14 min on one MI250X. Four
-  epochs overfit, so the epoch with the lowest validation loss (the second) is kept.
+  weights), learning rate 1e-4, batch 8, 25 250 segments, 3 h 8 min on one MI250X (with
+  validation after each epoch). Four epochs overfit, so the epoch with the lowest validation
+  loss (the second) is kept.
 - **Decoding.** Cut long audio into 15–25 s pieces at quiet points before transcribing.
-  Whisper's own long-form loop made a fine-tuned model repeat one phrase about 40 times.
+  Whisper's own long-form loop made a fine-tuned model repeat one phrase about 40 times. For
+  long audio without manual chunking, use the [timestamp variant](#timestamp-variant).
 
 ## Results
 
@@ -84,19 +92,64 @@ against 14 and 14).
 More dialect speech is what helps most (the internal model), so a larger openly licensed
 dialect corpus would be the next step.
 
+**Open-model judges agree.** The LA-murre judging was repeated with the same prompt, labels and
+order by open models on CSC's Aitta inference service. gpt-oss-120b, on all 583 segments, gives
+Whisper large-v3 20.5, round 1 13.4, the published model 13.2 and the internal model 12.9 points,
+and prefers the same transcript as Claude in 81 % of pairs. Gemma 4 31B and Qwen3.6-27B, on a
+sample of up to 200 segments, give the same order and agree with Claude in 90–94 % of pairs. All
+four judges rank internal < published ≈ round 1 << Whisper large-v3. Their point scales differ, so
+compare scores within one judge.
+
+## Timestamp variant
+
+The published model writes timestamps, but almost never where a sentence starts. A second run
+with the same recipe trained half of the SKN segments in each epoch with Whisper's timestamp
+tokens, taken from SKN's sentence times (15 040 of 15 042 segments had usable times): 3 h 6 min,
+best epoch 2. It is on the model's `timestamps` branch; load it with `revision="timestamps"`.
+
+| | Whisper large-v3 | Published (`v1.0`) | `timestamps` branch |
+|---|--:|--:|--:|
+| SKN dialect WER % | 40.4 | 21.1 | 21.4 |
+| FLEURS / VoxPopuli WER % | 7.4 / 12.7 | 7.6 / 10.8 | 7.4 / 11.2 |
+| LA-murre judge points (third round) | 24.2 | 13.7 | 13.7 |
+| SKN sentence starts found within 1 s | 61 % | 1 % | 58 % |
+| Long dialect interviews, sequential with fallback: WER % | 37.5 | 19.8 | 18.1 |
+| Same, sentence starts within 1 s | 63 % | 19 % | 49 % |
+| Same audio in quiet chunks: WER % | 39.4 | 17.3 | 17.1 |
+
+The third judging round put the three models side by side on 577 of the 583 LA-murre segments:
+the variant gets fewer points than the published model in 96 segments and more in 97, so no
+difference. The long interviews are 10 windows of about 4 minutes from the SKN test
+municipalities, decoded with Whisper's own sequential long-form mode. Without temperature
+fallback the published model loops in one window (21.5 % WER) and the variant in three (25.2 %);
+with OpenAI's fallback settings neither loops. On the webinar clip the variant decodes long-form
+with timestamps at 16.7 % WER (16.2 % against the reviewed reference) where the published model
+loops (62.7 %); in quiet chunks it is 15.2 / 14.5 % against the published model's 13.9 / 14.0 %.
+
+The variant is slightly worse on VoxPopuli (+0.4) and on the chunked clip (+0.5 to 1.3), which
+broke the rule agreed before the run, so the published model stays the main model. Use the
+variant when you need sentence timestamps or long audio without manual chunking, and always with
+the fallback settings: `temperature=(0.0, 0.2, 0.4, 0.6, 0.8, 1.0)`,
+`compression_ratio_threshold=1.35`, `logprob_threshold=-1.0`, `no_speech_threshold=0.6`,
+`condition_on_prev_tokens=False`.
+
 ## Limits
 
-- One training run per model, one seed, one LLM judge.
+- One training run per model, one seed. Claude Opus 5.5 is the main judge; the open-model
+  judges above check its order, not its exact scores.
 - Both dialect corpora are 1960s–70s interviews with elderly speakers, not today's regional
   speech.
 - The SKN test shares SKN's transcription conventions with the training data; LA-murre does not.
 
-## Attribution
+## Attribution and acknowledgement
 
 Suomen kielen näytteitä, Kotimaisten kielten keskus (Kotus), via Kielipankki – The Language
 Bank of Finland, CC BY 4.0, [urn:nbn:fi:lb-2020112937](http://urn.fi/urn:nbn:fi:lb-2020112937).
 Lauseopin arkiston murrekorpus, University of Turku and Kotus, via Kielipankki, CC BY-ND 4.0,
 [urn:nbn:fi:lb-2020112935](http://urn.fi/urn:nbn:fi:lb-2020112935): used for testing only in
 the shared model. FLEURS (Google, CC BY 4.0), VoxPopuli (Meta, CC0). Base model
-[openai/whisper-large-v3](https://huggingface.co/openai/whisper-large-v3), Apache 2.0. Computing
-on LUMI through CSC – IT Center for Science, Finland.
+[openai/whisper-large-v3](https://huggingface.co/openai/whisper-large-v3), Apache 2.0.
+
+We acknowledge CSC – IT Center for Science, Finland for awarding this project access to the LUMI
+supercomputer, owned by the EuroHPC Joint Undertaking, hosted by CSC (Finland) and the LUMI
+consortium through CSC – IT Center for Science, Finland.
