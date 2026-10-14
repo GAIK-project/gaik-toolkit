@@ -144,7 +144,7 @@ say little about spontaneous speech; measure a candidate on your own audio.
 [`finnish_dialect_asr/`](../finnish_dialect_asr/README.md). In short: the clip does not test them, so they were measured on Suomen kielen
 näytteitä (SKN; Kotus / Kielipankki, CC BY 4.0): dialect interviews from 50
 municipalities with a normalised standard-Finnish transcript. The test is 600 segments
-(2.5 h) from 10 municipalities across all dialect regions; the reference is the
+(2.5 h) from 10 municipalities in five of SKN's six main dialect groups; the reference is the
 normalised text, so a model must hear dialect and write standard Finnish.
 
 | Model | SKN dialects WER % | FLEURS WER % | VoxPopuli WER % |
@@ -179,7 +179,8 @@ judge (Claude Opus 5.5) counted meaning errors instead:
 | Whisper large-v3 | 22.7 | 55 |
 
 The fine-tune is ahead in all 10 localities: about 40 % fewer meaning-error points than
-base Whisper, a smaller gain than the WER on SKN suggests. One judge, itself a model.
+base Whisper in this judging (47 % when judged again in the second round below), about the
+size of the WER gain on SKN. One judge, itself a model; compare scores only within a round.
 
 A second round kept the method and changed the data. An LLM (Claude Opus 5.5, text only,
 with a word-for-word check) put punctuation and capitals back into SKN's training text, so the
@@ -194,8 +195,11 @@ validation loss, because four epochs overfit. Judged together on the same 583 LA
 | Ours, round 2 + 56 h of LA-murre, internal only | **19.7** | **11.4** |
 
 More dialect speech helps on both tests; LA-murre's licence (CC BY-ND) keeps that model
-internal. No model is published; base Whisper large-v3 stays the better choice for
-standard-Finnish audio full of brand names.
+internal. Round 2 with punctuation is published as
+[GAIK-project/whisper-large-v3-fi-dialects](https://huggingface.co/GAIK-project/whisper-large-v3-fi-dialects)
+(dataset [GAIK-project/skn-finnish-dialects-asr](https://huggingface.co/datasets/GAIK-project/skn-finnish-dialects-asr);
+details in [finnish_dialect_asr](../finnish_dialect_asr/README.md)). Base Whisper large-v3 stays the
+better choice for standard-Finnish audio full of brand names.
 
 ## Input → method → output
 

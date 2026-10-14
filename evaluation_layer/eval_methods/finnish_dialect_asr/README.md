@@ -18,8 +18,9 @@ University of Applied Sciences.
   large-v3 has a 40.4 % word error rate and the Finnish fine-tunes on read speech 48–57 %.
   Our LoRA fine-tune of Whisper large-v3 on 62 h of open dialect interviews brings it to
   **21.1 %**, and still writes punctuated sentences.
-- On a second dialect corpus it was never trained on, a blind LLM judge counts about half the
-  meaning errors of plain Whisper (13.6 against 25.9 points per 100 words).
+- On a second dialect corpus it was never trained on, a blind LLM judge gives it about half the
+  meaning-error points of plain Whisper (13.6 against 25.9 per 100 words; by count, 5.4 against
+  8.5 errors per 100 words).
 - Read and formal speech stays at plain Whisper's level (FLEURS 7.6 %, VoxPopuli 10.8 %).
 - Weakness: rare names and technical terms in standard-Finnish audio are spelled worse than
   by plain Whisper. For that kind of audio, use plain Whisper large-v3.
@@ -35,7 +36,10 @@ University of Applied Sciences.
 | VoxPopuli Finnish (Meta) | European Parliament speech: train and test | CC0 |
 | Lauseopin arkiston murrekorpus (LA-murre), University of Turku and Kotus via Kielipankki | second dialect test: 583 segments from 10 localities outside SKN; one internal model was also trained on its other localities | CC BY-ND 4.0, so that model is not shared |
 
-The split is by municipality, so no test locality or speaker is heard in training. The target
+The split is by municipality, so no test locality or interviewee is heard in training (a few
+interviewers recorded both test and training municipalities, and their questions are kept). The
+test covers five of SKN's six main dialect groups; the Ostrobothnian and Peräpohjola
+municipalities are all in training. The target
 text is SKN's standard-Finnish transcript: the model hears dialect and writes standard Finnish.
 
 ## How it was trained
@@ -73,8 +77,9 @@ WER after lower-casing and removing punctuation. LA-murre's reference is written
 WER there ranks spelling; instead Claude Opus 5.5 read the reference and all four transcripts
 of each of the 583 segments, unlabelled and shuffled, and counted meaning errors (critical 10,
 major 5, minor 1 points per 100 reference words). The webinar clip is the 180 s
-[Ajokortti recording](../transcription_eval/README.md), decoded in chunks; on it the judges
-find more name and term errors for every dialect model than for plain Whisper.
+[Ajokortti recording](../transcription_eval/README.md), decoded in chunks; on it the judges give every dialect model more meaning-error points than
+plain Whisper, and the published model gets fewer of the clip's 14 names right (11 and 10
+against 14 and 14).
 
 More dialect speech is what helps most (the internal model), so a larger openly licensed
 dialect corpus would be the next step.
