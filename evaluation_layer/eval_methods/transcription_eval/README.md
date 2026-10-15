@@ -100,6 +100,10 @@ list, so estimated at its successor 3.6 Flash's rate. Other prices are list pric
 OpenAI $0.006/min, ElevenLabs $0.22/h, Chirp 3 $0.016/min (first 500 000 min a month). The open
 models need a GPU (about 5 GPU-minutes per audio hour on one AMD MI250X on LUMI).
 
+Every model, one row each, on the three public test sets ([full table](https://github.com/GAIK-project/finnish-asr#public-test-sets-skn-and-la-murre-dialects-fleurs-and-voxpopuli)):
+
+![Word error rate of every model on SKN dialects, FLEURS and VoxPopuli](images/all-sets.svg)
+
 **What it shows**
 
 - **Dialects:** our fine-tune halves Whisper's errors (40 → 21 %); every API service is at 35–63 %.
