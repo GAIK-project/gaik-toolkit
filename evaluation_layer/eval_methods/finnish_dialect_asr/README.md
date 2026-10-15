@@ -15,6 +15,18 @@ dialect speech. Everything (code, results, figures) is in
 
 ## Results
 
+| Model | Dialects (SKN) WER % | Dialects (LA-murre): meaning points | Read (FLEURS) WER % | Parliament (VoxPopuli) WER % |
+|---|--:|--:|--:|--:|
+| **Ours** | **21.1** | **14.2** | 7.6 | 10.8 |
+| Whisper large-v3 | 40.4 | 25.0 | 7.4 | 12.7 |
+| Gemini 3.5 Flash | 34.7 ¹ | 27.2 ¹ | 5.1 | 11.5 |
+| OpenAI gpt-4o-transcribe | 62.5 | 34.2 | 4.0 | 11.4 |
+| ElevenLabs Scribe v2 | 44.9 | – | **3.3** | **9.1** |
+| Google Chirp 3 | 41.3 | – | 4.8 | 11.6 |
+
+Lower is better. Meaning points: errors per 100 words found by a blind LLM judge (Claude Opus 5.5,
+583 segments). ¹ asked for standard Finnish.
+
 ![Word error rate of Whisper large-v3, our model, gpt-4o-transcribe and Gemini 3.5 Flash on SKN dialects, FLEURS and VoxPopuli](images/across-sets.svg)
 
 A second dialect corpus (LA-murre, 10 localities no model was trained on) has dialect-spelled
