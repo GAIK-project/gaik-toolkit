@@ -15,15 +15,11 @@ calls an LLM.
   These are raw transcripts, not the enhanced results below. After a listener reviewed
   the reference's 42 disputed spans, the WhisperX numbers become **15.7%** and **14.0%**
   ([Reviewed reference](#reviewed-reference)).
-- **October 2026 model comparison, same clip:** 20 speech-to-text set-ups, 12 of them
-  open models run locally on a GPU, scored with WER and with two blind LLM judges
-  (see [below](#october-2026-current-models-and-an-llm-judge)). Gemini 3.5 Flash has
-  the fewest meaning errors; plain Whisper large-v3 is the best open model; the
-  Finnish-NLP fine-tune keeps the lowest WER but garbles more names. On the public
-  FLEURS and VoxPopuli sets the Finnish fine-tunes lead, and our own fine-tuning pilot
-  improved them but not the webinar clip. On dialect speech (SKN, 10 held-out
-  municipalities) every ready-made model has 40–67 % WER; our Whisper large-v3 fine-tune
-  with open dialect data reaches 22 %, and a second dialect corpus confirms the gain ([Dialects](#october-2026-current-models-and-an-llm-judge)).
+- **October 2026, five test sets (9.9 h):** our Whisper large-v3 dialect fine-tune halves the errors on
+  dialect speech (40 → 21 % WER; every API service 35–63 %). On read and parliament speech the API
+  services lead (ElevenLabs Scribe v2: 3.3 % and 9.1 %). On ten dental webinars, two blind LLM judges
+  find the fewest meaning errors in Gemini 3.5 Flash and ElevenLabs; WER there favours Whisper because
+  the reference leaves fillers out ([below](#october-2026-current-models-and-an-llm-judge)).
 - **Interpretation:** WER measures textual differences, including spoken/written
   style and compound spelling. Check names, numbers and missing content directly
   before drawing a conclusion about usefulness.
@@ -64,6 +60,69 @@ rest is unverified. Different datasets, references, settings and enhancement sta
 comparison with the historical table.
 
 ## October 2026: current models and an LLM judge
+
+Current speech-to-text models on five Finnish test sets, **9.9 hours of audio in all**, scored
+with word error rate (WER) and, where WER misleads, with blind LLM judges that count only
+meaning errors. The code, transcripts (where licences allow), scores and judge summaries are in
+[GAIK-project/finnish-asr](https://github.com/GAIK-project/finnish-asr).
+
+**Data used**
+
+| Test set | Speech | Size | Reference |
+|---|---|--:|---|
+| SKN dialect test (Kotus, CC BY 4.0) | dialect interviews, 10 municipalities never used in training | 600 segments, 2.5 h | a person's standard-Finnish transcript |
+| LA-murre test (Univ. of Turku / Kotus, CC BY-ND 4.0) | dialect interviews, 10 other localities | 583 segments, 2.3 h | a person's dialect transcript, so judged on meaning |
+| FLEURS Finnish test (Google, CC BY 4.0) | Wikipedia sentences read aloud | 918 sentences, 3.3 h | the read text |
+| VoxPopuli Finnish test (Meta, CC0) | European Parliament speeches | 478 segments, 1.3 h | the parliament's text |
+| Dental webinars (QAdental, HY's QAD-1 set A) | standard spoken Finnish, many brand names and terms | 10 × 180 s clips, 0.5 h | HY's transcript, not listener-checked (below) |
+
+![Word error rate of Whisper large-v3, our dialect model, gpt-4o-transcribe and Gemini 3.5 Flash on SKN dialects, FLEURS and VoxPopuli](images/across-sets.svg)
+
+| Model | Type | Dialects (SKN) WER % | Dialects (LA-murre): meaning points | Read (FLEURS) WER % | Parliament (VoxPopuli) WER % | Dental webinars: meaning points | Dental webinars WER % | List price per audio hour |
+|---|---|--:|--:|--:|--:|--:|--:|--:|
+| Our dialect model ([finnish_dialect_asr](../finnish_dialect_asr/README.md)) | open | **21.1** | **14.2** | 7.6 | 10.8 | 7.5 | 25.9 | own GPU |
+| Whisper large-v3 | open | 40.4 | 25.0 | 7.4 | 12.7 | 5.0 | **15.7** | own GPU |
+| OpenAI gpt-4o-transcribe (via Azure) | API | 62.5 | 34.2 | 4.0 | 11.4 | 7.2 | 19.1 | $0.36 |
+| Gemini 3.5 Flash | API | 34.7 ¹ | 27.2 ¹ | 5.1 | 11.5 | **1.7** | 28.6 | ≈ $0.15 ² |
+| ElevenLabs Scribe v2 | API | 44.9 | – | **3.3** | **9.1** | 2.2 | 25.4 | $0.22 |
+| Google Chirp 3 | API | 41.3 | – | 4.8 | 11.6 | 3.0 | 25.9 | $0.96 |
+| Finnish-NLP whisper-large-finnish-v3 † | open | 56.6 | – | 7.1 † | 6.6 † | – | 25.8 | own GPU |
+| RASMUS Finnish-ASR-Canary-v2 + KenLM † | open | 47.6 | – | 7.6 † | 7.7 † | – | 28.6 | own GPU |
+
+WER after lower-casing and removing punctuation. **Meaning points**: errors per 100 reference
+words found by blind LLM judges, who ignore fillers, spoken forms and punctuation (critical 10, major
+5, minor 1): on LA-murre Claude Opus 5.5 on all 583 segments, with the six transcripts of a segment
+judged together (its reference is in dialect, so WER would rank spelling); on the dental webinars the
+mean of Claude Opus 5.5 and Gemini 3.1 Pro. † trained on FLEURS and
+VoxPopuli, so those two numbers are on familiar material. ¹ asked for standard Finnish word forms
+(40.8 % when asked to write as spoken). ² token-priced; 3.5 Flash is no longer on Google's price
+list, so estimated at its successor 3.6 Flash's rate. Other prices are list prices on 15 Oct 2026:
+OpenAI $0.006/min, ElevenLabs $0.22/h, Chirp 3 $0.016/min (first 500 000 min a month). The open
+models need a GPU (about 5 GPU-minutes per audio hour on one AMD MI250X on LUMI).
+
+**What it shows**
+
+- **Dialects:** our fine-tune halves Whisper's errors (40 → 21 %); every API service is at 35–63 %.
+  gpt-4o-transcribe condenses dialect speech and leaves out 46 % of the reference's words. On the
+  second dialect corpus the judge gives our model 14.2 meaning points, plain Whisper 25.0, Gemini 3.5
+  Flash 27.2 and gpt-4o-transcribe 34.2.
+- **Read and parliament speech:** the API services lead; ElevenLabs is best on both. Our model
+  stays at about Whisper's level (FLEURS 7.6 against 7.4 %, VoxPopuli 10.8 against 12.7 %).
+- **Dental webinars:** Gemini 3.5 Flash and ElevenLabs make the fewest meaning errors; plain
+  Whisper has the lowest WER only because the reference leaves fillers out, as Whisper does.
+
+![Ten dental-webinar clips: meaning-error points and word error rate side by side](images/dental-webinars.svg)
+
+**The dental references.** HY's transcripts omit fillers ("niinku", "tota", "no niin") and were
+not checked against the audio by a listener; a spot check found a wrong word form and a word
+missing at a clip's start. Models that write what is said get 11–14 % of inserted words from that
+alone. A listening page that lists the 383 places where most of eleven systems disagree with the
+reference is ready for a full review (kept private, since HY's texts are not public); until then,
+read the dental WER as agreement with HY's style and the judges as the measure.
+
+<details>
+<summary><b>The Ajokortti clip: 20 set-ups, judges and a reviewed reference</b></summary>
+
 
 Raw transcripts of the 180 s Ajokortti clip ([`data/Ajokortti.mp3`](data/Ajokortti.mp3))
 against [`data/reference.txt`](data/reference.txt), Finnish set as the language, no
@@ -140,27 +199,6 @@ points: HY's text favoured WhisperX output. The best set-ups now sit within abou
 one 408-word clip cannot separate. Only the disputed spans were checked; the judges' scores above
 were not re-run.
 
-**Public test sets.** The open models also ran on the two Finnish test sets that model
-cards report: FLEURS (918 sentences read aloud) and VoxPopuli (478 European Parliament
-segments). Same normalisation as model cards: lower-case, punctuation removed.
-
-| Model | FLEURS WER % | VoxPopuli WER % |
-|---|--:|--:|
-| Finnish-NLP whisper-large-finnish-v3 † | 7.1 | 6.6 |
-| Whisper large-v3 + LoRA on FLEURS and VoxPopuli (our pilot) †‡ | 7.1 | 10.8 |
-| Whisper large-v3 | 7.4 | 12.7 |
-| RASMUS Finnish-ASR-Canary-v2 + KenLM †‡ | 7.6 | 7.7 |
-| Whisper large-v3 turbo | 8.4 | 13.5 |
-| RASMUS Finnish-ASR-Canary-v2, greedy †‡ | 8.4 | 6.8 |
-| NVIDIA Canary 1B v2 | 8.7 | 11.4 |
-| Orukeet | 11.6 | 15.9 |
-| NVIDIA Parakeet TDT 0.6B v3 | 13.0 | 17.5 |
-| Finnish-NLP wav2vec2 XLS-R 1B (no LM) | 16.2 | 9.4 |
-| Qwen3-ASR 1.7B | 25.1 | 27.5 |
-
-† trained on FLEURS, ‡ on VoxPopuli training data, so those numbers are on familiar
-material. The RASMUS model card's FLEURS numbers (8.39 % and 7.75 %) reproduce here.
-
 **Fine-tuning on open data does not fix webinar speech.** A LoRA fine-tune of Whisper
 large-v3 on the FLEURS and VoxPopuli training sets (10 208 recordings, 51 minutes on one
 GPU) improved both public sets but raised WER on the Ajokortti clip from 14.7 % to 17.9 %;
@@ -168,66 +206,9 @@ the two judges disagree on its meaning errors (Claude 2.7 → 2.2 points, Gemini
 The Finnish fine-tunes above follow the same pattern. Public benchmark numbers therefore
 say little about spontaneous speech; measure a candidate on your own audio.
 
-**Dialects.** Training and results of the dialect model have their own page:
-[`finnish_dialect_asr/`](../finnish_dialect_asr/README.md). In short: the clip does not test them, so they were measured on Suomen kielen
-näytteitä (SKN; Kotus / Kielipankki, CC BY 4.0): dialect interviews from 50
-municipalities with a normalised standard-Finnish transcript. The test is 600 segments
-(2.5 h) from 10 municipalities in five of SKN's six main dialect groups; the reference is the
-normalised text, so a model must hear dialect and write standard Finnish.
+</details>
 
-| Model | SKN dialects WER % | FLEURS WER % | VoxPopuli WER % |
-|---|--:|--:|--:|
-| Whisper large-v3 + LoRA on SKN, FLEURS and VoxPopuli (ours) †‡§ | **22.2** | 7.8 | 10.6 |
-| Whisper large-v3 | 40.4 | 7.4 | 12.7 |
-| Whisper large-v3 turbo | 42.5 | 8.4 | 13.5 |
-| NVIDIA Canary 1B v2 | 45.6 | 8.7 | 11.4 |
-| RASMUS Finnish-ASR-Canary-v2 + KenLM †‡ | 47.6 | 7.6 | 7.7 |
-| RASMUS Finnish-ASR-Canary-v2, greedy †‡ | 50.1 | 8.4 | 6.8 |
-| Finnish-NLP whisper-large-finnish-v3 † | 56.6 | 7.1 | 6.6 |
-| Qwen3-ASR 1.7B | 66.7 | 25.1 | 27.5 |
-
-† trained on FLEURS, ‡ on VoxPopuli, § on SKN from 38 other municipalities (62 h,
-2 h 2 min on one GPU); no test
-municipality is heard in training. Every ready-made model struggles with dialects, and
-the Finnish fine-tunes trained on read speech do worst. Dialect training data nearly
-halves the error rate, in all 10 test municipalities, while FLEURS and VoxPopuli stay
-about level. On the webinar clip it spells rare names and dental terms worse than base
-Whisper (its first, higher WER came from Whisper's long-form decoding loop; decoded in
-15-25 s chunks it is 14.9 % against 15.7 %). The test shares SKN's transcription conventions with the training data, which
-favours the fine-tune, so the model was also run on a second corpus it never saw: 583
-segments from 10 other localities in the Finnish Dialect Syntax Archive (LA-murre,
-University of Turku / Kotus, Kielipankki, CC BY-ND 4.0). Its reference is written in
-dialect, so WER charges standard-Finnish output (52–73 % for every model) and a blind
-judge (Claude Opus 5.5) counted meaning errors instead:
-
-| Model | Meaning-error points / 100 words | Segments with no error |
-|---|--:|--:|
-| Whisper large-v3 + LoRA incl. SKN dialects (ours) | **13.9** | 108 of 564 |
-| Finnish-NLP whisper-large-finnish-v3 | 21.6 | 49 |
-| Whisper large-v3 | 22.7 | 55 |
-
-The fine-tune is ahead in all 10 localities: about 40 % fewer meaning-error points than
-base Whisper in this judging (47 % when judged again in the second round below), about the
-size of the WER gain on SKN. One judge, itself a model; compare scores only within a round.
-
-A second round kept the method and changed the data. An LLM (Claude Opus 5.5, text only,
-with a word-for-word check) put punctuation and capitals back into SKN's training text, so the
-model writes sentences again (round 1 wrote none); training stops at the epoch with the lowest
-validation loss, because four epochs overfit. Judged together on the same 583 LA-murre segments:
-
-| Model | SKN dialect WER % | LA-murre meaning points / 100 words |
-|---|--:|--:|
-| Whisper large-v3 | 40.4 | 25.9 |
-| Ours, round 1 | 22.2 | 13.8 |
-| Ours, round 2 with punctuation | 21.1 | 13.6 |
-| Ours, round 2 + 56 h of LA-murre, internal only | **19.7** | **11.4** |
-
-More dialect speech helps on both tests; LA-murre's licence (CC BY-ND) keeps that model
-internal. Round 2 with punctuation is published as
-[GAIK-project/whisper-large-v3-fi-dialects](https://huggingface.co/GAIK-project/whisper-large-v3-fi-dialects)
-(dataset [GAIK-project/skn-finnish-dialects-asr](https://huggingface.co/datasets/GAIK-project/skn-finnish-dialects-asr);
-details in [finnish_dialect_asr](../finnish_dialect_asr/README.md)). Base Whisper large-v3 stays the
-better choice for standard-Finnish audio full of brand names.
+**Dialects.** How the dialect model was trained, the second dialect corpus judged by four LLM judges, and its limits: [`finnish_dialect_asr/`](../finnish_dialect_asr/README.md).
 
 **Acknowledgement.** The open models and the fine-tunes ran on LUMI. We acknowledge CSC – IT Center
 for Science, Finland for awarding this project access to the LUMI supercomputer, owned by the

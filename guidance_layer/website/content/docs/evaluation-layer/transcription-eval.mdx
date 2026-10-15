@@ -17,9 +17,18 @@ calls an LLM.
   2025 WhisperX output gets **10.4%**, with its model settings unrecorded.
   These are raw transcripts, not the enhanced results below. After a listener reviewed
   the reference's 42 disputed spans, the WhisperX numbers become **15.7%** and **14.0%**.
+- **October 2026, five test sets (9.9 h of audio):** the GAIK dialect fine-tune of Whisper
+  large-v3 halves the errors on dialect speech (40 → 21 % WER; every API service 35–63 %). On read and
+  parliament speech the API services lead (ElevenLabs Scribe v2: 3.3 % and 9.1 %). On ten dental
+  webinars, blind LLM judges find the fewest meaning errors in Gemini 3.5 Flash and ElevenLabs.
+  Details, prices and the data used: the
+  [transcription_eval README](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/transcription_eval#october-2026-current-models-and-an-llm-judge)
+  and [GAIK-project/finnish-asr](https://github.com/GAIK-project/finnish-asr).
 - **Interpretation:** WER measures textual differences, including spoken/written
   style and compound spelling. Check names, numbers and missing content directly
   before drawing a conclusion about usefulness.
+
+![Word error rate of Whisper large-v3, the GAIK dialect model, gpt-4o-transcribe and Gemini 3.5 Flash on SKN dialects, FLEURS and VoxPopuli](/images/transcription-across-sets.svg)
 
 ![Historical raw and enhanced WER for 13 models, lower is better](/images/transcription-historical-wer.svg)
 
@@ -54,7 +63,7 @@ The QAD-1 rerun's transcripts and scoring code are public in
 [GAIK-project/finnish-asr](https://github.com/GAIK-project/finnish-asr). Its Finnish reference
 was reviewed at its 42 disputed spans on 14 Oct 2026; the rest is unverified. The
 [transcription_eval README](https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/transcription_eval)
-has the October 2026 comparison of 20 set-ups and the scores against the reviewed reference.
+has the October 2026 comparison on five test sets, the clip's 20 set-ups and the scores against the reviewed reference.
 Different datasets, references, settings and enhancement stages prevent direct comparison with
 the historical table.
 
