@@ -282,6 +282,22 @@ QUOTED_CALLS = [
         ("lower_is_better",),
     ),
     ("gaik.software_components.RAG.relevance_gate", "RelevanceGate.is_answerable", ("key",)),
+    # generate-structured-reports (its helper script, scripts/run_report.py)
+    ("gaik.software_modules.report_writer", "ReportSpec.load", ()),
+    ("gaik.software_modules.report_writer", "ReportWriter", ("config",)),
+    ("gaik.software_modules.report_writer", "ReportWriter.normalize", ("progress_callback",)),
+    ("gaik.software_modules.report_writer", "ReportWriter.curate", ("progress_callback",)),
+    ("gaik.software_modules.report_writer", "ReportWriter.synthesize", ("progress_callback",)),
+    ("gaik.software_modules.report_writer", "ReportWriter.rebuild", ()),
+    ("gaik.software_modules.report_writer", "KnowledgeBase.load", ()),
+    ("gaik.software_modules.report_writer", "KnowledgeBase.verify_quotes", ()),
+    ("gaik.software_modules.report_writer", "NormalizedSources.load", ()),
+    (
+        "gaik.software_components.source_normalizer",
+        "SourceNormalizer",
+        ("vision_model", "transcription_model", "language"),
+    ),
+    ("gaik.software_components.source_normalizer", "SourceNormalizer.to_markdown", ()),
 ]
 
 

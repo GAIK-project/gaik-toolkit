@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "gaik-toolkit",
-      "description": "Choosing a document parser that preserves table structure, designing extraction schemas that stay inside provider limits and produce checkable evidence, and building hybrid pgvector search that fails visibly. Use when parsing PDFs or DOCX, pulling fields and line items into a schema, adding semantic or hybrid search over documents, or when a parse, extraction, or search looked fine but the output is wrong, when a presentation, slide deck or speaker notes are needed from a brief, or when a recording or a set of documents should become an incident report, a construction site diary, a priced sales order or a structured Word report.",
+      "description": "Choosing a document parser that preserves table structure, designing extraction schemas that stay inside provider limits and produce checkable evidence, building hybrid pgvector search that fails visibly, and writing source-cited reports from mixed files. Use when parsing PDFs or DOCX, pulling fields and line items into a schema, adding semantic or hybrid search over documents, when a report must be written from source files with every statement traced to a source, or when a parse, extraction, or search looked fine but the output is wrong, when a presentation, slide deck or speaker notes are needed from a brief, or when a recording or a set of documents should become an incident report, a construction site diary, a priced sales order or a structured Word report.",
       "source": "./implementation_layer/no-code-assets/agent-skills",
       "category": "data",
       "homepage": "https://gaik-project.github.io/gaik-toolkit/"

@@ -1,16 +1,16 @@
-# Graph Report - gaik-toolkit  (2026-09-09)
+# Graph Report - gaik-toolkit  (2026-10-17)
 
 ## Corpus Check
-- 1328 files · ~2,662,164 words
+- 1696 files · ~3,235,452 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 27004 nodes · 35777 edges · 2401 communities (1983 shown, 418 thin omitted)
-- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 2474 edges (avg confidence: 0.62)
+- 32309 nodes · 46259 edges · 2615 communities (2144 shown, 471 thin omitted)
+- Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 3644 edges (avg confidence: 0.61)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `47ecbf8c`
+- Built from commit: `f7999192`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -1002,6 +1002,7 @@
 - [[_COMMUNITY_Community 994|Community 994]]
 - [[_COMMUNITY_Community 995|Community 995]]
 - [[_COMMUNITY_Community 997|Community 997]]
+- [[_COMMUNITY_Community 999|Community 999]]
 - [[_COMMUNITY_Community 1000|Community 1000]]
 - [[_COMMUNITY_Community 1007|Community 1007]]
 - [[_COMMUNITY_Community 1009|Community 1009]]
@@ -2305,18 +2306,230 @@
 - [[_COMMUNITY_Community 2398|Community 2398]]
 - [[_COMMUNITY_Community 2399|Community 2399]]
 - [[_COMMUNITY_Community 2400|Community 2400]]
+- [[_COMMUNITY_Community 2401|Community 2401]]
+- [[_COMMUNITY_Community 2402|Community 2402]]
+- [[_COMMUNITY_Community 2404|Community 2404]]
+- [[_COMMUNITY_Community 2405|Community 2405]]
+- [[_COMMUNITY_Community 2406|Community 2406]]
+- [[_COMMUNITY_Community 2407|Community 2407]]
+- [[_COMMUNITY_Community 2408|Community 2408]]
+- [[_COMMUNITY_Community 2409|Community 2409]]
+- [[_COMMUNITY_Community 2410|Community 2410]]
+- [[_COMMUNITY_Community 2411|Community 2411]]
+- [[_COMMUNITY_Community 2412|Community 2412]]
+- [[_COMMUNITY_Community 2413|Community 2413]]
+- [[_COMMUNITY_Community 2414|Community 2414]]
+- [[_COMMUNITY_Community 2415|Community 2415]]
+- [[_COMMUNITY_Community 2416|Community 2416]]
+- [[_COMMUNITY_Community 2417|Community 2417]]
+- [[_COMMUNITY_Community 2418|Community 2418]]
+- [[_COMMUNITY_Community 2419|Community 2419]]
+- [[_COMMUNITY_Community 2420|Community 2420]]
+- [[_COMMUNITY_Community 2421|Community 2421]]
+- [[_COMMUNITY_Community 2422|Community 2422]]
+- [[_COMMUNITY_Community 2423|Community 2423]]
+- [[_COMMUNITY_Community 2424|Community 2424]]
+- [[_COMMUNITY_Community 2425|Community 2425]]
+- [[_COMMUNITY_Community 2426|Community 2426]]
+- [[_COMMUNITY_Community 2427|Community 2427]]
+- [[_COMMUNITY_Community 2428|Community 2428]]
+- [[_COMMUNITY_Community 2429|Community 2429]]
+- [[_COMMUNITY_Community 2430|Community 2430]]
+- [[_COMMUNITY_Community 2431|Community 2431]]
+- [[_COMMUNITY_Community 2432|Community 2432]]
+- [[_COMMUNITY_Community 2433|Community 2433]]
+- [[_COMMUNITY_Community 2434|Community 2434]]
+- [[_COMMUNITY_Community 2435|Community 2435]]
+- [[_COMMUNITY_Community 2436|Community 2436]]
+- [[_COMMUNITY_Community 2437|Community 2437]]
+- [[_COMMUNITY_Community 2438|Community 2438]]
+- [[_COMMUNITY_Community 2439|Community 2439]]
+- [[_COMMUNITY_Community 2440|Community 2440]]
+- [[_COMMUNITY_Community 2441|Community 2441]]
+- [[_COMMUNITY_Community 2442|Community 2442]]
+- [[_COMMUNITY_Community 2443|Community 2443]]
+- [[_COMMUNITY_Community 2444|Community 2444]]
+- [[_COMMUNITY_Community 2445|Community 2445]]
+- [[_COMMUNITY_Community 2446|Community 2446]]
+- [[_COMMUNITY_Community 2447|Community 2447]]
+- [[_COMMUNITY_Community 2448|Community 2448]]
+- [[_COMMUNITY_Community 2449|Community 2449]]
+- [[_COMMUNITY_Community 2450|Community 2450]]
+- [[_COMMUNITY_Community 2451|Community 2451]]
+- [[_COMMUNITY_Community 2452|Community 2452]]
+- [[_COMMUNITY_Community 2453|Community 2453]]
+- [[_COMMUNITY_Community 2454|Community 2454]]
+- [[_COMMUNITY_Community 2455|Community 2455]]
+- [[_COMMUNITY_Community 2456|Community 2456]]
+- [[_COMMUNITY_Community 2457|Community 2457]]
+- [[_COMMUNITY_Community 2458|Community 2458]]
+- [[_COMMUNITY_Community 2459|Community 2459]]
+- [[_COMMUNITY_Community 2460|Community 2460]]
+- [[_COMMUNITY_Community 2461|Community 2461]]
+- [[_COMMUNITY_Community 2462|Community 2462]]
+- [[_COMMUNITY_Community 2463|Community 2463]]
+- [[_COMMUNITY_Community 2464|Community 2464]]
+- [[_COMMUNITY_Community 2465|Community 2465]]
+- [[_COMMUNITY_Community 2466|Community 2466]]
+- [[_COMMUNITY_Community 2467|Community 2467]]
+- [[_COMMUNITY_Community 2468|Community 2468]]
+- [[_COMMUNITY_Community 2469|Community 2469]]
+- [[_COMMUNITY_Community 2470|Community 2470]]
+- [[_COMMUNITY_Community 2471|Community 2471]]
+- [[_COMMUNITY_Community 2472|Community 2472]]
+- [[_COMMUNITY_Community 2473|Community 2473]]
+- [[_COMMUNITY_Community 2474|Community 2474]]
+- [[_COMMUNITY_Community 2475|Community 2475]]
+- [[_COMMUNITY_Community 2476|Community 2476]]
+- [[_COMMUNITY_Community 2477|Community 2477]]
+- [[_COMMUNITY_Community 2478|Community 2478]]
+- [[_COMMUNITY_Community 2479|Community 2479]]
+- [[_COMMUNITY_Community 2480|Community 2480]]
+- [[_COMMUNITY_Community 2481|Community 2481]]
+- [[_COMMUNITY_Community 2482|Community 2482]]
+- [[_COMMUNITY_Community 2483|Community 2483]]
+- [[_COMMUNITY_Community 2484|Community 2484]]
+- [[_COMMUNITY_Community 2485|Community 2485]]
+- [[_COMMUNITY_Community 2486|Community 2486]]
+- [[_COMMUNITY_Community 2487|Community 2487]]
+- [[_COMMUNITY_Community 2488|Community 2488]]
+- [[_COMMUNITY_Community 2489|Community 2489]]
+- [[_COMMUNITY_Community 2490|Community 2490]]
+- [[_COMMUNITY_Community 2491|Community 2491]]
+- [[_COMMUNITY_Community 2492|Community 2492]]
+- [[_COMMUNITY_Community 2493|Community 2493]]
+- [[_COMMUNITY_Community 2494|Community 2494]]
+- [[_COMMUNITY_Community 2495|Community 2495]]
+- [[_COMMUNITY_Community 2496|Community 2496]]
+- [[_COMMUNITY_Community 2497|Community 2497]]
+- [[_COMMUNITY_Community 2498|Community 2498]]
+- [[_COMMUNITY_Community 2499|Community 2499]]
+- [[_COMMUNITY_Community 2500|Community 2500]]
+- [[_COMMUNITY_Community 2501|Community 2501]]
+- [[_COMMUNITY_Community 2502|Community 2502]]
+- [[_COMMUNITY_Community 2503|Community 2503]]
+- [[_COMMUNITY_Community 2504|Community 2504]]
+- [[_COMMUNITY_Community 2505|Community 2505]]
+- [[_COMMUNITY_Community 2506|Community 2506]]
+- [[_COMMUNITY_Community 2507|Community 2507]]
+- [[_COMMUNITY_Community 2508|Community 2508]]
+- [[_COMMUNITY_Community 2509|Community 2509]]
+- [[_COMMUNITY_Community 2510|Community 2510]]
+- [[_COMMUNITY_Community 2511|Community 2511]]
+- [[_COMMUNITY_Community 2512|Community 2512]]
+- [[_COMMUNITY_Community 2513|Community 2513]]
+- [[_COMMUNITY_Community 2514|Community 2514]]
+- [[_COMMUNITY_Community 2515|Community 2515]]
+- [[_COMMUNITY_Community 2516|Community 2516]]
+- [[_COMMUNITY_Community 2517|Community 2517]]
+- [[_COMMUNITY_Community 2518|Community 2518]]
+- [[_COMMUNITY_Community 2519|Community 2519]]
+- [[_COMMUNITY_Community 2520|Community 2520]]
+- [[_COMMUNITY_Community 2521|Community 2521]]
+- [[_COMMUNITY_Community 2522|Community 2522]]
+- [[_COMMUNITY_Community 2523|Community 2523]]
+- [[_COMMUNITY_Community 2524|Community 2524]]
+- [[_COMMUNITY_Community 2525|Community 2525]]
+- [[_COMMUNITY_Community 2526|Community 2526]]
+- [[_COMMUNITY_Community 2527|Community 2527]]
+- [[_COMMUNITY_Community 2528|Community 2528]]
+- [[_COMMUNITY_Community 2529|Community 2529]]
+- [[_COMMUNITY_Community 2530|Community 2530]]
+- [[_COMMUNITY_Community 2531|Community 2531]]
+- [[_COMMUNITY_Community 2532|Community 2532]]
+- [[_COMMUNITY_Community 2533|Community 2533]]
+- [[_COMMUNITY_Community 2534|Community 2534]]
+- [[_COMMUNITY_Community 2535|Community 2535]]
+- [[_COMMUNITY_Community 2537|Community 2537]]
+- [[_COMMUNITY_Community 2538|Community 2538]]
+- [[_COMMUNITY_Community 2539|Community 2539]]
+- [[_COMMUNITY_Community 2542|Community 2542]]
+- [[_COMMUNITY_Community 2543|Community 2543]]
+- [[_COMMUNITY_Community 2545|Community 2545]]
+- [[_COMMUNITY_Community 2546|Community 2546]]
+- [[_COMMUNITY_Community 2547|Community 2547]]
+- [[_COMMUNITY_Community 2548|Community 2548]]
+- [[_COMMUNITY_Community 2549|Community 2549]]
+- [[_COMMUNITY_Community 2550|Community 2550]]
+- [[_COMMUNITY_Community 2551|Community 2551]]
+- [[_COMMUNITY_Community 2552|Community 2552]]
+- [[_COMMUNITY_Community 2554|Community 2554]]
+- [[_COMMUNITY_Community 2555|Community 2555]]
+- [[_COMMUNITY_Community 2556|Community 2556]]
+- [[_COMMUNITY_Community 2557|Community 2557]]
+- [[_COMMUNITY_Community 2558|Community 2558]]
+- [[_COMMUNITY_Community 2559|Community 2559]]
+- [[_COMMUNITY_Community 2560|Community 2560]]
+- [[_COMMUNITY_Community 2561|Community 2561]]
+- [[_COMMUNITY_Community 2562|Community 2562]]
+- [[_COMMUNITY_Community 2564|Community 2564]]
+- [[_COMMUNITY_Community 2566|Community 2566]]
+- [[_COMMUNITY_Community 2567|Community 2567]]
+- [[_COMMUNITY_Community 2568|Community 2568]]
+- [[_COMMUNITY_Community 2569|Community 2569]]
+- [[_COMMUNITY_Community 2571|Community 2571]]
+- [[_COMMUNITY_Community 2572|Community 2572]]
+- [[_COMMUNITY_Community 2573|Community 2573]]
+- [[_COMMUNITY_Community 2575|Community 2575]]
+- [[_COMMUNITY_Community 2576|Community 2576]]
+- [[_COMMUNITY_Community 2577|Community 2577]]
+- [[_COMMUNITY_Community 2578|Community 2578]]
+- [[_COMMUNITY_Community 2579|Community 2579]]
+- [[_COMMUNITY_Community 2580|Community 2580]]
+- [[_COMMUNITY_Community 2581|Community 2581]]
+- [[_COMMUNITY_Community 2582|Community 2582]]
+- [[_COMMUNITY_Community 2584|Community 2584]]
+- [[_COMMUNITY_Community 2585|Community 2585]]
+- [[_COMMUNITY_Community 2586|Community 2586]]
+- [[_COMMUNITY_Community 2587|Community 2587]]
+- [[_COMMUNITY_Community 2588|Community 2588]]
+- [[_COMMUNITY_Community 2589|Community 2589]]
+- [[_COMMUNITY_Community 2590|Community 2590]]
+- [[_COMMUNITY_Community 2591|Community 2591]]
+- [[_COMMUNITY_Community 2592|Community 2592]]
+- [[_COMMUNITY_Community 2593|Community 2593]]
+- [[_COMMUNITY_Community 2594|Community 2594]]
+- [[_COMMUNITY_Community 2595|Community 2595]]
+- [[_COMMUNITY_Community 2596|Community 2596]]
+- [[_COMMUNITY_Community 2597|Community 2597]]
+- [[_COMMUNITY_Community 2598|Community 2598]]
+- [[_COMMUNITY_Community 2599|Community 2599]]
+- [[_COMMUNITY_Community 2600|Community 2600]]
+- [[_COMMUNITY_Community 2601|Community 2601]]
+- [[_COMMUNITY_Community 2602|Community 2602]]
+- [[_COMMUNITY_Community 2603|Community 2603]]
+- [[_COMMUNITY_Community 2604|Community 2604]]
+- [[_COMMUNITY_Community 2605|Community 2605]]
+- [[_COMMUNITY_Community 2606|Community 2606]]
+- [[_COMMUNITY_Community 2607|Community 2607]]
+- [[_COMMUNITY_Community 2608|Community 2608]]
+- [[_COMMUNITY_Community 2609|Community 2609]]
+- [[_COMMUNITY_Community 2610|Community 2610]]
+- [[_COMMUNITY_Community 2611|Community 2611]]
+- [[_COMMUNITY_Community 2612|Community 2612]]
+- [[_COMMUNITY_Community 2613|Community 2613]]
+- [[_COMMUNITY_Community 2614|Community 2614]]
+- [[_COMMUNITY_Community 2615|Community 2615]]
+- [[_COMMUNITY_Community 2616|Community 2616]]
+- [[_COMMUNITY_Community 2617|Community 2617]]
+- [[_COMMUNITY_Community 2619|Community 2619]]
+- [[_COMMUNITY_Community 2620|Community 2620]]
+- [[_COMMUNITY_Community 2621|Community 2621]]
+- [[_COMMUNITY_Community 2625|Community 2625]]
+- [[_COMMUNITY_Community 2630|Community 2630]]
+- [[_COMMUNITY_Community 2632|Community 2632]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `cn()` - 292 edges
-2. `DataExtractor` - 131 edges
-3. `ProviderClient` - 111 edges
-4. `create_extraction_model()` - 91 edges
-5. `LLMJudge` - 91 edges
-6. `Transcriber` - 89 edges
-7. `ExtractionRequirements` - 82 edges
-8. `Blueprint` - 64 edges
-9. `VisionExtractor` - 61 edges
-10. `Embedder` - 58 edges
+1. `cn()` - 387 edges
+2. `DataExtractor` - 148 edges
+3. `ProviderClient` - 135 edges
+4. `Transcriber` - 102 edges
+5. `create_extraction_model()` - 95 edges
+6. `LLMJudge` - 93 edges
+7. `Button` - 86 edges
+8. `ExtractionRequirements` - 84 edges
+9. `UsageCounter` - 82 edges
+10. `Embedder` - 68 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Settings` --uses--> `Settings`  [INFERRED]
@@ -2425,27 +2638,27 @@
 - **ABB PO 4512560923 with three CU Short Circuit Bar BOMs for AXR 500MR6** —  [EXTRACTED 1.00]
 - **Aurora Digital Solutions - TechCorp service contract, invoice, and annual report cluster** —  [EXTRACTED 1.00]
 
-## Communities (2401 total, 418 thin omitted)
+## Communities (2615 total, 471 thin omitted)
 
 ### Community 0 - "Community 0"
-Cohesion: 0.03
-Nodes (163): AudioStructuredResult, ClassifyResult, DEFAULT_CLASSES, OptionsForm(), OptionsFormProps, ReportOptions, effectiveId(), SectionEditor() (+155 more)
+Cohesion: 0.02
+Nodes (225): AudioResult, AudioStructuredResult, GUIDE_NOTES, GUIDE_STEPS, OptionsForm(), OptionsFormProps, ReportOptions, Row() (+217 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.02
-Nodes (135): LogLine(), parseSectionName(), ProgressStream(), ProgressStreamProps, StarLayer(), StarLayerProps, StarsBackground(), StarsBackgroundProps (+127 more)
+Cohesion: 0.01
+Nodes (251): Message(), MessageActionProps, MessageActions(), MessageActionsProps, MessageBranch(), MessageBranchContent(), MessageBranchContentProps, MessageBranchContext (+243 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.03
-Nodes (71): AttachmentsContext, LocalAttachmentsContext, LocalReferencedSourcesContext, PromptInputActionAddAttachmentsProps, PromptInputActionMenuContent(), PromptInputActionMenuContentProps, PromptInputActionMenuItem(), PromptInputActionMenuItemProps (+63 more)
+Cohesion: 0.05
+Nodes (60): SectionInspector(), takeKnowledgeHandoff(), EXAMPLE_SECTIONS, GUIDE_NOTES, GUIDE_STEPS, KnowledgeSynthesisPage(), newRow(), Run (+52 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.08
-Nodes (49): AnswerResult, Any, bool, float, GeneratedSQL, int, Path, QueryResult (+41 more)
+Cohesion: 0.06
+Nodes (56): AnswerResult, Any, bool, float, GeneratedSQL, int, Path, QueryResult (+48 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.03
-Nodes (72): dependencies, ai, ansi-to-react, babel-plugin-react-compiler, class-variance-authority, clsx, cmdk, date-fns (+64 more)
+Nodes (73): dependencies, ai, ansi-to-react, babel-plugin-react-compiler, class-variance-authority, clsx, cmdk, date-fns (+65 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.04
@@ -2453,31 +2666,31 @@ Nodes (56): blueprint_path, kind, blueprint_path, kind, blueprint_path, kind, bl
 
 ### Community 6 - "Community 6"
 Cohesion: 0.03
-Nodes (126): Generates Pydantic schemas from natural language requirements.      Automatica, Generates Pydantic schemas from natural language requirements.      Automatica, Generates Pydantic schemas from natural language requirements.      Automatica, Generates Pydantic schemas from natural language requirements.      Automatica, Generates Pydantic schemas from natural language requirements.      Automatica, Generates Pydantic schemas from natural language requirements.      Automatica, Generates Pydantic schemas from natural language requirements.      Automatica, Generates Pydantic schemas from natural language requirements.      Automatica (+118 more)
+Nodes (168): description, DataExtractor, Extractor for structured data from documents using Pydantic schemas.      Take, Extractor for structured data from documents using Pydantic schemas.      Take, File, Form, ExtractionRequirements, int (+160 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.18
-Nodes (13): bool, int, Path, str, Transcribe an audio or video file and return transcript info., Transcribe via local Whisper and return (text, segments)., If input <= max_size_mb: single-pass transcription using the original file, Single-pass transcription of the original file (audio OR video). (+5 more)
+Cohesion: 0.06
+Nodes (36): BOM_FIELDS, BOM_OF_MATERIAL, DocumentKind, EXAMPLE_CASES, EXAMPLE_DOCUMENTS, ExampleCase, ExampleDocument, ExtractedField (+28 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.06
-Nodes (64): int, str, Any, BaseModel, bool, Path, str, str (+56 more)
+Cohesion: 0.05
+Nodes (72): int, str, Any, BaseModel, bool, Path, str, create_s3_client() (+64 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.08
-Nodes (42): ABC, BackendName, discover_auto_backend(), LemmatizationBackend, lemmatize(), Backend implementations for FinnishTextProcessor.  Each backend implements :cl, spaCy-based lemmatizer using ``fi_core_news_*`` models.      Requires the mode, spaCy-based lemmatizer using ``fi_core_news_*`` models.      Requires the mode (+34 more)
+Cohesion: 0.13
+Nodes (28): ABC, BackendName, LemmatizationBackend, spaCy-based lemmatizer using ``fi_core_news_*`` models.      Requires the mode, spaCy-based lemmatizer using ``fi_core_news_*`` models.      Requires the mode, spaCy-based lemmatizer using ``fi_core_news_*`` models.      Requires the mode, Voikko-based lemmatizer with compound splitting.      Requires ``libvoikko`` s, Voikko-based lemmatizer with compound splitting.      Requires ``libvoikko`` s (+20 more)
 
 ### Community 10 - "Community 10"
-Cohesion: 0.07
-Nodes (25): apply_field_policies(), ExtractionRequirements, FieldSpec, composite(), _make_requirements(), Unit tests for field policy logic — no LLM calls required., A real False in the extracted data must not be reinterpreted as         missing, The widening only applies when there is no usable default; a real         expli (+17 more)
+Cohesion: 0.05
+Nodes (43): apply_field_policies(), create_extraction_model(), Create a Pydantic model dynamically from field specifications (strict).     - F, Create a Pydantic model dynamically from field specifications (strict).     - F, Create a Pydantic model dynamically from field specifications (strict).     - F, Create a Pydantic model dynamically from field specifications (strict).     - F, Create a Pydantic model dynamically from field specifications (strict).     - F, Create a Pydantic model dynamically from field specifications (strict).     - F (+35 more)
 
 ### Community 11 - "Community 11"
-Cohesion: 0.09
-Nodes (47): EvidenceItem, Any, bool, GeneratedSection, int, ReportSectionSpec, Multi-source report generator: turn mixed source files (PDF, Word, Excel/CSV, t, EvidenceItem (+39 more)
+Cohesion: 0.04
+Nodes (100): EvidenceItem, Any, bool, GeneratedSection, int, Path, ReportSectionSpec, str (+92 more)
 
 ### Community 12 - "Community 12"
 Cohesion: 0.04
-Nodes (78): CompositeExtractionRequirements, CompositeExtractionRequirements, bool, ModelProvider, Path, ReasoningEffort, str, UsageRecord (+70 more)
+Nodes (77): Path, str, UsageRecord, RequirementsSpec, Single-pass vision extraction: PDF/image → structured data in one LLM call.  C, System and user prompts for the VisionExtractor — one per provider., _combine_with_verification(), _detect_mime_type() (+69 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.07
@@ -2496,107 +2709,107 @@ Cohesion: 0.05
 Nodes (42): fumadocs-core, fumadocs-mdx, fumadocs-ui, Root Layout (app/layout.tsx), Shared Layout Options, PWA Web Manifest, MDX Components, Mermaid MDX Component (+34 more)
 
 ### Community 17 - "Community 17"
-Cohesion: 0.08
-Nodes (57): Any, bool, Document, int, Path, str, UploadFile, Lock (+49 more)
+Cohesion: 0.05
+Nodes (66): Any, Document, int, Path, str, _build_demo_workflow(), clear_all_collections(), clear_collection() (+58 more)
 
 ### Community 18 - "Community 18"
 Cohesion: 0.07
 Nodes (34): getUserAccessStatus (cached query), getAccessStatus (data layer), verify_api_key Dependency, OpenShift Rahti 2 Deploy Script, generate_diary_pdf (ReportLab PDF), gaik AudioToStructuredData Pipeline, gaik DataExtractor (external component), gaik DocumentsToStructuredData Pipeline (+26 more)
 
 ### Community 19 - "Community 19"
-Cohesion: 0.09
-Nodes (28): basic_classification(), custom_parser_example(), directory_classification(), error_handling_example(), mixed_file_types_example(), Document Classifier Example  Demonstrates how to classify documents into predefi, Classify directory with mixed file types (PDF, DOCX, images)., Demonstrate error handling for various scenarios. (+20 more)
+Cohesion: 0.05
+Nodes (43): basic_classification(), custom_parser_example(), directory_classification(), error_handling_example(), mixed_file_types_example(), Document Classifier Example  Demonstrates how to classify documents into prede, Classify directory with mixed file types (PDF, DOCX, images)., Classify directory with mixed file types (PDF, DOCX, images). (+35 more)
 
 ### Community 20 - "Community 20"
 Cohesion: 0.09
 Nodes (23): bool, int, str, AcceleratorDevice, AcceleratorOptions, DoclingParser, Document, DocumentConverter (+15 more)
 
 ### Community 21 - "Community 21"
-Cohesion: 0.04
-Nodes (52): AccessPendingPage(), SuccessAnimation, adminLogout(), adminPasswordSchema, AdminResult, isAdminAuthenticated(), limitOverrideSchema, requireAdmin() (+44 more)
+Cohesion: 0.05
+Nodes (33): AccessPendingPage(), SuccessAnimation, AccessRequest, initialState, AuthResult, AccessPolling(), AuthBackdrop(), AuthBackdropProps (+25 more)
 
 ### Community 22 - "Community 22"
-Cohesion: 0.11
-Nodes (41): CalibrationItem, CalibrationReport, float, LLMJudge, str, ValidationRubric, bytes, float (+33 more)
+Cohesion: 0.10
+Nodes (44): CalibrationItem, CalibrationReport, float, LLMJudge, str, ValidationRubric, bytes, float (+36 more)
 
 ### Community 23 - "Community 23"
 Cohesion: 0.05
-Nodes (61): UploadFile, bool, download_pdf(), Pipeline router - End-to-end pipeline endpoints for demos., str, UploadFile, bytes, str (+53 more)
+Nodes (43): date, ExtractionResult, Data Extractor for extracting structured data from documents using generated Pyd, Structured return value from :meth:`DataExtractor.extract_with_usage`.      At, Structured return value from :meth:`DataExtractor.extract_with_usage`.      At, Knowledge Extraction Using Dynamic Schema Generation  Extract structured data, _detect_date_format(), _detect_global_date_format() (+35 more)
 
 ### Community 24 - "Community 24"
 Cohesion: 0.17
 Nodes (25): int, MultiSourceReportGenerator, _draft_index(), _FakeClient, _gen(), patch_llm(), Unit tests for the agentic (V2) path of the multi_source_report_generator.  Al, strict_review must NOT raise for informational 'no matching sample' warnings. (+17 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.07
-Nodes (26): 11. JSON Blueprint Schema, 12. Component Selection Guidance, 12. Example JSON Blueprint, 14. Component Selection Guidance, 16. Proof-of-Concept Structure, 18. Security, Privacy, and Governance, 19. Error Handling, 1. Purpose of the Wizard (+18 more)
+Cohesion: 0.06
+Nodes (32): 11. JSON Blueprint Schema, 12. Component Selection Guidance, 12. Example JSON Blueprint, 14. Component Selection Guidance, 16. Proof-of-Concept Structure, 17. Final Use-Case Package Structure, 18. Security, Privacy, and Governance, 19. Error Handling (+24 more)
 
 ### Community 26 - "Community 26"
 Cohesion: 0.08
 Nodes (47): _build_header_table(), _build_image_grid(), _build_info_table(), _build_main_table(), _build_signature_table(), _create_styles(), _decode_base64_image(), _format_multiline_list() (+39 more)
 
 ### Community 27 - "Community 27"
-Cohesion: 0.05
-Nodes (56): EvaluationDataset, EvaluationItem, from_csv(), from_jsonl(), from_list(), _item_from_dict(), Tiny dataset abstraction used by all evaluators.  Plain dataclass + JSONL/CSV, One row of an evaluation dataset.      The shape is intentionally generic so t (+48 more)
+Cohesion: 0.07
+Nodes (45): EvaluationDataset, EvaluationItem, from_csv(), from_jsonl(), from_list(), _item_from_dict(), Tiny dataset abstraction used by all evaluators.  Plain dataclass + JSONL/CSV, One row of an evaluation dataset.      The shape is intentionally generic so t (+37 more)
 
 ### Community 28 - "Community 28"
-Cohesion: 0.11
-Nodes (19): RAGWorkflow (pipeline module), bool, float, int, Path, str, RAG workflow software component., main() (+11 more)
+Cohesion: 0.05
+Nodes (76): ChildRequirements, CompositeExtractionRequirements, Initialize the DataExtractor.          Args:             config: OpenAI confi, Initialize the DataExtractor.          Args:             config: OpenAI confi, Run extraction on a single document.          Returns the normalized record di, Run extraction on a single document.          Returns the normalized record di, Extract structured data from documents using a pre-generated Pydantic model., Extract structured data from documents using a pre-generated Pydantic model. (+68 more)
 
 ### Community 29 - "Community 29"
-Cohesion: 0.14
-Nodes (16): int, Path, str, _cleanup_chunks(), _extract_segments(), Transcribe an audio or video file.          Args:             file_path: Path, Transcribe a single (small) file without chunking., Transcribe a single file with Whisper. (+8 more)
+Cohesion: 0.08
+Nodes (34): int, Path, str, TranscriptionConfig, Available transcription models., Final result of a parallel transcription run., TranscriptionModel, TranscriptionResult (+26 more)
 
 ### Community 30 - "Community 30"
-Cohesion: 0.20
-Nodes (16): float, str, dental_transcription_example(), Return a ready-made example video and subtitles for the demo page., _format_srt_time(), format_timestamp(), _format_vtt_time(), parse_srt() (+8 more)
+Cohesion: 0.08
+Nodes (37): float, int, str, bool, int, Path, str, Audio and Video Transcription  This module provides audio/video transcription (+29 more)
 
 ### Community 31 - "Community 31"
-Cohesion: 0.14
-Nodes (27): bool, float, int, object, str, PromptVariant, _accumulate(), accuracy() (+19 more)
+Cohesion: 0.13
+Nodes (28): bool, float, int, object, str, PromptVariant, _accumulate(), accuracy() (+20 more)
 
 ### Community 32 - "Community 32"
-Cohesion: 0.08
-Nodes (32): float, int, Provider, str, Any, int, str, float (+24 more)
+Cohesion: 0.06
+Nodes (41): float, int, Provider, str, Any, int, str, float (+33 more)
 
 ### Community 33 - "Community 33"
-Cohesion: 0.10
-Nodes (26): MagicMock, str, TranscriptEnhancer, _build_enhancer(), _FakeRawOpenAIClient, Unit tests for the new TranscriptEnhancer parameters.  Covers: - ``reasoning_, Stand-in for the openai.OpenAI client (NOT a ProviderClient)., With reasoning_effort=None, the kwarg must NOT be passed to the API     so prov (+18 more)
+Cohesion: 0.07
+Nodes (39): apply_domain_rules(), Inject domain-specific rules at the ``{DOMAIN_RULES}`` placeholder.      When, Inject domain-specific rules at the ``{DOMAIN_RULES}`` placeholder.      When, MagicMock, str, TranscriptEnhancer, _build_enhancer(), _FakeRawOpenAIClient (+31 more)
 
 ### Community 34 - "Community 34"
 Cohesion: 0.12
 Nodes (21): Any, bool, bytes, Document, int, OpenAIConfig, str, Vision-enhanced RAG parser combining Docling structure analysis with AI vision m (+13 more)
 
 ### Community 35 - "Community 35"
-Cohesion: 0.08
-Nodes (33): Exception, bool, Path, str, bool, TranscriptionConfig, from_env(), Configuration for parallel transcription.  All tuneable knobs live in :class:` (+25 more)
+Cohesion: 0.14
+Nodes (23): bool, float, str, check_ffmpeg_available(), Return True if both ``ffmpeg`` and ``ffprobe`` are on ``$PATH``., Parallel Audio/Video Transcription  Production-quality parallel transcription, check_ffmpeg(), Parallel transcription pipeline orchestrator.  Ported from QAdental's ``transc (+15 more)
 
 ### Community 36 - "Community 36"
 Cohesion: 0.09
 Nodes (32): GAIK Demo API Main (FastAPI), Classifier Router, Dental Transcription Router, Construction Diary Router, Extractor Router, BOMData (Pydantic Model), PurchaseOrder (Pydantic Model), Luvata Order Router (+24 more)
 
 ### Community 37 - "Community 37"
-Cohesion: 0.12
-Nodes (30): ClaudeSDKClient, bool, ClaudeSDKClient, int, Namespace, Path, str, ResultMessage (+22 more)
+Cohesion: 0.13
+Nodes (29): bool, ClaudeSDKClient, int, Namespace, Path, str, ResultMessage, build_initial_prompt() (+21 more)
 
 ### Community 38 - "Community 38"
-Cohesion: 0.12
-Nodes (23): FinnishTextProcessor, Any, Document, float, int, str, _build_filter_clause(), _format_vector() (+15 more)
+Cohesion: 0.05
+Nodes (57): Connection, FinnishTextProcessor, Any, bool, Connection, Document, FinnishTextProcessor, float (+49 more)
 
 ### Community 39 - "Community 39"
 Cohesion: 0.11
 Nodes (23): AcceleratorDevice, bool, Document, int, str, OrderedDict, HierarchicalChunker, Docling-based RAG parser. (+15 more)
 
 ### Community 40 - "Community 40"
-Cohesion: 0.05
-Nodes (46): _clean_schema_dump(), generate_and_persist_assets(), load_assets_and_extract(), load_saved_requirements(), load_saved_schema(), Example 4: Persisting a dynamically generated schema for later reuse.  Steps d, Dump the generated Pydantic model into a valid Python file., Dump the generated Pydantic model into a valid Python file. (+38 more)
+Cohesion: 0.06
+Nodes (35): _clean_decimal_string(), print_pydantic_schema(), Print the exact Pydantic model as Python class definition.     For nested struc, Strip currency/unit noise from a numeric string before Decimal parsing.      E, Strip currency/unit noise from a numeric string before Decimal parsing.      E, Strip currency/unit noise from a numeric string before Decimal parsing.      E, Strip currency/unit noise from a numeric string before Decimal parsing.      E, Strip currency/unit noise from a numeric string before Decimal parsing.      E (+27 more)
 
 ### Community 41 - "Community 41"
-Cohesion: 0.07
-Nodes (61): Path, str, Any, BaseModel, bool, Provider, ReasoningEffort, str (+53 more)
+Cohesion: 0.05
+Nodes (82): Path, str, Any, BaseModel, bool, Provider, ReasoningEffort, str (+74 more)
 
 ### Community 42 - "Community 42"
-Cohesion: 0.17
+Cohesion: 0.16
 Nodes (29): bool, ChunkSpec, float, int, Path, str, TranscriptionConfig, TranscriptionConfig (+21 more)
 
 ### Community 43 - "Community 43"
@@ -2604,100 +2817,100 @@ Cohesion: 0.12
 Nodes (34): Any, BytesIO, Paragraph, ParagraphStyle, str, Table, _build_header_table(), _build_info_table() (+26 more)
 
 ### Community 44 - "Community 44"
-Cohesion: 0.29
-Nodes (7): blueprint_path, kind, Activity_apply_rbac_and_retrieve, TextAnnotation_1, blueprint_path, kind, bpmn_mapping
+Cohesion: 0.03
+Nodes (64): blueprint_path, kind, blueprint_path, kind, blueprint_path, kind, blueprint_path, kind (+56 more)
 
 ### Community 45 - "Community 45"
 Cohesion: 0.09
 Nodes (28): Anthropic / Claude Provider, Azure OpenAI Provider, DocumentClassifier, Document Classifier Component, DoclingApiClientParser, DoclingParser, DocxParser, GAIK Toolkit GitHub Repository (+20 more)
 
 ### Community 46 - "Community 46"
-Cohesion: 0.08
-Nodes (14): buildingBlocks, comingSoonModules, comingSoonUseCases, containerVariants, Demo, DemoCardsProps, FeatureItem, itemVariants (+6 more)
+Cohesion: 0.04
+Nodes (67): AudioExample, AudioOptions, DEFAULT_OPTIONS, EXAMPLES, formFields(), schemaKeyFor(), base, fields (+59 more)
 
 ### Community 47 - "Community 47"
 Cohesion: 0.06
-Nodes (58): Embedder, Embedder, Generate vector embeddings from text., Any, Document, Embedder, float, int (+50 more)
+Nodes (44): int, str, UploadFile, clear_all_segments(), _get_database_url(), _get_embedder(), get_playback_url(), _get_store() (+36 more)
 
 ### Community 48 - "Community 48"
 Cohesion: 0.04
 Nodes (53): blueprint_path, kind, blueprint_path, kind, blueprint_path, kind, blueprint_path, kind (+45 more)
 
 ### Community 49 - "Community 49"
-Cohesion: 0.12
-Nodes (21): _aggregate(), main(), RAGEvaluator demo — RAGAS-style RAG metrics built on LLMJudge v2.  Computes fa, RAGEvaluationResult, RAGEvaluator, RAGItemResult, RAGMetrics, RAGAS-style RAG evaluator built on top of GAIK's LLMJudge v2.  Computes four s (+13 more)
+Cohesion: 0.10
+Nodes (20): _aggregate(), main(), RAGEvaluator demo — RAGAS-style RAG metrics built on LLMJudge v2.  Computes fa, RAGEvaluationResult, RAGEvaluator, RAGItemResult, RAGMetrics, RAGAS-style RAG evaluator built on top of GAIK's LLMJudge v2.  Computes four s (+12 more)
 
 ### Community 50 - "Community 50"
-Cohesion: 0.05
-Nodes (46): date, ExtractionResult, Data Extractor for extracting structured data from documents using generated Pyd, Initialize the DataExtractor.          Args:             config: OpenAI confi, Initialize the DataExtractor.          Args:             config: OpenAI confi, Run extraction on a single document.          Returns the normalized record di, Run extraction on a single document.          Returns the normalized record di, Extract structured data from documents using a pre-generated Pydantic model. (+38 more)
+Cohesion: 0.06
+Nodes (63): NormalizedSources, bool, NormalizedSources, ReportSpec, str, KnowledgeBase, NormalizedSources, Path (+55 more)
 
 ### Community 51 - "Community 51"
 Cohesion: 0.04
-Nodes (75): get_openai_config(), get_settings(), Environment configuration for GAIK API., Get cached settings singleton., Build OpenAI configuration from environment variables., API configuration from environment variables., Settings, FastAPI dependencies and authentication. (+67 more)
+Nodes (86): get_openai_config(), get_settings(), Environment configuration for GAIK API., Get cached settings singleton., Get cached settings singleton., Build OpenAI configuration from environment variables., Build OpenAI configuration from environment variables., API configuration from environment variables. (+78 more)
 
 ### Community 52 - "Community 52"
-Cohesion: 0.04
-Nodes (63): ChildRequirements, CompositeExtractionRequirements, SchemaGenerationResult, SchemaGenerator, _build_parent_task(), ChildContainerSpec, _collection_as_list_str_field(), parse_nested_requirements() (+55 more)
+Cohesion: 0.03
+Nodes (81): ChildRequirements, CompositeExtractionRequirements, SchemaGenerationResult, SchemaGenerator, _build_structure_classification_prompt(), child_container_name(), child_requirements(), detect_structure_type() (+73 more)
 
 ### Community 53 - "Community 53"
 Cohesion: 0.17
-Nodes (21): apply_domain_rules(), _build_diff_chunks(), CorrectionSummary, _default_model_for_config(), DiffChunk, _extract_response_text(), _notify(), Two-pass transcript enhancement for Finnish ASR output. (+13 more)
+Nodes (18): _build_diff_chunks(), CorrectionSummary, _default_model_for_config(), DiffChunk, _extract_response_text(), _notify(), Two-pass transcript enhancement for Finnish ASR output., Enhance Finnish transcripts using a two-pass prompt workflow. (+10 more)
 
 ### Community 54 - "Community 54"
-Cohesion: 0.10
-Nodes (29): Any, bool, bytes, float, int, OpenAIConfig, str, float (+21 more)
+Cohesion: 0.13
+Nodes (24): Any, bool, bytes, float, int, OpenAIConfig, str, float (+16 more)
 
 ### Community 55 - "Community 55"
-Cohesion: 0.09
-Nodes (20): create_pdf_report(), Diary Creation Workflow (main), Ty_maap_iv_kirja Extraction Model (Pydantic), Diary Schema Requirements JSON, DocumentClassifier, DocumentClassifier Package __init__, TranscriptEnhancer, TranscriptEnhancerResult (Pydantic) (+12 more)
+Cohesion: 0.17
+Nodes (7): create_pdf_report(), Diary Creation Workflow (main), Ty_maap_iv_kirja Extraction Model (Pydantic), Diary Schema Requirements JSON, AudioToStructuredData (pipeline module), _build_main_table(), generate_diary_pdf()
 
 ### Community 56 - "Community 56"
-Cohesion: 0.10
-Nodes (20): bytes, float, int, Path, str, _cleanup_prompt(), Convert a PDF into Markdown pages.          Parameters         ----------, Convert a PDF into Markdown pages.          Parameters         ---------- (+12 more)
+Cohesion: 0.05
+Nodes (52): Any, AzureOpenAI, bool, bytes, float, int, OpenAI, Path (+44 more)
 
 ### Community 57 - "Community 57"
-Cohesion: 0.10
-Nodes (38): bool, bytes, float, int, LLMJudge, object, str, float (+30 more)
+Cohesion: 0.15
+Nodes (25): bool, bytes, float, int, LLMJudge, object, str, JudgeUsage (+17 more)
 
 ### Community 58 - "Community 58"
 Cohesion: 0.12
 Nodes (24): AutoTech Manufacturing Corp., Purchase Order PO-2025-15903 (AutoTech Manufacturing), Material AL-001: Aluminum Angle Bar, Material CS-001: Seamless Steel Pipe, Material SS-001: Stainless Steel Sheet, Precision Steel & Components Ltd., AutoTech Manufacturing Corp., BOM MAT-2401: Aluminum Angle L-Profile 6061-T6 (+16 more)
 
 ### Community 59 - "Community 59"
-Cohesion: 0.19
-Nodes (12): Any, bool, str, DocxParser, parse_docx(), Parse a Word document and return its content with metadata.          Args:, Check if file format is supported (.docx or .doc)., Extract text from DOCX preserving structure and formatting information. (+4 more)
+Cohesion: 0.11
+Nodes (25): int, Path, str, Path, str, Source Normalizer  Converts mixed source files (PDF, Word, spreadsheets, text,, from_texts(), load() (+17 more)
 
 ### Community 60 - "Community 60"
-Cohesion: 0.13
-Nodes (15): Any, bool, Path, str, Component registry loader and lookup.  The registry is the single source of tr, Return deduplicated gaik[extra] requirement lines for a set of component names., Return a compact registry summary suitable for inclusion in a prompt., Return a compact registry summary suitable for inclusion in a prompt. (+7 more)
+Cohesion: 0.08
+Nodes (32): Any, bool, Path, str, Blueprint, Registry, str, ArtifactSource (+24 more)
 
 ### Community 61 - "Community 61"
 Cohesion: 0.04
-Nodes (50): blueprint_path, kind, blueprint_path, kind, Activity_extract_po_fields, Activity_validate_extraction, DataObjectRef_source_pdf, EndEvent_success (+42 more)
+Nodes (50): blueprint_path, kind, blueprint_path, kind, Activity_extract_po_fields, Activity_validate_extraction, DataObjectRef_source_pdf, DataObjectRef_validation_report (+42 more)
 
 ### Community 62 - "Community 62"
-Cohesion: 0.06
-Nodes (51): Blueprint, str, _derive_pattern_key(), Derive a stable, topology-aware key for a blueprint's pipeline shape.      The, Derive a stable, topology-aware key for a blueprint's pipeline shape.      The, Derive a stable, topology-aware key for a blueprint's pipeline shape.      The k, _blueprint_with_extra_block(), _blueprint_with_parser() (+43 more)
+Cohesion: 0.05
+Nodes (62): Blueprint, str, _derive_pattern_key(), Derive a stable, topology-aware key for a blueprint's pipeline shape.      The, Derive a stable, topology-aware key for a blueprint's pipeline shape.      The, Derive a stable, topology-aware key for a blueprint's pipeline shape.      The k, Derive a stable, topology-aware key for a blueprint's pipeline shape.      The, _blueprint_with_extra_block() (+54 more)
 
 ### Community 63 - "Community 63"
 Cohesion: 0.11
 Nodes (23): Agent Skills for Incident Report Writing (No-Code Asset), Audio to Structured Data Module, Data Extractor (LLM-Powered Field Extraction), Extraction Evaluation Methods (Cosine Similarity), Extractor Software Component, GAIK Demo Application, GenAI Product Canvas for Incident Reporting, Prompt Templates for Incident Report Writing (No-Code Asset) (+15 more)
 
 ### Community 64 - "Community 64"
-Cohesion: 0.04
-Nodes (62): CodeBlock(), CodeBlockProps, Tab, GitHubIcon(), GitHubIconProps, Hero(), InstallSnippet(), Glimpse() (+54 more)
+Cohesion: 0.02
+Nodes (87): buildingBlocks, CardLook, comingSoonModules, comingSoonUseCases, containerVariants, Demo, DemoCard(), DemoCards() (+79 more)
 
 ### Community 65 - "Community 65"
 Cohesion: 0.12
 Nodes (12): inter, Layout(), metadata, baseOptions(), source, cache, cachePromise(), Mermaid() (+4 more)
 
 ### Community 66 - "Community 66"
-Cohesion: 0.13
-Nodes (16): AnswerGenerator, _format_context(), Answer generation for RAG workflows., Generate answers from retrieved context., _with_retries(), Answer generator building block., AnswerGenerator (gaik.software_components.RAG), bool (+8 more)
+Cohesion: 0.15
+Nodes (14): AnswerGenerator, _format_context(), Answer generation for RAG workflows., Generate answers from retrieved context., Generate answers from retrieved context., _with_retries(), Answer generator building block., AnswerGenerator (gaik.software_components.RAG) (+6 more)
 
 ### Community 67 - "Community 67"
-Cohesion: 0.04
-Nodes (48): Action Items, code:block1 (REPORT), code:block10 (- [Date]: [Event/milestone]), code:block11 (RISKS & ISSUES), code:block12 (1. [Risk/Issue]), code:block13 (NEXT STEPS), code:block14 (Participants: [Not specified in source materials]), code:block15 (Date: [To be confirmed]) (+40 more)
+Cohesion: 0.12
+Nodes (16): Action Items, code:block11 (RISKS & ISSUES), code:block12 (1. [Risk/Issue]), code:block13 (NEXT STEPS), code:block4 (DECISIONS MADE), code:block5 (ACTION ITEMS), code:block6 (OPEN QUESTIONS), code:block7 (DATA/FINDINGS) (+8 more)
 
 ### Community 68 - "Community 68"
 Cohesion: 0.05
@@ -2705,11 +2918,11 @@ Nodes (69): int, Path, str, _accepted_option_params(), _call_method(), _card_mod
 
 ### Community 69 - "Community 69"
 Cohesion: 0.08
-Nodes (25): Basic import tests to ensure package structure is correct., Test that extractor module can be imported., Test that parsers module can be imported., Test that transcriber module can be imported., Test that doc_classifier module can be imported., Test that embedder module can be imported., Test that vector_store module can be imported., Test that pg_vector_store module can be imported (requires psycopg). (+17 more)
+Nodes (30): Basic import tests to ensure package structure is correct., The CURACT components and the ReportWriter module import with their extras insta, Test that extractor module can be imported., Test that parsers module can be imported., Test that transcriber module can be imported., Test that doc_classifier module can be imported., Test that jev_classifier module can be imported., Test that embedder module can be imported. (+22 more)
 
 ### Community 70 - "Community 70"
-Cohesion: 0.07
-Nodes (20): DataExtractor, create_extraction_model(), Create a Pydantic model dynamically from field specifications (strict).     - F, Create a Pydantic model dynamically from field specifications (strict).     - F, Create a Pydantic model dynamically from field specifications (strict).     - F, Create a Pydantic model dynamically from field specifications (strict).     - F, Create a Pydantic model dynamically from field specifications (strict).     - F, Create a Pydantic model dynamically from field specifications (strict).     - F (+12 more)
+Cohesion: 0.06
+Nodes (38): DataExtractor, DataExtractor, ExtractionResult, _parse_with, _build_parse_requirements_prompt(), _clean_requirements_text(), parse_user_requirements(), Parse extraction requirements from natural language using LLM with type detectio (+30 more)
 
 ### Community 71 - "Community 71"
 Cohesion: 0.04
@@ -2724,8 +2937,8 @@ Cohesion: 0.16
 Nodes (21): LemmatizationBackend (ABC), SimpleBackend, SpacyBackend, UralicNLPBackend, VoikkoBackend, discover_auto_backend (function), Embedder, embed_texts (function) (+13 more)
 
 ### Community 74 - "Community 74"
-Cohesion: 0.10
-Nodes (20): aliases, components, hooks, lib, ui, utils, iconLibrary, registries (+12 more)
+Cohesion: 0.09
+Nodes (21): aliases, components, hooks, lib, ui, utils, iconLibrary, registries (+13 more)
 
 ### Community 75 - "Community 75"
 Cohesion: 0.14
@@ -2736,12 +2949,12 @@ Cohesion: 0.19
 Nodes (20): Path, str, _content_type_for(), download_video(), extract_thumbnail(), main(), process_video(), Seed script for dental demo: download, transcribe, embed, and store videos.  U (+12 more)
 
 ### Community 77 - "Community 77"
-Cohesion: 0.11
-Nodes (16): HallucinationFlag, parse_hallucination_flags(), Parse ``{"flags": [...]}`` JSON into typed :class:`HallucinationFlag`\\ s., Parse ``{"flags": [...]}`` JSON into typed :class:`HallucinationFlag`\\ s., build_hallucination_prompt(), Assemble the user-side prompt for a hallucination-detector call.      The sour, Unit tests for LLMJudge.detect_hallucinations()., The judge should only emit non-ok entries, but be defensive anyway. (+8 more)
+Cohesion: 0.10
+Nodes (18): parse_hallucination_flags(), Identify fields in ``extracted`` whose values are not supported by ``source_text, Identify fields in ``extracted`` whose values are not supported by ``source_text, Parse ``{"flags": [...]}`` JSON into typed :class:`HallucinationFlag`\\ s., Parse ``{"flags": [...]}`` JSON into typed :class:`HallucinationFlag`\\ s., Parse ``{"flags": [...]}`` JSON into typed :class:`HallucinationFlag`\\ s., build_hallucination_prompt(), Assemble the user-side prompt for a hallucination-detector call.      The sour (+10 more)
 
 ### Community 78 - "Community 78"
-Cohesion: 0.04
-Nodes (47): 1.1 List of Metrics, 1.2 Metric Descriptions, 1. Evaluation Metrics, 1. Install Dependencies, 2.1 Python Scripts, 2.2 Python Dependencies, 2.3 Sample Data, 2. Download NLTK Data (first run only) (+39 more)
+Cohesion: 0.18
+Nodes (11): 1.1 List of Metrics, 1.2 Metric Descriptions, 1. Evaluation Metrics, BLEU, chrF, code:text (BLEU = BP × exp(Σ wₙ × log pₙ)), code:text (chrF = (1 + β²) × chrP × chrR / (β² × chrP + chrR)), code:text (TER = Edit Operations / Reference Length × 100%) (+3 more)
 
 ### Community 79 - "Community 79"
 Cohesion: 0.15
@@ -2752,8 +2965,8 @@ Cohesion: 0.04
 Nodes (53): blueprint_path, kind, blueprint_path, kind, blueprint_path, kind, Activity_extract_meeting_record, Activity_human_review (+45 more)
 
 ### Community 81 - "Community 81"
-Cohesion: 0.08
-Nodes (30): RAGEvaluationResult, RAGEvaluator, RAGItemResult, RAGMetrics, PairwiseSpec, RAGPairwiseEvalResult, RAGResponseEvalResult, RAGResponseEvaluator (+22 more)
+Cohesion: 0.04
+Nodes (53): PairwiseSpec, RAGPairwiseEvalResult, RAGResponseEvalResult, RAGResponseEvaluator, ScoringSpec, ProviderClient, AnthropicProvider, ProviderClient (Protocol) (+45 more)
 
 ### Community 82 - "Community 82"
 Cohesion: 0.15
@@ -2768,7 +2981,7 @@ Cohesion: 0.04
 Nodes (45): Audio transcription not working, Claude doesn't recognize the skill, code:block1 (pip install fastmcp gaik[transcriber] python-dotenv), code:block10 (Project-Update/), code:block11 (Use our company template to create a report from C:\Work\Qua), code:block12 (Quarterly-Review/), code:block13 (Create a report like last month's from C:\Reports\February u), code:block14 (February/) (+37 more)
 
 ### Community 85 - "Community 85"
-Cohesion: 0.05
+Cohesion: 0.04
 Nodes (43): 1) Validate folder structure (MCP filesystem only), 2) Capability check (prevents Windows/Linux path loops for binaries), code:block1 (<input_folder>/), code:block2 (=== TRANSCRIPTION: <filename> ===), code:block3 (view /mnt/skills/public/docx/SKILL.md), code:block4 (REPORT), code:block5 (/home/user/projects/analysis/), code:block6 (/reports/quarterly/) (+35 more)
 
 ### Community 86 - "Community 86"
@@ -2784,20 +2997,20 @@ Cohesion: 0.06
 Nodes (58): Adding a new component to the registry, code:bash (git clone https://github.com/GAIK-project/gaik-toolkit.git), code:bash (cd poc/), code:bash (# The agent first generalises the validated poc/run_poc.py i), code:bash (cd implementation_layer/solution_wizard), code:block13 (solution_wizard/), code:block14 (/gaik-sync  I just added a new component: ParallelTranscribe), code:bash (python scripts/validate_blueprint.py --blueprint ~/projects/) (+50 more)
 
 ### Community 89 - "Community 89"
-Cohesion: 0.07
-Nodes (36): ConfigActions(), ConfigActionsProps, PrivacyContent(), ExamplePreviewDialogProps, ProcessingDetails(), ProcessingDetailsProps, FeedbackButtonProps, FeedbackDialog() (+28 more)
+Cohesion: 0.02
+Nodes (128): Conversation(), ConversationContent(), ConversationContentProps, ConversationEmptyState(), ConversationEmptyStateProps, ConversationProps, ConversationScrollButton(), ConversationScrollButtonProps (+120 more)
 
 ### Community 90 - "Community 90"
 Cohesion: 0.11
 Nodes (19): Enhance Transcript Example README, Enhance Transcript Example Script - enhance_transcript_example.py, Transcription Eval - Character Error Rate (CER) Metric, Transcription Eval Domain - Finnish Dental Webinars, Transcription Model - aalto-asr (WER 49.37%), Transcription Model - gemini-2.5-pro (WER 25.32%), Transcription Model - gpt-4o-transcribe (WER 17.91%), Transcription Model - whisper-large-finnish-v3-ct2 (Best Raw WER 14.57%) (+11 more)
 
 ### Community 91 - "Community 91"
-Cohesion: 0.17
-Nodes (21): bool, Path, str, UploadFile, StructuredDataToPDF, _clean_schema_dump(), diary_audio_pipeline_stream(), diary_text_pipeline_stream() (+13 more)
+Cohesion: 0.10
+Nodes (18): Initialize the SchemaGenerator.          Args:             config: OpenAI con, Analyze if the requirements need nested or flat structure.          Args:, Analyze if the requirements need nested or flat structure.          Args:, Initialize the SchemaGenerator.          Args:             config: OpenAI con, Analyze if the requirements need nested or flat structure.          Args:, Initialize the SchemaGenerator.          Args:             config: OpenAI con, Initialize the SchemaGenerator.          Args:             config: OpenAI con, Initialize the SchemaGenerator.          Args:             config: OpenAI con (+10 more)
 
 ### Community 92 - "Community 92"
-Cohesion: 0.12
-Nodes (19): Form Understander  Maps cryptic form-field identifiers (e.g. ASP.NET ``FieldI, FormUnderstander, InputField, LabelEntry, LabelMapping, Form field label cleaner., Input row for FormUnderstander.clean_labels., One id → cleaned label pair. We use a list of these instead of a     free-form (+11 more)
+Cohesion: 0.07
+Nodes (35): CorrectnessScore, PairwiseComparison, PairwiseVerdict, Reference-free A-vs-B verdict with per-aspect Likert scores per side.      Scr, Reference-free A-vs-B verdict with per-aspect Likert scores per side.      Scr, One head-to-head comparison row (post-aggregation across swap passes)., One head-to-head comparison row (post-aggregation across swap passes)., 4+1 dimensional scoring against a reference answer.      Scratchpad fields for (+27 more)
 
 ### Community 93 - "Community 93"
 Cohesion: 0.04
@@ -2808,8 +3021,8 @@ Cohesion: 0.08
 Nodes (33): AnswerGenerator, RAG Answer Generator Documentation, Answer Generator Component, Chroma Persistent Vector Store, AnswerGenerator Class, DoclingRagParser Class, Embedder Class, Retriever Class (+25 more)
 
 ### Community 95 - "Community 95"
-Cohesion: 0.08
-Nodes (41): _calibration_scatter(), client(), _constraint_violation_summary(), CorrectnessScore, _pairwise_aspect_radar(), pairwise_plots(), _pairwise_ranking(), _pairwise_win_matrix() (+33 more)
+Cohesion: 0.03
+Nodes (92): ArtifactBrowser(), downloadBlob(), FOLDER_NOTE, Doc, ExampleOverview(), ext(), kindOf(), labelOf() (+84 more)
 
 ### Community 96 - "Community 96"
 Cohesion: 0.05
@@ -2829,39 +3042,39 @@ Nodes (25): Audio to Structured Data Module Documentation, Software Component Ar
 
 ### Community 100 - "Community 100"
 Cohesion: 0.15
-Nodes (15): Any, BaseModel, ChatMessage, ChatResponse, float, str, Any, BaseModel (+7 more)
+Nodes (16): Any, BaseModel, ChatMessage, ChatResponse, float, int, str, Running token totals of a client's calls; safe to add to from worker threads. (+8 more)
 
 ### Community 101 - "Community 101"
-Cohesion: 0.15
-Nodes (11): bool, Document, float, int, str, Vector store building block., _cosine_similarity(), _iter_indices() (+3 more)
+Cohesion: 0.07
+Nodes (36): composeFromFields(), CustomField, defaultSelection(), FIELD_GROUPS, FieldChoice, FieldGroupKey, FieldSelection, fieldsOf() (+28 more)
 
 ### Community 102 - "Community 102"
 Cohesion: 0.13
 Nodes (17): TranscriptionResult Dataclass, ParallelTranscriber._call_gpt4o_api, ParallelTranscriber._call_whisper_local_api, ParallelTranscriber._make_whisper_client, ParallelTranscriber._transcribe_chunks_gpt4o, ParallelTranscriber._transcribe_chunks_whisper, ParallelTranscriber._transcribe_chunks_whisper_local, ParallelTranscriber._transcribe_single (+9 more)
 
 ### Community 103 - "Community 103"
-Cohesion: 0.02
-Nodes (102): Conversation(), ConversationContent(), ConversationContentProps, ConversationEmptyState(), ConversationEmptyStateProps, ConversationProps, ConversationScrollButton(), ConversationScrollButtonProps (+94 more)
+Cohesion: 0.06
+Nodes (91): CuratedUnit, CurationResponse, DroppedUnit, NormalizedSources, bool, int, KnowledgeBase, NormalizedSources (+83 more)
 
 ### Community 104 - "Community 104"
 Cohesion: 0.10
 Nodes (56): Any, bool, int, Path, SheetLayout, str, LayoutInferrer, _apply_layout() (+48 more)
 
 ### Community 105 - "Community 105"
-Cohesion: 0.17
-Nodes (11): DiaryDetails(), DiaryDetailsProps, DiaryEntry, FIELD_ALIASES, FieldResolution, hasContent(), PhaseCard(), renderList() (+3 more)
+Cohesion: 0.18
+Nodes (10): DiaryDetailsProps, DiaryEntry, FIELD_ALIASES, FieldResolution, hasContent(), PhaseCard(), renderList(), resolveField() (+2 more)
 
 ### Community 106 - "Community 106"
-Cohesion: 0.14
-Nodes (12): Path, ParallelTranscriber, Create a new OpenAI client for Whisper (thread-safe: one per thread)., High-level orchestrator for parallel audio/video transcription.      Args:, _api_cfg(), Tests for the WHISPER_LOCAL transcription path in ParallelTranscriber., TestChunkedWhisperLocal, TestConstructor (+4 more)
+Cohesion: 0.12
+Nodes (14): Path, ParallelTranscriber, Create a new OpenAI client for Whisper (thread-safe: one per thread)., Create a new OpenAI client for Whisper (thread-safe: one per thread)., High-level orchestrator for parallel audio/video transcription.      Args:, High-level orchestrator for parallel audio/video transcription.      Args:, _api_cfg(), Tests for the WHISPER_LOCAL transcription path in ParallelTranscriber. (+6 more)
 
 ### Community 107 - "Community 107"
 Cohesion: 0.17
 Nodes (16): ExtractionRequirements (gaik extractor), print_pydantic_schema (gaik extractor schema), create_s3_client, ensure_object_exists, generate_presigned_url, clean_numeric_string, load_schema, normalize_decimal_value (+8 more)
 
 ### Community 108 - "Community 108"
-Cohesion: 0.08
-Nodes (26): apply_composite_field_policies(), _map_over_composite(), normalize_composite_extracted_data(), Apply a flat per-record post-processor across a parent-with-children record., ``apply_field_policies`` for a ``parent_with_nested_list`` record.      Polici, ``normalize_extracted_data`` for a ``parent_with_nested_list`` record., Apply a flat per-record post-processor across a parent-with-children record., Apply a flat per-record post-processor across a parent-with-children record. (+18 more)
+Cohesion: 0.07
+Nodes (30): apply_composite_field_policies(), _map_over_composite(), normalize_composite_extracted_data(), Apply a flat per-record post-processor across a parent-with-children record., ``apply_field_policies`` for a ``parent_with_nested_list`` record.      Polici, ``normalize_extracted_data`` for a ``parent_with_nested_list`` record., Apply a flat per-record post-processor across a parent-with-children record., Apply a flat per-record post-processor across a parent-with-children record. (+22 more)
 
 ### Community 109 - "Community 109"
 Cohesion: 0.08
@@ -2892,8 +3105,8 @@ Cohesion: 0.05
 Nodes (39): 10. Calculate scores, 1. Validate the frozen package, 2. Conduct Run 1, 3. Conduct Run 2, 4. Check the PoC command configuration, 5. Execute both original PoCs, 6. Refine only if attempt 0 is unsuccessful, 7. Collect evidence (+31 more)
 
 ### Community 116 - "Community 116"
-Cohesion: 0.14
-Nodes (23): build_orchestrator_graph(), build_phases(), _make_join_node(), _make_section_runner(), Section orchestrator for the agentic report workflow.  Sections are written in d, Run sections in dependency layers, review each, and assemble the report.      Re, Run sections in dependency layers, review each, and assemble the report.      Re, Run sections in dependency layers, review each, and assemble the report.      Re (+15 more)
+Cohesion: 0.06
+Nodes (46): extract_po_bom_data(), Extract and match PO+BOM data from the combined classified output.      Uses S, Extract and match PO+BOM data from the combined classified output.      Uses S, Generates Pydantic schemas from natural language requirements.      Automatica, Generates Pydantic schemas from natural language requirements.      Automatica, Generates Pydantic schemas from natural language requirements.      Automatica, Generates Pydantic schemas from natural language requirements.      Automatica, Generates Pydantic schemas from natural language requirements.      Automatica (+38 more)
 
 ### Community 117 - "Community 117"
 Cohesion: 0.15
@@ -2904,24 +3117,24 @@ Cohesion: 0.05
 Nodes (39): 1. Sales Order Document, 2. Calculation Breakdown Document, 5.1 Line Item Calculations, 5.2 Material Subtotal, 5.3 Volume Discount, 5.4 Fees, Shipping, Tax, and Grand Total, 6.1 Determine Output Format, 6.2 Generate Document Sections (+31 more)
 
 ### Community 119 - "Community 119"
-Cohesion: 0.05
-Nodes (39): code:json ({), code:block10 (NewCustomer/), code:block2 (My-Order/), code:block3 (Process these documents using purchase-order-processing skil), code:block4 (Generate sales order from C:\Orders\NewCustomer using purcha), code:block5 (Process the purchase order in C:\Orders\Project-Q4 using pur), code:block6 (Project-Q4/), code:block7 (Generate sales order from C:\Orders\QuickQuote using purchas) (+31 more)
+Cohesion: 0.14
+Nodes (13): code:json ({), Customizing the Skill, Getting Help, License, Option A: Easy Setup (Recommended), Output Files, Prerequisites, Purchase Order Processing Skill for Claude Desktop (+5 more)
 
 ### Community 120 - "Community 120"
 Cohesion: 0.19
 Nodes (14): Validator Calibration Demo (LLM Judge vs Human Labels), Validator Hallucination Detection Demo, Validator Likert 1-5 Scoring Demo, LLM-as-Judge Demo (Vision/PDF Extraction Validation), LLM Judge Text-Pair Equivalence Demo, Pairwise A/B Extractor Comparison Demo, LLM Judge Panel (Multi-Judge Jury) Demo, compare_pairwise Function (gaik.software_components.validators) (+6 more)
 
 ### Community 121 - "Community 121"
-Cohesion: 0.18
-Nodes (18): CompositeExtractionRequirements, ExtractionRequirements, int, str, _annotation_repr(), _clean_schema_dump(), _collect_models(), main() (+10 more)
+Cohesion: 0.20
+Nodes (13): CompositeExtractionRequirements, ExtractionRequirements, int, _collect_models(), main(), Collect nested Pydantic models before the parent model., Collect nested Pydantic models before the parent model., Produce the payload that load_schema() expects. (+5 more)
 
 ### Community 123 - "Community 123"
-Cohesion: 0.14
-Nodes (14): devDependencies, concurrently, eslint, eslint-config-next, @eslint/eslintrc, prettier-plugin-tailwindcss, tailwindcss, @tailwindcss/postcss (+6 more)
+Cohesion: 0.13
+Nodes (15): devDependencies, concurrently, eslint, eslint-config-next, @eslint/eslintrc, prettier-plugin-tailwindcss, @shadcn/lint, tailwindcss (+7 more)
 
 ### Community 124 - "Community 124"
-Cohesion: 0.19
-Nodes (13): Carousel(), CarouselApi, CarouselContent(), CarouselContext, CarouselContextProps, CarouselItem(), CarouselNext(), CarouselOptions (+5 more)
+Cohesion: 0.08
+Nodes (37): _apply(), DraftReviewer, EditList, Fact-check generated text against reference material with exact search-and-repla, The reviewer's structured answer., Apply edits in order where the search text occurs exactly once., Fact-check a text against reference material and apply exact corrections., Args:             config: Provider config from ``get_llm_config()``. (+29 more)
 
 ### Community 125 - "Community 125"
 Cohesion: 0.06
@@ -2948,12 +3161,12 @@ Cohesion: 0.05
 Nodes (42): AnswerGenerator, code:python (from gaik.software_components.RAG.embedder import Embedder), code:python (results = store.search(query_embedding, top_k=5, filters=Non), code:python (from gaik.software_components.RAG.finnish_text_processor imp), code:python (from gaik.software_components.RAG.retriever import Retriever), code:python (from gaik.software_components.RAG.ranker import Ranker), code:python (semantic = store.search_semantic(query_embedding, top_k=50)), code:python (ranker.fuse(semantic, keyword, names=("semantic", "keyword")) (+34 more)
 
 ### Community 131 - "Community 131"
-Cohesion: 0.06
-Nodes (35): code:block1 (Process incident report from C:\path\to\your\audio-file.mp3 ), code:block2 (INCIDENT REPORT), code:block3 (Process incident report from [path-to-folder]\data\Sample 1.), Fixed-Option Fields, Anti-Hallucination Design, Audio transcription not working, code:bash (pip install fastmcp gaik[transcriber] python-dotenv), code:block5 (OPENAI_API_KEY=your_api_key_here) (+27 more)
+Cohesion: 0.05
+Nodes (39): code:block1 (Process incident report from C:\path\to\your\audio-file.mp3 ), code:block2 (INCIDENT REPORT), code:block3 (Process incident report from [path-to-folder]\data\Sample 1.), Fixed-Option Fields, code:block1 (Process incident report from C:\path\to\your\audio-file.mp3 ), code:block2 (INCIDENT REPORT), code:block3 (Process incident report from [path-to-folder]\data\Sample 1.), Fixed-Option Fields (+31 more)
 
 ### Community 132 - "Community 132"
 Cohesion: 0.05
-Nodes (35): API, code:bash (pip install gaik[pg-vector-store]), code:sql (-- Hybrid search: combine semantic + keyword with RRF), code:bash (docker run -d --name pgvector-db \), code:python (from langchain_core.documents import Document), code:bash (docker run -d --name pgvector-db \), code:sql (CREATE INDEX s3_segments_embedding_hnsw), code:text (rrf_score = sem_weight / (k + sem_rank) + kw_weight / (k + k) (+27 more)
+Nodes (44): API, code:bash (pip install gaik[pg-vector-store]), code:sql (CREATE INDEX s3_segments_embedding_hnsw), code:text (rrf_score = sem_weight / (k + sem_rank) + kw_weight / (k + k), code:text ('fluoridi ksylitoli' → 'fluoridi:* & ksylitoli:*'), code:bash (# Connect to your database and run migrations in order:), code:sql (-- Hybrid search: combine semantic + keyword with RRF), code:bash (docker run -d --name pgvector-db \) (+36 more)
 
 ### Community 133 - "Community 133"
 Cohesion: 0.06
@@ -2976,8 +3189,8 @@ Cohesion: 0.06
 Nodes (36): default, items, title, type, ManualStep, default, items, title (+28 more)
 
 ### Community 138 - "Community 138"
-Cohesion: 0.13
-Nodes (19): _BpmnBuilder, _Node, Resolve a lane id for a node category, creating lanes lazily.          Categorie, Resolve a lane id for a node category, creating lanes lazily.          Categorie, Resolve a lane id for a node category, creating lanes lazily.          Categorie, Resolve a lane id for a node category, creating lanes lazily.          Categorie, Resolve a lane id for a node category, creating lanes lazily.          Categor, Add a 'Rejected' end event connected from the given gateway. (+11 more)
+Cohesion: 0.09
+Nodes (28): bool, float, str, _BpmnBuilder, _Flow, _Node, Return (lane_id, name) for the first business_process participant         matchi, Return (lane_id, name) for the first business_process participant         matchi (+20 more)
 
 ### Community 139 - "Community 139"
 Cohesion: 0.06
@@ -2985,15 +3198,15 @@ Nodes (33): code:mdx (---), code:block10, code:markdown (## Business layer – u
 
 ### Community 140 - "Community 140"
 Cohesion: 0.06
-Nodes (30): AudioToStructuredData, Batch Processing with Schema Reuse, code:python (from gaik.software_modules.audio_to_structured_data import A), code:python (from pathlib import Path), code:python (from gaik.software_components.extractor import ExtractionReq), code:python (from gaik.software_components.RAG.pg_vector_store import PgV), code:python (# Audio pipeline), code:python (@dataclass) (+22 more)
+Nodes (34): AudioToStructuredData, Batch Processing with Schema Reuse, code:python (from gaik.software_modules.audio_to_structured_data import A), code:python (from pathlib import Path), code:python (from gaik.software_components.extractor import ExtractionReq), code:python (from gaik.software_components.RAG.pg_vector_store import PgV), code:python (# Audio pipeline), code:python (@dataclass) (+26 more)
 
 ### Community 141 - "Community 141"
 Cohesion: 0.06
-Nodes (33): code:block1 (single document PO/), code:json ("order_summary": {), code:block11 (- Parse the numeric part of the quantity string and convert ), code:json ({), code:block2 (multi document PO/), code:block3 (material_cost = quantity × unit_price), code:block4 (Header fields:), code:block5 (- Project code (as stated; else "")) (+25 more)
+Nodes (35): code:block1 (single document PO/), code:json ("order_summary": {), code:block11 (- Parse the numeric part of the quantity string and convert ), code:json ({), code:block2 (multi document PO/), code:block3 (material_cost = quantity × unit_price), code:block4 (Header fields:), code:block5 (- Project code (as stated; else "")) (+27 more)
 
 ### Community 142 - "Community 142"
 Cohesion: 0.06
-Nodes (62): Any, Blueprint, bool, Path, str, _build_generic_judge_section(), _build_generic_pipeline_skeleton(), _build_input_loaders() (+54 more)
+Nodes (72): Any, Blueprint, bool, Path, str, _build_generic_judge_section(), _build_generic_pipeline_skeleton(), _build_input_loaders() (+64 more)
 
 ### Community 143 - "Community 143"
 Cohesion: 0.06
@@ -3008,8 +3221,8 @@ Cohesion: 0.15
 Nodes (10): assets, ddd, fr, h, ip, layers, nm, op (+2 more)
 
 ### Community 146 - "Community 146"
-Cohesion: 0.22
-Nodes (8): blueprint_schema(), _inner_type(), multi_child_schema(), Tests for schema generator improvements: nested_list and parent_with_nested_list, Return the non-None type from an Optional[X] annotation., Return the non-None type from an Optional[X] annotation., Return the non-None type from an Optional[X] annotation., schema()
+Cohesion: 0.08
+Nodes (37): LectureExample, TranscriptionResult, activeCue(), clean(), clock(), Cue, CueStats, EXAMPLES (+29 more)
 
 ### Community 147 - "Community 147"
 Cohesion: 0.15
@@ -3024,12 +3237,12 @@ Cohesion: 0.17
 Nodes (13): POST /pipeline/diary Endpoint, POST /pipeline/incident-report Endpoint, ReportLab PDF Generation Dependency, Construction Site Diary Creation Use Case, GenAI Product Canvas for Incident Reporting, Incident Reporting Use Case, Value Evaluation Model for Incident Reporting, Report Writing Evaluation (+5 more)
 
 ### Community 150 - "Community 150"
-Cohesion: 0.06
-Nodes (31): Anthropic (Claude), API, Claude (Anthropic Foundry), Claude (Direct Anthropic API), code:bash (pip install "gaik[multimodal-parser]"), code:python (from gaik.software_components.parsers.multimodal_parser impo), code:python (from gaik.software_components.parsers.multimodal_parser impo), code:python (from gaik.software_components.parsers.multimodal_parser impo) (+23 more)
+Cohesion: 0.07
+Nodes (34): Anthropic (Claude), API, Claude (Anthropic Foundry), Claude (Direct Anthropic API), code:bash (pip install "gaik[multimodal-parser]"), code:python (from gaik.software_components.parsers.multimodal_parser impo), code:python (from gaik.software_components.parsers.multimodal_parser impo), code:python (from gaik.software_components.parsers.multimodal_parser impo) (+26 more)
 
 ### Community 151 - "Community 151"
-Cohesion: 0.21
-Nodes (12): ratelimit, AccessState, AUTH_ROUTES, getAccessState(), isAuthRoute(), isProtectedRoute(), matchesRoute(), PROTECTED_ROUTES (+4 more)
+Cohesion: 0.08
+Nodes (32): bool, str, MultimodalParser._call_claude, MultimodalParser._call_google, MultimodalParser._call_openai, create_claude_client(), create_openai_client(), get_claude_config() (+24 more)
 
 ### Community 152 - "Community 152"
 Cohesion: 0.15
@@ -3040,20 +3253,20 @@ Cohesion: 0.12
 Nodes (17): 21.1 Two-Layer Architecture, 21.2 Package Structure, 21.3 Claude Desktop Compatibility, 21. Implementation Design, 7.10 Phase 10: Proof-of-Concept Creation (V1+), 7.11 Phase 11: PoC Validation and Refinement (V1+), 7.12 Phase 12: Documentation Suite (V1) and Full Package (V2), 7.2 Phase 2: Guided Requirement Collection (+9 more)
 
 ### Community 154 - "Community 154"
-Cohesion: 0.18
-Nodes (13): AudioToStructuredData, Audio PipelineResult, AudioToStructuredData Package Init, format_timestamp (srt_utils), segments_to_srt, segments_to_vtt, Transcriber, TranscriptionResult (+5 more)
+Cohesion: 0.12
+Nodes (18): AudioToStructuredData, Audio PipelineResult, AudioToStructuredData Package Init, format_timestamp (srt_utils), segments_to_srt, segments_to_vtt, TranscribeResponse Model, Transcriber (+10 more)
 
 ### Community 155 - "Community 155"
 Cohesion: 0.27
 Nodes (11): bool, str, enhance_transcript_pass1(), enhance_transcript_pass2(), get_client(), main(), process_transcripts(), Enhance transcripts using GPT-5.4.  Strategy: - Read transcripts from a direc (+3 more)
 
 ### Community 156 - "Community 156"
-Cohesion: 0.08
-Nodes (27): global_exception_handler(), Global exception handler for unhandled errors., Global exception handler for unhandled errors., Global exception handler for unhandled errors., Global exception handler for unhandled errors., Global exception handler for unhandled errors., Global exception handler for unhandled errors., Health check endpoint (+19 more)
+Cohesion: 0.13
+Nodes (17): global_exception_handler(), Global exception handler for unhandled errors., Global exception handler for unhandled errors., Global exception handler for unhandled errors., Global exception handler for unhandled errors., Global exception handler for unhandled errors., Global exception handler for unhandled errors., Global exception handler for unhandled errors. (+9 more)
 
 ### Community 157 - "Community 157"
-Cohesion: 0.03
-Nodes (75): Audio-to-structured-data pipeline: transcribe audio and extract structured field, AudioToStructuredData, _clean_schema_dump(), main(), Example: extracts key structured fields from audios by dynamically building extr, PipelineResult, Reusable software component to transcribe audio and extract structured data. Bu, Persist schema and requirements to disk under schema_dir. (+67 more)
+Cohesion: 0.40
+Nodes (5): Namespace, Namespace, main(), parse_args(), Minimal example for running the Transcriber class on a single file with transcri
 
 ### Community 158 - "Community 158"
 Cohesion: 0.14
@@ -3084,12 +3297,12 @@ Cohesion: 0.07
 Nodes (26): agentic, output_dir, curate_evidence, image_options, mode, include_evidence_index, include_source_references, input_paths (+18 more)
 
 ### Community 165 - "Community 165"
-Cohesion: 0.20
-Nodes (11): str, UploadFile, _cleanup_old_subtitles(), dental_transcription_stream(), download_srt(), download_vtt(), Video transcription router - Audio/video transcription with SRT/VTT subtitle gen, Download generated SRT subtitle file. (+3 more)
+Cohesion: 0.10
+Nodes (22): bool, int, str, UploadFile, _cleanup_old_subtitles(), dental_transcription_example(), dental_transcription_stream(), download_srt() (+14 more)
 
 ### Community 166 - "Community 166"
-Cohesion: 0.06
-Nodes (46): BaseModel, Generated output schema.  Generated by GAIK Solution Configuration Wizard V2., SupplierPerformanceReport, Generated output schema.  Generated by GAIK Solution Configuration Wizard V2., SupplierPerformanceReport, Any, bool, invoice_extraction_ExtractionNormalized (+38 more)
+Cohesion: 0.01
+Nodes (272): availability_record_Extraction, education_history_Extraction, employment_application_form_Extraction, employment_history_Extraction, Auto-generated schema module (do not edit manually)., Extraction model for availability_record, Extraction model for education_history, Extraction model for employment_history (+264 more)
 
 ### Community 167 - "Community 167"
 Cohesion: 0.24
@@ -3100,12 +3313,12 @@ Cohesion: 0.18
 Nodes (11): GAIK Toolkit Demo App (Next.js + FastAPI), GAIK Docs Website (Fumadocs/Next.js), gaik PyPI Package, GAIK Component Conventions Reference, GAIK Component File Templates Reference, GAIK Component Verification Reference, Build Software Component Skill, GAIK Add Examples Skill (+3 more)
 
 ### Community 169 - "Community 169"
-Cohesion: 0.18
-Nodes (17): Opt-in agentic report workflow (V2).  Independent per-section drafting in para, _apply_corrections(), _check_prompt(), Correction, CorrectionList, diff_editor_run(), _find_search_string(), Diff-editor reviewer — ported from the Lotus ``agentic_diff_editor`` and generi (+9 more)
+Cohesion: 0.13
+Nodes (27): Any, bool, Connection, SchemaInfo, str, str, PostgreSQL text-to-SQL query agent.  ``PostgresAgent`` connects to a PostgreSQ, PostgreSQL text-to-SQL query agent.  Connect ``PostgresAgent`` to a PostgreSQL (+19 more)
 
 ### Community 170 - "Community 170"
-Cohesion: 0.40
-Nodes (5): blueprint_path, kind, Activity_extract_meeting_record, visualizations, bpmn_mapping
+Cohesion: 0.03
+Nodes (61): blueprint_path, kind, blueprint_path, kind, blueprint_path, kind, blueprint_path, kind (+53 more)
 
 ### Community 171 - "Community 171"
 Cohesion: 0.25
@@ -3144,16 +3357,16 @@ Cohesion: 0.20
 Nodes (10): GAIK Project (gaik.ai), GAIK Toolkit README, Knowledge Access Process, Knowledge Capture Process, Knowledge Synthesis Process, BCG Report 2024 (GenAI Value Realization), Brynjolfsson 2025 (Customer Support AI Study), Dell'Acqua 2023 (AI Productivity Study) (+2 more)
 
 ### Community 180 - "Community 180"
-Cohesion: 0.04
-Nodes (57): classify_document (LLM doc classifier PO vs BOM), extract_po_bom_data (PO+BOM Data Extractor), Extraction Example 2 Main (Parse+Classify PDFs), _make_llm_client (Azure/OpenAI client factory), ProjectInfo (Manual Pydantic Schema), Extraction Example 3 Main (Manual Schema Extraction), generate_and_persist_assets (Schema Generation + Persistence), load_assets_and_extract (Load Saved Schema + Extract) (+49 more)
+Cohesion: 0.05
+Nodes (42): classify_document (LLM doc classifier PO vs BOM), extract_po_bom_data (PO+BOM Data Extractor), Extraction Example 2 Main (Parse+Classify PDFs), _make_llm_client (Azure/OpenAI client factory), ProjectInfo (Manual Pydantic Schema), Extraction Example 3 Main (Manual Schema Extraction), generate_and_persist_assets (Schema Generation + Persistence), load_assets_and_extract (Load Saved Schema + Extract) (+34 more)
 
 ### Community 181 - "Community 181"
 Cohesion: 0.11
 Nodes (24): int, Blueprint, Path, str, main(), generate_mermaid(), _node_id(), _node_label() (+16 more)
 
 ### Community 182 - "Community 182"
-Cohesion: 0.10
-Nodes (22): bool, float, str, _esc(), _Flow, Point on element_id's rectangle border on the ray toward `toward`., Point on element_id's rectangle border on the ray toward `toward`., A dashed data-association edge from a_id to b_id, attached to each         shape (+14 more)
+Cohesion: 0.13
+Nodes (13): Point on element_id's rectangle border on the ray toward `toward`., Point on element_id's rectangle border on the ray toward `toward`., A dashed data-association edge from a_id to b_id, attached to each         shape, A dashed data-association edge from a_id to b_id, attached to each         shape, A dashed data-association edge from a_id to b_id, attached to each         shape, Point on element_id's rectangle border on the ray toward `toward`., Point on element_id's rectangle border on the ray toward `toward`., A dashed data-association edge from a_id to b_id, attached to each         shape (+5 more)
 
 ### Community 183 - "Community 183"
 Cohesion: 0.10
@@ -3164,12 +3377,12 @@ Cohesion: 0.20
 Nodes (10): Sheet, SheetContent, SheetOverlay, SheetPortal, Sidebar, SidebarMenuButton, SidebarProvider, SidebarRail (+2 more)
 
 ### Community 185 - "Community 185"
-Cohesion: 0.11
-Nodes (31): Any, bool, bytes, int, ScoringMode, str, UploadFile, JudgeProvider (+23 more)
+Cohesion: 0.10
+Nodes (34): Any, bool, ScoringMode, str, UploadFile, JudgeProvider, _flag_dict(), HallucinationRequest (+26 more)
 
 ### Community 186 - "Community 186"
-Cohesion: 0.09
-Nodes (22): bool, classify_document(), main(), _make_llm_client(), End-to-end example: - Parse each whole PDF with a parser - Classify the parsed, Create an OpenAI (or Azure OpenAI) client + return (client, model, use_azure)., Classify a fully parsed document as either:       - 'Purchase order'       - ', bool (+14 more)
+Cohesion: 0.07
+Nodes (19): bool, bool, OpenAI, create_openai_client(), get_openai_config(), Shared API configuration for OpenAI and Azure OpenAI.  This module provides re, Get OpenAI configuration based on whether to use Azure or standard OpenAI., Create an OpenAI or Azure OpenAI client based on configuration.      Args: (+11 more)
 
 ### Community 187 - "Community 187"
 Cohesion: 0.25
@@ -3184,8 +3397,8 @@ Cohesion: 0.22
 Nodes (9): Command, CommandDialog, Dialog, DialogContent, DialogDescription, DialogHeader, DialogOverlay, DialogPortal (+1 more)
 
 ### Community 190 - "Community 190"
-Cohesion: 0.07
-Nodes (29): Audio transcription not working, Construction Diary Creation Skill for Claude Desktop, Dependencies, Empty or incorrect fields, Example Output, Extracted Fields, Getting Help, How It Works (+21 more)
+Cohesion: 0.05
+Nodes (37): Audio transcription not working, Construction Diary Creation Skill for Claude Desktop, Dependencies, Empty or incorrect fields, Example Output, Extracted Fields, Getting Help, How It Works (+29 more)
 
 ### Community 191 - "Community 191"
 Cohesion: 0.18
@@ -3193,7 +3406,7 @@ Nodes (10): model_name, fields, use_case_name, requirements, children, fields, p
 
 ### Community 192 - "Community 192"
 Cohesion: 0.06
-Nodes (35): assumptions, blueprint_version, business_process, decision_points, exceptions, external_parties, manual_steps, message_flows (+27 more)
+Nodes (33): assumptions, blueprint_version, change_log, components, custom_components, selected_building_blocks, selected_modules, inputs (+25 more)
 
 ### Community 193 - "Community 193"
 Cohesion: 0.12
@@ -3220,8 +3433,8 @@ Cohesion: 0.06
 Nodes (35): assumptions, blueprint_version, change_log, components, custom_components, selected_building_blocks, selected_modules, evaluation (+27 more)
 
 ### Community 199 - "Community 199"
-Cohesion: 0.36
-Nodes (4): bool, bytes, float, str
+Cohesion: 0.08
+Nodes (35): _is_permanent(), main(), Generate the synthetic house condition assessment dataset.  Writes the custome, A report on a different, fictional property: for tone and format only., A config/input problem, or a 4xx response: retrying can't fix either., Synthesize each recording script to mp3. An API call that needs credentials., Write A4 pages of ``(style, content)`` blocks: ``h1``, ``h2``, ``p`` or ``table`, write_floor_plan() (+27 more)
 
 ### Community 200 - "Community 200"
 Cohesion: 0.04
@@ -3244,24 +3457,24 @@ Cohesion: 0.07
 Nodes (28): Basic API, code:bash (pip install gaik[rag-parser-vision]), code:powershell ($env:TESSDATA_PREFIX="C:\Program Files\Tesseract-OCR\tessdat), code:python (from gaik.software_components.RAG.rag_parser_vision import V), code:python (from gaik.software_components.RAG.rag_parser_vision import V), code:powershell (winget install ffmpeg), code:bash (brew install ffmpeg), code:bash (sudo apt-get install ffmpeg  # Ubuntu/Debian) (+20 more)
 
 ### Community 205 - "Community 205"
-Cohesion: 0.25
-Nodes (8): BuildingBlockCard, DemoCards, FeaturedCard, NoCodeAssetsSection, Hero, HomePage, InstallSnippet, getUserAccessStatus
+Cohesion: 0.29
+Nodes (7): BuildingBlockCard, DemoCards, FeaturedCard, NoCodeAssetsSection, Hero, HomePage, getUserAccessStatus
 
 ### Community 206 - "Community 206"
 Cohesion: 0.29
 Nodes (7): bytes, int, Path, basic_example(), LLM-as-Judge demo.  Renders a sample purchase-order PDF to PNG bytes via PyMuP, Render every page of *pdf_path* to PNG bytes using PyMuPDF., render_pages_to_png()
 
 ### Community 207 - "Community 207"
-Cohesion: 0.14
-Nodes (17): getReportWriterMaxReports(), PipelineLogViewer(), PipelineLogViewerProps, parseSSEEvents(), SSEEvent, SSEStep, SSEStepDetails, SSEStreamHandlers (+9 more)
+Cohesion: 0.19
+Nodes (18): POST(), POST(), POST(), POST(), POST(), checkCurateForm(), ratelimit, accessDenial() (+10 more)
 
 ### Community 208 - "Community 208"
-Cohesion: 0.20
-Nodes (4): Construction blueprint — single child list under a large header., Construction blueprint — single child list under a large header., Construction blueprint — single child list under a large header., TestParentWithNestedListBlueprint
+Cohesion: 0.12
+Nodes (25): build_curation_prompt(), build_polish_instruction(), build_reviewer_instruction(), build_section_user_prompt(), Genericized prompts for the agentic workflow.  Adapted from the Lotus building, Mandatory fact/format repair, then optional style-only polish., Mandatory fact/format repair, then optional style-only polish., Mandatory fact/format repair, then optional style-only polish. (+17 more)
 
 ### Community 209 - "Community 209"
-Cohesion: 0.20
-Nodes (19): PostgresAgent, _make_agent(), Unit tests for the postgres_agent extra_instructions / answer_language hooks., Build a PostgresAgent without opening a real DB connection., Record the messages passed to chat_parsed; always return canned SQL., Record the messages passed to chat; always return a canned answer., _stub_llm_for_answer(), _stub_llm_for_sql() (+11 more)
+Cohesion: 0.08
+Nodes (26): FieldSpec, _normalize_explicit_default(), Specification for a single field to extract., Resolve whether ``f`` carries a *usable* explicit default for its type.      `, Resolve whether ``f`` carries a *usable* explicit default for its type.      `, Resolve whether ``f`` carries a *usable* explicit default for its type.      `, Get information about the generated schema.          Returns:             Dic, Resolve whether ``f`` carries a *usable* explicit default for its type.      ` (+18 more)
 
 ### Community 210 - "Community 210"
 Cohesion: 0.25
@@ -3277,7 +3490,7 @@ Nodes (8): Tapered Flat Aluminum Bar Alloy 1350-H14 (Rotor Bar), BOM 4BGQ3128843
 
 ### Community 213 - "Community 213"
 Cohesion: 0.09
-Nodes (21): code:bash (pip install gaik[rag-workflow]), gaik-demo-api Deployment (OpenShift), gaik-demo Frontend Deployment (OpenShift), pgvector PostgreSQL Deployment (OpenShift), CSC Rahti 2 OpenShift Deployment, gaik-demo.2.rahtiapp.fi Route, ClusterIP Services (gaik-demo + gaik-demo-api), Basic API (+13 more)
+Nodes (22): code:bash (pip install gaik[rag-workflow]), gaik-demo-api Deployment (OpenShift), gaik-demo Frontend Deployment (OpenShift), pgvector PostgreSQL Deployment (OpenShift), CSC Rahti 2 OpenShift Deployment, gaik-demo.2.rahtiapp.fi Route, ClusterIP Services (gaik-demo + gaik-demo-api), Basic API (+14 more)
 
 ### Community 214 - "Community 214"
 Cohesion: 0.29
@@ -3292,8 +3505,8 @@ Cohesion: 0.32
 Nodes (7): bool, str, fetch_pypi_info(), format_output(), main(), Fetch package info from PyPI., Format PyPI data for display.
 
 ### Community 217 - "Community 217"
-Cohesion: 0.15
-Nodes (22): MagicMock, PostgresAgent, str, FakeProviderClient, Shared test helper: an explicit ``ProviderClient`` stub.  Lives next to the po, _make_agent(), Unit tests for PostgresAgent.query timeout handling.  When PostgreSQL fires ``, Regression: other psycopg errors keep the original 3-attempt loop. (+14 more)
+Cohesion: 0.10
+Nodes (28): Any, BaseModel, ChatMessage, ChatResponse, float, str, PostgresAgent, QueryResult (+20 more)
 
 ### Community 218 - "Community 218"
 Cohesion: 0.33
@@ -3304,7 +3517,7 @@ Cohesion: 0.09
 Nodes (40): bool, DataFrame, int, Path, str, build_or_load_index(), _build_refined_index(), compute_retrieval_metrics() (+32 more)
 
 ### Community 220 - "Community 220"
-Cohesion: 0.07
+Cohesion: 0.06
 Nodes (29): Audio/Video Recordings, code:block1 (gaik-transcriber:transcribe_audio), code:block2 (Image Type: [Handwritten notes / Diagram / Whiteboard / Figu), code:block3 (SLIDE 1: [Title]), code:block4 (<input_folder>/), Contents, Error Handling, Excel Files (+21 more)
 
 ### Community 221 - "Community 221"
@@ -3336,12 +3549,12 @@ Cohesion: 0.20
 Nodes (20): Path, _load_bundle(), load_config(), _load_output_schema(), load_requirements(), main(), Proof of Concept: Meeting Record Generation Assistant  Custom / hybrid pipeline, Persist a freshly generated schema to schemas/output_schema.* and update the has (+12 more)
 
 ### Community 228 - "Community 228"
-Cohesion: 0.06
-Nodes (60): AnswerResult, GeneratedSQL, AnswerResult, Any, bool, Connection, float, GeneratedSQL (+52 more)
+Cohesion: 0.05
+Nodes (68): AnswerResult, GeneratedSQL, AnswerResult, Any, bool, Connection, float, GeneratedSQL (+60 more)
 
 ### Community 229 - "Community 229"
-Cohesion: 0.12
-Nodes (25): build_curation_prompt(), build_polish_instruction(), build_reviewer_instruction(), build_section_user_prompt(), Genericized prompts for the agentic workflow.  Adapted from the Lotus building, Mandatory fact/format repair, then optional style-only polish., Mandatory fact/format repair, then optional style-only polish., Mandatory fact/format repair, then optional style-only polish. (+17 more)
+Cohesion: 0.14
+Nodes (23): build_orchestrator_graph(), build_phases(), _make_join_node(), _make_section_runner(), Section orchestrator for the agentic report workflow.  Sections are written in d, Run sections in dependency layers, review each, and assemble the report.      Re, Run sections in dependency layers, review each, and assemble the report.      Re, Run sections in dependency layers, review each, and assemble the report.      Re (+15 more)
 
 ### Community 230 - "Community 230"
 Cohesion: 0.15
@@ -3356,16 +3569,16 @@ Cohesion: 0.22
 Nodes (9): Dental Learning Assistant Use Case, ParallelTranscriber Component, TranscriptionConfig Object, Video Transcription and Subtitles Use Case, RAG Evaluation, Hybrid Search (Semantic + Keyword), PostgreSQL pgvector Store, Semantic Video Search Use Case (+1 more)
 
 ### Community 233 - "Community 233"
-Cohesion: 0.17
-Nodes (10): Evaluation Methods, LLM-as-Judge Evaluation Approach, Purpose, Structure, Usage, Cosine Similarity Metric for Extraction, Extraction Evaluation Pipeline, IE_evaluation.py Evaluation Script (+2 more)
+Cohesion: 0.15
+Nodes (11): Available evaluation methods, Evaluation Methods, LLM-as-Judge Evaluation Approach, Purpose, Structure, Usage, Cosine Similarity Metric for Extraction, Extraction Evaluation Pipeline (+3 more)
 
 ### Community 234 - "Community 234"
 Cohesion: 0.48
 Nodes (6): get_current_branch(), get_recent_tags(), has_uncommitted_changes(), main(), run(), tag_exists()
 
 ### Community 235 - "Community 235"
-Cohesion: 0.05
-Nodes (38): ChildRequirements, _ParsedChoice, _ParsedMessage, _ParsedShim, _print_single_model(), Helper to print a single Pydantic model., Run schema generation and capture aggregated usage + latency.          Returns, Helper to print a single Pydantic model. (+30 more)
+Cohesion: 0.17
+Nodes (17): CREATE_STEPS, EXAMPLE_STEPS, INCIDENT_CONFIG, composeIncidentPrompt(), DEFAULT_FIELD_IDS, examplePrompt(), INCIDENT_FIELDS, IncidentField (+9 more)
 
 ### Community 236 - "Community 236"
 Cohesion: 0.13
@@ -3380,12 +3593,12 @@ Cohesion: 0.33
 Nodes (6): bytes, int, Path, main(), LLM-as-Judge Likert-1-5 scoring demo.  Shows the difference between the v1 "se, render_pages_to_png()
 
 ### Community 239 - "Community 239"
-Cohesion: 0.14
-Nodes (4): Task 1: English PO with rich type qualifiers., Task 1: English PO with rich type qualifiers., Task 1: English PO with rich type qualifiers., TestParentWithNestedListPO
+Cohesion: 0.18
+Nodes (17): Opt-in agentic report workflow (V2).  Independent per-section drafting in para, _apply_corrections(), _check_prompt(), Correction, CorrectionList, diff_editor_run(), _find_search_string(), Diff-editor reviewer — ported from the Lotus ``agentic_diff_editor`` and generi (+9 more)
 
 ### Community 240 - "Community 240"
 Cohesion: 0.33
-Nodes (6): bytes, int, Path, main(), LLM-as-Judge Panel (jury) demo.  Runs three judges (Gemini + Claude + GPT-5.4-, render_pages_to_png()
+Nodes (6): bytes, int, Path, main(), LLM-as-Judge Panel (jury) demo.  Runs three judges (Gemini + Claude + GPT-6 Lu, render_pages_to_png()
 
 ### Community 241 - "Community 241"
 Cohesion: 0.04
@@ -3420,8 +3633,8 @@ Cohesion: 0.08
 Nodes (27): float, str, names_of(), Unit tests for Ranker.order_by / rank / to_documents.  This is the asc/desc su, A None never reaches a `<` comparison., Asserted explicitly so a future rewrite cannot silently lose stability., Guards the Retriever defect where scores leaked into the vector store., Ordering by a field must ignore relevance entirely. (+19 more)
 
 ### Community 249 - "Community 249"
-Cohesion: 0.29
-Nodes (6): model_name, requirements, fields, use_case_name, schema_format_version, user_requirements
+Cohesion: 0.04
+Nodes (88): Flag, HallucinationResult, HallucinationsTab(), Judged, agreementText(), applySuggestions(), DiffPart, Expectation (+80 more)
 
 ### Community 250 - "Community 250"
 Cohesion: 0.07
@@ -3472,12 +3685,12 @@ Cohesion: 0.29
 Nodes (6): model_name, requirements, fields, use_case_name, schema_format_version, user_requirements
 
 ### Community 262 - "Community 262"
-Cohesion: 0.29
-Nodes (6): model_name, requirements, fields, use_case_name, schema_format_version, user_requirements
+Cohesion: 0.21
+Nodes (25): apply_model_defaults(), cmd_curate(), cmd_normalize(), cmd_preflight(), cmd_rebuild(), cmd_synthesize(), cmd_update_sample(), cmd_validate_knowledge() (+17 more)
 
 ### Community 263 - "Community 263"
-Cohesion: 0.22
-Nodes (3): Task 6 (custom): Employee record — flat with enums and text-string salary., Task 6 (custom): Employee record — flat with enums and text-string salary., TestFlatEmployee
+Cohesion: 0.05
+Nodes (44): CodeBlock(), CodeBlockProps, Tab, CopyAndOpen(), CopyButton(), AgentLogos(), agents, AssetIcon() (+36 more)
 
 ### Community 264 - "Community 264"
 Cohesion: 0.04
@@ -3512,8 +3725,8 @@ Cohesion: 0.40
 Nodes (5): DetailCard (Diary) Internal Component, DiaryDetails Component, PhaseCard (Diary) Internal Component, SectionCard (Diary) Internal Component, IncidentDetails Component
 
 ### Community 272 - "Community 272"
-Cohesion: 0.15
-Nodes (17): Any, bool, int, str, _format_value(), Write a key-value pair with bold key., StructuredDataToPDF, Recursively render a value to the PDF. (+9 more)
+Cohesion: 0.14
+Nodes (19): Any, bool, int, str, _format_key(), _format_value(), Generate PDF documents from structured data., Write a key-value pair with bold key. (+11 more)
 
 ### Community 273 - "Community 273"
 Cohesion: 0.40
@@ -3532,20 +3745,20 @@ Cohesion: 0.40
 Nodes (4): model_name, requirements, fields, use_case_name
 
 ### Community 277 - "Community 277"
-Cohesion: 0.11
-Nodes (26): str, ask_question(), AskRequest, AskResponse, get_demo_schema(), _jsonable(), _llm_config(), _make_agent() (+18 more)
+Cohesion: 0.08
+Nodes (34): str, ask_question(), AskRequest, AskResponse, get_demo_schema(), _jsonable(), _llm_config(), _make_agent() (+26 more)
 
 ### Community 278 - "Community 278"
-Cohesion: 0.33
-Nodes (5): model_name, requirements, fields, use_case_name, schema_format_version
+Cohesion: 0.09
+Nodes (38): DiaryCard(), HEADER_FIELDS, CREATE_STEPS, DIARY_CONFIG, EXAMPLE_STEPS, composeDiaryPrompt(), DEFAULT_FIELD_IDS, DIARY_FIELDS (+30 more)
 
 ### Community 279 - "Community 279"
 Cohesion: 0.40
 Nodes (4): compat, __dirname, eslintConfig, __filename
 
 ### Community 280 - "Community 280"
-Cohesion: 0.08
-Nodes (31): action_items_record_Extraction, business_card_contact_information_Extraction, construction_blueprint_compliance_information_Extraction, construction_blueprint_header_fields_Extraction, drawing_views_grid_lines_and_callouts_record_Extraction, elevation_references_record_Extraction, finnish_construction_site_diary_extraction_Extraction, general_construction_notes_record_Extraction (+23 more)
+Cohesion: 0.20
+Nodes (19): PostgresAgent, _make_agent(), Unit tests for the postgres_agent extra_instructions / answer_language hooks., Build a PostgresAgent without opening a real DB connection., Record the messages passed to chat_parsed; always return canned SQL., Record the messages passed to chat; always return a canned answer., _stub_llm_for_answer(), _stub_llm_for_sql() (+11 more)
 
 ### Community 281 - "Community 281"
 Cohesion: 0.04
@@ -3580,8 +3793,8 @@ Cohesion: 0.08
 Nodes (25): code:yaml (---), code:json ({), code:markdown (## The Problem), code:markdown (## How We Evaluate), code:markdown (## Benchmarking Results), code:markdown (## Error Classification), code:markdown (## Real-World Applications), code:markdown (## Quality Considerations) (+17 more)
 
 ### Community 289 - "Community 289"
-Cohesion: 0.33
-Nodes (5): model_name, requirements, fields, use_case_name, schema_format_version
+Cohesion: 0.04
+Nodes (45): Audio transcription not working, Claude doesn't recognize the skill, code:block1 (pip install fastmcp gaik[transcriber] python-dotenv), code:block10 (Project-Update/), code:block11 (Use our company template to create a report from C:\Work\Qua), code:block12 (Quarterly-Review/), code:block13 (Create a report like last month's from C:\Reports\February u), code:block14 (February/) (+37 more)
 
 ### Community 290 - "Community 290"
 Cohesion: 0.40
@@ -3592,16 +3805,16 @@ Cohesion: 0.40
 Nodes (5): AICapDev (AI Implementation Capability Assessment Tool), GenAI Success Canvas, Strategy Layer, Use Case Selection Framework, Value Evaluation Framework
 
 ### Community 292 - "Community 292"
-Cohesion: 0.22
-Nodes (4): Task 5 (custom): Invoice header + line items., Task 5 (custom): Invoice header + line items., Task 5 (custom): Invoice header + line items., TestParentWithNestedListInvoice
+Cohesion: 0.13
+Nodes (23): adminLogout(), adminPasswordSchema, AdminResult, getReportWriterMaxReports(), isAdminAuthenticated(), limitOverrideSchema, requireAdmin(), resetReportUsage() (+15 more)
 
 ### Community 293 - "Community 293"
 Cohesion: 0.40
 Nodes (4): drawing_date, confidence_reason, confidence_score, value
 
 ### Community 294 - "Community 294"
-Cohesion: 0.22
-Nodes (4): Task 2 (provided): Simple PO line items., Task 2 (provided): Simple PO line items., Task 2 (provided): Simple PO line items., TestNestedListPO
+Cohesion: 0.05
+Nodes (72): Path, agreed_spec(), apply_spec(), cli(), _edit_knowledge(), full_run(), library_cli(), _link_dir() (+64 more)
 
 ### Community 295 - "Community 295"
 Cohesion: 0.83
@@ -3628,7 +3841,7 @@ Cohesion: 0.83
 Nodes (4): extraction_evaluator_example.py — ExtractionEvaluator + BatchRunner Demo, BatchEvaluationRunner (gaik.software_components.evaluators), EvaluationDataset (gaik.software_components.evaluators), ExtractionEvaluator (gaik.software_components.evaluators)
 
 ### Community 301 - "Community 301"
-Cohesion: 0.08
+Cohesion: 0.07
 Nodes (25): code:block1 (gaik-transcriber:transcribe_audio), code:block2 (view /mnt/skills/public/docx/SKILL.md), code:block3 (| Kenttä                      | Arvo                        ), Construction Diary Creation (Työmaapäiväkirja), Critical Rules to Prevent Hallucination:, Error Handling:, Example 1: Standard Daily Diary, Example 2: Minimal Information (+17 more)
 
 ### Community 302 - "Community 302"
@@ -3664,12 +3877,12 @@ Cohesion: 0.12
 Nodes (17): final_output, optional, produced_by, source, type, artifacts, approved_ticket, validation_report (+9 more)
 
 ### Community 310 - "Community 310"
-Cohesion: 0.08
+Cohesion: 0.07
 Nodes (25): code:block1 (gaik-transcriber:transcribe_audio), code:block2 (view /mnt/skills/public/docx/SKILL.md), code:block3 (| Field                          | Value                    ), Critical Rules to Prevent Hallucination:, Error Handling:, Example 1: Standard Safety Observation, Example 2: Minimal Information, Example 3: Missing File Path (+17 more)
 
 ### Community 311 - "Community 311"
-Cohesion: 0.10
-Nodes (45): Blueprint, bool, str, _hospital_blueprint(), _local(), _parse(), _pdf_blueprint(), Tests for the BPMN 2.0 visual-blueprint generator (V2 enhancement).  Verifies: (+37 more)
+Cohesion: 0.08
+Nodes (53): Blueprint, bool, str, _blueprint_with_loop_to_exception(), _hospital_blueprint(), _local(), _parse(), _pdf_blueprint() (+45 more)
 
 ### Community 312 - "Community 312"
 Cohesion: 0.08
@@ -3685,7 +3898,7 @@ Nodes (18): `additional_instructions`, API, code:python (from gaik.software_comp
 
 ### Community 315 - "Community 315"
 Cohesion: 0.09
-Nodes (24): Add New Standalone Feature, ➕ Adding New Code, code:text (implementation_layer/src/gaik/), code:text (gaik-toolkit/), code:mermaid (flowchart LR), code:python (from .your_parser import YourParser), code:toml ([project.optional-dependencies]), code:text (implementation_layer/src/gaik/software_components/analysis/) (+16 more)
+Nodes (26): Add New Standalone Feature, ➕ Adding New Code, code:text (implementation_layer/src/gaik/), code:bash (# 1. Delete old tag locally and from remote), code:text (gaik-toolkit/), code:mermaid (flowchart LR), code:python (from .your_parser import YourParser), code:toml ([project.optional-dependencies]) (+18 more)
 
 ### Community 316 - "Community 316"
 Cohesion: 0.50
@@ -3756,8 +3969,8 @@ Cohesion: 0.50
 Nodes (4): total_foundation_width, confidence_reason, confidence_score, value
 
 ### Community 333 - "Community 333"
-Cohesion: 0.05
-Nodes (33): API, Claude, Claude, code:bash (pip install "gaik[vision-extract]"), code:text (implementation_layer/examples/software_components/vision_ext), code:python (result.usage.provider), code:python (from dotenv import load_dotenv), code:python (from gaik.software_components.vision_extractor import Vision) (+25 more)
+Cohesion: 0.06
+Nodes (40): API, Claude, Claude, Claude, code:bash (pip install "gaik[vision-extract]"), code:text (schema.py           # Generated Pydantic model), code:python (extractor = VisionExtractor(), code:python (extractor = VisionExtractor() (+32 more)
 
 ### Community 334 - "Community 334"
 Cohesion: 0.67
@@ -3876,8 +4089,24 @@ Cohesion: 0.04
 Nodes (53): DataObjectRef_access_manifest, DataObjectRef_answer_records, DataObjectRef_document_collection, DataObjectRef_poc_input_bundle, DataObjectRef_query_set, EndEvent_success, Lane_gaik_ai, Lane_users (+45 more)
 
 ### Community 398 - "Community 398"
-Cohesion: 0.15
-Nodes (15): LLMJudge, calibrate_against_human_labels, LLM Judge Package Init, LLMJudgePanel, parse_hallucination_flags, parse_judge_flags, parse_text_judgement, CalibrationReport (+7 more)
+Cohesion: 0.08
+Nodes (34): FewShotExample, ScoringMode, str, ValidationFlag, ValidationRubric, LLMJudge, calibrate_against_human_labels, LLM Judge Package Init (+26 more)
+
+### Community 419 - "Community 419"
+Cohesion: 0.06
+Nodes (35): additionalProperties, description, type, enum, type, type, items, type (+27 more)
+
+### Community 423 - "Community 423"
+Cohesion: 0.18
+Nodes (18): str, MultimodalParser, Multi-provider PDF-to-markdown parser with layout-aware extraction., Multi-provider PDF-to-markdown parser with layout-aware extraction., Multi-provider PDF-to-markdown parser with layout-aware extraction., claude_example(), google_example(), openai_example() (+10 more)
+
+### Community 424 - "Community 424"
+Cohesion: 0.11
+Nodes (21): MonkeyPatch, Path, str, TestClient, client(), _events(), examples(), FakeWriter (+13 more)
+
+### Community 426 - "Community 426"
+Cohesion: 0.11
+Nodes (25): Any, Path, str, str, main(), Simple demonstration of the spreadsheet parser for .xlsx and .csv files.  Each, Convert a two-sheet workbook and a CSV file to Markdown tables., Spreadsheet Parser  Converts .xlsx workbooks and .csv files to Markdown tables (+17 more)
 
 ### Community 445 - "Community 445"
 Cohesion: 0.05
@@ -3888,8 +4117,8 @@ Cohesion: 0.12
 Nodes (23): Basic API, code:bash (pip install gaik[transcriber]), code:powershell (winget install ffmpeg), code:bash (brew install ffmpeg), code:bash (sudo apt-get install ffmpeg  # Ubuntu/Debian), code:bash (ffmpeg -version), code:python (from gaik.software_components.transcriber import Transcriber), code:python (from gaik.software_components.transcriber import Transcriber) (+15 more)
 
 ### Community 657 - "Community 657"
-Cohesion: 0.05
-Nodes (67): bool, str, bool, int, ModelProvider, Path, ReasoningEffort, str (+59 more)
+Cohesion: 0.15
+Nodes (23): int, Path, str, _build_claude_content(), _build_google_body(), _build_openai_content(), _encode_pdf_base64(), _extract_claude_usage() (+15 more)
 
 ### Community 658 - "Community 658"
 Cohesion: 0.09
@@ -3940,8 +4169,8 @@ Cohesion: 0.10
 Nodes (18): code:bash (pip install "gaik[postgres-agent]"), code:python (from gaik.software_components.postgres_agent import Postgres), code:sql (CREATE ROLE gaik_readonly LOGIN PASSWORD 'choose-a-strong-pa), `answer_language`, API, code:python (extra = """), Configuration, Constructor (+10 more)
 
 ### Community 670 - "Community 670"
-Cohesion: 0.08
-Nodes (52): DataFrame, _aggregate_pairwise(), _aggregate_referenced(), _build_outcome(), _canonicalize_verdict(), _CanonVerdict, _count_constraint_violations(), _emit() (+44 more)
+Cohesion: 0.06
+Nodes (78): DataFrame, _aggregate_pairwise(), _aggregate_referenced(), _build_outcome(), _calibration_scatter(), _canonicalize_verdict(), _CanonVerdict, client() (+70 more)
 
 ### Community 671 - "Community 671"
 Cohesion: 0.10
@@ -3956,12 +4185,12 @@ Cohesion: 0.10
 Nodes (19): code:json ({), code:block2 (TRANSCRIPT:), code:block3 (.), Fixed-option fields, Core guardrails (anti-hallucination), Disclaimer, Fields extracted, Free-text fields (kept short) (+11 more)
 
 ### Community 674 - "Community 674"
-Cohesion: 0.09
-Nodes (29): 1. Extractor – schema‑based structured data, 2. Parsers – documents → text / markdown, 2. Vision Extractor – document/image → structured data in one call, 3. Parsers – documents → text / markdown, 3. Transcriber – audio / video → transcripts, 4. RAG Components – retrieval‑augmented generation, 4. Transcriber and Transcript Enhancement – audio / video → transcripts, 5. Classification and Form Understanding (+21 more)
+Cohesion: 0.08
+Nodes (34): 1. Extractor – schema‑based structured data, 2. Parsers – documents → text / markdown, 2. Vision Extractor – document/image → structured data in one call, 3. Parsers – documents → text / markdown, 3. Transcriber – audio / video → transcripts, 4. RAG Components – retrieval‑augmented generation, 4. Transcriber and Transcript Enhancement – audio / video → transcripts, 5. Classification and Form Understanding (+26 more)
 
 ### Community 675 - "Community 675"
-Cohesion: 0.14
-Nodes (14): ExternalParty, description, properties, required, title, type, sends, to_step (+6 more)
+Cohesion: 0.06
+Nodes (51): HEADING_CLASS, Inlines(), MarkdownView(), Marked(), Block, countMatches(), escapeRegExp(), EXAMPLES (+43 more)
 
 ### Community 676 - "Community 676"
 Cohesion: 0.07
@@ -3981,7 +4210,7 @@ Nodes (19): 1. Transcriber, 2. Extractor, Adaptable to Other Domains, Business l
 
 ### Community 680 - "Community 680"
 Cohesion: 0.11
-Nodes (18): code:block1 (<component_name>/), code:python ("""<Component Title>), code:python (from gaik.software_components.config import create_openai_cl), code:toml ([project.optional-dependencies]), code:python (# Multi-provider PDF parsing (requires anthropic, google-aut), Contents, Directory layout, Examples directory (+10 more)
+Nodes (18): code:block1 (<component_name>/), code:python ("""<Component Title>), code:python (from gaik.software_components.llm.factory import build_compa), code:toml ([project.optional-dependencies]), code:python (# Multi-provider PDF parsing (requires anthropic, google-aut), Contents, Directory layout, Examples directory (+10 more)
 
 ### Community 681 - "Community 681"
 Cohesion: 0.10
@@ -3996,16 +4225,16 @@ Cohesion: 0.11
 Nodes (18): Benchmarking Results, code:mermaid (graph LR), code:mermaid (graph TD), Compound Word Inconsistency, Domain Terminology Errors, Error Classification, Getting Started, How We Evaluate (+10 more)
 
 ### Community 684 - "Community 684"
-Cohesion: 0.11
+Cohesion: 0.10
 Nodes (18): BOM Validation Details, Calculation Breakdown Template, code:block1 (============================================================), code:block2 (PRICE COMPARISON), code:block3 (WARNINGS/NOTES), code:block4 (BOM VALIDATION), Customization Guidelines, Example Variable Mapping (+10 more)
 
 ### Community 685 - "Community 685"
-Cohesion: 0.11
-Nodes (17): code:bash (pip install gaik[transcriber]), code:bash (ffmpeg -version), Basic API, Chunking Behavior, code:python (from gaik.software_components.transcriber import Transcriber), code:python (from gaik.software_components.transcriber import Transcriber), Environment Variables, Examples (+9 more)
+Cohesion: 0.10
+Nodes (18): code:bash (pip install gaik[transcriber]), code:bash (ffmpeg -version), code:python (from gaik.software_components.transcriber import Transcriber), Basic API, Chunking Behavior, code:python (from gaik.software_components.transcriber import Transcriber), code:python (from gaik.software_components.transcriber import Transcriber), Environment Variables (+10 more)
 
 ### Community 686 - "Community 686"
 Cohesion: 0.10
-Nodes (19): API Endpoints, code:bash (cd implementation_layer/toolkit_demo_app), code:bash (cp .env.example .env.local), code:bash (BACKEND_URL=http://localhost:8000), code:bash (# Terminal 1: Frontend), code:bash (docker compose up --build), code:block6 (toolkit_demo_app/), Docker (+11 more)
+Nodes (22): API Endpoints, code:bash (uv run python implementation_layer/toolkit_demo_app/scripts/), code:bash (cd implementation_layer/toolkit_demo_app), code:bash (cp .env.example .env.local), code:bash (BACKEND_URL=http://localhost:8000), code:bash (bun dev:all        # frontend + API together), code:bash (docker compose up --build), code:block7 (toolkit_demo_app/) (+14 more)
 
 ### Community 687 - "Community 687"
 Cohesion: 0.11
@@ -4024,12 +4253,12 @@ Cohesion: 0.10
 Nodes (21): code:block11 (- Type/Part Designation (required)), code:block12 (< $5,000:     0% discount), Customizing the Skill, 10. Company Information, 1. Price List Structure, 2. Volume Discount Tiers, 3. Fee Calculation Defaults, 4. BOM Field Names (+13 more)
 
 ### Community 691 - "Community 691"
-Cohesion: 0.11
-Nodes (17): enum, title, type, enum, title, type, enum, title (+9 more)
+Cohesion: 0.07
+Nodes (26): enum, title, type, enum, title, type, enum, title (+18 more)
 
 ### Community 692 - "Community 692"
 Cohesion: 0.10
-Nodes (32): HallucinationReport, Any, bool, bytes, int, ModelProvider, str, ValidationFlag (+24 more)
+Nodes (42): HallucinationFlag, HallucinationReport, Any, bool, bytes, int, ModelProvider, str (+34 more)
 
 ### Community 693 - "Community 693"
 Cohesion: 0.10
@@ -4041,15 +4270,15 @@ Nodes (14): Answer Generator, AnswerGenerator, Basic API, code:bash (pip install
 
 ### Community 695 - "Community 695"
 Cohesion: 0.12
-Nodes (16): Basic API, code:bash (pip install gaik[embedder]), code:python (from gaik.software_components.RAG.embedder import Embedder, ), code:python (from gaik.software_components.RAG.embedder import Embedder), code:python (from gaik.software_components.RAG.embedder import embed_text), Configuration, Convenience Function, Embedder (+8 more)
+Nodes (17): Basic API, code:bash (pip install gaik[embedder]), code:python (from gaik.software_components.RAG.embedder import Embedder, ), code:python (from gaik.software_components.RAG.embedder import Embedder), code:python (from gaik.software_components.RAG.embedder import embed_text), Configuration, Convenience Function, Embedder (+9 more)
 
 ### Community 696 - "Community 696"
 Cohesion: 0.09
 Nodes (22): description, items, title, type, description, items, title, type (+14 more)
 
 ### Community 697 - "Community 697"
-Cohesion: 0.11
-Nodes (18): Basic API, code:python (from gaik.software_components.extractor import SchemaGenerat), code:python (from gaik.software_components.extractor import SchemaGenerat), code:python (from gaik.software_components.extractor import DataExtractor), code:python (from gaik.software_components.extractor import get_openai_co), code:python (MODEL = 'gpt-5.6-sol'), Configuration, DataExtractor (+10 more)
+Cohesion: 0.10
+Nodes (20): Basic API, code:python (from gaik.software_components.extractor import SchemaGenerat), code:python (from gaik.software_components.extractor import SchemaGenerat), code:python (from gaik.software_components.extractor import DataExtractor), code:mermaid (flowchart TD), code:python (from gaik.software_components.extractor import get_openai_co), code:python (MODEL = 'gpt-5.6-sol'), Configuration (+12 more)
 
 ### Community 698 - "Community 698"
 Cohesion: 0.16
@@ -4061,7 +4290,7 @@ Nodes (14): Answer Generator, AnswerGenerator, Basic API, code:bash (pip install
 
 ### Community 700 - "Community 700"
 Cohesion: 0.12
-Nodes (16): Basic API, code:bash (pip install gaik[embedder]), code:python (from gaik.software_components.RAG.embedder import Embedder, ), code:python (from gaik.software_components.RAG.embedder import Embedder), code:python (from gaik.software_components.RAG.embedder import embed_text), Configuration, Convenience Function, Embedder (+8 more)
+Nodes (17): Basic API, code:bash (pip install gaik[embedder]), code:python (from gaik.software_components.RAG.embedder import Embedder, ), code:python (from gaik.software_components.RAG.embedder import Embedder), code:python (from gaik.software_components.RAG.embedder import embed_text), Configuration, Convenience Function, Embedder (+9 more)
 
 ### Community 701 - "Community 701"
 Cohesion: 0.12
@@ -4072,8 +4301,8 @@ Cohesion: 0.12
 Nodes (16): Basic API, code:bash (pip install gaik[vector-store]), code:python (from langchain_core.documents import Document), code:python (from gaik.software_components.RAG.vector_store import Vector), code:python (store.add(documents: list[Document], embeddings: list[list[f), Configuration, Environment Variables, Examples (+8 more)
 
 ### Community 703 - "Community 703"
-Cohesion: 0.12
-Nodes (14): Basic API, code:bash (pip install gaik[rag-workflow]), code:python (from gaik.software_modules.RAG_workflow import RAGWorkflow), Configuration, Environment Variables, Examples, Features, Installation (+6 more)
+Cohesion: 0.11
+Nodes (15): Basic API, code:bash (pip install gaik[rag-workflow]), code:python (from gaik.software_modules.RAG_workflow import RAGWorkflow), code:python (from gaik.software_components.llm import get_llm_config), Configuration, Environment Variables, Examples, Features (+7 more)
 
 ### Community 704 - "Community 704"
 Cohesion: 0.12
@@ -4084,8 +4313,8 @@ Cohesion: 0.12
 Nodes (16): 1. Transcriber, 2. TranscriptEnhancer, Adaptable to Other Domains, Business layer – use case specification, code:mermaid (flowchart LR), code:mermaid (flowchart LR), code:mermaid (flowchart TD), Downstream tasks (+8 more)
 
 ### Community 706 - "Community 706"
-Cohesion: 0.08
-Nodes (24): int, Blueprint, Path, main(), cx(), cy(), _empty_bpmn(), generate_bpmn() (+16 more)
+Cohesion: 0.06
+Nodes (36): int, int, Path, Blueprint, int, Path, main(), main() (+28 more)
 
 ### Community 707 - "Community 707"
 Cohesion: 0.12
@@ -4096,8 +4325,8 @@ Cohesion: 0.12
 Nodes (16): Basic API, code:bash (pip install gaik[vector-store]), code:python (from langchain_core.documents import Document), code:python (from gaik.software_components.RAG.vector_store import Vector), code:python (store.add(documents: list[Document], embeddings: list[list[f), Configuration, Environment Variables, Examples (+8 more)
 
 ### Community 709 - "Community 709"
-Cohesion: 0.12
-Nodes (16): code:block1 (┌─────────────────────┐      ┌─────────────────────┐), code:bash (# 1. Login to Rahti), code:bash (cd implementation_layer/toolkit_demo_app/openshift), Files, Architecture, Backend (gaik-demo-api), Build & Push Images, code:bash (cd implementation_layer/toolkit_demo_app/openshift) (+8 more)
+Cohesion: 0.10
+Nodes (23): code:block1 (┌─────────────────────┐      ┌─────────────────────┐), code:bash (git push origin <branch>:deploy/demo-staging   # add --force), code:bash (git push origin main:deploy/demo-app), Files, Architecture, Backend (gaik-demo-api), Build & Push Images, code:bash (# 1. Login to Rahti) (+15 more)
 
 ### Community 710 - "Community 710"
 Cohesion: 0.12
@@ -4128,8 +4357,8 @@ Cohesion: 0.12
 Nodes (16): UseCase, title, type, title, type, default, items, title (+8 more)
 
 ### Community 717 - "Community 717"
-Cohesion: 0.13
-Nodes (15): 1.1 List of metrics, 1.2 Metric descriptions, 1. Evaluation metrics, Character Error Rate (CER), code:text (WER = (S + D + I) / N * 100%), code:text (CER = (character substitutions + character deletions + chara), code:text (Spelling Error Rate = spelling substitutions / total referen), code:text (Substitution Rate = substitutions / total reference words * ) (+7 more)
+Cohesion: 0.15
+Nodes (14): 1.1 List of metrics, 1.2 Metric descriptions, 1. Evaluation metrics, Character Error Rate (CER), code:bash (uv venv .venv), code:bash (python side_by_side_compare.py reference original reports/ra), code:text (Substitution Rate = substitutions / total reference words * ), code:text (Deletion Rate = deletions / total reference words * 100%) (+6 more)
 
 ### Community 718 - "Community 718"
 Cohesion: 0.13
@@ -4148,8 +4377,8 @@ Cohesion: 0.13
 Nodes (14): Acceptable Minor Errors, Benchmarking Results, Enhancement Evaluation, Error Classification, Fixable Through Enhancement, Getting Started, How We Evaluate, Key Findings (+6 more)
 
 ### Community 722 - "Community 722"
-Cohesion: 0.11
-Nodes (18): 1 · RAG Parser, 2 · Embedder, 3 · Vector Store, 4 · Retriever, 5 · Answer Generator, 5 · Ranker, 6 · Answer Generator, Document Classifier (+10 more)
+Cohesion: 0.08
+Nodes (24): 1 · RAG Parser, 2 · Embedder, 3 · Vector Store, 4 · Retriever, 5 · Answer Generator, 5 · Ranker, 6 · Answer Generator, Document Classifier (+16 more)
 
 ### Community 723 - "Community 723"
 Cohesion: 0.12
@@ -4172,8 +4401,8 @@ Cohesion: 0.13
 Nodes (15): default, $ref, audit_log_required, contains_personal_data, external_model_api_allowed, local_processing_required, output_sensitivity, retention_policy (+7 more)
 
 ### Community 728 - "Community 728"
-Cohesion: 0.13
-Nodes (15): default, items, title, type, Participant, default, title, type (+7 more)
+Cohesion: 0.05
+Nodes (37): ChildRequirements, _ParsedChoice, _ParsedMessage, _print_single_model(), Helper to print a single Pydantic model., Run schema generation and capture aggregated usage + latency.          Returns, Helper to print a single Pydantic model., Run schema generation and capture aggregated usage + latency.          Returns (+29 more)
 
 ### Community 729 - "Community 729"
 Cohesion: 0.07
@@ -4204,20 +4433,20 @@ Cohesion: 0.14
 Nodes (12): BatchEvaluationRunner, code:python (for r in result.per_item:), code:python (from gaik.software_components.evaluators import RAGEvaluator), code:python (from gaik.software_components.evaluators import BatchEvaluat), code:python (from gaik.software_components.evaluators import EvaluationDa), Dataset format, Examples, ExtractionEvaluator (+4 more)
 
 ### Community 736 - "Community 736"
-Cohesion: 0.14
-Nodes (13): Audio components, code:bash (pip install 'gaik[llm-anthropic]'   # adds anthropic SDK), code:python (from gaik.software_components.extractor import DataExtractor), Configuration, Helpers, Installation, Migration checklist, Provider support matrix (+5 more)
+Cohesion: 0.08
+Nodes (23): Audio, Audio components, Choose providers per pipeline stage, code:bash (pip install 'gaik[extract]'), code:python (from pydantic import BaseModel, ConfigDict), code:python (from gaik.software_components.llm import create_llm_client, ), code:bash (uv run python implementation_layer/examples/software_compone), code:python (from gaik.software_modules.audio_to_structured_data import A) (+15 more)
 
 ### Community 737 - "Community 737"
 Cohesion: 0.14
 Nodes (13): ehdotus, kellonaika, lahellaPitiTilanne, mahdollisetSeuraukset, mitaTapahtui, paivamaara, rakennus, raportinTyyppi (+5 more)
 
 ### Community 738 - "Community 738"
-Cohesion: 0.26
-Nodes (13): Blueprint, int, str, _blueprint_specific_tokens(), _check_fills_cleanly(), _check_genericity(), _check_imports(), _check_parses() (+5 more)
+Cohesion: 0.17
+Nodes (19): Blueprint, bool, int, str, _blueprint_specific_tokens(), _check_fills_cleanly(), _check_genericity(), _check_imports() (+11 more)
 
 ### Community 739 - "Community 739"
-Cohesion: 0.17
-Nodes (22): _apply_type_overrides(), Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types (+14 more)
+Cohesion: 0.16
+Nodes (23): _apply_type_overrides(), Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types, Apply deterministic heuristics to FieldSpec entries to enforce critical types (+15 more)
 
 ### Community 740 - "Community 740"
 Cohesion: 0.14
@@ -4236,8 +4465,8 @@ Cohesion: 0.11
 Nodes (17): code:text (implementation_layer/examples/software_components/schema-gen), code:bash (cd implementation_layer/examples/software_components/schema-), code:text (schema_generated_single_doc/), code:text (schema.py), code:text (AZURE_API_KEY=...), API Credentials, code:text (implementation_layer/examples/software_components/schema-gen), code:bash (cd implementation_layer/examples/software_components/schema-) (+9 more)
 
 ### Community 744 - "Community 744"
-Cohesion: 0.15
-Nodes (12): API, code:bash (pip install gaik[llm-judge]), code:python (import fitz  # pymupdf — render the source PDF to page image), code:python (class LLMJudge:), Installation, LLM-as-Judge Validator (v2), Picking a model, Quick Start (+4 more)
+Cohesion: 0.14
+Nodes (14): API, code:bash (pip install gaik[llm-judge]), code:python (import fitz  # pymupdf — render the source PDF to page image), code:python (from gaik.software_components.llm import get_llm_config), code:python (class LLMJudge:), Installation, LLM-as-Judge Validator (v2), Picking a model (+6 more)
 
 ### Community 745 - "Community 745"
 Cohesion: 0.15
@@ -4276,16 +4505,16 @@ Cohesion: 0.17
 Nodes (11): Adding/Editing Documentation, code:bash (pnpm install    # Install dependencies), code:mdx (---), code:json ({), code:block4 (guidance_layer/website/), Deployment, Development, GAIK Documentation Website (+3 more)
 
 ### Community 754 - "Community 754"
-Cohesion: 0.17
-Nodes (11): [Audio-to-Structured-Data](./audio_to_structured_data), Available Examples, code:bash (pip install gaik), code:bash (export OPENAI_API_KEY="your-key-here"), [Documents-to-Structured-Data](./documents_to_structured_data), Getting Started, Modules vs Components, [RAG-Workflow](./RAG_workflow) (+3 more)
+Cohesion: 0.15
+Nodes (12): [Audio-to-Structured-Data](./audio_to_structured_data), Available Examples, code:bash (pip install gaik), code:bash (export OPENAI_API_KEY="your-key-here"), [Documents-to-Structured-Data](./documents_to_structured_data), Getting Started, Modules vs Components, [RAG-Workflow](./RAG_workflow) (+4 more)
 
 ### Community 755 - "Community 755"
 Cohesion: 0.17
 Nodes (12): Breakdown Table Columns, Calculation Breakdown Document, code:block15 (╔═══════════════════════════════════════════════════════════), code:block16 (╔═══════════════════════════════════════════════════════════), code:block17 (=== CALCULATION BREAKDOWN ===), code:markdown (Output: CLI         # Print to console only), Compact Format (Alternative), Customization (+4 more)
 
 ### Community 756 - "Community 756"
-Cohesion: 0.17
-Nodes (12): code:python (from gaik.software_components.llm import get_llm_config, cre), code:python (# google: {"provider": "google", "api_key": str, "model": "g), code:toml (gaik[llm-anthropic]   # adds anthropic SDK), code:python (from gaik.software_components.extractor import DataExtractor), Example: same code, three providers, Extras, get_llm_config(), Helpers (+4 more)
+Cohesion: 0.15
+Nodes (13): code:python (from gaik.software_components.llm import get_llm_config, cre), code:python (# google: {"provider": "google", "api_key": str, "model": "g), code:toml (gaik[llm-anthropic]   # adds anthropic SDK), code:python (from gaik.software_components.extractor import DataExtractor), Example: same code, three providers, Extras, get_llm_config(), Helpers (+5 more)
 
 ### Community 757 - "Community 757"
 Cohesion: 0.17
@@ -4300,19 +4529,19 @@ Cohesion: 0.18
 Nodes (10): Available Evaluation Methods, Evaluation Principles, Extraction Evaluation, LLM-as-Judge Validation, LLM-Judge Prompt Benchmark, RAG Evaluation, Report Writing Evaluation, Transcription Evaluation (+2 more)
 
 ### Community 760 - "Community 760"
-Cohesion: 0.18
-Nodes (9): Best Practices, Citation, For Enhancement, For Evaluation, For Production Use, High WER (> 30%), Related Resources, Transcription Evaluation (+1 more)
+Cohesion: 0.17
+Nodes (10): Citation, High WER (> 30%), October 2026: current models and an LLM judge, Read an actual output, Related examples, Related Resources, Results at a glance, Transcription evaluation (+2 more)
 
 ### Community 761 - "Community 761"
 Cohesion: 0.18
 Nodes (10): code:bash (python pipeline_example.py), Files, Indexing Phase, Module Outputs, Module Workflow, Query Phase, RAG-Workflow Module Example, Related Documentation (+2 more)
 
 ### Community 762 - "Community 762"
-Cohesion: 0.18
-Nodes (10): Add currency conversion step, Calculation Logic Reference, code:block1 (1. Line Item Calculations (per item)), code:block29 (Grand_Total = Net_Material_Cost + Total_Fees + Shipping + Ta), code:block30 (Net_Material_Cost = $24,289.12), code:block39, Final Calculation, Grand Total (+2 more)
+Cohesion: 0.32
+Nodes (6): Add currency conversion step, Calculation Logic Reference, code:block1 (1. Line Item Calculations (per item)), code:block39, Overview, Round to 2 decimal places
 
 ### Community 763 - "Community 763"
-Cohesion: 0.18
+Cohesion: 0.17
 Nodes (10): code:block11 (Terms & Conditions:), code:block14 (════════════════════════════════════════════════════════════), Output Format Reference, Output Modes, Processing Summary Output, Sales Order Sections, Section 7: Footer, Section Overview (+2 more)
 
 ### Community 764 - "Community 764"
@@ -4352,8 +4581,8 @@ Cohesion: 0.20
 Nodes (10): audit_log_required, contains_personal_data, external_model_api_allowed, local_processing_required, output_sensitivity, retention_policy, stores_input_data, stores_outputs (+2 more)
 
 ### Community 773 - "Community 773"
-Cohesion: 0.20
-Nodes (9): Get information about the generated schema.          Returns:             Dic, Resolve whether ``f`` carries a *usable* explicit default for its type.      `, Get information about the generated schema.          Returns:             Dic, Get information about the generated schema.          Returns:             Dic, Get information about the generated schema.          Returns:             Dic, Get information about the generated schema.          Returns:             Dic, Get information about the generated schema.          Returns:             Dic, Get information about the generated schema.          Returns:             Dic (+1 more)
+Cohesion: 0.06
+Nodes (30): reasoning_effort, temperature, description, instructions, language, models, curator, reviewer (+22 more)
 
 ### Community 774 - "Community 774"
 Cohesion: 0.20
@@ -4364,8 +4593,8 @@ Cohesion: 0.36
 Nodes (9): Path, str, clean_text_translation(), evaluate_model(), _fuzzy_match_filename(), main(), translation_evaluation.py BLEU / chrF / TER / Cosine Similarity evaluation for, Given a ground truth filename (e.g. 'ABC_20210115_Final.txt'),     finds the be (+1 more)
 
 ### Community 776 - "Community 776"
-Cohesion: 0.09
-Nodes (45): ChildRequirements, _build_parse_requirements_prompt(), CompositeExtractionRequirements, _create_parent_with_nested_list_model(), _ensure_no_list_dict_fields(), Requirements for one parent record with one or more repeated child collections., Requirements for one parent record with one or more repeated child collections., Requirements for one parent record with one or more repeated child collections. (+37 more)
+Cohesion: 0.12
+Nodes (32): Any, Namespace, str, changed_stages(), cmd_apply_spec(), cmd_propose_spec(), complete_spec(), find_secrets() (+24 more)
 
 ### Community 777 - "Community 777"
 Cohesion: 0.20
@@ -4388,16 +4617,16 @@ Cohesion: 0.20
 Nodes (10): code:block18 (Total_Cutting_Fees = Σ Cutting_Cost (for all items)), code:block19 (Total_Testing_Fees = Σ Testing_Cost (for all items)), code:block20 (Total_Cert_Fees = Σ Cert_Cost (for all items)), code:block21 (Total_Fees = Total_Cutting_Fees + Total_Testing_Fees + Total), code:block22 (Total_Cutting_Fees = $30.00), Combined Fees, Fees Aggregation, Total Certification Fees (+2 more)
 
 ### Community 782 - "Community 782"
-Cohesion: 0.20
-Nodes (10): code:block1 (============================================================), code:block2 (SO-{SO_Number}_{Customer_Name}_{Date}.txt), code:block3 (SO-2025-15903_AutoTech_Manufacturing_2025-11-15.txt), Complete Default Format, Default Text Format (When No Sample Provided), Example Variables, File Naming Convention, File Specifications (+2 more)
+Cohesion: 0.12
+Nodes (16): code:block1 (============================================================), code:block2 (SO-{SO_Number}_{Customer_Name}_{Date}.txt), code:block3 (SO-2025-15903_AutoTech_Manufacturing_2025-11-15.txt), Complete Default Format, Conditional Display, Currency Formatting, Default Text Format (When No Sample Provided), Example Variables (+8 more)
 
 ### Community 783 - "Community 783"
 Cohesion: 0.20
 Nodes (10): audit_log_required, contains_personal_data, external_model_api_allowed, local_processing_required, output_sensitivity, retention_policy, stores_input_data, stores_outputs (+2 more)
 
 ### Community 784 - "Community 784"
-Cohesion: 0.22
-Nodes (8): Audio to Structured Data (Software Component), Basic Usage, Constructor, Parameters, Returns (`PipelineResult`), `run(...)`, Schema Persistence (example pattern), code:python (from gaik.software_modules.audio_to_structured_data import A)
+Cohesion: 0.20
+Nodes (9): Audio to Structured Data (Software Component), Basic Usage, code:python (from gaik.software_components.llm import get_llm_config), Constructor, Parameters, Returns (`PipelineResult`), `run(...)`, Schema Persistence (example pattern) (+1 more)
 
 ### Community 785 - "Community 785"
 Cohesion: 0.22
@@ -4428,12 +4657,12 @@ Cohesion: 0.22
 Nodes (8): assumptions, blueprint_version, change_log, target_output_spec, traceability, visualizations, workflow, steps
 
 ### Community 792 - "Community 792"
-Cohesion: 0.22
-Nodes (8): Available Parsers, code:bash (pip install gaik[parser]), Environment Variables, Examples, Installation, License, Quick Comparison, Resources
+Cohesion: 0.20
+Nodes (9): Available Parsers, code:bash (pip install gaik[parser]), code:python (from gaik.software_components.llm import get_llm_config), Environment Variables, Examples, Installation, License, Quick Comparison (+1 more)
 
 ### Community 793 - "Community 793"
-Cohesion: 0.22
-Nodes (8): Audio to Structured Data (Software Component), Basic Usage, code:python (from gaik.software_modules.audio_to_structured_data import A), Constructor, Parameters, Returns (`PipelineResult`), `run(...)`, Schema Persistence (example pattern)
+Cohesion: 0.20
+Nodes (9): Audio to Structured Data (Software Component), Basic Usage, code:python (from gaik.software_modules.audio_to_structured_data import A), code:python (from gaik.software_components.llm import get_llm_config), Constructor, Parameters, Returns (`PipelineResult`), `run(...)` (+1 more)
 
 ### Community 794 - "Community 794"
 Cohesion: 0.20
@@ -4444,20 +4673,20 @@ Cohesion: 0.22
 Nodes (7): bool, str, main(), Example: ask a PostgreSQL database questions in natural language.  Demonstrate, Seed a small demo database for the postgres_agent example.  Creates an isolate, Create and populate the demo schema.      Args:         database_url: Postgre, seed_demo_db()
 
 ### Community 796 - "Community 796"
-Cohesion: 0.22
-Nodes (8): code:bash (pip install gaik[parser]), Available Parsers, Environment Variables, Examples, Installation, License, Quick Comparison, Resources
+Cohesion: 0.20
+Nodes (9): code:bash (pip install gaik[parser]), Available Parsers, code:python (from gaik.software_components.llm import get_llm_config), Environment Variables, Examples, Installation, License, Quick Comparison (+1 more)
 
 ### Community 797 - "Community 797"
 Cohesion: 0.22
 Nodes (9): code:block12 (Subtotal = Σ Material_Cost (for all items)), code:block13 (Item 1: $5,700.00), code:block14 (IF Subtotal < $5,000:), code:block15 (Volume_Discount = Subtotal × Discount_Rate), code:block16 (Net_Material_Cost = Subtotal - Volume_Discount), code:block17 (Subtotal = $25,567.50), Order-Level Calculations, Subtotal (Material Cost Only) (+1 more)
 
 ### Community 798 - "Community 798"
-Cohesion: 0.20
-Nodes (9): code:python (class TranscriptionModel(StrEnum):), code:python (cancel = SimpleCancellation()), Parallel Transcriber Module, ParallelTranscriber, SimpleCancellation, TranscriptionConfig, TranscriptionModel, TranscriptionResult (+1 more)
+Cohesion: 0.18
+Nodes (10): code:python (class TranscriptionModel(StrEnum):), code:python (cancel = SimpleCancellation()), Parallel Transcriber Module, ParallelTranscriber, SimpleCancellation, TranscriptionConfig, TranscriptionModel, TranscriptionResult (+2 more)
 
 ### Community 799 - "Community 799"
-Cohesion: 0.07
-Nodes (27): assumptions, blueprint_version, change_log, components, custom_components, selected_building_blocks, selected_modules, evaluation (+19 more)
+Cohesion: 0.06
+Nodes (33): assumptions, blueprint_version, change_log, components, custom_components, selected_building_blocks, selected_modules, evaluation (+25 more)
 
 ### Community 800 - "Community 800"
 Cohesion: 0.22
@@ -4468,8 +4697,8 @@ Cohesion: 0.25
 Nodes (7): Audio-to-Structured-Data Module Examples, Files, Module Outputs, Related Documentation, Usage, What These Examples Show, code:bash (# Run the basic pipeline example)
 
 ### Community 802 - "Community 802"
-Cohesion: 0.25
-Nodes (7): Basic Usage, Constructor, Parameters, Returns (`PipelineResult`), `run(...)`, Schema Persistence (example pattern), code:python (from gaik.software_modules.documents_to_structured_data impo)
+Cohesion: 0.22
+Nodes (8): Basic Usage, code:python (from gaik.software_components.llm import get_llm_config), Constructor, Parameters, Returns (`PipelineResult`), `run(...)`, Schema Persistence (example pattern), code:python (from gaik.software_modules.documents_to_structured_data impo)
 
 ### Community 803 - "Community 803"
 Cohesion: 0.25
@@ -4480,16 +4709,16 @@ Cohesion: 0.05
 Nodes (39): attempt_number, attempt_type, automatic_checks, EQ4-X01, EQ4-X02, EQ4-X03, EQ4-X04, automatic_execution_successful (+31 more)
 
 ### Community 805 - "Community 805"
-Cohesion: 0.25
-Nodes (7): Basic Usage, code:python (from gaik.software_modules.documents_to_structured_data impo), Constructor, Parameters, Returns (`PipelineResult`), `run(...)`, Schema Persistence (example pattern)
+Cohesion: 0.22
+Nodes (8): Basic Usage, code:python (from gaik.software_modules.documents_to_structured_data impo), code:python (from gaik.software_components.llm import get_llm_config), Constructor, Parameters, Returns (`PipelineResult`), `run(...)`, Schema Persistence (example pattern)
 
 ### Community 806 - "Community 806"
 Cohesion: 0.25
 Nodes (7): components, created_at, pattern_key, status, topology_signature, validated_by, variables_used
 
 ### Community 807 - "Community 807"
-Cohesion: 0.25
-Nodes (7): code:bash (python transcriber_example.py path/to/audio.mp3), code:bash (python transcriber_exmaple_local_model.py), Files, Related Documentation, Transcriber Example, Usage, What These Examples Show
+Cohesion: 0.20
+Nodes (9): code:bash (python transcriber_example.py path/to/audio.mp3), code:bash (python transcriber_exmaple_local_model.py), code:mermaid (flowchart LR), Files, Input, output and evaluation, Related documentation, Transcriber Example, Usage (+1 more)
 
 ### Community 808 - "Community 808"
 Cohesion: 0.25
@@ -4524,8 +4753,8 @@ Cohesion: 0.29
 Nodes (6): Extractor Examples, Files, Related Documentation, Usage, What These Examples Show, code:bash (# Run individual examples)
 
 ### Community 816 - "Community 816"
-Cohesion: 0.14
-Nodes (13): code:block1 (/solution-wizard), code:bash (cd implementation_layer/toolkit_demo_app), code:bash (cd implementation_layer/solution_wizard), Full documentation, How to run it, Layer-Based Architecture, License, Overall approach (+5 more)
+Cohesion: 0.13
+Nodes (14): code:block1 (/solution-wizard), code:bash (cd implementation_layer/toolkit_demo_app), code:bash (cd implementation_layer/solution_wizard), Full documentation, How to run it, Layer-Based Architecture, License, Overall approach (+6 more)
 
 ### Community 817 - "Community 817"
 Cohesion: 0.29
@@ -4629,11 +4858,11 @@ Nodes (6): enhanced_transcript, final_output, optional, produced_by, source, typ
 
 ### Community 842 - "Community 842"
 Cohesion: 0.12
-Nodes (16): Authoring a new entry from documentation (for approved `new` findings), code:bash (python .claude/skills/gaik-sync/scripts/audit_registry.py --), code:bash (python .claude/skills/gaik-sync/scripts/audit_registry.py), code:bash (# What does the wizard consider its last-validated state?), code:block4 (| # | Finding | Category | File | Field / location | Current), code:bash (cd implementation_layer/solution_wizard), code:bash (python -c "from importlib.metadata import version; print(ver), GAIK Sync — keep the Solution Wizard in step with gaik (+8 more)
+Nodes (16): Authoring a new entry from documentation (for approved `new` findings), code:bash (uv run python .claude/skills/gaik-sync/scripts/audit_registr), code:bash (uv run python .claude/skills/gaik-sync/scripts/audit_registr), code:bash (# What does the wizard consider its last-validated state?), code:block4 (| # | Finding | Category | File | Field / location | Current), code:bash (uv run python -m pytest implementation_layer/solution_wizard), code:bash (python -c "from importlib.metadata import version; print(ver), GAIK Sync — keep the Solution Wizard in step with gaik (+8 more)
 
 ### Community 843 - "Community 843"
-Cohesion: 0.05
-Nodes (68): code:bash (pip install "gaik[multi-source-report-generator]"), code:bash (pip install "gaik[multi-source-report-generator-agentic]"), `run(...)`, Agentic API Calls, Agentic Curation, Agentic Mode Details, Agentic Progress, Agentic Review Behavior (+60 more)
+Cohesion: 0.15
+Nodes (16): `run(...)`, code:python (review_options={), code:text (output_dir/), code:python (from gaik.software_modules.multi_source_report_generator imp), code:text (implementation_layer/examples/software_modules/multi_source_), Components Used, Environment / API keys, Example (+8 more)
 
 ### Community 844 - "Community 844"
 Cohesion: 0.33
@@ -4688,16 +4917,16 @@ Cohesion: 0.33
 Nodes (5): code:bash (# Local parsing example), Files, Related Documentation, Usage, What These Examples Show
 
 ### Community 857 - "Community 857"
-Cohesion: 0.33
+Cohesion: 0.29
 Nodes (5): Automated Testing (Future), code:python (def test_scenario_1():), Evaluation Scenarios, Manual Testing, Running Evaluations
 
 ### Community 858 - "Community 858"
-Cohesion: 0.33
-Nodes (5): 1. ExtractionRequirements `field_type` enum, 2. Azure OpenAI structured output rejects bare `dict` types, code:python (class Medication(BaseModel):), Schema generation constraints, Solution Wizard — Claude Code Notes
+Cohesion: 0.29
+Nodes (6): 1. ExtractionRequirements `field_type` enum, 2. Azure OpenAI structured output rejects bare `dict` types, code:python (class Medication(BaseModel):), Provider configuration when wiring a PoC, Schema generation constraints, Solution Wizard — Claude Code Notes
 
 ### Community 859 - "Community 859"
-Cohesion: 0.22
-Nodes (4): Task 4 (custom): Medical lab results., Task 4 (custom): Medical lab results., Task 4 (custom): Medical lab results., TestNestedListLabResults
+Cohesion: 0.06
+Nodes (30): reasoning_effort, temperature, description, instructions, language, models, curator, reviewer (+22 more)
 
 ### Community 860 - "Community 860"
 Cohesion: 0.33
@@ -4752,8 +4981,8 @@ Cohesion: 0.33
 Nodes (6): code:block4 (Format: SO-[Year]-[5-digit sequence]), code:block5 (╔═══════════════════════════════════════════════════════════), Fields, Layout Example, Section 1: Header, SO Number Generation
 
 ### Community 873 - "Community 873"
-Cohesion: 0.33
-Nodes (6): Conditional Display, Currency Formatting, Formatting Rules, Section Headers, Tables, Text Alignment
+Cohesion: 0.03
+Nodes (78): AccessNotice(), EMPTY, GPT_PRESETS, IconType, LABELS, ModelSettingsButton(), ModelSettingsNotice(), Preset (+70 more)
 
 ### Community 874 - "Community 874"
 Cohesion: 0.33
@@ -4796,12 +5025,12 @@ Cohesion: 0.29
 Nodes (7): LLMJudge, call, construct, import, install_extra, options, returns
 
 ### Community 884 - "Community 884"
-Cohesion: 0.29
+Cohesion: 0.25
 Nodes (7): MultimodalParser, call, construct, import, install_extra, options, returns
 
 ### Community 885 - "Community 885"
-Cohesion: 0.25
-Nodes (7): PgVectorStore, call, construct, import, install_extra, options, returns
+Cohesion: 0.22
+Nodes (9): PgVectorStore, call, check_health, construct, hybrid_metadata, import, install_extra, options (+1 more)
 
 ### Community 886 - "Community 886"
 Cohesion: 0.29
@@ -4904,12 +5133,12 @@ Cohesion: 0.40
 Nodes (5): models, answer_model, embedding_model, provider, temperature
 
 ### Community 911 - "Community 911"
-Cohesion: 0.40
-Nodes (4): Agent Skills, How No-Code Assets Fit In, Overview, Prompt Templates
+Cohesion: 0.29
+Nodes (6): Agent Skills, code:bash (# Claude Code), How No-Code Assets Fit In, Overview, Prompt Templates, Skills for coding agents
 
 ### Community 912 - "Community 912"
-Cohesion: 0.33
-Nodes (5): Audio-to-Structured-Data, Document-to-Structured-Data, Multi-Source-Report-Generator, Overview, RAG-Workflow
+Cohesion: 0.25
+Nodes (7): Audio-to-Structured-Data, Document-to-Structured-Data, Multi-Source-Report-Generator, Multi-Source-Report-Generator (legacy), Overview, RAG-Workflow, Report-Writer
 
 ### Community 913 - "Community 913"
 Cohesion: 0.40
@@ -5020,8 +5249,8 @@ Cohesion: 0.05
 Nodes (39): attempt_number, attempt_type, automatic_checks, EQ4-X01, EQ4-X02, EQ4-X03, EQ4-X04, automatic_execution_successful (+31 more)
 
 ### Community 940 - "Community 940"
-Cohesion: 0.18
-Nodes (14): _chunked(), embed_texts(), OpenAI/Azure OpenAI text embedding utilities., Embed documents or raw strings while preserving metadata., Embed a single query string for search., One-shot embedding helper., _with_retries(), Text embedding building block. (+6 more)
+Cohesion: 0.06
+Nodes (47): Embedder, _chunked(), embed_texts(), Embedder, OpenAI/Azure OpenAI text embedding utilities., Embed a single query string for search., One-shot embedding helper., Generate vector embeddings from text. (+39 more)
 
 ### Community 941 - "Community 941"
 Cohesion: 0.50
@@ -5085,7 +5314,7 @@ Nodes (3): Contents, Security and Compliance Layer, Status
 
 ### Community 957 - "Community 957"
 Cohesion: 0.09
-Nodes (33): _build_variables(), _determine_pattern(), Return the PoC pattern name (= template subdir) to use.      Discovery order:, Return the PoC pattern name (= template subdir) to use.      Discovery order:, Return the PoC pattern name (= template subdir) to use.      Discovery order:, True when the blueprint requests a PDF report of the PoC output.      Triggered, Build the substitution variables dict from the blueprint., Build the substitution variables dict from the blueprint. (+25 more)
+Nodes (32): _determine_pattern(), Return the PoC pattern name (= template subdir) to use.      Discovery order:, Return the PoC pattern name (= template subdir) to use.      Discovery order:, Return the PoC pattern name (= template subdir) to use.      Discovery order:, Return the PoC pattern name (= template subdir) to use.      Discovery order:, Two selected modules (e.g. audio + document) must not silently drop one., Two selected modules (e.g. audio + document) must not silently drop one., Two selected modules (e.g. audio + document) must not silently drop one. (+24 more)
 
 ### Community 958 - "Community 958"
 Cohesion: 0.50
@@ -5128,8 +5357,8 @@ Cohesion: 0.67
 Nodes (3): Output Files, 1. Sales Order Document, 2. Calculation Breakdown
 
 ### Community 975 - "Community 975"
-Cohesion: 0.33
-Nodes (7): int, Path, _FakeAudio, Chunking behavior for the regular Transcriber component., test_gpt_transcription_chunks_when_duration_exceeds_limit(), test_gpt_transcription_single_pass_when_within_size_and_duration(), _transcriber()
+Cohesion: 0.11
+Nodes (25): float, int, Path, slice, _FakeAudio, _FakeChunk, Chunking behavior for the regular Transcriber component., Regression for #11: the shipped default must not exceed what the API takes. (+17 more)
 
 ### Community 976 - "Community 976"
 Cohesion: 0.67
@@ -5168,8 +5397,8 @@ Cohesion: 0.67
 Nodes (3): type, enum, type
 
 ### Community 987 - "Community 987"
-Cohesion: 0.40
-Nodes (5): code:bash (uv sync --all-extras), gaik-sync (keep the Solution Wizard in step with gaik), gaik-toolkit agent instructions, graphify, graphify (optional — only when the tooling is present)
+Cohesion: 0.15
+Nodes (13): agent-skills (the published agent plugin), code:bash (uv sync --all-extras), docs site (GitHub Pages), formatting, gaik-sync (keep the Solution Wizard in step with gaik), gaik-toolkit agent instructions, graphify, graphify (optional) (+5 more)
 
 ### Community 988 - "Community 988"
 Cohesion: 0.50
@@ -5183,17 +5412,21 @@ Nodes (39): attempt_number, attempt_type, automatic_checks, EQ4-X01, EQ4-X02, EQ
 Cohesion: 0.05
 Nodes (39): attempt_number, attempt_type, automatic_checks, EQ4-X01, EQ4-X02, EQ4-X03, EQ4-X04, automatic_execution_successful (+31 more)
 
+### Community 999 - "Community 999"
+Cohesion: 0.08
+Nodes (25): 1. SourceNormalizer (Stage 1), 2. KnowledgeCurator (Stage 2), 3. ReportSynthesizer (Stage 3), Adaptable to Other Domains, Business layer – use case specification, code:mermaid (flowchart LR), code:mermaid (flowchart LR), code:mermaid (flowchart LR) (+17 more)
+
 ### Community 1000 - "Community 1000"
 Cohesion: 0.05
 Nodes (39): attempt_number, attempt_type, automatic_checks, EQ4-X01, EQ4-X02, EQ4-X03, EQ4-X04, automatic_execution_successful (+31 more)
 
 ### Community 1010 - "Community 1010"
-Cohesion: 0.15
-Nodes (15): Any, bool, Document, float, int, str, Retriever building block., _bm25() (+7 more)
+Cohesion: 0.06
+Nodes (41): RAGWorkflow (pipeline module), bool, Document, float, int, str, bool, float (+33 more)
 
 ### Community 1011 - "Community 1011"
-Cohesion: 0.29
-Nodes (4): Task 3 (provided): Finnish incident report — verifies flat path unchanged., Task 3 (provided): Finnish incident report — verifies flat path unchanged., Task 3 (provided): Finnish incident report — verifies flat path unchanged., TestFlatIncident
+Cohesion: 0.11
+Nodes (25): PgVectorStore, str, HealthReport, What :meth:`PgVectorStore.health` found.      ``ok`` is ``True`` when ``proble, _drop(), _filled(), PgVectorStore: column type, session settings, similarity in hybrid results, heal, RRF scores are built from rank positions, so they cannot tell a real     match (+17 more)
 
 ### Community 1012 - "Community 1012"
 Cohesion: 0.14
@@ -5212,20 +5445,20 @@ Cohesion: 0.40
 Nodes (5): 18.1 GenAI Product Canvas, 18.2 Technical Specification, 18.3 User Guide, 18.4 Developer Guide, 18. Documentation Generated by the Wizard
 
 ### Community 1016 - "Community 1016"
-Cohesion: 0.12
-Nodes (19): Path, str, UploadFile, _find_example_dir(), generate_report(), get_example_config(), get_example_file(), get_example_sample_report() (+11 more)
+Cohesion: 0.19
+Nodes (32): ArgumentParser, Any, int, Namespace, Path, str, all_templates(), build_parser() (+24 more)
 
 ### Community 1017 - "Community 1017"
-Cohesion: 0.03
-Nodes (92): ClaudeAgentOptions, FileAttachment, FileResponse, download_pdf(), ClaudeSDKClient, int, Path, str (+84 more)
+Cohesion: 0.08
+Nodes (32): ClaudeAgentOptions, ClaudeSDKClient, Path, StreamingResponse, _bootstrap_prompt(), _build_options(), _foundry_env(), MessageRequest (+24 more)
 
 ### Community 1018 - "Community 1018"
-Cohesion: 0.22
-Nodes (12): float, str, Transcribe a single (small) file with Whisper Local, return SRT., _whisper_local_segments_to_srt(), combine_srt_chunks(), _normalize_text_for_comparison(), Convert an SRT timestamp (``HH:MM:SS,mmm``) to seconds.      Both comma and do, Convert seconds to SRT timestamp format (``HH:MM:SS,mmm``). (+4 more)
+Cohesion: 0.12
+Nodes (28): Any, BaseModel, str, Field names that the schema generator reduced to ASCII get their letters back., test_descriptions_can_supply_the_spelling(), test_english_names_are_not_touched(), test_keys_are_renamed_at_every_depth_without_overwriting(), test_names_with_underscores_for_missing_letters_are_restored_from_the_prompt() (+20 more)
 
 ### Community 1019 - "Community 1019"
-Cohesion: 0.22
-Nodes (16): PostgresAgent, QueryResult, _capture_synthesis_kwargs(), _make_agent(), Unit tests for the postgres_agent ``temperature`` parameter.  The agent used t, The parameter must not change the contract, only the request., Documents why SQL generation already worked on reasoning models.      ``chat_p, Route ``_synthesize_answer`` through a client that records its kwargs. (+8 more)
+Cohesion: 0.11
+Nodes (21): Any, bool, str, DocxParser, parse_docx(), Python-docx based parser for Word document (.docx, .doc) text extraction.  Thi, Parse a Word document and return its content with metadata.          Args:, Parse a Word document and return its content with metadata.          Args: (+13 more)
 
 ### Community 1020 - "Community 1020"
 Cohesion: 0.15
@@ -5284,8 +5517,8 @@ Cohesion: 0.05
 Nodes (39): attempt_number, attempt_type, automatic_checks, EQ4-X01, EQ4-X02, EQ4-X03, EQ4-X04, automatic_execution_successful (+31 more)
 
 ### Community 1035 - "Community 1035"
-Cohesion: 0.26
-Nodes (14): Path, load_config(), _load_output_schema(), load_requirements(), main(), Proof of Concept: AI-Supported Meeting Record Generation  Custom / hybrid pipeli, Read the participant list JSON directly (no parsing component needed).      Retu, str (+6 more)
+Cohesion: 0.11
+Nodes (31): Path, load_config(), _load_output_schema(), load_requirements(), main(), Proof of Concept: AI-Supported Meeting Record Generation  Custom / hybrid pipeli, Read the participant list JSON directly (no parsing component needed).      Retu, str (+23 more)
 
 ### Community 1036 - "Community 1036"
 Cohesion: 0.12
@@ -5300,20 +5533,20 @@ Cohesion: 0.17
 Nodes (11): Artifacts, Evaluation method, Inputs and outputs, Model configuration, Output schema, Overview, Runtime and integration assumptions, Security and governance (+3 more)
 
 ### Community 1041 - "Community 1041"
-Cohesion: 0.22
-Nodes (9): BaseModel, bool, _field_map(), _is_optional(), Return {field_name: FieldInfo} for a Pydantic model., Return {field_name: FieldInfo} for a Pydantic model., True if annotation is X | None or Optional[X]., Return {field_name: FieldInfo} for a Pydantic model. (+1 more)
+Cohesion: 0.15
+Nodes (23): Path, str, _docx(), _fake(), _pdf(), Offline tests for SourceNormalizer and the parser options it relies on.  Fixtu, A stand-in for Transcriber and VisionParser that records its constructor args., test_all_files_are_checked_before_converting() (+15 more)
 
 ### Community 1043 - "Community 1043"
 Cohesion: 0.18
 Nodes (10): Business need, Evaluation focus, Expected benefits, GenAI Product Canvas — Safety, Environmental & Energy Efficiency Observation Reporting, Knowledge object, Proposed solution, Risks and constraints, Success criteria (+2 more)
 
 ### Community 1044 - "Community 1044"
-Cohesion: 0.17
-Nodes (12): _match_sample_section(), _normalize_heading(), Normalize a heading for tolerant matching.      Lowercase; strip leading markd, Normalize a heading for tolerant matching.      Lowercase; strip leading markd, Split a sample report at its top-level report-section headings.      Detects t, Split a sample report at its top-level report-section headings.      Detects t, Normalize a heading for tolerant matching.      Lowercase; strip leading markd, Split a sample report at its top-level report-section headings.      Sample re (+4 more)
+Cohesion: 0.08
+Nodes (28): int, str, _extract_stream_text(), _extract_stream_thinking(), _parse_pdf_attachment(), Parse a PDF attachment, including OCR-capable fallback for scanned PDFs., Parse a PDF attachment, including OCR-capable fallback for scanned PDFs., Short human-readable activity line for a tool use. (+20 more)
 
 ### Community 1045 - "Community 1045"
-Cohesion: 0.17
-Nodes (12): _dict_to_markdown(), Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence. (+4 more)
+Cohesion: 0.15
+Nodes (13): _dict_to_markdown(), Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence., Serialize a VisionExtractor result dict into readable markdown evidence. (+5 more)
 
 ### Community 1047 - "Community 1047"
 Cohesion: 0.18
@@ -5332,8 +5565,8 @@ Cohesion: 0.09
 Nodes (23): review_status, action_items, conflicts, decisions, end_time, meeting_date, meeting_id, participants (+15 more)
 
 ### Community 1055 - "Community 1055"
-Cohesion: 0.33
-Nodes (6): bytes, int, Path, main(), LLM-as-Judge pairwise A/B comparison demo.  Compares two extractor outputs aga, render_pages_to_png()
+Cohesion: 0.23
+Nodes (26): _answer(), _curate(), fake(), _knowledge(), Offline tests for KnowledgeCurator: the LLM client is a fake with scripted answe, test_a_retry_that_fixes_the_quotes_drops_nothing(), test_a_section_whose_units_all_fail_is_kept_empty(), test_bad_quote_is_retried_once_with_feedback() (+18 more)
 
 ### Community 1056 - "Community 1056"
 Cohesion: 0.22
@@ -5392,8 +5625,8 @@ Cohesion: 0.67
 Nodes (3): 5. Release Plan, Release V1 -- Current Release, Release V2 -- Future Release
 
 ### Community 1075 - "Community 1075"
-Cohesion: 0.10
-Nodes (30): Path, str, UploadFile, ask_question(), AskRequest, AskResponse, ColumnInfo, _discard() (+22 more)
+Cohesion: 0.09
+Nodes (31): Path, str, UploadFile, ask_question(), AskRequest, AskResponse, ColumnInfo, _discard() (+23 more)
 
 ### Community 1077 - "Community 1077"
 Cohesion: 0.05
@@ -5424,16 +5657,16 @@ Cohesion: 0.06
 Nodes (33): additionalProperties, maximum, minimum, type, type, type, items, minItems (+25 more)
 
 ### Community 1096 - "Community 1096"
-Cohesion: 0.07
-Nodes (29): assumptions, blueprint_version, change_log, components, custom_components, selected_building_blocks, selected_modules, inputs (+21 more)
+Cohesion: 0.05
+Nodes (36): assumptions, blueprint_version, business_process, decision_points, exceptions, external_parties, manual_steps, message_flows (+28 more)
 
 ### Community 1097 - "Community 1097"
-Cohesion: 0.13
-Nodes (14): parse_text_judgement(), Parse the judge's text-pair JSON response.      Returns ``(equivalent, severit, Parse the judge's text-pair JSON response.      Returns ``(equivalent, severit, build_text_pair_prompt(), Assemble the user-side prompt for a text-vs-text equivalence call.      Both v, Severity, Unit tests for LLMJudge.judge_text_pair() and ExtractionEvaluator semantic mode., test_build_text_pair_prompt_includes_field_name_when_given() (+6 more)
+Cohesion: 0.10
+Nodes (21): main(), ExtractionEvaluator demo — field-level Precision / Recall / F1 + hallucination r, Show how the BatchEvaluationRunner glues a pipeline to the evaluator., Show how the BatchEvaluationRunner glues a pipeline to the evaluator., runner_example(), ExtractionEvaluator, Evaluate structured extractor outputs against ground-truth dicts.      Args:, parse_text_judgement() (+13 more)
 
 ### Community 1098 - "Community 1098"
-Cohesion: 0.04
-Nodes (68): _build_structure_classification_prompt(), child_container_name(), _clean_decimal_string(), _detect_date_format(), _detect_global_date_format(), _enum_nonempty(), _field_specific_context(), FieldSpec (+60 more)
+Cohesion: 0.08
+Nodes (31): action_items_record_Extraction, business_card_contact_information_Extraction, construction_blueprint_compliance_information_Extraction, construction_blueprint_header_fields_Extraction, drawing_views_grid_lines_and_callouts_record_Extraction, elevation_references_record_Extraction, finnish_construction_site_diary_extraction_Extraction, general_construction_notes_record_Extraction (+23 more)
 
 ### Community 1099 - "Community 1099"
 Cohesion: 0.17
@@ -5452,8 +5685,8 @@ Cohesion: 0.06
 Nodes (33): additionalProperties, maximum, minimum, type, type, type, items, minItems (+25 more)
 
 ### Community 1103 - "Community 1103"
-Cohesion: 0.09
-Nodes (32): Path, str, _csv_to_markdown(), _extract_sample_docx(), _extract_sample_pdf(), MultiSourceReportGenerator, Generate a user-defined Markdown report from many mixed source files.      Examp, Generate a user-defined Markdown report from many mixed source files.      Examp (+24 more)
+Cohesion: 0.17
+Nodes (13): glimpse(), DemoCards, HomePage(), FooterServer(), getCachedGithubPreview, MainLayout(), MainLayoutProps, SiteNavServer() (+5 more)
 
 ### Community 1104 - "Community 1104"
 Cohesion: 0.06
@@ -5468,8 +5701,8 @@ Cohesion: 0.07
 Nodes (29): `applicable_standard`, code:json ({), `cut_length`, `delivery_address`, `delivery_date`, `delivery_length_note`, `hardness_hv`, `min_bend_radius` (+21 more)
 
 ### Community 1108 - "Community 1108"
-Cohesion: 0.05
-Nodes (74): description, Documents (PDF/images/DOCX) to structured data pipeline: parse + extract., _clean_schema_dump(), DocumentsToStructuredData, main(), Example: parse documents (PDF/images/DOCX) and extract structured fields by dyna, PipelineResult, Reusable pipeline to parse documents (PDF/images/DOCX) and extract structured da (+66 more)
+Cohesion: 0.07
+Nodes (32): _build_parent_task(), ChildContainerSpec, _collection_as_list_str_field(), Metadata for one repeated child collection identified by detect_structure_type., Metadata for one repeated child collection identified by detect_structure_type., Metadata for one repeated child collection identified by detect_structure_type., Metadata for one repeated child collection identified by detect_structure_type., Metadata for one repeated child collection identified by detect_structure_type. (+24 more)
 
 ### Community 1109 - "Community 1109"
 Cohesion: 0.07
@@ -5496,8 +5729,8 @@ Cohesion: 0.07
 Nodes (28): assumptions, blueprint_version, change_log, components, custom_components, selected_building_blocks, selected_modules, inputs (+20 more)
 
 ### Community 1115 - "Community 1115"
-Cohesion: 0.17
-Nodes (12): _coerce_markdown(), Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object. (+4 more)
+Cohesion: 0.15
+Nodes (13): _coerce_markdown(), Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object., Best-effort extraction of markdown text from a parser result object. (+5 more)
 
 ### Community 1116 - "Community 1116"
 Cohesion: 0.25
@@ -5512,8 +5745,8 @@ Cohesion: 0.07
 Nodes (28): adaptive_question_policy, answer, reason, source, business_process, business_spec, completeness_caveat, confirmation_policy (+20 more)
 
 ### Community 1119 - "Community 1119"
-Cohesion: 0.20
-Nodes (9): Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response. (+1 more)
+Cohesion: 0.08
+Nodes (25): B1: single-call baseline, C1: main distribution board, known only from a document, C2: supply-air unit, known only from recording 3, C3: moisture, the observation contradicts the 2019 survey, C4: attic underlay, an uncertain observation contradicts a document, C5: roof covering, two documents disagree, code:sh (# Print one section of the report; the title prefix is enoug), code:sh (uv run python -c "from gaik.software_components.knowledge_cu) (+17 more)
 
 ### Community 1120 - "Community 1120"
 Cohesion: 0.07
@@ -5556,8 +5789,8 @@ Cohesion: 0.07
 Nodes (27): business_process, business_spec, phase_1, selection_relevant_options, target_output_spec, technical_spec, confirmation_policy, covered_questions (+19 more)
 
 ### Community 1133 - "Community 1133"
-Cohesion: 0.12
-Nodes (15): action_items_record_Extraction, conflicts_record_Extraction, MeetingRecord_Extraction, participants_record_Extraction, Output schema for this use case.  Generated by GAIK SchemaGenerator via the So, Extraction model for participants_record, Extraction model for topics_record, topics_record_Extraction (+7 more)
+Cohesion: 0.23
+Nodes (17): Content, GenerateContentConfig, Any, BaseModel, ChatMessage, ChatResponse, float, int (+9 more)
 
 ### Community 1134 - "Community 1134"
 Cohesion: 0.07
@@ -5572,24 +5805,24 @@ Cohesion: 0.22
 Nodes (9): incident_log_csv, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 1138 - "Community 1138"
-Cohesion: 0.16
-Nodes (20): Blueprint, str, _load_example(), Tests for Scaffolder (WP-3)., Requirements JSON must have the shape load_schema() can read., Requirements JSON must have the shape load_schema() can read., Requirements JSON must have the shape load_schema() can read., test_extraction_requirements_generated() (+12 more)
+Cohesion: 0.09
+Nodes (47): Blueprint, str, Scaffold the complete poc/ folder for a validated blueprint.      Args:, Scaffold the complete poc/ folder for a validated blueprint.      Args:, Scaffold the complete poc/ folder for a validated blueprint.      Args:, Scaffold the complete poc/ folder for a validated blueprint.      Args:, Scaffold the complete poc/ folder for a validated blueprint.      Args:, scaffold_poc() (+39 more)
 
 ### Community 1139 - "Community 1139"
-Cohesion: 0.18
-Nodes (13): AzureOpenAI, Audio and Video Transcription  This module provides audio/video transcription, Convert Whisper transcription segments to SRT subtitle format.      Each segme, segments_to_srt(), format_timestamp(), Reusable transcription package entry point., # IMPORTANT: do NOT mutate self.default_prompt across calls., Split audio into chunks and transcribe with rolling context. (+5 more)
+Cohesion: 0.05
+Nodes (60): bool, str, MCP Server for GAIK Transcriber, Transcribe audio/video file using GAIK Transcriber.      ==== CRITICAL OUTPUT, transcribe_audio(), bool, str, MCP Server for GAIK Transcriber (+52 more)
 
 ### Community 1140 - "Community 1140"
 Cohesion: 0.07
 Nodes (26): applicable_standard, code:block1 (PurchaseOrderERPRecord), cut_length, delivery_address, delivery_date, delivery_length_note, hardness_hv, min_bend_radius (+18 more)
 
 ### Community 1141 - "Community 1141"
-Cohesion: 0.67
-Nodes (3): 17. Final Use-Case Package Structure, code:block25 (use_case_package/), code:bash (python -m use_case_name.main --input data/samples/input.wav )
+Cohesion: 0.10
+Nodes (22): Audio-to-structured-data pipeline: transcribe audio and extract structured field, _clean_schema_dump(), PipelineResult, Reusable software component to transcribe audio and extract structured data. Bu, Persist schema and requirements to disk under schema_dir., Persist schema and requirements to disk under schema_dir., Load schema + requirements if both files exist; otherwise return None., Load schema + requirements if both files exist; otherwise return None. (+14 more)
 
 ### Community 1142 - "Community 1142"
-Cohesion: 0.67
-Nodes (3): 24. Recommended Implementation Sequence, Phase 1: V1 -- Implemented, Phase 2: V2 -- Future
+Cohesion: 0.13
+Nodes (24): int, Path, str, docx_markdown(), draft_structure(), headings(), main(), outline() (+16 more)
 
 ### Community 1143 - "Community 1143"
 Cohesion: 0.07
@@ -5648,8 +5881,8 @@ Cohesion: 0.08
 Nodes (26): eval_framework, expected_outputs, method, numerical_threshold, queries, answer_model, embedding_model, generation_model (+18 more)
 
 ### Community 1157 - "Community 1157"
-Cohesion: 0.25
-Nodes (6): Any, BaseModel, ChatMessage, ChatResponse, float, str
+Cohesion: 0.11
+Nodes (26): str, _events(), FakeGaik, FakeNormalizer, FakeSynthesizer, OldSynthesizer, Knowledge Synthesis endpoints: a fake ReportSynthesizer stands in for gaik's, so, gaik 0.8.2: no `citations` option, and it always cites. (+18 more)
 
 ### Community 1158 - "Community 1158"
 Cohesion: 0.08
@@ -5661,15 +5894,15 @@ Nodes (23): metrics, test_data, extraction_model, temperature, technical_spec, d
 
 ### Community 1160 - "Community 1160"
 Cohesion: 0.07
-Nodes (43): int, Any, Blueprint, bool, str, main(), _answered(), _as_dict() (+35 more)
+Nodes (46): int, int, Any, Blueprint, bool, str, main(), main() (+38 more)
 
 ### Community 1161 - "Community 1161"
 Cohesion: 0.20
 Nodes (10): urgency, target_output_spec, allowed_values, confidence_required, fields, missing_value_policy, optional_fields, required_fields (+2 more)
 
 ### Community 1162 - "Community 1162"
-Cohesion: 0.10
-Nodes (28): Enum, AccessDecisionEnum, RAGAnswerRecord, Output schema for the Manufacturing Knowledge Assistant PoC.  RAGAnswerRecord --, RoleEnum, Path, Provider (Enum), Provider (+20 more)
+Cohesion: 0.09
+Nodes (31): Enum, AccessDecisionEnum, RAGAnswerRecord, Output schema for the Manufacturing Knowledge Assistant PoC.  RAGAnswerRecord --, RoleEnum, Path, Provider (Enum), Provider (+23 more)
 
 ### Community 1163 - "Community 1163"
 Cohesion: 0.09
@@ -5713,7 +5946,7 @@ Nodes (12): str, _Answer, _call(), _flat_requirements(), Unit tests for how the 
 
 ### Community 1173 - "Community 1173"
 Cohesion: 0.10
-Nodes (19): Best practices — when to use which feature, Calibration against human labels, code:mermaid (flowchart LR), code:python (import fitz  # pymupdf — render the source PDF to PNG bytes), code:python (from pathlib import Path), code:python (from gaik.software_components.validators import LLMJudge, LL), code:python (from gaik.software_components.validators import LLMJudge, co), End-to-end synthetic example (+11 more)
+Nodes (21): Best practices — when to use which feature, Calibration against human labels, code:mermaid (flowchart LR), code:python (import fitz  # pymupdf — render the source PDF to PNG bytes), code:python (from gaik.software_components.llm import get_llm_config), code:python (from pathlib import Path), code:python (from gaik.software_components.validators import LLMJudge, LL), code:python (from gaik.software_components.validators import LLMJudge, co) (+13 more)
 
 ### Community 1174 - "Community 1174"
 Cohesion: 0.10
@@ -5793,15 +6026,15 @@ Nodes (19): artifacts, source_pdf, validation_report, externally_visible, final_
 
 ### Community 1193 - "Community 1193"
 Cohesion: 0.11
-Nodes (19): artifacts, validation_report, externally_visible, final_output, optional, overwrite, produced_by, schema_ref (+11 more)
+Nodes (19): artifacts, source_pdf, validation_report, externally_visible, final_output, optional, overwrite, produced_by (+11 more)
 
 ### Community 1194 - "Community 1194"
 Cohesion: 0.11
 Nodes (19): access_decision, role, access_decision, answer, citations, query_id, question, refusal_reason (+11 more)
 
 ### Community 1195 - "Community 1195"
-Cohesion: 0.20
-Nodes (10): artifacts, chunked_documents, externally_visible, final_output, optional, overwrite, produced_by, schema_ref (+2 more)
+Cohesion: 0.22
+Nodes (9): chunked_documents, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 1196 - "Community 1196"
 Cohesion: 0.09
@@ -5828,12 +6061,12 @@ Cohesion: 0.11
 Nodes (19): artifacts, meeting_notes_md, quality_audit_pdf, externally_visible, final_output, optional, overwrite, produced_by (+11 more)
 
 ### Community 1202 - "Community 1202"
-Cohesion: 0.11
-Nodes (18): Benchmarking Results, code:mermaid (graph LR), code:mermaid (graph TD), Compound Word Inconsistency, Domain Terminology Errors, Error Classification, Getting Started, How We Evaluate (+10 more)
+Cohesion: 0.09
+Nodes (23): Benchmarking Results, code:mermaid (graph LR), code:mermaid (flowchart LR), code:mermaid (graph TD), Compound Word Inconsistency, Domain Terminology Errors, Error Classification, Getting Started (+15 more)
 
 ### Community 1203 - "Community 1203"
 Cohesion: 0.09
-Nodes (22): description, title, type, description, title, type, description, title (+14 more)
+Nodes (22): description, items, title, type, description, title, type, description (+14 more)
 
 ### Community 1204 - "Community 1204"
 Cohesion: 0.10
@@ -5933,11 +6166,11 @@ Nodes (15): description, fixture_type, scenario_id, schema_version, sha256, poc_
 
 ### Community 1228 - "Community 1228"
 Cohesion: 0.12
-Nodes (15): Adjusting the PoC, code:bash (# 1. Install dependencies), code:bash (python run_poc.py --input <path-to-poc_input_bundle.json>), code:bash (python run_poc.py --input "C:\Users\h02317\Downloads\runs\ru), code:json ([), code:bash (python evals/run_basic_eval.py), Prerequisites, Running the basic evaluation (+7 more)
+Nodes (15): Adjusting the PoC, code:bash (# 1. Install dependencies), code:bash (python run_poc.py --input <path-to-poc_input_bundle.json>), code:bash (python run_poc.py --input "%USERPROFILE%\Downloads\runs\run_), code:json ([), code:bash (python evals/run_basic_eval.py), Prerequisites, Running the basic evaluation (+7 more)
 
 ### Community 1229 - "Community 1229"
 Cohesion: 0.12
-Nodes (15): Adjusting the PoC, code:block1 (# 1. Install dependencies), code:block2 (python run_poc.py --input <path-to-poc_input_bundle.json>), code:block3 (python run_poc.py --input C:\Users\h02317\Downloads\fixtures), code:json ({), code:block5 (python evals/run_basic_eval.py), Expected output, Next steps (+7 more)
+Nodes (15): Adjusting the PoC, code:block1 (# 1. Install dependencies), code:block2 (python run_poc.py --input <path-to-poc_input_bundle.json>), code:block3 (python run_poc.py --input %USERPROFILE%\Downloads\fixtures\p), code:json ({), code:block5 (python evals/run_basic_eval.py), Expected output, Next steps (+7 more)
 
 ### Community 1230 - "Community 1230"
 Cohesion: 0.08
@@ -6052,16 +6285,16 @@ Cohesion: 0.13
 Nodes (14): Benchmarking Results, Clarity Issues, Error Classification, Evaluation Criteria, Factual Errors, Getting Started, How We Evaluate, Missing Sections (+6 more)
 
 ### Community 1258 - "Community 1258"
-Cohesion: 0.13
-Nodes (14): Acceptable Minor Errors, Benchmarking Results, Enhancement Evaluation, Error Classification, Fixable Through Enhancement, Getting Started, How We Evaluate, Key Findings (+6 more)
+Cohesion: 0.09
+Nodes (22): Acceptable Minor Errors, Benchmarking Results, code:mermaid (flowchart TD), code:bash (uv venv .venv), code:bash (python side_by_side_compare.py reference original reports/ra), Enhancement Evaluation, Error Classification, Fixable Through Enhancement (+14 more)
 
 ### Community 1259 - "Community 1259"
-Cohesion: 0.06
-Nodes (37): DataExtractor, ExtractionResult, _parse_with, _clean_requirements_text(), detect_structure_type(), parse_user_requirements(), _parse_with(), The sampling half of a ``parse`` call, with either half omittable.      ``temp (+29 more)
+Cohesion: 0.08
+Nodes (9): RelevanceGate: the floor, the "no opinion" case, and calibration honesty., The skill tells users to print() the reading; with similarities the         com, The defect this component exists for.          Measured on a real corpus, a gi, `None` means nothing was searched by vector, not that it was irrelevant., The answer that stops you shipping a meaningless threshold.          Splitting, TestCalibration, TestFilter, TestNoOpinion (+1 more)
 
 ### Community 1260 - "Community 1260"
 Cohesion: 0.10
-Nodes (21): description, items, title, type, description, items, title, type (+13 more)
+Nodes (21): description, items, title, type, $ref, description, items, title (+13 more)
 
 ### Community 1261 - "Community 1261"
 Cohesion: 0.21
@@ -6269,7 +6502,7 @@ Nodes (20): description, title, type, properties, anyOf, default, description, t
 
 ### Community 1312 - "Community 1312"
 Cohesion: 0.11
-Nodes (19): externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source, type (+11 more)
+Nodes (19): artifacts, meeting_record_json, transcript_with_speakers, externally_visible, final_output, optional, overwrite, produced_by (+11 more)
 
 ### Community 1313 - "Community 1313"
 Cohesion: 0.11
@@ -6481,7 +6714,7 @@ Nodes (10): GenAI Product Canvas — Quarterly Supplier Performance Report Gener
 
 ### Community 1365 - "Community 1365"
 Cohesion: 0.18
-Nodes (10): User Guide — Q2 2026 Supplier Performance Report — Multi-Source Synthesis, Adjusting settings, code:bash (python poc/run_poc.py --input <path-to-poc_input_bundle.json), code:bash (python poc/run_poc.py --input "C:\Users\h02317\Downloads\fix), Inspecting the output, Prerequisites, Privacy note, Providing input (+2 more)
+Nodes (10): User Guide — Q2 2026 Supplier Performance Report — Multi-Source Synthesis, Adjusting settings, code:bash (python poc/run_poc.py --input <path-to-poc_input_bundle.json), code:bash (python poc/run_poc.py --input "%USERPROFILE%\Downloads\fixtu), Inspecting the output, Prerequisites, Privacy note, Providing input (+2 more)
 
 ### Community 1366 - "Community 1366"
 Cohesion: 0.18
@@ -6596,8 +6829,8 @@ Cohesion: 0.35
 Nodes (16): int, Path, attempt_paths(), execute(), main(), now(), read_json(), resolve_command() (+8 more)
 
 ### Community 1394 - "Community 1394"
-Cohesion: 0.25
-Nodes (8): _blueprint_with_loop_to_exception(), Blueprint where rejection loops back to the employee (user_task) step., Fix B: when an exception with outcome='loop_to:<step>' is defined, the     'No', Blueprint where rejection loops back to the employee (user_task) step., Fix B: when an exception with outcome='loop_to:<step>' is defined, the     'No', Blueprint where rejection loops back to the employee (user_task) step., Fix B: when an exception with outcome='loop_to:<step>' is defined, the     'No', test_explicit_loop_to_exception_routes_to_named_step()
+Cohesion: 0.14
+Nodes (24): make_spec(), Offline tests of the ReportWriter module.  The stage components and the LLM cl, Replace the components, the LLM client and Pandoc with recording fakes., rec(), _save_and_edit_report(), test_citations_default_on_and_are_saved_in_the_spec(), test_curate(), test_missing_stage_input_raises() (+16 more)
 
 ### Community 1395 - "Community 1395"
 Cohesion: 0.20
@@ -6653,7 +6886,7 @@ Nodes (9): User Guide — Meeting Record Generator, Adjusting settings, code:bas
 
 ### Community 1408 - "Community 1408"
 Cohesion: 0.20
-Nodes (9): User Guide — Quarterly Supplier Performance Report Generator, Adjusting settings, code:bash (python poc/run_poc.py --input C:\Users\h02317\Downloads\fixt), Inspecting the output, Prerequisites, Privacy note, Providing input, Running (+1 more)
+Nodes (9): User Guide — Quarterly Supplier Performance Report Generator, Adjusting settings, code:bash (python poc/run_poc.py --input %USERPROFILE%\Downloads\fixtur), Inspecting the output, Prerequisites, Privacy note, Providing input, Running (+1 more)
 
 ### Community 1409 - "Community 1409"
 Cohesion: 0.42
@@ -6832,12 +7065,12 @@ Cohesion: 0.22
 Nodes (9): expert_notes, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 1453 - "Community 1453"
-Cohesion: 0.22
-Nodes (9): report_draft, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
+Cohesion: 0.11
+Nodes (26): _clean_schema_dump(), generate_and_persist_assets(), load_assets_and_extract(), load_saved_requirements(), load_saved_schema(), Example 4: Persisting a dynamically generated schema for later reuse.  Steps d, Dump the generated Pydantic model into a valid Python file., Dump the generated Pydantic model into a valid Python file. (+18 more)
 
 ### Community 1454 - "Community 1454"
-Cohesion: 0.22
-Nodes (9): report_markdown, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
+Cohesion: 0.10
+Nodes (21): int, path_collisions(), pdf_page_text(), pdf_pages_without_text(), preflight_checks(), Return (page count, 1-based pages that have no text layer)., Return (page count, 1-based pages that have no text layer)., Return (page count, pages with no text at all, pages with only a little text), 1 (+13 more)
 
 ### Community 1455 - "Community 1455"
 Cohesion: 0.22
@@ -6940,16 +7173,16 @@ Cohesion: 0.36
 Nodes (9): Evaluation Plan — Manufacturing Knowledge Assistant, Evaluation Plan — Manufacturing Knowledge Base RAG Assistant, Goal, Human review, Limitations, Recommended metrics, Stated evaluation requirements, Test data (+1 more)
 
 ### Community 1480 - "Community 1480"
-Cohesion: 0.22
-Nodes (9): externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source, type (+1 more)
+Cohesion: 0.11
+Nodes (19): externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source, type (+11 more)
 
 ### Community 1481 - "Community 1481"
 Cohesion: 0.22
 Nodes (9): document_collection, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 1482 - "Community 1482"
-Cohesion: 0.22
-Nodes (9): local_vector_index, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
+Cohesion: 0.15
+Nodes (26): Path, str, _errors(), _example(), _example_ids(), _examples_root(), _gaik(), get_example_file() (+18 more)
 
 ### Community 1483 - "Community 1483"
 Cohesion: 0.22
@@ -6960,8 +7193,8 @@ Cohesion: 0.22
 Nodes (9): rag_answer_records, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 1485 - "Community 1485"
-Cohesion: 0.10
-Nodes (19): Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`., Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`., Generate schema and report token usage + latency + cost.          Same input a, Generate schema and report token usage + latency + cost.          Same input a, Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`., Generate schema and report token usage + latency + cost.          Same input a, ``normalize_extracted_data`` for a ``parent_with_nested_list`` record., Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`. (+11 more)
+Cohesion: 0.12
+Nodes (14): backend_config(), BoundedClient, BoundedOpenAIClient, _budget_component(), CallBudget, _close(), main(), int (+6 more)
 
 ### Community 1486 - "Community 1486"
 Cohesion: 0.22
@@ -6985,7 +7218,7 @@ Nodes (17): run_id, scenario_id, schema_version, checks, poc_recovery, attempts,
 
 ### Community 1491 - "Community 1491"
 Cohesion: 0.12
-Nodes (18): description, items, title, type, properties, unresolved_issues_record_Extraction, description, title (+10 more)
+Nodes (18): description, items, title, type, additionalProperties, description, properties, required (+10 more)
 
 ### Community 1492 - "Community 1492"
 Cohesion: 0.11
@@ -7052,8 +7285,8 @@ Cohesion: 0.22
 Nodes (8): maximum_refinement_attempts, poc, output_globs, run_command, setup_command, run_id, scenario_id, schema_version
 
 ### Community 1508 - "Community 1508"
-Cohesion: 0.11
-Nodes (17): Initialize the SchemaGenerator.          Args:             config: OpenAI con, Initialize the SchemaGenerator.          Args:             config: OpenAI con, Analyze if the requirements need nested or flat structure.          Args:, Analyze if the requirements need nested or flat structure.          Args:, Initialize the SchemaGenerator.          Args:             config: OpenAI con, Analyze if the requirements need nested or flat structure.          Args:, Initialize the SchemaGenerator.          Args:             config: OpenAI con, Initialize the SchemaGenerator.          Args:             config: OpenAI con (+9 more)
+Cohesion: 0.08
+Nodes (25): 1. SourceNormalizer (Stage 1), 2. KnowledgeCurator (Stage 2), 3. ReportSynthesizer (Stage 3), Adaptable to Other Domains, Business layer – use case specification, code:mermaid (flowchart LR), code:mermaid (flowchart LR), code:mermaid (flowchart LR) (+17 more)
 
 ### Community 1509 - "Community 1509"
 Cohesion: 0.22
@@ -7104,16 +7337,16 @@ Cohesion: 0.12
 Nodes (16): Adjusting the PoC, code:bash (# 1. Install dependencies), code:json ({), code:bash (python run_poc.py --input /path/to/poc_input_bundle.json), code:bash (python evals/run_basic_eval.py), code:bash (python evals/compare_to_expected.py \), Expected output, Input (+8 more)
 
 ### Community 1521 - "Community 1521"
-Cohesion: 0.23
-Nodes (16): float, Path, _format_hhmmss(), load_config(), _load_output_schema(), load_requirements(), main(), Proof of Concept: Meeting Record Generation  Custom / hybrid pipeline (agent-wir (+8 more)
+Cohesion: 0.08
+Nodes (24): 1. Start a database, 2. Create the store and index documents, 3. Search, 4. Check that both arms are alive, 5. Decide whether anything relevant was found, An existing table, or an application that is not Python, code:bash (pip install "gaik[pg-vector-store,embedder,ranker]"), code:python (store = PgVectorStore(dsn, embedding_dim=1536, fts_language=) (+16 more)
 
 ### Community 1522 - "Community 1522"
 Cohesion: 0.22
 Nodes (9): externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source, type (+1 more)
 
 ### Community 1523 - "Community 1523"
-Cohesion: 0.22
-Nodes (9): externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source, type (+1 more)
+Cohesion: 0.11
+Nodes (21): BaseException, bool, Exception, str, LogRecord, test_incident_reporting_endpoints_accept_per_tab_model_settings(), Shared configuration utilities for the demo API., _CredentialRedactionFilter (+13 more)
 
 ### Community 1524 - "Community 1524"
 Cohesion: 0.12
@@ -7288,8 +7521,8 @@ Cohesion: 0.25
 Nodes (7): scripted_answers, policy, confirmation_answer, unexpected_question_answer, use_only_when_asked, scenario_id, schema_version
 
 ### Community 1567 - "Community 1567"
-Cohesion: 0.43
-Nodes (7): bool, int, Path, str, extract_audio_from_video(), is_video_file(), transcribe()
+Cohesion: 0.18
+Nodes (12): FPDF, Any, bool, int, _format_value(), Recursively render a value to the PDF.          Args:             pdf: FPDF i, Set up a Unicode-capable font for Finnish language support., Recursively render a value to the PDF.          Args:             pdf: FPDF i (+4 more)
 
 ### Community 1568 - "Community 1568"
 Cohesion: 0.50
@@ -7332,8 +7565,8 @@ Cohesion: 0.29
 Nodes (7): business_process, decision_points, exceptions, external_parties, manual_steps, message_flows, participants
 
 ### Community 1578 - "Community 1578"
-Cohesion: 0.19
-Nodes (18): FewShotExample, ScoringMode, str, ValidationFlag, ValidationRubric, build_system_prompt(), build_user_prompt(), _flag_dict() (+10 more)
+Cohesion: 0.16
+Nodes (23): Any, float, str, Tests for reading the single extraction of the priced example., test_a_missing_shipping_or_tax_is_zero_or_none(), test_numbers_are_read_from_values_and_text(), test_other_field_names_work_too(), test_the_extraction_is_split_into_header_lines_and_fees() (+15 more)
 
 ### Community 1579 - "Community 1579"
 Cohesion: 0.29
@@ -7348,8 +7581,8 @@ Cohesion: 0.29
 Nodes (7): business_process, decision_points, exceptions, external_parties, manual_steps, message_flows, participants
 
 ### Community 1582 - "Community 1582"
-Cohesion: 0.18
-Nodes (11): properties, recovery_diagnostic, run_id, scenario_id, schema_version, additionalProperties, required, type (+3 more)
+Cohesion: 0.29
+Nodes (7): properties, run_id, scenario_id, schema_version, type, const, type
 
 ### Community 1583 - "Community 1583"
 Cohesion: 0.29
@@ -7360,8 +7593,8 @@ Cohesion: 0.29
 Nodes (6): documents, expected_results, input_bundle, purpose, scenario_id, schema_version
 
 ### Community 1585 - "Community 1585"
-Cohesion: 0.18
-Nodes (12): FPDF, Any, bool, int, _format_value(), Recursively render a value to the PDF.          Args:             pdf: FPDF i, Set up a Unicode-capable font for Finnish language support., Recursively render a value to the PDF.          Args:             pdf: FPDF i (+4 more)
+Cohesion: 0.22
+Nodes (14): isStateChanging(), needsApprovedUser(), READ_METHODS, AccessState, AUTH_ROUTES, getAccessState(), isAuthRoute(), isProtectedRoute() (+6 more)
 
 ### Community 1586 - "Community 1586"
 Cohesion: 0.22
@@ -7481,11 +7714,11 @@ Nodes (6): metadata, blueprint_id, created_at, created_by, last_updated_at, stat
 
 ### Community 1615 - "Community 1615"
 Cohesion: 0.40
-Nodes (5): start_time, anyOf, default, description, title
+Nodes (5): default, description, title, meeting_date, anyOf
 
 ### Community 1616 - "Community 1616"
-Cohesion: 0.22
-Nodes (17): Any, bool, Connection, SchemaInfo, str, _fetch_sample_rows(), introspect_schema(), Read-only schema introspection for the postgres_agent component. (+9 more)
+Cohesion: 0.15
+Nodes (16): _CapturingCompletions, _parser(), Tests for model-specific VisionParser request options., test_aitta_vision_defaults_to_aitta_endpoint(), test_azure_vision_accepts_explicit_base_url(), test_explicit_azure_provider_overrides_legacy_flag(), test_explicit_non_azure_provider_uses_configured_endpoint(), test_gpt6_raw_vision_omits_default_sampling() (+8 more)
 
 ### Community 1617 - "Community 1617"
 Cohesion: 0.33
@@ -7528,8 +7761,8 @@ Cohesion: 0.33
 Nodes (6): default, description, enum, title, type, product_form
 
 ### Community 1627 - "Community 1627"
-Cohesion: 0.06
-Nodes (37): Document classification using LLM analysis.  This module provides document cla, Any, bool, str, Any, AzureOpenAI, bool, OpenAI (+29 more)
+Cohesion: 0.10
+Nodes (21): PyMuPDFParser (gaik.software_components.parsers), Any, bool, str, main(), Simple demonstration of PyMuPDF parser for fast local PDF text extraction.  This, Extract text from a sample PDF using PyMuPDF., parse_pdf() (+13 more)
 
 ### Community 1628 - "Community 1628"
 Cohesion: 0.33
@@ -7552,8 +7785,8 @@ Cohesion: 0.47
 Nodes (5): int, Path, main(), _sha256(), str
 
 ### Community 1633 - "Community 1633"
-Cohesion: 0.33
-Nodes (6): metadata, blueprint_id, created_at, created_by, last_updated_at, status
+Cohesion: 0.08
+Nodes (24): ReportWriter, call, call_from_spec_file, call_rebuild, call_resume, call_single_call, construct, import (+16 more)
 
 ### Community 1634 - "Community 1634"
 Cohesion: 0.33
@@ -7636,8 +7869,8 @@ Cohesion: 0.33
 Nodes (6): package, include_docs, include_evals, include_tests, name, output_dir
 
 ### Community 1654 - "Community 1654"
-Cohesion: 0.21
-Nodes (22): ColumnProfile, Any, bool, int, str, TabularSchema, TableProfile, ColumnProfile (+14 more)
+Cohesion: 0.11
+Nodes (38): ColumnProfile, str, Any, bool, int, str, TabularSchema, str (+30 more)
 
 ### Community 1655 - "Community 1655"
 Cohesion: 0.33
@@ -7676,20 +7909,20 @@ Cohesion: 0.10
 Nodes (20): code:bash (pip install gaik[ranker]), code:python (Ranker(model_loader=lambda name: MyCohereReranker(name))), code:bash (pip install gaik[ranker-rerank]), code:python (from gaik.software_components.RAG.pg_vector_store import PgV), code:python (newest_first = ranker.order_by(hits, field="published_at", d), code:python (ranker.fuse(semantic, keyword, weights=(0.7, 0.3), top_k=10)), code:python (ranker.fuse(semantic, keyword, recency, weights=(0.5, 0.3, 0), code:python (ranker.fuse(semantic, keyword, names=("semantic", "keyword")) (+12 more)
 
 ### Community 1664 - "Community 1664"
-Cohesion: 0.36
-Nodes (9): Path, str, _decimal_model(), Regression tests for the demo API's shared schema persistence., test_committed_decimal_schemas_are_provider_safe(), test_decimal_schema_round_trip_is_provider_safe(), test_legacy_requirements_invalidate_cache(), test_saved_requirements_include_current_format_version() (+1 more)
+Cohesion: 0.15
+Nodes (15): Any, bool, Document, float, int, str, Retriever building block., _bm25() (+7 more)
 
 ### Community 1665 - "Community 1665"
-Cohesion: 0.12
-Nodes (16): description, items, title, type, $ref, description, items, title (+8 more)
+Cohesion: 0.10
+Nodes (21): description, items, title, type, description, items, title, type (+13 more)
 
 ### Community 1666 - "Community 1666"
 Cohesion: 0.33
 Nodes (5): Attribution, GenAI Success Canvas, How to use the canvas, Status, Structure of the canvas
 
 ### Community 1667 - "Community 1667"
-Cohesion: 0.20
-Nodes (17): Unit tests for PgVectorStore row -> (Document, score) conversion.  ``_rows_to_, The point of surfacing id: fusion across arms that reformat content., Without a stable id, Ranker cannot match the same row across two lists., The Document must not share psycopg's row dict., A keyword-only hit has no semantic rank; the key must be absent., row(), test_empty_rows_return_empty(), test_existing_content_and_score_behaviour_is_unchanged() (+9 more)
+Cohesion: 0.14
+Nodes (20): Unit tests for PgVectorStore row -> (Document, score) conversion.  ``_rows_to_, The point of surfacing id: fusion across arms that reformat content., The mode is validated in the constructor, not at query time.      An invalid m, The default was "websearch" until 0.8.3, to preserve behaviour. It         requ, Without a stable id, Ranker cannot match the same row across two lists., The Document must not share psycopg's row dict., A keyword-only hit has no semantic rank; the key must be absent., row() (+12 more)
 
 ### Community 1668 - "Community 1668"
 Cohesion: 0.33
@@ -7984,8 +8217,8 @@ Cohesion: 0.50
 Nodes (3): Basic evaluation script for Finnish Voice Fault Reporting — Maintenance Ticket G, run_evaluation(), Path
 
 ### Community 1742 - "Community 1742"
-Cohesion: 0.08
-Nodes (24): Decimal, MaintenanceTicket_Extraction, Output schema for this use case.  Generated by GAIK SchemaGenerator via the So, Extraction model for MaintenanceTicket, MaintenanceTicket_Extraction, Output schema for this use case.  Generated by GAIK SchemaGenerator via the So, Extraction model for MaintenanceTicket, Output schema for this use case.  Generated by GAIK SchemaGenerator via the So (+16 more)
+Cohesion: 0.06
+Nodes (37): Decimal, MaintenanceTicket_Extraction, Output schema for this use case.  Generated by GAIK SchemaGenerator via the So, Extraction model for MaintenanceTicket, MaintenanceTicket_Extraction, Output schema for this use case.  Generated by GAIK SchemaGenerator via the So, Extraction model for MaintenanceTicket, Path (+29 more)
 
 ### Community 1743 - "Community 1743"
 Cohesion: 0.50
@@ -8000,8 +8233,8 @@ Cohesion: 0.50
 Nodes (4): quantity, description, title, type
 
 ### Community 1746 - "Community 1746"
-Cohesion: 0.50
-Nodes (4): models, extraction_model, provider, temperature
+Cohesion: 0.15
+Nodes (15): Any, bool, float, str, calibrate(), Calibration, Decide whether a retrieval result means anything, and calibrate the threshold., The closest score among *results*, or ``None`` when there is nothing to judge. (+7 more)
 
 ### Community 1747 - "Community 1747"
 Cohesion: 0.50
@@ -8112,8 +8345,8 @@ Cohesion: 0.13
 Nodes (14): Adjusting the PoC, code:bash (# 1. Install dependencies), code:bash (python run_poc.py --input path/to/poc_input_bundle.json), code:json ({), code:bash (python evals/run_basic_eval.py), Expected output, Input, Next steps (+6 more)
 
 ### Community 1777 - "Community 1777"
-Cohesion: 0.12
-Nodes (15): conflicts_record_Extraction, meeting_record_decisions_record_Extraction, MeetingRecord_Extraction, participants_record_Extraction, Output schema for this use case.  Generated by GAIK SchemaGenerator via the So, Extraction model for participants_record, Extraction model for topics_record, Extraction model for meeting_record_decisions_record (+7 more)
+Cohesion: 0.33
+Nodes (6): gaik_info(), The installed gaik version, and whether it is an editable source checkout., The installed gaik version, and whether it is an editable source checkout., The installed gaik version, and whether it is an editable source checkout., The installed gaik version, and whether it is an editable source checkout., The installed gaik version, and whether it is an editable source checkout.
 
 ### Community 1779 - "Community 1779"
 Cohesion: 0.67
@@ -8124,15 +8357,15 @@ Cohesion: 0.67
 Nodes (3): blueprint_path, kind, Activity_upload_po
 
 ### Community 1781 - "Community 1781"
-Cohesion: 0.12
-Nodes (16): action_items_record_Extraction, conflicts_record_Extraction, MeetingRecord_Extraction, participants_record_Extraction, Output schema for this use case.  Generated by GAIK SchemaGenerator via the Solu, Extraction model for topics_record, Extraction model for decisions_record, Extraction model for participants_record (+8 more)
+Cohesion: 0.25
+Nodes (6): signIn(), signInSchema, signOut(), signUp(), signUpSchema, createClient()
 
 ### Community 1782 - "Community 1782"
 Cohesion: 0.67
 Nodes (3): Lane_gaik_ai, blueprint_path, kind
 
 ### Community 1783 - "Community 1783"
-Cohesion: 0.12
+Cohesion: 0.14
 Nodes (12): Position data objects (in the data-zone of their producer task's own         row, Position data objects (in the data-zone of their producer task's own         row, Position data objects (in the data-zone of their producer task's own         row, The flow node a data object hangs from: its producer, else its first         con, The flow node a data object hangs from: its producer, else its first         con, The flow node a data object hangs from: its producer, else its first         con, Position data objects (in the data-zone of their producer task's own         row, Position data objects (in the data-zone of their producer task's own         row (+4 more)
 
 ### Community 1785 - "Community 1785"
@@ -8144,12 +8377,12 @@ Cohesion: 0.13
 Nodes (15): review_status, action_items, conflicts, decisions, unresolved_issues, target_output_spec, allowed_values, confidence_required (+7 more)
 
 ### Community 1789 - "Community 1789"
-Cohesion: 0.12
-Nodes (15): MeetingRecord_Extraction, Output schema for this use case.  Generated by GAIK SchemaGenerator via the So, Extraction model for meetingrecord_topics_record, Extraction model for meetingrecord_decisions_record, Extraction model for meetingrecord_action_items_record, Extraction model for MeetingRecord with repeated topics, decisions, action_items, unresolved_issues_record_Extraction, meetingrecord_action_items_record_Extraction (+7 more)
+Cohesion: 0.17
+Nodes (20): Path, chain_findings(), load_record(), Hashes of what one stage reads. Only fields that change its output are included., Hashes of what one stage reads. Only fields that change its output are included., Hashes of what one stage reads. Only fields that change its output are included., Checks that are free and catch what the module catches late or never., What no longer matches, per stage. An empty dict means every recorded stage is c (+12 more)
 
 ### Community 1790 - "Community 1790"
-Cohesion: 0.23
-Nodes (14): str, claude_example(), google_example(), openai_example(), print_total(), print_usage(), Multimodal Parser Example  Demonstrates how to parse PDFs using the multimodal, Parse a PDF using Google Gemini via Vertex AI. (+6 more)
+Cohesion: 0.08
+Nodes (52): Report, bool, bytes, str, UploadFile, ValidationError, bool, str (+44 more)
 
 ### Community 1800 - "Community 1800"
 Cohesion: 0.67
@@ -8160,16 +8393,16 @@ Cohesion: 0.35
 Nodes (16): Any, int, Path, build_workbook(), _display_value(), _excel_text(), main(), _populate_evaluation_sheet() (+8 more)
 
 ### Community 1802 - "Community 1802"
-Cohesion: 0.33
-Nodes (5): Return (lane_id, name) for the first business_process participant         matchi, Return (lane_id, name) for the first business_process participant         matchi, Return (lane_id, name) for the first business_process participant         matchi, Return (lane_id, name) for the first business_process participant         matchi, Return (lane_id, name) for the first business_process participant         match
+Cohesion: 0.07
+Nodes (42): FileResponse, download_pdf(), bool, Path, str, Path, str, UploadFile (+34 more)
 
 ### Community 1805 - "Community 1805"
 Cohesion: 0.67
 Nodes (3): DataObjectRef_kpi_spreadsheet, blueprint_path, kind
 
 ### Community 1806 - "Community 1806"
-Cohesion: 0.18
-Nodes (15): Blueprint, _audio_enhance_data(), _base_blueprint(), Tests for BlueprintValidator (WP3)., Artifact claims produced_by a step that doesn't list it in outputs., Artifact claims produced_by a step that doesn't list it in outputs., test_no_redundancy_warning_for_single_transcriber(), test_redundant_transcript_enhancer_warns_but_does_not_block() (+7 more)
+Cohesion: 0.12
+Nodes (20): combine_documents(), One text for a single extraction, with each document labelled by its role., _line(), _order(), Tests for the Purchase Order demo's "Create your use case" extraction., The example's progress steps follow the real stages of processing., The schema is generated once and corrected by hand; this keeps it so., test_a_line_with_no_bom_details_is_flagged() (+12 more)
 
 ### Community 1807 - "Community 1807"
 Cohesion: 0.67
@@ -8216,8 +8449,8 @@ Cohesion: 0.13
 Nodes (15): description, title, type, meeting_record_decisions_record_Extraction, additionalProperties, description, properties, required (+7 more)
 
 ### Community 1819 - "Community 1819"
-Cohesion: 0.21
-Nodes (15): Content, GenerateContentConfig, Any, BaseModel, ChatMessage, ChatResponse, float, str (+7 more)
+Cohesion: 0.15
+Nodes (13): export_docx(), Remove secret values of the config from a message, and shorten it., Remove secret values of the config from a message, and shorten it., Remove secret values of the config from a message, and shorten it., Remove secret values of the config from a message, and shorten it., Remove secret values of the config from a message, and shorten it., Word export through rebuild(), recorded apart from synthesis., Word export through rebuild(), recorded apart from synthesis. (+5 more)
 
 ### Community 1820 - "Community 1820"
 Cohesion: 0.29
@@ -8273,7 +8506,7 @@ Nodes (12): action_items, conflicts, decisions, end_time, meeting_date, meeting_
 
 ### Community 1833 - "Community 1833"
 Cohesion: 0.15
-Nodes (12): additionalProperties, $defs, description, required, title, type, meeting_record_action_items_record_Extraction, additionalProperties (+4 more)
+Nodes (12): additionalProperties, $defs, unresolved_issues_record_Extraction, description, required, title, type, additionalProperties (+4 more)
 
 ### Community 1834 - "Community 1834"
 Cohesion: 0.15
@@ -8328,8 +8561,8 @@ Cohesion: 0.15
 Nodes (13): items, type, items, type, items, type, $ref, items (+5 more)
 
 ### Community 1847 - "Community 1847"
-Cohesion: 0.50
-Nodes (3): DoclingApiClientParser (gaik.software_components.parsers), main(), Example for DoclingApiClientParser (remote parsing service).  This example ret
+Cohesion: 0.16
+Nodes (18): Offline tests for ReportSynthesizer: the writer client and the reviewer are fake, _synthesize(), test_blank_sample_report_raises(), test_citations_are_on_by_default(), test_derived_prompt_has_reviewed_prerequisites_and_no_knowledge(), test_derived_sections_are_written_after_their_prerequisites(), test_empty_writer_answer_raises(), test_long_dependency_chain() (+10 more)
 
 ### Community 1848 - "Community 1848"
 Cohesion: 0.67
@@ -8344,16 +8577,16 @@ Cohesion: 0.67
 Nodes (3): code:block10 (Transformation chain:), code:bash (python scripts/run_wizard.py --show-registry), Phase 5: Component Selection
 
 ### Community 1851 - "Community 1851"
-Cohesion: 0.67
-Nodes (3): 5.1 High-level improvement strategies, 5.2 Mapping table: performance issues -> improvement strategies, 5. Improvement strategies
+Cohesion: 0.18
+Nodes (19): FactUnit, str, _events(), FakeCurator, _knowledge(), Knowledge Curator endpoints: a fake KnowledgeCurator stands in for gaik's, so no, gaik 0.8.2 has no KnowledgeBase.dropped: the result reports an empty list., _run() (+11 more)
 
 ### Community 1852 - "Community 1852"
-Cohesion: 0.20
-Nodes (10): main(), Standalone schema generation example.  This example uses SchemaGenerator to ou, Save a generated Pydantic model as importable Python source., Save a generated Pydantic model as importable Python source., Save a generated Pydantic model as importable Python source., Save a generated Pydantic model as importable Python source., Save a generated Pydantic model as importable Python source., Save a generated Pydantic model as importable Python source. (+2 more)
+Cohesion: 0.11
+Nodes (20): Path, main(), Standalone schema generation example.  This example uses SchemaGenerator to ou, Save a generated Pydantic model as importable Python source., Save a generated Pydantic model as importable Python source., Save a generated Pydantic model as importable Python source., Save a generated Pydantic model as importable Python source., Save requirements metadata beside the generated schema. (+12 more)
 
 ### Community 1853 - "Community 1853"
-Cohesion: 0.12
-Nodes (15): action_items_record_Extraction, meeting_record_decisions_record_Extraction, MeetingRecord_Extraction, Output schema for this use case.  Generated by GAIK SchemaGenerator via the So, Extraction model for meeting_record_participants_record, Extraction model for meeting_record_topics_row, Extraction model for meeting_record_decisions_record, Extraction model for action_items_record (+7 more)
+Cohesion: 0.20
+Nodes (15): float, str, _fees(), Tests for pricing the fees of an order line., test_a_fee_without_a_rate_is_reported_and_not_charged(), test_a_missing_quantity_is_charged_once_and_reported(), test_applying_fees_are_priced_as_rate_times_quantity(), test_only_flat_rates_are_taken_from_the_services_section() (+7 more)
 
 ### Community 1854 - "Community 1854"
 Cohesion: 0.67
@@ -8368,8 +8601,8 @@ Cohesion: 0.15
 Nodes (13): business_spec, current_process, expected_value, input_artifacts, intended_users, pain_points, poc_goal, proposed_solution (+5 more)
 
 ### Community 1973 - "Community 1973"
-Cohesion: 0.15
-Nodes (13): action_items, conflicts, decisions, end_time, meeting_date, meeting_id, participants, review_status (+5 more)
+Cohesion: 0.09
+Nodes (23): review_status, action_items, conflicts, decisions, end_time, meeting_date, meeting_id, participants (+15 more)
 
 ### Community 1974 - "Community 1974"
 Cohesion: 0.15
@@ -8440,8 +8673,8 @@ Cohesion: 0.29
 Nodes (7): type, properties, uncertain_fields, description, title, items, type
 
 ### Community 1991 - "Community 1991"
-Cohesion: 0.22
-Nodes (9): participant_context, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
+Cohesion: 0.16
+Nodes (15): str, assert_openai_or_azure(), Factory that turns a config dict into a ``ProviderClient`` instance.  Lazy-imp, Raise NotImplementedError if config picks a non-OpenAI/Azure provider.      Au, Raise NotImplementedError if config picks a non-OpenAI/Azure provider.      Au, Raise NotImplementedError if config picks a non-OpenAI/Azure provider.      Au, Test Module: assert_openai_or_azure (audio guard), Audio components must reject non-OpenAI/Azure providers. (+7 more)
 
 ### Community 1992 - "Community 1992"
 Cohesion: 0.18
@@ -8492,8 +8725,8 @@ Cohesion: 0.18
 Nodes (11): unresolved_issues_record_Extraction, uncertainty_reason, description, title, type, additionalProperties, description, properties (+3 more)
 
 ### Community 2004 - "Community 2004"
-Cohesion: 0.11
-Nodes (17): additionalProperties, $defs, description, description, title, type, discussion_summary, required (+9 more)
+Cohesion: 0.18
+Nodes (11): description, title, type, discussion_summary, meetingrecord_topics_record_Extraction, additionalProperties, description, properties (+3 more)
 
 ### Community 2005 - "Community 2005"
 Cohesion: 0.18
@@ -8580,12 +8813,12 @@ Cohesion: 0.20
 Nodes (9): required, type, $defs, check, $id, required, $schema, title (+1 more)
 
 ### Community 2026 - "Community 2026"
-Cohesion: 0.14
-Nodes (11): code:bash (pip install "gaik[extract]"), code:python (from gaik.software_components.config import get_openai_confi), code:python (from gaik.software_components.extractor import SchemaGenerat), API, Compatibility, Example, Installation, License (+3 more)
+Cohesion: 0.13
+Nodes (12): code:bash (pip install "gaik[extract]"), code:python (from gaik.software_components.config import get_openai_confi), code:python (from gaik.software_components.extractor import SchemaGenerat), API, Compatibility, Example, Generated Artifacts, Installation (+4 more)
 
 ### Community 2027 - "Community 2027"
-Cohesion: 0.18
-Nodes (17): Any, str, _archive_artifacts(), generate_schema(), GenerateSchemaRequest, GenerateSchemaResponse, Schema Generator demo endpoints., Return a safe filename and base64-encoded ZIP containing both artifacts. (+9 more)
+Cohesion: 0.15
+Nodes (20): Any, str, _archive_artifacts(), generate_schema(), GenerateSchemaRequest, GenerateSchemaResponse, Schema Generator demo endpoints., Build the portable metadata consumed alongside a generated model. (+12 more)
 
 ### Community 2028 - "Community 2028"
 Cohesion: 0.22
@@ -8596,12 +8829,12 @@ Cohesion: 0.20
 Nodes (10): audit_log_required, contains_personal_data, external_model_api_allowed, local_processing_required, output_sensitivity, retention_policy, stores_input_data, stores_outputs (+2 more)
 
 ### Community 2030 - "Community 2030"
-Cohesion: 0.20
-Nodes (8): BaseModel, Path, Generate a PDF from a Pydantic model instance or dict.          Args:, Generate a PDF from a Pydantic model instance or dict.          Args:, Set up a Unicode-capable font for Finnish language support., Set up a Unicode-capable font for Finnish language support., Initialize the PDF generator.          Args:             title: Title shown a, Initialize the PDF generator.          Args:             title: Title shown a
+Cohesion: 0.09
+Nodes (4): _Answer, client(), _Models, Google adapter contract tests using the installed SDK types and a fake transport
 
 ### Community 2031 - "Community 2031"
-Cohesion: 0.22
-Nodes (9): meeting_record_json, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
+Cohesion: 0.10
+Nodes (20): Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`., Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`., Generate schema and report token usage + latency + cost.          Same input a, Generate schema and report token usage + latency + cost.          Same input a, Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`., Generate schema and report token usage + latency + cost.          Same input a, Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`., Structured return value from :meth:`SchemaGenerator.generate_schema_with_usage`. (+12 more)
 
 ### Community 2032 - "Community 2032"
 Cohesion: 0.22
@@ -8684,12 +8917,12 @@ Cohesion: 0.33
 Nodes (6): transcript, final_output, optional, produced_by, source, type
 
 ### Community 2052 - "Community 2052"
-Cohesion: 0.22
-Nodes (9): externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source, type (+1 more)
+Cohesion: 0.19
+Nodes (11): str, Any, BaseModel, bool, ChatMessage, ChatResponse, float, str (+3 more)
 
 ### Community 2053 - "Community 2053"
-Cohesion: 0.22
-Nodes (9): poc_input_bundle, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
+Cohesion: 0.15
+Nodes (18): FakeClient, make(), JevClassifier: label choice, confidence gate, hierarchy, batches and files., Stands in for typesafe_sdk.TypeSafeClient and records what it was asked., test_classify_file_directory_isolates_a_bad_file(), test_classify_file_reads_docx_text(), test_classify_file_rejects_unsupported_and_missing(), test_classify_many_fails_fast_on_bad_classes() (+10 more)
 
 ### Community 2054 - "Community 2054"
 Cohesion: 0.22
@@ -8732,16 +8965,16 @@ Cohesion: 0.17
 Nodes (11): Adding a skill, code:bash (/plugin marketplace add GAIK-project/gaik-toolkit), code:bash (/plugin install gaik-toolkit@gaik-toolkit), code:text (agent-plugin/), code:bash (python -c "import json; json.load(open('agent-plugin/plugin.), gaik-toolkit agent plugin, Installing, Layout (+3 more)
 
 ### Community 2064 - "Community 2064"
-Cohesion: 0.16
-Nodes (12): str, str, assert_openai_or_azure(), Factory that turns a config dict into a ``ProviderClient`` instance.  Lazy-imp, Raise NotImplementedError if config picks a non-OpenAI/Azure provider.      Au, Raise NotImplementedError if config picks a non-OpenAI/Azure provider.      Au, Test Module: assert_openai_or_azure (audio guard), Audio components must reject non-OpenAI/Azure providers. (+4 more)
+Cohesion: 0.14
+Nodes (14): ExternalParty, description, properties, required, title, type, sends, to_step (+6 more)
 
 ### Community 2065 - "Community 2065"
 Cohesion: 0.22
 Nodes (9): validation_report, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 2066 - "Community 2066"
-Cohesion: 0.20
-Nodes (10): externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source, type (+2 more)
+Cohesion: 0.11
+Nodes (19): externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source, type (+11 more)
 
 ### Community 2067 - "Community 2067"
 Cohesion: 0.22
@@ -8756,8 +8989,8 @@ Cohesion: 0.33
 Nodes (6): use_case, description, domain, id, knowledge_processes, name
 
 ### Community 2070 - "Community 2070"
-Cohesion: 0.24
-Nodes (10): AzureOpenAI, format_timestamp(), post_process_transcript(), Reusable transcription package entry point., # IMPORTANT: do NOT mutate self.default_prompt across calls., Enhance transcript quality with GPT models., Split audio into chunks and transcribe with rolling context., Backward-compatible wrapper without explicit context parameter. (+2 more)
+Cohesion: 0.16
+Nodes (19): get_form_config(), OpenAI configuration for the form routes, with their reasoning effort., str, _build_requirements(), extract_form(), ExtractFormRequest, ExtractFormResponse, IncomingField (+11 more)
 
 ### Community 2071 - "Community 2071"
 Cohesion: 0.22
@@ -8820,8 +9053,8 @@ Cohesion: 0.50
 Nodes (4): code:bash (pytest implementation_layer/unit_tests/test_imports.py::test), code:bash (pip install -e ".[<name>]"), code:bash (pip install gaik[<name>]), Step 6: Test the Software Component
 
 ### Community 2086 - "Community 2086"
-Cohesion: 0.33
-Nodes (13): Any, str, _anthropic_config(), _anthropic_foundry_config(), _azure_config(), _embedding_model_default(), get_llm_config(), _google_config() (+5 more)
+Cohesion: 0.30
+Nodes (17): Any, str, _aitta_config(), _anthropic_config(), _anthropic_foundry_config(), _azure_config(), _compatible_config(), _embedding_model_default() (+9 more)
 
 ### Community 2087 - "Community 2087"
 Cohesion: 0.22
@@ -8832,8 +9065,8 @@ Cohesion: 0.25
 Nodes (8): access_decision, answer, citations, query_id, question, refusal_reason, role, field_descriptions
 
 ### Community 2089 - "Community 2089"
-Cohesion: 0.29
-Nodes (6): Call, str, _call_name(), Regression tests for the demo website's shared OpenAI model settings., test_all_target_router_constructors_use_the_shared_profile(), test_get_api_config_pins_the_website_model()
+Cohesion: 0.03
+Nodes (99): Call, str, UploadFile, bool, download_pdf(), Pipeline router - End-to-end pipeline endpoints for demos., str, UploadFile (+91 more)
 
 ### Community 2090 - "Community 2090"
 Cohesion: 0.25
@@ -8924,8 +9157,8 @@ Cohesion: 0.29
 Nodes (6): Field-by-field guidance, Purpose, Citation format (strict), Core evidence rule, Extraction Requirements — MeetingRecord, What must NOT be asserted
 
 ### Community 2112 - "Community 2112"
-Cohesion: 0.17
-Nodes (12): description, items, title, type, type, citations, meetingrecord_conflicts_record_Extraction, additionalProperties (+4 more)
+Cohesion: 0.29
+Nodes (7): description, items, title, type, type, citations, properties
 
 ### Community 2113 - "Community 2113"
 Cohesion: 0.29
@@ -8956,8 +9189,8 @@ Cohesion: 0.40
 Nodes (5): anyOf, default, description, title, asset_identifier
 
 ### Community 2120 - "Community 2120"
-Cohesion: 0.17
-Nodes (11): code:bash (pip install "gaik[extract]"), code:python (from gaik.software_components.vision_extractor import Vision), Evidence that is worth something, Extracting structured data with gaik, Fix the schema, not the prompt, Gotchas, Measuring whether any of this worked, Only put fields in the schema that the document actually contains (+3 more)
+Cohesion: 0.12
+Nodes (14): Choose providers separately for audio, vision and extraction, code:bash (pip install "gaik[extract]"), code:python (from gaik.software_components.vision_extractor import Vision), code:bash (pip install "gaik[audio-to-structured-data,documents-to-stru), code:python (from gaik.software_modules.audio_to_structured_data import A), Evidence that is worth something, Extracting structured data with gaik, Fix the schema, not the prompt (+6 more)
 
 ### Community 2121 - "Community 2121"
 Cohesion: 0.33
@@ -8996,8 +9229,8 @@ Cohesion: 0.33
 Nodes (6): models, extraction_model, provider, temperature, transcription_model, transcription_provider
 
 ### Community 2130 - "Community 2130"
-Cohesion: 0.22
-Nodes (9): parsed_agenda, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
+Cohesion: 0.16
+Nodes (10): BaseModel, Path, PDFResult, Generate a PDF from a Pydantic model instance or dict.          Args:, Generate a PDF from a Pydantic model instance or dict.          Args:, Set up a Unicode-capable font for Finnish language support., Set up a Unicode-capable font for Finnish language support., Result from PDF generation. (+2 more)
 
 ### Community 2131 - "Community 2131"
 Cohesion: 0.40
@@ -9060,12 +9293,12 @@ Cohesion: 0.33
 Nodes (5): attempt, generated_package, run_id, schema_version, status
 
 ### Community 2146 - "Community 2146"
-Cohesion: 0.18
+Cohesion: 0.17
 Nodes (9): Choose by what must survive, not by file type, code:bash (pip install "gaik[parser]"              # PyMuPDF, python-do), code:python (from gaik.software_components.parsers import PyMuPDFParser, ), Gotchas, Parsing documents with gaik, Parsing quality is usually a traceability decision, not an accuracy one, Use the API correctly, Verify before building on the output (+1 more)
 
 ### Community 2147 - "Community 2147"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_validation_report, blueprint_path, kind
+Cohesion: 0.16
+Nodes (16): Any, float, int, Path, str, _extract_text(), JevClassifier, _normalize_classes() (+8 more)
 
 ### Community 2148 - "Community 2148"
 Cohesion: 0.33
@@ -9080,16 +9313,16 @@ Cohesion: 0.40
 Nodes (5): default, description, title, location, type
 
 ### Community 2151 - "Community 2151"
-Cohesion: 0.67
-Nodes (3): TextAnnotation_2, blueprint_path, kind
+Cohesion: 0.16
+Nodes (20): MagicMock, PostgresAgent, str, _make_agent(), Unit tests for PostgresAgent.query timeout handling.  When PostgreSQL fires ``, Regression: other psycopg errors keep the original 3-attempt loop., Regression: other psycopg errors keep the original 3-attempt loop., If the LLM's rewrite executes successfully, the result is returned. (+12 more)
 
 ### Community 2152 - "Community 2152"
-Cohesion: 0.67
-Nodes (3): Lane_gaik_ai, blueprint_path, kind
+Cohesion: 0.33
+Nodes (4): GAIKPdf, Custom FPDF class with header and footer for GAIK branding., Add header with logo and title., Add footer with page number and generation date.
 
 ### Community 2153 - "Community 2153"
-Cohesion: 0.33
-Nodes (6): additionalProperties, description, required, title, type, conflicts_record_Extraction
+Cohesion: 0.24
+Nodes (9): classify_document(), main(), _make_llm_client(), End-to-end example: - Parse each whole PDF with a parser - Classify the parsed, Create an OpenAI (or Azure OpenAI) client + return (client, model, use_azure)., Create an OpenAI (or Azure OpenAI) client + return (client, model, use_azure)., Classify a fully parsed document as either:       - 'Purchase order'       - ', Classify a fully parsed document as either:       - 'Purchase order'       - ' (+1 more)
 
 ### Community 2154 - "Community 2154"
 Cohesion: 0.33
@@ -9112,8 +9345,8 @@ Cohesion: 0.33
 Nodes (6): unresolved_issues_record_Extraction, additionalProperties, description, required, title, type
 
 ### Community 2159 - "Community 2159"
-Cohesion: 0.22
-Nodes (9): source_pdf, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
+Cohesion: 0.11
+Nodes (19): cmd_set_sections(), find_cycle(), Write the user's approved structure into the spec. No model call., The user's structure (titles, prompts) as spec sections, or the errors that stop, The user's structure (titles, prompts) as spec sections, or the errors that stop, Write the user's approved structure into the spec. No model call., Write the user's approved structure into the spec. No model call., Write the user's approved structure into the spec. No model call. (+11 more)
 
 ### Community 2160 - "Community 2160"
 Cohesion: 0.40
@@ -9128,8 +9361,8 @@ Cohesion: 0.40
 Nodes (5): evaluation, eval_framework, ground_truth_dir, metrics, sample_data_dir
 
 ### Community 2163 - "Community 2163"
-Cohesion: 0.25
-Nodes (7): Connection, bool, Connection, Create extensions, table, indexes, and SQL functions (idempotent).          Sa, Create the pure semantic search SQL function., Create the RRF-based hybrid search SQL function., Create the weighted linear combination hybrid search SQL function.
+Cohesion: 0.20
+Nodes (10): BaseModel, _collect_models(), Collect nested Pydantic models before the parent model., Collect nested Pydantic models before the parent model., Collect nested Pydantic models before the parent model., Collect nested Pydantic models before the parent model., Collect nested Pydantic models before the parent model., Collect nested Pydantic models before the parent model. (+2 more)
 
 ### Community 2164 - "Community 2164"
 Cohesion: 0.40
@@ -9140,12 +9373,12 @@ Cohesion: 0.40
 Nodes (5): description, items, title, type, decisions
 
 ### Community 2166 - "Community 2166"
-Cohesion: 0.40
-Nodes (5): default, description, title, meeting_date, anyOf
+Cohesion: 0.14
+Nodes (4): Task 1: English PO with rich type qualifiers., Task 1: English PO with rich type qualifiers., Task 1: English PO with rich type qualifiers., TestParentWithNestedListPO
 
 ### Community 2167 - "Community 2167"
-Cohesion: 0.23
-Nodes (10): FormControl(), FormDescription(), FormFieldContext, FormFieldContextValue, FormItem(), FormItemContext, FormItemContextValue, FormLabel() (+2 more)
+Cohesion: 0.20
+Nodes (10): str, _annotation_repr(), Return a Python source representation for common Pydantic field types., Return a Python source representation for common Pydantic field types., Return a Python source representation for common Pydantic field types., Return a Python source representation for common Pydantic field types., Return a Python source representation for common Pydantic field types., Return a Python source representation for common Pydantic field types. (+2 more)
 
 ### Community 2168 - "Community 2168"
 Cohesion: 0.40
@@ -9180,20 +9413,20 @@ Cohesion: 0.40
 Nodes (5): urgency, anyOf, default, description, title
 
 ### Community 2176 - "Community 2176"
-Cohesion: 0.20
-Nodes (10): review_status, target_output_spec, allowed_values, confidence_required, fields, missing_value_policy, optional_fields, required_fields (+2 more)
+Cohesion: 0.16
+Nodes (11): Any, BaseModel, float, int, str, add_usage(), Provider-agnostic LLM client interface., The counts added between two ``UsageCounter.snapshot()`` calls. (+3 more)
 
 ### Community 2177 - "Community 2177"
-Cohesion: 0.20
-Nodes (10): _clean_decimal_string(), purchase_order_data_Extraction, purchase_order_header_extraction_Extraction, purchase_order_line_item_Extraction, Auto-generated schema — do not edit manually., Strip currency/unit noise before Decimal parsing; reject (return None)     ambi, Strip currency/unit noise before Decimal parsing; reject (return None)     ambi, Extraction model for purchase_order_line_item (+2 more)
+Cohesion: 0.24
+Nodes (10): str, _annotation_repr(), _clean_schema_dump(), Render the generated Pydantic model (and any nested child models) to a     .py, Render the generated Pydantic model (and any nested child models) to a     .py, Remove the header/footer separator lines print_pydantic_schema adds.      The, Return a Python source representation for common Pydantic field types.      Ro, Return a Python source representation for common Pydantic field types.      Ro (+2 more)
 
 ### Community 2178 - "Community 2178"
-Cohesion: 0.22
-Nodes (9): Workflow, steps, default, items, title, type, properties, title (+1 more)
+Cohesion: 0.14
+Nodes (20): Any, bool, str, _is_openai_api(), normalize_chat_kwargs(), Translate common chat options for OpenAI's reasoning model families., Return compatible options without mutating caller-owned dictionaries.      GPT, True for configs that select OpenAI or Azure OpenAI, including legacy ``use_azur (+12 more)
 
 ### Community 2179 - "Community 2179"
-Cohesion: 0.22
-Nodes (10): Path, Tests for VisionExtractor.suggest_requirements (suggest fields from a sample doc, Public suggestion API is present on VisionExtractor., The internal meta-model carries exactly one requirements_text field., Render a tiny one-page invoice PDF used as the sample document., One vision pass over a sample invoice returns usable requirements text., test_requirements_suggestion_meta_model_shape(), test_suggest_methods_exist() (+2 more)
+Cohesion: 0.14
+Nodes (15): Path, Tests for VisionExtractor.suggest_requirements (suggest fields from a sample doc, Public suggestion API is present on VisionExtractor., The internal meta-model carries exactly one requirements_text field., Render a tiny one-page invoice PDF used as the sample document., One vision pass over a sample invoice returns usable requirements text., One vision pass over a sample invoice returns usable requirements text., test_requirements_suggestion_meta_model_shape() (+7 more)
 
 ### Community 2180 - "Community 2180"
 Cohesion: 0.18
@@ -9204,16 +9437,16 @@ Cohesion: 0.40
 Nodes (4): model_name, requirements, fields, use_case_name
 
 ### Community 2182 - "Community 2182"
-Cohesion: 0.20
-Nodes (10): BaseModel, _collect_models(), Collect nested Pydantic models before the parent model., Collect nested Pydantic models before the parent model., Collect nested Pydantic models before the parent model., Collect nested Pydantic models before the parent model., Collect nested Pydantic models before the parent model., Collect nested Pydantic models before the parent model. (+2 more)
+Cohesion: 0.10
+Nodes (18): _clean_markdown(), _markdown_to_html(), ParseResult, Result of parsing a PDF document., Result of parsing a PDF document., Parse a PDF file and return structured output., Parse a PDF file and return structured output., Parse a PDF file and return structured output. (+10 more)
 
 ### Community 2183 - "Community 2183"
 Cohesion: 0.40
 Nodes (5): description, items, title, type, conflicts
 
 ### Community 2184 - "Community 2184"
-Cohesion: 0.40
-Nodes (5): description, items, title, type, decisions
+Cohesion: 0.12
+Nodes (17): Small authenticated-through-Next connectivity check for model settings., test_connection(), Test Module: Parent + Nested List Schema, API Config Utilities, get_api_config Utility, validate_file_size Utility, gaik SchemaGenerator Component, VerifiableField (+9 more)
 
 ### Community 2185 - "Community 2185"
 Cohesion: 0.40
@@ -9228,12 +9461,12 @@ Cohesion: 0.40
 Nodes (5): default, description, title, type, meeting_date
 
 ### Community 2188 - "Community 2188"
-Cohesion: 0.20
-Nodes (10): Path, Save a generated Pydantic model as importable Python source., Save requirements metadata beside the generated schema., Save requirements metadata beside the generated schema., Save requirements metadata beside the generated schema., Save requirements metadata beside the generated schema., Save requirements metadata beside the generated schema., Save requirements metadata beside the generated schema. (+2 more)
+Cohesion: 0.13
+Nodes (11): _distributions(), _passed_result(), Fail-closed release result validation and bounded real-client runner contracts., test_distribution_validation_preserves_sql_typing_and_source(), test_distribution_validation_rejects_missing_runtime_asset(), test_distribution_validation_rejects_oversized_artifact(), test_distribution_validation_rejects_repository_data(), test_distribution_validation_requires_sdist_as_well_as_wheel() (+3 more)
 
 ### Community 2189 - "Community 2189"
-Cohesion: 0.20
-Nodes (10): str, _annotation_repr(), Return a Python source representation for common Pydantic field types., Return a Python source representation for common Pydantic field types., Return a Python source representation for common Pydantic field types., Return a Python source representation for common Pydantic field types., Return a Python source representation for common Pydantic field types., Return a Python source representation for common Pydantic field types. (+2 more)
+Cohesion: 0.22
+Nodes (9): participant_context, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 2190 - "Community 2190"
 Cohesion: 0.50
@@ -9268,24 +9501,24 @@ Cohesion: 0.50
 Nodes (3): mappings, scenario_id, schema_version
 
 ### Community 2198 - "Community 2198"
-Cohesion: 0.22
-Nodes (9): parsed_agenda_text, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
+Cohesion: 0.19
+Nodes (13): lemmatize(), PyVoikkoBackend, Backend implementations for FinnishTextProcessor.  Each backend implements :cl, Voikko morphology as a pure-Python FST — no system library, no model download., normalize_unicode(), Light normalization helpers shared by every backend.  These run BEFORE the hea, Split *text* into word-like tokens. No lowercasing — backends handle that., Apply NFC normalization so combining diacritics collapse into single codepoints. (+5 more)
 
 ### Community 2199 - "Community 2199"
-Cohesion: 0.22
-Nodes (8): description, homepage, keywords, license, name, repository, $schema, version
+Cohesion: 0.07
+Nodes (33): 10. Changes after delivery, 1. Intake, 2. The spec, 2. The spec for normalization, 3. Preflight, 4. Normalize, 5. Curate, 5. The report spec, agreed in chat (+25 more)
 
 ### Community 2200 - "Community 2200"
-Cohesion: 0.22
+Cohesion: 0.20
 Nodes (8): code:python (from gaik.software_components.evaluators import ExtractionEv), Contents, Measure stability before you have ground truth, Measuring extraction quality, Reading a zero correctly, Recording enough to reproduce a number, Rules that keep a comparison honest, What gaik provides
 
 ### Community 2201 - "Community 2201"
-Cohesion: 0.31
-Nodes (7): str, Text-to-speech router., synthesize_text(), TextToSpeechResponse, main(), Generate speech audio from text using OpenAI or Azure OpenAI., TextToSpeech
+Cohesion: 0.22
+Nodes (9): externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source, type (+1 more)
 
 ### Community 2202 - "Community 2202"
-Cohesion: 0.29
-Nodes (8): API Config Utilities, get_api_config Utility, validate_file_size Utility, gaik SchemaGenerator Component, VisionExtractResponse Model, extract_vision Endpoint, generate_schema Endpoint, Vision Extractor Router
+Cohesion: 0.23
+Nodes (16): float, Path, _format_hhmmss(), load_config(), _load_output_schema(), load_requirements(), main(), Proof of Concept: Meeting Record Generation  Custom / hybrid pipeline (agent-wir (+8 more)
 
 ### Community 2203 - "Community 2203"
 Cohesion: 0.50
@@ -9296,16 +9529,16 @@ Cohesion: 0.50
 Nodes (3): Basic evaluation script for AI-Assisted Project Meeting Record Generation.  Ev, run_evaluation(), Path
 
 ### Community 2205 - "Community 2205"
-Cohesion: 0.29
-Nodes (6): load_report_config(), Load a config file saved by ``save_report_config`` and return a dict     that c, Load a config file saved by ``save_report_config`` and return a dict     that c, Load a config file saved by ``save_report_config`` and return a dict     that c, main(), Example: generate a user-defined Markdown report from multiple source files.
+Cohesion: 0.13
+Nodes (15): default, items, title, type, Participant, default, title, type (+7 more)
 
 ### Community 2206 - "Community 2206"
 Cohesion: 0.29
 Nodes (7): business_process, decision_points, exceptions, external_parties, manual_steps, message_flows, participants
 
 ### Community 2207 - "Community 2207"
-Cohesion: 0.22
-Nodes (9): retrieved_chunks_per_query, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
+Cohesion: 0.18
+Nodes (11): create_llm_client (gaik.software_components.llm), get_llm_config (gaik.software_components.llm), Project (Multi-Provider Pydantic Schema), Multi-Provider Extractor Main, run_one (Single Provider Extraction Run), CountryFact (Structured Output Schema), demo_chat (ProviderClient Chat Demo), demo_chat_parsed (ProviderClient Structured Output Demo) (+3 more)
 
 ### Community 2208 - "Community 2208"
 Cohesion: 0.67
@@ -9336,8 +9569,8 @@ Cohesion: 0.67
 Nodes (3): TextAnnotation_1, blueprint_path, kind
 
 ### Community 2215 - "Community 2215"
-Cohesion: 0.33
-Nodes (6): metadata, blueprint_id, created_at, created_by, last_updated_at, status
+Cohesion: 0.60
+Nodes (3): extractReportUsage(), pickUsageFromEvents(), ReportUsageInfo
 
 ### Community 2216 - "Community 2216"
 Cohesion: 0.67
@@ -9373,10 +9606,10 @@ Nodes (3): DataObjectRef_approved_ticket, blueprint_path, kind
 
 ### Community 2224 - "Community 2224"
 Cohesion: 0.33
-Nodes (4): Path, Text-to-Speech generation using OpenAI or Azure OpenAI.  Main Classes:     -, filename(), SpeechSynthesisResult
+Nodes (6): int, Namespace, main(), ProjectFact, Check Aitta through GAIK's shared client and DataExtractor.      uv run python, smoke()
 
 ### Community 2226 - "Community 2226"
-Cohesion: 0.29
+Cohesion: 0.15
 Nodes (3): Tests for the website's true-form VisionExtractor workflow., test_temporary_schema_is_process_local_and_bound_to_its_task(), test_temporary_schema_task_matching_normalizes_multipart_newlines()
 
 ### Community 2227 - "Community 2227"
@@ -9384,72 +9617,72 @@ Cohesion: 0.22
 Nodes (9): TabularAgent, call, construct, import, install_extra, note, options, returns (+1 more)
 
 ### Community 2228 - "Community 2228"
-Cohesion: 0.29
-Nodes (7): Test Module: Parent + Nested List Schema, VerifiableField, VisionExtractionResult, VisionExtractor, VisionExtractor Package Init, _make_schema_strict, VisionExtractor Prompts
+Cohesion: 0.22
+Nodes (4): _Provider, Provider routing keeps label validation identical across SDKs., test_empty_form_does_not_call_provider(), test_form_routes_provider_and_preserves_label_contract()
 
 ### Community 2229 - "Community 2229"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_notify_manager
+Cohesion: 0.20
+Nodes (12): Any, bool, int, str, available(), _client(), _counts(), Optional, opt-in Solution Wizard diagnostics; no other demo is instrumented. (+4 more)
 
 ### Community 2230 - "Community 2230"
-Cohesion: 0.33
-Nodes (5): PurchaseOrderERPRecord_Extraction, Output schema for this use case.  Generated by GAIK SchemaGenerator via the So, Extraction model for purchase_order_erp_record_line_item, Extraction model for PurchaseOrderERPRecord with repeated line_items, purchase_order_erp_record_line_item_Extraction
+Cohesion: 0.25
+Nodes (8): decimal_field_repr(), Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal, Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal, Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal, Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal, Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal, Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal, Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal
 
 ### Community 2231 - "Community 2231"
-Cohesion: 0.33
-Nodes (6): metadata, blueprint_id, created_at, created_by, last_updated_at, status
+Cohesion: 0.12
+Nodes (17): bool, checked(), install_provider_extra(), load_config(), package_available(), The runtime LLM config. Credentials come from the environment, never from the sp, The runtime LLM config. Credentials come from the environment, never from the sp, The runtime LLM config. Credentials come from the environment, never from the sp (+9 more)
 
 ### Community 2232 - "Community 2232"
-Cohesion: 0.18
-Nodes (8): _format_key(), GAIKPdf, PDFResult, Generate PDF documents from structured data., Custom FPDF class with header and footer for GAIK branding., Add header with logo and title., Add footer with page number and generation date., Result from PDF generation.
+Cohesion: 0.17
+Nodes (15): PgVectorStore, str, _first_words(), PgVectorStore's SQL: what the Python methods send, and what the SQL does.  The, gaik before the tsquery_mode argument calls, and its setup() re-creates,     th, Stands in for a psycopg connection and remembers every call., The SQL functions take the mode as their last argument; the Python     wrappers, _Recorder (+7 more)
 
 ### Community 2233 - "Community 2233"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_poc_input_bundle, blueprint_path, kind
+Cohesion: 0.14
+Nodes (20): banner(), card(), chip(), ICON(), label(), matrix(), numbered_cards(), R() (+12 more)
 
 ### Community 2234 - "Community 2234"
-Cohesion: 0.11
-Nodes (29): int, Path, int, Path, int, Blueprint, Registry, str (+21 more)
+Cohesion: 0.18
+Nodes (16): BaseModel, _by_name(), Invoice, Line, The field table of a generated schema., test_a_date_held_as_text_is_shown_as_a_date_with_its_format(), test_annotated_fields_are_read_through_their_wrapper(), test_choices_list_their_allowed_values() (+8 more)
 
 ### Community 2235 - "Community 2235"
 Cohesion: 0.67
 Nodes (3): Gateway_join_extract_meeting_record, blueprint_path, kind
 
 ### Community 2236 - "Community 2236"
-Cohesion: 0.33
-Nodes (5): purchase_order_header_extraction_Extraction, purchase_order_item_Extraction, Committed schema for the Vision Extractor PO/BOM website example., Purchase order header with repeated PO items enriched from matching BOMs., Extraction model for purchase_order_item.
+Cohesion: 0.13
+Nodes (16): Health check endpoint, Health check endpoint, Health check endpoint, Root endpoint with API info, Root endpoint with API info, Health check endpoint, Health check endpoint, Health check endpoint (+8 more)
 
 ### Community 2237 - "Community 2237"
 Cohesion: 0.29
 Nodes (6): The step a rejected review loops back to: the automated_task that         produc, The step a rejected review loops back to: the automated_task that         produc, The step a rejected review loops back to: the automated_task that         produc, The step a rejected review loops back to: the automated_task that         produc, The step a rejected review loops back to: the automated_task that         produc, The step a rejected review loops back to: the automated_task that         produ
 
 ### Community 2238 - "Community 2238"
-Cohesion: 0.40
-Nodes (5): evaluation, eval_framework, ground_truth_dir, metrics, sample_data_dir
+Cohesion: 0.16
+Nodes (17): BAR(), est_lines(), _font(), font_file(), KP(), KPS(), line_factor(), LN() (+9 more)
 
 ### Community 2239 - "Community 2239"
-Cohesion: 0.29
-Nodes (7): business_process, decision_points, exceptions, external_parties, manual_steps, message_flows, participants
+Cohesion: 0.09
+Nodes (39): bool, Path, str, bool, SectionSpec, str, bool, int (+31 more)
 
 ### Community 2240 - "Community 2240"
-Cohesion: 0.50
-Nodes (5): ChildRequirements, CompositeExtractionRequirements, ExtractionRequirements, FieldSpec, TestFieldSpecCompat (FieldSpec backward compat tests)
+Cohesion: 0.20
+Nodes (4): Construction blueprint — single child list under a large header., Construction blueprint — single child list under a large header., Construction blueprint — single child list under a large header., TestParentWithNestedListBlueprint
 
 ### Community 2241 - "Community 2241"
-Cohesion: 0.50
-Nodes (4): str, _format_sample_row(), Render a compact, LLM-friendly description of the schema., Render one sample row as a compact, length-capped string.
+Cohesion: 0.18
+Nodes (14): header(), BYOK security and request isolation; no network or real credentials., test_classifier_result_error_does_not_bypass_sanitizer(), test_judge_uses_own_config_and_sanitizes_remote_errors(), test_keys_are_rejected_on_unsupported_routes_before_endpoint_runs(), test_normalizes_documented_public_azure_urls(), test_own_key_provider_calls_do_not_block_the_event_loop(), test_own_key_request_urls_are_not_logged() (+6 more)
 
 ### Community 2242 - "Community 2242"
 Cohesion: 0.25
 Nodes (7): description, name, owner, name, url, plugins, $schema
 
 ### Community 2243 - "Community 2243"
-Cohesion: 0.32
-Nodes (7): main(), Example: query a report-style Excel file that is not a clean data table.  ``me, Print the cell grid exactly as the loader first sees it., Print the table the agent ends up querying., Show the messy sheet, then the clean table the agent queries., show_loaded_table(), show_raw_sheet()
+Cohesion: 0.40
+Nodes (3): str, _FakeResponse, _title_of()
 
 ### Community 2244 - "Community 2244"
-Cohesion: 0.32
-Nodes (7): str, _clip(), _describe_column(), Render the statistical annotations that follow a column's type., Shorten a rendered value so one wide column cannot flood the prompt., Render a compact, LLM-friendly description of the loaded data.          Column, table_names()
+Cohesion: 0.17
+Nodes (17): TextToSpeechPage(), bytesFromBase64(), DIARY, estimateSeconds(), EXAMPLES, formatDuration(), joinBytes(), Language (+9 more)
 
 ### Community 2248 - "Community 2248"
 Cohesion: 0.67
@@ -9480,20 +9713,20 @@ Cohesion: 0.67
 Nodes (3): Gateway_join_extract_meeting_record, blueprint_path, kind
 
 ### Community 2256 - "Community 2256"
-Cohesion: 0.29
+Cohesion: 0.25
 Nodes (6): Choosing a provider for vision parsing, Contents, Credentials per parser, Escalation ladder, Install extras, Parser configuration and credentials
 
 ### Community 2257 - "Community 2257"
-Cohesion: 0.29
-Nodes (7): decimal_field_repr(), Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal, Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal, Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal, Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal, Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal, Return "DecimalField"/"OptionalDecimalField" if ``annotation`` is     ``Decimal
+Cohesion: 0.03
+Nodes (102): FileViewer(), FileLine(), CuratorExample, totalsOf(), EXAMPLE_NORMALIZED, EXAMPLE_SECTIONS, putKnowledgeHandoff(), GUIDE_NOTES (+94 more)
 
 ### Community 2258 - "Community 2258"
-Cohesion: 0.67
-Nodes (3): code:text (Spelling Error Rate = spelling-close substitutions / total r), code:text (normalized_distance = Levenshtein_distance / length(referenc), Spelling Error Rate
+Cohesion: 0.17
+Nodes (11): Agreeing it in chat, code:json ([), code:bash (python <skill>/scripts/template_to_spec.py template.docx --o), code:markdown (# Kuntoarvio), code:json ([), Drafting from a template, Drafting without a template, Section ids (+3 more)
 
 ### Community 2259 - "Community 2259"
-Cohesion: 0.18
-Nodes (9): _normalize_report_markdown(), Convert a Markdown file to DOCX using Pandoc via pypandoc.          Requires t, Convert a Markdown file to DOCX using Pandoc via pypandoc.          Requires t, Convert a Markdown file to DOCX using Pandoc via pypandoc.          Requires t, Convert a Markdown file to DOCX using Pandoc via pypandoc.          Requires t, Ensure the model's report starts with a single H1 title and ends cleanly., Ensure the model's report starts with a single H1 title and ends cleanly., Ensure the model's report starts with a single H1 title and ends cleanly. (+1 more)
+Cohesion: 0.04
+Nodes (63): MessageResponse, Conflict, ConflictCard(), EvidenceView(), FactList(), isRecording(), Knowledge, KnowledgeData (+55 more)
 
 ### Community 2261 - "Community 2261"
 Cohesion: 0.67
@@ -9504,16 +9737,16 @@ Cohesion: 0.67
 Nodes (3): type, oracle_value, type
 
 ### Community 2263 - "Community 2263"
-Cohesion: 0.33
-Nodes (5): str, UploadFile, classify_document(), Classifier router - Document classification endpoints, Classify a document into predefined categories.      - **file**: The document
+Cohesion: 0.30
+Nodes (17): Edit, _edits(), make(), Unit tests for DraftReviewer. Offline: ``create_llm_client`` is replaced by a fa, test_ambiguous_search_fails_and_is_retried(), test_chat_options_reach_every_request(), test_client_exception_propagates(), test_edit_failing_every_attempt_is_unresolved() (+9 more)
 
 ### Community 2264 - "Community 2264"
-Cohesion: 0.40
-Nodes (5): TranscribeResponse Model, _build_diff_chunks Helper, Transcriber Router, _summarize_corrections Helper, transcribe_audio Endpoint
+Cohesion: 0.18
+Nodes (11): Name, _pdf(), Shared-config multimodal components use canonical messages and validated outputs, _SharedClient, test_anthropic_shared_call_skips_sdk_streaming_guard(), test_failed_model_call_respects_transport_ownership(), test_multimodal_parser_routes_shared_config(), test_parser_then_extractor_can_reuse_caller_http_client() (+3 more)
 
 ### Community 2265 - "Community 2265"
-Cohesion: 0.33
-Nodes (6): package, include_docs, include_evals, include_tests, name, output_dir
+Cohesion: 0.29
+Nodes (7): business_process, decision_points, exceptions, external_parties, manual_steps, message_flows, participants
 
 ### Community 2266 - "Community 2266"
 Cohesion: 0.33
@@ -9521,47 +9754,51 @@ Nodes (6): package, include_docs, include_evals, include_tests, name, output_dir
 
 ### Community 2267 - "Community 2267"
 Cohesion: 0.33
-Nodes (5): PurchaseOrderERPRecord_Extraction, Output schema for this use case.  Generated by GAIK SchemaGenerator via the So, Extraction model for PurchaseOrderERPRecord_line_item, Extraction model for PurchaseOrderERPRecord with repeated line_items, PurchaseOrderERPRecord_line_item_Extraction
+Nodes (6): use_case, description, domain, id, knowledge_processes, name
 
 ### Community 2268 - "Community 2268"
 Cohesion: 0.33
 Nodes (6): use_case, description, domain, id, knowledge_processes, name
 
 ### Community 2269 - "Community 2269"
-Cohesion: 0.33
-Nodes (6): _print_field_details(), Integration test — calls parse_user_requirements() with a real LLM.  Requires, Parse the Finnish incident report task and verify the generated model., Parse the Finnish incident report task and verify the generated model., Parse the Finnish incident report task and verify the generated model., test_finnish_incident_report_schema()
+Cohesion: 0.11
+Nodes (18): 10. Company Information, 1. Price List Structure, 2. Volume Discount Tiers, 4. BOM Field Names, 5. Tax Rate, 6. Sales Order Format, 7. Extraction Fields from PO/BOM, 8. Calculation Formulas (+10 more)
 
 ### Community 2270 - "Community 2270"
-Cohesion: 0.50
-Nodes (4): description, title, type, action_items
+Cohesion: 0.22
+Nodes (17): _git(), main(), bool, float, int, Path, str, Reproducible local/CI release gate, including authenticated component tests. (+9 more)
 
 ### Community 2271 - "Community 2271"
-Cohesion: 0.33
-Nodes (5): line_item_and_document_extraction_Collection, line_item_and_document_extraction_Extraction, Auto-generated schema module (do not edit manually)., Collection of line_item_and_document_extraction items, Extraction model for line_item_and_document_extraction
+Cohesion: 0.12
+Nodes (16): code:sql (CREATE EXTENSION IF NOT EXISTS vector;), code:sql (CREATE INDEX chunks_embedding_hnsw ON chunks USING hnsw (emb), code:sql (-- websearch parsing keeps stemming, stop words and quoted p), code:sql (-- $1 query vector '[...]'  $2 query text  $3 candidates per), code:sql (-- 's' means a stored generated column; '' means a plain col), Column type by dimension, Contents, Filters (+8 more)
 
 ### Community 2272 - "Community 2272"
 Cohesion: 0.33
 Nodes (5): additionalProperties, description, required, title, type
 
-### Community 2274 - "Community 2274"
+### Community 2273 - "Community 2273"
 Cohesion: 0.40
-Nodes (5): models, extraction_model, provider, temperature, transcription_model
+Nodes (5): start_time, anyOf, default, description, title
+
+### Community 2274 - "Community 2274"
+Cohesion: 0.33
+Nodes (6): metadata, blueprint_id, created_at, created_by, last_updated_at, status
 
 ### Community 2275 - "Community 2275"
-Cohesion: 0.40
-Nodes (5): topics, description, items, title, type
+Cohesion: 0.12
+Nodes (16): code:bash (pip install "gaik[report-writer]"), code:python (from gaik.software_modules.report_writer import ReportSpec, ), code:json ({), code:block4 (workspace/), code:python (# Correct a fact, delete a unit or resolve a conflict in wor), code:python (baseline = writer.run(spec, "workspace", mode="single_call")), Components used, Example (+8 more)
 
 ### Community 2276 - "Community 2276"
-Cohesion: 0.50
-Nodes (4): int, load_json(), main(), str
+Cohesion: 0.26
+Nodes (16): bytes, int, MonkeyPatch, str, TestClient, client(), _pdf(), _post() (+8 more)
 
 ### Community 2277 - "Community 2277"
-Cohesion: 0.40
-Nodes (4): Auto-generated schema module (do not edit manually)., Extraction model for Työmaapäiväkirja kenttien poiminta äänitallenteesta, Extraction model for Työmaapäiväkirja kenttien poiminta äänitallenteesta, Ty_maap_iv_kirja_kenttien_poiminta_nitallenteesta_Extraction
+Cohesion: 0.16
+Nodes (13): int, Path, _check_output_dir(), main(), Refuse to write inside the GAIK repo (implementation_layer/ or above).     Exce, Try to parse run_poc.py -- returns error string or None if valid., Try to parse run_poc.py -- returns error string or None if valid., Try to parse run_poc.py -- returns error string or None if valid. (+5 more)
 
 ### Community 2278 - "Community 2278"
-Cohesion: 0.40
-Nodes (5): description, items, title, type, action_items
+Cohesion: 0.22
+Nodes (9): report_markdown, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 2279 - "Community 2279"
 Cohesion: 0.67
@@ -9572,20 +9809,20 @@ Cohesion: 0.67
 Nodes (3): topics, items, type
 
 ### Community 2281 - "Community 2281"
-Cohesion: 0.50
-Nodes (4): title, description, title, type
+Cohesion: 0.33
+Nodes (6): download_file(), Download one artifact (path-traversal guarded to the workspace)., Download one artifact (path-traversal guarded to the workspace)., Download one artifact (path-traversal guarded to the workspace)., Download one artifact (path-traversal guarded to the workspace)., Download one artifact (path-traversal guarded to the workspace).
 
 ### Community 2282 - "Community 2282"
-Cohesion: 0.40
-Nodes (5): start_time, anyOf, default, description, title
+Cohesion: 0.22
+Nodes (9): local_vector_index, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 2283 - "Community 2283"
-Cohesion: 0.40
-Nodes (4): Auto-generated schema module (do not edit manually)., Extraction model for standard_medical_consultation_summary, Extraction model for standard_medical_consultation_summary, standard_medical_consultation_summary_Extraction
+Cohesion: 0.15
+Nodes (14): float, int, str, Judge two short texts for semantic equivalence (no source document)., Judge two short texts for semantic equivalence (no source document)., compute_judge_cost_usd(), lookup_judge_price(), Per-million-token rates for LLM-as-judge models.  The judge reads the shared t (+6 more)
 
 ### Community 2284 - "Community 2284"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_reviewer_approves
+Cohesion: 0.22
+Nodes (9): parsed_agenda, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 2285 - "Community 2285"
 Cohesion: 0.40
@@ -9596,8 +9833,8 @@ Cohesion: 0.67
 Nodes (3): blueprint_path, kind, Activity_transcribe_meeting
 
 ### Community 2287 - "Community 2287"
-Cohesion: 0.50
-Nodes (4): Return steps sorted in topological order from the depends_on graph.      Two b, Return steps sorted in topological order from the depends_on graph.      Two b, Return steps sorted in topological order from the depends_on graph.      Two blu, _topo_order()
+Cohesion: 0.40
+Nodes (5): Return steps sorted in topological order from the depends_on graph.      Two b, Return steps sorted in topological order from the depends_on graph.      Two b, Return steps sorted in topological order from the depends_on graph.      Two blu, Return steps sorted in topological order from the depends_on graph.      Two b, _topo_order()
 
 ### Community 2288 - "Community 2288"
 Cohesion: 0.67
@@ -9608,8 +9845,8 @@ Cohesion: 0.67
 Nodes (3): DataObjectRef_enhanced_transcript, blueprint_path, kind
 
 ### Community 2290 - "Community 2290"
-Cohesion: 0.29
-Nodes (7): _collect_input_files(), Expand files/folders into a flat list of supported source files., Expand files/folders into a flat list of supported source files., Expand files/folders into a flat list of supported source files., Expand files/folders into a flat list of supported source files., Expand files/folders into a flat list of supported source files., Expand files/folders into a flat list of supported source files.
+Cohesion: 0.24
+Nodes (16): Any, bool, str, describe_type(), _is_model(), _plain_name(), A generated schema as a field table for people: names, plain types, rules and ne, The structure the generator found, read from the field table of its schema. (+8 more)
 
 ### Community 2291 - "Community 2291"
 Cohesion: 0.67
@@ -9620,20 +9857,20 @@ Cohesion: 0.67
 Nodes (3): DataObjectRef_query_set, blueprint_path, kind
 
 ### Community 2293 - "Community 2293"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_chunked_documents, blueprint_path, kind
+Cohesion: 0.40
+Nodes (5): start_time, anyOf, default, description, title
 
 ### Community 2294 - "Community 2294"
-Cohesion: 0.33
-Nodes (6): additionalProperties, description, required, title, type, conflicts_record_Extraction
+Cohesion: 0.22
+Nodes (8): blueprint_schema(), _inner_type(), multi_child_schema(), Tests for schema generator improvements: nested_list and parent_with_nested_list, Return the non-None type from an Optional[X] annotation., Return the non-None type from an Optional[X] annotation., Return the non-None type from an Optional[X] annotation., schema()
 
 ### Community 2295 - "Community 2295"
 Cohesion: 0.67
 Nodes (3): DataObjectRef_local_vector_index, blueprint_path, kind
 
 ### Community 2296 - "Community 2296"
-Cohesion: 0.53
-Nodes (5): int, load_json(), main(), str, load_json()
+Cohesion: 0.12
+Nodes (13): API, Batches and files, code:bash (pip install gaik[jev-classifier]), code:python (JevClassifier(api_key=gaik_decide_key, base_url="https://gai), code:python (from gaik.software_components.jev_classifier import JevClass), code:python ({), Confidence, not just probability, Installation (+5 more)
 
 ### Community 2297 - "Community 2297"
 Cohesion: 0.67
@@ -9643,77 +9880,89 @@ Nodes (3): Lane_project_coordinator, blueprint_path, kind
 Cohesion: 0.67
 Nodes (3): Lane_project_manager, blueprint_path, kind
 
+### Community 2299 - "Community 2299"
+Cohesion: 0.17
+Nodes (12): _match_sample_section(), _normalize_heading(), Normalize a heading for tolerant matching.      Lowercase; strip leading markd, Normalize a heading for tolerant matching.      Lowercase; strip leading markd, Split a sample report at its top-level report-section headings.      Detects t, Split a sample report at its top-level report-section headings.      Detects t, Normalize a heading for tolerant matching.      Lowercase; strip leading markd, Split a sample report at its top-level report-section headings.      Sample re (+4 more)
+
+### Community 2300 - "Community 2300"
+Cohesion: 0.12
+Nodes (15): code:text (report-runs/<name>/), code:json ({), code:bash (python <skill>/scripts/run_report.py validate-knowledge --sp), code:bash (python <skill>/scripts/run_report.py update-sample --spec SP), code:bash (python <skill>/scripts/run_report.py rebuild --spec SPEC --w), Correcting the evidence, Editing the report by hand, Review, corrections and resuming (+7 more)
+
 ### Community 2301 - "Community 2301"
-Cohesion: 0.33
-Nodes (5): int, main(), Example: Transcribe audio/video and generate SRT/VTT subtitles.  Demonstrates:, chunk_segments(), Group short subtitle segments into longer chunks for embedding.      Combines
+Cohesion: 0.12
+Nodes (15): A result count is not evidence, code:bash (pip install "gaik[pg-vector-store,embedder,ranker]"), code:python (from gaik.software_components.config import get_openai_confi), code:python (from gaik.software_components.llm import get_llm_config), code:python (from gaik.software_components.RAG.finnish_text_processor imp), code:python (from gaik.software_components.RAG.relevance_gate import Rele), Finnish and other inflected languages, From chunks to documents (+7 more)
 
 ### Community 2302 - "Community 2302"
-Cohesion: 0.40
-Nodes (3): str, _FakeResponse, _title_of()
+Cohesion: 0.22
+Nodes (9): BaseModel, bool, _field_map(), _is_optional(), Return {field_name: FieldInfo} for a Pydantic model., Return {field_name: FieldInfo} for a Pydantic model., True if annotation is X | None or Optional[X]., Return {field_name: FieldInfo} for a Pydantic model. (+1 more)
 
 ### Community 2303 - "Community 2303"
-Cohesion: 0.40
-Nodes (5): models, extraction_model, provider, temperature, transcription_model
+Cohesion: 0.12
+Nodes (13): API, Batches and files, code:bash (pip install gaik[jev-classifier]), code:python (JevClassifier(api_key=gaik_decide_key, base_url="https://gai), code:python (from gaik.software_components.jev_classifier import JevClass), code:python ({), Confidence, not just probability, Installation (+5 more)
+
+### Community 2318 - "Community 2318"
+Cohesion: 0.20
+Nodes (12): Any, bool, float, str, enabled(), _number(), Optional, bounded demo telemetry. Never sends user content or affects a request., Accept only numeric usage and model/provider identifiers, never free text. (+4 more)
 
 ### Community 2319 - "Community 2319"
 Cohesion: 0.67
 Nodes (3): DataObjectRef_query_batch, blueprint_path, kind
 
 ### Community 2320 - "Community 2320"
-Cohesion: 0.50
-Nodes (3): medical_audio_extraction_Extraction, Auto-generated schema module (do not edit manually)., Extraction model for medical_audio_extraction
+Cohesion: 0.18
+Nodes (9): bool, ModelProvider, ReasoningEffort, Args:             model_provider: Which LLM provider to use.             model, Args:             model_provider: Which LLM provider to use.             model, Args:             model_provider: Which LLM provider to use.             model, Build provider-specific config from the constructor flags., Build provider-specific config from the constructor flags. (+1 more)
 
 ### Community 2324 - "Community 2324"
-Cohesion: 0.50
-Nodes (3): material_extraction_Extraction, Auto-generated schema module (do not edit manually)., Extraction model for material_extraction
+Cohesion: 0.67
+Nodes (3): TextAnnotation_2, blueprint_path, kind
 
 ### Community 2325 - "Community 2325"
-Cohesion: 0.50
-Nodes (3): construction_diary_extraction_Extraction, Auto-generated schema module (do not edit manually)., Extraction model for construction_diary_extraction
+Cohesion: 0.40
+Nodes (5): description, items, title, type, action_items
 
 ### Community 2333 - "Community 2333"
-Cohesion: 0.50
-Nodes (3): incident_details_extraction_Extraction, Auto-generated schema module (do not edit manually)., Extraction model for incident_details_extraction
+Cohesion: 0.12
+Nodes (16): ClaudeSDKClient, cleanup_idle_sessions(), download_zip(), Async generator that interleaves ``receive_response()`` messages with     perio, Download the whole session workspace (blueprint + diagrams + docs + PoC)     as, Async generator that interleaves ``receive_response()`` messages with     perio, Async generator that interleaves ``receive_response()`` messages with     perio, Async generator that interleaves ``receive_response()`` messages with     perio (+8 more)
 
 ### Community 2334 - "Community 2334"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_participant_list, blueprint_path, kind
+Cohesion: 0.15
+Nodes (16): Agentic API Calls, Agentic Curation, Agentic Progress, Agentic Review Behavior, Agentic Sample Report Handling, code:python (from gaik.software_components.llm import get_llm_config), code:python (sections=[), code:text (section title + section instructions + full evidence pack) (+8 more)
 
 ### Community 2335 - "Community 2335"
-Cohesion: 0.50
-Nodes (3): Output schema for this use case.  Generated by GAIK SchemaGenerator via the Solu, RAGAnswerDraft, Model-facing draft of a single role-aware RAG answer.
+Cohesion: 0.22
+Nodes (9): report_draft, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 2336 - "Community 2336"
-Cohesion: 0.67
-Nodes (3): EndEvent_rejected_reviewer_review, blueprint_path, kind
+Cohesion: 0.22
+Nodes (9): externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source, type (+1 more)
 
 ### Community 2337 - "Community 2337"
-Cohesion: 0.40
-Nodes (4): PyMuPDFParser (gaik.software_components.parsers), main(), Simple demonstration of PyMuPDF parser for fast local PDF text extraction.  This, Extract text from a sample PDF using PyMuPDF.
+Cohesion: 0.67
+Nodes (3): DataObjectRef_meeting_audio, blueprint_path, kind
 
 ### Community 2338 - "Community 2338"
-Cohesion: 0.67
-Nodes (3): Gateway_fork_upload_source_material, blueprint_path, kind
+Cohesion: 0.22
+Nodes (9): externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source, type (+1 more)
 
 ### Community 2339 - "Community 2339"
 Cohesion: 0.67
 Nodes (3): Lane_requesting_user, blueprint_path, kind
 
 ### Community 2340 - "Community 2340"
-Cohesion: 0.67
-Nodes (3): code:powershell (python -m pip install -r .\requirements.txt), code:powershell (python -m pip install -r .\requirements-optional.txt), Installation
+Cohesion: 0.18
+Nodes (10): Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response., Write the entire report in one LLM call and return the raw response. (+2 more)
 
 ### Community 2341 - "Community 2341"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_generate_answers
+Cohesion: 0.28
+Nodes (8): bytes, Path, str, build_chat_document_content(), _image_part(), Convert local documents into portable Chat Completions image content., Render PDFs as page images and retain native image bytes for vision models., test_webp_image_keeps_media_type_without_platform_mapping()
 
 ### Community 2342 - "Community 2342"
 Cohesion: 0.67
 Nodes (3): StartEvent_1, blueprint_path, kind
 
 ### Community 2343 - "Community 2343"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_ingest_and_index
+Cohesion: 0.13
+Nodes (14): 5. Data Flow Diagram, BOM Requirements for Fee Calculations, code:block21 (Cutting_Required: [number]        # e.g., 2 (for 2 cuts)), code:block25 (┌─────────────────┐), Example Use Cases, Getting Help, License, Prerequisites (+6 more)
 
 ### Community 2344 - "Community 2344"
 Cohesion: 0.67
@@ -9724,8 +9973,8 @@ Cohesion: 0.67
 Nodes (3): EndEvent_success, blueprint_path, kind
 
 ### Community 2346 - "Community 2346"
-Cohesion: 0.67
-Nodes (3): StartEvent_1, blueprint_path, kind
+Cohesion: 0.22
+Nodes (4): Task 5 (custom): Invoice header + line items., Task 5 (custom): Invoice header + line items., Task 5 (custom): Invoice header + line items., TestParentWithNestedListInvoice
 
 ### Community 2347 - "Community 2347"
 Cohesion: 0.67
@@ -9740,200 +9989,804 @@ Cohesion: 0.67
 Nodes (3): Lane_gaik_ai, blueprint_path, kind
 
 ### Community 2350 - "Community 2350"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_load_participant_list
+Cohesion: 0.13
+Nodes (13): code:bash (pip install "gaik[knowledge-curator]"), code:python (from gaik.software_components.report_synthesizer import Repo), code:json ({), code:python (knowledge = curator.curate(sources, sections)), code:python (from gaik.software_components.knowledge_curator import Knowl), Editing knowledge files, Fact units, Installation (+5 more)
 
 ### Community 2351 - "Community 2351"
 Cohesion: 0.67
 Nodes (3): TextAnnotation_1, blueprint_path, kind
 
 ### Community 2352 - "Community 2352"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_parse_agenda
+Cohesion: 0.22
+Nodes (4): Task 2 (provided): Simple PO line items., Task 2 (provided): Simple PO line items., Task 2 (provided): Simple PO line items., TestNestedListPO
 
 ### Community 2353 - "Community 2353"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_transcribe_audio
+Cohesion: 0.13
+Nodes (13): Citations, code:bash (pip install "gaik[report-synthesizer]"), code:python (from gaik.software_components.knowledge_curator import Knowl), code:python (from gaik.software_components.report_synthesizer import Repo), How sections are written, Installation, Known limitation, License (+5 more)
 
 ### Community 2354 - "Community 2354"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_upload_source_material
-
-### Community 2355 - "Community 2355"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_load_input
+Cohesion: 0.18
+Nodes (15): int, MonkeyPatch, str, TestClient, client(), _events(), FakeNormalizer, Source Normalizer endpoint: a fake SourceNormalizer stands in for gaik's, so no (+7 more)
 
 ### Community 2356 - "Community 2356"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_answer_records, blueprint_path, kind
+Cohesion: 0.19
+Nodes (8): FinnishTextProcessor, processor(), FinnishTextProcessor: tsquery rendering, compound splitting, backend honesty., ``backend="auto"`` built its backend without the argument, so         ``decompo, The index and the query must agree on it, and the better value is not         t, splitter(), TestBackendHonesty, TestDecompoundSetting
 
 ### Community 2357 - "Community 2357"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_parsed_agenda_text, blueprint_path, kind
+Cohesion: 0.13
+Nodes (15): code:block14 (Participants: [Not specified in source materials]), code:block15 (Date: [To be confirmed]), code:block16 (| 1 | Complete budget review | TBD | 2024-01-15 | M |), code:block17 (| 1 | Complete budget review | Sarah | TBD | M |), code:block18 (Participants: John, Sarah, and others (full list not capture), code:block19 (Note: Date appears as both Dec 15 and Dec 16 in notes.), Conflicting Information, Entire Sections (+7 more)
 
 ### Community 2358 - "Community 2358"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_document_collection, blueprint_path, kind
+Cohesion: 0.22
+Nodes (4): Task 4 (custom): Medical lab results., Task 4 (custom): Medical lab results., Task 4 (custom): Medical lab results., TestNestedListLabResults
 
 ### Community 2359 - "Community 2359"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_query_set, blueprint_path, kind
+Cohesion: 0.22
+Nodes (3): Task 6 (custom): Employee record — flat with enums and text-string salary., Task 6 (custom): Employee record — flat with enums and text-string salary., TestFlatEmployee
 
 ### Community 2360 - "Community 2360"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_validation_report, blueprint_path, kind
+Cohesion: 0.25
+Nodes (7): action_items_Extraction, meeting_minutes_Extraction, participants_Extraction, Auto-generated schema module (do not edit manually)., Extraction model for participants, Extraction model for action_items, Extraction model for meeting_minutes with repeated participants, action_items
 
 ### Community 2361 - "Community 2361"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_rag_answer_records, blueprint_path, kind
+Cohesion: 0.14
+Nodes (13): brief-to-slides, code:text (Make a 45-minute teaching deck on data privacy basics for fi), code:text (Turn the attached project report into a 10-minute briefing f), code:text (brief-to-slides/), Files, How it works, Installing, Requirements (+5 more)
 
 ### Community 2362 - "Community 2362"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_meeting_audio, blueprint_path, kind
+Cohesion: 0.14
+Nodes (13): author, name, url, description, displayName, documentationUrl, homepage, icon (+5 more)
 
 ### Community 2363 - "Community 2363"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_retrieved_chunks_per_query, blueprint_path, kind
+Cohesion: 0.32
+Nodes (7): main(), Example: query a report-style Excel file that is not a clean data table.  ``me, Print the cell grid exactly as the loader first sees it., Print the table the agent ends up querying., Show the messy sheet, then the clean table the agent queries., show_loaded_table(), show_raw_sheet()
 
 ### Community 2364 - "Community 2364"
-Cohesion: 0.67
-Nodes (3): EndEvent_success, blueprint_path, kind
+Cohesion: 0.21
+Nodes (14): FileAttachment, bytes, str, _extract_text_from_attachment(), FileAttachment, Extract plain text from an uploaded file using GAIK parsers for PDF/DOCX., Extract plain text from an uploaded file using GAIK parsers for PDF/DOCX., _attachment() (+6 more)
 
 ### Community 2365 - "Community 2365"
-Cohesion: 0.67
-Nodes (3): Lane_project_manager, blueprint_path, kind
+Cohesion: 0.14
+Nodes (13): API, Backends, code:bash (pip install gaik[finnish-rag]          # pure pip, no system), code:python (from gaik.software_components.RAG.finnish_text_processor imp), code:sql (SELECT to_tsvector('finnish', 'tilinpäätös');      -- 'tilin), code:python (# ingest), code:python (FinnishTextProcessor(backend="pyvoikko", decompound=True).le), Compound splitting (+5 more)
 
 ### Community 2366 - "Community 2366"
-Cohesion: 0.67
-Nodes (3): Lane_gaik_ai, blueprint_path, kind
+Cohesion: 0.14
+Nodes (13): Construction Site Diary Creation, Dental Learning Assistant, Documents and data from documents, Documents and records from speech, Incident Reporting, Purchase Order Processing, Report Writing, Safety Observation Reporting (+5 more)
 
 ### Community 2367 - "Community 2367"
-Cohesion: 0.67
-Nodes (3): Gateway_approve_human_review, blueprint_path, kind
+Cohesion: 0.29
+Nodes (8): bytes, UploadFile, Validate file size and return content if valid., Validate file size and return content if valid., Validate file size and return content if valid., Validate an audio/video upload against the audio limit and return content., validate_audio_file_size(), validate_file_size()
 
 ### Community 2368 - "Community 2368"
-Cohesion: 0.67
-Nodes (3): Lane_users, blueprint_path, kind
+Cohesion: 0.14
+Nodes (13): code:json ({), Customizing the Skill, Getting Help, License, Option A: Easy Setup (Recommended), Output Files, Prerequisites, Purchase Order Processing Skill for Claude Desktop (+5 more)
 
 ### Community 2369 - "Community 2369"
-Cohesion: 0.67
-Nodes (3): StartEvent_1, blueprint_path, kind
+Cohesion: 0.22
+Nodes (9): poc_input_bundle, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 2370 - "Community 2370"
-Cohesion: 0.67
-Nodes (3): TextAnnotation_2, blueprint_path, kind
+Cohesion: 0.29
+Nodes (7): str, StreamingResponse, SSE (Server-Sent Events) utilities., Format data as an SSE event., Return a StreamingResponse that emits a single SSE error event., sse_error_response(), sse_event()
 
 ### Community 2371 - "Community 2371"
-Cohesion: 0.67
-Nodes (3): Lane_project_coordinator, blueprint_path, kind
+Cohesion: 0.14
+Nodes (13): Backfilling a lemma column, Choosing and pinning a backend, code:sql (SELECT to_tsvector('finnish', 'tilinpäätös');     -- 'tilinp), Contents, Finnish full-text search, Hyphenated words, Lemmatize both sides, Long queries flood the lemma arm (+5 more)
 
 ### Community 2373 - "Community 2373"
-Cohesion: 0.67
-Nodes (3): TextAnnotation_2, blueprint_path, kind
+Cohesion: 0.29
+Nodes (6): str, UploadFile, classify_document(), Classifier router - Document classification endpoints, Classify a document into predefined categories.      - **file**: The document, Classify a document into predefined categories.      - **file**: The document
 
 ### Community 2374 - "Community 2374"
-Cohesion: 0.67
-Nodes (3): StartEvent_1, blueprint_path, kind
+Cohesion: 0.47
+Nodes (5): create_pdf_report(), main(), Example: extracts key structured fields from construction site audios by dynamic, Build a diary PDF using the first extracted record, optional logo, and any image, Path
 
 ### Community 2375 - "Community 2375"
 Cohesion: 0.67
 Nodes (3): DataObjectRef_fault_audio, blueprint_path, kind
 
 ### Community 2376 - "Community 2376"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_human_review
+Cohesion: 0.27
+Nodes (9): app(), Telemetry is optional, bounded and content-free. No network or credentials., request(), test_disabled_without_either_setting(), test_errors_report_status_without_messages(), test_probes_and_unmatched_routes_are_not_reported(), test_reporting_exception_cannot_change_success(), test_streaming_bytes_unchanged() (+1 more)
 
 ### Community 2377 - "Community 2377"
 Cohesion: 0.67
 Nodes (3): blueprint_path, kind, Activity_validate_meeting_record
 
 ### Community 2378 - "Community 2378"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_agenda_pdf, blueprint_path, kind
+Cohesion: 0.33
+Nodes (13): bytes, int, Path, str, build(), _files(), _frontmatter(), main() (+5 more)
 
 ### Community 2384 - "Community 2384"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_approved_meeting_record, blueprint_path, kind
+Cohesion: 0.15
+Nodes (12): code:text (agent-skills/   (implementation_layer/no-code-assets/)), code:bash (claude plugin validate .), Distribution, Extending, GAIK agent skills, How the clients read it, Installing, Layout (+4 more)
 
 ### Community 2385 - "Community 2385"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_participant_context, blueprint_path, kind
+Cohesion: 0.33
+Nodes (6): metadata, blueprint_id, created_at, created_by, last_updated_at, status
 
 ### Community 2386 - "Community 2386"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_structured_meeting_record, blueprint_path, kind
+Cohesion: 0.33
+Nodes (5): bytes, str, image_data(), Validation shared by adapters accepting canonical Chat Completions image parts., Decode an inline image without fetching a caller-supplied URL.
 
 ### Community 2387 - "Community 2387"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_submission_marker, blueprint_path, kind
+Cohesion: 0.28
+Nodes (12): add_el(), build(), fill_tf(), icon_png(), icon_svg(), Render a deck spec to an editable .pptx inside a COPY of a template.  - Remove, Placeholder shapes (sldImg + empty body) copied from an existing notes slide, if, Remove the theme style reference so shapes get no theme shadow/outline. (+4 more)
 
 ### Community 2388 - "Community 2388"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_transcript_with_segments, blueprint_path, kind
+Cohesion: 0.22
+Nodes (9): erp_record_json, externally_visible, final_output, optional, overwrite, produced_by, schema_ref, source (+1 more)
 
 ### Community 2389 - "Community 2389"
-Cohesion: 0.67
-Nodes (3): EndEvent_success, blueprint_path, kind
+Cohesion: 0.33
+Nodes (5): daily_diary_entry_Collection, daily_diary_entry_Extraction, Auto-generated schema module (do not edit manually)., Collection of daily_diary_entry items, Extraction model for daily_diary_entry
 
 ### Community 2390 - "Community 2390"
-Cohesion: 0.67
-Nodes (3): Lane_gaik_ai, blueprint_path, kind
+Cohesion: 0.24
+Nodes (12): code:text (OPENAI_API_KEY), code:text (input files), code:text (input files), code:python (MultiSourceReportGenerator(*, api_config: dict | None = None), General parsing (default), Option 1 (simple, non-agentic) — Single-Call (default, `agentic=False`), Option 1 — Single-Call (default, `agentic=False`), Option 2 — Agentic (`agentic=True`) (+4 more)
 
 ### Community 2391 - "Community 2391"
-Cohesion: 0.67
-Nodes (3): TextAnnotation_1, blueprint_path, kind
+Cohesion: 0.21
+Nodes (13): code:bash (pip install "gaik[multi-source-report-generator]"), code:bash (pip install "gaik[multi-source-report-generator-agentic]"), code:python (from gaik.software_modules.multi_source_report_generator imp), code:bash (pip install "gaik[multi-source-report-generator-docx]"), code:text (AZURE_API_KEY), code:python (from gaik.software_modules.multi_source_report_generator imp), Constructor, Environment (+5 more)
 
 ### Community 2392 - "Community 2392"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_generate_role_aware_answers
+Cohesion: 0.08
+Nodes (21): _parse_with(), _ParsedShim, OpenAI-completion-shaped wrapper around a parsed Pydantic instance.      Lets, The sampling half of a ``parse`` call, with either half omittable.      ``temp, The sampling half of a ``parse`` call, with either half omittable.      ``temp, Wraps client.beta.chat.completions.parse in a retry + deterministic settings., Wraps client.beta.chat.completions.parse in a retry + deterministic settings., Wraps client.beta.chat.completions.parse in a retry + deterministic settings. (+13 more)
 
 ### Community 2393 - "Community 2393"
 Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_notify_manager
+Nodes (3): DataObjectRef_participant_list, blueprint_path, kind
 
 ### Community 2394 - "Community 2394"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_provide_access_manifest
+Cohesion: 0.29
+Nodes (4): Task 3 (provided): Finnish incident report — verifies flat path unchanged., Task 3 (provided): Finnish incident report — verifies flat path unchanged., Task 3 (provided): Finnish incident report — verifies flat path unchanged., TestFlatIncident
 
 ### Community 2395 - "Community 2395"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_submit_queries
+Cohesion: 0.17
+Nodes (11): author, name, url, description, homepage, keywords, license, name (+3 more)
 
 ### Community 2396 - "Community 2396"
-Cohesion: 0.67
-Nodes (3): blueprint_path, kind, Activity_upload_documents
+Cohesion: 0.33
+Nodes (5): purchase_order_header_fields_Extraction, purchase_order_line_item_Extraction, Auto-generated schema module (do not edit manually)., Extraction model for purchase_order_line_item, Extraction model for purchase_order_header_fields with repeated line_items
 
 ### Community 2397 - "Community 2397"
-Cohesion: 0.67
-Nodes (3): DataObjectRef_source_documents, blueprint_path, kind
+Cohesion: 0.17
+Nodes (11): additionalProperties, $defs, description, required, title, type, meetingrecord_conflicts_record_Extraction, additionalProperties (+3 more)
 
 ### Community 2398 - "Community 2398"
-Cohesion: 0.67
-Nodes (3): Gateway_decision_access_decision_gateway, blueprint_path, kind
+Cohesion: 0.20
+Nodes (9): FinnishTextProcessor, Return a list of lemma tokens for *text*.          Compound words are split wh, Render *text* as a space-separated string of lemmas, ready for ``to_tsvector``., Render *query* as a space-separated string of lemmas, ready for ``websearch_to_t, Lemmatize Finnish text and (optionally) split compound words.      The process, Lemmatize Finnish text and (optionally) split compound words.      The process, Return a list of lemma tokens for *text*.          Compound words are split wh, Render *text* as a space-separated string of lemmas, ready for ``to_tsvector``. (+1 more)
 
 ### Community 2399 - "Community 2399"
 Cohesion: 0.67
-Nodes (3): Gateway_join_generate_role_aware_answers, blueprint_path, kind
+Nodes (3): DataObjectRef_structured_meeting_record, blueprint_path, kind
+
+### Community 2400 - "Community 2400"
+Cohesion: 0.67
+Nodes (3): Gateway_fork_upload_source_material, blueprint_path, kind
+
+### Community 2401 - "Community 2401"
+Cohesion: 0.53
+Nodes (5): int, load_json(), main(), str, load_json()
+
+### Community 2402 - "Community 2402"
+Cohesion: 0.18
+Nodes (4): _fake_generator(), Incident, Session schemas: generated once for a prompt, reused until the prompt changes., test_the_schema_endpoint_returns_an_id_and_the_fields()
+
+### Community 2404 - "Community 2404"
+Cohesion: 0.47
+Nodes (5): _generate(), The Extractor demo's schema step: a flat schema and one with a nested list., test_a_flat_schema_comes_with_its_field_table(), test_a_schema_with_a_nested_list_does_not_need_flat_requirements(), test_the_structure_is_read_from_the_field_table()
+
+### Community 2405 - "Community 2405"
+Cohesion: 0.67
+Nodes (3): TextAnnotation_2, blueprint_path, kind
+
+### Community 2406 - "Community 2406"
+Cohesion: 0.23
+Nodes (11): int, Path, _api_limit_mb(), The demo app's audio upload limit must be the same number in every layer.  An, Read MAX_AUDIO_FILE_SIZE_MB without importing the demo API package., A widget advertising more than the API accepts is a guaranteed 413., The audio widget of the incident and diary pages is in one shared component., test_audio_upload_widgets_match_the_api_limit() (+3 more)
+
+### Community 2407 - "Community 2407"
+Cohesion: 0.29
+Nodes (12): Agentic Mode Details, code:python (parser_options={), code:python (transcriber_options={), code:python (image_options={"mode": "parse"}), code:python (image_options={), code:python (writer_options={), `image_options`, Option Dictionaries (+4 more)
+
+### Community 2408 - "Community 2408"
+Cohesion: 0.18
+Nodes (10): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, requirements_type (+2 more)
+
+### Community 2409 - "Community 2409"
+Cohesion: 0.18
+Nodes (10): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, requirements_type (+2 more)
+
+### Community 2410 - "Community 2410"
+Cohesion: 0.05
+Nodes (39): Alternative: a `.env` file, Changing the provider and the models, Checkpoints, Claude Code and Codex, Claude Desktop and claude.ai, code:text (Use the generate-structured-reports skill to write a conditi), code:bash (echo 'export OPENAI_API_KEY="openai_api_key"' >> ~/.zshrc), code:powershell (setx LLM_PROVIDER "azure") (+31 more)
+
+### Community 2411 - "Community 2411"
+Cohesion: 0.18
+Nodes (10): code:block1 (Title only                        Section label + title), Intake questions, Mapping answers to the build, Not asked (inferred; mention in the reply only if relevant), Step 1: the user's own material (always first), Step 2: source mode (immediately after the material arrives), Step 3: content and title slide (one call), Step 4: footer, logo, design (one call) (+2 more)
+
+### Community 2412 - "Community 2412"
+Cohesion: 0.18
+Nodes (10): Case A: a spec JSON, Case B: a Word or Markdown template, Case C: no template, code:bash (python <skill>/scripts/template_to_spec.py template.docx --o), code:markdown (# Kuntoarvio), code:json ([), From a template to the spec's sections, Limits (+2 more)
+
+### Community 2413 - "Community 2413"
+Cohesion: 0.18
+Nodes (10): Baselines on every run, Contents, End to end, not in isolation, Evaluating retrieval, Measured not to help, Metrics at the level the reader sees, Noise before signal, Traps that produce a confident wrong number (+2 more)
+
+### Community 2414 - "Community 2414"
+Cohesion: 0.25
+Nodes (8): Any, int, Path, str, parse_document_via_api(), HTTP client parser for Docling service endpoints.  This parser sends documents, Parse a document through remote service and return markdown+metadata., Convenience wrapper for one-off API parsing calls.
+
+### Community 2415 - "Community 2415"
+Cohesion: 0.67
+Nodes (3): blueprint_path, kind, Activity_reviewer_approves
+
+### Community 2416 - "Community 2416"
+Cohesion: 0.18
+Nodes (9): API, Calibrate — don't copy the number, code:python (from gaik.software_components.RAG.relevance_gate import Rele), code:text (OVERLAPPING by 0.090: answerable reaches 0.710 while unanswe), code:python (gate.is_answerable(hits, key=lambda hit: hit[1])          # ), `None` means "no opinion", not "irrelevant", Related, Relevance Gate (+1 more)
+
+### Community 2417 - "Community 2417"
+Cohesion: 0.18
+Nodes (10): code:bash (pip install "gaik[source-normalizer]"), code:python (from gaik.software_components.knowledge_curator import Knowl), code:python (from gaik.software_components.source_normalizer import Norma), Environment Variables (recordings and images only), File Types, Installation, License, Quick Start (+2 more)
+
+### Community 2418 - "Community 2418"
+Cohesion: 0.18
+Nodes (10): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, requirements_type (+2 more)
+
+### Community 2419 - "Community 2419"
+Cohesion: 0.18
+Nodes (10): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, requirements_type (+2 more)
+
+### Community 2420 - "Community 2420"
+Cohesion: 0.18
+Nodes (10): code:mermaid (flowchart TD), code:powershell (# Run from this directory; the env file is private and never), code:bash (oc -n gaik set env deployment/gaik-demo-api WIZARD_LANGFUSE_), Disable and expand, How it is connected, Rahti layout, Recorded information and limits, Reproduce the deployment (+2 more)
+
+### Community 2421 - "Community 2421"
+Cohesion: 0.22
+Nodes (9): float, int, Path, TranscriptionConfig, _gpt4o_chunk_minutes(), GPT-4o chunk durations must stay inside the API's per-request duration limit., Mirror of the cap the pipeline applies when picking GPT-4o chunk length., Regression: a middle chunk carries the overlap on *both* sides.      With the (+1 more)
+
+### Community 2423 - "Community 2423"
+Cohesion: 0.20
+Nodes (9): code:bash (pip install "gaik[report-writer]"   # or: uv sync --all-extr), code:python (EXAMPLE = "house_condition_assessment"  # or "project_meetin), code:bash (uv run python implementation_layer/examples/software_modules), code:block4 (output/<EXAMPLE>/), How to run, Report Writer Examples, The two examples, The workspace (+1 more)
+
+### Community 2424 - "Community 2424"
+Cohesion: 0.20
+Nodes (10): code:block10 (NewCustomer/), code:block5 (Process the purchase order in C:\Orders\Project-Q4 using pur), code:block6 (Project-Q4/), code:block7 (Generate sales order from C:\Orders\QuickQuote using purchas), code:block8 (QuickQuote/), code:block9 (Create sales order matching our format from C:\Orders\NewCus), Example 1: Full Workflow with BOMs, Example 2: Quick Quote (No BOMs) (+2 more)
+
+### Community 2425 - "Community 2425"
+Cohesion: 0.20
+Nodes (9): Example data and interface drawings, Extended-mode research, Never invent, On-slide citation (source line), Reading provided material, References slides, Source ledger, Source modes (+1 more)
+
+### Community 2426 - "Community 2426"
+Cohesion: 0.47
+Nodes (9): el_html(), esc(), preview_page(), px(), Render the same deck spec as Slides-deck sections (1920x1080 canvas, 1 in = 144, runs_html(), section(), stack() (+1 more)
+
+### Community 2427 - "Community 2427"
+Cohesion: 0.17
+Nodes (11): Citations and gap markers, code:python (from gaik.software_modules.report_writer import ReportSpec), code:json ({), Example, Files the pipeline reads, Keys, Proposed models, Sections (+3 more)
+
+### Community 2428 - "Community 2428"
+Cohesion: 0.20
+Nodes (10): code:block10 (NewCustomer/), code:block5 (Process the purchase order in C:\Orders\Project-Q4 using pur), code:block6 (Project-Q4/), code:block7 (Generate sales order from C:\Orders\QuickQuote using purchas), code:block8 (QuickQuote/), code:block9 (Create sales order matching our format from C:\Orders\NewCus), Example 1: Full Workflow with BOMs, Example 2: Quick Quote (No BOMs) (+2 more)
+
+### Community 2429 - "Community 2429"
+Cohesion: 0.31
+Nodes (8): fake_generator(), invoke(), Provider-aware schema CLI contracts without inference or real credentials., test_cli_does_not_expose_a_secret_flag(), test_compatible_overrides_are_applied_before_required_field_validation(), test_explicit_provider_overrides_legacy_flag_and_schema_reloads(), test_legacy_cli_selects_provider_and_preserves_environment_model(), test_missing_credentials_fail_before_inference_or_schema_writes()
+
+### Community 2430 - "Community 2430"
+Cohesion: 0.20
+Nodes (9): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, schema_format_version (+1 more)
+
+### Community 2431 - "Community 2431"
+Cohesion: 0.20
+Nodes (9): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, schema_format_version (+1 more)
+
+### Community 2432 - "Community 2432"
+Cohesion: 0.20
+Nodes (9): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, schema_format_version (+1 more)
+
+### Community 2433 - "Community 2433"
+Cohesion: 0.20
+Nodes (9): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, schema_format_version (+1 more)
+
+### Community 2434 - "Community 2434"
+Cohesion: 0.20
+Nodes (9): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, schema_format_version (+1 more)
+
+### Community 2435 - "Community 2435"
+Cohesion: 0.20
+Nodes (9): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, schema_format_version (+1 more)
+
+### Community 2436 - "Community 2436"
+Cohesion: 0.20
+Nodes (9): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, schema_format_version (+1 more)
+
+### Community 2437 - "Community 2437"
+Cohesion: 0.20
+Nodes (9): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, schema_format_version (+1 more)
+
+### Community 2438 - "Community 2438"
+Cohesion: 0.20
+Nodes (9): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, schema_format_version (+1 more)
+
+### Community 2439 - "Community 2439"
+Cohesion: 0.20
+Nodes (9): model_name, fields, use_case_name, requirements, children, parent_requirements, structure_type, schema_format_version (+1 more)
+
+### Community 2440 - "Community 2440"
+Cohesion: 0.29
+Nodes (9): float, int, Path, str, main(), Write the example price list as JSON, for the Purchase Order demo's preview.  Th, The rows of the first sheet, without the empty cells at the end of each row., read_rows() (+1 more)
+
+### Community 2441 - "Community 2441"
+Cohesion: 0.12
+Nodes (14): Exception, bool, Path, str, is_cancelled(), is_last(), plain_text(), Data models for parallel transcription.  Enums, result types, chunk specificat (+6 more)
+
+### Community 2442 - "Community 2442"
+Cohesion: 0.20
+Nodes (10): code:block10 (NewCustomer/), code:block5 (Process the purchase order in C:\Orders\Project-Q4 using pur), code:block6 (Project-Q4/), code:block7 (Generate sales order from C:\Orders\QuickQuote using purchas), code:block8 (QuickQuote/), code:block9 (Create sales order matching our format from C:\Orders\NewCus), Example 1: Full Workflow with BOMs, Example 2: Quick Quote (No BOMs) (+2 more)
+
+### Community 2443 - "Community 2443"
+Cohesion: 0.20
+Nodes (10): FinnishTextProcessor, call, call_index_side, call_query_side, check_backend, construct, import, install_extra (+2 more)
+
+### Community 2444 - "Community 2444"
+Cohesion: 0.20
+Nodes (10): ReportSynthesizer, call, call_rebuild, construct, import, install_extra, note, options (+2 more)
+
+### Community 2445 - "Community 2445"
+Cohesion: 0.20
+Nodes (10): SourceNormalizer, call, call_single_file, construct, import, install_extra, note, options (+2 more)
+
+### Community 2446 - "Community 2446"
+Cohesion: 0.20
+Nodes (10): ARW(), cover(), P(), Paragraph. runs: str or list of str / (text, style). style keys: bold italic col, Block arrow, d = r|l|u|d. Keep near 1:1 to 2:1., Horizontal process: steps = [(number, title, desc)], arrows between. dark = indi, One references-slide entry: Author (year). *Title*. rest short-url(link)., Title-slide elements (a logo, if any, is added by chrome()). ONLY these: optiona (+2 more)
+
+### Community 2447 - "Community 2447"
+Cohesion: 0.28
+Nodes (9): DocumentClassifier, DocumentClassifier Package __init__, TranscriptEnhancer, TranscriptEnhancerResult (Pydantic), apply_domain_rules(), GAIK Package __init__, Software Components Config (get_openai_config / create_openai_client), Software Components Package __init__ (+1 more)
+
+### Community 2448 - "Community 2448"
+Cohesion: 0.22
+Nodes (8): code:bash (pip install "gaik[draft-reviewer]"), code:python (from gaik.software_components.draft_reviewer import DraftRev), Draft Reviewer, Exact matching and retries, Installation, License, Quick Start, Use in ReportSynthesizer
+
+### Community 2449 - "Community 2449"
+Cohesion: 0.22
+Nodes (7): Contents, Output Sections Reference, Section Overview, Template/Sample Processing, When Both Template and Sample Provided, When Sample is Provided (no template), When Template is Provided
+
+### Community 2450 - "Community 2450"
+Cohesion: 0.22
+Nodes (8): 1. Deliverable, 2. Template, 3. Shape the content (infer when not given), 4. Slide design rules, 5. Speaker notes, 6. Sources, research and citations, 7. Final verification (before delivery), Default brief
+
+### Community 2451 - "Community 2451"
+Cohesion: 0.40
+Nodes (5): evaluation, eval_framework, ground_truth_dir, metrics, sample_data_dir
+
+### Community 2452 - "Community 2452"
+Cohesion: 0.22
+Nodes (8): code:bash (pip install "gaik[spreadsheet-parser]"), code:python (from gaik.software_components.parsers.spreadsheet_parser imp), code:markdown (## Sheet: Log), Installation, License, Output Format, Quick Start, Spreadsheet Parser
+
+### Community 2453 - "Community 2453"
+Cohesion: 0.22
+Nodes (9): KnowledgeCurator, call, call_verify, construct, import, install_extra, note, options (+1 more)
+
+### Community 2454 - "Community 2454"
+Cohesion: 0.22
+Nodes (9): RelevanceGate, call, call_best, call_calibrate, construct, import, install_extra, options (+1 more)
+
+### Community 2455 - "Community 2455"
+Cohesion: 0.22
+Nodes (9): 3.1 Evaluation Setup / Context, 3.2 Results, 3.3 Key Findings, 3.3 The toolkit scripts on all 15 model folders, 3.4 Key Findings, 3.5 How the judging and the charts were made, 3.6 The exact judge prompt, 3. Evaluations / Comparisons (+1 more)
+
+### Community 2456 - "Community 2456"
+Cohesion: 0.22
+Nodes (9): Adjusting the embedding model, code:bash (python src/generate_metrics_plot.py), code:python (transformer_model = SentenceTransformer("your-model-name")), code:python (import json), Customization Guide, Evaluating GAIK Transcription + Translation Workflows, Integration with GAIK Toolkit, Supported Use Cases (+1 more)
+
+### Community 2457 - "Community 2457"
+Cohesion: 0.22
+Nodes (3): A query is user input, and `to_tsquery` raises on stray syntax.          Anyth, Not the same as empty input, and the caller has to tell them apart.          `, TestTsQuery
+
+### Community 2458 - "Community 2458"
+Cohesion: 0.25
+Nodes (7): 1. Inputs, 1a. Source mode (decide before planning), 1b. Intake questions (before research or building), 2. Workflow (keep a task list), 3. Non-negotiables, Brief to Slides, Files
+
+### Community 2459 - "Community 2459"
+Cohesion: 0.25
+Nodes (7): Code changes in the toolkit demo app (and gaik), Kinds of model, Models listed in the UI today, Models the GAIK demo app uses, and what Aitta would need, What Aitta would need, What each demo calls today, Where a user's own key works
+
+### Community 2460 - "Community 2460"
+Cohesion: 0.25
+Nodes (6): 4. Performance Issues, 5.1 Mapping Table: Issues → Improvement Strategies, 5. Improvement Strategies, Related Resources, Result: which model translates best?, Translation Evaluation
+
+### Community 2461 - "Community 2461"
+Cohesion: 0.50
+Nodes (5): ChildRequirements, CompositeExtractionRequirements, ExtractionRequirements, FieldSpec, TestFieldSpecCompat (FieldSpec backward compat tests)
+
+### Community 2462 - "Community 2462"
+Cohesion: 0.40
+Nodes (4): Auto-generated schema module (do not edit manually)., Extraction model for Työmaapäiväkirja kenttien poiminta äänitallenteesta, Extraction model for Työmaapäiväkirja kenttien poiminta äänitallenteesta, Ty_maap_iv_kirja_kenttien_poiminta_nitallenteesta_Extraction
+
+### Community 2463 - "Community 2463"
+Cohesion: 0.67
+Nodes (3): code:text (Spelling Error Rate = spelling-close substitutions / total r), code:text (normalized_distance = Levenshtein_distance / length(referenc), Spelling Error Rate
+
+### Community 2464 - "Community 2464"
+Cohesion: 0.36
+Nodes (7): bool, TestClient, client(), _post(), The transcribe endpoint passes on the timing, subtitles and usage the component, test_the_cloud_model_returns_text_and_usage_only(), test_timed_segments_come_back_without_speaker_detection()
+
+### Community 2465 - "Community 2465"
+Cohesion: 0.40
+Nodes (5): bytes, int, Render PDF bytes into PNG byte streams (one per page, capped)., Render PDF bytes into PNG byte streams (one per page, capped)., _render_pdf_pages()
+
+### Community 2467 - "Community 2467"
+Cohesion: 0.25
+Nodes (8): "BOM not found" warnings, Claude doesn't recognize the skill, "File not found" errors, Incorrect calculations, "MCP server not found" error, PDF reading issues, "Price not found" errors, Troubleshooting
+
+### Community 2468 - "Community 2468"
+Cohesion: 0.25
+Nodes (8): DraftReviewer, call, construct, import, install_extra, note, options, returns
+
+### Community 2469 - "Community 2469"
+Cohesion: 0.29
+Nodes (8): chrome(), IMG(), _logo_box(), Title box for a content slide, honouring show_kicker and a top logo., (x, y, w, h) of the logo for this slide, fitted to its corner., Recurring elements for one slide (everything except the title): section label, l, resolve_theme(), title_box()
+
+### Community 2470 - "Community 2470"
+Cohesion: 0.32
+Nodes (8): code:bash (python src/translation_evaluation.py), code:bash (cd evaluation_layer/eval_methods/translation_eval), code:block9 (data/), Generating the comparison chart, Reproducing the 20-clip evaluation, Reproduction Notes (Usage Guide), Running the batch evaluation (multiple models), Running the standalone evaluation
+
+### Community 2471 - "Community 2471"
+Cohesion: 0.29
+Nodes (6): code:text (Use the extracting-structured-data skill to design a schema ), extracting-structured-data, Files, Needs, Use it when, What it covers
+
+### Community 2472 - "Community 2472"
+Cohesion: 0.29
+Nodes (5): discover_auto_backend(), Try backends in best-to-worst order; return the first that imports cleanly., Try backends in best-to-worst order; return the first that imports cleanly., Try backends in best-to-worst order; return the first that imports cleanly., bool
+
+### Community 2473 - "Community 2473"
+Cohesion: 0.38
+Nodes (4): Slice *baseform* into compound parts on the ``=`` boundaries in *structure*., _split_on_structure(), A short structure would otherwise return a silently truncated word., TestStructureSplitting
+
+### Community 2474 - "Community 2474"
+Cohesion: 0.38
+Nodes (6): batch(), build_classifier(), Jev Classifier Example  Classifies short texts with Jev through the gaik-decid, The key is the per-app gaik-decide key, never a TypeSafe key., single_text(), JevClassifier
+
+### Community 2475 - "Community 2475"
+Cohesion: 0.29
+Nodes (7): code:block2 (My-Order/), code:block3 (Process these documents using purchase-order-processing skil), code:block4 (Generate sales order from C:\Orders\NewCustomer using purcha), How to Use, Step 1: Organize Your Documents, Step 2: Ask Claude to Process the Order, Step 3: Get Your Sales Order
+
+### Community 2476 - "Community 2476"
+Cohesion: 0.29
+Nodes (6): Activities (only when the user asked for them; required parts), code:block1 ([3 min] SAY: <central point in plain language, 2–4 sentences), code:block2 ([5 min: 2 min in pairs, 3 min sharing and debrief]), Format, Rules, Speaker notes
+
+### Community 2477 - "Community 2477"
+Cohesion: 0.29
+Nodes (6): code:text (Use the parsing-documents skill to choose a parser for my PD), Files, Needs, parsing-documents, Use it when, What it covers
+
+### Community 2478 - "Community 2478"
+Cohesion: 0.29
+Nodes (7): code:block2 (My-Order/), code:block3 (Process these documents using purchase-order-processing skil), code:block4 (Generate sales order from C:\Orders\NewCustomer using purcha), How to Use, Step 1: Organize Your Documents, Step 2: Ask Claude to Process the Order, Step 3: Get Your Sales Order
+
+### Community 2479 - "Community 2479"
+Cohesion: 0.29
+Nodes (6): code:text (Use the searching-documents skill to add hybrid search over ), Files, Needs, searching-documents, Use it when, What it covers
+
+### Community 2480 - "Community 2480"
+Cohesion: 0.50
+Nodes (4): runtime, entrypoint, env_file, interface
+
+### Community 2481 - "Community 2481"
+Cohesion: 0.29
+Nodes (6): model_name, requirements, fields, use_case_name, schema_format_version, user_requirements
+
+### Community 2482 - "Community 2482"
+Cohesion: 0.29
+Nodes (6): model_name, requirements, fields, use_case_name, schema_format_version, user_requirements
+
+### Community 2483 - "Community 2483"
+Cohesion: 0.29
+Nodes (6): model_name, requirements, fields, use_case_name, schema_format_version, user_requirements
+
+### Community 2484 - "Community 2484"
+Cohesion: 0.29
+Nodes (6): model_name, requirements, fields, use_case_name, schema_format_version, user_requirements
+
+### Community 2485 - "Community 2485"
+Cohesion: 0.29
+Nodes (6): model_name, requirements, fields, use_case_name, schema_format_version, user_requirements
+
+### Community 2486 - "Community 2486"
+Cohesion: 0.33
+Nodes (6): additionalProperties, description, required, title, type, conflicts_record_Extraction
+
+### Community 2488 - "Community 2488"
+Cohesion: 0.29
+Nodes (7): code:block2 (My-Order/), code:block3 (Process these documents using purchase-order-processing skil), code:block4 (Generate sales order from C:\Orders\NewCustomer using purcha), How to Use, Step 1: Organize Your Documents, Step 2: Ask Claude to Process the Order, Step 3: Get Your Sales Order
+
+### Community 2489 - "Community 2489"
+Cohesion: 0.29
+Nodes (7): code:block1 (REPORT), code:block2 (This analysis examined the Q4 product roadmap and resource a), code:block3 (KEY POINTS), Key Points, Report Header, Summary, Universal Sections (Always Include)
+
+### Community 2490 - "Community 2490"
+Cohesion: 0.29
+Nodes (7): JevClassifier, call, construct, import, install_extra, options, returns
+
+### Community 2491 - "Community 2491"
+Cohesion: 0.29
+Nodes (7): 2.1 Python Scripts, 2.2 Python Dependencies, 2.3 Sample Data, 2. Evaluation Tools / Code, code:text (MQM points per 100 source words = (10 x critical + 5 x major), code:block6 (data/), MQM error points (LLM judge, reference-free)
+
+### Community 2492 - "Community 2492"
+Cohesion: 0.29
+Nodes (3): `WORDBASES` would give `vähetä` + `oikea` — a verb and an adjective., The property the whole component exists for.          Postgres' Finnish snowba, TestCompoundSplitting
+
+### Community 2493 - "Community 2493"
+Cohesion: 0.11
+Nodes (19): Documents (PDF/images/DOCX) to structured data pipeline: parse + extract., _clean_schema_dump(), DocumentsToStructuredData, main(), Example: parse documents (PDF/images/DOCX) and extract structured fields by dyna, PipelineResult, Reusable pipeline to parse documents (PDF/images/DOCX) and extract structured da, End-to-end workflow: parse document(s) -> structured extraction. (+11 more)
+
+### Community 2494 - "Community 2494"
+Cohesion: 0.50
+Nodes (4): recovery_diagnostic, additionalProperties, required, type
+
+### Community 2495 - "Community 2495"
+Cohesion: 0.33
+Nodes (5): Blind translation judge: mqm-v1, code:text (Finnish source:), code:json ({), Input, output and score, Validation and aggregation
+
+### Community 2496 - "Community 2496"
+Cohesion: 0.40
+Nodes (5): build_sources(), curate_example(), Knowledge Curator Example  Curates two short synthetic sources into section-bo, Wrap the synthetic texts as one primary and one secondary source., Curate both sections, print the knowledge, save it and re-check the quotes.
+
+### Community 2497 - "Community 2497"
+Cohesion: 0.33
+Nodes (5): Report Synthesizer Example  Writes a short condition report from a hand-writte, Write the report, print it with the review log and save it., One fact unit, as KnowledgeCurator would write it., synthesize_example(), unit()
+
+### Community 2498 - "Community 2498"
+Cohesion: 0.33
+Nodes (5): full_example(), offline_example(), Source Normalizer Example  Converts the multi-source report generator's sample, Normalize the documents locally and reload the saved folder., Also transcribe the recording and describe the sketch (calls the API).
+
+### Community 2499 - "Community 2499"
+Cohesion: 0.33
+Nodes (5): Build notes and pitfalls, Environment, Template handling (render_pptx.py does this), Text fitting (the most common defect), Verify
+
+### Community 2500 - "Community 2500"
+Cohesion: 0.33
+Nodes (5): Canvas and chrome, Colour roles, Design system (assets/template.pptx, default THEME in scripts/dsl.py), Shapes and recurring motifs, Type scale (pt)
+
+### Community 2501 - "Community 2501"
+Cohesion: 0.50
+Nodes (4): RAGEvaluationResult, RAGEvaluator, RAGItemResult, RAGMetrics
+
+### Community 2502 - "Community 2502"
+Cohesion: 0.20
+Nodes (18): Any, BaseModel, bool, ChatMessage, ChatResponse, float, int, object (+10 more)
+
+### Community 2503 - "Community 2503"
+Cohesion: 0.50
+Nodes (3): DoclingApiClientParser (gaik.software_components.parsers), main(), Example for DoclingApiClientParser (remote parsing service).  This example ret
+
+### Community 2504 - "Community 2504"
+Cohesion: 0.50
+Nodes (3): document_metrics_extraction_Extraction, Auto-generated schema module (do not edit manually)., Extraction model for document_metrics_extraction
+
+### Community 2505 - "Community 2505"
+Cohesion: 0.50
+Nodes (4): title, description, title, type
+
+### Community 2506 - "Community 2506"
+Cohesion: 0.67
+Nodes (3): StartEvent_1, blueprint_path, kind
+
+### Community 2507 - "Community 2507"
+Cohesion: 0.50
+Nodes (4): int, load_json(), main(), str
+
+### Community 2508 - "Community 2508"
+Cohesion: 0.67
+Nodes (3): Lane_gaik_ai, blueprint_path, kind
+
+### Community 2509 - "Community 2509"
+Cohesion: 0.67
+Nodes (3): DataObjectRef_query_set, blueprint_path, kind
+
+### Community 2510 - "Community 2510"
+Cohesion: 0.67
+Nodes (3): TextAnnotation_2, blueprint_path, kind
+
+### Community 2511 - "Community 2511"
+Cohesion: 0.67
+Nodes (3): Lane_users, blueprint_path, kind
+
+### Community 2512 - "Community 2512"
+Cohesion: 0.67
+Nodes (3): DataObjectRef_validation_report, blueprint_path, kind
+
+### Community 2513 - "Community 2513"
+Cohesion: 0.33
+Nodes (3): TestClient, client(), The classify endpoint hands the chosen parser on to the component.
+
+### Community 2516 - "Community 2516"
+Cohesion: 0.40
+Nodes (4): TabularAgent's default temperature must not break GPT-6 on the raw OpenAI path., Stands in for ``OpenAI``/``AzureOpenAI``: not a ``ProviderClient``., _RawOpenAIClient, test_raw_openai_path_adapts_default_temperature_to_the_model()
+
+### Community 2518 - "Community 2518"
+Cohesion: 0.15
+Nodes (12): end_session(), list_files(), List the artifacts generated in this session's workspace., Disconnect and clean up a session., List the artifacts generated in this session's workspace., Disconnect and clean up a session., List the artifacts generated in this session's workspace., List the artifacts generated in this session's workspace. (+4 more)
+
+### Community 2519 - "Community 2519"
+Cohesion: 0.67
+Nodes (3): blueprint_path, kind, Activity_notify_manager
+
+### Community 2520 - "Community 2520"
+Cohesion: 0.33
+Nodes (6): meeting_record_action_items_record_Extraction, additionalProperties, description, required, title, type
+
+### Community 2521 - "Community 2521"
+Cohesion: 0.33
+Nodes (6): bytes, int, Path, main(), LLM-as-Judge pairwise A/B comparison demo.  Compares two extractor outputs aga, render_pages_to_png()
+
+### Community 2522 - "Community 2522"
+Cohesion: 0.40
+Nodes (4): code:sh (uv run python implementation_layer/examples/software_modules), code:sh (uv run python implementation_layer/examples/software_modules), Regenerating the data, Synthetic construction report (house)
+
+### Community 2523 - "Community 2523"
+Cohesion: 0.60
+Nodes (4): The price list preview of the Purchase Order demo must match the spreadsheet., _script(), test_the_json_preview_matches_the_example_spreadsheet(), test_the_preview_keeps_the_rows_the_example_order_uses()
+
+### Community 2524 - "Community 2524"
+Cohesion: 0.60
+Nodes (4): _download(), The pipeline's PDF download can also be shown inside a page (the incident previe, test_the_pdf_can_be_shown_inline(), test_the_pdf_downloads_as_an_attachment_by_default()
+
+### Community 2525 - "Community 2525"
+Cohesion: 0.67
+Nodes (3): DataStore_downloadable_json_file, blueprint_path, kind
+
+### Community 2526 - "Community 2526"
+Cohesion: 0.40
+Nodes (4): normalized/01_inspector-notes.md, normalized/02_seller-disclosure.md, normalized/03_moisture-readings.md, normalized/sources.json
+
+### Community 2527 - "Community 2527"
+Cohesion: 0.40
+Nodes (4): normalized/01_meeting-minutes.md, normalized/02_site-notes.md, normalized/03_maintenance-log.md, normalized/sources.json
+
+### Community 2528 - "Community 2528"
+Cohesion: 0.33
+Nodes (6): metadata, blueprint_id, created_at, created_by, last_updated_at, status
+
+### Community 2529 - "Community 2529"
+Cohesion: 0.50
+Nodes (5): 1. Install Dependencies, 2. Download NLTK Data (first run only), code:bash (cd evaluation_layer/eval_methods/translation_eval), code:python (import nltk), Installation & Setup
+
+### Community 2530 - "Community 2530"
+Cohesion: 0.50
+Nodes (3): code:sh (uv run python scripts/release_check.py --live --version X.Y.), code:sh (uv run --no-sync python scripts/release_smoke.py --provider ), Release certification
+
+### Community 2531 - "Community 2531"
+Cohesion: 0.50
+Nodes (3): Draft Reviewer Example  Fact-checks a short draft with a planted wrong year ag, Review the draft and print the edit log., review_example()
+
+### Community 2533 - "Community 2533"
+Cohesion: 0.67
+Nodes (3): code:powershell (python -m pip install -r .\requirements.txt), code:powershell (python -m pip install -r .\requirements-optional.txt), Installation
+
+### Community 2535 - "Community 2535"
+Cohesion: 0.33
+Nodes (5): Convert a Markdown file to DOCX using Pandoc via pypandoc.          Requires t, Convert a Markdown file to DOCX using Pandoc via pypandoc.          Requires t, Convert a Markdown file to DOCX using Pandoc via pypandoc.          Requires t, Convert a Markdown file to DOCX using Pandoc via pypandoc.          Requires t, Convert a Markdown file to DOCX using Pandoc via pypandoc.          Requires t
+
+### Community 2537 - "Community 2537"
+Cohesion: 0.50
+Nodes (3): Ask after every delivery, Make targeted changes, not a rebuild, Review and targeted changes
+
+### Community 2538 - "Community 2538"
+Cohesion: 0.83
+Nodes (3): main(), overflow(), pptx_checks()
+
+### Community 2539 - "Community 2539"
+Cohesion: 0.50
+Nodes (3): $comment, prompts, skills
+
+### Community 2542 - "Community 2542"
+Cohesion: 0.29
+Nodes (7): effective_models(), The provider and model names a stage runs with. Names only: never keys or endpoi, The provider and model names a stage runs with. Names only: never keys or endpoi, The provider and model names a stage runs with. Names only: never keys or endpoi, The provider and model names a stage runs with. Names only: never keys or endpoi, The provider and model names a stage runs with. Names only: never keys or endpoi, The provider and model names a stage runs with. Names only: never keys or endpoi
+
+### Community 2545 - "Community 2545"
+Cohesion: 0.50
+Nodes (3): knowledge/bathroom.json, knowledge/plumbing.json, knowledge/roof.json
+
+### Community 2546 - "Community 2546"
+Cohesion: 0.50
+Nodes (3): knowledge/facade.json, knowledge/roof.json, knowledge/schedule.json
+
+### Community 2548 - "Community 2548"
+Cohesion: 0.50
+Nodes (4): code:block22 (Type/Part Designation    # Must match BOM Type/Part exactly), code:block23 (Cutting Fee             # Cost per cut), code:block24 (Type/Part: Aluminum Angle - L Profile), Price List Requirements
+
+### Community 2549 - "Community 2549"
+Cohesion: 0.50
+Nodes (4): code:block29 (Grand_Total = Net_Material_Cost + Total_Fees + Shipping + Ta), code:block30 (Net_Material_Cost = $24,289.12), Final Calculation, Grand Total
+
+### Community 2550 - "Community 2550"
+Cohesion: 0.50
+Nodes (4): _cleanup_expired_pdfs(), Remove PDFs older than TTL., Remove PDFs older than TTL., Remove PDFs older than TTL.
+
+### Community 2551 - "Community 2551"
+Cohesion: 0.50
+Nodes (4): Best Practices, For Enhancement, For Evaluation, For Production Use
+
+### Community 2552 - "Community 2552"
+Cohesion: 0.40
+Nodes (5): topics, description, items, title, type
+
+### Community 2557 - "Community 2557"
+Cohesion: 0.67
+Nodes (3): Example Use Cases, Supported File Types, What Does This Skill Do?
+
+### Community 2566 - "Community 2566"
+Cohesion: 0.67
+Nodes (3): BOMs (Optional), Document Requirements, Price List (Required)
+
+### Community 2567 - "Community 2567"
+Cohesion: 0.67
+Nodes (3): Currency Formatting, Important Requirements, Special Instructions
+
+### Community 2568 - "Community 2568"
+Cohesion: 0.67
+Nodes (3): Example Use Cases, Supported File Types, What Does This Skill Do?
+
+### Community 2569 - "Community 2569"
+Cohesion: 0.67
+Nodes (3): 1. Sales Order Document, 2. Calculation Breakdown, Output Files
+
+### Community 2571 - "Community 2571"
+Cohesion: 0.67
+Nodes (3): code:json ({), Option A: Easy Setup (Recommended), Setup
+
+### Community 2572 - "Community 2572"
+Cohesion: 0.67
+Nodes (3): code:block10 (- [Date]: [Event/milestone]), code:block9 (TIMELINE/SCHEDULE), Timeline/Schedule
+
+### Community 2573 - "Community 2573"
+Cohesion: 0.40
+Nodes (4): ProjectInfo, Example 3: Using a manually defined schema instead of SchemaGenerator.  This d, Static schema mirroring the project information fields., Static schema mirroring the project information fields.
+
+### Community 2576 - "Community 2576"
+Cohesion: 0.67
+Nodes (3): code:mermaid (flowchart TD), Input → method → output, Word Error Rate (WER)
+
+### Community 2619 - "Community 2619"
+Cohesion: 0.50
+Nodes (4): description, title, type, action_items
+
+### Community 2620 - "Community 2620"
+Cohesion: 0.50
+Nodes (3): Output schema for this use case.  Generated by GAIK SchemaGenerator via the Solu, RAGAnswerDraft, Model-facing draft of a single role-aware RAG answer.
+
+### Community 2625 - "Community 2625"
+Cohesion: 0.67
+Nodes (3): DataObjectRef_chunked_documents, blueprint_path, kind
+
+### Community 2630 - "Community 2630"
+Cohesion: 0.67
+Nodes (3): 3. Fee Calculation Defaults, code:block13 (Cutting: 0 cuts (no cutting fee unless BOM specifies)), code:block14 (**Default:** `Lots_Per_Item = 2` (two lots per material type)
+
+### Community 2632 - "Community 2632"
+Cohesion: 0.67
+Nodes (3): 5.1 High-level improvement strategies, 5.2 Mapping table: performance issues -> improvement strategies, 5. Improvement strategies
 
 ## Knowledge Gaps
-- **13404 isolated node(s):** `CompletedProcess`, `int`, `Path`, `int`, `bool` (+13399 more)
+- **14560 isolated node(s):** `CompletedProcess`, `int`, `Path`, `int`, `bool` (+14555 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **418 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **471 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `ProviderClient` connect `Community 53` to `Community 3`, `Community 6`, `Community 776`, `Community 2064`, `Community 19`, `Community 1819`, `Community 27`, `Community 670`, `Community 33`, `Community 940`, `Community 47`, `Community 50`, `Community 52`, `Community 66`, `Community 1098`, `Community 1485`, `Community 1742`, `Community 81`, `Community 95`, `Community 228`, `Community 100`, `Community 235`, `Community 1259`?**
+- **Why does `ProviderClient` connect `Community 92` to `Community 2176`, `Community 3`, `Community 2052`, `Community 19`, `Community 23`, `Community 28`, `Community 670`, `Community 33`, `Community 940`, `Community 52`, `Community 53`, `Community 54`, `Community 56`, `Community 186`, `Community 66`, `Community 70`, `Community 1097`, `Community 1485`, `Community 1742`, `Community 209`, `Community 81`, `Community 1108`, `Community 2392`, `Community 728`, `Community 228`, `Community 2031`, `Community 116`?**
+  _High betweenness centrality (0.012) - this node is a cross-community bridge._
+- **Why does `OpenAI` connect `Community 186` to `Community 1409`, `Community 151`, `Community 1178`, `Community 30`, `Community 1184`, `Community 1185`, `Community 1186`, `Community 169`, `Community 940`, `Community 52`, `Community 1079`, `Community 56`, `Community 66`, `Community 1222`, `Community 81`, `Community 2392`, `Community 92`, `Community 100`, `Community 2153`, `Community 1519`, `Community 1654`?**
   _High betweenness centrality (0.007) - this node is a cross-community bridge._
-- **Why does `LLMJudge` connect `Community 22` to `Community 227`, `Community 1289`, `Community 1578`, `Community 1035`, `Community 1261`, `Community 1326`, `Community 1328`, `Community 49`, `Community 1521`, `Community 692`, `Community 1241`, `Community 27`, `Community 1534`, `Community 57`?**
-  _High betweenness centrality (0.006) - this node is a cross-community bridge._
-- **Why does `Blueprint` connect `Community 2234` to `Community 706`, `Community 738`, `Community 197`, `Community 166`, `Community 1160`, `Community 1162`, `Community 138`, `Community 172`, `Community 142`, `Community 1806`, `Community 1138`, `Community 181`, `Community 182`, `Community 311`, `Community 2299`, `Community 62`?**
-  _High betweenness centrality (0.006) - this node is a cross-community bridge._
-- **Are the 123 inferred relationships involving `DataExtractor` (e.g. with `AudioToStructuredData` and `.run()`) actually correct?**
-  _`DataExtractor` has 123 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 105 inferred relationships involving `ProviderClient` (e.g. with `AnswerGenerator` and `AnswerResult`) actually correct?**
-  _`ProviderClient` has 105 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 105 inferred relationships involving `ValueError` (e.g. with `build_phases()` and `.classify()`) actually correct?**
-  _`ValueError` has 105 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `Blueprint` connect `Community 1160` to `Community 706`, `Community 738`, `Community 2277`, `Community 197`, `Community 166`, `Community 138`, `Community 1162`, `Community 172`, `Community 142`, `Community 1138`, `Community 181`, `Community 311`, `Community 60`, `Community 62`?**
+  _High betweenness centrality (0.007) - this node is a cross-community bridge._
+- **Are the 140 inferred relationships involving `DataExtractor` (e.g. with `AudioToStructuredData` and `.run()`) actually correct?**
+  _`DataExtractor` has 140 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 129 inferred relationships involving `ProviderClient` (e.g. with `AnswerGenerator` and `AnswerResult`) actually correct?**
+  _`ProviderClient` has 129 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 103 inferred relationships involving `ValueError` (e.g. with `build_phases()` and `.classify()`) actually correct?**
+  _`ValueError` has 103 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `CompletedProcess`, `int`, `Get current git branch name.` to the rest of the system?**
-  _15957 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _18100 weakly-connected nodes found - possible documentation gaps or missing edges._

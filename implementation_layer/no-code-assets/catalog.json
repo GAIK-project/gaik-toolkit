@@ -106,6 +106,17 @@
       "output": "Retrieval code and evals",
       "needs": ["Postgres with pgvector"],
       "tryPrompt": "Use the searching-documents skill ({url}) to add hybrid search over my document chunks and measure it with Hit@K."
+    },
+    {
+      "id": "generate-structured-reports",
+      "group": "developer",
+      "path": "agent-skills/skills/generate-structured-reports",
+      "title": "Generating structured reports",
+      "tagline": "Write a source-cited report from mixed files, with every quote checked and the gaps listed.",
+      "input": "PDF, Word, spreadsheet, text, recording or image files; optional template",
+      "output": "Markdown report, optional Word (.docx)",
+      "needs": ["gaik[report-writer]", "Pandoc for Word output"],
+      "tryPrompt": "Use the generate-structured-reports skill ({url}) to write a report from my files. I will give you the sources and, if I have one, a template."
     }
   ],
   "prompts": [

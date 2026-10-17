@@ -21,6 +21,7 @@ vector-only — rather than restating the API reference.
 | [`parsing-documents`](skills/parsing-documents) | Converting PDFs, scans, or Word files to text or markdown; tables come out wrong; parsing costs more than expected |
 | [`extracting-structured-data`](skills/extracting-structured-data) | Pulling fields or line items into a schema; a request fails with a 400 or truncates; adding page/quote evidence; measuring accuracy |
 | [`searching-documents`](skills/searching-documents) | Adding semantic or hybrid (pgvector + full-text) search over documents; Finnish text; deciding whether a search found anything; measuring retrieval |
+| [`generate-structured-reports`](skills/generate-structured-reports) | Writing a source-cited report from mixed files (PDF, Word, spreadsheets, recordings, images) with the gaik report writer, following a template or proposing one; every statement traced to a verified quote, with gaps and conflicts shown |
 
 **Ready-to-run use cases.** No code needed. `brief-to-slides` runs anywhere; the other four
 are written for Claude Desktop and need a local MCP server, which each skill's README sets up.
@@ -32,6 +33,8 @@ are written for Claude Desktop and need a local MCP server, which each skill's R
 | [`construction-diary-creation`](skills/construction-diary-creation) | Turns a site manager's spoken day into a Työmaapäiväkirja | gaik-transcriber MCP server |
 | [`purchase-order-processing`](skills/purchase-order-processing) | Matches a purchase order and its BOMs against a price list and writes a priced sales order | Filesystem MCP server |
 | [`report-writing`](skills/report-writing) | Consolidates recordings, notes and documents into one structured Word report | Filesystem and gaik-transcriber MCP servers |
+
+`report-writing` has Claude write the report itself in Claude Desktop. `generate-structured-reports` runs gaik's normalize, curate and synthesize pipeline instead, with quotes checked against the sources, and needs an agent that can run Python.
 
 Long detail sits in `references/` (or `reference/`) and is loaded only when the task needs it.
 The Claude Desktop skills also carry their setup files beside `SKILL.md`: `setup.bat`,
@@ -76,6 +79,7 @@ agent-skills/   (implementation_layer/no-code-assets/)
     │   ├── SKILL.md
     │   ├── README.md
     │   └── references/
+    ├── generate-structured-reports/   # also scripts/: the stage helper
     ├── brief-to-slides/        # also assets/ and scripts/
     ├── incident-report-writing/
     ├── construction-diary-creation/

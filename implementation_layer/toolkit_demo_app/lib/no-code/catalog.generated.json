@@ -1,7 +1,7 @@
 {
   "plugin": {
     "name": "gaik-toolkit",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "marketplace": "GAIK-project/gaik-toolkit",
     "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills"
   },
@@ -203,6 +203,37 @@
       "zip": "/downloads/skills/searching-documents.zip",
       "zipBytes": 41514,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/searching-documents",
+      "guideUrl": null
+    },
+    {
+      "id": "generate-structured-reports",
+      "group": "developer",
+      "title": "Generating structured reports",
+      "tagline": "Write a source-cited report from mixed files, with every quote checked and the gaps listed.",
+      "description": "Writes a source-cited report from the user's files by running the gaik ReportWriter pipeline: every file (PDF, Word, spreadsheet, text, recording, image) is normalized to text, facts are curated per report section with quotes checked against the sources, and each section is drafted and reviewed. Drafts the report's sections from an optional template or proposes them, and agrees the structure with the user in chat; reports what the sources do not cover, where they disagree, and which facts were dropped. Use when a report must be written from source material and every statement must trace to a source, for example a condition or inspection report, an assessment, or a project or meeting report filled into a fixed template. Also use to correct curated facts and write the report again, or to rebuild a report after its sections were edited. Runs Python with gaik[report-writer]; in Claude Desktop without code execution, use the report-writing skill instead.",
+      "input": "PDF, Word, spreadsheet, text, recording or image files; optional template",
+      "output": "Markdown report, optional Word (.docx)",
+      "needs": [
+        "gaik[report-writer]",
+        "Pandoc for Word output"
+      ],
+      "setup": [],
+      "kit": null,
+      "tryPrompt": "Use the generate-structured-reports skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/generate-structured-reports) to write a report from my files. I will give you the sources and, if I have one, a template.",
+      "files": [
+        "README.md",
+        "SKILL.md",
+        "references/report-spec.md",
+        "references/report-structure.md",
+        "references/review-and-resume.md",
+        "scripts/install_pandoc.py",
+        "scripts/run_report.py",
+        "scripts/template_library.py",
+        "scripts/template_to_spec.py"
+      ],
+      "zip": "/downloads/skills/generate-structured-reports.zip",
+      "zipBytes": 185140,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/generate-structured-reports",
       "guideUrl": null
     }
   ],
