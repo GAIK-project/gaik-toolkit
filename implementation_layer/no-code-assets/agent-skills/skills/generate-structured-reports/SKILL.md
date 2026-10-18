@@ -43,7 +43,7 @@ did. If the install fails it stops and prints the command to run. Recordings and
 normalizing a recording fails. Install them before the first run with recordings, and ask
 before installing anything. The Docling and PyTorch warnings on documents are not errors;
 install them only if the user needs richer PDF parsing (the skill's README,
-"Optional installs").
+"Installing the skill").
 
 `<skill>` is this skill's installed directory. The helper reads the provider's credentials
 from the environment (`get_llm_config`): never put a key in the spec or on the command line.
