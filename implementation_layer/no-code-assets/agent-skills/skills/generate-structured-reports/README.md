@@ -96,23 +96,6 @@ you review its sections in the chat like any other structure. When you finish a 
 is new, the agent offers to save it, shows exactly what would be saved, and writes it **only if
 you agree**.
 
-- **What is saved:** the report's title and language, the report-wide instructions, and the
-  sections with their prompts and required items. Never your sources, facts, file paths, models
-  or keys.
-- **Where:** one JSON file per template in `report-templates` under your home folder, or in the
-  folder named by the `GAIK_REPORT_TEMPLATES` environment variable. It is outside the skill, so
-  a skill update does not replace it, and outside any git repository: the helper refuses to
-  save into a git working tree or into the skill's folder.
-- **Search:** by the words of your request, matched against each template's name, keywords,
-  description and section titles. It makes no model call. Give a template a few keywords you
-  would search with.
-- **Shared libraries:** point `GAIK_REPORT_TEMPLATES` at a shared folder to share templates.
-  Saving never overwrites an existing template unless you agree to update it.
-- **Needs file access:** the agent must be able to read and write that folder, as in Claude
-  Code and Codex. A chat without file access cannot use the library.
-
-You can also use the helper yourself: `python scripts/template_library.py list`.
-
 ## Where it runs
 
 The skill is a set of instructions plus a Python helper. The agent follows the instructions and
@@ -155,23 +138,7 @@ Use the generate-structured-reports skill to write a project status report from 
 When the skill starts for the first time, it installs all the dependencies it needs. You
 only need Python 3.11 or later and an API key (see [Providers and API keys](#providers-and-api-keys)).
 
-**Required, installed when a run needs them:**
-
-- `gaik[report-writer]`, the Python package that does the work.
-- For Anthropic, Google or LiteLLM as the provider: that provider's gaik extra (`llm-anthropic`,
-  `llm-google` or `llm-litellm`). The helper installs it itself.
-- For recordings and video: ffmpeg, which reads and converts them, and, on Python 3.13 or later,
-  `audioop-lts`, which Python 3.13 removed from the standard library. Without them, normalizing a
-  recording fails.
-- For Word output: Pandoc, downloaded into your user folder with no administrator rights, and
-  only if you agree. If you say no, the report is Markdown only.
-
-**Optional, only if you need them:**
-
-- Docling (`gaik[parser]`), gaik's advanced PDF parser, for richer table and layout extraction
-  from complex PDFs.
-- PyTorch, for GPU-accelerated parsing in image- and OCR-heavy flows.
-
+The dependencies required by the skill at the time of first run include gaik's report writer module (`gaik[report-writer]`), `ffmpeg`, `audioop-lts`, `pandoc`, and some optional dependencies such as `docling`, and `PyTorch`. 
 
 ## Providers and API keys
 
