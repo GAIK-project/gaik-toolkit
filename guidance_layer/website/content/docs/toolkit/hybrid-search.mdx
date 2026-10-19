@@ -196,6 +196,8 @@ unanswerable = [best_similarity(q) for q in sensible_questions_about_other_topic
 
 reading = RelevanceGate.calibrate(answerable, unanswerable, lower_is_better=False)
 print(reading)   # separated: answerable ≥ 0.559, unanswerable ≤ 0.114, margin 0.445 → floor 0.337
+if not reading.separated:
+    raise SystemExit("the two sets overlap: no floor separates them, so do not gate yet")
 
 gate = RelevanceGate(reading.floor, lower_is_better=False)
 hits = store.search_semantic(embedder.embed_query(query), top_k=10, threshold=0.0)

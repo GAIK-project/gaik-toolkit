@@ -141,6 +141,10 @@ item = EvaluationItem(
 
 Only `input` is required. `expected`, `context`, and `metadata` are optional.
 
+`from_csv` keeps every cell as text, so a CSV row's `expected` is a string. That works for
+`RAGEvaluator`, but `ExtractionEvaluator` needs `expected` as a dict of fields and raises
+`TypeError` on a CSV-loaded dataset: use JSONL or `from_list` for extraction ground truth.
+
 ## Examples
 
 - [`extraction_evaluator_example.py`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_components/evaluators/extraction_evaluator_example.py)
@@ -150,9 +154,11 @@ Only `input` is required. `expected`, `context`, and `metadata` are optional.
 
 ## Related
 
-- [LLM-as-Judge](/evaluation-layer/llm-judge) — the underlying grader. Use
-  `LLMJudgePanel` for cross-model averaging if you need defensible
-  benchmarks.
+- [LLM-as-Judge](/evaluation-layer/llm-judge) — the underlying grader. Both
+  evaluators take a single `LLMJudge`; `LLMJudgePanel` returns a different
+  result type, so it cannot be passed as their `judge`. For a cross-model
+  check, run the evaluator once per judge model and compare the scores, or
+  validate with `LLMJudgePanel` directly.
 - [Calibration](/evaluation-layer/llm-judge#calibration-against-human-labels)
   — verify your judge correlates with human raters before trusting any of
   these metrics.

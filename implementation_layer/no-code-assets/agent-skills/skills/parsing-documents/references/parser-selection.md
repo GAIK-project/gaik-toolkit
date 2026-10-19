@@ -14,17 +14,22 @@ deciding which extra to install.
 | Extra | Brings | Needed by |
 |---|---|---|
 | `gaik[parser]` | PyMuPDF, python-docx, Docling | `PyMuPDFParser`, `DocxParser`, `DoclingParser`, `VisionPlusParser` |
-| `gaik[parser-cpu]` | same, CPU-only wheels | everything except `DoclingParser` |
+| `gaik[parser-cpu]` | PyMuPDF and python-docx only | `PyMuPDFParser`, `DocxParser` |
 | `gaik[multimodal-parser]` | PyMuPDF, Anthropic, Google auth, markdown-it | `MultimodalParser` |
 | `gaik[llm-google]` | Google Gen AI SDK and auth | Shared `google` and `vertex` clients |
 | `gaik[llm-anthropic]` | Anthropic SDK | Shared `anthropic` and `anthropic_foundry` clients |
 | `gaik[llm-litellm]` | LiteLLM | Optional `litellm` client; use a provider-prefixed model |
 
-`DoclingParser` needs `parser`, not `parser-cpu`. Components swallow a missing optional
-dependency in `__init__.py` (`try: from .x import Y / except ImportError: pass`), so a
-class installed under the wrong extra is not an error — it is simply **absent** from the
-namespace, and the import fails with `ImportError: cannot import name`. If a documented
-class will not import, suspect the extra before suspecting the code.
+`DoclingParser` and `VisionPlusParser` need `parser`, not `parser-cpu`; `DoclingApiClientParser`
+needs `requests`, which `parser` brings. Components swallow a missing optional dependency
+in `__init__.py` (`try: from .x import Y / except ImportError: pass`), so a class installed
+under the wrong extra is not an error — it is usually **absent** from the namespace, and
+the import fails with `ImportError: cannot import name`. If a documented class will not
+import, suspect the extra before suspecting the code.
+
+`DoclingParser` is the exception: it still imports without Docling (with a printed
+warning), and the failure comes at parse time as `ModuleNotFoundError: psutil` or
+`ValueError: Docling is not available`. Either message means the `parser` extra is missing.
 
 ## Credentials per parser
 
@@ -104,5 +109,7 @@ which rung you need.
    when figures carry meaning that must sit in the right position for RAG chunks.
 4. **`MultimodalParser` / `VisionParser`** — the model reads the rendered page. This is the
    rung that recovers merged cells and stacked headers, because it can emit HTML.
+   `MultimodalParser` asks for HTML tables by default; `VisionParser` asks for markdown
+   tables unless a `custom_prompt` asks for HTML.
 5. **`merge_table=True`** — for tables broken across a page boundary, which no
    page-at-a-time parser can reassemble.

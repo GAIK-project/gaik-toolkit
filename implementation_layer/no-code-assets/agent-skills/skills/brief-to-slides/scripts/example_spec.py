@@ -82,8 +82,9 @@ for i, (t, d) in enumerate([('Decisions', 'What was decided?'), ('Actions', 'Who
 els += chip(6.6, 5.0, 2.8, 0.6, '1 · Pairs · 3 min', fill=NAVY, color=LIGHT, size=14, bold=True)
 els += chip(9.65, 5.0, 2.8, 0.6, '2 · Debrief · 1 min', fill=NAVY, color=LIGHT, size=14, bold=True)
 SLIDES.append(dict(id='activity', kind='content', kicker='ACTIVITY · 4 MINUTES · IN PAIRS', title='Extract the Action Items', els=els, minutes=4, notes="""[4 min: 3 min in pairs, 1 min debrief]
-EXACT INSTRUCTIONS: "In pairs, read the transcript excerpt. Write the decisions, the action items with owner and deadline, and the gaps. Three minutes."
-SAMPLE ANSWER: Decision: riverside venue. Actions: Tom sends the budget by Friday. Gaps: catering has no owner or date; the draft agenda has no owner or date.
+EXACT INSTRUCTIONS (read aloud): "In pairs, read the transcript excerpt. Write the decisions, the action items with owner and deadline, and the gaps. Three minutes." Start a visible timer.
+WHAT STUDENTS SHOULD NOTICE: two items sound like decisions but have no owner or date, so the honest output lists them as gaps.
+STRONG SAMPLE ANSWER: Decision: riverside venue. Actions: Tom sends the budget by Friday. Gaps: catering has no owner or date; the draft agenda has no owner or date.
 DEBRIEF: Take two pairs. A good AI draft would list the same gaps instead of inventing an owner. That is exactly what the "if unsure" line in the instructions asks for. Point out that "the client wants a draft agenda" is a request, not yet an action item, until someone takes it; good notes keep that distinction.
 TRANSITION: "Let's wrap up.\""""))
 

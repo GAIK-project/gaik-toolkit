@@ -31,7 +31,7 @@ task needed. Decide first what has to still be true afterwards, then pick:
 | Plain prose, simple single-column layout | `PyMuPDFParser` | free, local, milliseconds |
 | A Word document's text | `DocxParser` | free, local |
 | Text on scans / no text layer | `DoclingParser` (OCR) | slow on CPU, free |
-| **Table structure — merged cells, multi-row headers** | `MultimodalParser` or `VisionParser` | API calls |
+| **Table structure — merged cells, multi-row headers** | `MultimodalParser` (HTML tables by default), or `VisionParser` with a `custom_prompt` that asks for HTML | API calls |
 | Images explained in place, for RAG chunks | `VisionPlusParser` | Docling + API call |
 | Docling quality without the local install | `DoclingApiClientParser` | a Docling service (`api_base=`, `password=`) |
 
@@ -161,7 +161,12 @@ column-collapse and page-drop, which both otherwise read as fine prose.
 - Docling on CPU runs roughly 20–30 s/page. A GPU makes it faster but does **not** change
   its accuracy, so never reach for Docling to improve a *quality* result you measured on
   CPU — the number will be identical.
-- `DoclingParser` requires the `parser` extra, not `parser-cpu`.
+- `DoclingParser` requires the `parser` extra, not `parser-cpu`. Without Docling the class
+  still imports (it prints a warning); `parse_document` then fails with
+  `ModuleNotFoundError: psutil` or `ValueError: Docling is not available`.
+- `VisionParser`'s default prompt asks for markdown pipe tables, which cannot hold a merged
+  cell. For table structure, pass a `custom_prompt` that asks for HTML `<table>` markup, or
+  use `MultimodalParser`, whose prompts already do.
 - `VisionParser` accepts all shared provider configs, including native Google/Vertex,
   Anthropic, Aitta and optional LiteLLM. The selected model must support image inputs.
   `MultimodalParser(api_config=...)` uses the same interface. LiteLLM requires

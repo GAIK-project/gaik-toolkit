@@ -8,7 +8,8 @@ mkdir -p "$OUT"; rm -f "$OUT"/slide-*.png
 soffice --headless --convert-to pdf --outdir "$OUT" "$PPTX" >/dev/null 2>&1
 PDF="$OUT/$(basename "${PPTX%.*}").pdf"
 pdftoppm -r "$DPI" -png "$PDF" "$OUT/slide"
-python3 - "$OUT" << 'PY'
+PY=python3; "$PY" -c "" 2>/dev/null || PY=python   # python3 may be missing or a Windows Store stub
+"$PY" - "$OUT" << 'PY'
 import sys, glob, re
 from PIL import Image
 out = sys.argv[1]

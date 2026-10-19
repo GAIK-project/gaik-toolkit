@@ -278,8 +278,10 @@ latency is sequential. Aggregation rules:
 
 - **Severity** = mode across judges; ties resolve to the worst severity.
 - **Score** = median of non-zero Likert scores.
-- **`agreement_score`** = fraction of `(item_index, field)` keys where ALL
-  judges produced the same severity.
+- **`agreement_score`** = fraction of flagged `(item_index, field)` keys where
+  every judge that flagged the key gave the same severity. A key only one judge
+  flagged counts as agreement, so a low score means real severity disagreement,
+  and a high score does not prove the judges flagged the same fields.
 
 ## Pairwise A/B comparison
 

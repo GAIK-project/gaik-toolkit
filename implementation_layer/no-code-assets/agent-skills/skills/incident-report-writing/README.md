@@ -35,7 +35,7 @@ The skill extracts essential incident report information including:
 Before setting up, please install:
 
 1. **Claude Desktop** — Download from [claude.ai/download](https://claude.ai/download)
-2. **Python 3.8+** — Download from [python.org](https://www.python.org/downloads/)
+2. **Python 3.11+** — Download from [python.org](https://www.python.org/downloads/)
    - During installation, check **"Add Python to PATH"**
 3. **OpenAI API Key** (REQUIRED for transcription) — Get from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 
@@ -137,12 +137,12 @@ Test the skill with included sample audio:
 
 | File | Description |
 |------|-------------|
-| `data/Sample 1.m4a` | Incident report recording |
-| `data/Sample 2.m4a` | Safety observation recording |
+| `data/Sample_1.m4a` | Incident report recording |
+| `data/Sample_2.m4a` | Safety observation recording |
 
 **Try it:**
 ```
-Process incident report from [path-to-folder]\data\Sample 1.m4a
+Process incident report from [path-to-folder]\data\Sample_1.m4a
 ```
 
 ---
@@ -277,8 +277,8 @@ incident-report-writing/
 │   ├── server.py                  # FastMCP server implementation
 │   └── .env                       # API credentials
 └── data/                          # Sample audio files
-    ├── Sample 1.m4a
-    └── Sample 2.m4a
+    ├── Sample_1.m4a
+    └── Sample_2.m4a
 ```
 
 ### How It Works

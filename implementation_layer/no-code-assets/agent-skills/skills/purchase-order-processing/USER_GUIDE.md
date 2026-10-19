@@ -493,7 +493,7 @@ Certificates_Required: [number]   # e.g., 1 (for 1 certificate)
 - As a separate "FEE REQUIREMENTS" section
 
 **Template available:**
-See `reference/BOM_TEMPLATE_WITH_FEES.md` for a complete example of how to structure your BOMs with fee fields.
+See "Fee Calculation Fields" in `reference/EXTRACTION_FIELDS.md` for the fee fields a BOM can carry, their alternative names and their defaults.
 
 **If BOMs don't include these fields:**
 - Cutting: Defaults to 0 (no cutting fee)
@@ -589,7 +589,7 @@ Cert Fee: $25.00
 
 A `sample_data/` folder with example files is added to help you test the skill.
 
-The output for the sample data can be found in `output` folder.
+The output for the sample data is in the `output/` folder (`output_report.docx` and `calculation_breakdown.txt`).
 ---
 
 ## Tips for Best Results
@@ -646,7 +646,7 @@ Contains:
 - **Issues:** Create an issue in the GitHub repository
 - **Documentation:** Review files in `reference/` folder for detailed specifications
 - **Customization:** See the "Customizing the Skill" section above
-- **Verification:** Check `VERIFICATION_REPORT.md` for extraction/calculation strategy
+- **Verification:** `EVALUATION.md` lists test scenarios; `reference/CALCULATION_LOGIC.md` explains the calculation
 
 ---
 

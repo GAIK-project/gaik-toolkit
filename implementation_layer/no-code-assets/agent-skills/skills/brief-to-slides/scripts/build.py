@@ -7,7 +7,7 @@
 SPEC.py defines SLIDES (list of slide dicts) and optionally THEME, TITLE, SECTIONS
 (list of (first_slide_id, one-sentence description)) for the Slides deck index.
 """
-import argparse, datetime, importlib.util, json, os, sys
+import argparse, datetime, importlib.util, json, os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from render_pptx import build as build_pptx
@@ -31,6 +31,13 @@ def main():
     slides, theme = m.SLIDES, getattr(m, 'THEME', None)
     ids = [s['id'] for s in slides]
     assert len(ids) == len(set(ids)), 'slide ids must be unique'
+    # check_deck.py times the deck from the notes' "[N min" prefix; keep `minutes` in step
+    for s in slides:
+        m_ = re.match(r'\s*\[(\d+(?:\.\d+)?)\s*min', s.get('notes', ''))
+        noted = float(m_.group(1)) if m_ else 0
+        if abs(noted - float(s.get('minutes', 0) or 0)) > 1e-6:
+            start = f'[{m_.group(1)} min]' if m_ else 'no [N min] prefix'
+            print(f'WARNING: {s["id"]}: minutes={s.get("minutes", 0)} but the notes start with {start}')
     build_pptx(slides, o.out, o.template, theme)
     print('pptx:', o.out, len(slides), 'slides')
     if o.preview:

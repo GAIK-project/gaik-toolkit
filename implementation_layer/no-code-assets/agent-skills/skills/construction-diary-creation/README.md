@@ -34,7 +34,7 @@ The skill extracts essential construction diary information including:
 Before setting up, please install:
 
 1. **Claude Desktop** — Download from [claude.ai/download](https://claude.ai/download)
-2. **Python 3.8+** — Download from [python.org](https://www.python.org/downloads/)
+2. **Python 3.11+** — Download from [python.org](https://www.python.org/downloads/)
    - During installation, check **"Add Python to PATH"**
 3. **OpenAI API Key** (REQUIRED for transcription) — Get from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 

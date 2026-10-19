@@ -2,8 +2,6 @@
 
 Turn your scattered documents, recordings, and notes into professional Word reports — automatically.
 
-![Report Writing Skill](images/img.png)
-
 ---
 
 ## What Does This Skill Do?
@@ -40,7 +38,7 @@ This skill helps you **create structured reports** from multiple sources without
 Before setting up, please install:
 
 1. **Claude Desktop** — Download from [claude.ai/download](https://claude.ai/download)
-2. **Python 3.8+** — Download from [python.org](https://www.python.org/downloads/)
+2. **Python 3.11+** — Download from [python.org](https://www.python.org/downloads/)
    - During installation, check **"Add Python to PATH"**
 3. **Node.js** — Download from [nodejs.org](https://nodejs.org/)
 4. **OpenAI API Key** (for audio transcription) — Get from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
@@ -114,7 +112,7 @@ For **Azure OpenAI**:
 ```
 AZURE_API_KEY=your_api_key_here
 AZURE_ENDPOINT=your_endpoint_url
-AZURE_DEPLOYMENT=your_whisper_deployment
+AZURE_TRANSCRIPTION_MODEL=your_transcription_deployment
 OPENAI_API_TYPE=azure
 ```
 
@@ -314,23 +312,27 @@ The skill automatically detects what sections to include based on your content:
 
 ## Sample Data for Testing
 
-The `sample_data/` folder contains example files you can use to test the skill:
+The repository has a synthetic dataset you can use to test the skill: a fictional house
+condition assessment with three recordings, PDF and Word reports, a spreadsheet and a floor
+plan. Download the folder
+[`house_condition_assessment/inputs`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_modules/report_writer/house_condition_assessment/inputs)
+and, if you want, `sample_report.docx` one level up as the style sample.
 
 | File | Description |
 |------|-------------|
-| `input_documents/meeting_recording.mp3` | Sample audio recording |
-| `input_documents/sketch.png` | Handwritten notes image |
-| `input_documents/notes.txt` | Text notes |
-| `input_documents/roadmap-presentation.pptx` | PowerPoint slides |
-| `input_documents/project-budget.xlsx` | Excel spreadsheet |
-| `input_documents/deployment-freeze-policy.pdf` | PDF document |
-| `templates/meeting-template.docx` | Sample template |
-| `sample_documents/sample-meeting-minutes.docx` | Sample output format |
+| `rec1_exterior_attic.mp3`, `rec2_interior_wet_rooms.mp3`, `rec3_building_services.mp3` | Inspection recordings |
+| `renovation_report_1998.pdf`, `roof_renovation_2012.pdf` | Earlier renovation reports |
+| `moisture_survey_2019.docx` | Word document |
+| `maintenance_log.xlsx` | Excel spreadsheet |
+| `floor_plan.png` | Image |
 
 **Try it:**
 ```
-Create a report from C:\path\to\report-writing\sample_data
+Create a house condition report from C:\path\to\inputs
 ```
+
+[`expected_behaviours.md`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/examples/software_modules/report_writer/house_condition_assessment/expected_behaviours.md)
+lists what a good report does with these sources.
 
 ---
 
@@ -363,10 +365,9 @@ report-writing/
 ├── SKILL.md                  # Claude skill definition: main workflow
 ├── EVALUATION.md             # Test scenarios
 ├── reference/                # Detailed handling guides
-├── transcription-MCP/        # Audio transcription server
-│   ├── server.py             # FastMCP implementation
-│   └── .env                  # API configuration
-└── sample_data/              # Example files for testing
+└── transcription-MCP/        # Audio transcription server
+    ├── server.py             # FastMCP implementation
+    └── .env                  # API configuration
 ```
 
 ### How It Works

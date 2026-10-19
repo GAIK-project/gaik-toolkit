@@ -1,7 +1,7 @@
 {
   "name": "gaik-toolkit",
   "displayName": "GAIK Toolkit",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "GAIK agent skills. For developers building document pipelines with the gaik Python toolkit: choosing a document parser that preserves table structure, designing extraction schemas that stay inside provider limits, building hybrid pgvector search whose failures are visible instead of silent, and writing source-cited reports from mixed files with the gaik report writer. Ready-to-run use cases: turning a short brief into an editable slide deck with speaker notes, timing and citations, and Claude Desktop skills that write incident reports, construction site diaries, priced sales orders and structured reports.",
   "author": {
     "name": "GAIK project",
