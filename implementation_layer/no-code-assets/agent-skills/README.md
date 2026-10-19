@@ -23,12 +23,12 @@ vector-only — rather than restating the API reference.
 | [`searching-documents`](skills/searching-documents) | Adding semantic or hybrid (pgvector + full-text) search over documents; Finnish text; deciding whether a search found anything; measuring retrieval |
 | [`generate-structured-reports`](skills/generate-structured-reports) | Writing a source-cited report from mixed files (PDF, Word, spreadsheets, recordings, images) with the gaik report writer, following a template or proposing one; every statement traced to a verified quote, with gaps and conflicts shown |
 
-**Ready-to-run use cases.** No code needed. `brief-to-slides` runs anywhere; the other four
+**Ready-to-run use cases.** No code needed. `brief-to-slides` runs in any agent that can run Python and bash; the other four
 are written for Claude Desktop and need a local MCP server, which each skill's README sets up.
 
 | Skill | What it does | Needs |
 |---|---|---|
-| [`brief-to-slides`](skills/brief-to-slides) | Builds an editable PowerPoint deck with speaker notes, exact timing and citations from a topic, an audience and a length | — |
+| [`brief-to-slides`](skills/brief-to-slides) | Builds an editable PowerPoint deck with speaker notes, exact timing and citations from a topic, an audience and a length | Python, bash; LibreOffice and poppler for previews |
 | [`incident-report-writing`](skills/incident-report-writing) | Turns a spoken incident or safety observation into a Word report | gaik-transcriber MCP server |
 | [`construction-diary-creation`](skills/construction-diary-creation) | Turns a site manager's spoken day into a Työmaapäiväkirja | gaik-transcriber MCP server |
 | [`purchase-order-processing`](skills/purchase-order-processing) | Matches a purchase order and its BOMs against a price list and writes a priced sales order | Filesystem MCP server |
@@ -56,7 +56,7 @@ Each one receives the user's own content, under that provider's terms.
 | `extracting-structured-data` | The LLM provider the user configures, as above | Document text or page images, and the extraction schema | As above |
 | `searching-documents` | The configured embedding and LLM provider; the user's PostgreSQL database | Document chunks and search queries | As above, and the database URL |
 | `generate-structured-reports` | The configured LLM provider; OpenAI or Azure OpenAI for recordings | Text of the user's source files, transcribed audio and the report draft | As above |
-| `incident-report-writing`, `construction-diary-creation`, `report-writing` | OpenAI (Whisper and GPT models) through the local `gaik-transcriber` MCP server | The audio or video file the user names | `OPENAI_API_KEY`, which `setup.bat` asks for and writes to `transcription-MCP/.env` beside the server; a key already set in the environment takes precedence |
+| `incident-report-writing`, `construction-diary-creation`, `report-writing` | OpenAI or Azure OpenAI (transcription and GPT models) through the local `gaik-transcriber` MCP server | The audio or video file the user names | `OPENAI_API_KEY`, or `AZURE_API_KEY` and `AZURE_ENDPOINT`, which `setup.bat` asks for and writes to `transcription-MCP/.env` beside the server; a key already set in the environment takes precedence |
 | `purchase-order-processing` | Nothing outside the machine; Claude reads the files through the local filesystem MCP server | — | — |
 | `brief-to-slides` | Web pages the user links or the agent researches; the browser fetches Google Fonts when an HTML preview opens | Search queries and page addresses | — |
 

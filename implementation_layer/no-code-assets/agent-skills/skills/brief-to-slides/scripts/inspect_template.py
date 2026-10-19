@@ -9,8 +9,8 @@ kicker positions, citation-like small text, and notes conventions. With --render
 writes PNGs + a contact sheet (via render_preview.sh) to look at.
 """
 import argparse, collections, os, re, subprocess, zipfile
-from pptx import Presentation
 from pptx.util import Emu
+from dsl import open_presentation
 
 IN = 914400
 
@@ -22,7 +22,7 @@ def r2(v):
 def main():
     a = argparse.ArgumentParser(); a.add_argument('path'); a.add_argument('--slides', type=int, default=6); a.add_argument('--render')
     o = a.parse_args()
-    p = Presentation(o.path)
+    p = open_presentation(o.path)
     print(f'size: {r2(p.slide_width)} x {r2(p.slide_height)} in (ratio {p.slide_width / p.slide_height:.3f})')
     z = zipfile.ZipFile(o.path)
     for n in sorted(x for x in z.namelist() if re.match(r'ppt/theme/theme\d+\.xml', x)):

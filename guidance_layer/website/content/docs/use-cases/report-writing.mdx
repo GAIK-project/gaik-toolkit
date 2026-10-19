@@ -129,6 +129,8 @@ The code-based method follows CURACT (Curation-Anchored, Governed, Traceable Rep
 
 Three software components implement the three stages: **SourceNormalizer**, **KnowledgeCurator** and **ReportSynthesizer**. The **ReportWriter** module combines them. Reviewing, signing and delivering the report remain downstream tasks outside the GenAI pipeline.
 
+The [`generate-structured-reports`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/no-code-assets/agent-skills/skills/generate-structured-reports/README.md) agent skill runs this pipeline from a coding agent such as Claude Code: it agrees the report's sections with the user, runs the three stages and shows the gaps, conflicts and dropped facts before the report is written.
+
 ```mermaid
 flowchart LR
     A("🎙️ Site Recordings<br/>primary sources") --> S1
@@ -442,6 +444,7 @@ The finished report is scored 0–10 by an LLM judge that looks for factual erro
 | Value evaluation model (Report Writing) | [Download →](https://github.com/GAIK-project/gaik-toolkit/blob/main/evaluation_layer/value_evaluation_framework/Value_evaluation_model_for%20Report_writing_v0.1.pptx) |
 | BPMN process model (Report Writing) | [Download →](/images/report-writing-bpmn.png) |
 | Report Writing Claude Skill | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing/README.md) |
+| Generate Structured Reports agent skill (runs ReportWriter) | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/no-code-assets/agent-skills/skills/generate-structured-reports/README.md) |
 | SourceNormalizer component | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/source_normalizer) |
 | KnowledgeCurator component | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/knowledge_curator) |
 | ReportSynthesizer component | [GitHub →](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/report_synthesizer) |

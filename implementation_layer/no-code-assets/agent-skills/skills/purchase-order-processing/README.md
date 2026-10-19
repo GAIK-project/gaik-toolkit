@@ -263,7 +263,7 @@ The skill is highly customizable. Edit files in the `reference/` folder to match
 Include these fields for accurate fee calculations:
 - `Cutting_Required`, `Testing_Lots_Required`, `Certificates_Required`
 - If not specified: Cutting defaults to 0, Testing to 1 lot, Certs to 1
-- See `reference/BOM_TEMPLATE_WITH_FEES.md` for template
+- See the fee fields in `reference/EXTRACTION_FIELDS.md` ("Fee Calculation Fields")
 
 ### Price List (Required)
 **Required columns:** Type/Part Designation, Unit Price
@@ -294,6 +294,7 @@ does not download PDFs and Office files. Download
 [`no-code-assets/samples/purchase-order-processing`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/samples/purchase-order-processing):
 `sample_data/` holds a purchase order, three BOMs, a price list and a sample sales order, and
 `example_output/` holds the sales order and calculation breakdown the skill produced from them.
+
 ---
 
 ## Important Requirements

@@ -13,7 +13,9 @@
   then drop any remaining `/slide` relationships (orphan slides). Unreferenced parts, old notes
   and media disappear on save.
 - Use the template layout named in THEME (`layout`) and its TITLE placeholder; delete the other
-  placeholders on each slide.
+  placeholders on each slide. If no layout has that name, the renderer warns, lists the
+  layout names and falls back to the first layout.
+- A `.potx` template is opened as a presentation in memory (`dsl.open_presentation`).
 - Title slide: background from THEME (`title_bg`, scheme colour or hex) and
   `showMasterSp="0"` when the template hides master graphics on its cover.
 - Notes: some templates have a notes master without placeholders, so `notes_text_frame` is
@@ -21,8 +23,9 @@
   template, or inserts a minimal body placeholder.
 - Every added shape has its `p:style` removed (no theme shadows/outlines). Text boxes: zero
   insets, `noAutofit`, explicit latin/ea/cs fonts.
-- Removing a logo from a template: delete the picture shape AND drop the now-unused image
-  relationship from the master/layout, or the image stays in the file.
+- Removing a logo from a template is not done by render_pptx.py: in your template copy, delete
+  the picture shape AND drop the now-unused image relationship from the master/layout, or the
+  image stays in the file.
 
 ## Text fitting (the most common defect)
 - Size boxes with `text_h()` (real font metrics, word wrapping) instead of guessing.

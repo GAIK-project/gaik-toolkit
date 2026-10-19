@@ -87,8 +87,9 @@ With no material the mode is `extended`. See `references/research-and-citations.
 
 ## Requirements
 
-- Python 3 and `pip`, Node `npm`, LibreOffice (`soffice`) and poppler (`pdftoppm`) on the
-  `PATH`.
+- Python 3 and `pip`, Node `npm`, `bash`, LibreOffice (`soffice`) and poppler (`pdftoppm`) on
+  the `PATH`. fontconfig (`fc-match`) gives exact text measurement; without it, as on plain
+  Windows, `dsl.py` looks for the font files in `~/.fonts` and the system font folders.
 - `bash scripts/setup_env.sh` installs the rest: `python-pptx`, Pillow, CairoSVG, lxml and
   Playwright, the default fonts (Montserrat, IBM Plex Sans and Mono, Source Serif 4) and the
   Lucide icons. It writes to `~/.fonts` and `~/.cache/brief-to-slides`.

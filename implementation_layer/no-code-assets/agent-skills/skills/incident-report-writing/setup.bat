@@ -45,6 +45,14 @@ if %errorlevel% neq 0 (
 )
 
 for /f "tokens=2" %%i in ('python --version 2^>^&1') do set PYTHON_VERSION=%%i
+python -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Python %PYTHON_VERSION% is too old: gaik needs Python 3.11 or later.
+    echo Please install Python 3.11+ from https://www.python.org/downloads/
+    echo.
+    pause
+    exit /b 1
+)
 echo [OK] Python %PYTHON_VERSION% found.
 
 :: ============================================================================
@@ -121,7 +129,7 @@ if "%API_CHOICE%"=="1" (
     echo.
     set /p AZURE_KEY="Enter your Azure API key: "
     set /p AZURE_ENDPOINT="Enter your Azure endpoint URL: "
-    set /p AZURE_DEPLOYMENT="Enter your Whisper deployment name: "
+    set /p AZURE_DEPLOYMENT="Enter your transcription deployment name, for example whisper or gpt-4o-transcribe: "
 
     if "!AZURE_KEY!"=="" (
         echo [WARNING] No API key provided. You can add it later to:
@@ -135,7 +143,7 @@ if "%API_CHOICE%"=="1" (
             echo # Azure OpenAI Configuration
             echo AZURE_API_KEY=!AZURE_KEY!
             echo AZURE_ENDPOINT=!AZURE_ENDPOINT!
-            echo AZURE_DEPLOYMENT=!AZURE_DEPLOYMENT!
+            echo AZURE_TRANSCRIPTION_MODEL=!AZURE_DEPLOYMENT!
             echo OPENAI_API_TYPE=azure
         ) > "%TRANSCRIPTION_MCP_PATH%\.env"
         echo [OK] .env file created at %TRANSCRIPTION_MCP_PATH%\.env

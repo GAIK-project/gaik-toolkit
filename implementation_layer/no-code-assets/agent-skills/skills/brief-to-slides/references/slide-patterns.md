@@ -3,8 +3,8 @@
 The 20 teaching slides of `assets/template.pptx` are worked examples of reusable patterns.
 Pick a pattern per slide from the purpose column, then build it with the DSL helpers named.
 Open the example slide (render it with `scripts/render_preview.sh assets/template.pptx OUT`)
-when you need exact proportions. `scripts/example_spec.py` shows code for patterns 1, 2, 3, 6, 19 (its activity slide shows the
-pattern for when a user asks for one).
+when you need exact proportions. `scripts/example_spec.py` shows code for patterns 1, 2, 6, 16 (its step row), 19 and 20 (its
+activity slide shows the pattern for when a user asks for one).
 
 | # | Pattern | Use it to… | Structure | Helpers | Example slide |
 |---|---|---|---|---|---|

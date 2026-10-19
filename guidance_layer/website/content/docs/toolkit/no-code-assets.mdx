@@ -140,7 +140,7 @@ Every skill is a folder under `agent-skills/skills/` with a `SKILL.md` that the 
 
 #### Skills for coding agents
 
-The [`agent-skills`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills) folder is also a plugin in the [Agent Plugins](https://agent-plugins.org) format, so one install brings every skill in it: the use-case skills above and three skills for developers building document pipelines with the `gaik` package: parsing documents, extracting structured data and searching documents. The developer skills carry the decisions and failure modes that are expensive to rediscover, such as which parser keeps a table's structure or why a hybrid search quietly became vector-only.
+The [`agent-skills`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills) folder is also a plugin in the [Agent Plugins](https://agent-plugins.org) format, so one install brings every skill in it: the use-case skills above and four skills for developers building document pipelines with the `gaik` package: parsing documents, extracting structured data, searching documents and generating structured reports. The last one runs the `gaik` report writer from an agent that can run Python, so every statement in the report traces to a verified quote from the user's files. The developer skills carry the decisions and failure modes that are expensive to rediscover, such as which parser keeps a table's structure or why a hybrid search quietly became vector-only.
 
 **Claude Desktop and claude.ai.** The repository is a plugin marketplace, so Claude installs it straight from GitHub:
 

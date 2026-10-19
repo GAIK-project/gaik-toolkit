@@ -109,8 +109,8 @@ def section(sd, n, img_src, theme=None):
     th = resolve_theme(theme)
     cover = sd['kind'] == 'title'
     bg = th['title_bg'] if cover else (th['content_bg'] or 'FFFFFF')
-    if bg == 'accent1':
-        bg = BRAND
+    if bg in THEME_COLOURS:      # a theme colour name: the blank template's value
+        bg = THEME_COLOURS[bg]
     out = [f'<section id="{sd["id"]}" data-transition="fade" style="background:#{bg};color:#{NAVY};'
            f'font-family:{stack(H)};padding:128px 128px 160px;display:flex;flex-direction:column">']
     if not cover and th['footer_band']:

@@ -7,10 +7,14 @@ A deck spec is a Python module that defines:
 
 Geometry is in inches on a 13.333 x 7.5 in (16:9) canvas. Sizes are in points.
 Text is measured with the real fonts (via fontconfig), so heights you compute with
-text_h() match what LibreOffice/PowerPoint and the browser render.
+text_h() match what LibreOffice/PowerPoint and the browser render. Without fontconfig
+(fc-match), the font files are looked up in ~/.fonts and the system font folders.
 """
+import glob
+import io
 import os
 import subprocess
+import zipfile
 from PIL import ImageFont
 
 # ---------------------------------------------------------------- palette / fonts
@@ -19,6 +23,11 @@ NAVY = '14213D'; NAVY2 = '1D2D50'; ORANGE = 'E07A2E'; BURNT = 'A84A12'; BLUE = '
 BRAND = '0079C2'; CREAM = 'FFFDF9'; CREAMLINE = 'E2DED5'; BLUETINT = 'E8EEF6'; ORTINT = 'FBE3CF'
 GREY = '5B6472'; GREY2 = '3F4A5A'; LIGHT = 'F7F5F0'; PALEBLUE = 'DCE3EE'; PEACH = 'F2B27A'
 BLUE2 = 'D3DFEE'; WARM = 'FFF6EC'; ORMID = 'F2C9A0'; BLUELINE = 'C9D2DF'; GREEN = '99C879'; WHITE = 'FFFFFF'
+
+# Theme colour names of assets/blank-template.pptx, for the HTML preview of title_bg etc.
+THEME_COLOURS = dict(dk1='000000', lt1='FFFFFF', dk2='44546A', lt2='E7E6E6', accent1=BRAND,
+                     accent2='8BADDC', accent3='00AACD', accent4='CAD510', accent5='99C879',
+                     accent6='FBB900')
 
 H = 'Montserrat'        # headings + most body text
 B = 'IBM Plex Sans'     # kickers, labels, captions, source lines
@@ -185,14 +194,39 @@ def ICON(name, x, y, s=0.36, color=BLUE, sw=2.0):
 _cache, _path_cache = {}, {}
 
 
+_FONT_DIRS = [os.path.expanduser('~/.fonts'), os.path.expanduser('~/.local/share/fonts'),
+              '/usr/share/fonts', '/Library/Fonts', os.path.expanduser('~/Library/Fonts'),
+              os.path.join(os.environ.get('WINDIR', r'C:\Windows'), 'Fonts'),
+              os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Microsoft', 'Windows', 'Fonts')]
+
+
+def _find_font_file(font, bold, italic):
+    """Font file by name, for systems without fontconfig. Matches the TTF names setup_env.sh
+    installs (e.g. Montserrat_700Bold.ttf, IBMPlexSans_400Regular_Italic.ttf)."""
+    stem = font.replace(' ', '').lower()
+    weight = '700bold' if bold else '400regular'
+    files = [f for d in _FONT_DIRS if d and os.path.isdir(d)
+             for f in glob.glob(os.path.join(d, '**', '*.[ot]tf'), recursive=True)]
+    named = [f for f in files if os.path.basename(f).replace(' ', '').replace('-', '').lower().startswith(stem)]
+    for f in named:
+        n = os.path.basename(f).lower()
+        if weight in n and (('italic' in n) == bool(italic)):
+            return f
+    return named[0] if named else None
+
+
 def font_file(font, bold=False, italic=False):
     key = (font, bool(bold), bool(italic))
     if key not in _path_cache:
         pat = font + (':weight=bold' if bold else '') + (':slant=italic' if italic else '')
-        p = subprocess.run(['fc-match', '-f', '%{file}', pat], capture_output=True, text=True).stdout.strip()
-        fam = subprocess.run(['fc-match', '-f', '%{family}', pat], capture_output=True, text=True).stdout
+        try:
+            p = subprocess.run(['fc-match', '-f', '%{file}', pat], capture_output=True, text=True).stdout.strip()
+            fam = subprocess.run(['fc-match', '-f', '%{family}', pat], capture_output=True, text=True).stdout
+        except FileNotFoundError:   # no fontconfig (e.g. Windows without Git Bash's fc-match)
+            p = _find_font_file(font, bold, italic)
+            fam = font if p else 'nothing'
         if font.lower() not in fam.lower():
-            print(f'WARNING: font "{font}" not installed (fc-match gave {fam!r}); run setup_env.sh. Measurements are approximate.')
+            print(f'WARNING: font "{font}" not installed (found {fam!r}); run setup_env.sh. Measurements are approximate.')
         _path_cache[key] = p
     return _path_cache[key]
 
@@ -200,8 +234,32 @@ def font_file(font, bold=False, italic=False):
 def _font(font, bold, italic):
     k = (font, bool(bold), bool(italic))
     if k not in _cache:
-        _cache[k] = ImageFont.truetype(font_file(font, bold, italic), 100)
+        path = font_file(font, bold, italic)
+        _cache[k] = ImageFont.truetype(path, 100) if path else ImageFont.load_default(100)
     return _cache[k]
+
+
+_TEMPLATE_CT = 'application/vnd.openxmlformats-officedocument.presentationml.template.main+xml'
+_PRESENTATION_CT = 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'
+
+
+def open_presentation(path):
+    """python-pptx Presentation for a .pptx or a .potx template (python-pptx refuses the
+    template content type, so a .potx is reopened in memory as a presentation)."""
+    from pptx import Presentation
+    with zipfile.ZipFile(path) as z:
+        types = z.read('[Content_Types].xml').decode('utf8')
+        if _TEMPLATE_CT not in types:
+            return Presentation(path)
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as out:
+            for item in z.infolist():
+                data = z.read(item.filename)
+                if item.filename == '[Content_Types].xml':
+                    data = types.replace(_TEMPLATE_CT, _PRESENTATION_CT).encode('utf8')
+                out.writestr(item, data)
+    buf.seek(0)
+    return Presentation(buf)
 
 
 def line_factor(font):

@@ -109,8 +109,8 @@ def test_legacy_requirements_invalidate_cache(tmp_path: Path):
             "document_structured_business_default_requirements.json",
         ),
         (
-            "extractor_e1f98f627acc8960_schema.py",
-            "extractor_e1f98f627acc8960_requirements.json",
+            "extractor_b181ed4cb5b2cadd_schema.py",
+            "extractor_b181ed4cb5b2cadd_requirements.json",
         ),
     ],
 )

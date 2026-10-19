@@ -18,14 +18,14 @@
         "gaik-transcriber MCP server"
       ],
       "setup": [
-        "Windows only. Needs Python 3.8+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
+        "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
         "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": {
         "zip": "/downloads/skills/incident-report-writing-setup-kit.zip",
-        "zipBytes": 37956
+        "zipBytes": 39312
       },
       "tryPrompt": "Use the incident-report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing) to turn my audio recording into an incident report. I will attach the file next.",
       "files": [
@@ -48,14 +48,14 @@
         "gaik-transcriber MCP server"
       ],
       "setup": [
-        "Windows only. Needs Python 3.8+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
+        "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
         "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": {
         "zip": "/downloads/skills/construction-diary-creation-setup-kit.zip",
-        "zipBytes": 36128
+        "zipBytes": 37484
       },
       "tryPrompt": "Use the construction-diary-creation skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation) to create today's Työmaapäiväkirja from my site recording. I will attach the audio next.",
       "files": [
@@ -110,14 +110,14 @@
         "gaik-transcriber MCP server"
       ],
       "setup": [
-        "Windows only. Needs Python 3.8+, Node.js and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so recordings are transcribed with Whisper first.",
+        "Windows only. Needs Python 3.11+, Node.js and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so recordings are transcribed with Whisper first.",
         "Download the setup kit, unzip it and run setup.bat. It installs the transcriber and the file access server, saves your key and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": {
         "zip": "/downloads/skills/report-writing-setup-kit.zip",
-        "zipBytes": 72244
+        "zipBytes": 73961
       },
       "tryPrompt": "Use the report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing) to write a report from the materials I am about to attach. Infer the sections from the content.",
       "files": [
@@ -127,9 +127,55 @@
         "reference/OUTPUT_SECTIONS.md"
       ],
       "zip": "/downloads/skills/report-writing.zip",
-      "zipBytes": 46607,
+      "zipBytes": 46603,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing",
       "guideUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing"
+    },
+    {
+      "id": "brief-to-slides",
+      "group": "no-code",
+      "title": "Brief to slides",
+      "tagline": "Turn a topic, an audience and a length into an editable slide deck with speaker notes.",
+      "description": "Builds a visual, editable PowerPoint (.pptx) deck with speaker-ready notes, exact timing, citations and a layout-checked design from a topic, an audience and a length, using only the user's own material (strict mode) or adding web research (extended mode). Use when the user asks for a presentation, slide deck, lecture, training session or talk, wants a brief, outline or source documents turned into slides, or needs speaker notes and per-slide timing for a deck. Also use to make targeted changes to a deck this skill produced.",
+      "input": "Topic, audience and length; optional source files and template",
+      "output": "PowerPoint (.pptx)",
+      "needs": [
+        "code execution (Python, bash)",
+        "LibreOffice and poppler for previews"
+      ],
+      "setup": [],
+      "kit": null,
+      "tryPrompt": "Use the brief-to-slides skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/brief-to-slides) to make a 20-minute slide deck with speaker notes. I will tell you the topic and the audience next.",
+      "files": [
+        "README.md",
+        "SKILL.md",
+        "assets/blank-template.pptx",
+        "assets/template.pptx",
+        "references/build-notes.md",
+        "references/default-brief.md",
+        "references/design-system.md",
+        "references/intake-questions.md",
+        "references/research-and-citations.md",
+        "references/revisions.md",
+        "references/slide-patterns.md",
+        "references/slides-artifact.md",
+        "references/speaker-notes.md",
+        "scripts/build.py",
+        "scripts/check_deck.py",
+        "scripts/collect_sources.py",
+        "scripts/diff_decks.py",
+        "scripts/dsl.py",
+        "scripts/example_spec.py",
+        "scripts/inspect_template.py",
+        "scripts/render_html.py",
+        "scripts/render_pptx.py",
+        "scripts/render_preview.sh",
+        "scripts/setup_env.sh"
+      ],
+      "zip": "/downloads/skills/brief-to-slides.zip",
+      "zipBytes": 537964,
+      "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/brief-to-slides",
+      "guideUrl": null
     },
     {
       "id": "parsing-documents",
@@ -151,7 +197,7 @@
         "references/parser-selection.md"
       ],
       "zip": "/downloads/skills/parsing-documents.zip",
-      "zipBytes": 17734,
+      "zipBytes": 18699,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/parsing-documents",
       "guideUrl": null
     },
@@ -175,7 +221,7 @@
         "references/measuring-extraction.md"
       ],
       "zip": "/downloads/skills/extracting-structured-data.zip",
-      "zipBytes": 21713,
+      "zipBytes": 22341,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/extracting-structured-data",
       "guideUrl": null
     },
@@ -201,7 +247,7 @@
         "references/postgres-without-gaik.md"
       ],
       "zip": "/downloads/skills/searching-documents.zip",
-      "zipBytes": 41535,
+      "zipBytes": 42020,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/searching-documents",
       "guideUrl": null
     },

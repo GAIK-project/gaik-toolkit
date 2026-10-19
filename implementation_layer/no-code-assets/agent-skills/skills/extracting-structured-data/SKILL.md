@@ -23,8 +23,9 @@ pip install "gaik[vision-extract]==0.8.4"   # PDF/image extraction
 
 Two entry points, and the choice is about where the document is in its lifecycle:
 
-- **`VisionExtractor`** — PDF or image straight to structured data in one call. It renders
-  the pages, so it sees layout, stamps, and handwriting.
+- **`VisionExtractor`** — PDF or image straight to structured data in one call. A vision
+  model reads the pages (the PDF itself, or page images labelled with their page number
+  when you pass a shared `api_config`), so it sees layout, stamps, and handwriting.
 - **`DataExtractor`** — takes document **text** you already parsed. Pair it with the
   `parsing-documents` skill.
 
@@ -73,6 +74,7 @@ pip install "gaik[audio-to-structured-data,documents-to-structured-data]==0.8.4"
 ```
 
 ```python
+from gaik.software_components.llm import get_llm_config
 from gaik.software_modules.audio_to_structured_data import AudioToStructuredData
 from gaik.software_modules.documents_to_structured_data import DocumentsToStructuredData
 

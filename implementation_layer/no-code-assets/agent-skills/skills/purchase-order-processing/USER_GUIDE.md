@@ -493,7 +493,7 @@ Certificates_Required: [number]   # e.g., 1 (for 1 certificate)
 - As a separate "FEE REQUIREMENTS" section
 
 **Template available:**
-See `reference/BOM_TEMPLATE_WITH_FEES.md` for a complete example of how to structure your BOMs with fee fields.
+See "Fee Calculation Fields" in `reference/EXTRACTION_FIELDS.md` for the fee fields a BOM can carry, their alternative names and their defaults.
 
 **If BOMs don't include these fields:**
 - Cutting: Defaults to 0 (no cutting fee)
@@ -592,6 +592,7 @@ does not download PDFs and Office files. Download
 [`no-code-assets/samples/purchase-order-processing`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/samples/purchase-order-processing):
 `sample_data/` holds a purchase order, three BOMs, a price list and a sample sales order, and
 `example_output/` holds the sales order and calculation breakdown the skill produced from them.
+
 ---
 
 ## Tips for Best Results
@@ -648,7 +649,7 @@ Contains:
 - **Issues:** Create an issue in the GitHub repository
 - **Documentation:** Review files in `reference/` folder for detailed specifications
 - **Customization:** See the "Customizing the Skill" section above
-- **Verification:** Check `VERIFICATION_REPORT.md` for extraction/calculation strategy
+- **Verification:** `EVALUATION.md` lists test scenarios; `reference/CALCULATION_LOGIC.md` explains the calculation
 
 ---
 
