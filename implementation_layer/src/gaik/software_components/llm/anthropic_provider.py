@@ -1,8 +1,8 @@
 """Anthropic Claude adapter (direct API and Foundry).
 
 Pydantic structured output is implemented with Anthropic's tool-use mechanism:
-the schema is offered as a single forced tool, and the tool input is validated
-back through Pydantic.
+the schema is offered as a single forced, strict tool, and the tool input is
+validated back through Pydantic.
 """
 
 from __future__ import annotations
@@ -61,7 +61,52 @@ _NO_SAMPLING_MODELS = (
 _SAMPLING_KEYS = ("temperature", "top_p", "top_k")
 
 # Models that answer 400 to a forced tool_choice (`tool` or `any`).
-_NO_FORCED_TOOL_MODELS = ("claude-opus-5-5", "claude-fable-5-1", "claude-mythos-5-1")
+_NO_FORCED_TOOL_MODELS = (
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-fable-5-1",
+    "claude-mythos-5-1",
+)
+
+# Models that take `strict: true` on a tool. Others get the plain forced tool.
+_STRICT_TOOL_MODELS = (
+    "claude-fable",
+    "claude-mythos",
+    "claude-opus-5",
+    "claude-opus-4-8",
+    "claude-opus-4-5",
+    "claude-opus-4-1",
+    "claude-sonnet-5",
+    "claude-haiku-5",
+    "claude-haiku-4-5",
+)
+
+# Large structured outputs (a report section's facts and quotes) do not fit in
+# 4096 tokens; 16000 stays under the SDK's limit for non-streaming requests.
+DEFAULT_MAX_TOKENS = 16000
+
+
+def _strict_schema(node: Any) -> Any:
+    """Copy a JSON schema into the shape strict tool use accepts.
+
+    Strict mode needs every object closed (`additionalProperties: false`) with
+    all its properties required. Optional fields stay nullable through their
+    `anyOf` with null, so Pydantic still validates the answer.
+    """
+    if isinstance(node, list):
+        return [_strict_schema(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    node = {key: _strict_schema(value) for key, value in node.items()}
+    if node.get("type") == "object" and "properties" in node:
+        node["additionalProperties"] = False
+        node["required"] = list(node["properties"])
+    return node
+
+
+def _is_schema_rejection(error: anthropic.BadRequestError) -> bool:
+    message = str(getattr(error, "message", error)).lower()
+    return "strict" in message or "schema" in message
 
 
 def _usage(response) -> dict[str, int]:
@@ -77,7 +122,7 @@ class AnthropicProvider:
     def __init__(self, config: dict):
         self.provider = config.get("provider", "anthropic")
         self.model = config["model"]
-        self.max_tokens = config.get("max_tokens", 4096)
+        self.max_tokens = config.get("max_tokens", DEFAULT_MAX_TOKENS)
         self._config = config
         self.raw = self._build_client(config)
         self.usage = UsageCounter()
@@ -212,6 +257,11 @@ class AnthropicProvider:
         }
         system, rest = self._split_system(messages)
         model = kwargs.pop("model", self.model)
+        if _is_family(str(model), _STRICT_TOOL_MODELS):
+            # Without strict, Claude Sonnet 5 sometimes wraps the arguments in an
+            # extra key, and Pydantic rejects the whole response.
+            tool["input_schema"] = _strict_schema(schema)
+            tool["strict"] = True
         tool_choice: dict[str, Any] = {"type": "tool", "name": tool_name}
         if _is_family(str(model), _NO_FORCED_TOOL_MODELS):
             # These models reject a forced tool, so offer it and ask for it; a
@@ -229,8 +279,22 @@ class AnthropicProvider:
         if system is not None:
             params["system"] = system
         params.update(kwargs)
-        response = self.raw.messages.create(**params)
+        try:
+            response = self.raw.messages.create(**params)
+        except anthropic.BadRequestError as error:
+            # A schema strict mode cannot express (an open dict field, say) is
+            # still worth sending as a plain forced tool.
+            if "strict" not in tool or not _is_schema_rejection(error):
+                raise
+            tool.pop("strict")
+            tool["input_schema"] = schema
+            response = self.raw.messages.create(**params)
         self.usage.add(_usage(response))
+        if getattr(response, "stop_reason", None) == "max_tokens":
+            raise ValueError(
+                f"Anthropic response for '{tool_name}' was cut off at "
+                f"max_tokens={params['max_tokens']}; raise max_tokens or ANTHROPIC_MAX_TOKENS."
+            )
         for block in response.content:
             if getattr(block, "type", None) == "tool_use" and block.name == tool_name:
                 return response_format.model_validate(block.input)
