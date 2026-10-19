@@ -87,6 +87,41 @@ jobs:
     - name: Run tests
       run: pytest -m "not llm" --strict-markers
 
+  # The demo app's API tests. They run in the demo's own environment (its
+  # pyproject.toml; uv.lock is not tracked), which installs this repository's
+  # gaik as an editable package, so they catch both a demo change and a gaik
+  # change that breaks the demo. Not part of the release gate or the nightly
+  # run: the deployed demo installs gaik from PyPI.
+  demo-api-tests:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' && !inputs.release_gate
+    defaults:
+      run:
+        working-directory: implementation_layer/toolkit_demo_app
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref || github.ref }}
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
+        cache-dependency-glob: |
+          pyproject.toml
+          implementation_layer/toolkit_demo_app/pyproject.toml
+
+    # `python -m pytest` puts the demo folder on sys.path so `import api` works;
+    # plain `pytest` would also pick up the repository root's pytest config.
+    - name: Run demo API tests
+      run: uv run --python 3.11 --with pytest --with pytest-asyncio python -m pytest api/tests -o addopts="" -q
+
   # Tests that make real LLM calls. Kept off the ordinary push path: they
   # are a signal about the model and the AZURE_DEPLOYMENT behind it, not a
   # regression gate for our code. Run nightly and on demand
