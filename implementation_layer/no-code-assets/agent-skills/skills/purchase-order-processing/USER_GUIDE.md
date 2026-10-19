@@ -61,7 +61,7 @@ Before setting up, please install:
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "C:\\"]
     }
   }
 }
@@ -587,9 +587,11 @@ Cert Fee: $25.00
 
 ## Sample Data for Testing
 
-A `sample_data/` folder with example files is added to help you test the skill.
-
-The output for the sample data can be found in `output` folder.
+Sample files are kept in the repository, outside the plugin, so that installing the plugin
+does not download PDFs and Office files. Download
+[`no-code-assets/samples/purchase-order-processing`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/samples/purchase-order-processing):
+`sample_data/` holds a purchase order, three BOMs, a price list and a sample sales order, and
+`example_output/` holds the sales order and calculation breakdown the skill produced from them.
 ---
 
 ## Tips for Best Results

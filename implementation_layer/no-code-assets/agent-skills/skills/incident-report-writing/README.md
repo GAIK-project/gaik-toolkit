@@ -35,7 +35,7 @@ The skill extracts essential incident report information including:
 Before setting up, please install:
 
 1. **Claude Desktop** — Download from [claude.ai/download](https://claude.ai/download)
-2. **Python 3.8+** — Download from [python.org](https://www.python.org/downloads/)
+2. **Python 3.11+** — Download from [python.org](https://www.python.org/downloads/)
    - During installation, check **"Add Python to PATH"**
 3. **OpenAI API Key** (REQUIRED for transcription) — Get from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 
@@ -133,16 +133,18 @@ INCIDENT REPORT
 
 ## Sample Data
 
-Test the skill with included sample audio:
+Sample recordings are kept in the repository, outside the plugin, so that installing
+the plugin does not download audio. Download them from
+[`no-code-assets/samples/incident-report-writing`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/samples/incident-report-writing):
 
 | File | Description |
 |------|-------------|
-| `data/Sample 1.m4a` | Incident report recording |
-| `data/Sample 2.m4a` | Safety observation recording |
+| `Sample_1.m4a` | Incident report recording |
+| `Sample_2.m4a` | Safety observation recording |
 
 **Try it:**
 ```
-Process incident report from [path-to-folder]\data\Sample 1.m4a
+Process incident report from [path-to-download-folder]\Sample_1.m4a
 ```
 
 ---
@@ -233,7 +235,7 @@ If you prefer manual configuration:
 
 **Install Dependencies:**
 ```bash
-pip install fastmcp gaik[transcriber] python-dotenv
+pip install mcp==1.30.0 "gaik[transcriber]==0.8.4" python-dotenv==1.2.4
 ```
 
 **Configure API Key:**
@@ -275,10 +277,7 @@ incident-report-writing/
 ├── SKILL.md                       # Skill definition: extraction workflow & field specifications
 ├── transcription-MCP/             # Audio transcription MCP server
 │   ├── server.py                  # FastMCP server implementation
-│   └── .env                       # API credentials
-└── data/                          # Sample audio files
-    ├── Sample 1.m4a
-    └── Sample 2.m4a
+│   └── .env                       # API credentials (created by setup.bat, never committed)
 ```
 
 ### How It Works
@@ -293,7 +292,7 @@ incident-report-writing/
 
 ### Dependencies
 
-- **Python packages:** `fastmcp`, `gaik[transcriber]`, `python-dotenv`
+- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.8.4`, `python-dotenv==1.2.4`
 - **External APIs:** OpenAI Whisper API (for audio transcription)
 
 ### Anti-Hallucination Design
@@ -327,6 +326,6 @@ This skill is designed for:
 ## License & Attribution
 
 This skill is part of the GAIK toolkit. Built using:
-- [FastMCP](https://github.com/jlowin/fastmcp) - MCP server framework
-- [GAIK](https://github.com/umairalimran/gaik) - Audio transcription library
+- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) - MCP server framework (its `FastMCP` API, `mcp` 1.x)
+- [GAIK](https://github.com/GAIK-project/gaik-toolkit) - Audio transcription library (`gaik` on PyPI)
 - OpenAI Whisper API - Speech-to-text transcription

@@ -37,8 +37,53 @@ are written for Claude Desktop and need a local MCP server, which each skill's R
 `report-writing` has Claude write the report itself in Claude Desktop. `generate-structured-reports` runs gaik's normalize, curate and synthesize pipeline instead, with quotes checked against the sources, and needs an agent that can run Python.
 
 Long detail sits in `references/` (or `reference/`) and is loaded only when the task needs it.
-The Claude Desktop skills also carry their setup files beside `SKILL.md`: `setup.bat`,
-`transcription-MCP/` and sample data.
+The Claude Desktop skills also carry their setup files beside `SKILL.md`: `setup.bat` and
+`transcription-MCP/`. Their sample recordings, purchase orders, price list and example output
+are not part of the plugin; they are in the repository under
+[`implementation_layer/no-code-assets/samples/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/samples),
+and each skill's README links its own.
+
+## Data, services and credentials
+
+The plugin contains instructions, reference text, scripts and two PowerPoint templates. It
+declares no MCP server, hook or command, and it sends nothing anywhere by itself. A skill
+reaches an outside service only when the agent follows it, and only the services below.
+Each one receives the user's own content, under that provider's terms.
+
+| Skill | Sends data to | What is sent | Credential it reads |
+|---|---|---|---|
+| `parsing-documents` | The LLM provider the user configures in gaik: OpenAI, Azure OpenAI, Anthropic (direct or Microsoft Foundry), Google Gemini / Vertex AI, CSC Aitta, or a provider reached through LiteLLM; a Docling API server whose address the user gives | Page images and text of the documents being parsed. The local parsers (PyMuPDF, python-docx, Docling) send nothing. | That provider's API key from the environment, such as `OPENAI_API_KEY`, `AZURE_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `AITTA_API_KEY` |
+| `extracting-structured-data` | The LLM provider the user configures, as above | Document text or page images, and the extraction schema | As above |
+| `searching-documents` | The configured embedding and LLM provider; the user's PostgreSQL database | Document chunks and search queries | As above, and the database URL |
+| `generate-structured-reports` | The configured LLM provider; OpenAI or Azure OpenAI for recordings | Text of the user's source files, transcribed audio and the report draft | As above |
+| `incident-report-writing`, `construction-diary-creation`, `report-writing` | OpenAI (Whisper and GPT models) through the local `gaik-transcriber` MCP server | The audio or video file the user names | `OPENAI_API_KEY`, which `setup.bat` asks for and writes to `transcription-MCP/.env` beside the server; a key already set in the environment takes precedence |
+| `purchase-order-processing` | Nothing outside the machine; Claude reads the files through the local filesystem MCP server | — | — |
+| `brief-to-slides` | Web pages the user links or the agent researches; the browser fetches Google Fonts when an HTML preview opens | Search queries and page addresses | — |
+
+**Installs.** Skills that run code install packages from public registries: gaik and
+its dependencies from PyPI (`gaik==0.8.4` with the extra the task needs), `mcp`,
+`python-dotenv`, `python-pptx`, `pillow`, `cairosvg`, `lxml` and `playwright` from PyPI,
+Playwright's Chromium build, the font packages and `lucide-static` from npm for
+`brief-to-slides`, and `@modelcontextprotocol/server-filesystem` from npm for the Claude
+Desktop MCP setup. Those commands name exact versions, and the packages' own dependencies
+resolve when the user installs them. `generate-structured-reports` installs `gaik[report-writer]`,
+and a provider's gaik extra when it is missing, without a version pin. After the user agrees,
+it also downloads Pandoc from its official release through pypandoc. Its `SKILL.md`
+describes both.
+
+**Credentials.** No credential is stored in this plugin. The skills use whatever API key
+the user has set for gaik in their environment or in a local `.env` file, and they send it
+only to the provider it belongs to. The `setup.bat` scripts ask the user for the key and
+write it to a `.env` file on the user's machine. That file stays there and is never part
+of the plugin or the repository.
+
+## Directory review notes
+
+- `skills/brief-to-slides/assets/template.pptx` (391 KiB) and `blank-template.pptx` are
+  the decks the skill builds on, so they stay in the plugin and their review hold is
+  accepted. Without them the skill cannot keep a template's layouts, fonts and theme.
+- The skills ask for no `userConfig` value. The keys are gaik's ordinary environment
+  variables, which gaik also reads outside the agent, and Codex has no `userConfig`.
 
 ## Installing
 
@@ -65,12 +110,13 @@ date as this repository changes.
 
 ## Layout
 
+The root also holds the plugin icon that the Claude and OpenAI directory listings show.
+
 ```text
 agent-skills/   (implementation_layer/no-code-assets/)
 ├── plugin.json          # Agent Plugins v1 manifest
 ├── .claude-plugin/
 │   └── plugin.json      # Claude Code's own manifest; also the directory listing fields
-├── icon.png             # shown in Claude's plugin directory, named by `icon` in that manifest
 ├── LICENSE
 └── skills/
     ├── parsing-documents/

@@ -14,7 +14,7 @@ SOURCE DOCUMENTS USED
    - BOM1.pdf (AL-001)
    - BOM2.pdf (SS-001)
    - BOM3.pdf (CS-001)
-3. Master Price List: price list.xlsx (Effective October 01, 2025)
+3. Master Price List: price_list.xlsx (Effective October 01, 2025)
 
 ================================================================================
 LINE ITEM CALCULATIONS

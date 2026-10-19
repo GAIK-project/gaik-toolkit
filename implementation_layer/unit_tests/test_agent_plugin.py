@@ -131,6 +131,22 @@ def test_skill_frontmatter_follows_the_spec(skill_dir):
     assert len(body.splitlines()) <= 500, "keep SKILL.md under 500 lines; move detail out"
 
 
+def test_gaik_pins_name_the_validated_release():
+    # The skills pin `gaik[...]==X.Y.Z` because plugin directories hold unpinned installs.
+    # A release sets the wizard's validated version first; this fails until the pins follow.
+    validated = _read(
+        REPO_ROOT / "implementation_layer" / "solution_wizard" / "gaik_validated_version.txt"
+    ).strip()
+    stale = []
+    for path in sorted((PLUGIN_DIR / "skills").rglob("*")):
+        if path.suffix not in {".md", ".bat", ".sh", ".py"}:
+            continue
+        for version in re.findall(r"gaik\[[\w,-]+\]==([\w.]+)", _read(path)):
+            if version != validated:
+                stale.append(f"{path.relative_to(PLUGIN_DIR).as_posix()}: {version}")
+    assert not stale, f"pin these to gaik {validated}: {stale}"
+
+
 @pytest.mark.parametrize("path", SKILL_FILES, ids=lambda p: p.relative_to(PLUGIN_DIR).as_posix())
 def test_referenced_files_exist(path):
     skill_dir = PLUGIN_DIR / "skills" / path.relative_to(PLUGIN_DIR / "skills").parts[0]

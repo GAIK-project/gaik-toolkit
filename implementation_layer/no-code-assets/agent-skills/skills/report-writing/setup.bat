@@ -37,7 +37,7 @@ python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Python is not installed or not in PATH.
     echo.
-    echo Please install Python 3.8+ from https://www.python.org/downloads/
+    echo Please install Python 3.11+ from https://www.python.org/downloads/
     echo Make sure to check "Add Python to PATH" during installation.
     echo.
     pause
@@ -75,15 +75,15 @@ if %errorlevel% neq 0 (
 echo.
 echo [Step 3/6] Installing Python dependencies...
 echo ----------------------------------------------------------------------------
-echo Installing: fastmcp, gaik[transcriber], python-dotenv
+echo Installing: mcp==1.30.0, gaik[transcriber]==0.8.4, python-dotenv==1.2.4
 echo This may take a few minutes...
 echo.
 
-pip install fastmcp "gaik[transcriber]" python-dotenv --quiet
+pip install mcp==1.30.0 "gaik[transcriber]==0.8.4" python-dotenv==1.2.4 --quiet
 
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install dependencies.
-    echo Please try running: pip install fastmcp "gaik[transcriber]" python-dotenv
+    echo Please try running: pip install mcp==1.30.0 "gaik[transcriber]==0.8.4" python-dotenv==1.2.4
     pause
     exit /b 1
 )
@@ -216,7 +216,7 @@ echo     "filesystem": {
 echo       "command": "npx",
 echo       "args": [
 echo         "-y",
-echo         "@modelcontextprotocol/server-filesystem",
+echo         "@modelcontextprotocol/server-filesystem@2026.8.31",
 echo         "C:\\"
 echo       ]
 echo     }
