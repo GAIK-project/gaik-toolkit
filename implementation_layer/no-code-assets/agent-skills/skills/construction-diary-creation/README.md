@@ -122,16 +122,18 @@ TYÖMAAPÄIVÄKIRJA
 
 ## Sample Data
 
-Test the skill with included sample audio:
+Sample recordings are kept in the repository, outside the plugin, so that installing
+the plugin does not download audio. Download them from
+[`no-code-assets/samples/construction-diary-creation`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/samples/construction-diary-creation):
 
 | File | Description |
 |------|-------------|
-| `data/fin-example-1.mp3` | Finnish construction diary recording |
-| `data/en-example-1.mp3` | English example (for testing) |
+| `fin-example-1.mp3` | Finnish construction diary recording |
+| `en-example-1.mp3` | English example (for testing) |
 
 **Try it:**
 ```
-Process construction diary from [path-to-folder]\data\fin-example-1.mp3
+Process construction diary from [path-to-download-folder]\fin-example-1.mp3
 ```
 
 ---
@@ -161,7 +163,7 @@ If you prefer manual configuration:
 
 **Install Dependencies:**
 ```bash
-pip install fastmcp gaik[transcriber] python-dotenv
+pip install mcp==1.30.0 "gaik[transcriber]==0.8.4" python-dotenv==1.2.4
 ```
 
 **Configure API Key:**
@@ -203,10 +205,7 @@ construction-diary-creation/
 ├── SKILL.md                       # Skill definition: extraction workflow & field specifications
 ├── transcription-MCP/             # Audio transcription MCP server
 │   ├── server.py                  # FastMCP server implementation
-│   └── .env                       # API credentials
-└── data/                          # Sample audio files
-    ├── fin-example-1.mp3
-    └── en-example-1.mp3
+│   └── .env                       # API credentials (created by setup.bat, never committed)
 ```
 
 ### How It Works
@@ -221,7 +220,7 @@ construction-diary-creation/
 
 ### Dependencies
 
-- **Python packages:** `fastmcp`, `gaik[transcriber]`, `python-dotenv`
+- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.8.4`, `python-dotenv==1.2.4`
 - **External APIs:** OpenAI Whisper API (for audio transcription)
 
 ## Getting Help
@@ -235,6 +234,6 @@ construction-diary-creation/
 ## License & Attribution
 
 This skill is part of the GAIK toolkit. Built using:
-- [FastMCP](https://github.com/jlowin/fastmcp) - MCP server framework
-- [GAIK](https://github.com/umairalimran/gaik) - Audio transcription library
+- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) - MCP server framework (its `FastMCP` API, `mcp` 1.x)
+- [GAIK](https://github.com/GAIK-project/gaik-toolkit) - Audio transcription library (`gaik` on PyPI)
 - OpenAI Whisper API - Speech-to-text transcription

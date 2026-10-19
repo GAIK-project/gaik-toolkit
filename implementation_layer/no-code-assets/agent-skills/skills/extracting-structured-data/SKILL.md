@@ -16,8 +16,8 @@ description: >-
 # Extracting structured data with gaik
 
 ```bash
-pip install "gaik[extract]"
-pip install "gaik[vision-extract]"   # PDF/image extraction
+pip install "gaik[extract]==0.8.4"
+pip install "gaik[vision-extract]==0.8.4"   # PDF/image extraction
 # Add llm-google for shared Google/Vertex configs, or llm-litellm for LiteLLM.
 ```
 
@@ -70,7 +70,7 @@ The modules accept stage configs so transcription can stay on a supported audio 
 while text extraction uses Aitta or another chat provider:
 
 ```bash
-pip install "gaik[audio-to-structured-data,documents-to-structured-data]"
+pip install "gaik[audio-to-structured-data,documents-to-structured-data]==0.8.4"
 ```
 
 ```python

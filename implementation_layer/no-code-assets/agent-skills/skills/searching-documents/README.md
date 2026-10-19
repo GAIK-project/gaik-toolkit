@@ -39,7 +39,7 @@ with Hit@K.
 
 ## Needs
 
-Postgres with pgvector, `pip install "gaik[pg-vector-store,embedder,ranker]"`, and
+Postgres with pgvector, `pip install "gaik[pg-vector-store,embedder,ranker]==0.8.4"`, and
 `gaik[finnish-rag]` for Finnish. Embeddings need a provider key.
 
 Install the skill with the [gaik-toolkit plugin](../../README.md#installing).

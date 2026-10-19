@@ -95,7 +95,7 @@ If you prefer to set things up yourself:
 
 Open Command Prompt and run:
 ```
-pip install fastmcp gaik[transcriber] python-dotenv
+pip install mcp==1.30.0 "gaik[transcriber]==0.8.4" python-dotenv==1.2.4
 ```
 
 **Step 2: Configure API Key**
@@ -130,7 +130,7 @@ Open `%APPDATA%\Claude\claude_desktop_config.json` and add:
     },
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "C:\\"]
     }
   }
 }
@@ -384,6 +384,6 @@ report-writing/
 
 ### Dependencies
 
-- **Python packages:** `fastmcp`, `gaik[transcriber]`, `python-dotenv`
-- **Node.js packages:** `@modelcontextprotocol/server-filesystem`
+- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.8.4`, `python-dotenv==1.2.4`
+- **Node.js packages:** `@modelcontextprotocol/server-filesystem@2026.8.31`
 - **External APIs:** OpenAI Whisper API (for audio transcription)

@@ -1,7 +1,7 @@
 {
   "plugin": {
     "name": "gaik-toolkit",
-    "version": "0.5.1",
+    "version": "0.6.0",
     "marketplace": "GAIK-project/gaik-toolkit",
     "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills"
   },
@@ -25,7 +25,7 @@
       ],
       "kit": {
         "zip": "/downloads/skills/incident-report-writing-setup-kit.zip",
-        "zipBytes": 38782
+        "zipBytes": 39312
       },
       "tryPrompt": "Use the incident-report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing) to turn my audio recording into an incident report. I will attach the file next.",
       "files": [
@@ -55,7 +55,7 @@
       ],
       "kit": {
         "zip": "/downloads/skills/construction-diary-creation-setup-kit.zip",
-        "zipBytes": 36951
+        "zipBytes": 37484
       },
       "tryPrompt": "Use the construction-diary-creation skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation) to create today's Työmaapäiväkirja from my site recording. I will attach the audio next.",
       "files": [
@@ -117,7 +117,7 @@
       ],
       "kit": {
         "zip": "/downloads/skills/report-writing-setup-kit.zip",
-        "zipBytes": 73839
+        "zipBytes": 73961
       },
       "tryPrompt": "Use the report-writing skill (https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing) to write a report from the materials I am about to attach. Infer the sections from the content.",
       "files": [
@@ -173,7 +173,7 @@
         "scripts/setup_env.sh"
       ],
       "zip": "/downloads/skills/brief-to-slides.zip",
-      "zipBytes": 537893,
+      "zipBytes": 537964,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/brief-to-slides",
       "guideUrl": null
     },
@@ -197,7 +197,7 @@
         "references/parser-selection.md"
       ],
       "zip": "/downloads/skills/parsing-documents.zip",
-      "zipBytes": 18678,
+      "zipBytes": 18699,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/parsing-documents",
       "guideUrl": null
     },
@@ -221,7 +221,7 @@
         "references/measuring-extraction.md"
       ],
       "zip": "/downloads/skills/extracting-structured-data.zip",
-      "zipBytes": 22313,
+      "zipBytes": 22341,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/extracting-structured-data",
       "guideUrl": null
     },
@@ -247,7 +247,7 @@
         "references/postgres-without-gaik.md"
       ],
       "zip": "/downloads/skills/searching-documents.zip",
-      "zipBytes": 41999,
+      "zipBytes": 42020,
       "githubUrl": "https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/searching-documents",
       "guideUrl": null
     },

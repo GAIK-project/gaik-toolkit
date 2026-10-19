@@ -6,14 +6,15 @@
 # and poppler (pdftoppm) on PATH.
 set -uo pipefail
 CACHE="$HOME/.cache/brief-to-slides"; mkdir -p "$CACHE" "$HOME/.fonts"
+PY_PKGS="python-pptx==1.0.2 pillow==12.3.0 cairosvg==2.9.1 lxml==6.1.3"
 PY=python3; "$PY" -c "" 2>/dev/null || PY=python   # python3 may be missing or a Windows Store stub
-"$PY" -c "import pptx, PIL, cairosvg, lxml" 2>/dev/null || "$PY" -m pip install --quiet --break-system-packages python-pptx pillow cairosvg lxml 2>/dev/null || "$PY" -m pip install --quiet python-pptx pillow cairosvg lxml
-"$PY" -c "import playwright" 2>/dev/null || "$PY" -m pip install --quiet --break-system-packages playwright 2>/dev/null || "$PY" -m pip install --quiet playwright
+"$PY" -c "import pptx, PIL, cairosvg, lxml" 2>/dev/null || "$PY" -m pip install --quiet --break-system-packages $PY_PKGS 2>/dev/null || "$PY" -m pip install --quiet $PY_PKGS
+"$PY" -c "import playwright" 2>/dev/null || "$PY" -m pip install --quiet --break-system-packages playwright==1.64.0 2>/dev/null || "$PY" -m pip install --quiet playwright==1.64.0
 "$PY" -m playwright install chromium >/dev/null 2>&1 || echo "CHROMIUM MISSING: check_deck.py --preview needs it (python -m playwright install chromium)"
 cd "$CACHE"
 [ -f package.json ] || npm init -y >/dev/null 2>&1
 # Google Fonts as TTF via npm (GitHub raw downloads are often blocked in sandboxes)
-npm install --silent @expo-google-fonts/montserrat @expo-google-fonts/ibm-plex-sans @expo-google-fonts/ibm-plex-mono @expo-google-fonts/source-serif-4 lucide-static >/dev/null 2>&1
+npm install --silent @expo-google-fonts/montserrat@0.4.2 @expo-google-fonts/ibm-plex-sans@0.4.1 @expo-google-fonts/ibm-plex-mono@0.4.1 @expo-google-fonts/source-serif-4@0.4.2 lucide-static@1.59.0 >/dev/null 2>&1
 find node_modules/@expo-google-fonts -name '*.ttf' -exec cp -n {} "$HOME/.fonts/" \; 2>/dev/null
 if command -v fc-match >/dev/null; then
   fc-cache -f >/dev/null 2>&1

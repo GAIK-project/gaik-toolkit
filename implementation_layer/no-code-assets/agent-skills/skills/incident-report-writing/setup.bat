@@ -61,15 +61,15 @@ echo [OK] Python %PYTHON_VERSION% found.
 echo.
 echo [Step 2/5] Installing Python dependencies...
 echo ----------------------------------------------------------------------------
-echo Installing: fastmcp, gaik[transcriber], python-dotenv
+echo Installing: mcp==1.30.0, gaik[transcriber]==0.8.4, python-dotenv==1.2.4
 echo This may take a few minutes...
 echo.
 
-pip install fastmcp "gaik[transcriber]" python-dotenv --quiet
+pip install mcp==1.30.0 "gaik[transcriber]==0.8.4" python-dotenv==1.2.4 --quiet
 
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install dependencies.
-    echo Please try running: pip install fastmcp "gaik[transcriber]" python-dotenv
+    echo Please try running: pip install mcp==1.30.0 "gaik[transcriber]==0.8.4" python-dotenv==1.2.4
     pause
     exit /b 1
 )
@@ -278,7 +278,8 @@ echo    In Claude Desktop, try:
 echo    "Process incident report from C:\path\to\your\audio-file.mp3"
 echo.
 echo    Example with sample data:
-echo    "Process incident report from %SCRIPT_DIR%data\Sample_1.m4a"
+echo    Download a sample from https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/samples/incident-report-writing
+echo    and try: "Process incident report from C:\path\to\downloads\Sample_1.m4a"
 echo.
 echo ============================================================================
 echo.

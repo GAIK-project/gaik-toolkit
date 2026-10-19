@@ -18,7 +18,8 @@ This skill helps you **process purchase orders** and generate complete sales ord
 
 ---
 
-<img src="images/PO-skill.png" alt="Purchase Order Processing Workflow" width="70%">
+![Purchase Order Processing Workflow](images/PO-skill.png)
+
 ---
 
 ### Example Use Cases
@@ -68,7 +69,7 @@ Before setting up, please install:
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\"]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem@2026.8.31", "C:\\"]
     }
   }
 }
@@ -288,9 +289,12 @@ Include these fields for accurate fee calculations:
 
 ## Sample Data for Testing
 
-A `sample_data/` folder with example files is added to help you test the skill.
+Sample files are kept in the repository, outside the plugin, so that installing the plugin
+does not download PDFs and Office files. Download
+[`no-code-assets/samples/purchase-order-processing`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/samples/purchase-order-processing):
+`sample_data/` holds a purchase order, three BOMs, a price list and a sample sales order, and
+`example_output/` holds the sales order and calculation breakdown the skill produced from them.
 
-The output for the sample data is in the `output/` folder (`output_report.docx` and `calculation_breakdown.txt`).
 ---
 
 ## Important Requirements
