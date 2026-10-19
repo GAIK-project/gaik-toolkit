@@ -15,10 +15,6 @@ memory:
 3. **Synthesize**: each section is written from its own facts only, then checked by a reviewer
    model; a summary is written from the sections it depends on.
 
-It runs through a Python helper in `scripts/`, so it needs an agent that can execute code and
-a machine where `gaik` is installed. See [Where it runs](#where-it-runs). Where the agent cannot
-run code, use the [`report-writing`](../report-writing) skill instead.
-
 ## Use it when
 
 - a report must be written from source material and every statement must trace to a source;
@@ -88,35 +84,6 @@ source, and unresolved conflicts between sources are stated in the text.
   instructions and sections), saved in your template library, outside the run folder, only if you
   agree, and never with sources, facts or keys. See [Template library](#template-library).
 
-## Template library
-
-When you give no template, the agent searches your template library for one that fits your
-request, shows what it found, and asks whether to use it. A library template is only a draft:
-you review its sections in the chat like any other structure. When you finish a structure that
-is new, the agent offers to save it, shows exactly what would be saved, and writes it **only if
-you agree**.
-
-## Where it runs
-
-The skill is a set of instructions plus a Python helper. The agent follows the instructions and
-the helper does the work, so the agent must be able to **run Python on a machine that has `gaik`
-installed and your provider's API key in its environment**, with network access to the provider.
-
-**Recommended: run it in Claude Desktop's Claude Code section.** Before running the skill, set
-the API keys on your computer as environment variables (for example in PowerShell with the
-`setx` command, see [Setting the keys as environment variables](#setting-the-keys-as-environment-variables)).
-Claude Desktop's Claude Code section then reads those keys from the environment, and you never
-type a key into the chat.
-
-| Where you run it | Keys | Status |
-|---|---|---|
-| **Claude Code**: Claude Desktop's Claude Code section, the Claude Code CLI, or VS Code with the Claude Code plugin | Read from environment variables saved on your computer (safer) | Recommended. Tested end to end in the CLI |
-| **Codex**: the ChatGPT app, or the Codex plugin in VS Code | Read from environment variables saved on your computer (safer) | Runs end to end. Tested in the CLI |
-| **Claude Desktop chat, claude.ai chat, claude.ai's Claude Code** | Cannot read environment variables: the keys must be typed directly into the chat | Can run the skill, but unsafe and not recommended. Not tested |
-
-Where the agent cannot run code at all, use the [`report-writing`](../report-writing) skill
-instead. It has Claude write the report itself, without the quote checks.
-
 ## Installing the skill
 For **Running in Claude Desktop --> Claude Code**:
 
@@ -125,9 +92,12 @@ For **Running in Claude Desktop --> Claude Code**:
    `generate-structured-reports` folder yourself with `SKILL.md` directly inside it.
 2. Open **Customize → Skills → Add → Upload skill** and choose the `.zip`.
 
-For running with **Claude Code in VS Code or CLI**, save the skill folder in ~/.claude/skills at user or project level. 
+For running with **Claude Code in VS Code, or CLI**, save the skill folder in ~/.claude/skills at user or project level. 
 
 For running with **Codex (ChatGPT Codex, CLI, or Codex plugin in VS Code)**, save the skill folder in ~/.agents/skills at user or project level. 
+
+Before running the skill, set the API keys on your computer as environment variables (for example in PowerShell with the
+`setx` command, see [Setting the keys as environment variables](#setting-the-keys-as-environment-variables)).
 
 Then, the skill can be invoked as follows:
 
@@ -244,117 +214,6 @@ setx GAIK_REPORT_REVIEWER_MODEL "reviewer_model_name"
   "reviewer": "reviewer_model_name"
 }
 ```
-
-The config JSON has no provider field: the provider is always `LLM_PROVIDER`, or the provider
-the agent is told to use for the run.
-
-How a model is chosen, for each of the three steps:
-
-1. the report spec's `models` entry, if it has one;
-2. else the variable in the table, if it is set;
-3. else the default for the provider in the table above;
-4. else, for a provider without a default, the model configured for it.
-
-So:
-
-- A model name means something only to the provider the run uses, and a run uses a single
-  provider for every step. The defaults follow the provider you choose, so changing
-  `LLM_PROVIDER` also changes the default models.
-- On Azure OpenAI and Anthropic on Azure Foundry the names are your **deployment names**, so a
-  deployment must exist for each.
-- `OPENAI_MODEL`, `AZURE_DEPLOYMENT`, `ANTHROPIC_MODEL` and `GOOGLE_MODEL` do not set these three
-  steps; use the variables above.
-- Changing a model marks the stage that used it as not current, and the agent reruns it.
-
-**Reasoning effort** is not set by the skill: nothing is passed, so each model runs at its own
-default. If your model supports it, set it per step in the report's config JSON:
-
-```json
-"settings": {
-  "writer": {"reasoning_effort": "high"},
-  "reviewer": {"reasoning_effort": "low"}
-}
-```
-
-The curator has its own `curator` entry. Set it only for models that support it: the levels a
-model accepts depend on the model, and a model that does not accept the setting rejects the
-request, which stops the stage. gaik maps the setting for Anthropic models that take an effort
-and drops it for Google models.
-- `preflight` with `--check-provider` prints the provider and the model each step will use,
-  and the run record keeps what each stage ran with.
-
-### Alternative: a `.env` file
-
-Put the variables of the provider you use in a `.env` file. This skeleton lists them by name;
-fill in one provider's block, leave the others out, and never commit the file:
-
-```dotenv
-# Which provider the run uses: openai, azure, anthropic, anthropic_foundry or google.
-# Leave it out to use openai.
-LLM_PROVIDER=
-
-# Optional model names for the three steps; the defaults are in the README.
-GAIK_REPORT_CURATOR_MODEL=
-GAIK_REPORT_WRITER_MODEL=
-GAIK_REPORT_REVIEWER_MODEL=
-
-# --- OpenAI ---------------------------------------------------------------
-OPENAI_API_KEY=
-# Optional
-OPENAI_MODEL=
-OPENAI_TRANSCRIPTION_MODEL=
-
-# --- Azure OpenAI ---------------------------------------------------------
-AZURE_API_KEY=
-AZURE_ENDPOINT=
-# Optional
-AZURE_DEPLOYMENT=
-AZURE_TRANSCRIPTION_MODEL=
-
-# --- Anthropic ------------------------------------------------------------
-ANTHROPIC_API_KEY=
-# Optional
-ANTHROPIC_MODEL=
-
-# --- Anthropic on Azure Foundry -------------------------------------------
-ANTHROPIC_FOUNDRY_API_KEY=       # or AZURE_API_KEY
-ANTHROPIC_FOUNDRY_RESOURCE=
-# Optional
-# ANTHROPIC_MODEL=
-
-# --- Google ---------------------------------------------------------------
-GOOGLE_API_KEY=                  # or GEMINI_API_KEY
-# Optional
-GOOGLE_MODEL=
-```
-
-The helper reads environment variables, so load the file into the shell that starts the agent
-(gaik may not find a `.env` on its own when it is installed with pip):
-
-```bash
-set -a; source .env; set +a       # macOS, Linux, Git Bash
-```
-
-```powershell
-Get-Content .env | Where-Object { $_ -match '^\s*[^#\s][^=]*=' } | ForEach-Object {
-  $name, $value = $_ -split '=', 2
-  Set-Item "env:$($name.Trim())" ($value -replace '\s+#.*$', '').Trim()
-}                                  # Windows PowerShell
-```
-
-The empty values are placeholders. Delete the blocks of providers you do not use and every
-optional line you leave blank: some optional variables, such as the model names, would otherwise
-be read as an empty value instead of the provider's default.
-
-Limits that depend on the provider:
-
-- **Recordings and video** are transcribed with the provider of the whole run, which must be
-  `openai` or `azure`. With another provider, give a transcript instead.
-- **Images** are described by the run's model, which must accept images.
-- **Model names** (the variables or the spec's `models` section) must be names your provider
-  knows; see [Changing the provider and the models](#changing-the-provider-and-the-models).
-- The helper checks the provider before spending anything: `preflight` with `--check-provider`
-  loads the configuration without a model call.
 
 ## Files
 
