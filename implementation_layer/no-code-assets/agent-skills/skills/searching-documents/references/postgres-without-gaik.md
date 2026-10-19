@@ -2,7 +2,10 @@
 
 Read this when building hybrid search in a TypeScript or other non-Python app, when an
 embedding has more than 2,000 dimensions, or when writing the SQL by hand. The design is the
-one `PgVectorStore` implements; this is its shape in plain Postgres.
+one `PgVectorStore` implements; this is its shape in plain Postgres. The names here
+(`documents`, `chunks`, `fts`) are this schema's own: `PgVectorStore` keeps chunks in one
+table (`documents` by default) with a `text_search` column, so adapt the health queries
+before running them on a gaik table.
 
 ## Contents
 - Schema

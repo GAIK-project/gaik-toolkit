@@ -10,7 +10,6 @@ import copy
 import os
 import zipfile
 from lxml import etree
-from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE, MSO_CONNECTOR
@@ -175,7 +174,7 @@ def _template_notes_sps(template):
 
 def build(slides, out, template, theme=None):
     th = resolve_theme(theme)
-    prs = Presentation(template)
+    prs = open_presentation(template)
     lst = prs.slides._sldIdLst
     for sldId in list(lst):
         prs.part.drop_rel(sldId.rId); lst.remove(sldId)
@@ -183,6 +182,10 @@ def build(slides, out, template, theme=None):
         if rel.reltype.endswith('/slide'):
             prs.part.drop_rel(rId)
     layouts = [l for l in prs.slide_layouts if l.name == th['layout']]
+    if not layouts:
+        names = ', '.join(repr(l.name) for l in prs.slide_layouts)
+        print(f'WARNING: no layout named {th["layout"]!r} in the template; using '
+              f'{prs.slide_layouts[0].name!r}. Set THEME["layout"] to one of: {names}')
     layout = layouts[0] if layouts else prs.slide_layouts[0]
     note_sps = _template_notes_sps(template)
     for n, sd in enumerate(slides, 1):

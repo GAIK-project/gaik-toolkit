@@ -9,8 +9,8 @@ description: >-
   notes and per-slide timing for a deck. Also use to make targeted changes to a deck this
   skill produced.
 compatibility: >-
-  Needs Python 3, npm, LibreOffice and poppler to build the deck and render previews;
-  scripts/setup_env.sh installs the rest. Intake questions use AskUserQuestion where the
+  Needs Python 3, npm, bash, LibreOffice and poppler to build the deck and render previews,
+  and fontconfig for exact text measurement; scripts/setup_env.sh installs the rest. Intake questions use AskUserQuestion where the
   client has it and are asked in plain text otherwise.
 ---
 
@@ -96,8 +96,11 @@ first: it is the full brief applied when the user gives only the three required 
    - None given: use `assets/blank-template.pptx` with the default THEME.
    - Given: copy it; run `python scripts/inspect_template.py T.pptx --render tmpl_preview`;
      look at the contact sheet; write a `THEME` override (layout name, colours, kicker/title/
-     source/page-number boxes, title background, logos the user supplied) and map the palette
-     roles in references/design-system.md to its colours/fonts. Install missing fonts.
+     source/page-number boxes, title background, logos the user supplied; `fonts` lists the
+     families for the Slides deck). `THEME` styles only those recurring parts: the helpers
+     (`card`, `banner`, `chip`, `table`, …) take the palette in `dsl.py` as default
+     arguments, so map the palette roles in references/design-system.md to the template's
+     colours in your spec and pass them as `color=`/`fill=`. Install missing fonts.
 4. **Sources.** Read all provided material first (every file in `sources.json`, every link;
    report any that fail) and keep a source ledger (claim → source →
    page/section/URL). *Strict:* no web search; list gaps. *Extended:* research online (official
@@ -112,6 +115,8 @@ first: it is the full brief applied when the user gives only the three required 
    els, minutes, notes, source), `TITLE`, `SECTIONS`, `THEME`. Use the DSL and helpers in
    `scripts/dsl.py`; size every text box with `text_h()`. Write notes per
    references/speaker-notes.md (activities need instructions, timing, sample answer, debrief).
+   Start each timed slide's notes with its minutes, e.g. `[3 min]`: `check_deck.py` adds up
+   those prefixes, and `build.py` warns when one differs from the slide's `minutes`.
 7. **Build.** `python scripts/build.py spec.py --template T --out deck.pptx --preview preview.html`
 8. **Check.** `python scripts/check_deck.py --pptx deck.pptx --minutes N --preview preview.html
    --forbid "<old template text>"` must print OK. Then

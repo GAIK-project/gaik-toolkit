@@ -1,5 +1,7 @@
 """MCP Server for GAIK Transcriber"""
 
+import os
+import re
 import sys
 from pathlib import Path
 
@@ -11,6 +13,28 @@ load_dotenv(Path(__file__).with_name(".env"))
 
 # Initialize MCP server
 mcp = FastMCP("gaik-transcriber")
+
+
+def _api_config() -> dict:
+    """OpenAI or Azure OpenAI settings, as setup.bat wrote them to .env."""
+    use_azure = os.getenv("OPENAI_API_TYPE", "").strip().lower() == "azure" or (
+        not os.getenv("OPENAI_API_KEY") and bool(os.getenv("AZURE_API_KEY"))
+    )
+    config = get_openai_config(use_azure=use_azure)
+    if use_azure and not os.getenv("AZURE_TRANSCRIPTION_MODEL") and os.getenv("AZURE_DEPLOYMENT"):
+        # Older setups saved the transcription deployment as AZURE_DEPLOYMENT.
+        config["transcription_model"] = os.environ["AZURE_DEPLOYMENT"]
+    return config
+
+
+def _local_path(file_path: str) -> Path:
+    """Turn a WSL-style path (/mnt/c/...) into the Windows path the server can open."""
+    path = file_path.strip().strip('"')
+    match = re.match(r"^/mnt/([a-zA-Z])/(.*)$", path)
+    if match and os.name == "nt":
+        drive, rest = match.groups()
+        return Path(f"{drive.upper()}:/{rest}")
+    return Path(path)
 
 
 @mcp.tool()
@@ -35,14 +59,14 @@ def transcribe_audio(file_path: str, enhanced: bool = False) -> str:
     =====================================
 
     Args:
-        file_path: Full Windows path to audio/video file
+        file_path: Full Windows path to audio/video file (a /mnt/c/... path is converted)
         enhanced: If True, return enhanced transcript (default: False)
 
     Returns:
         The exact transcription text - output this verbatim with no changes.
     """
     try:
-        config = get_openai_config(use_azure=False)
+        config = _api_config()
 
         transcriber = Transcriber(
             api_config=config,
@@ -50,7 +74,7 @@ def transcribe_audio(file_path: str, enhanced: bool = False) -> str:
         )
 
         result = transcriber.transcribe(
-            file_path=Path(file_path),
+            file_path=_local_path(file_path),
             custom_context="",
         )
 

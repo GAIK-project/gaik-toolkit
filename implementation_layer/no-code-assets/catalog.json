@@ -12,7 +12,7 @@
       "output": "Word (.docx)",
       "needs": ["gaik-transcriber MCP server"],
       "setup": [
-        "Windows only. Needs Python 3.8+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
+        "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
         "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
@@ -31,7 +31,7 @@
       "output": "Word (.docx)",
       "needs": ["gaik-transcriber MCP server"],
       "setup": [
-        "Windows only. Needs Python 3.8+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
+        "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
         "Download the setup kit, unzip it and run setup.bat. It installs the transcriber, saves your key and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
@@ -66,13 +66,24 @@
       "output": "Word (.docx)",
       "needs": ["Filesystem MCP server", "gaik-transcriber MCP server"],
       "setup": [
-        "Windows only. Needs Python 3.8+, Node.js and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so recordings are transcribed with Whisper first.",
+        "Windows only. Needs Python 3.11+, Node.js and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so recordings are transcribed with Whisper first.",
         "Download the setup kit, unzip it and run setup.bat. It installs the transcriber and the file access server, saves your key and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
         "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
       ],
       "kit": true,
       "tryPrompt": "Use the report-writing skill ({url}) to write a report from the materials I am about to attach. Infer the sections from the content."
+    },
+    {
+      "id": "brief-to-slides",
+      "group": "no-code",
+      "path": "agent-skills/skills/brief-to-slides",
+      "title": "Brief to slides",
+      "tagline": "Turn a topic, an audience and a length into an editable slide deck with speaker notes.",
+      "input": "Topic, audience and length; optional source files and template",
+      "output": "PowerPoint (.pptx)",
+      "needs": ["code execution (Python, bash)", "LibreOffice and poppler for previews"],
+      "tryPrompt": "Use the brief-to-slides skill ({url}) to make a 20-minute slide deck with speaker notes. I will tell you the topic and the audience next."
     },
     {
       "id": "parsing-documents",

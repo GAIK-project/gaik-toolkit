@@ -105,9 +105,11 @@ the path for `PgVectorStore`.
 Fuse the two lists yourself instead of calling `store.search_hybrid()`:
 
 - the semantic list keeps its cosine similarities, which the relevance gate needs —
-  `search_hybrid()` returns only RRF scores;
-- `expose_ranks=True` writes `rank_semantic` and `rank_keyword` into every hit's metadata,
-  so an arm that contributes nothing shows up per result;
+  through gaik 0.8.3 `search_hybrid()` returns only RRF scores;
+- `expose_ranks=True` writes `rank_<arm>` (`rank_semantic`, `rank_keyword`) for each arm
+  that returned the hit, plus `rrf_score`, so an arm that contributes nothing shows up per
+  result. A hit only one arm found has only that arm's rank: read it with
+  `hit.metadata.get("rank_keyword")`;
 - through gaik 0.7.2 `search_hybrid()` ignores `tsquery_mode` and always parses in
   `websearch` mode, which ANDs every term, and `search_hybrid_weighted()` fails on every
   call with `column reference "id" is ambiguous`.
@@ -119,8 +121,9 @@ hit's metadata, so one call is enough when the ranks it returns are all you need
 reached 33.7% recall@15, equal weights at k=60 scored 8.7 points below vectors weighted 3×
 at k=20 (`Ranker(rrf_k=...)` sets k).
 
-**`embedding_dim` must equal the model's output, and at most 2,000.** `setup()` builds an
-HNSW index on `vector(N)`, which pgvector refuses above 2,000 dimensions. Without `model=`,
+**`embedding_dim` must equal the model's output, and at most 2,000.** The HNSW index on
+`vector(N)` takes at most 2,000 dimensions; from gaik 0.8.4 `PgVectorStore(...)` raises
+`ValueError` at construction above that, and older versions failed in `setup()`. Without `model=`,
 `Embedder` falls back to a default that depends on the config helper, and two of them
 are too large: `get_openai_config()` gives `text-embedding-3-large` (3,072) and
 `get_llm_config("google")` or `"vertex"` gives `gemini-embedding-001` (3,072).

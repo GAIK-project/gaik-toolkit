@@ -262,7 +262,7 @@ The skill is highly customizable. Edit files in the `reference/` folder to match
 Include these fields for accurate fee calculations:
 - `Cutting_Required`, `Testing_Lots_Required`, `Certificates_Required`
 - If not specified: Cutting defaults to 0, Testing to 1 lot, Certs to 1
-- See `reference/BOM_TEMPLATE_WITH_FEES.md` for template
+- See the fee fields in `reference/EXTRACTION_FIELDS.md` ("Fee Calculation Fields")
 
 ### Price List (Required)
 **Required columns:** Type/Part Designation, Unit Price
@@ -290,7 +290,7 @@ Include these fields for accurate fee calculations:
 
 A `sample_data/` folder with example files is added to help you test the skill.
 
-The output for the sample data can be found in `output` folder.
+The output for the sample data is in the `output/` folder (`output_report.docx` and `calculation_breakdown.txt`).
 ---
 
 ## Important Requirements

@@ -63,7 +63,7 @@ If you must run a command on Windows, prefer **PowerShell**.
 
 3) **When calling gaik-transcriber, prefer Windows drive-letter paths on Windows**
 Pass file paths like `C:\Users\...\recording.m4a`.
-If you only have a POSIX/WSL path (e.g., `/mnt/c/...`), convert it to a Windows path before calling the transcriber, or rely on the transcriber server's internal normalization (recommended).
+If you only have a POSIX/WSL path (e.g., `/mnt/c/...`), convert it to a Windows path before calling the transcriber; the transcriber server also converts `/mnt/<drive>/...` paths itself.
 
 4) **Never assume the environment is Linux**
 Treat the runtime as OS-ambiguous and enforce the above rules to stay stable.

@@ -87,7 +87,8 @@ must not discard the whole document. Those are two different rules.
 from gaik.software_components.evaluators import ExtractionEvaluator
 
 result = ExtractionEvaluator().evaluate_dataset(dataset, extracted_outputs)
-result.metrics    # precision, recall, f1, hallucination_rate, n_correct/n_expected
+result.aggregate  # precision, recall, f1, hallucination_rate, n_correct/n_expected
+result.per_item   # the same metrics per item, with field verdicts
 ```
 
 `extracted_outputs` is one dict per item **in the same order** as `dataset.items`, and each
@@ -100,9 +101,18 @@ detection, `LLMJudgePanel` for majority vote across judges with an agreement met
 `compare_pairwise` for A/B with position-bias mitigation, and `BatchEvaluationRunner` to
 apply a pipeline over a dataset with `on_error="skip"`.
 
-Note that `on_error="skip"` removes failures from the output. That is convenient for
-getting a run finished and wrong for scoring — reinstate the skipped items as zeros before
-computing a metric, or the average silently rewards crashing.
+With `on_error="skip"` a failed item comes back as `None` at its index in `outputs` and is
+listed in `failures`; `succeeded()` drops it. That is convenient for getting a run finished
+and wrong for scoring — score the failed items as empty extractions rather than leaving
+them out, or the average silently rewards crashing:
+
+```python
+from gaik.software_components.evaluators import BatchEvaluationRunner, ExtractionEvaluator
+
+run = BatchEvaluationRunner(pipeline, on_error="skip").run(dataset)
+outputs = [out if out is not None else {} for out in run.outputs]
+result = ExtractionEvaluator().evaluate_dataset(dataset, outputs)
+```
 
 ## Recording enough to reproduce a number
 
