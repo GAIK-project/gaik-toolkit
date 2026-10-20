@@ -25,8 +25,7 @@ Evaluation methods are organized by:
 | Folder | Evaluates |
 |--------|-----------|
 | [`extraction_eval/`](extraction_eval/README.md) | Structured data extraction |
-| [`transcription_eval/`](transcription_eval/README.md) | Speech transcription: WER/CER, aligned errors, raw vs enhanced chart and QAD-1 findings |
-| [`finnish_dialect_asr/`](finnish_dialect_asr/README.md) | Finnish dialect speech-to-text: an own Whisper large-v3 fine-tune, two dialect tests and a blind meaning judge |
+| [`transcription_eval/`](transcription_eval/README.md) | Speech transcription: WER/CER, aligned errors and raw vs enhanced transcripts; subfolders hold the October 2026 [Finnish ASR benchmark](transcription_eval/finnish_asr_benchmark/README.md) and the [Finnish dialect fine-tune](transcription_eval/finnish_dialect_asr/README.md) |
 | [`translation_eval/`](translation_eval/README.md) | Finnish-to-English translation: BLEU, chrF, TER, cosine and blind LLM-judge error points |
 | [`RAG_eval/`](RAG_eval/README.md) | Retrieval-augmented generation answers |
 | [`report_writing_eval/`](report_writing_eval/README.md) | Report writing |
