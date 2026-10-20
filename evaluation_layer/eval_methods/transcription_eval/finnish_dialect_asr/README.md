@@ -11,7 +11,7 @@ dialect speech. Everything (code, results, figures) is in
 📖 Story: [suomeksi](https://gaik-project.github.io/finnish-asr/story/story.fi.html) ·
 [in English](https://gaik-project.github.io/finnish-asr/story/story.en.html)
 
-![Dialect test word error rate of every model: ours 21.1 %, the best other model 34.7 %, base Whisper 40.4 %](images/dialect-ranking.svg)
+![Dialect test word error rate of every model: our la-murre version 19.7 %, our main model 21.1 %, the best other model 34.7 %, base Whisper 40.4 %](images/dialect-ranking.svg)
 
 ## Results
 
@@ -39,9 +39,14 @@ behind plain Whisper:
 
 ![Blind LLM judges on LA-murre: gpt-4o-transcribe, Gemini 3.5 Flash and base Whisper far behind our fine-tuned models](images/judges.svg)
 
-A variant trained on all 50 SKN municipalities makes slightly fewer meaning errors on LA-murre but more
-word errors on parliament speech, so it is a separate branch
-([`all-skn`](https://huggingface.co/GAIK-project/whisper-large-v3-fi-dialects/tree/all-skn)), not the main model.
+Two variants are separate branches, not the main model, because they make more word errors on
+parliament speech:
+
+- [`la-murre`](https://huggingface.co/GAIK-project/whisper-large-v3-fi-dialects/tree/la-murre):
+  also trained on 56 h of LA-murre interviews from other localities. The best on dialects: SKN
+  19.7 % WER, 11.6 meaning points on LA-murre. Use it for audio that is mostly dialect.
+- [`all-skn`](https://huggingface.co/GAIK-project/whisper-large-v3-fi-dialects/tree/all-skn):
+  trained on all 50 SKN municipalities, 13.1 meaning points on LA-murre.
 
 ## How it was made
 
@@ -62,8 +67,8 @@ Details, every model's numbers, the timestamp variant and the limits:
 Suomen kielen näytteitä, Kotus, via Kielipankki, CC BY 4.0,
 [urn:nbn:fi:lb-2020112937](http://urn.fi/urn:nbn:fi:lb-2020112937). Lauseopin arkiston
 murrekorpus, University of Turku and Kotus, via Kielipankki, CC BY-ND 4.0,
-[urn:nbn:fi:lb-2020112935](http://urn.fi/urn:nbn:fi:lb-2020112935), used for testing only in the
-shared model. FLEURS (Google, CC BY 4.0), VoxPopuli (Meta, CC0). Base model
+[urn:nbn:fi:lb-2020112935](http://urn.fi/urn:nbn:fi:lb-2020112935), used for testing and to train
+the `la-murre` branch (its rewritten texts are not published). FLEURS (Google, CC BY 4.0), VoxPopuli (Meta, CC0). Base model
 [openai/whisper-large-v3](https://huggingface.co/openai/whisper-large-v3), Apache 2.0.
 Developed by Akseli Leskinen ([laguagu](https://github.com/laguagu)), Haaga-Helia University of
 Applied Sciences, GAIK project.

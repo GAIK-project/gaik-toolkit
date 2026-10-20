@@ -81,13 +81,13 @@ under about 2 points as ties. The judge prompts are in
 | Gemini 3.5 Flash | API | 34.7 ¹ | 27.2 ¹ | 5.1 | 11.5 | **1.7** | 28.6 | ≈ $0.15 ² |
 | ElevenLabs Scribe v2 | API | 44.9 | – | **3.3** | **9.1** | 2.2 | 25.4 | $0.22 |
 | Google Chirp 3 | API | 41.3 | – | 4.8 | 11.6 | 3.0 | 25.9 | $0.96 |
-| Finnish-NLP whisper-large-finnish-v3 † | open | 56.6 | – | 7.1 † | 6.6 † | – | 25.8 | own GPU |
-| RASMUS Finnish-ASR-Canary-v2 + KenLM † | open | 47.6 | – | 7.6 † | 7.7 † | – | 28.6 | own GPU |
+| Finnish-NLP whisper-large-finnish-v3 | open | 56.6 | – | 7.1 | 6.6 | – | 25.8 | own GPU |
+| RASMUS Finnish-ASR-Canary-v2 + KenLM | open | 47.6 | – | 7.6 | 7.7 | – | 28.6 | own GPU |
 
 Meaning points on LA-murre: Claude Opus 5.5 on all 583 segments, with the six transcripts of a
 segment judged together (its reference is in dialect, so WER would rank spelling). On the dental
-webinars: the mean of Claude Opus 5.5 and Gemini 3.1 Pro. – = not run. † trained on FLEURS and
-VoxPopuli, so those two numbers are on familiar material. ¹ asked for standard Finnish word forms
+webinars: the mean of Claude Opus 5.5 and Gemini 3.1 Pro. – = not run. The Finnish-NLP and RASMUS
+models were trained on FLEURS and VoxPopuli, so their numbers there are on familiar material. ¹ asked for standard Finnish word forms
 (40.8 % when asked to write as spoken). ² token-priced; 3.5 Flash is no longer on Google's price
 list, so estimated at its successor 3.6 Flash's rate. Other prices are list prices on 15 Oct 2026:
 OpenAI $0.006/min, ElevenLabs $0.22/h, Chirp 3 $0.016/min (first 500 000 min a month). The open
