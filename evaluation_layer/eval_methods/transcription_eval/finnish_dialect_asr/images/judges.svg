@@ -68,9 +68,9 @@
 <rect x="335.0" y="422" width="14" height="14" rx="3" fill="#9aa4ae"/>
 <text x="355.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Whisper large-v3</text>
 <rect x="487.0" y="422" width="14" height="14" rx="3" fill="#2f6fb3"/>
-<text x="507.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Ours, published</text>
-<rect x="632.0" y="422" width="14" height="14" rx="3" fill="#8fb6e0"/>
-<text x="652.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Ours, all of SKN</text>
-<rect x="784.0" y="422" width="14" height="14" rx="3" fill="#1d3f6e"/>
-<text x="804.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Ours, + LA-murre</text>
+<text x="507.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Ours, main model</text>
+<rect x="639.0" y="422" width="14" height="14" rx="3" fill="#8fb6e0"/>
+<text x="659.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Ours, all of SKN</text>
+<rect x="791.0" y="422" width="14" height="14" rx="3" fill="#1d3f6e"/>
+<text x="811.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Ours, + LA-murre</text>
 </svg>

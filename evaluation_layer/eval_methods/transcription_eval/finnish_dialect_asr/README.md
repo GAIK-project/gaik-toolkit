@@ -17,7 +17,7 @@ dialect speech. Everything (code, results, figures) is in
 
 | Model | Dialects (SKN) WER % | Dialects (LA-murre): meaning points | Read (FLEURS) WER % | Parliament (VoxPopuli) WER % |
 |---|--:|--:|--:|--:|
-| **Ours** | **21.1** | **14.2** | 7.6 | 10.8 |
+| **Ours, main model** | **21.1** | **14.2** | 7.6 | 10.8 |
 | Whisper large-v3 | 40.4 | 25.0 | 7.4 | 12.7 |
 | Gemini 3.5 Flash | 34.7 ¹ | 27.2 ¹ | 5.1 | 11.5 |
 | OpenAI gpt-4o-transcribe | 62.5 | 34.2 | 4.0 | 11.4 |
