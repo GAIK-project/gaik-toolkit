@@ -24,8 +24,11 @@ dialect speech. Everything (code, results, figures) is in
 | ElevenLabs Scribe v2 | 44.9 | – | **3.3** | **9.1** |
 | Google Chirp 3 | 41.3 | – | 4.8 | 11.6 |
 
-Lower is better. Meaning points: errors per 100 words found by a blind LLM judge (Claude Opus 5.5,
-583 segments). ¹ asked for standard Finnish.
+Lower is better. WER: wrong, missing and extra words per 100 reference words. Meaning points:
+meaning-error points per 100 reference words from a blind LLM judge (Claude Opus 5.5, 583 segments;
+critical error 10 points, major 5, minor 1; dialect forms, fillers and punctuation are not errors).
+How they are counted: [finnish_asr_benchmark](../finnish_asr_benchmark/README.md#meaning-points).
+¹ asked for standard Finnish.
 
 ![Word error rate of Whisper large-v3, our model, gpt-4o-transcribe and Gemini 3.5 Flash on SKN dialects, FLEURS and VoxPopuli](images/across-sets.svg)
 
@@ -49,7 +52,7 @@ word errors on parliament speech, so it is a separate branch
   municipalities were kept out of training.
 - **Training:** LoRA on Whisper large-v3, about 3 h on one AMD MI250X on LUMI.
 - **Use it for** dialect and older speakers' speech. For standard Finnish full of brand names, plain
-  Whisper large-v3 or an API service is better ([transcription_eval](../transcription_eval/README.md)).
+  Whisper large-v3 or an API service is better ([finnish_asr_benchmark](../finnish_asr_benchmark/README.md)).
 
 Details, every model's numbers, the timestamp variant and the limits:
 [finnish-asr README](https://github.com/GAIK-project/finnish-asr#readme).
