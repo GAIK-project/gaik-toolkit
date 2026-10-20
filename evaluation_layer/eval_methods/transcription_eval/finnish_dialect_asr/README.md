@@ -11,7 +11,7 @@ dialect speech. Everything (code, results, figures) is in
 📖 Story: [suomeksi](https://gaik-project.github.io/finnish-asr/story/story.fi.html) ·
 [in English](https://gaik-project.github.io/finnish-asr/story/story.en.html)
 
-![Dialect test word error rate of every model: ours 21.1 %, the best other model 34.7 %, base Whisper 40.4 %](images/dialect-ranking.svg)
+![Dialect test word error rate of every model: our la-murre version 19.7 %, our main model 21.1 %, the best other model 34.7 %, base Whisper 40.4 %](images/dialect-ranking.svg)
 
 ## Results
 
