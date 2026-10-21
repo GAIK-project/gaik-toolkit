@@ -181,6 +181,20 @@ points: HY's text favoured WhisperX output. The best set-ups now sit within abou
 one 408-word clip cannot separate. Only the disputed spans were checked; the judges' scores above
 were not re-run.
 
+**Re-check (21 Oct 2026).** The seven API set-ups were run again with the same settings, and 33
+transcripts were scored with a separate normaliser that splits hyphenated words, so its numbers sit
+a few tenths from the tables above. Four findings:
+
+- Every WhisperX or Finnish-NLP set-up, and HY's 2025 Whisper run, scores 2.1–3.0 points worse
+  against the reviewed text; no other set-up loses more than 1.5.
+- The review did not favour the seven systems that picked the spans, four of them OpenAI's: fresh
+  OpenAI runs move by −0.4 to +1.5 points, and ElevenLabs, which was not among them, gains most (−3.3).
+- One run per model cannot rank them: against the reviewed text gpt-4o-transcribe scored 16.0 % in
+  the earlier run and 20.3 % now, and Gemini 3.1 Pro 20.1 % and 12.1 %.
+- Leaving out the 15 reference words the review changed, the Finnish-NLP model (9.9 %) and HY's
+  WhisperX run (10.2 %) still score lowest. The unchecked rest of the reference may still follow
+  WhisperX's wording, or the model may be that good; WER alone cannot tell which.
+
 **Fine-tuning on open data does not fix webinar speech.** A LoRA fine-tune of Whisper
 large-v3 on the FLEURS and VoxPopuli training sets (10 208 recordings, 51 minutes on one
 GPU) improved both public sets but raised WER on the Ajokortti clip from 14.7 % to 17.9 %;
