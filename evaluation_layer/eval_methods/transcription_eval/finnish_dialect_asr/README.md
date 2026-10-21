@@ -35,15 +35,15 @@ How they are counted: [finnish_asr_benchmark](../finnish_asr_benchmark/README.md
 
 A second dialect corpus (LA-murre, 10 localities no model was trained on) has dialect-spelled
 references, so blind LLM judges (Claude Opus 5.5, GPT-6.1-sol, gpt-oss-120b) counted meaning errors
-instead of WER. Every judge puts our models far ahead, and gpt-4o-transcribe and Gemini 3.5 Flash
-behind plain Whisper:
+instead of WER. All three put our main model first, our models far ahead, and gpt-4o-transcribe and
+Gemini 3.5 Flash behind plain Whisper:
 
-![Blind LLM judges on LA-murre: gpt-4o-transcribe, Gemini 3.5 Flash and base Whisper far behind our fine-tuned models](images/judges.svg)
+![Three blind LLM judges on LA-murre: our main model first with every judge; gpt-4o-transcribe, Gemini 3.5 Flash and base Whisper far behind](images/judges.svg)
 
 The main model since 21 Oct 2026 adds 72 h of Finnish parliament speech (Aalto corpus, via Kielipankki) and
 56 h of LA-murre interviews to the first model's data. It is level with or better than every earlier version on every
 test, and writes names, acronyms and terms more often right: on held-out parliament speech with tagged names and
-terms 12.4 % WER against the first model's 13.7 %, and on the dental webinars in pieces 22.9 % against 25.9 %. It was
+terms 12.4 % WER against the first model's 13.7 %. It was
 not judged on LA-murre's meaning points. Earlier versions are branches and tags of the same model:
 
 - [`v1.0`](https://huggingface.co/GAIK-project/whisper-large-v3-fi-dialects/tree/v1.0): the first published model
