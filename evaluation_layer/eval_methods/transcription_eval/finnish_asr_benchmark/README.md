@@ -105,7 +105,7 @@ Every model, one row each, on the three public test sets
 - **Read and parliament speech:** the API services lead; ElevenLabs is best on both. Our model
   stays at about Whisper's level (FLEURS 7.6 against 7.4 %, VoxPopuli 10.8 against 12.7 %).
 
-## The Ajokortti clip: 20 set-ups, judges and a reviewed reference
+## The Ajokortti clip: 20 set-ups and judges
 
 Raw transcripts of the 180 s Ajokortti clip ([`../data/Ajokortti.mp3`](../data/Ajokortti.mp3))
 against [`../data/reference.txt`](../data/reference.txt), Finnish set as the language, no
