@@ -13,8 +13,8 @@ licences allow), scores and judge records are in
   ([`finnish_dialect_asr/`](../finnish_dialect_asr/README.md)).
 - **Read and parliament speech:** the API services lead; ElevenLabs Scribe v2 is best on both
   (3.3 % and 9.1 % WER).
-- **One Ajokortti clip:** after a listener reviewed the reference, the best set-ups are within
-  about one WER point of each other, which one 408-word clip cannot separate.
+- **One Ajokortti clip:** the best set-ups are close, and one 408-word clip cannot separate
+  them.
 
 ## How to read the numbers
 
@@ -143,30 +143,6 @@ reference's standard forms (ElevenLabs: 18.2 % WER, five minor errors for Claude
 model matches the reference's wording but garbles names (the Finnish-NLP fine-tune: "Nobel-Baker"
 for Nobel Biocare). For a locally run model on this kind of audio, Whisper large-v3 is the one to
 start from. Qwen3-ASR lists Finnish as supported and is not usable for it here.
-
-**Reviewed reference.** The reference is the University of Helsinki's (HY) QAD-1 transcript of
-this clip; it reads like a corrected WhisperX draft, and how it was checked is not recorded. On
-14 Oct 2026 Akseli Leskinen (GAIK) listened to the 42 spans where most of seven systems hear
-something else and corrected 14 of them: mostly spoken forms written in standard Finnish ("mä" for
-"minä", "pikkasen" for "pikkuisen", "nää ei oo" for "nämä eivät ole"), two missing words and a
-brand name. The reviewed text is [`data/reference.reviewed.txt`](data/reference.reviewed.txt); the
-table above stays against [`../data/reference.txt`](../data/reference.txt).
-
-| Model | WER %, HY's reference | WER %, reviewed |
-|---|--:|--:|
-| OpenAI gpt-4o-mini-transcribe | 13.9 | **13.2** |
-| Whisper large-v3 | 14.7 | 13.7 |
-| Gemini 3.5 Flash | 14.2 | 13.7 |
-| Our dialect model ([finnish_dialect_asr](../finnish_dialect_asr/README.md)), chunked | 13.9 | 14.0 |
-| ElevenLabs Scribe v2 | 18.2 | 14.2 |
-| WhisperX, HY's 2025 run | 10.4 | 14.0 |
-| WhisperX + Finnish-NLP whisper-large-finnish-v3 (QAdental's server) | 11.9 | 15.7 |
-| Finnish-NLP whisper-large-finnish-v3 (plain transformers) | 13.2 | 15.7 |
-
-The WhisperX-based set-ups lose their lead and ElevenLabs, which writes what is said, gains four
-points: HY's text favoured WhisperX output. The best set-ups now sit within about one point, which
-one 408-word clip cannot separate. Only the disputed spans were checked; the judges' scores above
-were not re-run.
 
 **Fine-tuning on open data does not fix webinar speech.** A LoRA fine-tune of Whisper
 large-v3 on the FLEURS and VoxPopuli training sets (10 208 recordings, 51 minutes on one
