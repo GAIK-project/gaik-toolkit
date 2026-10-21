@@ -8,18 +8,18 @@
 <text x="65.9" y="129.0" font-size="15" font-weight="700" fill="#1f2328" text-anchor="start">Claude Opus 5.5</text>
 <text x="36.0" y="150.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">583 segments, the main judge</text>
 <text x="36.0" y="168.0" font-size="12" font-weight="700" fill="#59636e" text-anchor="start">the reference for the others</text>
-<rect x="82.5" y="221.7" width="26" height="150.3" rx="3" fill="#6b7280"/>
-<text x="95.5" y="215.7" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">34</text>
-<rect x="115.5" y="252.4" width="26" height="119.6" rx="3" fill="#8a5a2b"/>
-<text x="128.5" y="246.4" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">27</text>
-<rect x="148.5" y="262.2" width="26" height="109.8" rx="3" fill="#9aa4ae"/>
-<text x="161.5" y="256.2" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">25</text>
-<rect x="181.5" y="309.6" width="26" height="62.4" rx="3" fill="#2f6fb3"/>
-<text x="194.5" y="303.6" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">14</text>
-<rect x="214.5" y="314.4" width="26" height="57.6" rx="3" fill="#8fb6e0"/>
-<text x="227.5" y="308.4" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">13</text>
-<rect x="247.5" y="320.8" width="26" height="51.2" rx="3" fill="#1d3f6e"/>
-<text x="260.5" y="314.8" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">12</text>
+<rect x="82.5" y="222.4" width="26" height="149.6" rx="3" fill="#6b7280"/>
+<text x="95.5" y="216.4" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">34</text>
+<rect x="115.5" y="252.8" width="26" height="119.2" rx="3" fill="#8a5a2b"/>
+<text x="128.5" y="246.8" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">27</text>
+<rect x="148.5" y="264.5" width="26" height="107.5" rx="3" fill="#9aa4ae"/>
+<text x="161.5" y="258.5" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">24</text>
+<rect x="181.5" y="310.3" width="26" height="61.7" rx="3" fill="#8fb6e0"/>
+<text x="194.5" y="304.3" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">14</text>
+<rect x="214.5" y="318.9" width="26" height="53.1" rx="3" fill="#1d3f6e"/>
+<text x="227.5" y="312.9" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">12</text>
+<rect x="247.5" y="320.4" width="26" height="51.6" rx="3" fill="#2f6fb3"/>
+<text x="260.5" y="314.4" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">12</text>
 <line x1="38.0" y1="372" x2="318.0" y2="372" stroke="#59636e"/>
 <rect x="346.0" y="100" width="308.0" height="300" rx="10" fill="#f6f8fa" stroke="#d8dee4"/>
 <svg x="358.0" y="112.0" width="22.0" height="22.0" viewBox="0 0 611 611" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -27,19 +27,19 @@
 </svg>
 <text x="388.0" y="129.0" font-size="15" font-weight="700" fill="#1f2328" text-anchor="start">GPT-6.1-sol</text>
 <text x="358.0" y="150.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">583 segments, via Azure</text>
-<text x="358.0" y="168.0" font-size="12" font-weight="700" fill="#3f8f5b" text-anchor="start">agrees with Claude in 92 % of pairs</text>
-<rect x="404.5" y="215.3" width="26" height="156.7" rx="3" fill="#6b7280"/>
-<text x="417.5" y="209.3" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">36</text>
-<rect x="437.5" y="238.9" width="26" height="133.1" rx="3" fill="#8a5a2b"/>
-<text x="450.5" y="232.9" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">30</text>
-<rect x="470.5" y="256.5" width="26" height="115.5" rx="3" fill="#9aa4ae"/>
-<text x="483.5" y="250.5" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">26</text>
-<rect x="503.5" y="300.1" width="26" height="71.9" rx="3" fill="#2f6fb3"/>
-<text x="516.5" y="294.1" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">16</text>
-<rect x="536.5" y="303.7" width="26" height="68.3" rx="3" fill="#8fb6e0"/>
-<text x="549.5" y="297.7" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">16</text>
-<rect x="569.5" y="306.5" width="26" height="65.5" rx="3" fill="#1d3f6e"/>
-<text x="582.5" y="300.5" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">15</text>
+<text x="358.0" y="168.0" font-size="12" font-weight="700" fill="#3f8f5b" text-anchor="start">agrees with Claude in 93 % of pairs</text>
+<rect x="404.5" y="212.9" width="26" height="159.1" rx="3" fill="#6b7280"/>
+<text x="417.5" y="206.9" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">36</text>
+<rect x="437.5" y="240.6" width="26" height="131.4" rx="3" fill="#8a5a2b"/>
+<text x="450.5" y="234.6" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">30</text>
+<rect x="470.5" y="257.4" width="26" height="114.6" rx="3" fill="#9aa4ae"/>
+<text x="483.5" y="251.4" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">26</text>
+<rect x="503.5" y="300.0" width="26" height="72.0" rx="3" fill="#8fb6e0"/>
+<text x="516.5" y="294.0" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">16</text>
+<rect x="536.5" y="306.4" width="26" height="65.6" rx="3" fill="#1d3f6e"/>
+<text x="549.5" y="300.4" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">15</text>
+<rect x="569.5" y="307.3" width="26" height="64.7" rx="3" fill="#2f6fb3"/>
+<text x="582.5" y="301.3" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">15</text>
 <line x1="360.0" y1="372" x2="640.0" y2="372" stroke="#59636e"/>
 <rect x="668.0" y="100" width="308.0" height="300" rx="10" fill="#f6f8fa" stroke="#d8dee4"/>
 <svg x="680.0" y="112.0" width="22.0" height="22.0" viewBox="0 0 611 611" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -47,19 +47,19 @@
 </svg>
 <text x="710.0" y="129.0" font-size="15" font-weight="700" fill="#1f2328" text-anchor="start">gpt-oss-120b</text>
 <text x="680.0" y="150.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">200 segments, on CSC Aitta</text>
-<text x="680.0" y="168.0" font-size="12" font-weight="700" fill="#3f8f5b" text-anchor="start">agrees with Claude in 86 % of pairs</text>
-<rect x="726.5" y="277.0" width="26" height="95.0" rx="3" fill="#6b7280"/>
-<text x="739.5" y="271.0" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">22</text>
-<rect x="759.5" y="291.4" width="26" height="80.6" rx="3" fill="#8a5a2b"/>
-<text x="772.5" y="285.4" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">18</text>
-<rect x="792.5" y="300.0" width="26" height="72.0" rx="3" fill="#9aa4ae"/>
-<text x="805.5" y="294.0" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">16</text>
-<rect x="825.5" y="322.4" width="26" height="49.6" rx="3" fill="#2f6fb3"/>
-<text x="838.5" y="316.4" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">11</text>
-<rect x="858.5" y="325.9" width="26" height="46.1" rx="3" fill="#8fb6e0"/>
-<text x="871.5" y="319.9" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">10</text>
-<rect x="891.5" y="324.3" width="26" height="47.7" rx="3" fill="#1d3f6e"/>
-<text x="904.5" y="318.3" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">11</text>
+<text x="680.0" y="168.0" font-size="12" font-weight="700" fill="#3f8f5b" text-anchor="start">agrees with Claude in 88 % of pairs</text>
+<rect x="726.5" y="270.2" width="26" height="101.8" rx="3" fill="#6b7280"/>
+<text x="739.5" y="264.2" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">23</text>
+<rect x="759.5" y="291.9" width="26" height="80.1" rx="3" fill="#8a5a2b"/>
+<text x="772.5" y="285.9" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">18</text>
+<rect x="792.5" y="298.7" width="26" height="73.3" rx="3" fill="#9aa4ae"/>
+<text x="805.5" y="292.7" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">17</text>
+<rect x="825.5" y="324.0" width="26" height="48.0" rx="3" fill="#8fb6e0"/>
+<text x="838.5" y="318.0" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">11</text>
+<rect x="858.5" y="325.8" width="26" height="46.2" rx="3" fill="#1d3f6e"/>
+<text x="871.5" y="319.8" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">10</text>
+<rect x="891.5" y="327.4" width="26" height="44.6" rx="3" fill="#2f6fb3"/>
+<text x="904.5" y="321.4" font-size="12" font-weight="700" fill="#1f2328" text-anchor="middle">10</text>
 <line x1="682.0" y1="372" x2="962.0" y2="372" stroke="#59636e"/>
 <rect x="24" y="422" width="14" height="14" rx="3" fill="#6b7280"/>
 <text x="44.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">gpt-4o-transcribe</text>
@@ -67,10 +67,10 @@
 <text x="203.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Gemini 3.5 Flash</text>
 <rect x="335.0" y="422" width="14" height="14" rx="3" fill="#9aa4ae"/>
 <text x="355.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Whisper large-v3</text>
-<rect x="487.0" y="422" width="14" height="14" rx="3" fill="#2f6fb3"/>
+<rect x="487.0" y="422" width="14" height="14" rx="3" fill="#8fb6e0"/>
 <text x="507.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Ours, first model (v1.0)</text>
-<rect x="695.0" y="422" width="14" height="14" rx="3" fill="#8fb6e0"/>
-<text x="715.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Ours, all of SKN</text>
-<rect x="847.0" y="422" width="14" height="14" rx="3" fill="#1d3f6e"/>
-<text x="867.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Ours, + LA-murre</text>
+<rect x="695.0" y="422" width="14" height="14" rx="3" fill="#1d3f6e"/>
+<text x="715.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Ours, + LA-murre</text>
+<rect x="847.0" y="422" width="14" height="14" rx="3" fill="#2f6fb3"/>
+<text x="867.0" y="434.0" font-size="13" font-weight="400" fill="#1f2328" text-anchor="start">Ours, main model</text>
 </svg>
