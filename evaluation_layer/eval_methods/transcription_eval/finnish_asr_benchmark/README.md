@@ -9,7 +9,7 @@ licences allow), scores and judge records are in
 ## Results at a glance
 
 - **Five Finnish test sets, 9.9 hours of audio.** On dialect speech the GAIK dialect fine-tune of
-  Whisper large-v3 halves the errors (40 → 21 % WER); every API service is at 35–63 %
+  Whisper large-v3 halves the errors (40 → 19 % WER); every API service is at 35–63 %
   ([`finnish_dialect_asr/`](../finnish_dialect_asr/README.md)).
 - **Read and parliament speech:** the API services lead; ElevenLabs Scribe v2 is best on both
   (3.3 % and 9.1 % WER).
@@ -75,7 +75,8 @@ under about 2 points as ties. The judge prompts are in
 
 | Model | Type | Dialects (SKN) WER % | Dialects (LA-murre): meaning points | Read (FLEURS) WER % | Parliament (VoxPopuli) WER % | Dental webinars: meaning points | Dental webinars WER % | List price per audio hour |
 |---|---|--:|--:|--:|--:|--:|--:|--:|
-| Our dialect model ([finnish_dialect_asr](../finnish_dialect_asr/README.md)) | open | **21.1** | **14.2** | 7.6 | 10.8 | 7.5 | 25.9 | own GPU |
+| Our dialect model, main ([finnish_dialect_asr](../finnish_dialect_asr/README.md)) | open | **19.4** | **11.7** ³ | 7.6 | 11.1 | – | 22.9 | own GPU |
+| Our dialect model, first (`v1.0`) | open | 21.1 | 14.2 | 7.6 | 10.8 | 7.5 | 25.9 | own GPU |
 | Whisper large-v3 | open | 40.4 | 25.0 | 7.4 | 12.7 | 5.0 | **15.7** | own GPU |
 | OpenAI gpt-4o-transcribe (via Azure) | API | 62.5 | 34.2 | 4.0 | 11.4 | 7.2 | 19.1 | $0.36 |
 | Gemini 3.5 Flash | API | 34.7 ¹ | 27.2 ¹ | 5.1 | 11.5 | **1.7** | 28.6 | ≈ $0.15 ² |
@@ -91,7 +92,9 @@ models were trained on FLEURS and VoxPopuli, so their numbers there are on famil
 (40.8 % when asked to write as spoken). ² token-priced; 3.5 Flash is no longer on Google's price
 list, so estimated at its successor 3.6 Flash's rate. Other prices are list prices on 15 Oct 2026:
 OpenAI $0.006/min, ElevenLabs $0.22/h, Chirp 3 $0.016/min (first 500 000 min a month). The open
-models need a GPU (about 5 GPU-minutes per audio hour on one AMD MI250X on LUMI).
+models need a GPU (about 5 GPU-minutes per audio hour on one AMD MI250X on LUMI). ³ judge round 5, where the six
+transcripts were the main model, `v1.0` (14.0), `la-murre`, Whisper large-v3 (24.4), Gemini 3.5 Flash (27.1) and
+gpt-4o-transcribe (34.0); the other rows are round 4.
 
 Every model, one row each, on the three public test sets
 ([full table](https://github.com/GAIK-project/finnish-asr#public-test-sets-skn-and-la-murre-dialects-fleurs-and-voxpopuli)):
