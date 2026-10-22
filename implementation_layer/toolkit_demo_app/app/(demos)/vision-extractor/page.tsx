@@ -612,20 +612,27 @@ export default function VisionExtractorPage() {
                       disabled={busy}
                       onChange={setSettings}
                     />
-                    <div className="mt-4 flex items-center justify-between gap-3 rounded-md border px-3 py-2">
-                      <Label htmlFor="vision-sources" className="font-normal">
-                        Source quotes, checked against the PDF
-                      </Label>
-                      <Switch
-                        id="vision-sources"
-                        checked={includeSources}
-                        onCheckedChange={setIncludeSources}
-                        disabled={busy}
-                      />
-                    </div>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
+
+              {/* Done by the demo around the extractor, not by the component. */}
+              <div className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2.5">
+                <div className="space-y-0.5">
+                  <Label htmlFor="vision-sources">Trace sources</Label>
+                  <p className="text-muted-foreground text-xs">
+                    The model quotes where each value is; the quote is found in
+                    the PDF and highlighted. Adds output tokens.
+                  </p>
+                </div>
+                <Switch
+                  id="vision-sources"
+                  checked={includeSources}
+                  onCheckedChange={setIncludeSources}
+                  disabled={busy}
+                  className="mt-0.5"
+                />
+              </div>
 
               <Button
                 type="button"
