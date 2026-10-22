@@ -48,7 +48,6 @@ import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { ResultView, type Verification } from "../extractor/result-view";
 import {
-  SourceCheckFlow,
   SourcesView,
   TraceSourcesSwitch,
   type SourcesResult,
@@ -426,8 +425,6 @@ export default function VisionExtractorPage() {
           steps={GUIDE_STEPS}
           notes={GUIDE_NOTES}
         />
-
-        <SourceCheckFlow />
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold">

@@ -8,41 +8,10 @@ import { FileTypeIcon } from "@/components/demo/file-type-icon";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn, formatFieldName } from "@/lib/utils";
-import {
-  ArrowRight,
-  Check,
-  CircleAlert,
-  Minus,
-  Quote,
-  ScanEye,
-  SquareDashed,
-  TextSearch,
-} from "lucide-react";
+import { Check, CircleAlert, Minus } from "lucide-react";
 import { useState } from "react";
 import { cellText } from "../extractor/extractor-data";
-
-const FLOW = [
-  {
-    icon: ScanEye,
-    title: "The model reads the file",
-    text: "It sees the pages as images and extracts the values.",
-  },
-  {
-    icon: Quote,
-    title: "It quotes its source",
-    text: "For each value: the page and the exact text it read. No coordinates.",
-  },
-  {
-    icon: TextSearch,
-    title: "The quote is searched for",
-    text: "In the PDF's own text layer, by plain code. Case, spacing and punctuation are ignored.",
-  },
-  {
-    icon: SquareDashed,
-    title: "The PDF gives the box",
-    text: "The matched words carry their position on the page. The value inside the quote is checked too.",
-  },
-];
+import { TraceExplainer } from "./trace-explainer";
 
 /**
  * The "Trace sources" option. Tracing is done by the demo around the extractor, not by
@@ -62,7 +31,10 @@ export function TraceSourcesSwitch({
   return (
     <div className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2.5">
       <div className="space-y-0.5">
-        <Label htmlFor={id}>Trace sources</Label>
+        <span className="flex items-center gap-1.5">
+          <Label htmlFor={id}>Trace sources</Label>
+          <TraceExplainer />
+        </span>
         <p className="text-muted-foreground text-xs">
           Each value comes with its quote, highlighted in the PDF. Uses more
           output tokens.
@@ -76,44 +48,6 @@ export function TraceSourcesSwitch({
         className="mt-0.5"
       />
     </div>
-  );
-}
-
-/** How a source is checked, as four steps: shown before the first extraction. */
-export function SourceCheckFlow() {
-  return (
-    <section aria-label="How the sources are checked" className="space-y-3">
-      <h2 className="text-sm font-semibold">How the sources are checked</h2>
-      <ol className="grid gap-2 md:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] md:items-stretch">
-        {FLOW.map((step, index) => (
-          <li key={step.title} className="contents">
-            {index > 0 && (
-              <ArrowRight
-                aria-hidden
-                className="text-muted-foreground hidden size-4 self-center md:block"
-              />
-            )}
-            <div className="bg-card rounded-lg border p-3">
-              <p className="flex items-center gap-1.5 text-sm font-medium">
-                <step.icon
-                  className="text-primary size-4 shrink-0"
-                  aria-hidden
-                />
-                {step.title}
-              </p>
-              <p className="text-muted-foreground mt-1 text-xs leading-5">
-                {step.text}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ol>
-      <p className="text-muted-foreground text-xs">
-        Flagged for a person: a quote that is not in the PDF, or a quote that
-        does not hold the extracted value. Images have no text layer, so their
-        quotes cannot be checked.
-      </p>
-    </section>
   );
 }
 
@@ -287,16 +221,19 @@ export function SourcesView({ result }: { result: SourcesResult }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-muted-foreground text-sm">
-        {counts.check > 0 && (
-          <span className="font-medium text-amber-700 dark:text-amber-500">
-            {counts.check} to check,{" "}
-          </span>
-        )}
-        {counts.ok} verified
-        {counts.unchecked > 0 &&
-          `, ${counts.unchecked} without a text layer to check against`}
-      </p>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-muted-foreground text-sm">
+          {counts.check > 0 && (
+            <span className="font-medium text-amber-700 dark:text-amber-500">
+              {counts.check} to check,{" "}
+            </span>
+          )}
+          {counts.ok} verified
+          {counts.unchecked > 0 &&
+            `, ${counts.unchecked} without a text layer to check against`}
+        </p>
+        <TraceExplainer label="How it works" />
+      </div>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <ul className="max-h-[36rem] divide-y overflow-auto rounded-md border">
           {sources.map((source, index) => {
