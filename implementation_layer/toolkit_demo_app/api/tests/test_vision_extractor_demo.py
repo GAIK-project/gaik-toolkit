@@ -138,6 +138,7 @@ async def test_extract_passes_reviewed_schema_and_all_options(monkeypatch) -> No
         merge_table=True,
         additional_instructions="Prefer the final table.",
         include_verification=True,
+        include_sources=False,
     )
 
     assert response.data == {"ok": True}

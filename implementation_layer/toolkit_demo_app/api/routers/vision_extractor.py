@@ -40,10 +40,24 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 try:
+    from utils.citations import (
+        SOURCE_INSTRUCTION,
+        SOURCES_FIELD,
+        UploadedDocument,
+        check_sources,
+        with_sources,
+    )
     from utils.model_settings import get_request_api_config, provider_error_detail
     from utils.schema import SCHEMA_FORMAT_VERSION
     from utils.schema_view import describe_fields, specs_by_name, structure_of
 except ImportError:
+    from api.utils.citations import (
+        SOURCE_INSTRUCTION,
+        SOURCES_FIELD,
+        UploadedDocument,
+        check_sources,
+        with_sources,
+    )
     from api.utils.model_settings import get_request_api_config, provider_error_detail
     from api.utils.schema import SCHEMA_FORMAT_VERSION
     from api.utils.schema_view import describe_fields, specs_by_name, structure_of
@@ -193,6 +207,8 @@ _USAGE_FIELDS = (
 class VisionExtractResponse(BaseModel):
     data: dict
     verification: dict | None = None
+    # Where each value was read, checked against the PDF text layer (include_sources).
+    sources: dict | None = None
     model: str
     documents_processed: int
     duration_s: float
@@ -467,6 +483,7 @@ async def extract_vision(
     merge_table: bool = Form(False),
     additional_instructions: str | None = Form(None),
     include_verification: bool = Form(False),
+    include_sources: bool = Form(False),
 ):
     """Extract with the exact pre-built schema selected in the demo UI."""
     if not files:
@@ -490,6 +507,7 @@ async def extract_vision(
         _validate_suffix(uploaded_file.filename)
 
     temp_paths: list[Path] = []
+    documents: list[UploadedDocument] = []
     try:
         for uploaded_file in files:
             content = await validate_file_size(uploaded_file)
@@ -497,6 +515,7 @@ async def extract_vision(
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(content)
                 temp_paths.append(Path(tmp.name))
+            documents.append(UploadedDocument(uploaded_file.filename or "", Path(tmp.name)))
 
         try:
             from gaik.software_components.vision_extractor import VisionExtractor
@@ -509,6 +528,12 @@ async def extract_vision(
                     f"({exc})"
                 ),
             ) from exc
+
+        instructions = (additional_instructions or "").strip()
+        if include_sources:
+            # The citations are an extra field of the schema, so they come in the same call.
+            extraction_model = with_sources(extraction_model)
+            instructions = f"{instructions}\n\n{SOURCE_INSTRUCTION}".strip()
 
         try:
             extractor = VisionExtractor(
@@ -523,7 +548,7 @@ async def extract_vision(
                 merge_table=merge_table,
                 use_azure=use_azure,
                 vertex_ai=vertex_ai,
-                additional_instructions=(additional_instructions or "").strip() or None,
+                additional_instructions=instructions or None,
                 include_verification=include_verification,
             )
         except Exception as exc:
@@ -549,9 +574,19 @@ async def extract_vision(
                 status_code=500, detail=f"Vision extraction failed: {provider_error_detail(exc)}"
             ) from exc
 
+        data = dict(result.data)
+        verification = result.verification
+        sources = None
+        if include_sources:
+            raw_sources = data.pop(SOURCES_FIELD, None)
+            if isinstance(verification, dict):
+                verification = {k: v for k, v in verification.items() if k != SOURCES_FIELD}
+            sources = await run_in_threadpool(check_sources, raw_sources, data, documents)
+
         return VisionExtractResponse(
-            data=result.data,
-            verification=result.verification,
+            data=data,
+            verification=verification,
+            sources=sources,
             model=result.model,
             documents_processed=result.documents_processed,
             duration_s=result.duration_s,

@@ -263,6 +263,7 @@ export function ResultView({
   detail,
   noun = "document",
   extraTabs = [],
+  defaultTab = "readable",
   children,
 }: {
   results: Record<string, unknown>[];
@@ -276,6 +277,8 @@ export function ResultView({
   noun?: string;
   /** More tabs after Readable and JSON, for example the schema the data was extracted with. */
   extraTabs?: ExtraTab[];
+  /** The tab open first: "readable", "json" or the value of an extra tab. */
+  defaultTab?: string;
   /** Shown under the summary bar, for example the token usage. */
   children?: ReactNode;
 }) {
@@ -331,7 +334,7 @@ export function ResultView({
       )}
 
       {results.length > 0 && (
-        <Tabs defaultValue="readable">
+        <Tabs defaultValue={defaultTab}>
           <div className="flex flex-wrap items-center gap-3">
             <TabsList>
               <TabsTrigger value="readable">Readable</TabsTrigger>

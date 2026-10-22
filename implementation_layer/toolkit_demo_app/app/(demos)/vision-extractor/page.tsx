@@ -26,20 +26,13 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { cn, formatFileSize } from "@/lib/utils";
 import {
-  CheckCircle,
   File as FileIcon,
   FileCode2,
   ListChecks,
@@ -47,7 +40,7 @@ import {
   ScanEye,
   ShieldCheck,
   Sparkles,
-  Table2,
+  TextSearch,
   Upload,
   X,
 } from "lucide-react";
@@ -55,6 +48,11 @@ import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { ResultView, type Verification } from "../extractor/result-view";
+import {
+  SourceCheckFlow,
+  SourcesView,
+  type SourcesResult,
+} from "./sources-view";
 import {
   ACCEPTED_EXTENSIONS,
   EXAMPLES,
@@ -79,17 +77,17 @@ const GUIDE_STEPS: GuideStep[] = [
   {
     icon: ShieldCheck,
     title: "Choose the model",
-    text: "Pick the model and options. Turn on verification to get a confidence score for each field.",
+    text: "Pick the model and options. Confidence scores per field are optional.",
   },
   {
-    icon: Table2,
-    title: "Review the result",
-    text: "Fields, lists as tables, and the confidence of each value. Copy or download the JSON.",
+    icon: TextSearch,
+    title: "Check the sources",
+    text: "Each value comes with the quote it was read from, located in the PDF and highlighted.",
   },
 ];
 const GUIDE_NOTES = [
-  "One model call sees every file at once, so it can match values across documents, for example an invoice against its purchase order. There is no parsing step before it.",
-  "Nothing you enter is saved. The examples come with a ready-made schema. A schema generated for your own task, or for an edited example, lives in this session only and is used again while the task stays the same.",
+  "One model call sees every file at once, so it can match values across documents, for example an invoice against its purchase order.",
+  "Nothing you enter is saved. A schema generated for your own task lives in this session only.",
 ];
 
 const STRUCTURE_TEXT: Record<string, string> = {
@@ -122,6 +120,7 @@ interface GeneratedSchema {
 interface VisionExtractResult {
   data: Record<string, unknown>;
   verification: Verification | null;
+  sources?: SourcesResult | null;
   model: string;
   documents_processed: number;
   duration_s: number;
@@ -158,8 +157,7 @@ interface FileListRowProps {
 
 function FileListRow({ file, disabled, onRemove }: FileListRowProps) {
   return (
-    <div className="border-success/30 bg-success/10 flex items-center gap-2 rounded-md border p-2">
-      <CheckCircle className="text-success h-4 w-4 shrink-0" />
+    <div className="flex items-center gap-2 rounded-md border p-2">
       <FileIcon className="text-muted-foreground h-4 w-4 shrink-0" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{file.name}</p>
@@ -170,7 +168,7 @@ function FileListRow({ file, disabled, onRemove }: FileListRowProps) {
       <button
         onClick={onRemove}
         disabled={disabled}
-        className="hover:bg-success/20 rounded-full p-1 transition-colors"
+        className="hover:bg-muted rounded-full p-1 transition-colors"
         aria-label={`Remove ${file.name}`}
       >
         <X className="h-3.5 w-3.5" />
@@ -186,6 +184,7 @@ export default function VisionExtractorPage() {
   const catalogue = useVisionModels();
   const model = resolveVisionModel(settings, catalogue);
   const { includeVerification } = settings;
+  const [includeSources, setIncludeSources] = useState(true);
   const [exampleId, setExampleId] = useState<string | null>(null);
   // The task of the example that was picked: editing the text does not change it.
   const [exampleTask, setExampleTask] = useState<string | null>(null);
@@ -366,6 +365,7 @@ export default function VisionExtractorPage() {
         formData.append("user_requirements", userRequirements);
         formData.append("schema_id", current.schema_id);
         appendVisionSettings(formData, settings, model);
+        formData.append("include_sources", includeSources ? "true" : "false");
         return apiFetch("/api/extract-vision", {
           method: "POST",
           body: formData,
@@ -398,11 +398,10 @@ export default function VisionExtractorPage() {
         provider: settings.provider,
         documents_processed: data.documents_processed,
         include_verification: includeVerification,
+        include_sources: includeSources,
         total_tokens: data.usage?.total_tokens ?? 0,
         example: exampleId,
       });
-
-      toast.success("Vision extraction complete");
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
       if (error instanceof RateLimitError) return;
@@ -427,6 +426,8 @@ export default function VisionExtractorPage() {
           steps={GUIDE_STEPS}
           notes={GUIDE_NOTES}
         />
+
+        <SourceCheckFlow />
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold">
@@ -491,10 +492,6 @@ export default function VisionExtractorPage() {
           <Card>
             <CardHeader>
               <CardTitle>1. The documents</CardTitle>
-              <CardDescription>
-                PDFs or images, read together so the model can match across
-                files.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <label
@@ -578,10 +575,6 @@ export default function VisionExtractorPage() {
           <Card>
             <CardHeader>
               <CardTitle>2. What to extract</CardTitle>
-              <CardDescription>
-                Describe the fields in plain language. The schema is generated
-                when you extract, or earlier with the button below.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -599,11 +592,10 @@ export default function VisionExtractorPage() {
                 ) : (
                   <p className="text-muted-foreground text-xs">
                     {generatedSchema?.schema_source === "example" ||
-                    (!generatedSchema && readyMade)
-                      ? "This task has a ready-made schema, so only the extraction runs. Change the text and a new schema is generated."
-                      : schemaCurrent
-                        ? "The schema for this task is ready, so only the extraction runs. Change the text and a new schema is generated."
-                        : "Be specific about field names and types. The clearer your description, the better the generated schema. It is generated once for a task, then used again while the text stays the same."}
+                    (!generatedSchema && readyMade) ||
+                    schemaCurrent
+                      ? "The schema is ready, so only the extraction runs."
+                      : "A schema is generated from this text at the first run. Name the fields and their types."}
                   </p>
                 )}
               </div>
@@ -620,6 +612,17 @@ export default function VisionExtractorPage() {
                       disabled={busy}
                       onChange={setSettings}
                     />
+                    <div className="mt-4 flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+                      <Label htmlFor="vision-sources" className="font-normal">
+                        Source quotes, checked against the PDF
+                      </Label>
+                      <Switch
+                        id="vision-sources"
+                        checked={includeSources}
+                        onCheckedChange={setIncludeSources}
+                        disabled={busy}
+                      />
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
@@ -685,14 +688,6 @@ export default function VisionExtractorPage() {
                       built-in example schema
                     </Badge>
                   )}
-                  {!schemaCurrent && (
-                    <Badge
-                      variant="outline"
-                      className="border-amber-500 text-amber-700"
-                    >
-                      The task changed: a new schema will be generated
-                    </Badge>
-                  )}
                 </div>
                 <SchemaTabsView
                   tabs={schemaTabs(
@@ -712,25 +707,34 @@ export default function VisionExtractorPage() {
                   ? "Designing the extraction schema…"
                   : "Calling vision model…"
               }
-              subMessage="Multi-document extractions take a bit longer than a regular text pass"
             />
           )}
 
           {result && !isLoading && (
             <ResultView
               results={[result.data]}
+              defaultTab={result.sources ? "sources" : "readable"}
               documentCount={result.documents_processed}
               seconds={result.duration_s}
               detail={result.model}
               verification={includeVerification ? result.verification : null}
-              extraTabs={
-                resultSchema
+              extraTabs={[
+                ...(result.sources
+                  ? [
+                      {
+                        value: "sources",
+                        label: "Sources",
+                        content: <SourcesView result={result.sources} />,
+                      },
+                    ]
+                  : []),
+                ...(resultSchema
                   ? schemaTabs(
                       resultSchema,
                       STRUCTURE_TEXT[resultSchema.structure_type],
                     )
-                  : []
-              }
+                  : []),
+              ]}
             >
               {result.usage && <UsageStats usage={result.usage} />}
             </ResultView>
@@ -740,7 +744,7 @@ export default function VisionExtractorPage() {
             <EmptyStateCard
               icon={ScanEye}
               title="No extraction yet"
-              description="Add documents, describe what to extract, and click Extract data. Every field of the result is shown here, also those with no value."
+              description="Every field of the result appears here, with the place in the document it was read from."
               feedbackSlot={<FeedbackButton demoType="vision-extractor" />}
             />
           )}
