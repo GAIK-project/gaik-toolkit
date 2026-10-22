@@ -284,6 +284,7 @@ export function ResultView({
 }) {
   const [copied, setCopied] = useState(false);
   const [hideEmpty, setHideEmpty] = useState(false);
+  const [tab, setTab] = useState(defaultTab);
   const json = JSON.stringify(results, null, 2);
 
   const copy = async () => {
@@ -334,10 +335,10 @@ export function ResultView({
       )}
 
       {results.length > 0 && (
-        <Tabs defaultValue={defaultTab}>
+        <Tabs value={tab} onValueChange={setTab}>
           <div className="flex flex-wrap items-center gap-3">
             {/* Scrolls sideways on a phone rather than widening the page. */}
-            <div className="max-w-full overflow-x-auto">
+            <div className="max-w-full [scrollbar-width:none] overflow-x-auto">
               <TabsList>
                 <TabsTrigger value="readable">Readable</TabsTrigger>
                 <TabsTrigger value="json">JSON</TabsTrigger>
@@ -348,7 +349,13 @@ export function ResultView({
                 ))}
               </TabsList>
             </div>
-            <label className="text-muted-foreground ml-auto flex items-center gap-2 text-sm">
+            {/* Only the readable view shows empty fields. */}
+            <label
+              className={cn(
+                "text-muted-foreground ml-auto flex items-center gap-2 text-sm",
+                tab !== "readable" && "hidden",
+              )}
+            >
               <input
                 type="checkbox"
                 checked={hideEmpty}

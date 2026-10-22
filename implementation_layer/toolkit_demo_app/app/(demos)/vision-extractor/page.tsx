@@ -2,6 +2,7 @@
 
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
+import { FileTypeIcon } from "@/components/demo/file-type-icon";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
 import type { SchemaField } from "@/components/demo/schema-fields-table";
@@ -32,7 +33,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { cn, formatFileSize } from "@/lib/utils";
 import {
-  File as FileIcon,
   FileCode2,
   ListChecks,
   Loader2,
@@ -82,7 +82,7 @@ const GUIDE_STEPS: GuideStep[] = [
   {
     icon: TextSearch,
     title: "Check the sources",
-    text: "Each value comes with the quote it was read from, located in the PDF and highlighted.",
+    text: "Each value shows the text it was read from, highlighted on its page.",
   },
 ];
 const GUIDE_NOTES = [
@@ -158,7 +158,7 @@ interface FileListRowProps {
 function FileListRow({ file, disabled, onRemove }: FileListRowProps) {
   return (
     <div className="flex items-center gap-2 rounded-md border p-2">
-      <FileIcon className="text-muted-foreground h-4 w-4 shrink-0" />
+      <FileTypeIcon name={file.name} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{file.name}</p>
         <p className="text-muted-foreground text-xs">

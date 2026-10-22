@@ -4,6 +4,7 @@
 // the server finds the quote in the PDF's text layer, so the boxes drawn here come
 // from the PDF, never from the model.
 
+import { FileTypeIcon } from "@/components/demo/file-type-icon";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn, formatFieldName } from "@/lib/utils";
@@ -63,8 +64,8 @@ export function TraceSourcesSwitch({
       <div className="space-y-0.5">
         <Label htmlFor={id}>Trace sources</Label>
         <p className="text-muted-foreground text-xs">
-          The model quotes where each value is; the quote is found in the PDF
-          and highlighted. Adds output tokens.
+          Each value comes with its quote, highlighted in the PDF. Uses more
+          output tokens.
         </p>
       </div>
       <Switch
@@ -184,7 +185,7 @@ const ICONS: Record<Verdict, typeof Check> = {
 };
 
 const ICON_STYLE: Record<Verdict, string> = {
-  ok: "text-emerald-600",
+  ok: "text-emerald-600/70",
   check: "text-amber-600",
   unchecked: "text-muted-foreground",
 };
@@ -216,8 +217,11 @@ function PageView({
 
   return (
     <div className="space-y-2">
-      <p className="text-muted-foreground text-xs">
-        {name} · page {source.page}
+      <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+        <FileTypeIcon name={name} />
+        <span className="truncate">
+          {name}, page {source.page}
+        </span>
       </p>
       {page ? (
         <div className="relative overflow-hidden rounded-md border bg-white">
@@ -284,17 +288,14 @@ export function SourcesView({ result }: { result: SourcesResult }) {
   return (
     <div className="space-y-3">
       <p className="text-muted-foreground text-sm">
-        {counts.ok} verified
         {counts.check > 0 && (
-          <>
-            {" · "}
-            <span className="font-medium text-amber-700 dark:text-amber-500">
-              {counts.check} to check
-            </span>
-          </>
+          <span className="font-medium text-amber-700 dark:text-amber-500">
+            {counts.check} to check,{" "}
+          </span>
         )}
-        {counts.unchecked > 0 && ` · ${counts.unchecked} without a text layer`}.
-        The model gives a quote; the box is where that text is in the PDF.
+        {counts.ok} verified
+        {counts.unchecked > 0 &&
+          `, ${counts.unchecked} without a text layer to check against`}
       </p>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <ul className="max-h-[36rem] divide-y overflow-auto rounded-md border">
@@ -308,8 +309,8 @@ export function SourcesView({ result }: { result: SourcesResult }) {
                   onClick={() => setSelected(index)}
                   aria-current={index === selected}
                   className={cn(
-                    "hover:bg-muted/50 flex w-full gap-2.5 px-3 py-2 text-left",
-                    index === selected && "bg-muted",
+                    "hover:bg-muted/50 flex w-full gap-2.5 border-l-2 border-transparent px-3 py-2 text-left",
+                    index === selected && "border-primary bg-primary/5",
                   )}
                 >
                   <Icon
@@ -328,7 +329,7 @@ export function SourcesView({ result }: { result: SourcesResult }) {
                         {cellText(source.value)}
                       </span>
                     </span>
-                    <span className="block truncate font-mono text-xs">
+                    <span className="text-muted-foreground block truncate text-xs">
                       “{source.quote}”
                     </span>
                     {verdict !== "ok" && (
