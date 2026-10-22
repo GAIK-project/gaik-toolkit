@@ -149,3 +149,76 @@ async def test_extract_with_sources_asks_for_them_and_returns_them_checked(monke
     assert response.data == {"po_number": "PO-2025-15903"}
     assert response.sources["sources"][0]["status"] == "found"
     assert response.sources["sources"][0]["value_status"] == "match"
+
+
+def test_check_text_sources_finds_quotes_in_pasted_text() -> None:
+    text = "Invoice no. 100234\nTotal: 1.234,50 EUR"
+    raw = {
+        "items": [
+            {"field": "total", "document": 1, "page": 1, "quote": "Total: 1.234,50 EUR"},
+            {"field": "number", "document": 1, "page": 1, "quote": "Invoice no. 999"},
+        ]
+    }
+
+    result = citations.check_text_sources(raw, {"total": 1234.5, "number": "999"}, text)
+    total, number = result["sources"]
+
+    assert total["status"] == "found" and total["value_status"] == "match"
+    assert number["status"] == "not_found"
+    assert result["pages"] == {}
+
+
+@pytest.mark.asyncio
+async def test_text_extraction_with_sources_asks_for_them_and_checks_the_text() -> None:
+    from api.routers import extractor as route
+
+    captured: dict = {}
+
+    class FakeExtractor:
+        def extract(self, **kwargs):
+            captured.update(kwargs)
+            return [
+                {
+                    "total": 1234.5,
+                    citations.SOURCES_FIELD: {
+                        "items": [
+                            {"field": "total", "document": 1, "page": 1, "quote": "Total: 1.234,50"}
+                        ]
+                    },
+                }
+            ]
+
+    class Plain(BaseModel):
+        total: float | None = None
+
+    response = await route._run_extraction(
+        FakeExtractor(), Plain, None, "Extract the total", ["Total: 1.234,50 EUR"], True
+    )
+
+    assert citations.SOURCES_FIELD in captured["extraction_model"].model_fields
+    assert "SOURCE CITATIONS" in captured["user_requirements"]
+    assert response.results == [{"total": 1234.5}]
+    assert response.sources["sources"][0]["status"] == "found"
+    assert response.raw_sources[0]["items"][0]["quote"] == "Total: 1.234,50"
+
+
+@pytest.mark.asyncio
+async def test_trace_locates_text_quotes_in_the_pdf_without_trusting_the_page() -> None:
+    import io
+    import json
+
+    from api.routers import extractor as route
+    from fastapi import UploadFile
+
+    upload = UploadFile(filename="PO.pdf", file=io.BytesIO((EXAMPLES / "PO.pdf").read_bytes()))
+    raw = {
+        "items": [{"field": "po", "document": 1, "page": 3, "quote": "PO Number: PO-2025-15903"}]
+    }
+
+    result = await route.trace_sources(
+        file=upload, sources=json.dumps(raw), data=json.dumps({"po": "PO-2025-15903"})
+    )
+    source = result["sources"][0]
+
+    assert source["status"] == "found" and source["page"] == 1
+    assert source["rects"] and "1:1" in result["pages"]

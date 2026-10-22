@@ -4,6 +4,8 @@
 // the server finds the quote in the PDF's text layer, so the boxes drawn here come
 // from the PDF, never from the model.
 
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { cn, formatFieldName } from "@/lib/utils";
 import {
   ArrowRight,
@@ -40,6 +42,41 @@ const FLOW = [
     text: "The matched words carry their position on the page. The value inside the quote is checked too.",
   },
 ];
+
+/**
+ * The "Trace sources" option. Tracing is done by the demo around the extractor, not by
+ * the extractor component: one more schema field, one more instruction, a plain check.
+ */
+export function TraceSourcesSwitch({
+  checked,
+  disabled,
+  onCheckedChange,
+  id = "trace-sources",
+}: {
+  checked: boolean;
+  disabled: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  id?: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2.5">
+      <div className="space-y-0.5">
+        <Label htmlFor={id}>Trace sources</Label>
+        <p className="text-muted-foreground text-xs">
+          The model quotes where each value is; the quote is found in the PDF
+          and highlighted. Adds output tokens.
+        </p>
+      </div>
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        disabled={disabled}
+        className="mt-0.5"
+      />
+    </div>
+  );
+}
 
 /** How a source is checked, as four steps: shown before the first extraction. */
 export function SourceCheckFlow() {
@@ -211,7 +248,9 @@ function PageView({
         <p className="text-muted-foreground rounded-md border border-dashed p-6 text-sm">
           {source.status === "no_text_layer"
             ? "An image has no text layer, so the quote cannot be located. Read the value off the document yourself."
-            : "This page is not available."}
+            : result.documents.length === 0
+              ? "Checked against the text the model read. Only an uploaded PDF shows where the quote is on the page."
+              : "This page is not available."}
         </p>
       )}
     </div>

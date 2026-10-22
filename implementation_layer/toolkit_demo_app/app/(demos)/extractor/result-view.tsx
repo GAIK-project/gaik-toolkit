@@ -336,15 +336,18 @@ export function ResultView({
       {results.length > 0 && (
         <Tabs defaultValue={defaultTab}>
           <div className="flex flex-wrap items-center gap-3">
-            <TabsList>
-              <TabsTrigger value="readable">Readable</TabsTrigger>
-              <TabsTrigger value="json">JSON</TabsTrigger>
-              {extraTabs.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value}>
-                  {tab.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            {/* Scrolls sideways on a phone rather than widening the page. */}
+            <div className="max-w-full overflow-x-auto">
+              <TabsList>
+                <TabsTrigger value="readable">Readable</TabsTrigger>
+                <TabsTrigger value="json">JSON</TabsTrigger>
+                {extraTabs.map((tab) => (
+                  <TabsTrigger key={tab.value} value={tab.value}>
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
             <label className="text-muted-foreground ml-auto flex items-center gap-2 text-sm">
               <input
                 type="checkbox"

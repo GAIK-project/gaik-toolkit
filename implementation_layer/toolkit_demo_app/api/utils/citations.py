@@ -39,6 +39,13 @@ Fill `{SOURCES_FIELD}` with one entry for every value you extracted (skip null v
   value, e.g. "Total: 1.234,50 EUR" or "Invoice no. 100234".
 """.strip()
 
+# The same for one text a parser read from a file: it may not mark its pages.
+TEXT_SOURCE_INSTRUCTION = SOURCE_INSTRUCTION.replace(
+    "- document: the number of the file the value is in, counting the attached files from 1.\n"
+    "- page: the 1-based page of that file.\n",
+    "- document: 1.\n- page: the 1-based page when the text marks its pages, otherwise 1.\n",
+)
+
 # Pages rendered for the viewer: enough for any demo document, small enough to send.
 MAX_RENDERED_PAGES = 12
 RENDER_DPI = 110
@@ -69,21 +76,32 @@ class Source(BaseModel):
     quote: str = Field(description="Short verbatim snippet of the document holding the value")
 
 
-def with_sources(model: type[BaseModel]) -> type[BaseModel]:
-    """The extraction model with a list of citations next to its own fields."""
-    return create_model(
-        model.__name__,
-        __base__=model,
-        **{
-            SOURCES_FIELD: (
-                list[Source],
-                Field(
-                    default_factory=list,
-                    description="Where each extracted value was read: one entry per value.",
-                ),
-            )
-        },
+class SourceList(BaseModel):
+    """The citations as one object, for extractors that read every list as table rows."""
+
+    items: list[Source] = Field(default_factory=list)
+
+
+def with_sources(model: type[BaseModel], *, wrapped: bool = False) -> type[BaseModel]:
+    """The extraction model with the citations next to its own fields.
+
+    ``wrapped`` puts them in an object: the text extractor post-processes every list of
+    records as rows of the schema, which would rewrite the citations.
+    """
+    description = "Where each extracted value was read: one entry per value."
+    field = (
+        (SourceList, Field(default_factory=SourceList, description=description))
+        if wrapped
+        else (list[Source], Field(default_factory=list, description=description))
     )
+    return create_model(model.__name__, __base__=model, **{SOURCES_FIELD: field})
+
+
+def _entries(raw: Any) -> list:
+    """The citation entries, whether they came as a list or wrapped in an object."""
+    if isinstance(raw, dict):
+        raw = _plain(raw.get("items"))
+    return raw if isinstance(raw, list) else []
 
 
 def tokens(text: str) -> list[str]:
@@ -260,8 +278,14 @@ class UploadedDocument:
     path: Path
 
 
-def check_sources(raw: Any, data: dict, documents: list[UploadedDocument]) -> dict:
-    """Verify the model's citations and lay out what the viewer needs to show them."""
+def check_sources(
+    raw: Any, data: dict, documents: list[UploadedDocument], *, cited_pages: bool = True
+) -> dict:
+    """Verify the model's citations and lay out what the viewer needs to show them.
+
+    ``cited_pages`` is False when the model read parsed text without page marks: its
+    page is then a guess, and a quote found on another page is not a wrong page.
+    """
     pdf_pages: dict[int, list[list[_Page]]] = {}
     for number, document in enumerate(documents, start=1):
         if document.path.suffix.lower() == ".pdf":
@@ -271,7 +295,7 @@ def check_sources(raw: Any, data: dict, documents: list[UploadedDocument]) -> di
                 pdf_pages[number] = []
 
     checked: list[dict] = []
-    for entry in raw if isinstance(raw, list) else []:
+    for entry in _entries(raw):
         if not isinstance(entry, dict):
             continue
         field = str(_plain(entry.get("field")) or "").strip()
@@ -330,6 +354,9 @@ def check_sources(raw: Any, data: dict, documents: list[UploadedDocument]) -> di
                     result["value_rects"] = _rects(target, *span)
                 break
             if result["status"] != "not_found":
+                if not cited_pages:
+                    result["status"] = "found"
+                    result["cited_page"] = result["page"]
                 break
         # A scanned PDF: pages but no words on any of them.
         if (
@@ -377,3 +404,33 @@ def _render_pages(documents: list[UploadedDocument], sources: list[dict]) -> dic
         except Exception:
             continue
     return rendered
+
+
+def check_text_sources(raw: Any, data: dict, text: str) -> dict:
+    """Verify citations against pasted text: whether each quote is in it, no boxes."""
+    haystack = tokens(text)
+    checked: list[dict] = []
+    for entry in _entries(raw):
+        if not isinstance(entry, dict):
+            continue
+        field = str(_plain(entry.get("field")) or "").strip()
+        quote = str(_plain(entry.get("quote")) or "").strip()
+        if not field or not quote:
+            continue
+        value = value_at(data, field)
+        found = _find(haystack, tokens(quote)) is not None
+        checked.append(
+            {
+                "field": field,
+                "document": 1,
+                "page": 1,
+                "cited_page": 1,
+                "quote": quote,
+                "value": value,
+                "status": "found" if found else "not_found",
+                "value_status": value_status(value, quote),
+                "rects": [],
+                "value_rects": [],
+            }
+        )
+    return {"sources": checked, "pages": {}, "documents": []}

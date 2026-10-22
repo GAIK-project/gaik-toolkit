@@ -56,6 +56,11 @@ import {
   type ExtractorExample,
   type ParserType,
 } from "./extractor-data";
+import {
+  SourcesView,
+  TraceSourcesSwitch,
+  type SourcesResult,
+} from "../vision-extractor/sources-view";
 import { ResultView } from "./result-view";
 
 interface Field {
@@ -66,6 +71,9 @@ interface Field {
 interface ExtractResult {
   results: Record<string, unknown>[];
   document_count: number;
+  /** With Trace sources: each quote checked, and located in the PDF when there is one. */
+  sources?: SourcesResult | null;
+  raw_sources?: unknown[] | null;
 }
 
 interface GeneratedSchema {
@@ -112,6 +120,7 @@ const GUIDE_STEPS: GuideStep[] = [
   },
 ];
 const GUIDE_NOTES = [
+  "Trace sources asks the model for the exact text each value came from. The quote is checked against the text and, for a PDF, located and highlighted on its page, so a value can be checked at a glance.",
   "Auto-detect reads a PDF with PyMuPDF, a Word file with DOCX and an image with Vision. A scanned PDF has no text layer: choose Vision, Vision+, Multimodal or the HH Parser.",
   "Nothing you enter is saved. The examples come with a ready-made schema. A schema generated for your own task, or for an edited example, lives in this session only and is used again while the task stays the same.",
 ];
@@ -136,6 +145,7 @@ export default function ExtractorPage() {
   const [inputMode, setInputMode] = useState<"text" | "file">("text");
   const [documentText, setDocumentText] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [includeSources, setIncludeSources] = useState(true);
   const [parserType, setParserType] = useState<ParserType>(DEFAULT_PARSER);
   const [isParsing, setIsParsing] = useState(false);
 
@@ -300,6 +310,27 @@ export default function ExtractorPage() {
     if (next) toast.success("Schema generated");
   }
 
+  /** The quotes of a text extraction, located in the PDF the text was read from. */
+  async function traceInPdf(
+    pdf: File,
+    data: ExtractResult,
+  ): Promise<SourcesResult | null> {
+    const formData = new FormData();
+    formData.append("file", pdf);
+    formData.append("sources", JSON.stringify(data.raw_sources?.[0] ?? null));
+    formData.append("data", JSON.stringify(data.results[0] ?? {}));
+    try {
+      const response = await apiFetch("/api/extract/trace", {
+        method: "POST",
+        body: formData,
+        signal: abortControllerRef.current?.signal,
+      });
+      return response.ok ? ((await response.json()) as SourcesResult) : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function handleSubmit(): Promise<void> {
     if (busy) return;
     abortControllerRef.current?.abort();
@@ -355,6 +386,7 @@ export default function ExtractorPage() {
           body: JSON.stringify({
             documents: [text],
             user_requirements: userRequirements,
+            include_sources: includeSources,
             fields: Object.fromEntries(
               fields.map((field) => [field.name, field.description]),
             ),
@@ -379,6 +411,7 @@ export default function ExtractorPage() {
             documents: [text],
             user_requirements: task,
             schema_id: current.schema_id,
+            include_sources: includeSources,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -389,6 +422,15 @@ export default function ExtractorPage() {
         throw new Error(error?.detail ?? "Failed to extract data");
       }
       const data = (await response.json()) as ExtractResult;
+      // A PDF can show where each quote is: the quotes are located in it.
+      if (
+        data.sources &&
+        inputMode === "file" &&
+        file?.name.toLowerCase().endsWith(".pdf") &&
+        data.raw_sources?.[0]
+      ) {
+        data.sources = (await traceInPdf(file, data)) ?? data.sources;
+      }
       setResult(data);
       setResultSchema(usedSchema);
       setSeconds((performance.now() - started) / 1000);
@@ -692,6 +734,12 @@ export default function ExtractorPage() {
                 </TabsContent>
               </Tabs>
 
+              <TraceSourcesSwitch
+                checked={includeSources}
+                onCheckedChange={setIncludeSources}
+                disabled={busy}
+              />
+
               <Button
                 onClick={() => void handleSubmit()}
                 disabled={
@@ -783,14 +831,24 @@ export default function ExtractorPage() {
               results={result.results}
               documentCount={result.document_count}
               seconds={seconds}
-              extraTabs={
-                resultSchema
+              defaultTab={result.sources ? "sources" : "readable"}
+              extraTabs={[
+                ...(result.sources
+                  ? [
+                      {
+                        value: "sources",
+                        label: "Sources",
+                        content: <SourcesView result={result.sources} />,
+                      },
+                    ]
+                  : []),
+                ...(resultSchema
                   ? schemaTabs(
                       resultSchema,
                       STRUCTURE_TEXT[resultSchema.structure_type],
                     )
-                  : []
-              }
+                  : []),
+              ]}
             />
           )}
 

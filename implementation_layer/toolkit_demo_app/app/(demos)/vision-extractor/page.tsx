@@ -28,7 +28,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { cn, formatFileSize } from "@/lib/utils";
@@ -51,6 +50,7 @@ import { ResultView, type Verification } from "../extractor/result-view";
 import {
   SourceCheckFlow,
   SourcesView,
+  TraceSourcesSwitch,
   type SourcesResult,
 } from "./sources-view";
 import {
@@ -616,23 +616,11 @@ export default function VisionExtractorPage() {
                 </AccordionItem>
               </Accordion>
 
-              {/* Done by the demo around the extractor, not by the component. */}
-              <div className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2.5">
-                <div className="space-y-0.5">
-                  <Label htmlFor="vision-sources">Trace sources</Label>
-                  <p className="text-muted-foreground text-xs">
-                    The model quotes where each value is; the quote is found in
-                    the PDF and highlighted. Adds output tokens.
-                  </p>
-                </div>
-                <Switch
-                  id="vision-sources"
-                  checked={includeSources}
-                  onCheckedChange={setIncludeSources}
-                  disabled={busy}
-                  className="mt-0.5"
-                />
-              </div>
+              <TraceSourcesSwitch
+                checked={includeSources}
+                onCheckedChange={setIncludeSources}
+                disabled={busy}
+              />
 
               <Button
                 type="button"

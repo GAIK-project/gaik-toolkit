@@ -16,6 +16,28 @@ Interactive demo application for the [GAIK Toolkit](https://pypi.org/project/gai
 - **Tabular Agent** - Upload a CSV/Excel file and ask it questions — read-only SQL over DuckDB, messy report sheets cleaned up automatically
 - **LLM-as-Judge** - Score extractor output, detect hallucinations, run a multi-model judge panel
 
+### Source tracing (Trace sources)
+
+The Extractor and Vision Extractor pages have a **Trace sources** option. It is done by
+the demo around the extractor components, not by the components themselves
+(`api/utils/citations.py`):
+
+1. The schema gets one more field, `field_sources`, and the prompt asks for one entry per
+   value: field path, document, page and a short verbatim quote. The model never gives
+   coordinates.
+2. Plain code looks for the quote in the PDF's text layer (PyMuPDF, two reading orders;
+   case, spacing and punctuation ignored, no fuzzy matching). The matched words give the
+   highlight box. The page the model named is tried first.
+3. The extracted value must be inside its quote; numbers and dates are compared as numbers
+   and dates (`3.000 kg` = `3000`, `11.04.2025` = `2025-04-11`). Schema codes such as
+   `not_ok` are left unchecked.
+4. A quote missing from the PDF, or one that does not hold its value, is flagged on the
+   Sources tab. Images have no text layer and are shown as unchecked; pasted text is
+   checked without a page view.
+
+It works with any extractor that returns those quotes, as long as the original PDF has a
+text layer. It roughly triples the output tokens of an extraction.
+
 ### Software Modules
 
 - **RAG Builder** - Document upload, indexing, Q&A with citations and debug tools
@@ -162,7 +184,7 @@ toolkit_demo_app/
 | `/health` | Health check |
 | `/parse` | Parse PDF/DOCX documents |
 | `/classify` | Classify documents |
-| `/extract` | Extract structured data |
+| `/extract` | Extract structured data; `/extract/trace` locates its quotes in the PDF |
 | `/extract-vision` | One-call vision extraction for PDFs/images |
 | `/transcribe` | Transcribe audio/video |
 | `/text-to-speech` | Text-to-speech audio generation |
