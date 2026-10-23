@@ -207,7 +207,7 @@ llm-google = [
     "google-auth>=2.0.0",
 ]
 llm-litellm = [
-    "litellm>=1.102.1,<2",
+    "litellm>=1.102.1,!=1.107.0,<2",
 ]
 llm-all = [
     "gaik[llm-anthropic]",
