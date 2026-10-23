@@ -101,6 +101,13 @@ export const featuredUseCases: Demo[] = [
 
 export const useCases: Demo[] = [
   {
+    title: "Helpdesk Chatbot",
+    description:
+      "A customer service chatbot that answers from your own services and FAQ, and hands over to a person",
+    href: "/helpdesk-chatbot",
+    icon: Headset,
+  },
+  {
     title: "Video Transcription & Captioning",
     description:
       "Upload audio or video, or open the ready-made example, to generate subtitles and transcripts",

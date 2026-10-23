@@ -128,6 +128,11 @@ const navGroups: NavGroup[] = [
         icon: House,
       },
       {
+        label: "Helpdesk Chatbot",
+        href: "/helpdesk-chatbot",
+        icon: Headset,
+      },
+      {
         label: "Solution Wizard",
         href: "/solution-wizard",
         icon: Wand2,

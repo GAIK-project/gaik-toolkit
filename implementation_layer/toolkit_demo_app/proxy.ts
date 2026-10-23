@@ -88,7 +88,8 @@ export default async function proxy(request: NextRequest) {
     pathname === "/api/report-writer-v2/run" || // likewise
     pathname === "/api/source-normalizer/run" || // likewise
     pathname === "/api/knowledge-curator/run" || // likewise
-    pathname === "/api/knowledge-synthesis/run"; // likewise
+    pathname === "/api/knowledge-synthesis/run" || // likewise
+    pathname === "/api/helpdesk-chat"; // runs its model in Next.js
   if (pathname.startsWith("/api") && !isNextApiRoute) {
     // Rate limit requests that change state (heavy processing, deletes)
     if (ratelimit && isStateChanging(request.method)) {

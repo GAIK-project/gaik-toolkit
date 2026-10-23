@@ -1,6 +1,6 @@
 {
   "name": "nextjs16-template",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": false,
   "scripts": {
     "dev": "bun --bun next dev",
@@ -13,6 +13,8 @@
     "db:tunnel": "oc port-forward svc/pgvector-demo 5432:5432 -n gaik"
   },
   "dependencies": {
+    "@ai-sdk/azure": "^4.0.89",
+    "@ai-sdk/react": "^4.0.129",
     "@hookform/resolvers": "^5.4.0",
     "@radix-ui/react-accordion": "^1.2.14",
     "@radix-ui/react-alert-dialog": "^1.1.17",
@@ -49,7 +51,7 @@
     "@supabase/supabase-js": "^2.108.2",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
-    "ai": "^6.0.209",
+    "ai": "^7.0.126",
     "ansi-to-react": "^6.2.6",
     "babel-plugin-react-compiler": "^1.0.0",
     "class-variance-authority": "^0.7.1",
