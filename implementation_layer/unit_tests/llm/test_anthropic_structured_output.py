@@ -6,7 +6,7 @@ import httpx
 import pytest
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import create_llm_client
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ValidationError
 
 pytest.importorskip("anthropic")
 
@@ -79,6 +79,31 @@ def test_strict_tool_closes_every_object():
     item = schema["$defs"]["Item"]
     assert item["additionalProperties"] is False
     assert item["required"] == ["name", "note"]
+
+
+class Scored(BaseModel):
+    label: str = Field(min_length=1, max_length=40)
+    confidence: float = Field(ge=0, le=1)
+    maximum: int = Field(gt=0, multiple_of=2)
+
+
+def test_strict_tool_drops_bounds_and_pydantic_still_checks_them():
+    bodies = []
+    answer = {"label": "invoice", "confidence": 0.9, "maximum": 4}
+    reply = [{"type": "tool_use", "id": "t", "name": "Scored", "input": answer}]
+    client = _client("claude-sonnet-5-5", [httpx.Response(200, json=_message(reply))], bodies)
+
+    result = client.chat_parsed([{"role": "user", "content": "Hi"}], response_format=Scored)
+
+    assert result == Scored.model_validate(answer)
+    schema = bodies[0]["tools"][0]["input_schema"]
+    assert schema["properties"] == {
+        "label": {"title": "Label", "type": "string"},
+        "confidence": {"title": "Confidence", "type": "number"},
+        "maximum": {"title": "Maximum", "type": "integer"},
+    }
+    with pytest.raises(ValidationError):
+        Scored.model_validate({**answer, "confidence": 2})
 
 
 def test_model_without_strict_support_gets_plain_tool():

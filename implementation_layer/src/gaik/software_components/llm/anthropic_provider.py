@@ -86,18 +86,34 @@ _STRICT_TOOL_MODELS = (
 DEFAULT_MAX_TOKENS = 16000
 
 
+# Strict tool use rejects these with a 400 (Claude Sonnet 5.5: "For 'number'
+# type, properties maximum, minimum are not supported").
+_STRICT_UNSUPPORTED_KEYWORDS = frozenset(
+    {"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"}
+    | {"minLength", "maxLength"}
+)
+
+
 def _strict_schema(node: Any) -> Any:
     """Copy a JSON schema into the shape strict tool use accepts.
 
     Strict mode needs every object closed (`additionalProperties: false`) with
     all its properties required. Optional fields stay nullable through their
-    `anyOf` with null, so Pydantic still validates the answer.
+    `anyOf` with null, so Pydantic still validates the answer. Numeric and
+    string bounds are dropped; Pydantic checks them on the answer instead.
     """
     if isinstance(node, list):
         return [_strict_schema(item) for item in node]
     if not isinstance(node, dict):
         return node
-    node = {key: _strict_schema(value) for key, value in node.items()}
+    copied = {}
+    for key, value in node.items():
+        if key in ("properties", "$defs") and isinstance(value, dict):
+            # Field and model names, not keywords: keep a field called "maximum".
+            copied[key] = {name: _strict_schema(sub) for name, sub in value.items()}
+        elif key not in _STRICT_UNSUPPORTED_KEYWORDS:
+            copied[key] = _strict_schema(value)
+    node = copied
     if node.get("type") == "object" and "properties" in node:
         node["additionalProperties"] = False
         node["required"] = list(node["properties"])
