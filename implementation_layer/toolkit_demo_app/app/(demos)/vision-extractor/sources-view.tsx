@@ -89,16 +89,16 @@ function verdictOf(source: SourceCheck): Verdict {
 function statusText(source: SourceCheck): string {
   switch (source.status) {
     case "not_found":
-      return "Quote not found in the PDF";
+      return "Check: not found in the PDF";
     case "no_text_layer":
       return "No text layer to check against";
     case "moved":
       return source.value_status === "mismatch"
-        ? `Found on page ${source.page}, value not in the quote`
+        ? `Found on page ${source.page}, doesn't match the document`
         : `Found on page ${source.page}, not ${source.cited_page}`;
     default:
       return source.value_status === "mismatch"
-        ? "Value not in the quote"
+        ? "Check: doesn't match the document"
         : "Verified";
   }
 }
