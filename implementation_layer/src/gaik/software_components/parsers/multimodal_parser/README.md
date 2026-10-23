@@ -142,7 +142,7 @@ result = parser.parse("document.pdf")
 ```python
 from gaik.software_components.parsers.multimodal_parser import MultimodalParser
 
-parser = MultimodalParser(model_provider="claude", model="claude-sonnet-4-6", use_azure=True, reasoning_effort="high")
+parser = MultimodalParser(model_provider="claude", model="claude-sonnet-5-5", use_azure=True, reasoning_effort="high")
 result = parser.parse("document.pdf")
 ```
 
@@ -151,7 +151,7 @@ result = parser.parse("document.pdf")
 ```python
 from gaik.software_components.parsers.multimodal_parser import MultimodalParser
 
-parser = MultimodalParser(model_provider="claude", model="claude-sonnet-4-6", use_azure=False, reasoning_effort="high")
+parser = MultimodalParser(model_provider="claude", model="claude-sonnet-5-5", use_azure=False, reasoning_effort="high")
 result = parser.parse("document.pdf")
 ```
 
@@ -196,7 +196,7 @@ result = parser.parse("document.pdf")
 | `AZURE_API_KEY` | `use_azure=True` | — | Fallback when the Foundry key is unset |
 | `ANTHROPIC_FOUNDRY_RESOURCE` | `use_azure=True` | — | Foundry resource name |
 | `ANTHROPIC_API_KEY` | `use_azure=False` | — | Direct Anthropic API key |
-| `ANTHROPIC_MODEL` | Always | `claude-sonnet-4-6` | Model name (fallback when `model=None`) |
+| `ANTHROPIC_MODEL` | Always | `claude-sonnet-5-5` | Model name (fallback when `model=None`) |
 
 ### Google (Gemini)
 

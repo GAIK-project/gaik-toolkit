@@ -67,12 +67,12 @@ def get_claude_config(use_azure: bool = True) -> dict:
             "api_key": os.getenv("ANTHROPIC_FOUNDRY_API_KEY", "").strip()
             or require_env("AZURE_API_KEY"),
             "resource": require_env("ANTHROPIC_FOUNDRY_RESOURCE"),
-            "model": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
+            "model": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5"),
         }
     return {
         "use_azure": False,
         "api_key": require_env("ANTHROPIC_API_KEY"),
-        "model": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
+        "model": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5"),
     }
 
 

@@ -89,9 +89,9 @@ PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
     "openai": _OPENAI_MODELS,
     "azure": _OPENAI_MODELS,
     "claude": tuple(
-        os.getenv("DEMO_CLAUDE_MODELS", "claude-sonnet-4.6,claude-sonnet-5").split(",")
+        os.getenv("DEMO_CLAUDE_MODELS", "claude-sonnet-5-5,claude-haiku-5-5").split(",")
     ),
-    "google": tuple(os.getenv("DEMO_GOOGLE_MODELS", "gemini-3.1-flash-lite").split(",")),
+    "google": tuple(os.getenv("DEMO_GOOGLE_MODELS", "gemini-3.8-flash").split(",")),
 }
 
 

@@ -95,7 +95,7 @@ def claude_example(pdf_path: str):
 
     parser = MultimodalParser(
         model_provider="claude",
-        model="claude-sonnet-4-6",
+        model="claude-sonnet-5-5",
         use_azure=True,
         reasoning_effort="medium",
         merge_table=True,

@@ -293,7 +293,7 @@ extractor = VisionExtractor(
 ```python
 extractor = VisionExtractor(
     model_provider="claude",
-    model="claude-sonnet-4-6",
+    model="claude-sonnet-5-5",
     use_azure=False,
     reasoning_effort="high",
 )

@@ -83,14 +83,14 @@ def test_provider_model_allowlists(monkeypatch) -> None:
             "gpt-6-sol",
             "gpt-5.6-terra",
         ),
-        "claude": ("claude-sonnet-4.6", "claude-sonnet-5"),
-        "google": ("gemini-3.1-flash-lite",),
+        "claude": ("claude-sonnet-5-5", "claude-haiku-5-5"),
+        "google": ("gemini-3.8-flash",),
     }
 
     monkeypatch.setenv("AZURE_API_KEY", "test-key")
     monkeypatch.setenv("ANTHROPIC_FOUNDRY_RESOURCE", "test-resource")
     assert route._provider_settings("openai", "gpt-6-sol") == ("openai", True, False)
-    assert route._provider_settings("claude", "claude-sonnet-5") == (
+    assert route._provider_settings("claude", "claude-sonnet-5-5") == (
         "claude",
         True,
         False,
@@ -113,7 +113,7 @@ async def test_extract_passes_reviewed_schema_and_all_options(monkeypatch) -> No
             return SimpleNamespace(
                 data={"ok": True},
                 verification=None,
-                model="claude-sonnet-5",
+                model="claude-sonnet-5-5",
                 documents_processed=1,
                 duration_s=0.1,
                 usage=None,
@@ -133,7 +133,7 @@ async def test_extract_passes_reviewed_schema_and_all_options(monkeypatch) -> No
         user_requirements=task,
         schema_id=route.EXAMPLE_SCHEMA_ID,
         model_provider="claude",
-        model="claude-sonnet-5",
+        model="claude-sonnet-5-5",
         reasoning_effort="high",
         merge_table=True,
         additional_instructions="Prefer the final table.",
@@ -144,7 +144,7 @@ async def test_extract_passes_reviewed_schema_and_all_options(monkeypatch) -> No
     assert response.data == {"ok": True}
     assert captured["constructor"] == {
         "model_provider": "claude",
-        "model": "claude-sonnet-5",
+        "model": "claude-sonnet-5-5",
         "reasoning_effort": "high",
         "merge_table": True,
         "use_azure": True,
