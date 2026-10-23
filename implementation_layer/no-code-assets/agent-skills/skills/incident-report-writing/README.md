@@ -235,7 +235,7 @@ If you prefer manual configuration:
 
 **Install Dependencies:**
 ```bash
-pip install mcp==1.30.0 "gaik[transcriber]==0.8.4" python-dotenv==1.2.4
+pip install mcp==1.30.0 "gaik[transcriber]==0.8.5" python-dotenv==1.2.4
 ```
 
 **Configure API Key:**
@@ -292,7 +292,7 @@ incident-report-writing/
 
 ### Dependencies
 
-- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.8.4`, `python-dotenv==1.2.4`
+- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.8.5`, `python-dotenv==1.2.4`
 - **External APIs:** OpenAI Whisper API (for audio transcription)
 
 ### Anti-Hallucination Design

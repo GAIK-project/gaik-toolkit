@@ -95,7 +95,7 @@ If you prefer to set things up yourself:
 
 Open Command Prompt and run:
 ```
-pip install mcp==1.30.0 "gaik[transcriber]==0.8.4" python-dotenv==1.2.4
+pip install mcp==1.30.0 "gaik[transcriber]==0.8.5" python-dotenv==1.2.4
 ```
 
 **Step 2: Configure API Key**
@@ -384,6 +384,6 @@ report-writing/
 
 ### Dependencies
 
-- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.8.4`, `python-dotenv==1.2.4`
+- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.8.5`, `python-dotenv==1.2.4`
 - **Node.js packages:** `@modelcontextprotocol/server-filesystem@2026.8.31`
 - **External APIs:** OpenAI Whisper API (for audio transcription)

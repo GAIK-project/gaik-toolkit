@@ -16,8 +16,8 @@ description: >-
 # Parsing documents with gaik
 
 ```bash
-pip install "gaik[parser]==0.8.4"              # PyMuPDF, python-docx, Docling
-pip install "gaik[multimodal-parser]==0.8.4"   # multi-provider vision parsing
+pip install "gaik[parser]==0.8.5"              # PyMuPDF, python-docx, Docling
+pip install "gaik[multimodal-parser]==0.8.5"   # multi-provider vision parsing
 # Add llm-google for shared Google/Vertex configs, or llm-litellm for LiteLLM.
 ```
 

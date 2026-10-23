@@ -61,7 +61,7 @@ Each one receives the user's own content, under that provider's terms.
 | `brief-to-slides` | Web pages the user links or the agent researches; the browser fetches Google Fonts when an HTML preview opens | Search queries and page addresses | — |
 
 **Installs.** Skills that run code install packages from public registries: gaik and
-its dependencies from PyPI (`gaik==0.8.4` with the extra the task needs), `mcp`,
+its dependencies from PyPI (`gaik==0.8.5` with the extra the task needs), `mcp`,
 `python-dotenv`, `python-pptx`, `pillow`, `cairosvg`, `lxml` and `playwright` from PyPI,
 Playwright's Chromium build, the font packages and `lucide-static` from npm for
 `brief-to-slides`, and `@modelcontextprotocol/server-filesystem` from npm for the Claude

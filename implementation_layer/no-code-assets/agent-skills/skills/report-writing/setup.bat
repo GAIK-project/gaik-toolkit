@@ -83,15 +83,15 @@ if %errorlevel% neq 0 (
 echo.
 echo [Step 3/6] Installing Python dependencies...
 echo ----------------------------------------------------------------------------
-echo Installing: mcp==1.30.0, gaik[transcriber]==0.8.4, python-dotenv==1.2.4
+echo Installing: mcp==1.30.0, gaik[transcriber]==0.8.5, python-dotenv==1.2.4
 echo This may take a few minutes...
 echo.
 
-pip install mcp==1.30.0 "gaik[transcriber]==0.8.4" python-dotenv==1.2.4 --quiet
+pip install mcp==1.30.0 "gaik[transcriber]==0.8.5" python-dotenv==1.2.4 --quiet
 
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install dependencies.
-    echo Please try running: pip install mcp==1.30.0 "gaik[transcriber]==0.8.4" python-dotenv==1.2.4
+    echo Please try running: pip install mcp==1.30.0 "gaik[transcriber]==0.8.5" python-dotenv==1.2.4
     pause
     exit /b 1
 )
