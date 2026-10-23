@@ -113,21 +113,30 @@ def _numbers_in(text: str) -> list[float]:
     """Every number in the text, read both the European and the American way."""
     readings: list[float] = []
     for match in _NUMBER.finditer(text):
-        raw = re.sub(r"[\s'’]", "", match.group())
-        candidates = {raw.replace(",", "").replace(".", "")}
-        if "," in raw and "." in raw:
-            decimal = "," if raw.rfind(",") > raw.rfind(".") else "."
-            group = "." if decimal == "," else ","
-            candidates.add(raw.replace(group, "").replace(decimal, "."))
-        else:
-            for sep in (",", "."):
-                if raw.count(sep) == 1:
-                    candidates.add(raw.replace(sep, "."))
-        for candidate in candidates:
-            try:
-                readings.append(float(candidate))
-            except ValueError:
-                pass
+        # A space may group thousands (1 234) or only separate two numbers (010 6061).
+        pieces = match.group().split()
+        for piece in [match.group(), *pieces] if len(pieces) > 1 else [match.group()]:
+            readings += _readings_of(piece)
+    return readings
+
+
+def _readings_of(number: str) -> list[float]:
+    raw = re.sub(r"[\s'’]", "", number)
+    candidates = {raw.replace(",", "").replace(".", "")}
+    if "," in raw and "." in raw:
+        decimal = "," if raw.rfind(",") > raw.rfind(".") else "."
+        group = "." if decimal == "," else ","
+        candidates.add(raw.replace(group, "").replace(decimal, "."))
+    else:
+        for sep in (",", "."):
+            if raw.count(sep) == 1:
+                candidates.add(raw.replace(sep, "."))
+    readings: list[float] = []
+    for candidate in candidates:
+        try:
+            readings.append(float(candidate))
+        except ValueError:
+            pass
     return readings
 
 
