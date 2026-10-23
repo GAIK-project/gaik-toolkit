@@ -100,6 +100,17 @@ def test_provider_model_allowlists(monkeypatch) -> None:
         route._provider_settings("google", "gpt-6-sol")
 
 
+def test_google_is_offered_only_with_credentials(monkeypatch) -> None:
+    for name in ("GOOGLE_API_KEY", "GEMINI_API_KEY", "GOOGLE_PROJECT_ID"):
+        monkeypatch.delenv(name, raising=False)
+    assert route._offered_models("google") == ()
+    with pytest.raises(HTTPException, match="not available"):
+        route._provider_settings("google", "gemini-3.8-flash")
+
+    monkeypatch.setenv("GOOGLE_PROJECT_ID", "test-project")
+    assert route._offered_models("google") == ("gemini-3.8-flash",)
+
+
 @pytest.mark.asyncio
 async def test_extract_passes_reviewed_schema_and_all_options(monkeypatch) -> None:
     captured: dict = {}

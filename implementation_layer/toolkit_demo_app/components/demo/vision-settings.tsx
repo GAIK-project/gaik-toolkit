@@ -76,14 +76,16 @@ export function useVisionModels(): VisionModelCatalogue {
       .then((response) => (response.ok ? response.json() : null))
       .then((body) => {
         if (!active || !body?.models) return;
-        const valid = VISION_PROVIDERS.every(
-          (name) =>
-            Array.isArray(body.models[name]) &&
-            body.models[name].length > 0 &&
-            body.models[name].every(
-              (value: unknown) => typeof value === "string",
-            ),
-        );
+        // A provider without credentials comes with no models and is not shown.
+        const valid =
+          body.models.openai?.length > 0 &&
+          VISION_PROVIDERS.every(
+            (name) =>
+              Array.isArray(body.models[name]) &&
+              body.models[name].every(
+                (value: unknown) => typeof value === "string",
+              ),
+          );
         if (!valid) return;
         setCatalogue({
           choices: body.models,
@@ -186,8 +188,12 @@ export function VisionSettingsFields({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="openai">OpenAI / Azure</SelectItem>
-            <SelectItem value="claude">Claude</SelectItem>
-            <SelectItem value="google">Google</SelectItem>
+            {catalogue.choices.claude.length > 0 && (
+              <SelectItem value="claude">Claude</SelectItem>
+            )}
+            {catalogue.choices.google.length > 0 && (
+              <SelectItem value="google">Google</SelectItem>
+            )}
           </SelectContent>
         </Select>
       </div>

@@ -389,8 +389,15 @@ def _server_model() -> str:
 
 
 def _offered_models(provider: str) -> tuple[str, ...]:
-    """The models of a provider; the server's own model is always among the OpenAI/Azure ones."""
+    """The models of a provider; the server's own model is always among the OpenAI/Azure ones.
+
+    Google offers none without credentials, so the demo does not show a provider that fails.
+    """
     models = PROVIDER_MODELS[provider]
+    if provider == "google" and not any(
+        os.getenv(name) for name in ("GOOGLE_API_KEY", "GEMINI_API_KEY", "GOOGLE_PROJECT_ID")
+    ):
+        return ()
     if provider in {"openai", "azure"}:
         server_model = _server_model()
         if server_model not in models:
