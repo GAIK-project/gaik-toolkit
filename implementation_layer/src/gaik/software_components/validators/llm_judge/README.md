@@ -53,7 +53,7 @@ doc.close()
 # 2. Run the judge against (page images + extractor's JSON + rubric).
 judge = LLMJudge(
     model_provider="google",
-    model="gemini-3.6-flash",  # default; its predecessor gemini-3-flash-preview won our judge benchmark
+    model="gemini-3-flash-preview",  # winner of our internal judge benchmark
     use_vertexai=True,
 )
 
@@ -115,8 +115,8 @@ purchase-order extraction-validation test cases:
 | `gpt-5.5` / `gpt-5.4` / `gpt-5.4-mini` | 0.750 | 0.600 | 1.000 | $0.004–0.024 | 11–25 s |
 | `gemini-3.1-flash-lite-preview` | 0.750 | 0.600 | 1.000 | $0.0013 | 3.6 s |
 
-The default is now its successor, `gemini-3.6-flash`, which this benchmark has not
-measured yet. For two-tier setups, Gemini 3.1 Flash Lite is the cheapest screener.
+Recommendation: **Gemini 3 Flash via Vertex** as the default. For two-tier
+setups, Gemini 3.1 Flash Lite is the cheapest screener.
 
 ## Scoring modes
 

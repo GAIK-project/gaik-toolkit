@@ -160,7 +160,7 @@ result = parser.parse("document.pdf")
 ```python
 from gaik.software_components.parsers.multimodal_parser import MultimodalParser
 
-parser = MultimodalParser(model_provider="google", model="gemini-3.6-flash", vertex_ai=True, reasoning_effort="medium")
+parser = MultimodalParser(model_provider="google", model="gemini-3-flash-preview", vertex_ai=True, reasoning_effort="medium")
 result = parser.parse("document.pdf")
 ```
 
@@ -169,7 +169,7 @@ result = parser.parse("document.pdf")
 ```python
 from gaik.software_components.parsers.multimodal_parser import MultimodalParser
 
-parser = MultimodalParser(model_provider="google", model="gemini-3.6-flash", vertex_ai=False, reasoning_effort="medium")
+parser = MultimodalParser(model_provider="google", model="gemini-3-flash-preview", vertex_ai=False, reasoning_effort="medium")
 result = parser.parse("document.pdf")
 ```
 
@@ -207,7 +207,7 @@ result = parser.parse("document.pdf")
 | `GOOGLE_SCOPES` | `vertex_ai=True` | — | OAuth scopes (comma-separated) |
 | `GOOGLE_GENERATE_CONTENT_URL` | `vertex_ai=True` | — | Vertex generateContent endpoint. Include literal `{model}` to have the active model substituted at call time (e.g. `.../models/{model}:generateContent`), so one deployment can swap Gemini models at runtime. |
 | `GOOGLE_API_KEY` | `vertex_ai=False` | — | Direct Gemini API key |
-| `GOOGLE_MODEL` | Always | `gemini-3.6-flash` | Model name (fallback when `model=None`) |
+| `GOOGLE_MODEL` | Always | `gemini-3-flash-preview` | Model name (fallback when `model=None`) |
 
 ## License
 

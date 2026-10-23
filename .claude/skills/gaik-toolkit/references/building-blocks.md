@@ -81,7 +81,7 @@ passed without environment variables. A missing required field raises `ValueErro
 
 **Returns (always includes `provider`, `use_azure` and `model`):**
 ```python
-# google: {"provider": "google", "api_key": str, "model": "gemini-3.6-flash",
+# google: {"provider": "google", "api_key": str, "model": "gemini-2.5-flash",
 #          "embedding_model": "gemini-embedding-001"}
 # anthropic: {"provider": "anthropic", "api_key": str, "model": "claude-sonnet-5-5",
 #             "max_tokens": 4096}

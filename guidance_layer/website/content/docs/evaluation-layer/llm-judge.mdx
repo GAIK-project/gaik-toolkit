@@ -110,7 +110,7 @@ doc.close()
 
 judge = LLMJudge(
     model_provider="google",
-    model="gemini-3.6-flash",
+    model="gemini-3-flash-preview",
     use_vertexai=True,
 )
 
@@ -138,7 +138,7 @@ would.
 
 ### Providers
 
-`model_provider` accepts `"google"` (default, `gemini-3.6-flash`),
+`model_provider` accepts `"google"` (default, `gemini-3-flash-preview`),
 `"anthropic"` (`claude-haiku-4-5-20251001`), `"openai"` and `"azure"`
 (`gpt-6-luna`). Since gaik 0.8.0 the judge also accepts a shared provider
 configuration, so CSC Aitta, Vertex AI or another OpenAI-compatible server
@@ -215,7 +215,7 @@ rubric = ValidationRubric(
 # 4. Run the judge
 judge = LLMJudge(
     model_provider="google",
-    model="gemini-3.6-flash",
+    model="gemini-3-flash-preview",
     use_vertexai=True,
 )
 result = judge.validate(source_pages=pages, extracted=extracted, rubric=rubric)
@@ -262,7 +262,7 @@ The severity-to-score mapping the prompt enforces:
 from gaik.software_components.validators import LLMJudge, LLMJudgePanel, ValidationRubric
 
 panel = LLMJudgePanel(judges=[
-    LLMJudge(model_provider="google", model="gemini-3.6-flash"),
+    LLMJudge(model_provider="google", model="gemini-3-flash-preview"),
     LLMJudge(model_provider="anthropic", model="claude-haiku-4-5-20251001"),
     LLMJudge(model_provider="azure", model="gpt-5.4-mini"),
 ])
@@ -288,7 +288,7 @@ latency is sequential. Aggregation rules:
 ```python
 from gaik.software_components.validators import LLMJudge, compare_pairwise
 
-judge = LLMJudge(model_provider="google", model="gemini-3.6-flash")
+judge = LLMJudge(model_provider="google", model="gemini-3-flash-preview")
 
 result = compare_pairwise(
     judge=judge,
@@ -364,7 +364,7 @@ validation test set (per-field severity F1 against ground truth):
 | `gpt-5.5` / `gpt-5.4` / `gpt-5.4-mini` | 0.750 | $0.004–0.024 | 11–25 s |
 | `gemini-3.1-flash-lite-preview` | 0.750 | $0.0013 | 3.6 s |
 
-**Default**: Gemini 3.6 Flash (the benchmark winner was its predecessor, Gemini 3 Flash; 3.6 is not benchmarked yet). **Cheap screener**: Gemini 3.1 Flash Lite.
+**Default**: Gemini 3 Flash via Vertex. **Cheap screener**: Gemini 3.1 Flash Lite.
 For a public, reproducible comparison see the
 [Prompt Benchmark page](/evaluation-layer/llm-judge-benchmark).
 

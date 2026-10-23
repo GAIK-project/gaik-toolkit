@@ -84,7 +84,7 @@ def test_provider_model_allowlists(monkeypatch) -> None:
             "gpt-5.6-terra",
         ),
         "claude": ("claude-sonnet-5-5", "claude-haiku-5-5"),
-        "google": ("gemini-3.6-flash",),
+        "google": ("gemini-3.8-flash",),
     }
 
     monkeypatch.setenv("AZURE_API_KEY", "test-key")
@@ -105,10 +105,10 @@ def test_google_is_offered_only_with_credentials(monkeypatch) -> None:
         monkeypatch.delenv(name, raising=False)
     assert route._offered_models("google") == ()
     with pytest.raises(HTTPException, match="not available"):
-        route._provider_settings("google", "gemini-3.6-flash")
+        route._provider_settings("google", "gemini-3.8-flash")
 
     monkeypatch.setenv("GOOGLE_PROJECT_ID", "test-project")
-    assert route._offered_models("google") == ("gemini-3.6-flash",)
+    assert route._offered_models("google") == ("gemini-3.8-flash",)
 
 
 @pytest.mark.asyncio

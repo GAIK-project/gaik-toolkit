@@ -60,7 +60,7 @@ SAMPLE_ITEMS = [
 def main() -> None:
     judge = LLMJudge(
         model_provider="google",
-        model="gemini-3.6-flash",
+        model="gemini-3-flash-preview",
         use_vertexai=True,
     )
     evaluator = RAGEvaluator(judge=judge)

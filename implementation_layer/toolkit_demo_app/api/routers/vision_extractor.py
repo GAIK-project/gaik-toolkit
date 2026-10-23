@@ -91,7 +91,7 @@ PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
     "claude": tuple(
         os.getenv("DEMO_CLAUDE_MODELS", "claude-sonnet-5-5,claude-haiku-5-5").split(",")
     ),
-    "google": tuple(os.getenv("DEMO_GOOGLE_MODELS", "gemini-3.6-flash").split(",")),
+    "google": tuple(os.getenv("DEMO_GOOGLE_MODELS", "gemini-3.8-flash").split(",")),
 }
 
 
