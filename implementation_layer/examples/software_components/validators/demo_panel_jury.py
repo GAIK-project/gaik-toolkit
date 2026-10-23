@@ -54,7 +54,7 @@ def main() -> None:
 
     panel = LLMJudgePanel(
         judges=[
-            LLMJudge(model_provider="google", model="gemini-3-flash-preview", use_vertexai=True),
+            LLMJudge(model_provider="google", model="gemini-3.8-flash", use_vertexai=True),
             LLMJudge(model_provider="anthropic", model="claude-haiku-4-5-20251001"),
             LLMJudge(model_provider="azure", model="gpt-6-luna", use_azure=True),
         ]

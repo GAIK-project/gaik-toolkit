@@ -56,7 +56,7 @@ def basic_example() -> None:
 
     judge = LLMJudge(
         model_provider="google",
-        model="gemini-3-flash-preview",
+        model="gemini-3.8-flash",
         use_vertexai=True,
     )
 

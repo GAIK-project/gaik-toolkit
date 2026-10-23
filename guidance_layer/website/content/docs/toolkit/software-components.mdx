@@ -371,7 +371,7 @@ flowchart LR
 - Form-extraction review where missing or hallucinated fields are expensive
 - Two-tier setups: cheap pre-screen + premium judge on flagged rows
 
-**Recommended judge model:** `gemini-3-flash-preview` via Vertex AI — F1 = 1.000 at $0.004/PO in our internal Luvata judge benchmark across 8 candidates including GPT-5.4 / 5.5, Claude Haiku 4.5 / Sonnet 4.6 / Opus 4.7, and Gemini 3.1 Flash Lite.
+**Default judge model:** `gemini-3.8-flash`. Its predecessor `gemini-3-flash-preview` (Vertex AI) scored F1 = 1.000 at $0.004/PO in our internal Luvata judge benchmark across 8 candidates including GPT-5.4 / 5.5, Claude Haiku 4.5 / Sonnet 4.6 / Opus 4.7, and Gemini 3.1 Flash Lite; 3.8 Flash has not been benchmarked yet.
 
 - **Implementation code**: [software_components/validators/llm_judge](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/validators/llm_judge)
 - **Usage examples**: [examples/validators](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/validators)

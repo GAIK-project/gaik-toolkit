@@ -35,7 +35,7 @@ Example:
     >>> from gaik.software_components.validators.llm_judge import (
     ...     LLMJudge, ValidationRubric,
     ... )
-    >>> judge = LLMJudge(model_provider="google", model="gemini-3-flash-preview")
+    >>> judge = LLMJudge(model_provider="google", model="gemini-3.8-flash")
     >>> result = judge.validate(
     ...     source_pages=[png_bytes_page1],
     ...     extracted=[{"item_index": 0, "quantity": "10"}],

@@ -77,6 +77,8 @@ ANTHROPIC_PRICING_PER_M: dict[str, tuple[float, float]] = {
 }
 
 GEMINI_PRICING_PER_M: dict[str, tuple[float, float]] = {
+    # 0.75 / 3.75 through 2026-12-31, then 1.50 / 7.50 (Gemini API pricing page).
+    "gemini-3.8-flash": (0.75, 3.75),
     "gemini-3-flash": (0.50, 3.00),
     "gemini-3.1-flash-lite": (0.25, 1.50),
     "gemini-3.1-pro": (2.00, 12.00),

@@ -40,7 +40,7 @@ DEFAULT_MODELS: dict[str, str] = {
     "openai": "gpt-6-luna",
     "azure": "gpt-6-luna",
     "anthropic": "claude-haiku-4-5-20251001",
-    "google": "gemini-3-flash-preview",
+    "google": "gemini-3.8-flash",
 }
 
 

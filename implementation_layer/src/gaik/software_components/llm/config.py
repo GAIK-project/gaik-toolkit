@@ -65,7 +65,7 @@ def get_llm_config(
     Examples:
         >>> get_llm_config()                       # uses LLM_PROVIDER or azure
         >>> get_llm_config("anthropic")            # explicit
-        >>> get_llm_config("google", model="gemini-2.0-flash")
+        >>> get_llm_config("google", model="gemini-3.8-flash")
 
     Explicit keyword overrides are applied before required-field validation, so
     credentials and endpoints can be supplied without setting environment variables.
@@ -187,7 +187,7 @@ def _google_config() -> dict:
     return {
         "provider": Provider.GOOGLE.value,
         "api_key": _env("GOOGLE_API_KEY", "GEMINI_API_KEY"),
-        "model": os.getenv("GOOGLE_MODEL", "gemini-2.5-flash"),
+        "model": os.getenv("GOOGLE_MODEL", "gemini-3.8-flash"),
         "embedding_model": _embedding_model_default(Provider.GOOGLE.value),
     }
 
@@ -209,6 +209,6 @@ def _vertex_config() -> dict:
             if scope.strip()
         ],
         "generate_content_url": _env("GOOGLE_GENERATE_CONTENT_URL"),
-        "model": os.getenv("GOOGLE_MODEL", "gemini-2.5-flash"),
+        "model": os.getenv("GOOGLE_MODEL", "gemini-3.8-flash"),
         "embedding_model": _embedding_model_default(Provider.VERTEX.value),
     }

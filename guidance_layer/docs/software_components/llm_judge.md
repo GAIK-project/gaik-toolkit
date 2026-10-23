@@ -30,8 +30,8 @@ Anthropic / Google Vertex, or any provider passed as `config=get_llm_config(...)
 from gaik.software_components.validators import LLMJudge, ValidationRubric
 
 judge = LLMJudge(
-    model_provider="google",                 # winner of the Luvata judge benchmark
-    model="gemini-3-flash-preview",
+    model_provider="google",                 # default judge provider
+    model="gemini-3.8-flash",
     use_vertexai=True,
 )
 
@@ -175,8 +175,8 @@ We benchmarked eight judge models on five hand-curated Luvata test cases
 | `claude-opus-4-7` (Anthropic Foundry) | 0.667 | 0.500 | 1.000 | $0.1780 | 10.5 s |
 | `claude-haiku-4-5` (Anthropic Foundry) | 0.522 | 0.353 | 1.000 | $0.0059 | 4.1 s |
 
-Recommendation: **Gemini 3 Flash via Vertex** as the default. For two-tier
-setups, Gemini 3.1 Flash Lite is the cheapest screener.
+The default is now its successor, `gemini-3.8-flash`, which this benchmark has not
+measured yet. For two-tier setups, Gemini 3.1 Flash Lite is the cheapest screener.
 
 ---
 
