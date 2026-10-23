@@ -11,6 +11,7 @@ import {
   SERVICES,
   type Service,
   type ServiceCategory,
+  TEAMS,
 } from "./knowledge";
 
 const STOPWORDS = new Set(
@@ -95,4 +96,18 @@ export function searchArticles(query: string, limit = 3): Article[] {
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map(({ article }) => article);
+}
+
+/** A service as the searchServices tool returns it to the model and the UI. */
+export function toServiceCard(s: Service) {
+  return {
+    id: s.id,
+    name: s.name,
+    category: s.category,
+    summary: s.summary,
+    details: s.details,
+    price: s.price,
+    duration: s.duration,
+    team: TEAMS[s.team].name,
+  };
 }

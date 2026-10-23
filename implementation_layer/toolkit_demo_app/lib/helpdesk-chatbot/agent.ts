@@ -18,7 +18,7 @@ import {
   SERVICES,
   TEAMS,
 } from "./knowledge";
-import { searchArticles, searchServices } from "./search";
+import { searchArticles, searchServices, toServiceCard } from "./search";
 
 // The Next.js server calls Azure OpenAI directly, on the same resource as the
 // demo API. Chat Completions on that resource is served at deployment-scoped
@@ -53,17 +53,6 @@ function chatModel() {
   });
 }
 
-const serviceCard = (s: (typeof SERVICES)[number]) => ({
-  id: s.id,
-  name: s.name,
-  category: s.category,
-  summary: s.summary,
-  details: s.details,
-  price: s.price,
-  duration: s.duration,
-  team: TEAMS[s.team].name,
-});
-
 const tools = {
   searchServices: tool({
     description:
@@ -78,7 +67,7 @@ const tools = {
         .describe("A few English keywords from the question"),
     }),
     execute: async (filters) => ({
-      services: searchServices(filters).map(serviceCard),
+      services: searchServices(filters).map(toServiceCard),
     }),
   }),
   searchKnowledge: tool({
@@ -97,7 +86,7 @@ const tools = {
   }),
   requestHumanHandoff: tool({
     description:
-      "Pass the question to a person on the right team. The user is asked to approve first. Use it when the user asks for a person, wants to book a service, or the knowledge does not answer the question.",
+      "Open a contact form addressed to the right team, prefilled with a summary of the conversation. The user is asked to approve first. Use it when the user asks for a person, wants to book a service, or the knowledge does not answer the question.",
     inputSchema: z.object({
       team: z.enum(Object.keys(TEAMS) as [keyof typeof TEAMS]),
       topic: z
@@ -108,7 +97,7 @@ const tools = {
         .string()
         .max(600)
         .describe(
-          "Two or three sentences for the team, in the user's language: what the user needs and what has been answered already",
+          "The user's message to the team, written in the first person as the user (\"We are a 12-person machine shop and would like ...\"), in the user's language, two or three sentences. The user edits and sends it",
         ),
     }),
     // Demo: nothing is sent. A real helpdesk would create the ticket here and
@@ -134,7 +123,7 @@ const INSTRUCTIONS = `You are the helpdesk assistant of ${ORGANISATION}, a publi
 ## Tools
 - searchServices: services, prices, durations. Use category/audience filters when the question implies them (e.g. "training for our staff" → category "training"). The list is complete: if a service is not in it, the hub does not offer it.
 - searchKnowledge: everything else about the hub (eligibility, pricing rules, data protection, hours, events, languages, next steps).
-- requestHumanHandoff: when the user wants a person, wants to book or apply, or you cannot answer. Choose the team that owns the topic. The user is asked to approve; if they decline, acknowledge it and do not ask again. After approval, say in one sentence that the request went to the team (the card above your reply shows the details). Do not repeat the ticket fields.
+- requestHumanHandoff: when the user wants a person, wants to book or apply, or you cannot answer. Choose the team that owns the topic. The user is asked to approve; if they decline, acknowledge it and do not ask again. After approval, tell the user in one sentence to fill in the contact form, which appears ABOVE your reply (never say "below"). Do not list the form fields or claim anything was sent yet.
 
 ## Style
 - Answer in the user's language (Finnish or English).
