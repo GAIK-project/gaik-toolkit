@@ -31,7 +31,7 @@ from gaik.software_components.validators import LLMJudge, ValidationRubric
 
 judge = LLMJudge(
     model_provider="google",                 # default judge provider
-    model="gemini-3.8-flash",
+    model="gemini-3.6-flash",
     use_vertexai=True,
 )
 
@@ -175,7 +175,7 @@ We benchmarked eight judge models on five hand-curated Luvata test cases
 | `claude-opus-4-7` (Anthropic Foundry) | 0.667 | 0.500 | 1.000 | $0.1780 | 10.5 s |
 | `claude-haiku-4-5` (Anthropic Foundry) | 0.522 | 0.353 | 1.000 | $0.0059 | 4.1 s |
 
-The default is now its successor, `gemini-3.8-flash`, which this benchmark has not
+The default is now its successor, `gemini-3.6-flash`, which this benchmark has not
 measured yet. For two-tier setups, Gemini 3.1 Flash Lite is the cheapest screener.
 
 ---

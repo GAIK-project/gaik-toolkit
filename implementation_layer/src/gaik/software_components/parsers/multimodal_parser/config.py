@@ -88,7 +88,7 @@ def create_claude_client(config: dict):
 
 def get_google_config(vertex_ai: bool = True) -> dict:
     """Get Google configuration based on whether to use Vertex AI or direct Gemini API."""
-    model = os.getenv("GOOGLE_MODEL", "gemini-3.8-flash")
+    model = os.getenv("GOOGLE_MODEL", "gemini-3.6-flash")
     if vertex_ai:
         return {
             "vertex_ai": True,

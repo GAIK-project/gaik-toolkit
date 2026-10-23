@@ -119,7 +119,7 @@ def google_example(pdf_path: str):
 
     parser = MultimodalParser(
         model_provider="google",
-        model="gemini-3.8-flash",
+        model="gemini-3.6-flash",
         vertex_ai=True,
         reasoning_effort="medium",
         merge_table=True,
