@@ -139,6 +139,9 @@ function Box({ rect, className }: { rect: Rect; className: string }) {
   );
 }
 
+const NO_TEXT_LAYER =
+  "This page has no text layer, so the value can't be checked automatically.";
+
 function PageView({
   source,
   result,
@@ -157,6 +160,11 @@ function PageView({
           {name}, page {source.page}
         </span>
       </p>
+      {page && source.status === "no_text_layer" && (
+        <p className="text-muted-foreground text-xs">
+          {NO_TEXT_LAYER} Compare it with the page yourself.
+        </p>
+      )}
       {page ? (
         <div className="relative overflow-hidden rounded-md border bg-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -185,7 +193,7 @@ function PageView({
       ) : (
         <p className="text-muted-foreground rounded-md border border-dashed p-6 text-sm">
           {source.status === "no_text_layer"
-            ? "An image has no text layer, so the quote cannot be located. Read the value off the document yourself."
+            ? `${NO_TEXT_LAYER} Compare it with the document yourself.`
             : result.documents.length === 0
               ? "Checked against the text the model read. Only an uploaded PDF shows where the quote is on the page."
               : "This page is not available."}

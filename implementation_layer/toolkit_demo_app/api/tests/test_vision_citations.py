@@ -91,8 +91,11 @@ def test_check_sources_verifies_corrects_and_flags(tmp_path: Path) -> None:
     assert wrong_value["status"] == "found" and wrong_value["value_status"] == "mismatch"
     assert invented["status"] == "not_found" and invented["rects"] == []
     assert image_source["status"] == "no_text_layer"
-    assert set(result["pages"]) == {"1:1"}
+    # The image is shown too, scaled down, for a person to compare.
+    assert set(result["pages"]) == {"1:1", "2:1"}
     assert result["pages"]["1:1"]["image"].startswith("data:image/jpeg;base64,")
+    assert result["pages"]["2:1"]["image"].startswith("data:image/jpeg;base64,")
+    assert max(result["pages"]["2:1"]["width"], result["pages"]["2:1"]["height"]) <= 1400
 
 
 @pytest.mark.asyncio

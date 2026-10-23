@@ -11,12 +11,14 @@ reliable ones. Everything after that is plain code against the PDF's own text la
    as numbers and dates, so ``3.000 kg`` matches ``3000`` and ``11.04.2025`` matches
    ``2025-04-11``. A quote that is found but does not hold the value is flagged too.
 
-An image has no text layer, so its citations cannot be checked and are shown as such.
+An image has no text layer, so its citations cannot be checked: the image is shown
+next to the quote for a person to compare.
 """
 
 from __future__ import annotations
 
 import base64
+import io
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +51,8 @@ TEXT_SOURCE_INSTRUCTION = SOURCE_INSTRUCTION.replace(
 # Pages rendered for the viewer: enough for any demo document, small enough to send.
 MAX_RENDERED_PAGES = 12
 RENDER_DPI = 110
+# Longest side of an uploaded image in the viewer, about a PDF page at RENDER_DPI.
+MAX_IMAGE_SIDE = 1400
 
 # Underscores split words too, so a code such as approved_with_remarks reads as words.
 _NON_WORD = re.compile(r"[\W_]+", re.UNICODE)
@@ -398,6 +402,8 @@ def _render_pages(documents: list[UploadedDocument], sources: list[dict]) -> dic
             continue
         path = documents[document - 1].path
         if path.suffix.lower() != ".pdf":
+            if page == 1 and (image := _render_image(path)):
+                rendered[f"{document}:1"] = image
             continue
         try:
             with fitz.open(path) as doc:
@@ -413,6 +419,25 @@ def _render_pages(documents: list[UploadedDocument], sources: list[dict]) -> dic
         except Exception:
             continue
     return rendered
+
+
+def _render_image(path: Path) -> dict | None:
+    """An uploaded image for the viewer, scaled down: it has no text layer to box."""
+    from PIL import Image
+
+    try:
+        with Image.open(path) as image:
+            image = image.convert("RGB")
+            image.thumbnail((MAX_IMAGE_SIDE, MAX_IMAGE_SIDE))
+            buffer = io.BytesIO()
+            image.save(buffer, "JPEG", quality=80)
+    except Exception:
+        return None
+    return {
+        "image": f"data:image/jpeg;base64,{base64.b64encode(buffer.getvalue()).decode()}",
+        "width": image.width,
+        "height": image.height,
+    }
 
 
 def check_text_sources(raw: Any, data: dict, text: str) -> dict:
