@@ -50,13 +50,7 @@ export const EXAMPLE_DOCUMENTS: ExampleDocument[] = [
     kind: "po",
     title: "Purchase order",
     summary:
-      "AutoTech Manufacturing Corp. orders three materials from Precision Steel & Components. " +
-      "The aim is to extract all the top-level header fields (PO number, customer, order date, buyer, " +
-      "sales person, shipping address, payment terms, shipping cost and tax rate) and, for each line " +
-      "item, the quantity, the unit price, the details from its BOM and the additional fees that " +
-      "apply (such as cutting, certificates, hydrostatic testing and packaging). The total price is " +
-      "then calculated with a breakdown: material subtotal, additional fees, shipping, tax and grand " +
-      "total. The total printed on the purchase order does not include these additional fees.",
+      "AutoTech Manufacturing Corp. orders three materials from Precision Steel & Components.",
     method: "ai",
     fields: [
       { name: "PO number" },
@@ -138,12 +132,7 @@ export const SINGLE_EXAMPLE_DOCUMENTS: ExampleDocument[] = [
     kind: "po",
     title: "Purchase order",
     summary:
-      "Kestilä Industrial Systems Oy orders three materials from Baltic Metals Trading GmbH. " +
-      "The aim is to extract the top-level header fields (order date, delivery date, order number, " +
-      "supplier number and shipping address) and the information of each line item (item number, " +
-      "description, quantity, unit price and material number). The total on the order does not " +
-      "include the additional fees listed under each position, so this example only extracts " +
-      "what the order states; it does not price the fees or calculate a new total.",
+      "Kestilä Industrial Systems Oy orders three materials from Baltic Metals Trading GmbH.",
     method: "ai",
     fields: [],
     groups: [

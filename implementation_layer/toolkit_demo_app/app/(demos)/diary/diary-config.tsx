@@ -104,17 +104,15 @@ export const DIARY_CONFIG: ExtractionConfig = {
 - Work that was delayed and why`,
   exampleGuide: {
     steps: EXAMPLE_STEPS,
-    notes: [
-      "The examples use a saved schema, so they run quickly. To choose your own fields or language, open Test on your own data or examples.",
-    ],
+    notes: ["The examples use a saved schema, so they run quickly."],
     intro:
-      "A site supervisor writes or dictates the day's diary in plain words. The model reads out the structured entry: when, where, who was on site, what was done, what happened and what comes next. Pick a diary, see what is read from it, then process it.",
+      "A site supervisor writes or dictates the day's diary in plain words. The model reads out the structured entry: when, where, who was on site, what was done, what happened and what comes next.",
   },
   createGuide: {
     steps: CREATE_STEPS,
     notes: [
       "Field names stay in English; the language setting changes the extracted values only.",
-      "A text that covers several days gives one entry for each day. Nothing you add is kept as a use case: the schema lives for this session.",
+      "A text that covers several days gives one entry for each day.",
     ],
     intro:
       "Extract your own data from typed or dictated construction diaries. The schema is generated for this session and is not saved.",

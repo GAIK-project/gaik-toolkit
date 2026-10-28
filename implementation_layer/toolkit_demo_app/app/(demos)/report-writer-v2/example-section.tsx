@@ -33,7 +33,7 @@ const GUIDE_STEPS: GuideStep[] = [
   },
 ];
 const GUIDE_NOTES = [
-  "The example is fictional: a 1970s timber-frame house, three recordings from a site visit and five customer documents. Running it uses AI models and takes about two minutes: it transcribes the recordings, collects the facts and writes seven sections.",
+  "Running the example uses AI models and takes about two minutes.",
 ];
 
 /** The ready-made construction report: look at its sources, run it, check the evidence. */

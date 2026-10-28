@@ -22,8 +22,6 @@ export interface ExampleFile {
 export interface VisionExample {
   id: string;
   title: string;
-  /** The shape of the result, for the card. */
-  shape: string;
   summary: string;
   files: ExampleFile[];
   task: string;
@@ -41,7 +39,6 @@ export const EXAMPLES: VisionExample[] = [
     id: "application",
     readyMade: true,
     title: "Employment application form",
-    shape: "form + 5 lists",
     summary:
       "A two-page form with typed labels, handwriting, ticked boxes and tables: education, jobs, references and a weekly availability grid.",
     files: [{ url: `${DIR}/employment-application.pdf`, label: "Form" }],
@@ -58,7 +55,6 @@ Extract the emergency contact (name, relationship, phone), the name and date of 
     id: "blueprint",
     readyMade: true,
     title: "Construction blueprint",
-    shape: "title block + 6 lists",
     summary:
       "A foundation plan drawing. Notes, revisions, dimensions, elevations, the legend and the views are read from the image.",
     files: [{ url: `${DIR}/blueprint.png`, label: "Blueprint" }],
@@ -118,7 +114,6 @@ Rules:
     id: "inspection",
     readyMade: true,
     title: "Site safety inspection",
-    shape: "header + checklist + findings",
     summary:
       "A report with a checklist of ticked boxes (OK, not OK, not applicable), corrective actions and summary figures.",
     files: [{ url: `${DIR}/site-safety-inspection.pdf`, label: "Report" }],
@@ -134,7 +129,6 @@ Only fill values that are shown. Return null when a value is missing.`,
     id: "receipt",
     readyMade: true,
     title: "Shop receipt (Finnish)",
-    shape: "header + items",
     summary:
       "A small, tilted photo of a Finnish receipt, with weighed goods, a discount line and a deposit.",
     files: [{ url: `${DIR}/receipt.jpg`, label: "Receipt" }],

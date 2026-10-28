@@ -1,15 +1,16 @@
 import { cn } from "@/lib/utils";
-import { Info, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export interface GuideStep {
-  icon: LucideIcon;
+  /** Kept for the callers; the step number marks the step, so the icon is not drawn. */
+  icon?: LucideIcon;
   title: string;
   text: string;
 }
 
 /**
  * A short, always-visible guide at the top of a section: numbered steps for what to do,
- * and a few things worth knowing before starting.
+ * and a few things worth knowing before starting. Kept quiet so the demo itself leads.
  */
 export function SectionGuide({
   heading,
@@ -25,51 +26,36 @@ export function SectionGuide({
   return (
     <section
       aria-label={heading}
-      className={cn(
-        "from-primary/5 to-card rounded-xl border bg-gradient-to-br p-5",
-        className,
-      )}
+      className={cn("bg-card rounded-xl border px-5 py-4", className)}
     >
-      <h3 className="text-sm font-semibold tracking-wide uppercase">
-        {heading}
-      </h3>
+      <h2 className="text-sm font-semibold">{heading}</h2>
       <ol
         className={cn(
-          "mt-4 grid gap-3 sm:grid-cols-2",
+          "mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2",
           steps.length > 4 ? "lg:grid-cols-5" : "lg:grid-cols-4",
         )}
       >
         {steps.map((step, index) => (
-          <li
-            key={step.title}
-            className="bg-card flex gap-3 rounded-lg border p-3 shadow-xs"
-          >
-            <span className="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold">
+          <li key={step.title} className="flex gap-2.5">
+            <span className="border-primary/40 text-primary mt-px flex size-5 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums">
               {index + 1}
             </span>
             <span className="min-w-0">
-              <span className="flex items-center gap-1.5 text-sm font-semibold">
-                <step.icon
-                  className="text-primary size-4 shrink-0"
-                  aria-hidden
-                />
-                {step.title}
-              </span>
-              <span className="text-muted-foreground mt-1 block text-sm leading-5">
+              <span className="block text-sm font-medium">{step.title}</span>
+              <span className="text-muted-foreground mt-0.5 block text-sm leading-5">
                 {step.text}
               </span>
             </span>
           </li>
         ))}
       </ol>
-      <ul className="text-muted-foreground mt-4 space-y-1.5 text-sm">
-        {notes.map((note) => (
-          <li key={note} className="flex items-start gap-2">
-            <Info className="text-primary mt-0.5 size-4 shrink-0" aria-hidden />
-            <span>{note}</span>
-          </li>
-        ))}
-      </ul>
+      {notes.length > 0 && (
+        <ul className="text-muted-foreground mt-4 space-y-1 border-t pt-3 text-sm">
+          {notes.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

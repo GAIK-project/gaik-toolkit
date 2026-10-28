@@ -26,7 +26,6 @@ import {
   Eye,
   FileCode2,
   Loader2,
-  ListChecks,
   PenLine,
   Sparkles,
   Table2,
@@ -314,8 +313,8 @@ export default function SchemaGeneratorPage() {
               Start from a ready-made task
             </h2>
             <p className="text-muted-foreground text-sm">
-              The Schema Generator finds one of three structures. Each has two
-              examples; the types on a card are the kinds of field it asks for.
+              Two tasks for each of the three structures the generator finds.
+              The tags name the kinds of field each task asks for.
             </p>
           </div>
           <div
@@ -327,9 +326,6 @@ export default function SchemaGeneratorPage() {
               <div key={structure} className="space-y-2">
                 <h3 className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                   {STRUCTURE_TITLES[structure]}
-                  <Badge variant="secondary" className="font-mono font-normal">
-                    {structure}
-                  </Badge>
                   <span className="text-muted-foreground font-normal">
                     {STRUCTURE_TEXT[structure]}
                   </span>
@@ -358,9 +354,6 @@ export default function SchemaGeneratorPage() {
                             {item.summary}
                           </span>
                           <span className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                            <Badge variant="secondary" className="font-normal">
-                              {STRUCTURE_TITLES[item.structure]}
-                            </Badge>
                             {item.types.map((type) => (
                               <Badge
                                 key={type}
@@ -412,12 +405,6 @@ export default function SchemaGeneratorPage() {
                     maxLength={20000}
                     className="font-mono text-sm"
                   />
-                  <p className="text-muted-foreground flex gap-2 text-xs">
-                    <ListChecks className="mt-0.5 size-3.5 shrink-0" />A good
-                    task names the fields, their types, any lists of repeated
-                    records, formats such as dates, allowed values, and what to
-                    return when a value is missing.
-                  </p>
                 </TabsContent>
 
                 <TabsContent value="builder" className="space-y-3 pt-3">
@@ -456,12 +443,11 @@ export default function SchemaGeneratorPage() {
                   </>
                 )}
               </Button>
-              <p className="text-muted-foreground text-center text-xs">
-                Model:{" "}
-                {ownModel
-                  ? `your own (${ownModel.model})`
-                  : "the server's model"}
-              </p>
+              {ownModel && (
+                <p className="text-muted-foreground text-center text-xs">
+                  Model: your own ({ownModel.model})
+                </p>
+              )}
             </CardContent>
           </Card>
 

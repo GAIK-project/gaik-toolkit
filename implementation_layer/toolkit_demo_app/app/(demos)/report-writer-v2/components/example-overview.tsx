@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
   Download,
+  ExternalLink,
   FileAudio,
   FileImage,
   FileSpreadsheet,
@@ -132,12 +133,22 @@ function Preview({ doc }: { doc: Doc }) {
           This file type has no preview here.
         </p>
       )}
-      <Button asChild size="sm" variant="outline">
-        <a href={url} download={doc.name}>
-          <Download className="size-4" />
-          Download {doc.name}
-        </a>
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        {(kind.view === "pdf" || kind.view === "image") && (
+          <Button asChild size="sm" variant="outline">
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="size-4" />
+              Open in a new tab
+            </a>
+          </Button>
+        )}
+        <Button asChild size="sm" variant="outline">
+          <a href={url} download={doc.name}>
+            <Download className="size-4" />
+            Download {doc.name}
+          </a>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -276,9 +287,14 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
         </div>
 
         <div className="space-y-2 border-t pt-4">
-          <h4 className="text-sm font-semibold">
-            The report that will be written: {rw.sections.length} sections
-          </h4>
+          <div>
+            <h4 className="text-sm font-semibold">
+              The report that will be written: {rw.sections.length} sections
+            </h4>
+            <p className="text-muted-foreground text-xs">
+              An item that no source covers is marked as missing.
+            </p>
+          </div>
           <ol className="grid gap-2 md:grid-cols-2">
             {rw.sections.map((section, index) => {
               const derived = section.depends_on.length > 0;
@@ -306,8 +322,7 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
                     </span>
                     {(section.required_items?.length ?? 0) > 0 && (
                       <span className="text-muted-foreground block text-xs">
-                        Must cover {section.required_items!.length} items; any
-                        that no source covers are marked as missing.
+                        Must cover {section.required_items!.length} items
                       </span>
                     )}
                   </span>

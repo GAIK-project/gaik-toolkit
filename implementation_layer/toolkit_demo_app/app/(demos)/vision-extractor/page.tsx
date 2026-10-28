@@ -457,11 +457,6 @@ export default function VisionExtractorPage() {
                   <span className="text-muted-foreground text-sm">
                     {example.summary}
                   </span>
-                  <span>
-                    <Badge variant="outline" className="font-normal">
-                      {example.shape}
-                    </Badge>
-                  </span>
                 </button>
                 <div className="flex flex-wrap justify-center gap-1">
                   {example.files.map((file) => (

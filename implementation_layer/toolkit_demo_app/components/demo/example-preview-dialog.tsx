@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Loader2, FileText } from "lucide-react";
+import { ExternalLink, Eye, Loader2, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -92,7 +92,7 @@ export function ExamplePreviewDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Example Document
+              Example document
             </DialogTitle>
             <DialogDescription>{exampleName}</DialogDescription>
           </DialogHeader>
@@ -111,20 +111,28 @@ export function ExamplePreviewDialog({
             )}
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+          <DialogFooter className="sm:justify-between">
+            <Button asChild variant="ghost">
+              <a href={exampleUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Open in a new tab
+              </a>
             </Button>
-            <Button onClick={handleUseExample} disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                "Use this example"
-              )}
-            </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUseExample} disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  "Use this example"
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

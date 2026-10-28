@@ -1,12 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api-client";
 import { parseSSEEvents } from "@/lib/sse";
 import { cn } from "@/lib/utils";
@@ -64,13 +59,6 @@ const PIPELINES = {
     { icon: Sparkles, label: "Extract", detail: "AI reads the fields" },
     { icon: Table2, label: "Structured data", detail: "Header and line items" },
   ],
-};
-
-const DESCRIPTIONS: Record<ExampleCase, string> = {
-  single:
-    "A purchase order arrives as a single PDF. The model reads its header fields and every line item into structured data. Browse the document, see what is read from it, then process it.",
-  multi:
-    "A customer sends a purchase order with three bills of materials (BOMs). The supplier's price list turns it into a priced order draft. Browse the documents, see what is read from each, then process them.",
 };
 
 async function detail(response: Response, fallback: string) {
@@ -263,7 +251,6 @@ const MULTI_GUIDE_STEPS: GuideStep[] = [
 ];
 const MULTI_GUIDE_NOTES = [
   "Fees come from the price list: cutting, testing and certificates by the row rate, hydrostatic testing and packaging by a flat rate per unit. Tax applies to material, fees and shipping.",
-  "The example documents are fixed. To try your own documents or fields, open Test with your own data or examples.",
 ];
 const SINGLE_GUIDE_STEPS: GuideStep[] = [
   {
@@ -289,7 +276,6 @@ const SINGLE_GUIDE_STEPS: GuideStep[] = [
 ];
 const SINGLE_GUIDE_NOTES = [
   "This example only extracts what the order states. It does not price the fees listed under each position or calculate a new total.",
-  "The example document is fixed. To try your own documents or fields, open Test with your own data or examples.",
 ];
 
 /**
@@ -490,10 +476,7 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
         notes={single ? SINGLE_GUIDE_NOTES : MULTI_GUIDE_NOTES}
       />
       <Card>
-        <CardHeader>
-          <CardDescription>{DESCRIPTIONS[caseKey]}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 pt-6">
           {/* Which example to look at */}
           <div
             role="radiogroup"
