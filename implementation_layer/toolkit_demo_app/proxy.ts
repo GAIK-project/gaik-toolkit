@@ -136,11 +136,13 @@ export default async function proxy(request: NextRequest) {
       !!request.headers.get(MODEL_SETTINGS_HEADER) &&
       supportsModelSettings(pathname, request.method);
     if (needsApprovedUser(request.method, pathname, ownModelKey)) {
-      const refusal = await accessRefusal(
-        await getAccessState(request),
-        takeTrialRun,
-      );
+      const state = await getAccessState(request);
+      const refusal = await accessRefusal(state, takeTrialRun);
       if (refusal) {
+        // Why a run was refused, without who: the page shows the same text.
+        console.warn(
+          `[api-gate] ${refusal.status} ${request.method} ${pathname} loggedIn=${state.loggedIn} approved=${state.approved} pending=${state.pending}`,
+        );
         return NextResponse.json(
           { error: refusal.error },
           { status: refusal.status },

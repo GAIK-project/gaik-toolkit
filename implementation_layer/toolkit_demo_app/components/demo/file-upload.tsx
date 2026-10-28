@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Upload, File, X, CheckCircle } from "lucide-react";
+import { Upload, File, X, CheckCircle, ExternalLink } from "lucide-react";
 import { cn, formatFileSize } from "@/lib/utils";
 
 const SAME_FORMAT: Record<string, string> = { JPEG: "JPG", TIF: "TIFF" };
@@ -15,6 +15,14 @@ function formatAccept(accept: string): string {
     .filter(Boolean)
     .map((name) => SAME_FORMAT[name] ?? name);
   return [...new Set(names)].join(", ");
+}
+
+/** Open a chosen or loaded file in a new tab, so it can be read before it is sent. */
+export function openFileInNewTab(file: Blob) {
+  const url = URL.createObjectURL(file);
+  window.open(url, "_blank", "noopener");
+  // The new tab has loaded it by then; release the memory.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 interface FileUploadProps {
@@ -152,6 +160,15 @@ export function FileUpload({
                 {formatFileSize(selectedFile.size)}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => openFileInNewTab(selectedFile)}
+              className="hover:bg-success/20 rounded-full p-1 transition-colors"
+              aria-label={`Open ${selectedFile.name} in a new tab`}
+              title="Open in a new tab"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </button>
             <button
               onClick={removeFile}
               disabled={disabled}

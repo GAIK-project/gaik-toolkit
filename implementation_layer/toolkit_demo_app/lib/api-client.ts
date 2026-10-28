@@ -72,5 +72,20 @@ export async function apiFetch(
     throw new RateLimitError(resetTime);
   }
 
+  // The proxy's own refusals (sign in, pending approval, a used-up trial) say why
+  // in `error`, while the demo pages read the backend's `detail`; give them both
+  // so the page shows the reason instead of its generic fallback.
+  if (!response.ok) {
+    const body = (await response
+      .clone()
+      .json()
+      .catch(() => null)) as Record<string, unknown> | null;
+    if (body && typeof body.error === "string" && body.detail === undefined)
+      return Response.json(
+        { ...body, detail: body.error },
+        { status: response.status, statusText: response.statusText },
+      );
+  }
+
   return response;
 }

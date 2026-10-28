@@ -1,6 +1,6 @@
 "use client";
 
-import { FileUpload } from "@/components/demo/file-upload";
+import { FileUpload, openFileInNewTab } from "@/components/demo/file-upload";
 import {
   appendVisionSettings,
   DEFAULT_VISION_SETTINGS,
@@ -33,6 +33,7 @@ import { apiFetch } from "@/lib/api-client";
 import { cn, formatFileSize } from "@/lib/utils";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import {
+  ExternalLink,
   FileCode2,
   FileUp,
   ListChecks,
@@ -876,6 +877,15 @@ export function CustomUseCase() {
                           {formatFileSize(file.size)}
                         </span>
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => openFileInNewTab(file)}
+                        className="hover:bg-muted rounded-full p-1"
+                        aria-label={`Open ${file.name} in a new tab`}
+                        title="Open in a new tab"
+                      >
+                        <ExternalLink className="size-4" />
+                      </button>
                       <button
                         type="button"
                         disabled={busy}

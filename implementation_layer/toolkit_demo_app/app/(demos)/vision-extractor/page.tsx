@@ -32,7 +32,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { cn, formatFileSize } from "@/lib/utils";
+import { openFileInNewTab } from "@/components/demo/file-upload";
 import {
+  ExternalLink,
   FileCode2,
   ListChecks,
   Loader2,
@@ -164,6 +166,15 @@ function FileListRow({ file, disabled, onRemove }: FileListRowProps) {
           {formatFileSize(file.size)}
         </p>
       </div>
+      <button
+        type="button"
+        onClick={() => openFileInNewTab(file)}
+        className="hover:bg-muted rounded-full p-1 transition-colors"
+        aria-label={`Open ${file.name} in a new tab`}
+        title="Open in a new tab"
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+      </button>
       <button
         onClick={onRemove}
         disabled={disabled}
