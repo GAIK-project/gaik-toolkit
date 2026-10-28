@@ -76,8 +76,9 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
   (`[tool.uv.sources]` in its `pyproject.toml`), so a local run can pass on a fix that
   the deployed demo lacks.
 - `proxy.ts` is the only auth layer in front of the FastAPI backend; every
-  state-changing method needs a signed-in, approved user (`lib/api-access.ts`); the
-  wizard routes have their own gate.
+  state-changing method needs a signed-in, approved user (`lib/api-access.ts`), or a
+  pending one within the daily trial allowance (`lib/trial.ts`, counted in Upstash
+  Redis, off without it); the wizard routes have their own gate.
 
 ## docs site (GitHub Pages)
 

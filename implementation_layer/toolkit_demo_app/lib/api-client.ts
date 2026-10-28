@@ -49,6 +49,18 @@ export async function apiFetch(
 
   if (response.status === 429) {
     const resetHeader = response.headers.get("X-RateLimit-Reset");
+    if (!resetHeader) {
+      // The daily trial allowance (lib/trial.ts) has no countdown; say its own text.
+      const body = (await response
+        .clone()
+        .json()
+        .catch(() => null)) as { error?: unknown } | null;
+      toast.error(
+        typeof body?.error === "string" ? body.error : "Too many requests.",
+        { duration: 8000 },
+      );
+      throw new RateLimitError(0);
+    }
     const resetTime = resetHeader ? parseInt(resetHeader, 10) : 0;
     const secondsLeft = Math.max(1, Math.ceil((resetTime - Date.now()) / 1000));
 

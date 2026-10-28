@@ -6,6 +6,7 @@ import {
   type ReportUsageInfo,
 } from "@/lib/report-writer/usage";
 import { parseSSEEvents } from "@/lib/sse";
+import { getTrialLimits, takeTrialRun, trialEnabled } from "@/lib/trial";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 const BYPASS_AUTH = process.env.BYPASS_AUTH === "true";
@@ -28,26 +29,36 @@ export function clientIp(headers: Headers): string {
 /**
  * The 403 body for a user who is not approved or has used up their reports,
  * or null when the user may run. A per-user override wins over the default.
+ * A pending user may write up to `trialReports` reports (0 turns that off).
  */
 export function accessDenial(
   row: AccessRow | null,
   maxReports: number,
+  trialReports = 0,
 ): Record<string, unknown> | null {
-  if (!row || row.status !== "approved")
+  const trial = row?.status === "pending" && trialReports > 0;
+  if (!row || (row.status !== "approved" && !trial))
     return { error: "Your access is pending approval." };
   const used = row.reports_count ?? 0;
-  const cap = row.report_limit_override ?? maxReports;
+  const regularCap = row.report_limit_override ?? maxReports;
+  const cap = trial ? Math.min(trialReports, regularCap) : regularCap;
   if (used >= cap)
-    return {
-      error: `You've used all ${cap} of your reports. Ask an admin to reset your counter.`,
-      used,
-      limit: cap,
-    };
+    return trial
+      ? {
+          error: `You've used your ${cap === 1 ? "trial report" : `${cap} trial reports`}. Full access opens when your account is approved.`,
+          used,
+          limit: cap,
+        }
+      : {
+          error: `You've used all ${cap} of your reports. Ask an admin to reset your counter.`,
+          used,
+          limit: cap,
+        };
   return null;
 }
 
 /**
- * Auth + approval + quota, then the per-IP burst limit (parity with the proxy;
+ * Auth + approval (or trial) + quota, then the per-IP burst limit (parity with the proxy;
  * these routes are not proxied). Returns the refusal response, or the user id
  * (null under BYPASS_AUTH).
  */
@@ -73,8 +84,15 @@ export async function gateReportWriter(
     .select("status, reports_count, report_limit_override")
     .eq("user_id", user.id)
     .single();
-  const denial = accessDenial(row as AccessRow | null, maxReports);
+  const trialReports = trialEnabled() ? getTrialLimits().reports : 0;
+  const denial = accessDenial(row as AccessRow | null, maxReports, trialReports);
   if (denial) return NextResponse.json(denial, { status: 403 });
+  // A pending user's stages also count against the daily trial allowance.
+  if (row?.status === "pending") {
+    const trial = await takeTrialRun(user.id);
+    if (!trial.ok)
+      return NextResponse.json({ error: trial.error }, { status: trial.status });
+  }
 
   if (ratelimit) {
     try {

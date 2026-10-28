@@ -2,7 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Demo pages are open to look at. Running a demo needs a signed-in, approved
-// account or the user's own model key, and that is enforced on the API requests
+// account (or a pending one, within the trial allowance in lib/trial.ts) or the
+// user's own model key, and that is enforced on the API requests
 // in proxy.ts (see lib/api-access.ts), not by redirecting here. The demo layout
 // shows a "View only" notice to visitors who cannot run yet. The Solution Wizard
 // has its own finer gate in proxy.ts.
@@ -28,8 +29,19 @@ function isAuthRoute(pathname: string): boolean {
 export interface AccessState {
   loggedIn: boolean;
   approved: boolean;
+  /** Signed up and waiting for approval: may run demos on a trial allowance (lib/trial.ts). */
+  pending: boolean;
+  userId: string | null;
   wizardAccess: boolean;
 }
+
+const NO_ACCESS: AccessState = {
+  loggedIn: false,
+  approved: false,
+  pending: false,
+  userId: null,
+  wizardAccess: false,
+};
 
 /**
  * Read the requesting user's access state in one shot: logged in, approved
@@ -41,12 +53,17 @@ export async function getAccessState(
   request: NextRequest,
 ): Promise<AccessState> {
   if (BYPASS_AUTH)
-    return { loggedIn: true, approved: true, wizardAccess: true };
+    return {
+      loggedIn: true,
+      approved: true,
+      pending: false,
+      userId: null,
+      wizardAccess: true,
+    };
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!supabaseUrl || !supabaseKey)
-    return { loggedIn: false, approved: false, wizardAccess: false };
+  if (!supabaseUrl || !supabaseKey) return NO_ACCESS;
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
@@ -62,7 +79,7 @@ export async function getAccessState(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { loggedIn: false, approved: false, wizardAccess: false };
+  if (!user) return NO_ACCESS;
 
   const { data } = await supabase
     .from("access_requests")
@@ -73,6 +90,8 @@ export async function getAccessState(
   return {
     loggedIn: true,
     approved: data?.status === "approved",
+    pending: data?.status === "pending",
+    userId: user.id,
     wizardAccess: data?.wizard_access === true,
   };
 }

@@ -480,19 +480,37 @@ export function ModelSettingsNotice() {
   );
 }
 
-/** Tells visitors who cannot run a demo yet how to: sign in or use their own key. */
+/**
+ * Tells visitors who cannot run a demo yet how to: sign in or use their own key.
+ * A pending user on the trial allowance is told the daily limit instead.
+ */
 export function AccessNotice({
   loggedIn,
   unlocked,
+  trialRunsPerDay = null,
 }: {
   loggedIn: boolean;
   unlocked: boolean;
+  /** Set when the user is pending approval and on the trial allowance. */
+  trialRunsPerDay?: number | null;
 }) {
   const settings = useModelSettings();
   const pathname = usePathname();
   if (unlocked) return null;
   const ownKeyWorks = pageUsesModelSettings(pathname);
   if (ownKeyWorks && settings) return null;
+  if (trialRunsPerDay)
+    return (
+      <div
+        role="status"
+        className="border-border bg-muted/40 mb-6 rounded-lg border px-4 py-3 text-sm"
+      >
+        <p>
+          <strong>Trial access.</strong> You can run demos now, up to{" "}
+          {trialRunsPerDay} runs a day, while your account is reviewed.
+        </p>
+      </div>
+    );
   return (
     <div
       role="status"

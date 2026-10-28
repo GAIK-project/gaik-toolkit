@@ -1,11 +1,14 @@
 import { cookies } from "next/headers";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { trialEnabled } from "@/lib/trial";
 import type { User } from "@supabase/supabase-js";
 
 export interface AccessStatus {
   user: User | null;
   isUnlocked: boolean;
+  /** Pending approval, but may run demos on the daily trial allowance (lib/trial.ts). */
+  isTrial: boolean;
   /** Per-user Solution Wizard beta access (the `wizard_access` flag). */
   wizardAccess: boolean;
   bypassAuth: boolean;
@@ -15,7 +18,13 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
   const bypassAuth = process.env.BYPASS_AUTH === "true";
 
   if (bypassAuth) {
-    return { user: null, isUnlocked: true, wizardAccess: true, bypassAuth: true };
+    return {
+      user: null,
+      isUnlocked: true,
+      isTrial: false,
+      wizardAccess: true,
+      bypassAuth: true,
+    };
   }
 
   const supabase = await createClient();
@@ -27,6 +36,7 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
     return {
       user: null,
       isUnlocked: false,
+      isTrial: false,
       wizardAccess: false,
       bypassAuth: false,
     };
@@ -41,6 +51,7 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
   return {
     user,
     isUnlocked: data?.status === "approved",
+    isTrial: data?.status === "pending" && trialEnabled(),
     wizardAccess: data?.wizard_access === true,
     bypassAuth: false,
   };

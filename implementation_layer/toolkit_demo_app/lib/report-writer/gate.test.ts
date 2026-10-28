@@ -20,6 +20,23 @@ test("a missing or unapproved row is pending approval", () => {
   expect(accessDenial(row({ status: "pending" }), 5)).toEqual(pending);
 });
 
+test("a pending user may write the trial reports, within the regular cap", () => {
+  const trialRow = row({ status: "pending" });
+  expect(accessDenial(trialRow, 5, 1)).toBeNull();
+  expect(accessDenial(row({ status: "pending", reports_count: 1 }), 5, 1)).toEqual({
+    error: "You've used your trial report. Full access opens when your account is approved.",
+    used: 1,
+    limit: 1,
+  });
+  expect(accessDenial(row({ status: "pending", reports_count: 2 }), 5, 3)).toBeNull();
+  expect(accessDenial(row({ status: "pending", report_limit_override: 0 }), 5, 1)).toMatchObject({
+    limit: 0,
+  });
+  expect(accessDenial(row({ status: "rejected" }), 5, 1)).toEqual({
+    error: "Your access is pending approval.",
+  });
+});
+
 test("an approved user under the cap may run", () => {
   expect(accessDenial(row({ reports_count: 4 }), 5)).toBeNull();
   expect(accessDenial(row({ reports_count: null }), 5)).toBeNull();

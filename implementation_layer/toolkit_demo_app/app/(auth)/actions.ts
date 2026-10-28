@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { trialEnabled } from "@/lib/trial";
 
 export type AuthResult = {
   error?: string;
@@ -127,7 +128,8 @@ export async function signIn(
   }
 
   if (accessRequest.status === "pending") {
-    redirect("/access-pending");
+    // On the trial allowance a pending user can start testing at once.
+    redirect(trialEnabled() ? "/" : "/access-pending");
   }
 
   if (accessRequest.status === "rejected") {

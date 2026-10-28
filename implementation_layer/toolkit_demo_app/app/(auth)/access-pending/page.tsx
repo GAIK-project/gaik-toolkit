@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/(auth)/actions";
 import { getAccessStatus } from "@/data/auth";
@@ -5,6 +6,7 @@ import { AuthShell } from "../components/auth-shell";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 import { AccessPolling } from "../components/access-polling";
+import { getTrialLimits, trialEnabled } from "@/lib/trial";
 
 const SuccessAnimation = dynamic(() =>
   import("../components/success-animation").then((mod) => mod.SuccessAnimation),
@@ -23,9 +25,11 @@ export default async function AccessPendingPage() {
     redirect("/");
   }
 
+  const trial = trialEnabled();
+
   return (
     <AuthShell
-      title="Access pending"
+      title={trial ? "You can start testing" : "Access pending"}
       description="Your request is being reviewed by our team."
     >
       <div className="space-y-6 text-center">
@@ -39,10 +43,23 @@ export default async function AccessPendingPage() {
           <p className="font-medium">{email}</p>
         </div>
 
-        <p className="text-muted-foreground text-sm">
-          Your request will be reviewed shortly. We&apos;ll send you an email when
-          your access has been approved.
-        </p>
+        {trial ? (
+          <>
+            <p className="text-muted-foreground text-sm">
+              You can run the demos now, up to {getTrialLimits().runsPerDay}{" "}
+              runs a day. Full access opens when your request is approved, and
+              we&apos;ll email you then.
+            </p>
+            <Button asChild className="w-full">
+              <Link href="/">Start testing</Link>
+            </Button>
+          </>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            Your request will be reviewed shortly. We&apos;ll send you an email
+            when your access has been approved.
+          </p>
+        )}
 
         <form action={signOut}>
           <Button variant="outline" className="w-full" type="submit">

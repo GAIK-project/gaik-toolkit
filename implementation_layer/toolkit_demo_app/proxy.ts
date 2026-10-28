@@ -1,4 +1,8 @@
-import { isStateChanging, needsApprovedUser } from "@/lib/api-access";
+import {
+  accessRefusal,
+  isStateChanging,
+  needsApprovedUser,
+} from "@/lib/api-access";
 import {
   MODEL_SETTINGS_HEADER,
   encodeModelSettings,
@@ -7,6 +11,7 @@ import {
 } from "@/lib/model-settings";
 import { ratelimit } from "@/lib/rate-limit";
 import { getAccessState, updateSession } from "@/lib/supabase/proxy";
+import { takeTrialRun } from "@/lib/trial";
 import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
@@ -125,22 +130,20 @@ export default async function proxy(request: NextRequest) {
     // Require login + approval for every backend request that changes state,
     // not just POST: DELETE /video-search/clear empties a table.
     // A request that carries the user's own model key on a supported route runs
-    // on their credential, so it needs no account.
+    // on their credential, so it needs no account. A user still waiting for
+    // approval runs on the daily trial allowance (lib/trial.ts).
     const ownModelKey =
       !!request.headers.get(MODEL_SETTINGS_HEADER) &&
       supportsModelSettings(pathname, request.method);
     if (needsApprovedUser(request.method, pathname, ownModelKey)) {
-      const { loggedIn, approved } = await getAccessState(request);
-      if (!loggedIn) {
+      const refusal = await accessRefusal(
+        await getAccessState(request),
+        takeTrialRun,
+      );
+      if (refusal) {
         return NextResponse.json(
-          { error: "Sign in to use this feature." },
-          { status: 401 },
-        );
-      }
-      if (!approved) {
-        return NextResponse.json(
-          { error: "Your access is pending approval." },
-          { status: 403 },
+          { error: refusal.error },
+          { status: refusal.status },
         );
       }
     }

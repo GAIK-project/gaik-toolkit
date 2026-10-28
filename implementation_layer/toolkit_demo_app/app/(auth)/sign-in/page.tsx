@@ -74,7 +74,7 @@ export default function SignInPage() {
         </Button>
 
         <p className="text-muted-foreground text-center text-xs">
-          Your request will be reviewed shortly.
+          New accounts can try the demos right away, within a daily limit.
         </p>
       </form>
     </AuthShell>

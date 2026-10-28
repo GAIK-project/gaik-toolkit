@@ -6,11 +6,14 @@ import {
 } from "@/lib/helpdesk-chatbot/agent";
 import { ratelimit } from "@/lib/rate-limit";
 import { getAccessState } from "@/lib/supabase/proxy";
+import { accessRefusal } from "@/lib/api-access";
+import { takeTrialRun } from "@/lib/trial";
 
 /**
  * Helpdesk Chatbot demo. The only demo whose model runs in Next.js rather than
  * the FastAPI backend, so proxy.ts leaves it to this handler, which applies the
- * same rules: a signed-in, approved user and the per-IP rate limit.
+ * same rules: a signed-in, approved user (or a pending one within the trial
+ * allowance) and the per-IP rate limit.
  */
 export const maxDuration = 60;
 
@@ -29,17 +32,14 @@ function clientIp(request: NextRequest): string {
 }
 
 export async function POST(request: NextRequest) {
-  const { loggedIn, approved } = await getAccessState(request);
-  if (!loggedIn) {
+  const refusal = await accessRefusal(
+    await getAccessState(request),
+    takeTrialRun,
+  );
+  if (refusal) {
     return NextResponse.json(
-      { error: "Sign in to use this feature." },
-      { status: 401 },
-    );
-  }
-  if (!approved) {
-    return NextResponse.json(
-      { error: "Your access is pending approval." },
-      { status: 403 },
+      { error: refusal.error },
+      { status: refusal.status },
     );
   }
   if (!helpdeskConfigured()) {

@@ -28,3 +28,39 @@ export function needsApprovedUser(
     !ownModelKey
   );
 }
+
+export interface GateState {
+  loggedIn: boolean;
+  approved: boolean;
+  /** Waiting for approval: may run on the trial allowance (lib/trial.ts). */
+  pending: boolean;
+  userId: string | null;
+}
+
+export interface Refusal {
+  status: number;
+  error: string;
+}
+
+export const PENDING_DENIAL: Refusal = {
+  status: 403,
+  error: "Your access is pending approval.",
+};
+
+/**
+ * Why a request that needs an account is refused, or null when it may run.
+ * An approved user runs freely; a pending one spends a trial run.
+ */
+export async function accessRefusal(
+  state: GateState,
+  takeTrialRun: (
+    userId: string,
+  ) => Promise<{ ok: true } | ({ ok: false } & Refusal)>,
+): Promise<Refusal | null> {
+  if (!state.loggedIn)
+    return { status: 401, error: "Sign in to use this feature." };
+  if (state.approved) return null;
+  if (!state.pending || !state.userId) return PENDING_DENIAL;
+  const trial = await takeTrialRun(state.userId);
+  return trial.ok ? null : { status: trial.status, error: trial.error };
+}

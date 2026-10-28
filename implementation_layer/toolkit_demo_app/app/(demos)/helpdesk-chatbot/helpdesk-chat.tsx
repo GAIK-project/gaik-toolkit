@@ -49,6 +49,12 @@ function errorText(error: Error): string {
   try {
     const { error: message } = JSON.parse(error.message);
     if (KNOWN_ERRORS.has(message)) return message;
+    // The trial limits in lib/trial.ts, whose text carries the daily count.
+    if (
+      typeof message === "string" &&
+      message.endsWith("Full access opens when your account is approved.")
+    )
+      return message;
   } catch {
     // not JSON: fall through
   }

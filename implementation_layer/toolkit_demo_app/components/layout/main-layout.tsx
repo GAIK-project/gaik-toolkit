@@ -3,6 +3,7 @@ import { FooterServer } from "@/components/layout/footer-server";
 import { SiteNavServer } from "@/components/layout/site-nav-server";
 import { AccessNotice, ModelSettingsNotice } from "@/components/model-settings";
 import { getUserAccessStatus } from "@/lib/queries/access";
+import { getTrialLimits } from "@/lib/trial";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -37,7 +38,13 @@ export async function MainLayout({
       <SiteNavServer />
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 pt-8 pb-24 sm:px-8">
         {access && (
-          <AccessNotice loggedIn={!!access.user} unlocked={access.isUnlocked} />
+          <AccessNotice
+            loggedIn={!!access.user}
+            unlocked={access.isUnlocked}
+            trialRunsPerDay={
+              access.isTrial ? getTrialLimits().runsPerDay : null
+            }
+          />
         )}
         <ModelSettingsNotice />
         {contentWrapper === "spaced" ? (
