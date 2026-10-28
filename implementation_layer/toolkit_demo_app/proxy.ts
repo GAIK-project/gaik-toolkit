@@ -10,7 +10,12 @@ import {
   supportsModelSettings,
 } from "@/lib/model-settings";
 import { ratelimit } from "@/lib/rate-limit";
-import { getAccessState, updateSession } from "@/lib/supabase/proxy";
+import {
+  type AccessState,
+  getAccessState,
+  updateSession,
+  withSessionCookies,
+} from "@/lib/supabase/proxy";
 import { takeTrialRun } from "@/lib/trial";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -28,6 +33,13 @@ function hasBody(method: string): boolean {
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Read once per request and shared by the wizard and API gates. Reading it can
+  // refresh the session, and every response below carries the new cookies.
+  let access: AccessState | undefined;
+  const accessState = async () => (access ??= await getAccessState(request));
+  const reply = (response: NextResponse) =>
+    withSessionCookies(response, access);
 
   // Solution Wizard access gate. Two independent ways in:
   //   1. Team shortcut: /solution-wizard?key=<WIZARD_ACCESS_SECRET> sets a
@@ -66,19 +78,23 @@ export default async function proxy(request: NextRequest) {
       // Otherwise allowed via the team key/cookie — fall through.
     } else {
       // No team key: allow registered beta testers (logged-in + wizard_access).
-      const { loggedIn, wizardAccess } = await getAccessState(request);
+      const { loggedIn, wizardAccess } = await accessState();
       if (!wizardAccess) {
         if (isApi) {
-          return NextResponse.json(
-            { error: "Solution Wizard is not available yet." },
-            { status: 403 },
+          return reply(
+            NextResponse.json(
+              { error: "Solution Wizard is not available yet." },
+              { status: 403 },
+            ),
           );
         }
         // Page: send anonymous visitors to sign-in (to register / request
         // access); send logged-in users without the flag home with a flag so
         // the onboarding provider can explain how to request beta access.
-        return NextResponse.redirect(
-          new URL(loggedIn ? "/?wizard=denied" : "/sign-in", request.url),
+        return reply(
+          NextResponse.redirect(
+            new URL(loggedIn ? "/?wizard=denied" : "/sign-in", request.url),
+          ),
         );
       }
       // Otherwise allowed via registered beta access — fall through.
@@ -136,16 +152,18 @@ export default async function proxy(request: NextRequest) {
       !!request.headers.get(MODEL_SETTINGS_HEADER) &&
       supportsModelSettings(pathname, request.method);
     if (needsApprovedUser(request.method, pathname, ownModelKey)) {
-      const state = await getAccessState(request);
+      const state = await accessState();
       const refusal = await accessRefusal(state, takeTrialRun);
       if (refusal) {
         // Why a run was refused, without who: the page shows the same text.
         console.warn(
           `[api-gate] ${refusal.status} ${request.method} ${pathname} loggedIn=${state.loggedIn} approved=${state.approved} pending=${state.pending}`,
         );
-        return NextResponse.json(
-          { error: refusal.error },
-          { status: refusal.status },
+        return reply(
+          NextResponse.json(
+            { error: refusal.error },
+            { status: refusal.status },
+          ),
         );
       }
     }
@@ -159,9 +177,11 @@ export default async function proxy(request: NextRequest) {
     const modelSettings = request.headers.get(MODEL_SETTINGS_HEADER);
     if (modelSettings) {
       if (!supportsModelSettings(pathname, request.method)) {
-        return NextResponse.json(
-          { error: "This demo uses server model settings." },
-          { status: 400 },
+        return reply(
+          NextResponse.json(
+            { error: "This demo uses server model settings." },
+            { status: 400 },
+          ),
         );
       }
       try {
@@ -170,9 +190,11 @@ export default async function proxy(request: NextRequest) {
           encodeModelSettings(parseModelSettingsHeader(modelSettings)),
         );
       } catch {
-        return NextResponse.json(
-          { error: "Invalid model settings." },
-          { status: 400 },
+        return reply(
+          NextResponse.json(
+            { error: "Invalid model settings." },
+            { status: 400 },
+          ),
         );
       }
     }
@@ -195,32 +217,39 @@ export default async function proxy(request: NextRequest) {
 
       // For SSE streaming responses, pass through directly
       if (response.headers.get("content-type")?.includes("text/event-stream")) {
-        return new Response(response.body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": modelSettings
-              ? "no-store, no-transform"
-              : "no-cache, no-transform",
-            "X-Accel-Buffering": "no",
-          },
-        });
+        return reply(
+          new NextResponse(response.body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": modelSettings
+                ? "no-store, no-transform"
+                : "no-cache, no-transform",
+              "X-Accel-Buffering": "no",
+            },
+          }),
+        );
       }
 
-      return new NextResponse(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: new Headers(response.headers),
-      });
+      return reply(
+        new NextResponse(response.body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: new Headers(response.headers),
+        }),
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Proxy error";
-      return NextResponse.json({ error: message }, { status: 502 });
+      return reply(NextResponse.json({ error: message }, { status: 502 }));
     }
   }
 
-  // Handle Supabase session for all non-API routes
-  const response = await updateSession(request);
+  // Handle Supabase session for all non-API routes. A refresh in the wizard
+  // gate is handed on, so updateSession does not spend the old token again.
+  for (const { name, value } of access?.cookies ?? [])
+    request.cookies.set(name, value);
+  const response = reply(await updateSession(request));
   response.headers.set("x-current-path", pathname);
   return response;
 }

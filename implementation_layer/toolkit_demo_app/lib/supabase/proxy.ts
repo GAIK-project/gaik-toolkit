@@ -26,6 +26,12 @@ function isAuthRoute(pathname: string): boolean {
   return matchesRoute(pathname, AUTH_ROUTES);
 }
 
+export interface SessionCookie {
+  name: string;
+  value: string;
+  options: Parameters<NextResponse["cookies"]["set"]>[2];
+}
+
 export interface AccessState {
   loggedIn: boolean;
   approved: boolean;
@@ -33,6 +39,11 @@ export interface AccessState {
   pending: boolean;
   userId: string | null;
   wizardAccess: boolean;
+  /**
+   * Session cookies Supabase rewrote while reading the user: a refreshed token,
+   * or a cleared dead session. The caller sets them on its response.
+   */
+  cookies: SessionCookie[];
 }
 
 const NO_ACCESS: AccessState = {
@@ -41,6 +52,7 @@ const NO_ACCESS: AccessState = {
   pending: false,
   userId: null,
   wizardAccess: false,
+  cookies: [],
 };
 
 /**
@@ -48,6 +60,11 @@ const NO_ACCESS: AccessState = {
  * (general `status`), and Solution Wizard beta grant (`wizard_access`). Used by
  * the proxy's API auth gate and the wizard gate. Independent of the team `?key=`
  * shortcut. `BYPASS_AUTH` opens everything in dev.
+ *
+ * An API request skips updateSession, so an expired access token is refreshed
+ * here. The refresh spends the refresh token: unless the caller saves the new
+ * cookies, the browser's next run reuses the spent token, Supabase ends the
+ * session, and a signed-in user is refused with "Sign in to use this feature."
  */
 export async function getAccessState(
   request: NextRequest,
@@ -59,19 +76,21 @@ export async function getAccessState(
       pending: false,
       userId: null,
       wizardAccess: true,
+      cookies: [],
     };
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!supabaseUrl || !supabaseKey) return NO_ACCESS;
 
+  const cookies: SessionCookie[] = [];
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll() {
-        // Read-only: token refresh is handled by updateSession on page routes.
+      setAll(cookiesToSet) {
+        cookies.push(...cookiesToSet);
       },
     },
   });
@@ -79,7 +98,7 @@ export async function getAccessState(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return NO_ACCESS;
+  if (!user) return { ...NO_ACCESS, cookies };
 
   const { data } = await supabase
     .from("access_requests")
@@ -93,7 +112,18 @@ export async function getAccessState(
     pending: data?.status === "pending",
     userId: user.id,
     wizardAccess: data?.wizard_access === true,
+    cookies,
   };
+}
+
+/** Save the session cookies getAccessState rewrote on the response the browser gets. */
+export function withSessionCookies<T extends NextResponse>(
+  response: T,
+  state: AccessState | undefined,
+): T {
+  for (const { name, value, options } of state?.cookies ?? [])
+    response.cookies.set(name, value, options);
+  return response;
 }
 
 export async function updateSession(request: NextRequest) {
