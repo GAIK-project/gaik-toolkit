@@ -13,6 +13,8 @@ licences allow), scores and judge records are in
   ([`finnish_dialect_asr/`](../finnish_dialect_asr/README.md)).
 - **Read and parliament speech:** the API services lead; ElevenLabs Scribe v2 is best on both
   (3.3 % and 9.1 % WER).
+- **Newest open model:** NVIDIA Nemotron 3.5 Transcribe, released 28 Oct 2026, gets 47.6 % on dialects, behind plain
+  Whisper large-v3 (40.4 %), and is close to our main model on read and parliament speech (8.2 and 11.1 %).
 - **One Ajokortti clip:** the best set-ups are close, and one 408-word clip cannot separate
   them.
 
@@ -80,6 +82,7 @@ under about 2 points as ties. The judge prompts are in
 | Google Chirp 3 | API | 41.3 | – | 4.8 | 11.6 | $0.96 |
 | Finnish-NLP whisper-large-finnish-v3 | open | 56.6 | – | 7.1 | 6.6 | own GPU |
 | RASMUS Finnish-ASR-Canary-v2 + KenLM | open | 47.6 | – | 7.6 | 7.7 | own GPU |
+| NVIDIA Nemotron 3.5 Transcribe ⁴ | open | 47.6 | – | 8.2 | 11.1 | own GPU |
 
 Meaning points on LA-murre: Claude Opus 5.5 on all 583 segments, with the six transcripts of a
 segment judged together (its reference is in dialect, so WER would rank spelling). – = not run. The Finnish-NLP and RASMUS
@@ -89,7 +92,10 @@ list, so estimated at its successor 3.6 Flash's rate. Other prices are list pric
 OpenAI $0.006/min, ElevenLabs $0.22/h, Chirp 3 $0.016/min (first 500 000 min a month). The open
 models need a GPU (about 5 GPU-minutes per audio hour on one AMD MI250X on LUMI). ³ judge round 5, where the six
 transcripts were the main model, `v1.0` (14.0), `la-murre`, Whisper large-v3 (24.4), Gemini 3.5 Flash (27.1) and
-gpt-4o-transcribe (34.0); the other rows are round 4.
+gpt-4o-transcribe (34.0); the other rows are round 4. ⁴ measured on 30 Oct 2026 on one NVIDIA GH200 on CSC's Roihu (it
+runs on NVIDIA GPUs only), with its card's vLLM server and benchmark prompts; with the standard-Finnish prompt of the
+Gemini row it gets 47.2 on SKN. Its card makes no claim about dialects, and lists FLEURS and VoxPopuli among its
+training sources, so those two cells may be on familiar material.
 
 Every model, one row each, on the three public test sets
 ([full table](https://github.com/GAIK-project/finnish-asr#public-test-sets-skn-and-la-murre-dialects-fleurs-and-voxpopuli)):
@@ -156,4 +162,5 @@ say little about spontaneous speech; measure a candidate on your own audio.
 The open models and the fine-tunes ran on LUMI. We acknowledge CSC – IT Center for Science,
 Finland for awarding this project access to the LUMI supercomputer, owned by the EuroHPC Joint
 Undertaking, hosted by CSC (Finland) and the LUMI consortium through CSC – IT Center for Science,
-Finland.
+Finland. The Nemotron row was measured on CSC's Roihu supercomputer; we acknowledge CSC – IT Center
+for Science, Finland, for computational resources.

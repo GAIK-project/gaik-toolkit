@@ -24,12 +24,15 @@ dialect speech. Everything (code, results, figures) is in
 | OpenAI gpt-4o-transcribe | 62.5 | 34.2 | 4.0 | 11.4 |
 | ElevenLabs Scribe v2 | 44.9 | – | **3.3** | **9.1** |
 | Google Chirp 3 | 41.3 | – | 4.8 | 11.6 |
+| NVIDIA Nemotron 3.5 Transcribe ³ | 47.6 | – | 8.2 | 11.1 |
 
 Lower is better. WER: wrong, missing and extra words per 100 reference words. Meaning points:
 meaning-error points per 100 reference words from a blind LLM judge (Claude Opus 5.5, 583 segments;
 critical error 10 points, major 5, minor 1; dialect forms, fillers and punctuation are not errors).
 How they are counted: [finnish_asr_benchmark](../finnish_asr_benchmark/README.md#meaning-points).
 ¹ asked for standard Finnish. ² judge round 5 (the first model 14.0 in the same round; the other rows are round 4).
+³ the newest model here, released 28 Oct 2026 and measured two days later with its card's vLLM server and benchmark
+prompts. Its card makes no claim about dialects, and lists FLEURS and VoxPopuli among its training sources.
 
 ![Word error rate of Whisper large-v3, our model, gpt-4o-transcribe and Gemini 3.5 Flash on SKN dialects, FLEURS and VoxPopuli](images/across-sets.svg)
 
@@ -82,4 +85,5 @@ Applied Sciences, GAIK project.
 
 We acknowledge CSC – IT Center for Science, Finland for awarding this project access to the LUMI
 supercomputer, owned by the EuroHPC Joint Undertaking, hosted by CSC (Finland) and the LUMI
-consortium through CSC – IT Center for Science, Finland.
+consortium through CSC – IT Center for Science, Finland. The Nemotron row was measured on CSC's Roihu supercomputer; we
+acknowledge CSC – IT Center for Science, Finland, for computational resources.
