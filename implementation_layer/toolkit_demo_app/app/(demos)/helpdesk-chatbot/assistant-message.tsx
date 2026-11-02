@@ -37,6 +37,7 @@ import {
   Users,
 } from "lucide-react";
 import { useState } from "react";
+import { useHelpdeskExample } from "./example-context";
 import {
   type DemoFill,
   HandoffCard,
@@ -125,6 +126,7 @@ export function AssistantMessage({
   /** Scripted playback: open lists the presenter would otherwise click. */
   demo?: boolean;
 }) {
+  const { knowledge } = useHelpdeskExample();
   const [copied, setCopied] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState<boolean | null>(null);
   const [article, setArticle] = useState<Article | null>(null);
@@ -271,7 +273,7 @@ export function AssistantMessage({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{article?.title}</DialogTitle>
-            <DialogDescription>Lakeside AI Hub FAQ</DialogDescription>
+            <DialogDescription>{knowledge.organisation} FAQ</DialogDescription>
           </DialogHeader>
           <p className="text-sm leading-relaxed">{article?.body}</p>
         </DialogContent>

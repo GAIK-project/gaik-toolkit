@@ -4,15 +4,7 @@
 // text filter would make the result set depend on how the model phrased the
 // query, and the same question would get different answers from run to run.
 
-import {
-  ARTICLES,
-  type Article,
-  type Audience,
-  SERVICES,
-  type Service,
-  type ServiceCategory,
-  TEAMS,
-} from "./knowledge";
+import type { Article, Knowledge, Service } from "./knowledge";
 
 const STOPWORDS = new Set(
   "a an and are as at be by can do does for from how i in is it me my of on or our that the this to we what when where which who why will with you your".split(
@@ -55,23 +47,23 @@ function serviceScore(service: Service, query: string[]): number {
 }
 
 export interface ServiceFilters {
-  category?: ServiceCategory;
-  audience?: Audience;
+  category?: string;
+  audience?: string;
   query?: string;
 }
 
 /** Every service that passes the filters, best text match first. */
-export function searchServices({
-  category,
-  audience,
-  query,
-}: ServiceFilters): Service[] {
+export function searchServices(
+  knowledge: Knowledge,
+  { category, audience, query }: ServiceFilters,
+): Service[] {
   const words = tokenize(query ?? "");
-  return SERVICES.filter(
-    (s) =>
-      (!category || s.category === category) &&
-      (!audience || s.audiences.includes(audience)),
-  )
+  return knowledge.services
+    .filter(
+      (s) =>
+        (!category || s.category === category) &&
+        (!audience || s.audiences.includes(audience)),
+    )
     .map((service, index) => ({
       service,
       index,
@@ -82,16 +74,21 @@ export function searchServices({
 }
 
 /** The articles that share at least one word with the query, best first. */
-export function searchArticles(query: string, limit = 3): Article[] {
+export function searchArticles(
+  knowledge: Knowledge,
+  query: string,
+  limit = 3,
+): Article[] {
   const words = tokenize(query);
-  return ARTICLES.map((article) => ({
-    article,
-    score: score(words, [
-      [article.title, 3],
-      [article.tags.join(" "), 2],
-      [article.body, 1],
-    ]),
-  }))
+  return knowledge.articles
+    .map((article) => ({
+      article,
+      score: score(words, [
+        [article.title, 3],
+        [article.tags.join(" "), 2],
+        [article.body, 1],
+      ]),
+    }))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
@@ -99,7 +96,7 @@ export function searchArticles(query: string, limit = 3): Article[] {
 }
 
 /** A service as the searchServices tool returns it to the model and the UI. */
-export function toServiceCard(s: Service) {
+export function toServiceCard(knowledge: Knowledge, s: Service) {
   return {
     id: s.id,
     name: s.name,
@@ -108,6 +105,6 @@ export function toServiceCard(s: Service) {
     details: s.details,
     price: s.price,
     duration: s.duration,
-    team: TEAMS[s.team].name,
+    team: knowledge.teams[s.team]?.name ?? s.team,
   };
 }

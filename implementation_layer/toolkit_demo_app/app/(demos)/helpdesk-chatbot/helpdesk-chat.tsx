@@ -15,6 +15,8 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Button } from "@/components/ui/button";
 import type { HelpdeskUIMessage } from "@/lib/helpdesk-chatbot/agent";
+import type { HelpdeskExample } from "@/lib/helpdesk-chatbot/examples";
+import { OWN_ID } from "@/lib/helpdesk-chatbot/own-knowledge";
 import { cn } from "@/lib/utils";
 import { useChat } from "@ai-sdk/react";
 import {
@@ -26,14 +28,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { AssistantMessage } from "./assistant-message";
 import { DEMO_STEPS, playDemo } from "./demo-playback";
+import { ExampleProvider } from "./example-context";
 import type { DemoFill } from "./tool-cards";
-
-const STARTERS = [
-  "We are a 12-person machine shop. Where should we start with AI?",
-  "Do you have training for our staff?",
-  "Mitä tapahtuu yrityksemme datalle pilotissa?",
-  "I'd like to talk to someone about funding.",
-];
 
 // Route errors are fixed sentences written in route.ts; anything else (a proxy
 // page, a stack trace) is replaced, never shown.
@@ -78,11 +74,16 @@ const EMPTY_DEMO: DemoState = {
 };
 
 function Welcome({
+  text,
+  starters,
   onPick,
   onDemo,
 }: {
+  text: string;
+  starters: string[];
   onPick: (text: string) => void;
-  onDemo: () => void;
+  /** Missing when the helpdesk has no scripted conversation. */
+  onDemo?: () => void;
 }) {
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center gap-5 py-8 text-center">
@@ -96,32 +97,34 @@ function Welcome({
       </motion.div>
       <div className="space-y-1.5">
         <h2 className="font-serif text-xl font-semibold">How can we help?</h2>
-        <p className="text-muted-foreground text-sm text-balance">
-          Ask about services, prices or how to get started, in English or
-          Finnish. Answers come from the hub&apos;s own catalogue, and a person
-          can take over when needed.
-        </p>
+        <p className="text-muted-foreground text-sm text-balance">{text}</p>
       </div>
-      <Button onClick={onDemo} className="gap-2 rounded-full">
-        <Play className="size-4" />
-        Watch a demo conversation
-      </Button>
-      <div className="flex w-full flex-col gap-2">
-        <p className="text-muted-foreground text-xs">or ask one of these</p>
-        {STARTERS.map((s, i) => (
-          <motion.button
-            key={s}
-            type="button"
-            onClick={() => onPick(s)}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 * i + 0.1 }}
-            className="border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 rounded-xl border px-4 py-2.5 text-left text-sm transition-colors"
-          >
-            {s}
-          </motion.button>
-        ))}
-      </div>
+      {onDemo && (
+        <Button onClick={onDemo} className="gap-2 rounded-full">
+          <Play className="size-4" />
+          Watch a demo conversation
+        </Button>
+      )}
+      {starters.length > 0 && (
+        <div className="flex w-full flex-col gap-2">
+          <p className="text-muted-foreground text-xs">
+            {onDemo ? "or ask one of these" : "Ask one of these"}
+          </p>
+          {starters.map((s, i) => (
+            <motion.button
+              key={s}
+              type="button"
+              onClick={() => onPick(s)}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 * i + 0.1 }}
+              className="border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 rounded-xl border px-4 py-2.5 text-left text-sm transition-colors"
+            >
+              {s}
+            </motion.button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -168,7 +171,8 @@ function DemoCaption({
   );
 }
 
-export function HelpdeskChat() {
+/** The chat of one helpdesk. Remount it (a new `key`) to switch helpdesk. */
+export function HelpdeskChat({ example }: { example: HelpdeskExample }) {
   const [input, setInput] = useState("");
   const [demo, setDemo] = useState<DemoState | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -183,7 +187,15 @@ export function HelpdeskChat() {
     clearError,
     addToolApprovalResponse,
   } = useChat<HelpdeskUIMessage>({
-    transport: new DefaultChatTransport({ api: "/api/helpdesk-chat" }),
+    // The server picks the knowledge by this id; it never takes it from the browser.
+    transport: new DefaultChatTransport({
+      api: "/api/helpdesk-chat",
+      // The user's own documents travel with the request; an example is named.
+      body:
+        example.id === OWN_ID
+          ? { example: OWN_ID, knowledge: example.knowledge }
+          : { example: example.id },
+    }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     experimental_throttle: 50,
   });
@@ -202,6 +214,7 @@ export function HelpdeskChat() {
   }
 
   function startDemo() {
+    if (!example.demo) return;
     stopDemo();
     stop();
     clearError();
@@ -211,14 +224,17 @@ export function HelpdeskChat() {
     setDemo(EMPTY_DEMO);
     const update = (patch: Partial<DemoState>) =>
       setDemo((d) => (d ? { ...d, ...patch } : d));
-    playDemo({
-      signal: controller.signal,
-      setMessages: (m) => update({ messages: m }),
-      setInput,
-      setCaption: (caption) => update({ caption }),
-      setStreamingId: (streamingId) => update({ streamingId }),
-      setDemoFill: (fill) => update({ fill }),
-    })
+    playDemo(
+      {
+        signal: controller.signal,
+        setMessages: (m) => update({ messages: m }),
+        setInput,
+        setCaption: (caption) => update({ caption }),
+        setStreamingId: (streamingId) => update({ streamingId }),
+        setDemoFill: (fill) => update({ fill }),
+      },
+      example,
+    )
       .then(() => update({ playing: false }))
       .catch(() => {
         // stopped
@@ -242,146 +258,157 @@ export function HelpdeskChat() {
   }
 
   return (
-    <div className="bg-card flex h-[min(76vh,800px)] min-h-[520px] flex-col overflow-hidden rounded-2xl border shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary text-primary-foreground grid size-9 place-items-center rounded-full">
-            <Headset className="size-[18px]" />
+    <ExampleProvider value={example}>
+      <div className="bg-card flex h-[min(76vh,800px)] min-h-[520px] flex-col overflow-hidden rounded-2xl border shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary text-primary-foreground grid size-9 place-items-center rounded-full">
+              <Headset className="size-[18px]" />
+            </div>
+            <div className="leading-tight">
+              <p className="text-sm font-semibold">
+                {example.knowledge.helpdeskName}
+              </p>
+              <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                AI assistant · a person can take over
+              </p>
+            </div>
           </div>
-          <div className="leading-tight">
-            <p className="text-sm font-semibold">Lakeside AI Hub Helpdesk</p>
-            <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
-              <span className="size-1.5 rounded-full bg-emerald-500" />
-              AI assistant · a person can take over
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          {playing ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={stopDemo}
-              className="text-muted-foreground gap-1.5"
-            >
-              <Square className="size-3.5" />
-              Stop demo
-            </Button>
-          ) : (
-            shown.length > 0 && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={startDemo}
-                  className="text-muted-foreground gap-1.5"
-                >
-                  <Play className="size-3.5" />
-                  {demo ? "Replay demo" : "Watch demo"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={reset}
-                  className="text-muted-foreground gap-1.5"
-                >
-                  <RotateCcw className="size-3.5" />
-                  New conversation
-                </Button>
-              </>
-            )
-          )}
-        </div>
-      </div>
-
-      {demo?.caption && (
-        <DemoCaption caption={demo.caption} playing={playing} />
-      )}
-
-      <Conversation>
-        <ConversationContent className="gap-6 px-4 py-5 sm:px-6">
-          {shown.length === 0 && !demo ? (
-            <Welcome onPick={send} onDemo={startDemo} />
-          ) : (
-            shown.map((message, index) => {
-              const isLast = index === shown.length - 1;
-              return message.role === "user" ? (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Message from="user">
-                    <MessageContent className="bg-primary! text-primary-foreground! rounded-2xl! rounded-br-md!">
-                      <span className="whitespace-pre-wrap">
-                        {message.parts
-                          .map((p) => (p.type === "text" ? p.text : ""))
-                          .join("")}
-                      </span>
-                    </MessageContent>
-                  </Message>
-                </motion.div>
-              ) : (
-                <AssistantMessage
-                  key={message.id}
-                  message={message}
-                  streaming={
-                    demo ? demo.streamingId === message.id : isLast && busy
-                  }
-                  onApproval={demo ? () => {} : addToolApprovalResponse}
-                  onRegenerate={
-                    !demo && isLast && !busy
-                      ? () => void regenerate()
-                      : undefined
-                  }
-                  demoFill={demo?.fill}
-                  demo={Boolean(demo)}
-                />
-              );
-            })
-          )}
-          {!demo &&
-            status === "submitted" &&
-            messages.at(-1)?.role === "user" && (
-              <div className="text-muted-foreground">
-                <Loader2 className="size-3.5 animate-spin" />
-              </div>
+          <div className="flex items-center gap-1">
+            {playing ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={stopDemo}
+                className="text-muted-foreground gap-1.5"
+              >
+                <Square className="size-3.5" />
+                Stop demo
+              </Button>
+            ) : (
+              shown.length > 0 && (
+                <>
+                  {example.demo && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={startDemo}
+                      className="text-muted-foreground gap-1.5"
+                    >
+                      <Play className="size-3.5" />
+                      {demo ? "Replay demo" : "Watch demo"}
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={reset}
+                    className="text-muted-foreground gap-1.5"
+                  >
+                    <RotateCcw className="size-3.5" />
+                    New conversation
+                  </Button>
+                </>
+              )
             )}
-          {!demo && error && (
-            <p className="text-destructive text-sm" role="alert">
-              {errorText(error)}
-            </p>
-          )}
-        </ConversationContent>
-        <ConversationScrollButton />
-      </Conversation>
+          </div>
+        </div>
 
-      <div className="p-3 pt-0">
-        <PromptInput onSubmit={({ text }) => send(text)}>
-          <PromptInputBody>
-            <PromptInputTextarea
-              value={input}
-              onChange={(e) => setInput(e.currentTarget.value)}
-              placeholder="Ask the helpdesk…"
-              maxLength={2000}
-              readOnly={playing}
-            />
-          </PromptInputBody>
-          <PromptInputFooter className="justify-between">
-            <span className="text-muted-foreground px-2 text-xs">
-              {playing
-                ? "Demo playback · no AI calls are made"
-                : "AI can make mistakes. Check important details with the team."}
-            </span>
-            <PromptInputSubmit
-              status={status}
-              onStop={stop}
-              disabled={playing || (!busy && !input.trim())}
-            />
-          </PromptInputFooter>
-        </PromptInput>
+        {demo?.caption && (
+          <DemoCaption caption={demo.caption} playing={playing} />
+        )}
+
+        <Conversation>
+          <ConversationContent className="gap-6 px-4 py-5 sm:px-6">
+            {shown.length === 0 && !demo ? (
+              <Welcome
+                text={example.welcomeText}
+                starters={example.starters}
+                onPick={send}
+                onDemo={example.demo ? startDemo : undefined}
+              />
+            ) : (
+              shown.map((message, index) => {
+                const isLast = index === shown.length - 1;
+                return message.role === "user" ? (
+                  <motion.div
+                    key={message.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <Message from="user">
+                      <MessageContent className="bg-primary! text-primary-foreground! rounded-2xl! rounded-br-md!">
+                        <span className="whitespace-pre-wrap">
+                          {message.parts
+                            .map((p) => (p.type === "text" ? p.text : ""))
+                            .join("")}
+                        </span>
+                      </MessageContent>
+                    </Message>
+                  </motion.div>
+                ) : (
+                  <AssistantMessage
+                    key={message.id}
+                    message={message}
+                    streaming={
+                      demo ? demo.streamingId === message.id : isLast && busy
+                    }
+                    onApproval={demo ? () => {} : addToolApprovalResponse}
+                    onRegenerate={
+                      !demo && isLast && !busy
+                        ? () => void regenerate()
+                        : undefined
+                    }
+                    demoFill={demo?.fill}
+                    demo={Boolean(demo)}
+                  />
+                );
+              })
+            )}
+            {!demo &&
+              status === "submitted" &&
+              messages.at(-1)?.role === "user" && (
+                <div className="text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin" />
+                </div>
+              )}
+            {!demo && error && (
+              <p className="text-destructive text-sm" role="alert">
+                {errorText(error)}
+              </p>
+            )}
+          </ConversationContent>
+          <ConversationScrollButton />
+        </Conversation>
+
+        <div className="p-3 pt-0">
+          <PromptInput onSubmit={({ text }) => send(text)}>
+            <PromptInputBody>
+              <PromptInputTextarea
+                value={input}
+                onChange={(e) => setInput(e.currentTarget.value)}
+                placeholder="Ask the helpdesk…"
+                maxLength={2000}
+                readOnly={playing}
+              />
+            </PromptInputBody>
+            <PromptInputFooter className="justify-between">
+              <span className="text-muted-foreground px-2 text-xs">
+                {playing
+                  ? "Demo playback · no AI calls are made"
+                  : "AI can make mistakes. Check important details with the team."}
+              </span>
+              <PromptInputSubmit
+                status={status}
+                onStop={stop}
+                disabled={playing || (!busy && !input.trim())}
+              />
+            </PromptInputFooter>
+          </PromptInput>
+        </div>
       </div>
-    </div>
+    </ExampleProvider>
   );
 }

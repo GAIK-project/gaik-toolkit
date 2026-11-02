@@ -15,7 +15,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { HelpdeskUIMessage } from "@/lib/helpdesk-chatbot/agent";
-import { TEAMS } from "@/lib/helpdesk-chatbot/knowledge";
 import { cn } from "@/lib/utils";
 import {
   Check,
@@ -29,6 +28,7 @@ import {
 import { motion } from "motion/react";
 import dynamic from "next/dynamic";
 import { type ReactNode, useEffect, useState } from "react";
+import { useHelpdeskExample } from "./example-context";
 
 const SuccessAnimation = dynamic(
   () =>
@@ -90,13 +90,11 @@ function ToolCollapsible({
   );
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  advisory: "Advisory",
-  "proof-of-concept": "Proof-of-concept",
-  training: "Training",
-  funding: "Funding",
-  "technology-testing": "Technology testing",
-};
+/** A category's display name in the helpdesk being played. */
+function useCategoryLabel(): (category: string) => string {
+  const { knowledge } = useHelpdeskExample();
+  return (category) => knowledge.categoryLabels[category] ?? category;
+}
 
 const META_BADGE =
   "border-border bg-muted/50 text-muted-foreground text-[10px] whitespace-nowrap";
@@ -108,6 +106,7 @@ function ServiceRow({
   service: Service;
   onSelect: (s: Service) => void;
 }) {
+  const categoryLabel = useCategoryLabel();
   return (
     <button
       type="button"
@@ -126,7 +125,7 @@ function ServiceRow({
       <div className="text-foreground/60 mt-1 flex items-center gap-1.5 text-xs">
         <span className="truncate">{service.price}</span>
         <Badge variant="outline" className={META_BADGE}>
-          {CATEGORY_LABELS[service.category] ?? service.category}
+          {categoryLabel(service.category)}
         </Badge>
       </div>
     </button>
@@ -134,11 +133,12 @@ function ServiceRow({
 }
 
 function ServiceDetail({ service }: { service: Service }) {
+  const categoryLabel = useCategoryLabel();
   const facts = [
     ["Price", service.price],
     ["Duration", service.duration],
     ["Handled by", service.team],
-    ["Category", CATEGORY_LABELS[service.category] ?? service.category],
+    ["Category", categoryLabel(service.category)],
   ];
   return (
     <div className="space-y-4 text-sm">
@@ -279,7 +279,11 @@ function ApprovalCard({
       reason: approved ? undefined : DECLINED_REASON,
     });
   };
-  const team = TEAMS[part.input.team];
+  const { knowledge } = useHelpdeskExample();
+  const team = knowledge.teams[part.input.team] ?? {
+    name: "the team",
+    responseTime: "",
+  };
 
   return (
     <div className="border-border/60 from-card via-card to-primary/[0.03] relative overflow-hidden rounded-xl border bg-gradient-to-br p-4 shadow-[0_1px_0_0_rgb(0_0_0_/_0.02),_0_8px_24px_-12px_rgb(0_0_0_/_0.08)]">

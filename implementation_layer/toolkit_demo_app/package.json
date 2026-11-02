@@ -78,6 +78,7 @@
     "react-hot-toast": "^2.6.0",
     "react-resizable-panels": "^4.11.2",
     "react-syntax-highlighter": "^16.1.1",
+    "read-excel-file": "^9.3.14",
     "recharts": "3.9.0",
     "server-only": "^0.0.1",
     "shiki": "^4.2.0",

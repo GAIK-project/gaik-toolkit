@@ -47,8 +47,7 @@ ENV WIZARD_DIR=/app/implementation_layer/solution_wizard
 COPY implementation_layer/toolkit_demo_app/api/ .
 
 # Copy example files for RAG demo
-COPY implementation_layer/toolkit_demo_app/public/GAIK_Test_Document_Demo.pdf ./public/
-COPY implementation_layer/toolkit_demo_app/public/example-index.json ./public/
+COPY implementation_layer/toolkit_demo_app/public/rag-example/ ./public/rag-example/
 
 # Report Writer v2 examples, at their repository paths: routers/report_writer_v2.py
 # finds them by walking up from /app/routers, and the specs name their files by

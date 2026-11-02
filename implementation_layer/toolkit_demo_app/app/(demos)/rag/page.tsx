@@ -1,7 +1,6 @@
 "use client";
 
 import { apiFetch, RateLimitError } from "@/lib/api-client";
-import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
 import { PageTransition } from "@/components/demo/page-transition";
 import {
   DocumentList,
@@ -61,10 +60,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  RAG_EXAMPLE_DOCUMENTS,
+  RAG_EXAMPLE_ORGANISATION,
+  RAG_EXAMPLE_STARTERS,
+  isExampleCollection,
+} from "@/lib/rag-example";
 import { parseSSEEvents } from "@/lib/sse";
 import {
   ArrowLeft,
   Bot,
+  Eye,
   FileText,
   MessageSquare,
   Plus,
@@ -76,6 +82,7 @@ import {
   X,
 } from "lucide-react";
 import { FeedbackButton } from "@/components/feedback";
+import { RagExampleDialog } from "./rag-example-dialog";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
@@ -144,6 +151,64 @@ const STORAGE_KEYS = {
   collectionId: "rag-collection-id",
   indexedDocuments: "rag-indexed-documents",
 } as const;
+
+/** The start screen once the example is loaded: what it holds and four questions to try. */
+function ExampleStart({
+  disabled,
+  onAsk,
+  onAbout,
+}: {
+  disabled: boolean;
+  onAsk: (question: string) => void;
+  onAbout: () => void;
+}) {
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col items-center gap-4 py-6 text-center">
+      <div className="bg-primary/10 text-primary rounded-full p-4">
+        <MessageSquare className="h-8 w-8" />
+      </div>
+      <div className="space-y-1.5">
+        <h2 className="text-lg font-semibold">
+          Ask about {RAG_EXAMPLE_ORGANISATION}
+        </h2>
+        <p className="text-muted-foreground text-sm text-balance">
+          Two documents of a fictional company are indexed: an employee handbook
+          and a workplace and onboarding guide. Answers come from them and name
+          the document and page.
+        </p>
+      </div>
+      <ul className="flex flex-wrap justify-center gap-2 text-xs">
+        {RAG_EXAMPLE_DOCUMENTS.map((doc) => (
+          <li
+            key={doc.filename}
+            className="bg-muted/50 flex items-center gap-1.5 rounded-full border px-3 py-1"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            {doc.title}, {doc.pages} pages
+          </li>
+        ))}
+      </ul>
+      <div className="flex w-full flex-col gap-2">
+        <p className="text-muted-foreground text-xs">Try one of these</p>
+        {RAG_EXAMPLE_STARTERS.map((question) => (
+          <button
+            key={question}
+            type="button"
+            disabled={disabled}
+            onClick={() => onAsk(question)}
+            className="border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5 rounded-xl border px-4 py-2.5 text-left text-sm transition-colors disabled:opacity-60"
+          >
+            {question}
+          </button>
+        ))}
+      </div>
+      <Button variant="ghost" size="sm" className="gap-2" onClick={onAbout}>
+        <Eye className="h-4 w-4" />
+        View the documents and more questions to ask
+      </Button>
+    </div>
+  );
+}
 
 /** Reusable upload dialog content - used in both header and empty state */
 interface UploadDialogContentProps {
@@ -305,7 +370,10 @@ function DebugDialog({ collectionId }: { collectionId: string }) {
             Debug: {totalChunks} chunks in {collectionId}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3 overflow-y-auto pr-2" style={{ maxHeight: "60vh" }}>
+        <div
+          className="space-y-3 overflow-y-auto pr-2"
+          style={{ maxHeight: "60vh" }}
+        >
           {loading ? (
             <p className="text-muted-foreground text-sm">Loading...</p>
           ) : (
@@ -319,11 +387,11 @@ function DebugDialog({ collectionId }: { collectionId: string }) {
                     Chunk #{chunk.index}
                   </span>
                   <span className="text-muted-foreground">
-                    {chunk.metadata.parser_used as string ?? "unknown"} | page{" "}
+                    {(chunk.metadata.parser_used as string) ?? "unknown"} | page{" "}
                     {(chunk.metadata.page_number as string) ?? "?"}
                   </span>
                 </div>
-                <p className="text-muted-foreground whitespace-pre-wrap break-words leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed break-words whitespace-pre-wrap">
                   {chunk.content}
                 </p>
                 <details className="text-muted-foreground/70">
@@ -379,6 +447,7 @@ export default function RAGPage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isIndexing, setIsIndexing] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [exampleOpen, setExampleOpen] = useState(false);
 
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -473,6 +542,7 @@ export default function RAGPage() {
     (d) => d.status === "indexed",
   ).length;
   const hasDocuments = indexedCount > 0;
+  const isExample = isExampleCollection(collectionId);
 
   function handleFilesSelect(files: File[]): void {
     setPendingFiles((current) => {
@@ -530,7 +600,8 @@ export default function RAGPage() {
         if (typeof detail === "string") {
           message = detail;
         } else if (Array.isArray(detail)) {
-          message = detail.map((d: { msg?: string }) => d.msg).join("; ") || message;
+          message =
+            detail.map((d: { msg?: string }) => d.msg).join("; ") || message;
         }
         throw new Error(message);
       }
@@ -560,9 +631,12 @@ export default function RAGPage() {
         );
       } else {
         const firstError = data.documents?.find(
-          (d: { status: string; error?: string }) => d.status === "error" && d.error,
+          (d: { status: string; error?: string }) =>
+            d.status === "error" && d.error,
         )?.error;
-        toast.error(firstError ?? "Some documents failed to index", { duration: 15000 });
+        toast.error(firstError ?? "Some documents failed to index", {
+          duration: 15000,
+        });
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
@@ -616,7 +690,7 @@ export default function RAGPage() {
           }),
         ),
       );
-      toast.success("Example document loaded! Try asking a question.");
+      toast.success("Example documents loaded! Try asking a question.");
     } catch (error) {
       if (error instanceof RateLimitError) return; // Toast already shown
       toast.error(
@@ -787,6 +861,19 @@ export default function RAGPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* What the example is - only while the example is loaded */}
+            {hasDocuments && isExample && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => setExampleOpen(true)}
+              >
+                <Eye className="h-4 w-4" />
+                About this example
+              </Button>
+            )}
+
             {/* Document status badge - only show when documents exist */}
             {hasDocuments && (
               <DropdownMenu>
@@ -1001,7 +1088,13 @@ export default function RAGPage() {
           {/* Empty state */}
           {messages.length === 0 && !isQuerying && (
             <>
-              {hasDocuments ? (
+              {hasDocuments && isExample ? (
+                <ExampleStart
+                  disabled={isQuerying}
+                  onAsk={handleQuery}
+                  onAbout={() => setExampleOpen(true)}
+                />
+              ) : hasDocuments ? (
                 <ConversationEmptyState
                   title="Start a conversation"
                   description="Ask questions about your indexed documents and get AI-powered answers with citations."
@@ -1020,18 +1113,19 @@ export default function RAGPage() {
                       Get started
                     </h2>
                     <p className="text-muted-foreground mb-4 max-w-sm text-center text-sm">
-                      Try our example document or upload your own PDFs to ask
+                      Try our example documents or upload your own PDFs to ask
                       questions and get AI-powered answers with citations.
                     </p>
                     <div className="flex gap-3">
-                      <ExamplePreviewDialog
-                        exampleUrl="/GAIK_Test_Document_Demo.pdf"
-                        exampleName="GAIK_Test_Document_Demo.pdf"
-                        onUseExampleDirect={handleLoadExample}
+                      <Button
+                        size="lg"
+                        className="gap-2"
                         disabled={isIndexing}
-                        buttonVariant="default"
-                        buttonSize="lg"
-                      />
+                        onClick={() => setExampleOpen(true)}
+                      >
+                        <Eye className="h-5 w-5" />
+                        Try the example
+                      </Button>
                       <DialogTrigger asChild>
                         <Button size="lg" variant="outline" className="gap-2">
                           <Plus className="h-5 w-5" />
@@ -1119,6 +1213,14 @@ export default function RAGPage() {
           />
         </PromptInputFooter>
       </PromptInput>
+
+      <RagExampleDialog
+        open={exampleOpen}
+        onOpenChange={setExampleOpen}
+        onUse={handleLoadExample}
+        loading={isIndexing}
+        loaded={hasDocuments && isExample}
+      />
     </PageTransition>
   );
 }

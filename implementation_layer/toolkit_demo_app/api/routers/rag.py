@@ -1,7 +1,6 @@
 """RAG router - RAG pipeline endpoints for document indexing and Q&A."""
 
 import asyncio
-import json
 import os
 import re
 import tempfile
@@ -82,13 +81,22 @@ if (_base_path / "public").exists():
     _public_path = _base_path / "public"
 else:
     _public_path = _base_path.parent / "public"  # Fallback for local dev
-EXAMPLE_PDF_PATH = _public_path / "GAIK_Test_Document_Demo.pdf"
-EXAMPLE_INDEX_PATH = _public_path / "example-index.json"
+EXAMPLE_DIR = _public_path / "rag-example"
 EXAMPLE_COLLECTION_PREFIX = "example-demo"
-EXAMPLE_FILENAME = "GAIK_Test_Document_Demo.pdf"
-EXAMPLE_DOCUMENT_NAME = "GAIK_Test_Document_Demo"
-# example-index.json holds text-embedding-3-large vectors, so queries must use the
-# same model. gaik 0.8 OpenAI/Azure configs default to text-embedding-3-small.
+# The example is two documents of one fictional company, indexed into one collection.
+# The document name is what answers cite: the page shows it as a readable title.
+EXAMPLE_DOCUMENTS = (
+    {
+        "filename": "halden_employee_handbook.pdf",
+        "document_name": "halden_employee_handbook",
+    },
+    {
+        "filename": "halden_workplace_onboarding_guide.pdf",
+        "document_name": "halden_workplace_onboarding_guide",
+    },
+)
+# Documents and queries are embedded with the same model. gaik 0.8 OpenAI/Azure
+# configs default to text-embedding-3-small; the demo pins text-embedding-3-large.
 EXAMPLE_EMBEDDING_MODEL = "text-embedding-3-large"
 
 
@@ -813,21 +821,29 @@ async def clear_all_collections():
     return {"status": "success", "message": f"Cleared {count} collections"}
 
 
-def _example_index_response(collection_id: str, chunk_count: int) -> IndexResponse:
-    """Build a standard IndexResponse for the example document."""
+def _example_index_response(collection_id: str, chunk_counts: dict[str, int]) -> IndexResponse:
+    """Build a standard IndexResponse for the example documents (chunks per file name)."""
     return IndexResponse(
         collection_id=collection_id,
-        document_count=1,
-        chunk_count=chunk_count,
+        document_count=len(chunk_counts),
+        chunk_count=sum(chunk_counts.values()),
         documents=[
-            IndexedDocument(
-                filename=EXAMPLE_FILENAME,
-                chunk_count=chunk_count,
-                status="indexed",
-            )
+            IndexedDocument(filename=filename, chunk_count=count, status="indexed")
+            for filename, count in chunk_counts.items()
         ],
         status="success",
     )
+
+
+def _loaded_example_counts(workflow: object) -> dict[str, int]:
+    """Chunks per example file in an already loaded example collection."""
+    counts = dict.fromkeys((d["filename"] for d in EXAMPLE_DOCUMENTS), 0)
+    by_name = {d["document_name"]: d["filename"] for d in EXAMPLE_DOCUMENTS}
+    for doc in workflow.vector_store._documents:
+        filename = by_name.get(doc.metadata.get("document_name"))
+        if filename:
+            counts[filename] += 1
+    return counts
 
 
 @router.post("/load-example", response_model=IndexResponse)
@@ -835,17 +851,17 @@ async def load_example_document(
     parser_choice: Literal["vision_plus", "docling_rag", "pymupdf"] = Form("docling_rag"),
 ):
     """
-    Load the pre-indexed example document for demo purposes.
+    Load the example documents for demo purposes.
 
-    Uses pre-computed embeddings from example-index.json for instant loading.
-    Falls back to real-time indexing if pre-indexed file not found.
+    Both documents are parsed with the chosen parser and indexed into one collection, which is
+    kept in memory, so the next request for the same parser returns at once.
     """
     example_collection_id = f"{EXAMPLE_COLLECTION_PREFIX}-{parser_choice}"
 
     # If already loaded, return existing collection
     if example_collection_id in RAG_INSTANCES:
         workflow = RAG_INSTANCES[example_collection_id]
-        return _example_index_response(example_collection_id, workflow.vector_store.count())
+        return _example_index_response(example_collection_id, _loaded_example_counts(workflow))
 
     # Acquire lock
     lock = await _get_collection_lock(example_collection_id)
@@ -854,46 +870,43 @@ async def load_example_document(
         # Double-check after acquiring lock
         if example_collection_id in RAG_INSTANCES:
             workflow = RAG_INSTANCES[example_collection_id]
-            return _example_index_response(example_collection_id, workflow.vector_store.count())
+            return _example_index_response(example_collection_id, _loaded_example_counts(workflow))
 
         try:
+            missing = [
+                d["filename"]
+                for d in EXAMPLE_DOCUMENTS
+                if not (EXAMPLE_DIR / d["filename"]).exists()
+            ]
+            if missing:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Example documents not found. Please contact administrator.",
+                )
+
             config = get_api_config()
             workflow = _build_demo_workflow(config, example_collection_id)
 
-            # Try to load pre-indexed data first for Vision+ only (instant loading)
-            if parser_choice == "vision_plus" and EXAMPLE_INDEX_PATH.exists():
-                with open(EXAMPLE_INDEX_PATH, encoding="utf-8") as f:
-                    index_data = json.load(f)
-
-                documents = [
-                    Document(page_content=c["page_content"], metadata=c["metadata"])
-                    for c in index_data["chunks"]
-                ]
-                embeddings = [c["embedding"] for c in index_data["chunks"]]
-                workflow.vector_store.add(documents, embeddings)
-                RAG_INSTANCES[example_collection_id] = workflow
-
-                return _example_index_response(example_collection_id, len(documents))
-
-            if not EXAMPLE_PDF_PATH.exists():
-                raise HTTPException(
-                    status_code=500,
-                    detail="Example document not found. Please contact administrator.",
+            chunk_counts: dict[str, int] = {}
+            for document in EXAMPLE_DOCUMENTS:
+                chunks, parser_used = await asyncio.to_thread(
+                    _parse_document_to_chunks,
+                    EXAMPLE_DIR / document["filename"],
+                    document_name=document["document_name"],
+                    parser_choice=parser_choice,
+                    config=config,
                 )
-
-            chunks, parser_used = _parse_document_to_chunks(
-                EXAMPLE_PDF_PATH,
-                document_name=EXAMPLE_DOCUMENT_NAME,
-                parser_choice=parser_choice,
-                config=config,
-            )
-            chunk_count = workflow.index_chunk_documents(chunks)
-            print(f"Loaded example using parser: {parser_used}")
+                chunk_counts[document["filename"]] = await asyncio.to_thread(
+                    workflow.index_chunk_documents, chunks
+                )
+                print(f"Loaded example {document['filename']} using parser: {parser_used}")
 
             RAG_INSTANCES[example_collection_id] = workflow
 
-            return _example_index_response(example_collection_id, chunk_count)
+            return _example_index_response(example_collection_id, chunk_counts)
 
+        except HTTPException:
+            raise
         except ImportError as e:
             raise HTTPException(
                 status_code=500, detail=f"Required components not installed: {e}"

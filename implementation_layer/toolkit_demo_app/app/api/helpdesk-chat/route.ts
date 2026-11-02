@@ -4,6 +4,11 @@ import {
   createHelpdeskAgent,
   helpdeskConfigured,
 } from "@/lib/helpdesk-chatbot/agent";
+import { getHelpdeskExample } from "@/lib/helpdesk-chatbot/examples";
+import {
+  OWN_ID,
+  parseOwnKnowledge,
+} from "@/lib/helpdesk-chatbot/own-knowledge";
 import { ratelimit } from "@/lib/rate-limit";
 import { getAccessState } from "@/lib/supabase/proxy";
 import { accessRefusal } from "@/lib/api-access";
@@ -18,7 +23,9 @@ import { takeTrialRun } from "@/lib/trial";
 export const maxDuration = 60;
 
 const MAX_MESSAGES = 40;
-const MAX_BODY_BYTES = 200_000;
+// A request about the user's own documents carries them too (up to 150,000
+// characters of text), so it may be larger than one about an example.
+const MAX_BODY_BYTES = 400_000;
 
 // The router appends the real client address last; earlier entries are
 // whatever the client sent.
@@ -73,12 +80,25 @@ export async function POST(request: NextRequest) {
   }
 
   let messages: unknown;
+  let exampleId: unknown;
+  let ownKnowledge: unknown;
   try {
-    ({ messages } = await request.json());
+    ({
+      messages,
+      example: exampleId,
+      knowledge: ownKnowledge,
+    } = await request.json());
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
-  if (!Array.isArray(messages) || messages.length === 0) {
+  // An example is named by id and its knowledge comes from the server. The
+  // user's own documents come in the request, so they are validated, and only
+  // their content is used: what steers the assistant is set on the server.
+  const knowledge =
+    exampleId === OWN_ID
+      ? parseOwnKnowledge(ownKnowledge)
+      : getHelpdeskExample(exampleId)?.knowledge;
+  if (!knowledge || !Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
   if (messages.length > MAX_MESSAGES) {
@@ -95,7 +115,7 @@ export async function POST(request: NextRequest) {
       console.error("[helpdesk-chat]", error);
       return "The assistant could not answer. Please try again.";
     },
-    agent: createHelpdeskAgent(),
+    agent: createHelpdeskAgent(knowledge),
     uiMessages: messages,
     abortSignal: request.signal,
     // Rahti does not enforce maxDuration, so bound the call here.

@@ -1,43 +1,32 @@
-// The Helpdesk Chatbot demo's knowledge: a fictional regional AI hub with a
-// service catalogue, FAQ articles and support teams. All of it is synthetic.
+// The Helpdesk Chatbot demo's knowledge. Each helpdesk is one `Knowledge`: an
+// organisation with a service catalogue, FAQ articles and support teams. All of
+// it is synthetic. This file holds the types and the first helpdesk, a regional
+// AI hub; knowledge-it.ts holds a second one, and examples.ts lists them.
 //
 // A real deployment keeps the same three shapes in a database and searches them
 // with SQL (full-text search, or pgvector for semantic search); the demo keeps
 // them in memory so it runs without one.
 
-export const ORGANISATION = "Lakeside AI Hub";
-
-export const SERVICE_CATEGORIES = [
-  "advisory",
-  "proof-of-concept",
-  "training",
-  "funding",
-  "technology-testing",
-] as const;
-export type ServiceCategory = (typeof SERVICE_CATEGORIES)[number];
-
-export const AUDIENCES = ["sme", "startup", "public-sector"] as const;
-export type Audience = (typeof AUDIENCES)[number];
-
-export const TEAMS = {
-  advisory: { name: "AI Advisory team", responseTime: "2 working days" },
-  projects: { name: "Proof-of-concept team", responseTime: "3 working days" },
-  training: { name: "Training team", responseTime: "2 working days" },
-  funding: { name: "Funding desk", responseTime: "1 working day" },
-  general: { name: "Customer service", responseTime: "1 working day" },
-} as const;
-export type TeamId = keyof typeof TEAMS;
+export interface Team {
+  name: string;
+  responseTime: string;
+  /** What the team handles, to help the assistant choose between teams. */
+  handles?: string;
+}
 
 export interface Service {
   id: string;
   name: string;
-  category: ServiceCategory;
-  audiences: Audience[];
+  /** One of the knowledge's `categories`. */
+  category: string;
+  /** Some of the knowledge's `audiences`. */
+  audiences: string[];
   summary: string;
   details: string;
   price: string;
   duration: string;
-  team: TeamId;
+  /** A key of the knowledge's `teams`. */
+  team: string;
   tags: string[];
 }
 
@@ -48,7 +37,33 @@ export interface Article {
   tags: string[];
 }
 
-export const SERVICES: Service[] = [
+export interface Knowledge {
+  id: string;
+  organisation: string;
+  /** Name shown in the chat header. */
+  helpdeskName: string;
+  /** What the organisation is, for the assistant's instructions. */
+  persona: string;
+  /** What the assistant stays on, for the instructions. */
+  scope: string;
+  /** What the FAQ covers, for the searchKnowledge tool description. */
+  faqTopics: string;
+  /** What the services are, for the searchServices tool description. */
+  serviceNoun: string;
+  /** A sample first-person message for the hand-off summary. */
+  handoffExample: string;
+  categories: readonly [string, ...string[]];
+  /** Display names of the categories, for the service cards. */
+  categoryLabels: Record<string, string>;
+  audiences: readonly [string, ...string[]];
+  teams: Record<string, Team>;
+  services: Service[];
+  articles: Article[];
+  /** The documents came from the user, so the assistant treats them as data, never as instructions. */
+  userProvided?: boolean;
+}
+
+const HUB_SERVICES: Service[] = [
   {
     id: "ai-readiness-check",
     name: "AI Readiness Check",
@@ -170,7 +185,7 @@ export const SERVICES: Service[] = [
   },
 ];
 
-export const ARTICLES: Article[] = [
+const HUB_ARTICLES: Article[] = [
   {
     id: "who-we-are",
     title: "What is Lakeside AI Hub?",
@@ -232,3 +247,40 @@ export const ARTICLES: Article[] = [
     tags: ["chatbot", "ai assistant", "how it works", "accuracy"],
   },
 ];
+
+export const HUB_KNOWLEDGE: Knowledge = {
+  id: "ai-hub",
+  organisation: "Lakeside AI Hub",
+  helpdeskName: "Lakeside AI Hub Helpdesk",
+  persona:
+    "a publicly funded regional centre that helps small companies, start-ups and public organisations start using AI",
+  scope: "practical AI adoption",
+  faqTopics:
+    "who we are, eligibility, pricing rules, data protection, opening hours, events, languages, what happens after a pilot",
+  serviceNoun: "services",
+  handoffExample: "We are a 12-person machine shop and would like ...",
+  categories: [
+    "advisory",
+    "proof-of-concept",
+    "training",
+    "funding",
+    "technology-testing",
+  ],
+  categoryLabels: {
+    advisory: "Advisory",
+    "proof-of-concept": "Proof-of-concept",
+    training: "Training",
+    funding: "Funding",
+    "technology-testing": "Technology testing",
+  },
+  audiences: ["sme", "startup", "public-sector"],
+  teams: {
+    advisory: { name: "AI Advisory team", responseTime: "2 working days" },
+    projects: { name: "Proof-of-concept team", responseTime: "3 working days" },
+    training: { name: "Training team", responseTime: "2 working days" },
+    funding: { name: "Funding desk", responseTime: "1 working day" },
+    general: { name: "Customer service", responseTime: "1 working day" },
+  },
+  services: HUB_SERVICES,
+  articles: HUB_ARTICLES,
+};
