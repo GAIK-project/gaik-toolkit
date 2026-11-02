@@ -254,8 +254,6 @@ export function HelpdeskCreateSection() {
             documents do not answer it.
           </CardDescription>
 
-          <Guidance />
-
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="space-y-4">
               <div className="space-y-1.5">
@@ -366,6 +364,8 @@ export function HelpdeskCreateSection() {
           </div>
 
           {example && <HelpdeskChat key={revision} example={example} />}
+
+          <Guidance />
         </CardContent>
       </Card>
     </div>

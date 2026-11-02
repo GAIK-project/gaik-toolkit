@@ -260,12 +260,12 @@ export function HelpdeskChat({ example }: { example: HelpdeskExample }) {
   return (
     <ExampleProvider value={example}>
       <div className="bg-card flex h-[min(76vh,800px)] min-h-[520px] flex-col overflow-hidden rounded-2xl border shadow-sm">
-        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary text-primary-foreground grid size-9 place-items-center rounded-full">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="bg-primary text-primary-foreground grid size-9 shrink-0 place-items-center rounded-full">
               <Headset className="size-[18px]" />
             </div>
-            <div className="leading-tight">
+            <div className="min-w-0 leading-tight">
               <p className="text-sm font-semibold">
                 {example.knowledge.helpdeskName}
               </p>
@@ -275,7 +275,7 @@ export function HelpdeskChat({ example }: { example: HelpdeskExample }) {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-1">
             {playing ? (
               <Button
                 variant="ghost"
