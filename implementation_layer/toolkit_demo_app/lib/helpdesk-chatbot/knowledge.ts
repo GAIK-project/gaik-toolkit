@@ -188,8 +188,8 @@ const HUB_SERVICES: Service[] = [
 const HUB_ARTICLES: Article[] = [
   {
     id: "who-we-are",
-    title: "What is Lakeside AI Hub?",
-    body: "Lakeside AI Hub is a publicly funded regional centre that helps small and medium-sized companies, start-ups and public organisations start using AI. Most services are free or partly funded. We are a cooperation of two universities and the regional development agency.",
+    title: "What is FAIR AI Hub?",
+    body: "FAIR AI Hub is a publicly funded regional centre that helps small and medium-sized companies, start-ups and public organisations start using AI. Most services are free or partly funded. We are a cooperation of two universities and the regional development agency.",
     tags: ["about", "organisation", "who"],
   },
   {
@@ -201,7 +201,7 @@ const HUB_ARTICLES: Article[] = [
   {
     id: "who-can-use",
     title: "Who can use the services?",
-    body: "Companies with fewer than 250 employees, start-ups and public-sector organisations in the Lakeside region can use the services. Larger companies can join training courses but not the funded services.",
+    body: "Companies with fewer than 250 employees, start-ups and public-sector organisations in the FAIR region can use the services. Larger companies can join training courses but not the funded services.",
     tags: ["eligibility", "who can", "requirements", "region", "size"],
   },
   {
@@ -250,8 +250,8 @@ const HUB_ARTICLES: Article[] = [
 
 export const HUB_KNOWLEDGE: Knowledge = {
   id: "ai-hub",
-  organisation: "Lakeside AI Hub",
-  helpdeskName: "Lakeside AI Hub Helpdesk",
+  organisation: "FAIR AI Hub",
+  helpdeskName: "FAIR AI Hub Helpdesk",
   persona:
     "a publicly funded regional centre that helps small companies, start-ups and public organisations start using AI",
   scope: "practical AI adoption",

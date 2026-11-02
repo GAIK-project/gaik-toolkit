@@ -40,10 +40,17 @@ export interface HelpdeskExample {
 
 const HUB: HelpdeskExample = {
   id: HUB_KNOWLEDGE.id,
-  title: "AI hub for small companies",
+  title: "FAIR Helpdesk Chatbot",
   summary:
-    "A regional centre that helps small companies start using AI: services with prices, funding rules, and a hand-off to the right team.",
-  tags: ["Services and prices", "Funding", "English and Finnish"],
+    "Provides tailored answers about FAIR services and consultancies. Hands off to the right expert or team.",
+  tags: [
+    "Services",
+    "Consultancies",
+    "Prices",
+    "Support",
+    "Expertise",
+    "Finnish and English",
+  ],
   knowledge: HUB_KNOWLEDGE,
   welcomeText:
     "Ask about services, prices or how to get started, in English or Finnish. Answers come from the hub's own catalogue, and a person can take over when needed.",

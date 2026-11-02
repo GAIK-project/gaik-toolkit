@@ -14,7 +14,7 @@ export default function HelpdeskChatbotPage() {
       <DemoPageHeader
         icon={Headset}
         title="Helpdesk Chatbot"
-        description="A customer service assistant that answers from an organisation's own services and FAQ, shows its sources, and passes the question to a person when needed. The organisations here are fictional."
+        description="A customer service assistant that answers from an organisation's own services and FAQ, shows its sources, and passes the question to a person when needed."
       >
         <div className="mt-3 flex justify-end">
           <HowItWorks />
@@ -22,7 +22,7 @@ export default function HelpdeskChatbotPage() {
       </DemoPageHeader>
 
       <UseCaseChooser
-        exampleDescription="Nothing to prepare. Pick a fictional helpdesk and ask it a question, or watch a scripted conversation."
+        exampleDescription="Nothing to prepare. Pick a helpdesk and ask it a question, or watch a scripted conversation."
         examplePoints={[
           "Two helpdesks: a regional AI hub and a company's IT and HR desk",
           "Answers come only from the helpdesk's own services and FAQ, with the sources shown",

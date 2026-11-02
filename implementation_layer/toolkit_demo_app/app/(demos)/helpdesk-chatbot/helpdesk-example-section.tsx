@@ -19,7 +19,7 @@ const ICONS: Record<string, LucideIcon> = {
 const STEPS = [
   {
     title: "Pick a helpdesk",
-    text: "Two fictional organisations, each with its own services and FAQ.",
+    text: "Two organisations, each with its own services and FAQ.",
   },
   {
     title: "Ask a question",
