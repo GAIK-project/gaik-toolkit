@@ -184,8 +184,10 @@ taking the best match reports correct citations as wrong whenever a common strin
 in several places.
 
 gaik ships the wrapping form of this: `VisionExtractor(include_verification=True)` wraps
-each scalar in `{value, confidence_score, confidence_reason}`, and results land in
-`result.verification`. Wrapping buys paths that cannot drift onto the wrong field, because
+each scalar in `{value, confidence_score, confidence_reason, found_in_text, page}`, and
+results land in `result.verification`. The score is the model rating itself and can be
+1.0 for a misread value; `found_in_text` is gaik's own lookup of the value in the PDF
+text layer (`None` when there is no text layer), so flag on that, not on the score. Wrapping buys paths that cannot drift onto the wrong field, because
 the path is a fact about the response tree rather than a string the model wrote. It costs
 roughly **four times the property count** — and property count is the limit that decides
 whether the request is accepted at all. A separate citation table costs a flat +5

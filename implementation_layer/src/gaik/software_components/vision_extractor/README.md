@@ -149,7 +149,7 @@ extractor = VisionExtractor(
     use_azure=True,                  # OpenAI: Azure OpenAI. Claude: Anthropic Foundry.
     vertex_ai=True,                  # Google only. True = Vertex AI, False = Gemini direct API.
     additional_instructions=None,    # Extra instructions appended to the user prompt.
-    include_verification=False,      # Add confidence_score and confidence_reason per extracted field.
+    include_verification=False,      # Add confidence and a PDF text-layer check per extracted field.
 )
 ```
 
@@ -165,7 +165,7 @@ Constructor options:
 | `use_azure` | `bool` | `True` | For OpenAI, use Azure OpenAI. For Claude, use Anthropic Foundry. |
 | `vertex_ai` | `bool` | `True` | For Google, use Vertex AI instead of direct Gemini API. |
 | `additional_instructions` | `str | None` | `None` | Extra extraction instructions appended to the provider user prompt. |
-| `include_verification` | `bool` | `False` | Wraps fields with confidence metadata: `value`, `confidence_score`, and `confidence_reason`. |
+| `include_verification` | `bool` | `False` | Wraps fields with `value`, `confidence_score`, `confidence_reason`, `found_in_text` and `page`. |
 
 ### extract()
 
@@ -216,17 +216,33 @@ result.model                # Model/deployment identifier used
 result.documents_processed  # Number of input files
 ```
 
-When `include_verification=True`, scalar fields are returned with confidence metadata:
+When `include_verification=True`, scalar fields are returned with verification metadata:
 
 ```python
 {
     "invoice_number": {
         "value": "INV-1001",
         "confidence_score": 0.98,
-        "confidence_reason": "Value appears explicitly next to the invoice number label."
+        "confidence_reason": "Value appears explicitly next to the invoice number label.",
+        "found_in_text": True,
+        "page": 1
     }
 }
 ```
+
+`confidence_score` and `confidence_reason` are the model rating its own answer in the
+same call that extracted it. A misread value can still come back as 1.0, so do not
+treat a high score as verified.
+
+`found_in_text` is an independent check: the value is looked up in the PDF's text
+layer, ignoring case, spacing, punctuation, thousands separators, the decimal separator
+and the order of an ISO date. `page` is the 1-based page where it was found.
+
+| `found_in_text` | Meaning |
+|---|---|
+| `True` | The value is written on `page`. |
+| `False` | A PDF text layer exists and the value is not on any page: a misread, or a value the model inferred or reworded (a category, a summary). Review these. |
+| `None` | Not checked: images or scanned PDFs without a text layer, booleans and empty values. |
 
 ---
 

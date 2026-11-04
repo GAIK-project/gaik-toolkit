@@ -333,7 +333,7 @@
         "name": "include_verification",
         "type": "bool",
         "default": false,
-        "effect": "Per-field confidence + reasoning, useful before human review.",
+        "effect": "Per-field confidence_score + confidence_reason (the model's own rating, not proof) and found_in_text + page (the value checked against the PDF text layer; None without one). Use found_in_text, not the score, to flag values for human review.",
         "selection_relevant": true,
         "infer_from": "human_review == yes OR target_output_spec.confidence_required"
       },
