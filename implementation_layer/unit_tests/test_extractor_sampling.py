@@ -216,6 +216,40 @@ class TestComponentsForwardTheirSettings:
         assert captured["reasoning_effort"] == "low"
 
 
+@pytest.mark.parametrize(
+    ("returned", "field"),
+    [
+        ("", "records"),
+        ("Upcoming events!", "upcoming_events"),
+        ("2026 events", "records_2026_events"),
+    ],
+)
+def test_nested_list_container_name_is_a_usable_field_name(monkeypatch, returned, field):
+    # The structure detector's container name is free text from the model. An empty
+    # one used to become a field called "", whose records no caller could address.
+    from gaik.software_components.extractor import schema as schema_module
+
+    analysis = schema_module.StructureAnalysis(
+        structure_type="nested_list",
+        parent_container_name=returned,
+        parent_description="Events on the pages",
+        item_description="One event",
+        reasoning="Repeated events.",
+    )
+    monkeypatch.setattr(schema_module, "detect_structure_type", lambda *a, **k: analysis)
+    monkeypatch.setattr(
+        schema_module, "parse_user_requirements", lambda *a, **k: _flat_requirements()
+    )
+
+    model, _, returned_analysis = schema_module.parse_nested_requirements(
+        "List the events.", client=object(), model="gpt-6-luna"
+    )
+
+    assert list(model.model_fields) == [field]
+    assert returned_analysis.parent_container_name == field
+    assert model.model_validate({field: [{"answer": "x"}]})
+
+
 def _signature_default(cls, name: str):
     import inspect
 

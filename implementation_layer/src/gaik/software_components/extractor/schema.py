@@ -845,7 +845,13 @@ def parse_nested_requirements(
 
         return extraction_model, composite_requirements, analysis
 
-    # Nested structure
+    # Nested structure. The container name comes from the model as it wrote it: an
+    # empty or non-identifier name would become a field called "" (or "Events!"),
+    # so it gets the same snake_case cleanup as the parent-with-children path, and
+    # the returned analysis names the field the model actually has.
+    analysis.parent_container_name = _sanitize_field_name(
+        analysis.parent_container_name, fallback="records"
+    )
     print(f"Using nested structure with '{analysis.parent_container_name}' field")
     print(f"  Parent: {analysis.parent_description}")
 
