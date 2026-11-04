@@ -554,7 +554,7 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
             />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuContent align="end" className="w-72">
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
             {status}
           </DropdownMenuLabel>
@@ -571,7 +571,7 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
               return (
                 <DropdownMenuRadioItem key={model.id} value={model.id}>
                   <ProviderIcon provider={model.provider} className="size-4" />
-                  {model.label}
+                  <span className="whitespace-nowrap">{model.label}</span>
                   <span className="text-muted-foreground ml-auto text-xs">
                     {model.id === catalog.default
                       ? "default"
