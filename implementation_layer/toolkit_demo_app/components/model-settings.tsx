@@ -598,22 +598,10 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
               );
             })}
           </DropdownMenuRadioGroup>
-          {(someLocked ||
-            catalog.models.some((m) => !m.audio && m.allowed)) && (
-            <div className="text-muted-foreground space-y-1 px-2 pt-1 pb-1.5 text-xs">
-              {someLocked && (
-                <p>
-                  Some models are for the GAIK team only. Ask an admin for
-                  access.
-                </p>
-              )}
-              {catalog.models.some((m) => !m.audio) && (
-                <p>
-                  Claude and Gemini get audio as text from the server&apos;s
-                  transcriber.
-                </p>
-              )}
-            </div>
+          {someLocked && (
+            <p className="text-muted-foreground px-2 pt-1 pb-1.5 text-xs">
+              Locked models: ask an admin for access.
+            </p>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem

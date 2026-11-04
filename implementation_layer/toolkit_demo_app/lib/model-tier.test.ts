@@ -4,6 +4,13 @@ import { isModelStaff } from "./model-tier";
 describe("isModelStaff", () => {
   afterEach(() => {
     delete process.env.DEMO_USER_NAME;
+    delete process.env.MODEL_STAFF_EMAILS;
+  });
+
+  test("addresses listed in MODEL_STAFF_EMAILS are on the team", () => {
+    process.env.MODEL_STAFF_EMAILS = " a@example.org , B@Example.com";
+    expect(isModelStaff("b@example.com", undefined)).toBe(true);
+    expect(isModelStaff("c@example.com", undefined)).toBe(false);
   });
 
   test("haaga-helia.fi addresses are on the team, students and others are not", () => {

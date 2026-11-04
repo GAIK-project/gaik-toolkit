@@ -19,6 +19,10 @@ export interface ExtractionResult {
   /** The quote the model gave for each value, and where it is in the source text. */
   sources?: { sources: TracedSource[] } | null;
   pdf_available: boolean;
+  /** Which model turned the audio into text (audio runs only). */
+  transcription_model?: string | null;
+  /** Which model extracted the fields. */
+  extraction_model?: string | null;
 }
 
 export type ExtractionInput =

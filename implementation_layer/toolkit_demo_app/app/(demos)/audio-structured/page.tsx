@@ -42,6 +42,7 @@ import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { ResultView } from "../extractor/result-view";
+import { modelLabel } from "@/lib/model-labels";
 import {
   TranscriptView,
   type TranscribeResult,
@@ -72,6 +73,7 @@ type AudioResult = Omit<TranscribeResult, "filename"> & {
   schema_source?: "saved" | "generated" | "reused";
   schema_id?: string | null;
   timings?: Timings;
+  extraction_model?: string | null;
 };
 
 const GUIDE_STEPS: GuideStep[] = [
@@ -659,7 +661,12 @@ export default function AudioStructuredPage() {
                     </Badge>
                     {result.transcription_model && (
                       <Badge variant="outline" className="font-normal">
-                        {result.transcription_model}
+                        Transcribed by {modelLabel(result.transcription_model)}
+                      </Badge>
+                    )}
+                    {result.extraction_model && (
+                      <Badge variant="outline" className="font-normal">
+                        Extracted by {modelLabel(result.extraction_model)}
                       </Badge>
                     )}
                     {result.corrected_transcript && (

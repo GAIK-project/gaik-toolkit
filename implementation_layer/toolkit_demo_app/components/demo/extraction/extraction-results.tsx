@@ -27,6 +27,7 @@ import {
   type TracedSource,
 } from "./format";
 import { sourceTextOf, type ExtractionResult } from "./use-extraction-pipeline";
+import { runSummary } from "@/lib/model-labels";
 
 type Highlight = { text: string; n: number; record: number };
 
@@ -270,6 +271,7 @@ export function ExtractionResults({
   const hasTranscript = Boolean(
     result.raw_transcript || result.enhanced_transcript,
   );
+  const summary = runSummary(seconds, result);
 
   const copyJson = async () => {
     try {
@@ -299,10 +301,8 @@ export function ExtractionResults({
               ? `1 ${config.recordNoun} extracted`
               : `${records.length} ${config.recordsNoun} extracted`}
           </p>
-          {seconds !== null && (
-            <p className="text-muted-foreground text-xs">
-              in {seconds.toFixed(1)} s
-            </p>
+          {summary && (
+            <p className="text-muted-foreground text-xs">{summary}</p>
           )}
         </div>
         <Button variant="outline" size="sm" onClick={copyJson}>

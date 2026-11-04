@@ -45,6 +45,8 @@ def test_lists_only_providers_with_credentials_default_first(server_env, monkeyp
     assert models["anthropic_foundry:claude-haiku-5-5"].label == "Claude Haiku 5.5"
     assert models["anthropic_foundry:claude-haiku-5-5"].audio is False
     assert models["azure:gpt-6-astra"].staff and not models["azure:gpt-6-luna"].staff
+    assert models["anthropic_foundry:claude-opus-5-5"].staff
+    assert models["anthropic_foundry:claude-opus-5-5"].label == "Claude Opus 5.5"
 
     monkeypatch.setenv("GOOGLE_SERVICE_ACCOUNT_JSON", "{}")
     monkeypatch.setenv("GOOGLE_PROJECT_ID", "p")

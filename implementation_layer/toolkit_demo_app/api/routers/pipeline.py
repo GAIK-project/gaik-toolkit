@@ -944,6 +944,8 @@ async def audio_pipeline_stream(
                     "extracted_data": extracted_data,
                     "sources": sources,
                     "pdf_available": pdf_available,
+                    # The model that extracted, so the page can say which one ran.
+                    "extraction_model": config.get("model"),
                     # What the Transcriber demo shows, so that its view can be reused.
                     "corrected_transcript": corrected_transcript,
                     "correction_summary": correction_summary,
@@ -1115,6 +1117,8 @@ async def text_pipeline_stream(
                     "extracted_data": extracted_data,
                     "sources": sources,
                     "pdf_available": pdf_available,
+                    # The model that extracted, so the page can say which one ran.
+                    "extraction_model": config.get("model"),
                 },
             )
 
@@ -1359,6 +1363,8 @@ async def document_pipeline_stream(
                     "extracted_data": extracted_data,
                     "sources": sources,
                     "pdf_available": pdf_available,
+                    # The model that extracted, so the page can say which one ran.
+                    "extraction_model": config.get("model"),
                     # The parsed file as the parser shows it, and what it said about itself.
                     "parser": actual_parser_type,
                     "parsed_html": parsed_html,
