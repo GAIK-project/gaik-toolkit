@@ -98,13 +98,10 @@ export function PrivacyContent() {
 
       <Section icon={Eye} title="Optional Wizard Diagnostics">
         <p>
-          Solution Wizard offers optional session diagnostics, disabled by default.
-          If you enable it before the first message, prompts, extracted attachment
-          text, answers, tool activity and model usage are stored in our
-          login-protected Langfuse pilot on CSC Rahti and Allas in Finland.
-          Use synthetic examples without personal or confidential information.
-          Restart the wizard to start a session without diagnostics. Contact the
-          project team below to request deletion of an already recorded session.
+          Solution Wizard no longer records sessions. The optional diagnostics
+          pilot was switched off on 4 November 2026, and the sessions it stored
+          are being deleted. Contact the project team below with any questions
+          about them.
         </p>
       </Section>
 

@@ -55,9 +55,11 @@ text layer. It roughly triples the output tokens of an extraction.
 
 ### Solution Wizard
 
-Optional session diagnostics use a self-hosted Langfuse pilot. Users choose recording
-before their first message; it is off by default. See
-[the pilot setup and limits](observability/langfuse/README.md).
+Session diagnostics are off: the self-hosted Langfuse pilot was removed from Rahti on
+2026-11-04. The tracing adapter (`api/utils/wizard_tracing.py`) stays and records
+nothing unless `WIZARD_LANGFUSE_ENABLED=true` and the `LANGFUSE_*` variables point at a
+Langfuse instance; [observability/langfuse](observability/langfuse/README.md) has the
+pilot's setup if it is needed again.
 
 - **Solution Configuration Wizard** - Natural-language use case → validated blueprint, BPMN diagram, Mermaid flow, and runnable PoC. Access is gated separately from the regular demos: anonymous visitors are sent to `/sign-in`, approved users need a per-user `wizard_access` grant from `/admin`, and the optional team shortcut `/solution-wizard?key=<WIZARD_ACCESS_SECRET>` sets a temporary access cookie.
 

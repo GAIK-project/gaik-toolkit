@@ -1,5 +1,9 @@
 # Solution Wizard Langfuse pilot
 
+> **Removed on 2026-11-04.** The pilot received no traces after 2026-10-01, so its
+> Rahti resources, database and secrets were deleted and the demo API's `LANGFUSE_*`
+> variables removed. This folder stays as the recipe to set it up again.
+
 An optional pilot for `/solution-wizard`. Other demos and GAIK Ops keep their existing
 behavior. Infrastructure lives beside the demo so its setup and instrumentation can
 be reviewed together; credentials belong in private env files and Kubernetes Secrets.
