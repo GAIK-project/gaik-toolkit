@@ -600,11 +600,16 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
           </DropdownMenuRadioGroup>
           {(someLocked ||
             catalog.models.some((m) => !m.audio && m.allowed)) && (
-            <p className="text-muted-foreground px-2 pt-1 pb-1.5 text-xs">
-              {someLocked && "Locked models are for the GAIK project team. "}
-              {catalog.models.some((m) => !m.audio) &&
-                "With Claude or Gemini, audio is transcribed with GPT first."}
-            </p>
+            <div className="text-muted-foreground space-y-1 px-2 pt-1 pb-1.5 text-xs">
+              {someLocked && (
+                <p>Locked models are for the GAIK project team.</p>
+              )}
+              {catalog.models.some((m) => !m.audio) && (
+                <p>
+                  Claude and Gemini get audio as text, transcribed with GPT.
+                </p>
+              )}
+            </div>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
