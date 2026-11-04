@@ -139,6 +139,18 @@ def _has_credentials(provider: str) -> bool:
     }.get(provider, False)
 
 
+def _server_default() -> tuple[str, str] | None:
+    """Provider and model of the deployment's own config, or None if it has none."""
+    from .config import server_api_config
+
+    try:
+        config = server_api_config()
+    except Exception:
+        return None
+    provider, model = config.get("provider"), config.get("model")
+    return (str(provider), str(model)) if provider and model else None
+
+
 def server_models() -> list[ServerModel]:
     """Models the deployment's own credentials can run, default first.
 
@@ -156,16 +168,17 @@ def server_models() -> list[ServerModel]:
             if len(parts) >= 2 and parts[0] and parts[1]:
                 entries.append((parts[0], parts[1], parts[2:3] == ["staff"]))
     else:
-        default = os.getenv("DEMO_LLM_MODEL") or os.getenv("AZURE_DEPLOYMENT") or "gpt-6-luna"
-        rows = list(_DEFAULT_MODELS)
-        if not any(m == default for _, m, _ in rows):
-            rows.insert(0, ("gpt", default, False))
-        # The server's own model leads the list.
-        rows.sort(key=lambda row: row[1] != default)
-        for family, model, staff in rows:
+        for family, model, staff in _DEFAULT_MODELS:
             provider = next((p for p in _FAMILIES[family] if _has_credentials(p)), None)
             if provider:
                 entries.append((provider, model, staff))
+    # The model a request without a choice runs on leads the list and is open to
+    # everyone: it already runs for anyone who picks nothing.
+    default = _server_default()
+    if default is not None:
+        entries = [(default[0], default[1], False)] + [
+            e for e in entries if (e[0], e[1]) != default
+        ]
     models, seen = [], set()
     for provider, model, staff in entries:
         if not _has_credentials(provider) or (provider, model) in seen:

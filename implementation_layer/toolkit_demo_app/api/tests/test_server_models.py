@@ -58,10 +58,19 @@ def test_env_list_overrides_and_still_needs_credentials(server_env, monkeypatch)
         "DEMO_SERVER_MODELS", "azure:gpt-6-sol, vertex:gemini-x, azure:gpt-6-astra:staff"
     )
     models = settings.server_models()
+    # The server's own model (AZURE_DEPLOYMENT) always leads, even when unlisted.
     assert [(m.id, m.staff) for m in models] == [
+        ("azure:gpt-6-luna", False),
         ("azure:gpt-6-sol", False),
         ("azure:gpt-6-astra", True),
     ]
+
+
+def test_a_team_model_as_server_default_is_open_to_all(server_env, monkeypatch):
+    # With no choice the default runs for anyone, so the list must not lock it.
+    monkeypatch.setenv("DEMO_LLM_MODEL", "gpt-6-astra")
+    models = settings.server_models()
+    assert models[0].id == "azure:gpt-6-astra" and not models[0].staff
 
 
 def _app(observed):
