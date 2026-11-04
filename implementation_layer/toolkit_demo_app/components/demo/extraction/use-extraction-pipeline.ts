@@ -2,6 +2,7 @@
 
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
+import type { TracedSource } from "./format";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -15,6 +16,8 @@ export interface ExtractionResult {
   /** Set by the document (photo or scan) pipeline. */
   parsed_content?: string | null;
   extracted_data: Record<string, unknown>[] | null;
+  /** The quote the model gave for each value, and where it is in the source text. */
+  sources?: { sources: TracedSource[] } | null;
   pdf_available: boolean;
 }
 

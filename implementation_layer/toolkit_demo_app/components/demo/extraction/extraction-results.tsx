@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
+  AlertTriangle,
   Check,
   Copy,
   Download,
@@ -15,27 +16,50 @@ import {
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import type { ExtractionConfig } from "./config";
-import { splitAround, unwrapRecords, valueStrings } from "./format";
+import {
+  checkReason,
+  countVerdicts,
+  sourceFor,
+  splitAround,
+  unwrapRecords,
+  labelOf,
+  valueStrings,
+  type TracedSource,
+} from "./format";
 import { sourceTextOf, type ExtractionResult } from "./use-extraction-pipeline";
 
-type Highlight = { text: string; n: number };
+type Highlight = { text: string; n: number; record: number };
 
 /** The source text, with the value the user picked marked. */
 function SourcePanel({
   source,
   highlight,
+  traced,
   onRerun,
   busy,
 }: {
   source: string;
   highlight: Highlight | null;
+  /** The quote the model gave for the picked value, when it gave one. */
+  traced: TracedSource | null;
   onRerun?: (text: string) => void;
   busy: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(source);
   const markRef = useRef<HTMLElement>(null);
-  const parts = highlight ? splitAround(source, highlight.text) : null;
+  // The model's own quote first: it is found even when the value is worded differently
+  // (a date in another format, a translation, a summary). Else the value as it stands.
+  const quoted =
+    traced?.span && traced.span[1] <= source.length
+      ? ([
+          source.slice(0, traced.span[0]),
+          source.slice(traced.span[0], traced.span[1]),
+          source.slice(traced.span[1]),
+        ] as [string, string, string])
+      : null;
+  const parts =
+    quoted ?? (highlight ? splitAround(source, highlight.text) : null);
 
   useEffect(() => {
     markRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -89,10 +113,26 @@ function SourcePanel({
           source
         )}
       </div>
-      {highlight && !parts && (
+      {highlight && traced?.verdict === "check" && (
+        <p className="flex items-start gap-1.5 text-xs font-medium text-amber-700">
+          <AlertTriangle className="mt-px size-3.5 shrink-0" />
+          Check this value. {checkReason(traced)}
+        </p>
+      )}
+      {highlight && quoted && traced && (
         <p className="text-muted-foreground text-xs">
-          This value is not quoted word for word. The model interpreted it from
-          the report.
+          The model read this value from the marked passage
+          {traced.quote.trim() !== quoted[1].trim()
+            ? ` (“${traced.quote}”)`
+            : ""}
+          .
+        </p>
+      )}
+      {highlight && !quoted && !parts && (
+        <p className="text-muted-foreground text-xs">
+          {traced
+            ? "The model gave a quote for this value that is not in the text, so it may have reworded it. It interpreted the value from the report."
+            : "This value is not quoted word for word. The model interpreted it from the report."}
         </p>
       )}
       {onRerun && (
@@ -155,6 +195,55 @@ export function NotFound({ label }: { label?: string }) {
   );
 }
 
+/** How many values the quotes back, and the ones to check, each of which opens its quote. */
+function SourceChecks({
+  sources,
+  onPick,
+}: {
+  sources: TracedSource[];
+  onPick: (text: string, record: number) => void;
+}) {
+  const { verified, check } = countVerdicts(sources);
+  const flagged = sources.filter((source) => source.verdict === "check");
+  if (verified + check === 0) return null;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs">
+        <span
+          className={cn(
+            "font-medium",
+            check > 0 ? "text-amber-700" : "text-muted-foreground",
+          )}
+        >
+          {check > 0 ? `${check} to check` : "Nothing to check"}
+        </span>
+        <span className="text-muted-foreground">, {verified} verified</span>
+      </p>
+      {flagged.map((source) => (
+        <button
+          key={source.field}
+          type="button"
+          onClick={() =>
+            onPick(valueStrings(source.value)[0] ?? "", source.record ?? 0)
+          }
+          className="w-full rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-left text-xs hover:border-amber-400"
+        >
+          <span className="flex items-center gap-1.5 font-medium text-amber-800">
+            <AlertTriangle className="size-3.5 shrink-0" />
+            {labelOf(source.field.split(".").pop() ?? source.field)}:{" "}
+            <span className="truncate">
+              {valueStrings(source.value).join(", ")}
+            </span>
+          </span>
+          <span className="text-muted-foreground mt-0.5 block">
+            {checkReason(source)}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** What came out of a run: the records, where each value comes from, and the report. */
 export function ExtractionResults({
   config,
@@ -192,8 +281,11 @@ export function ExtractionResults({
     }
   };
 
-  const pick = (text: string) =>
-    setHighlight((current) => ({ text, n: (current?.n ?? 0) + 1 }));
+  const pick = (text: string, record: number) =>
+    setHighlight((current) => ({ text, record, n: (current?.n ?? 0) + 1 }));
+  const traced = highlight
+    ? sourceFor(result.sources?.sources, highlight.text, highlight.record)
+    : null;
 
   return (
     <div className="space-y-4">
@@ -243,7 +335,7 @@ export function ExtractionResults({
                   index={index}
                   total={records.length}
                   active={highlight?.text ?? null}
-                  onPick={pick}
+                  onPick={(text) => pick(text, index)}
                 />
               ))}
             </div>
@@ -256,9 +348,16 @@ export function ExtractionResults({
                 <p className="text-muted-foreground text-xs">
                   Click a value to see where it comes from.
                 </p>
+                {result.sources && (
+                  <SourceChecks
+                    sources={result.sources.sources}
+                    onPick={pick}
+                  />
+                )}
                 <SourcePanel
                   source={source}
                   highlight={highlight}
+                  traced={traced}
                   onRerun={onRerun}
                   busy={busy}
                 />

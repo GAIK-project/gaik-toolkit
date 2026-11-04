@@ -21,6 +21,7 @@ import base64
 import io
 import re
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 
@@ -147,7 +148,7 @@ def _readings_of(number: str) -> list[float]:
 def _as_number(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
-    if isinstance(value, int | float):
+    if isinstance(value, int | float | Decimal):
         return float(value)
     if isinstance(value, str) and re.fullmatch(r"-?\d+(\.\d+)?", value.strip()):
         return float(value)
@@ -223,6 +224,23 @@ def _spells(words: list[str], squeezed: str) -> bool:
             if not squeezed.startswith(joined):
                 break
     return False
+
+
+_WORD = re.compile(r"[^\W_]+", re.UNICODE)
+
+
+def locate_in_text(text: str, quote: str) -> tuple[int, int] | None:
+    """Where in ``text`` a quote sits, as character offsets, however it is spaced or punctuated.
+
+    Words are compared as in :func:`tokens`, so a quote that the model copied with other
+    line breaks, spacing or punctuation is still found.
+    """
+    words = [(match.group().lower(), match.start(), match.end()) for match in _WORD.finditer(text)]
+    needle = tokens(quote)
+    at = _find([word for word, _, _ in words], needle)
+    if at is None:
+        return None
+    return words[at][1], words[at + len(needle) - 1][2]
 
 
 def _find(haystack: list[str], needle: list[str]) -> int | None:
@@ -521,7 +539,8 @@ def check_text_sources(raw: Any, data: dict, text: str) -> dict:
         if not field or not quote:
             continue
         value = value_at(data, field)
-        found = _find(haystack, tokens(quote)) is not None
+        span = locate_in_text(text, quote)
+        found = span is not None
         status = value_status(value, quote)
         if status == "mismatch" and _value_around_quote(haystack, value, tokens(quote)) is not None:
             status = "match"
@@ -537,6 +556,77 @@ def check_text_sources(raw: Any, data: dict, text: str) -> dict:
                 "value_status": status,
                 "rects": [],
                 "value_rects": [],
+                # Where the quote sits in the text, for showing it there.
+                "span": list(span) if span else None,
             }
         )
     return {"sources": checked, "pages": {}, "documents": []}
+
+
+def ask_for_sources(model: type[BaseModel], user_requirements: str) -> tuple[type[BaseModel], str]:
+    """The extraction model and the task with the request for a quote per value added."""
+    return with_sources(model, wrapped=True), f"{user_requirements}\n\n{TEXT_SOURCE_INSTRUCTION}"
+
+
+def _record_lists(result: dict) -> list[str]:
+    """The fields of a result that hold a list of records (as the demos unwrap them)."""
+    return [
+        key
+        for key, value in result.items()
+        if isinstance(value, list) and value and all(isinstance(item, dict) for item in value)
+    ]
+
+
+def _verdict(source: dict) -> str:
+    """How far a person can trust a value on its quote: verified, check, reworded or unchecked.
+
+    A quote that is not in the text, or that holds another number or date, is a problem. A
+    text value that is not in its quote is usually the model's own wording (a translation
+    or a summary, which these reports ask for), so it is only noted.
+    """
+    if source["status"] != "found":
+        return "check"
+    status = source["value_status"]
+    if status == "match":
+        return "verified"
+    if status == "mismatch":
+        value = source["value"]
+        exact = _as_number(value) is not None or (
+            isinstance(value, str) and _date_parts(value) is not None
+        )
+        if not exact:
+            return "reworded"
+        # A number spelled out in words ("kaksi päivää") cannot be compared with a digit.
+        return "check" if re.search(r"\d", source["quote"]) else "unchecked"
+    return "unchecked"
+
+
+def trace_text_results(results: list, text: str) -> dict | None:
+    """Takes the citations out of the results and checks each against the text read.
+
+    Each checked source says where its quote sits in the text (``span``) and which record
+    of the unwrapped results it belongs to (``record``; None for a value every record
+    shares), so a person can click a value and see its evidence. None when the model gave
+    no citations at all.
+    """
+    sources: list[dict] = []
+    given = False
+    offset = 0
+    for result in results:
+        if not isinstance(result, dict):
+            offset += 1
+            continue
+        raw = result.pop(SOURCES_FIELD, None)
+        given = given or bool(_entries(raw))
+        lists = _record_lists(result)
+        key = lists[0] if len(lists) == 1 else None
+        for source in check_text_sources(raw, result, text)["sources"]:
+            if key is None:
+                source["record"] = offset
+            else:
+                inside = re.match(rf"{re.escape(key)}\[(\d+)\]", source["field"])
+                source["record"] = offset + int(inside.group(1)) if inside else None
+            source["verdict"] = _verdict(source)
+            sources.append(source)
+        offset += len(result[key]) if key else 1
+    return {"sources": sources} if given else None

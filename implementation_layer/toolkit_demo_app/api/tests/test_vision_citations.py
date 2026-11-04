@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -384,3 +385,87 @@ async def test_trace_finds_a_quote_in_whichever_of_several_pdfs_holds_it() -> No
     assert source["document"] == 2 and source["page"] == 1
     assert source["rects"] and "2:1" in result["pages"]
     assert result["documents"] == ["PO.pdf", "BOM.pdf"]
+
+
+def test_a_quote_is_located_in_the_text_whatever_its_spacing_and_punctuation() -> None:
+    text = "Date: 15.03.2025.\nThe forklift hit a rack\nat the  north dock."
+    span = citations.locate_in_text(text, "The forklift hit a rack at the north dock")
+    assert span is not None
+    assert text[span[0] : span[1]] == "The forklift hit a rack\nat the  north dock"
+    assert citations.locate_in_text(text, "The truck hit a rack") is None
+
+
+def test_traced_results_say_where_each_quote_is_and_which_record_it_is_for() -> None:
+    text = "Report 1: slipped at the depot. Report 2: fell at the north dock."
+    results = [
+        {
+            "incidents": [{"place": "Depot"}, {"place": "North dock"}],
+            citations.SOURCES_FIELD: {
+                "items": [
+                    {
+                        "field": "incidents[1].place",
+                        "document": 1,
+                        "page": 1,
+                        "quote": "at the north dock",
+                    },
+                    {
+                        "field": "incidents[0].place",
+                        "document": 1,
+                        "page": 1,
+                        "quote": "was never written",
+                    },
+                ]
+            },
+        }
+    ]
+
+    traced = citations.trace_text_results(results, text)
+
+    assert citations.SOURCES_FIELD not in results[0]
+    second, first = traced["sources"]
+    assert second["record"] == 1 and text[slice(*second["span"])] == "at the north dock"
+    # A quote that is not in the text is not located, and says so.
+    assert first["record"] == 0 and first["span"] is None and first["status"] == "not_found"
+
+
+def test_results_without_citations_are_not_traced() -> None:
+    assert citations.trace_text_results([{"place": "Depot"}], "text") is None
+
+
+def test_traced_values_are_flagged_only_when_there_is_something_to_check() -> None:
+    text = (
+        "Tapaturma 15.3.2025 klo 14.30. Virtanen sai lievän ruhjeen käteen. "
+        "Sairauslomalla kaksi päivää."
+    )
+    entries = [
+        ("date", "2025-03-15", "Tapaturma 15.3.2025"),  # another format: verified
+        ("time", "15.30", "klo 14.30"),  # a different number: check
+        ("injury", "Minor bruise", "lievän ruhjeen käteen"),  # own wording: reworded
+        ("cause", "Slipped", "kaatui liukkaalla"),  # quote not in the text: check
+        ("people", ["Virtanen"], "Virtanen"),  # list: unchecked
+        ("days", 2, "sairauslomalla kaksi päivää"),  # a number in words: unchecked
+        ("cost", Decimal("426.7"), "maksoi 340 euroa"),  # another number: check
+    ]
+    results = [
+        {
+            **{field: value for field, value, _ in entries},
+            citations.SOURCES_FIELD: {
+                "items": [
+                    {"field": field, "document": 1, "page": 1, "quote": quote}
+                    for field, _, quote in entries
+                ]
+            },
+        }
+    ]
+
+    traced = citations.trace_text_results(results, text)
+
+    assert {s["field"]: s["verdict"] for s in traced["sources"]} == {
+        "date": "verified",
+        "time": "check",
+        "injury": "reworded",
+        "cause": "check",
+        "people": "unchecked",
+        "days": "unchecked",
+        "cost": "check",
+    }
