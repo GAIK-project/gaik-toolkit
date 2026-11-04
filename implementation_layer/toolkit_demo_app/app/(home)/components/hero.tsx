@@ -91,6 +91,10 @@ export function Hero({
               {/* Update: what is new. Edit the text here; link only to pages that exist. */}
               <p data-tour="update" className="text-muted-foreground text-sm">
                 <span className="text-foreground font-medium">New:</span>{" "}
+                <Link href="/web-scraper" className={newLinkClassName}>
+                  Web Scraper
+                </Link>
+                ,{" "}
                 <Link href="/report-writer-v2" className={newLinkClassName}>
                   Report Writer
                 </Link>

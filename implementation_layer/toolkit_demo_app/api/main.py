@@ -61,6 +61,7 @@ try:
         transcriber,
         video_search,
         vision_extractor,
+        web_scraper,
     )
 except ImportError:
     # Local dev: running from project root with api.main:app
@@ -86,6 +87,7 @@ except ImportError:
         transcriber,
         video_search,
         vision_extractor,
+        web_scraper,
     )
 
 # The Solution Wizard router makes source-tree assumptions at module load: it
@@ -193,6 +195,7 @@ app.include_router(
 app.include_router(
     knowledge_synthesis.router, prefix="/knowledge-synthesis", tags=["Knowledge Synthesis"]
 )
+app.include_router(web_scraper.router, prefix="/web-scraper", tags=["Web Scraper"])
 if solution_wizard is not None:
     app.include_router(solution_wizard.router, prefix="/wizard", tags=["Solution Wizard"])
 
@@ -231,5 +234,6 @@ async def root():
             "video-search": "/video-search - Semantic dental video search (pgvector)",
             "luvata-order": "/luvata-order - Luvata ABB order processing with BOM matching",
             "llm-judge": "/llm-judge - LLM-as-judge: text-pair, hallucinations, validate, panel",
+            "web-scraper": "/web-scraper - Crawl an allowed site and extract structured data",
         },
     }

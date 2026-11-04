@@ -40,6 +40,8 @@ _PATHS = (
     "/pipeline/document/stream",
     "/pipeline/audio/stream",
     "/model-settings/test",
+    # Web scraper: the extraction step after the crawl.
+    "/web-scraper/run",
 )
 
 

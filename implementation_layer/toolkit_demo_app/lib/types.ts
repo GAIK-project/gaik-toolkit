@@ -26,7 +26,8 @@ export type DemoType =
   | "report-writer-v2"
   | "source-normalizer"
   | "knowledge-curator"
-  | "knowledge-synthesis";
+  | "knowledge-synthesis"
+  | "web-scraper";
 
 /**
  * User feedback stored in the database

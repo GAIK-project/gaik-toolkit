@@ -25,6 +25,8 @@ const SUPPORTED_PATHS = [
   "/api/pipeline/document/stream",
   "/api/pipeline/audio/stream",
   "/api/model-settings/test",
+  // Web scraper: the extraction step after the crawl.
+  "/api/web-scraper/run",
 ];
 
 export function supportsModelSettings(path: string, method = "POST"): boolean {
@@ -50,6 +52,7 @@ export function pageUsesModelSettings(path: string): boolean {
     "/audio-structured",
     "/diary",
     "/solution-wizard",
+    "/web-scraper",
   ].includes(path);
 }
 

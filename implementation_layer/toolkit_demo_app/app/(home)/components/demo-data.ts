@@ -275,6 +275,14 @@ export const components: Demo[] = [
     process: CAPTURE,
   },
   {
+    title: "Web Scraper",
+    description:
+      "Crawl a website into clean Markdown and extract structured data, with the page each value came from",
+    href: "/web-scraper",
+    icon: Globe,
+    process: CAPTURE,
+  },
+  {
     title: "Knowledge Curator",
     description:
       "Collect verified facts per topic from normalized sources, each with its exact quote and location",

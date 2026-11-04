@@ -53,6 +53,7 @@ import {
   FileOutput,
   FilePen,
   FileStack,
+  Globe,
   LibraryBig,
   NotebookPen,
   FileSearch,
@@ -197,6 +198,12 @@ const navGroups: NavGroup[] = [
         label: "Source Normalizer",
         href: "/source-normalizer",
         icon: FileStack,
+        section: CAPTURE,
+      },
+      {
+        label: "Web Scraper",
+        href: "/web-scraper",
+        icon: Globe,
         section: CAPTURE,
       },
       {
