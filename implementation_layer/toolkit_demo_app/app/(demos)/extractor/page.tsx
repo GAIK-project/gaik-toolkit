@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { useModelSettings } from "@/lib/model-settings-store";
+import { useActiveServerModel } from "@/lib/server-model-store";
 import { cn } from "@/lib/utils";
 import {
   Database,
@@ -235,6 +236,7 @@ export default function ExtractorPage() {
   const [seconds, setSeconds] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const ownModel = useModelSettings();
+  const serverModel = useActiveServerModel();
 
   useEffect(() => {
     return () => abortControllerRef.current?.abort();
@@ -914,7 +916,7 @@ export default function ExtractorPage() {
                 Model:{" "}
                 {ownModel
                   ? `your own (${ownModel.model})`
-                  : "the server's model"}
+                  : (serverModel?.label ?? "the server's model")}
               </p>
             </CardContent>
           </Card>

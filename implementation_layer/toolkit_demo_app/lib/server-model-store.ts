@@ -102,3 +102,12 @@ export function useServerModels(enabled = true): ServerModels | null {
     () => null,
   );
 }
+
+/** The server model requests run on now: the picked one, else the default. */
+export function useActiveServerModel(): ServerModel | null {
+  const catalog = useServerModels(true);
+  const picked = useServerModel();
+  if (!catalog) return null;
+  const id = picked ?? catalog.default;
+  return catalog.models.find((model) => model.id === id) ?? null;
+}
