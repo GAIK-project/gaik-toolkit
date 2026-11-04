@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { KeyRound, Loader2 } from "lucide-react";
+import { Check, ChevronDown, KeyRound, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Azure } from "@/components/ui/svgs/azure";
@@ -11,6 +11,17 @@ import { Openai } from "@/components/ui/svgs/openai";
 import { Csc } from "@/components/ui/svgs/csc";
 import { Gemma } from "@/components/ui/svgs/gemma";
 import { Meta } from "@/components/ui/svgs/meta";
+import { Claude } from "@/components/ui/svgs/claude";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +49,12 @@ import {
   type ModelSettings,
 } from "@/lib/model-settings";
 import { setModelSettings, useModelSettings } from "@/lib/model-settings-store";
+import {
+  setServerModel,
+  useServerModel,
+  useServerModels,
+  type ServerModel,
+} from "@/lib/server-model-store";
 
 const LABELS = { openai: "OpenAI", azure: "Azure OpenAI", aitta: "CSC Aitta" };
 const CUSTOM = "__custom__";
@@ -97,7 +114,10 @@ function isPreset(provider: ModelProvider, model: string): boolean {
   return PRESETS[provider].some((preset) => preset.id === model);
 }
 
-export function ModelSettingsButton() {
+/** The own-key dialog; `showTrigger={false}` leaves opening it to the model menu. */
+export function ModelSettingsButton({
+  showTrigger = true,
+}: { showTrigger?: boolean } = {}) {
   const settings = useModelSettings();
   const pathname = usePathname();
   const usedHere = pageUsesModelSettings(pathname);
@@ -227,45 +247,47 @@ export function ModelSettingsButton() {
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        className={cn(
-          "relative gap-1.5",
-          settings
-            ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15"
-            : "text-foreground",
-        )}
-        onClick={() => changeOpen(true)}
-        aria-label={
-          settings
-            ? `Model settings, own model on${usedHere ? "" : " (not used on this page)"}`
-            : "Model settings"
-        }
-        title={
-          settings
-            ? usedHere
-              ? "Own model on"
-              : "Own model set, not used on this page"
-            : "Use your own model"
-        }
-      >
-        <KeyRound className="h-4 w-4" />
-        <span className="hidden sm:inline">
-          {settings
-            ? `Model settings · ${LABELS[settings.provider]}`
-            : "Model settings"}
-        </span>
-        {settings && (
-          <span
-            aria-hidden="true"
-            className={cn(
-              "ring-card absolute top-1.5 right-1.5 size-2 rounded-full ring-2",
-              usedHere ? "bg-emerald-500" : "bg-muted-foreground/50",
-            )}
-          />
-        )}
-      </Button>
+      {showTrigger && (
+        <Button
+          variant="outline"
+          size="sm"
+          className={cn(
+            "relative gap-1.5",
+            settings
+              ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15"
+              : "text-foreground",
+          )}
+          onClick={() => changeOpen(true)}
+          aria-label={
+            settings
+              ? `Model settings, own model on${usedHere ? "" : " (not used on this page)"}`
+              : "Model settings"
+          }
+          title={
+            settings
+              ? usedHere
+                ? "Own model on"
+                : "Own model set, not used on this page"
+              : "Use your own model"
+          }
+        >
+          <KeyRound className="h-4 w-4" />
+          <span className="hidden sm:inline">
+            {settings
+              ? `Model settings · ${LABELS[settings.provider]}`
+              : "Model settings"}
+          </span>
+          {settings && (
+            <span
+              aria-hidden="true"
+              className={cn(
+                "ring-card absolute top-1.5 right-1.5 size-2 rounded-full ring-2",
+                usedHere ? "bg-emerald-500" : "bg-muted-foreground/50",
+              )}
+            />
+          )}
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={changeOpen}>
         <DialogContent
           className="ph-no-capture ph-mask max-h-[90dvh] overflow-y-auto sm:max-w-lg"
@@ -450,6 +472,128 @@ export function ModelSettingsButton() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+}
+
+function ProviderIcon({
+  provider,
+  className,
+}: {
+  provider: string;
+  className?: string;
+}) {
+  if (provider.startsWith("anthropic"))
+    return <Claude className={className} aria-hidden />;
+  if (provider === "google" || provider === "vertex")
+    return <Sparkles className={className} aria-hidden />;
+  return <Openai className={className} aria-hidden />;
+}
+
+/**
+ * The model menu in the nav. A signed-in user sees the model in use and can
+ * switch among the server's models without a key; their own key stays an
+ * advanced option. Without server models (signed out, or a clone with no
+ * server keys) it is the plain own-key button.
+ */
+export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
+  const catalog = useServerModels(loggedIn);
+  const picked = useServerModel();
+  const settings = useModelSettings();
+  const pathname = usePathname();
+  const usedHere = pageUsesModelSettings(pathname);
+
+  if (!loggedIn || !catalog || catalog.models.length === 0)
+    return <ModelSettingsButton />;
+
+  const activeId = picked ?? catalog.default;
+  const active: ServerModel | undefined =
+    catalog.models.find((m) => m.id === activeId) ?? catalog.models[0];
+  const label = settings
+    ? `Own · ${settings.model}`
+    : (active?.label ?? "Server model");
+  const status = settings
+    ? usedHere
+      ? "Your own model runs this demo"
+      : "This demo runs on the server default"
+    : usedHere
+      ? `${active?.label} runs this demo`
+      : "This demo runs on the server default";
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className={cn(
+              "relative max-w-56 gap-1.5",
+              settings &&
+                "border-primary/50 bg-primary/10 text-primary hover:bg-primary/15",
+            )}
+            aria-label={`Model: ${label}. ${status}.`}
+            title={status}
+          >
+            {settings ? (
+              <KeyRound className="size-4 shrink-0" aria-hidden />
+            ) : (
+              <ProviderIcon
+                provider={active?.provider ?? "azure"}
+                className="size-4 shrink-0"
+              />
+            )}
+            <span className="hidden truncate sm:inline">{label}</span>
+            <ChevronDown className="size-3.5 opacity-60" aria-hidden />
+            <span
+              aria-hidden="true"
+              className={cn(
+                "ring-card absolute top-1 right-1 size-2 rounded-full ring-2",
+                usedHere ? "bg-emerald-500" : "bg-muted-foreground/50",
+              )}
+            />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+            {status}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Server models</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            value={settings ? "" : (active?.id ?? "")}
+            onValueChange={(id) => {
+              setModelSettings(null);
+              setServerModel(id === catalog.default ? null : id);
+            }}
+          >
+            {catalog.models.map((model) => {
+              return (
+                <DropdownMenuRadioItem key={model.id} value={model.id}>
+                  <ProviderIcon provider={model.provider} className="size-4" />
+                  {model.label}
+                  <span className="text-muted-foreground ml-auto text-xs">
+                    {model.id === catalog.default
+                      ? "default"
+                      : model.audio
+                        ? ""
+                        : "no audio"}
+                  </span>
+                </DropdownMenuRadioItem>
+              );
+            })}
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={() => window.dispatchEvent(new Event(OPEN_EVENT))}
+          >
+            <KeyRound className="size-4" aria-hidden />
+            {settings ? "Own key settings…" : "Use your own key…"}
+            {settings && <Check className="ml-auto size-4" aria-hidden />}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ModelSettingsButton showTrigger={false} />
     </>
   );
 }

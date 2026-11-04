@@ -10,7 +10,31 @@ except ImportError:
     from api.utils.config import get_api_config
     from api.utils.model_settings import request_model_settings
 
+try:
+    from utils.model_settings import server_models
+except ImportError:
+    from api.utils.model_settings import server_models
+
 router = APIRouter()
+
+
+@router.get("/server")
+async def list_server_models():
+    """Models the deployment runs on its own credentials, default first."""
+    models = server_models()
+    return {
+        "default": models[0].id if models else None,
+        "models": [
+            {
+                "id": m.id,
+                "provider": m.provider,
+                "model": m.model,
+                "label": m.label,
+                "audio": m.audio,
+            }
+            for m in models
+        ],
+    }
 
 
 @router.post("/test")

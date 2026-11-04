@@ -1,7 +1,9 @@
 import toast from "react-hot-toast";
 import { getModelSettings } from "./model-settings-store";
+import { getServerModel } from "./server-model-store";
 import {
   MODEL_SETTINGS_HEADER,
+  SERVER_MODEL_HEADER,
   encodeModelSettings,
   supportsModelSettings,
 } from "./model-settings";
@@ -37,6 +39,18 @@ export async function apiFetch(
     headers.set(MODEL_SETTINGS_HEADER, encodeModelSettings(settings));
   } else if (!supported) {
     headers.delete(MODEL_SETTINGS_HEADER);
+  }
+  // No own key: run on the server model the user picked, if any.
+  const serverModel = getServerModel();
+  if (
+    supported &&
+    !headers.has(MODEL_SETTINGS_HEADER) &&
+    serverModel &&
+    !headers.has(SERVER_MODEL_HEADER)
+  ) {
+    headers.set(SERVER_MODEL_HEADER, serverModel);
+  } else if (!supported) {
+    headers.delete(SERVER_MODEL_HEADER);
   }
   const response = await fetch(url, {
     ...options,

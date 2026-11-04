@@ -55,6 +55,102 @@ class RequestModelSettings:
 _settings: ContextVar[RequestModelSettings | None] = ContextVar("demo_model_settings", default=None)
 _http_client: ContextVar[httpx.Client | None] = ContextVar("demo_model_http_client", default=None)
 
+# --- Server models a signed-in user can switch between without a key -------
+SERVER_HEADER = b"x-gaik-server-model"
+
+
+@dataclass(frozen=True)
+class ServerModel:
+    provider: str
+    model: str
+    label: str
+    # False when the model cannot run the audio demos (no transcription).
+    audio: bool = True
+
+    @property
+    def id(self) -> str:
+        return f"{self.provider}:{self.model}"
+
+
+_AUDIO_PATHS = ("/pipeline/audio/stream",)
+_server_model: ContextVar[ServerModel | None] = ContextVar("demo_server_model", default=None)
+
+_GPT_LABELS = {
+    "gpt-6-luna": "GPT-6 Luna",
+    "gpt-6-sol": "GPT-6 Sol",
+    "gpt-6.1-sol": "GPT-6.1 Sol",
+    "gpt-6-astra": "GPT-6 Astra",
+}
+
+
+def _label(model: str) -> str:
+    if model in _GPT_LABELS:
+        return _GPT_LABELS[model]
+    if model.startswith("claude-"):
+        # claude-sonnet-5-5 -> Claude Sonnet 5.5
+        parts = model.split("-")[1:]
+        words = [p.capitalize() for p in parts if not p.isdigit()]
+        version = ".".join(p for p in parts if p.isdigit())
+        return " ".join(["Claude", *words, version]).strip()
+    return model
+
+
+def server_models() -> list[ServerModel]:
+    """Models the deployment's own credentials can run, default first.
+
+    ``DEMO_SERVER_MODELS`` overrides the list as comma-separated
+    ``provider:model`` entries. A provider without credentials is left out.
+    """
+    import os
+
+    azure = bool(os.getenv("AZURE_API_KEY") and os.getenv("AZURE_ENDPOINT"))
+    openai = bool(os.getenv("OPENAI_API_KEY"))
+    has_creds = {
+        "azure": azure,
+        "openai": openai,
+        "anthropic_foundry": bool(
+            os.getenv("ANTHROPIC_FOUNDRY_API_KEY") and os.getenv("ANTHROPIC_FOUNDRY_RESOURCE")
+        ),
+        "anthropic": bool(os.getenv("ANTHROPIC_API_KEY")),
+        "google": bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")),
+        "vertex": bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS")),
+    }
+    configured = os.getenv("DEMO_SERVER_MODELS", "").strip()
+    if configured:
+        entries = [e.strip().split(":", 1) for e in configured.split(",") if ":" in e]
+    else:
+        gpt = "azure" if azure else "openai" if openai else None
+        default = os.getenv("DEMO_LLM_MODEL") or os.getenv("AZURE_DEPLOYMENT") or "gpt-6-luna"
+        entries = []
+        if gpt:
+            entries.append([gpt, default])
+            entries += [[gpt, m] for m in _GPT_LABELS if m != default]
+        entries.append(
+            [
+                "anthropic_foundry",
+                os.getenv("ANTHROPIC_DEFAULT_SONNET_MODEL") or "claude-sonnet-5-5",
+            ]
+        )
+        entries.append(["anthropic", os.getenv("ANTHROPIC_MODEL") or "claude-sonnet-5-5"])
+        entries.append(["google", os.getenv("GOOGLE_MODEL") or "gemini-2.5-flash"])
+        entries.append(["vertex", os.getenv("VERTEX_MODEL") or "gemini-2.5-flash"])
+    models, seen = [], set()
+    for provider, model in entries:
+        provider, model = provider.strip(), model.strip()
+        if not model or not has_creds.get(provider) or (provider, model) in seen:
+            continue
+        if provider == "anthropic" and has_creds["anthropic_foundry"]:
+            continue  # One Claude entry is enough; Foundry is the Haaga-Helia route.
+        seen.add((provider, model))
+        models.append(
+            ServerModel(provider, model, _label(model), audio=provider in {"azure", "openai"})
+        )
+    return models
+
+
+def request_server_model() -> ServerModel | None:
+    return _server_model.get()
+
 
 def request_model_settings() -> RequestModelSettings | None:
     return _settings.get()
@@ -144,7 +240,12 @@ def _validate_public_endpoint(endpoint: str) -> None:
 def get_request_api_config() -> dict | None:
     settings = _settings.get()
     if settings is None:
-        return None
+        chosen = _server_model.get()
+        if chosen is None:
+            return None
+        from gaik.software_components.llm import get_llm_config
+
+        return get_llm_config(chosen.provider, model=chosen.model)
     from gaik.software_components.llm import get_llm_config
 
     overrides = {
@@ -241,7 +342,7 @@ class ModelSettingsMiddleware:
             return await self.app(scope, receive, send)
         raw_headers = [v for k, v in scope.get("headers", []) if k.lower() == HEADER]
         if not raw_headers:
-            return await self.app(scope, receive, send)
+            return await self._server_model_call(scope, receive, send)
         try:
             if len(raw_headers) != 1 or not supports_model_settings(scope["path"], scope["method"]):
                 raise HTTPException(400, "This demo uses server model settings.")
@@ -285,3 +386,33 @@ class ModelSettingsMiddleware:
             _http_client.reset(client_token)
             _settings.reset(settings_token)
             await asyncio.to_thread(client.close)
+
+    async def _server_model_call(self, scope, receive, send):
+        """Run one request on a server model the user picked (no key involved).
+
+        Only routes that honour model settings switch; elsewhere the header is
+        ignored and the page shows that it runs on the server default.
+        """
+        raw = [v for k, v in scope.get("headers", []) if k.lower() == SERVER_HEADER]
+        if not raw or not supports_model_settings(scope["path"], scope["method"]):
+            return await self.app(scope, receive, send)
+        wanted = raw[0].decode("ascii", "replace").strip()
+        chosen = next((m for m in server_models() if m.id == wanted), None)
+        if len(raw) != 1 or chosen is None:
+            return await JSONResponse(
+                {"detail": "That server model is not available. Pick another in the model menu."},
+                status_code=400,
+            )(scope, receive, send)
+        if not chosen.audio and any(scope["path"].startswith(p) for p in _AUDIO_PATHS):
+            return await JSONResponse(
+                {
+                    "detail": f"{chosen.label} cannot transcribe audio. "
+                    "Pick a GPT model in the model menu for this demo."
+                },
+                status_code=400,
+            )(scope, receive, send)
+        token = _server_model.set(chosen)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            _server_model.reset(token)

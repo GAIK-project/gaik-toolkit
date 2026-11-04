@@ -5,6 +5,8 @@ import {
 } from "@/lib/api-access";
 import {
   MODEL_SETTINGS_HEADER,
+  SERVER_MODEL_HEADER,
+  isServerModelId,
   encodeModelSettings,
   parseModelSettingsHeader,
   supportsModelSettings,
@@ -197,6 +199,16 @@ export default async function proxy(request: NextRequest) {
           ),
         );
       }
+    }
+
+    // A server model the user picked. The API checks it against its own list.
+    const serverModel = request.headers.get(SERVER_MODEL_HEADER);
+    if (
+      !modelSettings &&
+      isServerModelId(serverModel) &&
+      supportsModelSettings(pathname, request.method)
+    ) {
+      headers.set(SERVER_MODEL_HEADER, serverModel);
     }
 
     try {

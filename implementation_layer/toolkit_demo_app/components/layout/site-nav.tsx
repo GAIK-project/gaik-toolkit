@@ -1,6 +1,6 @@
 "use client";
 
-import { ModelSettingsButton } from "@/components/model-settings";
+import { ModelPicker } from "@/components/model-settings";
 import { setModelSettings } from "@/lib/model-settings-store";
 
 import { GitHubIcon } from "@/components/github-icon";
@@ -1024,7 +1024,7 @@ export function SiteNav({
 
         {/* Right: Actions. min-w-fit keeps them from sliding under the nav. */}
         <div className="flex min-w-0 flex-1 items-center justify-end gap-3 md:min-w-fit">
-          <ModelSettingsButton />
+          <ModelPicker loggedIn={!!isLoggedIn} />
           <GitHubLink
             preview={mounted ? githubPreview : null}
             variant="desktop"

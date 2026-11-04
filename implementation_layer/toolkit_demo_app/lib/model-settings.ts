@@ -147,3 +147,13 @@ export function parseModelSettingsHeader(raw: string): ModelSettings {
     );
   }
 }
+
+/** A server model the user picked: `provider:model`, run on the server's keys. */
+export const SERVER_MODEL_HEADER = "x-gaik-server-model";
+
+export function isServerModelId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[a-z_]{2,30}:[A-Za-z0-9._/-]{1,120}$/.test(value)
+  );
+}
