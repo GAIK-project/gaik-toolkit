@@ -11,6 +11,11 @@ import {
   parseModelSettingsHeader,
   supportsModelSettings,
 } from "@/lib/model-settings";
+import {
+  ADMIN_COOKIE_NAME,
+  MODEL_TIER_HEADER,
+  isModelStaff,
+} from "@/lib/model-tier";
 import { ratelimit } from "@/lib/rate-limit";
 import {
   type AccessState,
@@ -209,6 +214,15 @@ export default async function proxy(request: NextRequest) {
       supportsModelSettings(pathname, request.method)
     ) {
       headers.set(SERVER_MODEL_HEADER, serverModel);
+    }
+    // Tell the API whether this user may run the team-only models.
+    if (
+      headers.has(SERVER_MODEL_HEADER) ||
+      backendPath === "/model-settings/server"
+    ) {
+      const { email } = await accessState();
+      if (isModelStaff(email, request.cookies.get(ADMIN_COOKIE_NAME)?.value))
+        headers.set(MODEL_TIER_HEADER, "staff");
     }
 
     try {

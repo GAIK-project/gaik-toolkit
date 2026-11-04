@@ -57,6 +57,9 @@ _http_client: ContextVar[httpx.Client | None] = ContextVar("demo_model_http_clie
 
 # --- Server models a signed-in user can switch between without a key -------
 SERVER_HEADER = b"x-gaik-server-model"
+# Set by the Next proxy, the only way to this API, from the signed-in user: "staff"
+# for the admin, the demo account and haaga-helia.fi addresses. Never from a browser.
+TIER_HEADER = b"x-gaik-model-tier"
 
 
 @dataclass(frozen=True)
@@ -64,7 +67,10 @@ class ServerModel:
     provider: str
     model: str
     label: str
-    # False when the model cannot run the audio demos (no transcription).
+    # Costlier models: only the GAIK team (admin, demo account, haaga-helia.fi).
+    staff: bool = False
+    # False when the provider has no speech-to-text: the audio demos then
+    # transcribe with the server's own transcriber and extract with this model.
     audio: bool = True
 
     @property
@@ -72,80 +78,114 @@ class ServerModel:
         return f"{self.provider}:{self.model}"
 
 
-_AUDIO_PATHS = ("/pipeline/audio/stream",)
 _server_model: ContextVar[ServerModel | None] = ContextVar("demo_server_model", default=None)
 
-_GPT_LABELS = {
+_LABELS = {
     "gpt-6-luna": "GPT-6 Luna",
     "gpt-6-sol": "GPT-6 Sol",
     "gpt-6.1-sol": "GPT-6.1 Sol",
     "gpt-6-astra": "GPT-6 Astra",
 }
 
+# (family, model, staff only). Families map to the provider that has credentials.
+_DEFAULT_MODELS = (
+    ("gpt", "gpt-6-luna", False),
+    ("gpt", "gpt-6-sol", False),
+    ("gpt", "gpt-6.1-sol", True),
+    ("gpt", "gpt-6-astra", True),
+    ("claude", "claude-haiku-5-5", False),
+    ("claude", "claude-sonnet-5-5", True),
+    ("gemini", "gemini-3.8-flash", False),
+    ("gemini", "gemini-4-argon", True),
+)
+_FAMILIES = {
+    "gpt": ("azure", "openai"),
+    "claude": ("anthropic_foundry", "anthropic"),
+    "gemini": ("vertex", "google"),
+}
+
 
 def _label(model: str) -> str:
-    if model in _GPT_LABELS:
-        return _GPT_LABELS[model]
-    if model.startswith("claude-"):
-        # claude-sonnet-5-5 -> Claude Sonnet 5.5
-        parts = model.split("-")[1:]
-        words = [p.capitalize() for p in parts if not p.isdigit()]
-        version = ".".join(p for p in parts if p.isdigit())
-        return " ".join(["Claude", *words, version]).strip()
-    return model
+    """gemini-3.8-flash -> Gemini 3.8 Flash, claude-haiku-5-5 -> Claude Haiku 5.5."""
+    if model in _LABELS:
+        return _LABELS[model]
+    words: list[str] = []
+    for part in model.split("-"):
+        if part.isdigit() and words and words[-1].replace(".", "").isdigit():
+            words[-1] += "." + part
+        elif any(c.isdigit() for c in part):
+            words.append(part)
+        else:
+            words.append(part.capitalize())
+    return " ".join(words)
+
+
+def _has_credentials(provider: str) -> bool:
+    import os
+
+    env = os.getenv
+    return {
+        "azure": bool(env("AZURE_API_KEY") and env("AZURE_ENDPOINT")),
+        "openai": bool(env("OPENAI_API_KEY")),
+        "anthropic_foundry": bool(
+            env("ANTHROPIC_FOUNDRY_API_KEY") and env("ANTHROPIC_FOUNDRY_RESOURCE")
+        ),
+        "anthropic": bool(env("ANTHROPIC_API_KEY")),
+        "vertex": bool(
+            env("GOOGLE_SERVICE_ACCOUNT_JSON")
+            and (env("GOOGLE_PROJECT_ID") or env("GOOGLE_CLOUD_PROJECT"))
+        ),
+        "google": bool(env("GOOGLE_API_KEY") or env("GEMINI_API_KEY")),
+    }.get(provider, False)
 
 
 def server_models() -> list[ServerModel]:
     """Models the deployment's own credentials can run, default first.
 
     ``DEMO_SERVER_MODELS`` overrides the list as comma-separated
-    ``provider:model`` entries. A provider without credentials is left out.
+    ``provider:model`` entries, with ``:staff`` for a team-only model.
+    A provider without credentials is left out.
     """
     import os
 
-    azure = bool(os.getenv("AZURE_API_KEY") and os.getenv("AZURE_ENDPOINT"))
-    openai = bool(os.getenv("OPENAI_API_KEY"))
-    has_creds = {
-        "azure": azure,
-        "openai": openai,
-        "anthropic_foundry": bool(
-            os.getenv("ANTHROPIC_FOUNDRY_API_KEY") and os.getenv("ANTHROPIC_FOUNDRY_RESOURCE")
-        ),
-        "anthropic": bool(os.getenv("ANTHROPIC_API_KEY")),
-        "google": bool(os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")),
-        "vertex": bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS")),
-    }
     configured = os.getenv("DEMO_SERVER_MODELS", "").strip()
+    entries: list[tuple[str, str, bool]] = []
     if configured:
-        entries = [e.strip().split(":", 1) for e in configured.split(",") if ":" in e]
+        for item in configured.split(","):
+            parts = [p.strip() for p in item.split(":")]
+            if len(parts) >= 2 and parts[0] and parts[1]:
+                entries.append((parts[0], parts[1], parts[2:3] == ["staff"]))
     else:
-        gpt = "azure" if azure else "openai" if openai else None
         default = os.getenv("DEMO_LLM_MODEL") or os.getenv("AZURE_DEPLOYMENT") or "gpt-6-luna"
-        entries = []
-        if gpt:
-            entries.append([gpt, default])
-            entries += [[gpt, m] for m in _GPT_LABELS if m != default]
-        entries.append(
-            [
-                "anthropic_foundry",
-                os.getenv("ANTHROPIC_DEFAULT_SONNET_MODEL") or "claude-sonnet-5-5",
-            ]
-        )
-        entries.append(["anthropic", os.getenv("ANTHROPIC_MODEL") or "claude-sonnet-5-5"])
-        entries.append(["google", os.getenv("GOOGLE_MODEL") or "gemini-2.5-flash"])
-        entries.append(["vertex", os.getenv("VERTEX_MODEL") or "gemini-2.5-flash"])
+        rows = list(_DEFAULT_MODELS)
+        if not any(m == default for _, m, _ in rows):
+            rows.insert(0, ("gpt", default, False))
+        # The server's own model leads the list.
+        rows.sort(key=lambda row: row[1] != default)
+        for family, model, staff in rows:
+            provider = next((p for p in _FAMILIES[family] if _has_credentials(p)), None)
+            if provider:
+                entries.append((provider, model, staff))
     models, seen = [], set()
-    for provider, model in entries:
-        provider, model = provider.strip(), model.strip()
-        if not model or not has_creds.get(provider) or (provider, model) in seen:
+    for provider, model, staff in entries:
+        if not _has_credentials(provider) or (provider, model) in seen:
             continue
-        if provider == "anthropic" and has_creds["anthropic_foundry"]:
-            continue  # One Claude entry is enough; Foundry is the Haaga-Helia route.
         seen.add((provider, model))
         models.append(
-            ServerModel(provider, model, _label(model), audio=provider in {"azure", "openai"})
+            ServerModel(
+                provider,
+                model,
+                _label(model),
+                staff=staff,
+                audio=provider in {"azure", "openai"},
+            )
         )
     return models
+
+
+def is_staff(scope_or_headers) -> bool:
+    headers = scope_or_headers.get("headers", []) if isinstance(scope_or_headers, dict) else []
+    return any(k.lower() == TIER_HEADER and v == b"staff" for k, v in headers)
 
 
 def request_server_model() -> ServerModel | None:
@@ -391,7 +431,9 @@ class ModelSettingsMiddleware:
         """Run one request on a server model the user picked (no key involved).
 
         Only routes that honour model settings switch; elsewhere the header is
-        ignored and the page shows that it runs on the server default.
+        ignored and the page shows that it runs on the server default. A model
+        without speech-to-text still runs the audio demos: they transcribe with
+        the server's transcriber (``get_transcription_api_config``).
         """
         raw = [v for k, v in scope.get("headers", []) if k.lower() == SERVER_HEADER]
         if not raw or not supports_model_settings(scope["path"], scope["method"]):
@@ -403,13 +445,13 @@ class ModelSettingsMiddleware:
                 {"detail": "That server model is not available. Pick another in the model menu."},
                 status_code=400,
             )(scope, receive, send)
-        if not chosen.audio and any(scope["path"].startswith(p) for p in _AUDIO_PATHS):
+        if chosen.staff and not is_staff(scope):
             return await JSONResponse(
                 {
-                    "detail": f"{chosen.label} cannot transcribe audio. "
-                    "Pick a GPT model in the model menu for this demo."
+                    "detail": f"{chosen.label} is for the GAIK project team. "
+                    "Pick another model in the model menu."
                 },
-                status_code=400,
+                status_code=403,
             )(scope, receive, send)
         token = _server_model.set(chosen)
         try:

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Check, ChevronDown, KeyRound, Loader2, Sparkles } from "lucide-react";
+import { Check, ChevronDown, KeyRound, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Azure } from "@/components/ui/svgs/azure";
@@ -12,6 +12,7 @@ import { Csc } from "@/components/ui/svgs/csc";
 import { Gemma } from "@/components/ui/svgs/gemma";
 import { Meta } from "@/components/ui/svgs/meta";
 import { Claude } from "@/components/ui/svgs/claude";
+import { Gemini } from "@/components/ui/svgs/gemini";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -268,7 +269,7 @@ export function ModelSettingsButton({
               ? usedHere
                 ? "Own model on"
                 : "Own model set, not used on this page"
-              : "Use your own model"
+              : "Use your own key"
           }
         >
           <KeyRound className="h-4 w-4" />
@@ -294,7 +295,7 @@ export function ModelSettingsButton({
           data-private
         >
           <DialogHeader>
-            <DialogTitle>Use your own model</DialogTitle>
+            <DialogTitle>Use your own key</DialogTitle>
             <DialogDescription>
               Your key stays in this tab and is cleared on reload.
             </DialogDescription>
@@ -324,7 +325,7 @@ export function ModelSettingsButton({
                 <ToggleGroupItem
                   key={id}
                   value={id}
-                  className="gap-1.5 px-2 text-xs sm:gap-2 sm:text-sm"
+                  className="data-[state=on]:border-primary/40 data-[state=on]:bg-primary/10 data-[state=on]:text-primary gap-1.5 px-2 text-xs sm:gap-2 sm:text-sm"
                 >
                   <Icon className="size-4" aria-hidden />
                   {label}
@@ -466,7 +467,7 @@ export function ModelSettingsButton({
                 connection
               </Button>
               <Button onClick={applySettings} disabled={testing}>
-                Use settings
+                Use this key
               </Button>
             </div>
           </DialogFooter>
@@ -486,7 +487,7 @@ function ProviderIcon({
   if (provider.startsWith("anthropic"))
     return <Claude className={className} aria-hidden />;
   if (provider === "google" || provider === "vertex")
-    return <Sparkles className={className} aria-hidden />;
+    return <Gemini className={className} />;
   return <Openai className={className} aria-hidden />;
 }
 
@@ -519,6 +520,8 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
     : usedHere
       ? `${active?.label} runs this demo`
       : "This demo runs on the server default";
+  const transcribedByGpt = !settings && usedHere && active && !active.audio;
+  const someLocked = catalog.models.some((m) => !m.allowed);
 
   return (
     <>
@@ -557,6 +560,11 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
         <DropdownMenuContent align="end" className="w-72">
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
             {status}
+            {transcribedByGpt && (
+              <span className="block">
+                Audio is transcribed with GPT first.
+              </span>
+            )}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuLabel>Server models</DropdownMenuLabel>
@@ -569,20 +577,35 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
           >
             {catalog.models.map((model) => {
               return (
-                <DropdownMenuRadioItem key={model.id} value={model.id}>
+                <DropdownMenuRadioItem
+                  key={model.id}
+                  value={model.id}
+                  disabled={!model.allowed}
+                  title={
+                    model.allowed ? undefined : "For the GAIK project team"
+                  }
+                >
                   <ProviderIcon provider={model.provider} className="size-4" />
                   <span className="whitespace-nowrap">{model.label}</span>
                   <span className="text-muted-foreground ml-auto text-xs">
-                    {model.id === catalog.default
-                      ? "default"
-                      : model.audio
-                        ? ""
-                        : "no audio"}
+                    {model.id === catalog.default ? (
+                      "default"
+                    ) : !model.allowed ? (
+                      <Lock className="size-3.5" aria-label="Team only" />
+                    ) : null}
                   </span>
                 </DropdownMenuRadioItem>
               );
             })}
           </DropdownMenuRadioGroup>
+          {(someLocked ||
+            catalog.models.some((m) => !m.audio && m.allowed)) && (
+            <p className="text-muted-foreground px-2 pt-1 pb-1.5 text-xs">
+              {someLocked && "Locked models are for the GAIK project team. "}
+              {catalog.models.some((m) => !m.audio) &&
+                "With Claude or Gemini, audio is transcribed with GPT first."}
+            </p>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={() => window.dispatchEvent(new Event(OPEN_EVENT))}

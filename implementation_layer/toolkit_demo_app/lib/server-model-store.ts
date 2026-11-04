@@ -8,8 +8,12 @@ export interface ServerModel {
   provider: string;
   model: string;
   label: string;
-  /** False when the model cannot run the audio demos. */
+  /** False when the model has no speech-to-text: GPT transcribes audio first. */
   audio: boolean;
+  /** A costlier model for the GAIK project team only. */
+  staff: boolean;
+  /** Whether this user may run it. */
+  allowed: boolean;
 }
 export interface ServerModels {
   default: string | null;
@@ -50,7 +54,8 @@ export function getServerModel(): string | null {
   readStorage();
   if (!selected) return null;
   // Drop a stale choice once the server no longer offers it.
-  if (catalog && !catalog.models.some((m) => m.id === selected)) return null;
+  if (catalog && !catalog.models.some((m) => m.id === selected && m.allowed))
+    return null;
   return selected;
 }
 

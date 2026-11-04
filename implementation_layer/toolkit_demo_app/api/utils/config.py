@@ -5,7 +5,11 @@ import os
 import fitz
 from fastapi import HTTPException, UploadFile
 
-from .model_settings import get_request_api_config, request_model_settings
+from .model_settings import (
+    get_request_api_config,
+    request_model_settings,
+    request_server_model,
+)
 
 # File size limits. Audio and video uploads get their own, larger budget: a
 # meeting recording is easily tens of megabytes, while the document demos work
@@ -66,7 +70,23 @@ def get_api_config():
     request_config = get_request_api_config()
     if request_config is not None:
         return request_config
+    return server_api_config()
 
+
+def get_transcription_api_config():
+    """The config that transcribes audio for this request.
+
+    A server model without speech-to-text (Claude, Gemini) leaves transcription
+    to the server's own transcriber; the picked model still does the extraction.
+    """
+    chosen = request_server_model()
+    if request_model_settings() is None and chosen is not None and not chosen.audio:
+        return server_api_config()
+    return get_api_config()
+
+
+def server_api_config():
+    """The deployment's own provider and model, ignoring any per-request choice."""
     from gaik.software_components.llm import get_llm_config
 
     provider = os.getenv("DEMO_LLM_PROVIDER") or os.getenv("LLM_PROVIDER")

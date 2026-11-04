@@ -38,6 +38,8 @@ export interface AccessState {
   /** Signed up and waiting for approval: may run demos on a trial allowance (lib/trial.ts). */
   pending: boolean;
   userId: string | null;
+  /** Lowercased sign-in email, for the model tier (lib/model-tier.ts). */
+  email: string | null;
   wizardAccess: boolean;
   /**
    * Session cookies Supabase rewrote while reading the user: a refreshed token,
@@ -51,6 +53,7 @@ const NO_ACCESS: AccessState = {
   approved: false,
   pending: false,
   userId: null,
+  email: null,
   wizardAccess: false,
   cookies: [],
 };
@@ -75,6 +78,7 @@ export async function getAccessState(
       approved: true,
       pending: false,
       userId: null,
+      email: null,
       wizardAccess: true,
       cookies: [],
     };
@@ -111,6 +115,7 @@ export async function getAccessState(
     approved: data?.status === "approved",
     pending: data?.status === "pending",
     userId: user.id,
+    email: user.email?.toLowerCase() ?? null,
     wizardAccess: data?.wizard_access === true,
     cookies,
   };

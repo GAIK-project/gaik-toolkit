@@ -19,6 +19,7 @@ try:
         MAX_FILE_SIZE_MB,
         get_api_config,
         get_model_options,
+        get_transcription_api_config,
         load_schema,
         save_schema,
         sse_event,
@@ -47,6 +48,7 @@ except ImportError:
         MAX_FILE_SIZE_MB,
         get_api_config,
         get_model_options,
+        get_transcription_api_config,
         load_schema,
         save_schema,
         sse_event,
@@ -757,8 +759,11 @@ async def audio_pipeline_stream(
             local_api_base = os.getenv("LOCAL_TRANSCRIBER_API_BASE")
             local_api_key = os.getenv("LOCAL_TRANSCRIBER_API_KEY")
 
+            # A picked Claude or Gemini model has no speech-to-text: the server's
+            # transcriber does that step and the picked model extracts.
+            transcription_config = get_transcription_api_config()
             transcriber_kwargs = {
-                "api_config": config,
+                "api_config": transcription_config,
                 "output_dir": tempfile.gettempdir(),
                 "enhanced_transcript": enhanced,
                 "compress_audio": compress_audio,
@@ -781,7 +786,7 @@ async def audio_pipeline_stream(
 
             used_fallback = False
             fallback_reason = None
-            cloud_model = config.get("transcription_model", "whisper")
+            cloud_model = transcription_config.get("transcription_model", "whisper")
             model_used = cloud_model
             transcribe_started = time.monotonic()
             if prefer_local_first and local_api_base and local_api_key:
