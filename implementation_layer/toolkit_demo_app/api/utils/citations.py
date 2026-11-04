@@ -189,7 +189,11 @@ def value_status(value: Any, quote: str) -> ValueStatus:
         return "unchecked"
     number = _as_number(value)
     if number is not None:
-        found = any(abs(reading - number) < 1e-6 for reading in _numbers_in(quote))
+        readings = _numbers_in(quote)
+        found = any(abs(reading - number) < 1e-6 for reading in readings)
+        # A sign set apart from its number ("Discount - EUR 1,014.50") reads as positive.
+        if not found and number < 0 and re.search(r"[-−–]", quote):
+            found = any(abs(reading + number) < 1e-6 for reading in readings)
         return "match" if found else "mismatch"
     text = str(value)
     parts = _date_parts(text)

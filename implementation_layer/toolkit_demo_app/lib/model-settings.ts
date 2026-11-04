@@ -47,6 +47,7 @@ export function pageUsesModelSettings(path: string): boolean {
     "/postgres-agent",
     "/incident-report",
     "/document-structured",
+    "/audio-structured",
     "/diary",
     "/solution-wizard",
   ].includes(path);
