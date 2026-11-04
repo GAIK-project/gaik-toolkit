@@ -9,6 +9,7 @@ import {
   addDocuments,
   cellText,
   columnsOf,
+  combineDocuments,
   countFound,
   isEmptyValue,
 } from "./extractor-data";
@@ -130,5 +131,18 @@ describe("addDocuments", () => {
     expect(files).toHaveLength(MAX_DOCUMENTS);
     expect(rejected).toHaveLength(2);
     expect(rejected[0]).toContain(`at most ${MAX_DOCUMENTS}`);
+  });
+});
+
+describe("combineDocuments", () => {
+  test("puts each document between markers that name it", () => {
+    const text = combineDocuments([
+      { name: "PO.pdf", text: "Order 1\n" },
+      { name: "BOM1.pdf", text: "ID MAT-1" },
+    ]);
+    expect(text).toBe(
+      "===== DOCUMENT 1 OF 2: PO.pdf =====\nOrder 1\n===== END OF DOCUMENT 1: PO.pdf =====\n\n" +
+        "===== DOCUMENT 2 OF 2: BOM1.pdf =====\nID MAT-1\n===== END OF DOCUMENT 2: BOM1.pdf =====",
+    );
   });
 });

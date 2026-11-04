@@ -221,3 +221,23 @@ export function addDocuments(
   }
   return { files, rejected };
 }
+
+/** How several uploaded files are given to the extraction. */
+export type ReadMode = "separate" | "combined";
+
+/**
+ * The texts of several documents as one text, each between clear markers that name the
+ * document, so the model can tell where one ends and the next begins and can relate them
+ * (a purchase order and the parts lists it refers to).
+ */
+export function combineDocuments(
+  documents: { name: string; text: string }[],
+): string {
+  const total = documents.length;
+  return documents
+    .map(
+      ({ name, text }, index) =>
+        `===== DOCUMENT ${index + 1} OF ${total}: ${name} =====\n${text.trim()}\n===== END OF DOCUMENT ${index + 1}: ${name} =====`,
+    )
+    .join("\n\n");
+}

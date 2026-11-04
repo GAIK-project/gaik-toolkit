@@ -368,12 +368,16 @@ async def extract_data(request: ExtractRequest):
 
 @router.post("/trace")
 async def trace_sources(
-    file: UploadFile = File(..., description="The PDF the text was parsed from"),
+    file: list[UploadFile] = File(..., description="The PDFs the text was parsed from"),
     sources: str = Form(..., description="raw_sources[0] of the extraction, as JSON"),
     data: str = Form(..., description="results[0] of the extraction, as JSON"),
 ):
-    """Locate the quotes of a text extraction in the PDF the text was read from."""
-    if Path(file.filename or "").suffix.lower() != ".pdf":
+    """Locate the quotes of a text extraction in the PDFs the text was read from.
+
+    With several files (read together as one text) a quote is looked up in all of them,
+    whichever file the model named.
+    """
+    if not file or any(Path(f.filename or "").suffix.lower() != ".pdf" for f in file):
         raise HTTPException(status_code=400, detail="Sources can be traced in a PDF only")
     try:
         raw = json.loads(sources)
@@ -381,14 +385,17 @@ async def trace_sources(
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail="sources and data must be JSON") from exc
 
-    content = await validate_file_size(file)
+    contents = [await validate_file_size(f) for f in file]
     with tempfile.TemporaryDirectory() as folder:
-        path = Path(folder) / "document.pdf"
-        path.write_bytes(content)
+        documents = []
+        for number, (upload, content) in enumerate(zip(file, contents, strict=True), start=1):
+            path = Path(folder) / f"document-{number}.pdf"
+            path.write_bytes(content)
+            documents.append(UploadedDocument(upload.filename or f"document-{number}.pdf", path))
         return await run_in_threadpool(
             check_sources,
             raw,
             record if isinstance(record, dict) else {},
-            [UploadedDocument(file.filename or "document.pdf", path)],
+            documents,
             cited_pages=False,
         )

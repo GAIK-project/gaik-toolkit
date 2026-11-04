@@ -343,9 +343,44 @@ async def test_trace_locates_text_quotes_in_the_pdf_without_trusting_the_page() 
     }
 
     result = await route.trace_sources(
-        file=upload, sources=json.dumps(raw), data=json.dumps({"po": "PO-2025-15903"})
+        file=[upload], sources=json.dumps(raw), data=json.dumps({"po": "PO-2025-15903"})
     )
     source = result["sources"][0]
 
     assert source["status"] == "found" and source["page"] == 1
     assert source["rects"] and "1:1" in result["pages"]
+
+
+@pytest.mark.asyncio
+async def test_trace_finds_a_quote_in_whichever_of_several_pdfs_holds_it() -> None:
+    import io
+    import json
+
+    import fitz
+    from api.routers import extractor as route
+    from fastapi import UploadFile
+
+    def pdf(text: str) -> bytes:
+        doc = fitz.open()
+        doc.new_page().insert_text((72, 100), text)
+        return doc.tobytes()
+
+    uploads = [
+        UploadFile(filename="PO.pdf", file=io.BytesIO(pdf("Order number 100"))),
+        UploadFile(filename="BOM.pdf", file=io.BytesIO(pdf("Sawing length = 1153,00 mm"))),
+    ]
+    # Read together as one text, the model names document 1 for every quote.
+    raw = {
+        "items": [
+            {"field": "length", "document": 1, "page": 1, "quote": "Sawing length = 1153,00 mm"}
+        ]
+    }
+
+    result = await route.trace_sources(
+        file=uploads, sources=json.dumps(raw), data=json.dumps({"length": "1153mm"})
+    )
+    source = result["sources"][0]
+
+    assert source["document"] == 2 and source["page"] == 1
+    assert source["rects"] and "2:1" in result["pages"]
+    assert result["documents"] == ["PO.pdf", "BOM.pdf"]

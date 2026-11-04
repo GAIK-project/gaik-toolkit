@@ -164,6 +164,55 @@ function RowsTable({ rows }: { rows: Record<string, unknown>[] }) {
   );
 }
 
+/**
+ * The results of several documents side by side: one row for each document with its single
+ * values, then one table for each list (such as the items), whose rows say which document
+ * they come from.
+ */
+function DocumentsTable({
+  results,
+  labels,
+}: {
+  results: Record<string, unknown>[];
+  labels: string[];
+}) {
+  const names = results.map(
+    (_, index) => labels[index] ?? `Result ${index + 1}`,
+  );
+  const listKeys = columnsOf(results).filter((key) =>
+    results.some((record) => isRecordList(record[key])),
+  );
+  const summary = results.map((record, index) => {
+    const row: Record<string, unknown> = { document: names[index] };
+    for (const [key, value] of Object.entries(record))
+      if (!listKeys.includes(key)) row[key] = value;
+    return row;
+  });
+  return (
+    <div className="space-y-5">
+      <RowsTable rows={summary} />
+      {listKeys.map((key) => {
+        const rows = results.flatMap((record, index) =>
+          isRecordList(record[key])
+            ? record[key].map((row) => ({ document: names[index], ...row }))
+            : [],
+        );
+        return (
+          <div key={key} className="space-y-2">
+            <p className="text-sm font-medium">
+              {formatFieldName(key)}{" "}
+              <Badge variant="secondary" className="font-normal">
+                {rows.length} rows
+              </Badge>
+            </p>
+            <RowsTable rows={rows} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export type Verification = Record<
   string,
   VerificationEntry | VerificationEntry[]
@@ -343,6 +392,9 @@ export function ResultView({
             {/* Scrolls sideways on a phone rather than widening the page. */}
             <div className="max-w-full [scrollbar-width:none] overflow-x-auto">
               <TabsList>
+                {results.length > 1 && (
+                  <TabsTrigger value="table">Table</TabsTrigger>
+                )}
                 <TabsTrigger value="readable">Readable</TabsTrigger>
                 <TabsTrigger value="json">JSON</TabsTrigger>
                 {extraTabs.map((tab) => (
@@ -443,6 +495,12 @@ export function ResultView({
               );
             })}
           </TabsContent>
+
+          {results.length > 1 && (
+            <TabsContent value="table" className="pt-3">
+              <DocumentsTable results={results} labels={labels ?? []} />
+            </TabsContent>
+          )}
 
           <TabsContent value="json" className="pt-3">
             <pre className="bg-muted/40 max-h-[32rem] overflow-auto rounded-lg border p-4 text-xs">

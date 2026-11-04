@@ -50,6 +50,8 @@ import toast from "react-hot-toast";
 import { DocumentUpload } from "./document-upload";
 import {
   DEFAULT_PARSER,
+  combineDocuments,
+  type ReadMode,
   EXAMPLES,
   PARSERS,
   type ExtractorExample,
@@ -193,6 +195,10 @@ export default function ExtractorPage() {
   const [includeSources, setIncludeSources] = useState(true);
   const [parserType, setParserType] = useState<ParserType>(DEFAULT_PARSER);
   const [isParsing, setIsParsing] = useState(false);
+  // Several files: one result for each, or one result from all of them read together.
+  const [readMode, setReadMode] = useState<ReadMode>("separate");
+  // With combined files, how many files the one result was read from.
+  const [combinedCount, setCombinedCount] = useState<number | null>(null);
   // Which uploaded file is being read, and of how many (1-based), while several are.
   const [reading, setReading] = useState<{ index: number; total: number }>({
     index: 1,
@@ -365,14 +371,14 @@ export default function ExtractorPage() {
     if (next) toast.success("Schema generated");
   }
 
-  /** The quotes of one document's extraction, located in the PDF the text was read from. */
+  /** The quotes of one extraction, located in the PDF or PDFs the text was read from. */
   async function traceInPdf(
-    pdf: File,
+    pdfs: File[],
     rawSources: unknown,
     record: Record<string, unknown>,
   ): Promise<SourcesResult | null> {
     const formData = new FormData();
-    formData.append("file", pdf);
+    for (const pdf of pdfs) formData.append("file", pdf);
     formData.append("sources", JSON.stringify(rawSources ?? null));
     formData.append("data", JSON.stringify(record ?? {}));
     try {
@@ -409,6 +415,8 @@ export default function ExtractorPage() {
     // The texts to extract from: the pasted text, or each file read by the parser.
     const texts: string[] = [];
     const names: string[] = [];
+    const combined =
+      inputMode === "file" && files.length > 1 && readMode === "combined";
     if (inputMode === "file") {
       if (files.length === 0) {
         toast.error("Please select a file first");
@@ -426,6 +434,13 @@ export default function ExtractorPage() {
         }
         texts.push(readable);
         names.push(file.name);
+      }
+      if (combined) {
+        const joined = combineDocuments(
+          texts.map((text, index) => ({ name: names[index], text })),
+        );
+        texts.splice(0, texts.length, joined);
+        names.splice(0, names.length, `${names.length} files combined`);
       }
     } else {
       if (!documentText.trim()) {
@@ -493,13 +508,24 @@ export default function ExtractorPage() {
         const perDocument = data.document_sources ?? [data.sources ?? null];
         data.document_sources = await Promise.all(
           perDocument.map(async (checked, index) => {
-            const pdf = inputMode === "file" ? files[index] : undefined;
+            // Combined: the quotes are of the joined text, so they are looked up in all the
+            // files, when all of them are PDFs (a Word file has no pages to point at).
+            const isPdf = (file: File) =>
+              file.name.toLowerCase().endsWith(".pdf");
+            const pdfs =
+              inputMode !== "file"
+                ? []
+                : combined
+                  ? files
+                  : files[index]
+                    ? [files[index]]
+                    : [];
             const raw = data.raw_sources?.[index];
-            if (!pdf || !pdf.name.toLowerCase().endsWith(".pdf") || !raw) {
+            if (pdfs.length === 0 || !pdfs.every(isPdf) || !raw) {
               return checked;
             }
             const located = await traceInPdf(
-              pdf,
+              pdfs,
               raw,
               data.results[index] ?? {},
             );
@@ -510,13 +536,15 @@ export default function ExtractorPage() {
       }
       setResult(data);
       setResultNames(names);
+      setCombinedCount(combined ? files.length : null);
       setResultSchema(usedSchema);
       setSeconds((performance.now() - started) / 1000);
       posthog.capture("data_extracted", {
         input_mode: inputMode,
         extraction_mode: mode,
         parser: inputMode === "file" ? parserType : null,
-        documents_count: texts.length,
+        documents_count: combined ? files.length : texts.length,
+        read_mode: combined ? "combined" : "separate",
         example: exampleId,
         results_count: data.results?.length || 0,
       });
@@ -636,6 +664,47 @@ export default function ExtractorPage() {
                     }}
                     disabled={busy}
                   />
+
+                  {files.length > 1 && (
+                    <div className="space-y-2">
+                      <Label>Several files</Label>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {(
+                          [
+                            [
+                              "separate",
+                              "Process each file individually",
+                              "One result for each file, shown in a table. For many documents of the same type, such as invoices.",
+                            ],
+                            [
+                              "combined",
+                              "Combine the files",
+                              "One result from all files read together, each marked with its name. For documents that refer to each other, such as an order and its parts lists.",
+                            ],
+                          ] as const
+                        ).map(([value, title, text]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            disabled={busy}
+                            aria-pressed={readMode === value}
+                            onClick={() => setReadMode(value)}
+                            className={cn(
+                              "rounded-lg border p-3 text-left text-sm transition-colors",
+                              readMode === value
+                                ? "border-primary bg-primary/5"
+                                : "hover:bg-muted/40",
+                            )}
+                          >
+                            <span className="font-medium">{title}</span>
+                            <span className="text-muted-foreground mt-1 block text-xs">
+                              {text}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label htmlFor="extractor-parser">Parser</Label>
@@ -906,10 +975,16 @@ export default function ExtractorPage() {
           {result && !isLoading && !isParsing && (
             <ResultView
               results={result.results}
-              documentCount={result.document_count}
+              documentCount={combinedCount ?? result.document_count}
               seconds={seconds}
               labels={resultNames.length > 1 ? resultNames : undefined}
-              defaultTab={result.sources ? "sources" : "readable"}
+              defaultTab={
+                result.results.length > 1
+                  ? "table"
+                  : result.sources
+                    ? "sources"
+                    : "readable"
+              }
               extraTabs={[
                 ...(result.document_sources || result.sources
                   ? [
