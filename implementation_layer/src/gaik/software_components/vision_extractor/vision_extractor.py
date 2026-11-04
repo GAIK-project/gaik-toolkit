@@ -922,7 +922,9 @@ class VisionExtractor:
                     {"role": "system", "content": system_prompt},
                     {
                         "role": "user",
-                        "content": build_chat_document_content(file_paths, user_prompt),
+                        "content": build_chat_document_content(
+                            file_paths, user_prompt, include_text_layer=True
+                        ),
                     },
                 ],
                 response_format=extraction_model,
