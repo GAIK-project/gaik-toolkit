@@ -31,6 +31,7 @@ try:
         save_schema,
         schema_id_from_requirements,
         sse_event,
+        validate_file_size,
         wrap_schema_with_numeric_normalizers,
     )
 except ImportError:
@@ -41,6 +42,7 @@ except ImportError:
         save_schema,
         schema_id_from_requirements,
         sse_event,
+        validate_file_size,
         wrap_schema_with_numeric_normalizers,
     )
 
@@ -823,6 +825,10 @@ async def process_order(
             if not pricing_file:
                 yield sse_event("error", {"message": "Pricing file required"})
                 return
+            if len(bom_files) > MAX_CUSTOM_BOMS:
+                yield sse_event("error", {"message": f"At most {MAX_CUSTOM_BOMS} BOMs"})
+                return
+            await validate_file_size(pricing_file)
             # 1. Parse every document to text
             yield sse_event("status", {"message": "Parsing documents..."})
             po_text, *bom_texts = await asyncio.gather(
@@ -882,6 +888,8 @@ async def process_order(
                 pdf_job_id=job_id,
             )
             yield sse_event("complete", response.model_dump())
+        except HTTPException as e:
+            yield sse_event("error", {"message": str(e.detail)})
         except Exception as e:
             logger.exception("Error processing order")
             yield sse_event("error", {"message": str(e)})
@@ -1042,7 +1050,10 @@ async def generate_custom_schema(request: CustomSchemaRequest) -> dict:
 
 
 async def _parse_upload(upload: UploadFile, prefix: str) -> str:
-    pdf_bytes = await upload.read()
+    # The page allows 20 MB per PDF; a request need not come from the page.
+    pdf_bytes = await validate_file_size(upload)
+    if not pdf_bytes.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail=f"{upload.filename or prefix} is not a PDF")
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
         tmp.write(pdf_bytes)
         tmp_path = tmp.name
