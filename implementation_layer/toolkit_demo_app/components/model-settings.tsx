@@ -46,9 +46,9 @@ const OPEN_EVENT = "gaik:open-model-settings";
 type IconType = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 type Preset = { id: string; label: string; note?: string; Icon?: IconType };
 const GPT_PRESETS: Preset[] = [
-  { id: "gpt-6-sol", label: "GPT-6 Sol", note: "default", Icon: Openai },
+  { id: "gpt-6-luna", label: "GPT-6 Luna", note: "default", Icon: Openai },
+  { id: "gpt-6-sol", label: "GPT-6 Sol", Icon: Openai },
   { id: "gpt-6.1-sol", label: "GPT-6.1 Sol", note: "newest", Icon: Openai },
-  { id: "gpt-6-luna", label: "GPT-6 Luna", Icon: Openai },
   { id: "gpt-6-astra", label: "GPT-6 Astra", Icon: Openai },
   { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", Icon: Openai },
 ];
