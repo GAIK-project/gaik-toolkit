@@ -2779,5 +2779,80 @@
         "infer_from": "gaik vector stores return (Document, score) pairs -> key=lambda hit: hit[1]"
       }
     ]
+  },
+  "WebScraper": {
+    "import": "from gaik.software_components.web_scraper import WebScraper, ScrapedPage",
+    "construct": "scraper = WebScraper(allowed_domains=allowed_domains)",
+    "call": "with scraper:\n        result = scraper.crawl(start_url, max_pages=max_pages, max_depth=max_depth)\n    source_text = result.to_markdown(max_chars_per_page=6000)",
+    "call_single_page": "page = scraper.scrape(url)  # raises ScrapeError(.reason) when the page cannot be fetched",
+    "returns": "CrawlResult(.start_url, .pages [ScrapedPage(.url, .final_url, .status_code, .title, .description, .language, .published, .canonical_url, .markdown, .links [PageLink(.url, .text, .internal)], .structured_data (JSON-LD dicts), .depth, .parent_url, .rendered, .word_count)], .skipped [SkippedPage(.url, .reason)], .duration_s); .to_markdown(max_chars_per_page) -> one document with a 'Source: <url>' line per page; .save(dir) -> pages/NN-<slug>.md + crawl.json; iter_crawl(...) yields ScrapedPage | SkippedPage as they arrive",
+    "install_extra": "web-scraper",
+    "options": [
+      {
+        "name": "allowed_domains",
+        "type": "list[str] | None",
+        "default": null,
+        "effect": "Domains every request and redirect hop must stay inside; a domain allows its subdomains. None allows every public host, which is unsafe when URLs come from users.",
+        "selection_relevant": true,
+        "infer_from": "the site(s) named in the use case -> their registrable domains, e.g. ['gaik.ai']"
+      },
+      {
+        "name": "max_pages",
+        "type": "int",
+        "default": 10,
+        "effect": "crawl() argument: stop after this many pages. Drives the size of the Markdown the extraction step reads, and so its cost.",
+        "selection_relevant": true,
+        "infer_from": "one page named -> use scrape(url) instead; a site section -> 10-30"
+      },
+      {
+        "name": "max_depth",
+        "type": "int",
+        "default": 2,
+        "effect": "crawl() argument: follow links at most this many steps from the start page.",
+        "selection_relevant": true,
+        "infer_from": "start page lists the target pages -> 1; deeper sections -> 2"
+      },
+      {
+        "name": "include_patterns",
+        "type": "list[str] | None",
+        "default": null,
+        "effect": "crawl() argument: follow only links whose path matches one of these shell patterns, e.g. ['/fi/koulutus*']; exclude_patterns does the opposite.",
+        "selection_relevant": true,
+        "infer_from": "the use case targets one section of a site -> its path prefix with *"
+      },
+      {
+        "name": "render_js",
+        "type": "bool | 'auto'",
+        "default": false,
+        "effect": "True renders every page in headless Chromium; 'auto' only pages whose HTML holds almost no text. Needs gaik[web-scraper-browser] and `playwright install chromium`.",
+        "selection_relevant": true,
+        "infer_from": "the site is a single-page app or builds its content with JavaScript -> 'auto'; otherwise False"
+      },
+      {
+        "name": "extraction",
+        "type": "str",
+        "default": "balanced",
+        "effect": "'precision' keeps only the main text, 'recall' keeps more blocks (home pages of short cards), 'balanced' sits between.",
+        "selection_relevant": false,
+        "infer_from": "facts listed on overview pages of short cards -> 'recall'"
+      },
+      {
+        "name": "respect_robots",
+        "type": "bool",
+        "default": true,
+        "effect": "Obey robots.txt (RFC 9309). Turn off only for a site you own.",
+        "selection_relevant": false,
+        "infer_from": "keep True"
+      },
+      {
+        "name": "delay_seconds",
+        "type": "float",
+        "default": 0.5,
+        "effect": "Least time between requests to one host; a robots.txt Crawl-delay lengthens it.",
+        "selection_relevant": false,
+        "infer_from": "keep the default"
+      }
+    ],
+    "note": "Makes no LLM calls. To extract structured data from a site, feed result.to_markdown() to SchemaGenerator + DataExtractor as one document and ask for the source page URL from the 'Source:' lines; to answer questions, index the pages in a RAG store. For PDFs linked from the site, download them and use a parser step."
   }
 }

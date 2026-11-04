@@ -3384,5 +3384,89 @@
     "example_script_path": "",
     "readme_path": "implementation_layer/src/gaik/software_components/RAG/relevance_gate/README.md",
     "install_extra": ""
+  },
+  {
+    "id": "web_scraper",
+    "name": "WebScraper",
+    "type": "software_component",
+    "input_artifact_types": [
+      "url",
+      "html"
+    ],
+    "output_artifact_types": [
+      "text",
+      "parsed_text"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [
+      "start_url"
+    ],
+    "optional_parameters": [
+      "allowed_domains",
+      "respect_robots",
+      "render_js",
+      "extraction",
+      "delay_seconds",
+      "max_crawl_delay",
+      "timeout_seconds",
+      "max_page_bytes",
+      "max_redirects",
+      "user_agent",
+      "allow_private_networks",
+      "max_pages",
+      "max_depth",
+      "include_patterns",
+      "exclude_patterns",
+      "stay_on_host"
+    ],
+    "supported_providers": [],
+    "cost_relevant_parameters": [
+      "max_pages",
+      "render_js"
+    ],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "Plain HTTP with trafilatura main-content extraction is fast (about 0.5 s per page plus delay_seconds); render_js=True runs headless Chromium for JavaScript-built pages at about 1.5-2.5 s per page",
+      "cost_sensitivity": "none for scraping -- no model calls; the extraction step that reads the Markdown carries the LLM cost, which grows with max_pages",
+      "degrades_on": [
+        "javascript_only_sites_without_render_js",
+        "pages_behind_login_or_cookie_walls",
+        "home_pages_made_of_short_link_cards"
+      ]
+    },
+    "known_limitations": [
+      "HTML pages only: PDFs, images and office files are skipped (not HTML), and links to files are not followed in a crawl. Parse downloaded documents with a parser instead.",
+      "Every request and redirect hop must stay inside allowed_domains (a domain allows its subdomains) and resolve to public addresses; set allowed_domains whenever URLs come from users. DNS rebinding is not covered.",
+      "Obeys robots.txt by default: disallowed pages are skipped, a 5xx robots.txt blocks the site, and a Crawl-delay above max_crawl_delay (30 s) skips the site.",
+      "Crawls breadth-first on the start page's host by default (stay_on_host=True), up to max_pages and max_depth; include_patterns/exclude_patterns are shell patterns on the URL path.",
+      "Main-content extraction drops navigation, banners and footers, so facts that live only in a footer (contact details) can be missing; extraction='recall' keeps more blocks.",
+      "No login, forms or cookies; render_js needs the web-scraper-browser extra plus `playwright install chromium`, and Playwright's sync API must not run in a thread with a running asyncio loop.",
+      "Synchronous and not thread-safe: use one scraper per thread."
+    ],
+    "best_for": [
+      "website_to_markdown_for_llm",
+      "site_crawl_for_rag_ingestion",
+      "structured_extraction_from_web_pages",
+      "monitoring_news_and_event_pages"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "crawl_site",
+        "component": "WebScraper",
+        "inputs": [
+          "start_url"
+        ],
+        "outputs": [
+          "site_markdown"
+        ]
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/web_scraper/",
+    "import_path": "gaik.software_components.web_scraper",
+    "example_script_path": "implementation_layer/examples/software_components/web_scraper/web_scraper_example.py",
+    "readme_path": "implementation_layer/src/gaik/software_components/web_scraper/README.md",
+    "install_extra": "web-scraper"
   }
 ]
