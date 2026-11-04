@@ -245,11 +245,30 @@ class WebScraper:
                     queued.add(link.url)
                     queue.append((link.url, depth + 1, page.final_url))
 
-    def crawl(self, start_url: str, **kwargs) -> CrawlResult:
-        """Crawl like :meth:`iter_crawl` and return every page at once."""
+    def crawl(
+        self,
+        start_url: str,
+        *,
+        max_pages: int = 10,
+        max_depth: int = 2,
+        include_patterns: Iterable[str] | None = None,
+        exclude_patterns: Iterable[str] | None = None,
+        stay_on_host: bool = True,
+        on_request: RequestCallback | None = None,
+    ) -> CrawlResult:
+        """Crawl like :meth:`iter_crawl` (same arguments) and return every page at once."""
         started = time.monotonic()
         result = CrawlResult(start_url=start_url)
-        for item in self.iter_crawl(start_url, **kwargs):
+        crawl = self.iter_crawl(
+            start_url,
+            max_pages=max_pages,
+            max_depth=max_depth,
+            include_patterns=include_patterns,
+            exclude_patterns=exclude_patterns,
+            stay_on_host=stay_on_host,
+            on_request=on_request,
+        )
+        for item in crawl:
             if isinstance(item, ScrapedPage):
                 result.pages.append(item)
             else:

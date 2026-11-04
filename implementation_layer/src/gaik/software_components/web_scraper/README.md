@@ -115,7 +115,7 @@ Methods:
   and `SkippedPage`. Patterns are shell patterns on the URL path and query
   (`"/fi/news/*"`). Links to files (PDF, images, archives, office documents) are not
   followed.
-- `crawl(start_url, **kwargs) -> CrawlResult` collects `iter_crawl`.
+- `crawl(start_url, *, max_pages=10, max_depth=2, ...) -> CrawlResult` takes the same arguments and collects `iter_crawl`.
 
 ### Results
 
