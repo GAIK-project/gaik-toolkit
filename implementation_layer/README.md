@@ -93,6 +93,9 @@ pip install "gaik[knowledge-curator]"
 pip install "gaik[draft-reviewer]"
 pip install "gaik[report-synthesizer]"
 
+# Web pages and sites -> Markdown (allowlisted, robots.txt-aware crawler)
+pip install "gaik[web-scraper]"
+
 # Software modules (pipelines)
 pip install "gaik[audio-to-structured-data]"
 pip install "gaik[documents-to-structured-data]"
@@ -209,6 +212,14 @@ Software components:
 - `KnowledgeCurator` – extracts section-bound fact units with verified verbatim quotes, and lists missing items and conflicts between sources
 - `DraftReviewer` – fact-checks a generated text against reference material with exact search-and-replace edits and an edit log
 - `ReportSynthesizer` – writes and reviews a report section by section from curated knowledge, and saves it as Markdown and DOCX
+
+### 10. Web Scraper – web pages and sites → Markdown
+
+**Goal:** bring a website's content into the same pipelines as documents.
+
+- `WebScraper` – fetches a page or crawls one site breadth-first and returns each page as clean Markdown with its title, language, date, links and JSON-LD
+- Stays inside `allowed_domains` and public addresses on every redirect hop, obeys robots.txt and spaces requests to one host; optional headless Chromium rendering for JavaScript sites
+- `CrawlResult.to_markdown()` heads each page with its `Source:` URL, ready for the Extractor or a RAG index
 
 ---
 

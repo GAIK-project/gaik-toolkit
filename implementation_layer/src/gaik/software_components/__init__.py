@@ -27,4 +27,5 @@ __all__ = [
     "knowledge_curator",
     "draft_reviewer",
     "report_synthesizer",
+    "web_scraper",
 ]

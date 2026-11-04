@@ -832,6 +832,52 @@ flowchart LR
 
 ---
 
+### Web Scraper
+
+The Web Scraper fetches web pages, or crawls one site breadth-first, and returns each page as clean Markdown with its title, description, language, date, links and JSON-LD. Navigation, cookie banners and footers are left out, so the text an LLM reads is the page's own content. Every request, redirect hops included, stays inside the domains you allow and never reaches a private or local address, robots.txt is obeyed, and requests to one host are spaced out. Hand the result to the Extractor to pull structured records out of a site, or to a RAG index to answer from it.
+
+<Mermaid chart={`
+flowchart LR
+    U("🌐 Start URL<br/>allowed domains") --> WS
+
+    subgraph WS["Web Scraper"]
+        direction TB
+        G["URL policy · robots.txt<br/>allowlist · public addresses · delay"]
+        F["Fetch<br/>httpx · optional headless Chromium"]
+        C["Read<br/>trafilatura Markdown · links · JSON-LD"]
+        G --> F --> C
+        C -->|"internal links, breadth-first"| G
+    end
+
+    WS --> O1("📝 Markdown per page<br/>Source: URL")
+    WS --> O2("🗂️ crawl.json<br/>metadata · links · skipped")
+
+    style U fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style WS fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- `WebScraper(allowed_domains=["gaik.ai"])`, then `scrape(url)` for one page or `crawl(start_url, max_pages=10, max_depth=2)` for a site. `iter_crawl(...)` yields each page as it arrives, so a crawl can be shown live or stopped
+- Crawl scope: the start page's host, `include_patterns` and `exclude_patterns` on the URL path (`"/fi/news/*"`), and links to files such as PDFs and images are not followed
+- Safe by default: http(s) only, each redirect hop checked, no private, loopback or link-local addresses, a size limit per page. Set `allowed_domains` whenever the URLs come from users
+- Polite: robots.txt with wildcards and `Crawl-delay`, `delay_seconds` between requests to one host, and a `User-Agent` that names the toolkit
+- `render_js=True` renders pages in headless Chromium, and `render_js="auto"` only pages whose HTML holds almost no text
+- `CrawlResult.to_markdown()` joins the pages into one document with a `Source:` line per page, ready for the Extractor; `save(directory)` writes one Markdown file per page and `crawl.json`
+- No LLM calls of its own
+- Install: `pip install "gaik[web-scraper]"`. JavaScript rendering: `pip install "gaik[web-scraper-browser]"` and `playwright install chromium`
+
+**Potential applications:**
+- Extracting events, products, courses or contact pages from a company's own website into structured data
+- Indexing a site or a documentation section for a RAG chatbot
+- Monitoring news and announcement pages for a report
+
+- **Implementation code**: [software_components/web_scraper](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/web_scraper)
+- **Usage examples**: [examples/web_scraper](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/web_scraper)
+
+---
+
 ### Knowledge Curator
 
 The Knowledge Curator collects the evidence for a fixed set of topics from normalized sources. For each topic, called a section, an LLM extracts fact units: a short summary paired with the exact words of the source, the file it came from and a locator such as a page or a sheet row. It also lists the required items that no source covers and the conflicts between sources. The source hierarchy in the instructions decides whether a conflict is resolved or unresolved. Every quote is checked against its source. It is the second stage of the Report-Writer module. On its own it suits any task that needs traceable evidence for fixed questions, such as audits and due diligence.

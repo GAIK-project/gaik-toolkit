@@ -28,6 +28,9 @@ Read-only text-to-SQL query agent. Ask a PostgreSQL database questions in natura
 ### [Tabular Agent](./tabular_agent)
 The same idea for files. Ask CSV, Excel, Parquet or JSON files questions in natural language; the agent loads them into DuckDB, profiles the columns, generates validated read-only SQL, runs it, and answers. Handles report-style spreadsheets with title rows, subtotals and trailing notes.
 
+### [Web Scraper](./web_scraper)
+Crawl a few pages of gaik.ai into Markdown, save them, and extract the upcoming events with the schema generator and the extractor.
+
 ## Getting Started
 
 1. Choose the component you want to explore

@@ -304,6 +304,7 @@ all = [
     "gaik[draft-reviewer]",
     "gaik[report-synthesizer]",
     "gaik[report-writer]",
+    "gaik[web-scraper]",
 ]
 
 # Software components
@@ -372,6 +373,25 @@ report-writer = [
     "gaik[report-synthesizer]",
 ]
 
+# Web scraper: fetch pages or crawl one site into LLM-ready Markdown inside a
+# domain allowlist. httpx fetches (openai already depends on it), trafilatura
+# separates the main content from boilerplate, protego reads robots.txt with
+# wildcards and Crawl-delay. crawl4ai was not used: it requires a litellm fork
+# that installs the same `litellm` module as gaik[llm-litellm], plus Playwright
+# and Chromium even for plain HTTP fetching.
+web-scraper = [
+    "httpx>=0.27",
+    "trafilatura>=2.0",
+    "protego>=0.4",
+]
+
+# Optional headless Chromium rendering for WebScraper(render_js=...). After
+# installing, download the browser once: `playwright install chromium`.
+web-scraper-browser = [
+    "gaik[web-scraper]",
+    "playwright>=1.49",
+]
+
 # CPU-only variants (no GPU/torch/docling dependencies)
 parser-cpu = [
     "PyMuPDF>=1.26.0",
@@ -408,6 +428,7 @@ all-cpu = [
     "gaik[draft-reviewer]",
     "gaik[report-synthesizer]",
     "gaik[report-writer]",
+    "gaik[web-scraper]",
 ]
 
 # Development tooling for maintainers only (pip install -e ".[dev]")
