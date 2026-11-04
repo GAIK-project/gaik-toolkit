@@ -602,7 +602,10 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
             catalog.models.some((m) => !m.audio && m.allowed)) && (
             <div className="text-muted-foreground space-y-1 px-2 pt-1 pb-1.5 text-xs">
               {someLocked && (
-                <p>Locked models are for the GAIK project team.</p>
+                <p>
+                  Some models are for the GAIK team only. Ask an admin for
+                  access.
+                </p>
               )}
               {catalog.models.some((m) => !m.audio) && (
                 <p>
