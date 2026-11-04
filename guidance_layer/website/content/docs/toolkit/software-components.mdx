@@ -238,7 +238,7 @@ flowchart TD
 - Multi-document calls: align line items in a PO with quantities in a BOM in one request
 - Multi-provider: OpenAI / Azure, Anthropic Claude (Foundry), Google Gemini (Vertex AI or direct), plus CSC Aitta, OpenAI-compatible servers or optional LiteLLM through a shared `get_llm_config()` config
 - Reuses generated Pydantic schemas across runs via `schema_dir` persistence
-- Optional per-field verification (`include_verification=True`): the model's own confidence score and reasoning, plus `found_in_text` and `page` from a lookup of the value in the PDF text layer. Flag values for review on `found_in_text`, not on the score: a misread value can still score 1.0
+- Optional per-field verification (`include_verification=True`): the model's own confidence score and reasoning, plus `found_in_text` and `page` from a lookup of the value in the PDF text layer. `found_in_text` is `False` when the PDF has a text layer and the value is not in it, and `None` when nothing could be checked (a scan or image without a text layer). Flag values for review on `found_in_text`, not on the score: a misread value can still score 1.0
 
 **Potential applications:**
 - Purchase order processing with bill-of-materials cross-referencing
