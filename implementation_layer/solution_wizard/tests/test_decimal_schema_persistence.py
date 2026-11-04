@@ -96,9 +96,8 @@ def _assert_decimal_safe(loaded_cls: type, price_field: str = "price", fee_field
 class TestGenerateSchemaPy:
     """scripts/generate_schema.py: _schema_to_py()."""
 
-    @classmethod
     @pytest.fixture(scope="class")
-    def module(cls):
+    def module(self):
         spec = importlib.util.spec_from_file_location(
             "_generate_schema", WIZARD_ROOT / "scripts" / "generate_schema.py"
         )
@@ -167,9 +166,8 @@ class TestRunPocTemplate:
     (the fallback path formerly calling inspect.getsource() on a
     dynamically created class, which always raised OSError there)."""
 
-    @classmethod
     @pytest.fixture(scope="class")
-    def schema_to_py_source(cls):
+    def schema_to_py_source(self):
         tmpl_path = WIZARD_ROOT / "templates" / "poc" / "_generic" / "run_poc.py.tmpl"
         text = tmpl_path.read_text(encoding="utf-8")
         start = text.index("def _schema_to_py_source")
