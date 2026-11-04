@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 
 from fastapi import APIRouter, Form, HTTPException
@@ -38,6 +39,33 @@ class TextToSpeechResponse(BaseModel):
     audio_base64: str
 
 
+def _retry_after(exc: Exception) -> float | None:
+    """Seconds to wait when the speech deployment is rate limited (HTTP 429), else None."""
+    response = getattr(exc, "response", None)
+    status = getattr(response, "status_code", None)
+    if status != 429 and "429" not in str(exc):
+        return None
+    try:
+        return min(float(response.headers.get("Retry-After", 2)), 10.0)
+    except (AttributeError, TypeError, ValueError):
+        return 2.0
+
+
+async def _synthesize_with_retry(tts, text: str, attempts: int = 3):
+    """The page asks for up to three voices at once, more than the deployment's
+    per-second limit allows: wait and retry a rate-limited request instead of failing.
+    The call runs in a thread so a long synthesis does not block other requests."""
+    for attempt in range(attempts):
+        try:
+            return await asyncio.to_thread(tts.synthesize, text)
+        except Exception as exc:
+            wait = _retry_after(exc)
+            if wait is None or attempt == attempts - 1:
+                raise
+            await asyncio.sleep(wait * (attempt + 1))
+    raise RuntimeError("unreachable")
+
+
 @router.post("", response_model=TextToSpeechResponse)
 async def synthesize_text(
     text: str = Form(...),
@@ -67,7 +95,7 @@ async def synthesize_text(
         from gaik.software_components.text_to_speech import TextToSpeech
 
         tts = TextToSpeech(api_config=get_api_config(), language=language, voice=voice)
-        result = tts.synthesize(normalized_text)
+        result = await _synthesize_with_retry(tts, normalized_text)
     except ImportError as exc:
         raise HTTPException(
             status_code=500, detail=f"Text-to-speech component not installed: {exc}"
