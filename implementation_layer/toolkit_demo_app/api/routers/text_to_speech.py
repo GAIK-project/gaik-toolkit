@@ -20,7 +20,6 @@ SUPPORTED_VOICES = {
     "alloy",
     "echo",
     "fable",
-    "nova",
     "onyx",
     "shimmer",
 }

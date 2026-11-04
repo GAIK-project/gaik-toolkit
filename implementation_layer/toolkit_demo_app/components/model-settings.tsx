@@ -520,7 +520,7 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
     : usedHere
       ? `${active?.label} runs this demo`
       : "This demo runs on the server default";
-  const transcribedByGpt = !settings && usedHere && active && !active.audio;
+  const transcribedFirst = !settings && usedHere && active && !active.audio;
   const someLocked = catalog.models.some((m) => !m.allowed);
 
   return (
@@ -560,9 +560,9 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
         <DropdownMenuContent align="end" className="w-72">
           <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
             {status}
-            {transcribedByGpt && (
+            {transcribedFirst && (
               <span className="block">
-                Audio is transcribed with GPT first.
+                Audio is transcribed on the server first.
               </span>
             )}
           </DropdownMenuLabel>
@@ -606,7 +606,8 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
               )}
               {catalog.models.some((m) => !m.audio) && (
                 <p>
-                  Claude and Gemini get audio as text, transcribed with GPT.
+                  Claude and Gemini get audio as text from the server&apos;s
+                  transcriber.
                 </p>
               )}
             </div>

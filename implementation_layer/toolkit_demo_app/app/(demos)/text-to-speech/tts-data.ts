@@ -18,7 +18,8 @@ export const VOICES = [
   { id: "echo", note: "Calm and even, a lower voice." },
   { id: "fable", note: "Warm and expressive, like a storyteller." },
   { id: "onyx", note: "Deep and firm, with some authority." },
-  { id: "nova", note: "Friendly and bright." },
+  // Nova is left out: the speech deployment answers it with HTTP 429 every time
+  // (checked 2026-11-04), while the other voices work.
   { id: "shimmer", note: "Soft and clear." },
 ] as const;
 
@@ -40,7 +41,7 @@ const DIARY: TtsExample = {
     "A Finnish diary entry with dates, numbers and place names. It comes with three voices to compare, so you can hear which one reads it best.",
   tags: ["Finnish", "3 voices to compare", "numbers and names"],
   language: "fi",
-  voices: ["alloy", "nova", "onyx"],
+  voices: ["alloy", "shimmer", "onyx"],
   text: `Päivämäärä 10.04.2025. Kohde: 4120-01 Revontulentie 3, 02100 Espoo, Toimistotalo Revontuli, osittainen purku. Työviikko 4.
 Sää: +6 astetta, puolipilvistä, tuuli noin 4 m/s.
 Resurssit: työnjohtajia 1 henkilö, omia työntekijöitä 3 henkilöä, asbestipurku-urakoitsijan työntekijöitä 4 henkilöä, muita alihankkijoita 2 henkilöä. Yhteensä 10 henkilöä.
