@@ -118,7 +118,14 @@ def test_effort_merges_into_a_caller_output_config():
 
 
 @pytest.mark.parametrize(
-    ("model", "kept"), [("claude-sonnet-5", False), ("claude-sonnet-4-6", True)]
+    ("model", "kept"),
+    [
+        ("claude-sonnet-5", False),
+        # Haiku 5.5 rejects temperature and top_p (checked 2026-11-04); 4.5 takes them.
+        ("claude-haiku-5-5", False),
+        ("claude-haiku-4-5", True),
+        ("claude-sonnet-4-6", True),
+    ],
 )
 def test_sampling_is_dropped_only_where_claude_rejects_it(model, kept):
     # Sonnet 5 answers 400 "temperature is deprecated for this model";
