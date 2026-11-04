@@ -5,6 +5,8 @@ import {
   EXAMPLES,
   PARSERS,
   DEFAULT_PARSER,
+  MAX_DOCUMENTS,
+  addDocuments,
   cellText,
   columnsOf,
   countFound,
@@ -89,5 +91,44 @@ describe("ready-made schemas", () => {
       );
       expect(saved.user_requirements).toBe(example.task);
     }
+  });
+});
+
+describe("addDocuments", () => {
+  const file = (name: string, size = 10) =>
+    new File([new Uint8Array(size)], name, { lastModified: 1 });
+
+  test("adds supported files after those already there, in order", () => {
+    const first = file("a.pdf");
+    const { files, rejected } = addDocuments(
+      [first],
+      [file("b.docx"), file("c.PNG")],
+    );
+    expect(files.map((f) => f.name)).toEqual(["a.pdf", "b.docx", "c.PNG"]);
+    expect(rejected).toEqual([]);
+  });
+
+  test("names every file it leaves out, and why", () => {
+    const { files, rejected } = addDocuments(
+      [file("a.pdf")],
+      [file("a.pdf"), file("notes.txt"), file("big.pdf", 3 * 1024 * 1024)],
+      { maxMb: 2 },
+    );
+    expect(files.map((f) => f.name)).toEqual(["a.pdf"]);
+    expect(rejected).toEqual([
+      "a.pdf: already added",
+      "notes.txt: this file type is not supported",
+      "big.pdf: larger than 2 MB",
+    ]);
+  });
+
+  test("stops at the limit", () => {
+    const incoming = Array.from({ length: MAX_DOCUMENTS + 2 }, (_, i) =>
+      file(`d${i}.pdf`),
+    );
+    const { files, rejected } = addDocuments([], incoming);
+    expect(files).toHaveLength(MAX_DOCUMENTS);
+    expect(rejected).toHaveLength(2);
+    expect(rejected[0]).toContain(`at most ${MAX_DOCUMENTS}`);
   });
 });

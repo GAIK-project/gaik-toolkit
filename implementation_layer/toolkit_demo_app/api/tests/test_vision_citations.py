@@ -210,6 +210,44 @@ async def test_text_extraction_with_sources_asks_for_them_and_checks_the_text() 
 
 
 @pytest.mark.asyncio
+async def test_several_documents_each_get_their_own_checked_sources() -> None:
+    from api.routers import extractor as route
+
+    def record(total: float, quote: str) -> dict:
+        return {
+            "total": total,
+            citations.SOURCES_FIELD: {
+                "items": [{"field": "total", "document": 1, "page": 1, "quote": quote}]
+            },
+        }
+
+    class FakeExtractor:
+        def extract(self, **kwargs):
+            return [record(10.0, "Total: 10,00"), record(20.0, "Total: 99,00")]
+
+    class Plain(BaseModel):
+        total: float | None = None
+
+    response = await route._run_extraction(
+        FakeExtractor(),
+        Plain,
+        None,
+        "Extract the total",
+        ["Total: 10,00 EUR", "Total: 20,00 EUR"],
+        True,
+    )
+
+    assert response.document_count == 2
+    assert [r["total"] for r in response.results] == [10.0, 20.0]
+    assert len(response.raw_sources) == 2
+    first, second = response.document_sources
+    assert first["sources"][0]["status"] == "found"
+    # The second quote is checked against the second document, not the first.
+    assert second["sources"][0]["status"] == "not_found"
+    assert response.sources == first
+
+
+@pytest.mark.asyncio
 async def test_trace_locates_text_quotes_in_the_pdf_without_trusting_the_page() -> None:
     import io
     import json

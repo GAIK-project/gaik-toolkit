@@ -83,6 +83,9 @@ class ExtractResponse(BaseModel):
     # the page boxes come from POST /extract/trace, which takes raw_sources back.
     sources: dict | None = None
     raw_sources: list | None = None
+    # include_sources with several documents: the checked quotes of each document, in the
+    # order of the documents. ``sources`` stays the first one, for older clients.
+    document_sources: list[dict | None] | None = None
 
 
 async def _run_extraction(
@@ -114,12 +117,16 @@ async def _run_extraction(
     raw_sources = [
         result.pop(SOURCES_FIELD, None) if isinstance(result, dict) else None for result in results
     ]
-    first = results[0] if results and isinstance(results[0], dict) else {}
+    document_sources = [
+        check_text_sources(raw, result if isinstance(result, dict) else {}, text)
+        for raw, result, text in zip(raw_sources, results, documents, strict=False)
+    ]
     return ExtractResponse(
         results=results,
         document_count=len(documents),
-        sources=check_text_sources(raw_sources[0] if raw_sources else None, first, documents[0]),
+        sources=document_sources[0] if document_sources else None,
         raw_sources=raw_sources,
+        document_sources=document_sources,
     )
 
 

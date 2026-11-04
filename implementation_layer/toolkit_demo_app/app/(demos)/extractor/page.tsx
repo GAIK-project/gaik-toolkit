@@ -2,7 +2,6 @@
 
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { ExamplePreviewDialog } from "@/components/demo/example-preview-dialog";
-import { FileUpload } from "@/components/demo/file-upload";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard, LoadingCard } from "@/components/demo/result-card";
 import type { SchemaField } from "@/components/demo/schema-fields-table";
@@ -48,8 +47,8 @@ import {
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { DocumentUpload } from "./document-upload";
 import {
-  ACCEPTED_FILES,
   DEFAULT_PARSER,
   EXAMPLES,
   PARSERS,
@@ -74,6 +73,8 @@ interface ExtractResult {
   /** With Trace sources: each quote checked, and located in the PDF when there is one. */
   sources?: SourcesResult | null;
   raw_sources?: unknown[] | null;
+  /** With several documents: the checked quotes of each, in the order of the documents. */
+  document_sources?: (SourcesResult | null)[] | null;
 }
 
 interface GeneratedSchema {
@@ -100,13 +101,13 @@ type Phase = "schema" | "extracting" | null;
 const GUIDE_STEPS: GuideStep[] = [
   {
     icon: Upload,
-    title: "Add the document",
-    text: "Upload a PDF, Word file or image, paste text, or start from a ready-made document.",
+    title: "Add the documents",
+    text: "Upload one or several PDF, Word or image files, paste text, or start from a ready-made document.",
   },
   {
     icon: ScanText,
     title: "Choose how it is read",
-    text: "For an uploaded file, pick the parser that reads it. Auto-detect chooses by file type.",
+    text: "For uploaded files, pick the parser that reads them. Auto-detect chooses by file type, for each file.",
   },
   {
     icon: ListChecks,
@@ -116,7 +117,7 @@ const GUIDE_STEPS: GuideStep[] = [
   {
     icon: Table2,
     title: "Review the result",
-    text: "Every field is shown, also those with no value. Copy or download the JSON.",
+    text: "Every field is shown, also those with no value, with one result for each document. Copy or download the JSON.",
   },
 ];
 const GUIDE_NOTES = [
@@ -141,13 +142,62 @@ const DEFAULT_FIELDS: Field[] = [
 
 const DEFAULT_TASK = EXAMPLES[0].task;
 
+/** The checked quotes of the results: one document at a time when there are several. */
+function DocumentSources({
+  names,
+  sources,
+}: {
+  names: string[];
+  sources: (SourcesResult | null)[];
+}) {
+  const [selected, setSelected] = useState(0);
+  const index = Math.min(selected, sources.length - 1);
+  const current = sources[index];
+  return (
+    <div className="space-y-3">
+      {sources.length > 1 && (
+        <div className="max-w-sm space-y-1">
+          <Label htmlFor="sources-document">Document</Label>
+          <Select
+            value={String(index)}
+            onValueChange={(value) => setSelected(Number(value))}
+          >
+            <SelectTrigger id="sources-document">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sources.map((_, position) => (
+                <SelectItem key={position} value={String(position)}>
+                  {names[position] ?? `Document ${position + 1}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      {current ? (
+        <SourcesView key={index} result={current} />
+      ) : (
+        <p className="text-muted-foreground text-sm">
+          The model returned no sources for this document.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function ExtractorPage() {
   const [inputMode, setInputMode] = useState<"text" | "file">("text");
   const [documentText, setDocumentText] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [includeSources, setIncludeSources] = useState(true);
   const [parserType, setParserType] = useState<ParserType>(DEFAULT_PARSER);
   const [isParsing, setIsParsing] = useState(false);
+  // Which uploaded file is being read, and of how many (1-based), while several are.
+  const [reading, setReading] = useState<{ index: number; total: number }>({
+    index: 1,
+    total: 1,
+  });
 
   const [mode, setMode] = useState<"plain-language" | "fields">(
     "plain-language",
@@ -174,6 +224,8 @@ export default function ExtractorPage() {
   const [resultSchema, setResultSchema] = useState<GeneratedSchema | null>(
     null,
   );
+  // What each result was read from: file names, or "Pasted text".
+  const [resultNames, setResultNames] = useState<string[]>([]);
   const [seconds, setSeconds] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const ownModel = useModelSettings();
@@ -193,8 +245,12 @@ export default function ExtractorPage() {
     : exampleTask !== null && task.trim() !== exampleTask.trim();
   const busy = isLoading || isParsing || isGeneratingSchema;
   const hasInput =
-    inputMode === "text" ? documentText.trim().length > 0 : Boolean(file);
+    inputMode === "text" ? documentText.trim().length > 0 : files.length > 0;
   const parser = PARSERS.find((p) => p.id === parserType) ?? PARSERS[0];
+  const readingMessage =
+    reading.total > 1
+      ? `Reading document ${reading.index} of ${reading.total}…`
+      : "Reading the document…";
 
   async function pickExample(example: ExtractorExample): Promise<void> {
     setExampleId(example.id);
@@ -207,11 +263,11 @@ export default function ExtractorPage() {
       const response = await fetch(example.url);
       if (!response.ok) throw new Error("Could not load the example");
       const blob = await response.blob();
-      setFile(
+      setFiles([
         new File([blob], example.fileName, {
           type: blob.type || "application/pdf",
         }),
-      );
+      ]);
       setInputMode("file");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed");
@@ -233,9 +289,8 @@ export default function ExtractorPage() {
     setNewFieldDesc("");
   }
 
-  /** Reads the file with the chosen parser; null if it failed. */
-  async function parseFile(): Promise<string | null> {
-    if (!file) return null;
+  /** Reads a file with the chosen parser; null if it failed. */
+  async function parseFile(file: File): Promise<string | null> {
     setIsParsing(true);
     try {
       const formData = new FormData();
@@ -310,15 +365,16 @@ export default function ExtractorPage() {
     if (next) toast.success("Schema generated");
   }
 
-  /** The quotes of a text extraction, located in the PDF the text was read from. */
+  /** The quotes of one document's extraction, located in the PDF the text was read from. */
   async function traceInPdf(
     pdf: File,
-    data: ExtractResult,
+    rawSources: unknown,
+    record: Record<string, unknown>,
   ): Promise<SourcesResult | null> {
     const formData = new FormData();
     formData.append("file", pdf);
-    formData.append("sources", JSON.stringify(data.raw_sources?.[0] ?? null));
-    formData.append("data", JSON.stringify(data.results[0] ?? {}));
+    formData.append("sources", JSON.stringify(rawSources ?? null));
+    formData.append("data", JSON.stringify(record ?? {}));
     try {
       const response = await apiFetch("/api/extract/trace", {
         method: "POST",
@@ -350,24 +406,34 @@ export default function ExtractorPage() {
       return;
     }
 
-    // The text to extract from: pasted, or read from the file by the parser.
-    let text = documentText;
+    // The texts to extract from: the pasted text, or each file read by the parser.
+    const texts: string[] = [];
+    const names: string[] = [];
     if (inputMode === "file") {
-      if (!file) {
+      if (files.length === 0) {
         toast.error("Please select a file first");
         return;
       }
-      const readable = await parseFile();
-      if (readable === null) return;
-      text = readable;
-    }
-    if (!text.trim()) {
-      toast.error(
-        inputMode === "file"
-          ? "The parser found no text. Try another parser."
-          : "Please provide document text",
-      );
-      return;
+      for (const [index, file] of files.entries()) {
+        setReading({ index: index + 1, total: files.length });
+        const readable = await parseFile(file);
+        if (readable === null) return;
+        if (!readable.trim()) {
+          toast.error(
+            `The parser found no text in ${file.name}. Try another parser.`,
+          );
+          return;
+        }
+        texts.push(readable);
+        names.push(file.name);
+      }
+    } else {
+      if (!documentText.trim()) {
+        toast.error("Please provide document text");
+        return;
+      }
+      texts.push(documentText);
+      names.push("Pasted text");
     }
 
     setIsLoading(true);
@@ -384,7 +450,7 @@ export default function ExtractorPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            documents: [text],
+            documents: texts,
             user_requirements: userRequirements,
             include_sources: includeSources,
             fields: Object.fromEntries(
@@ -408,7 +474,7 @@ export default function ExtractorPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            documents: [text],
+            documents: texts,
             user_requirements: task,
             schema_id: current.schema_id,
             include_sources: includeSources,
@@ -422,22 +488,35 @@ export default function ExtractorPage() {
         throw new Error(error?.detail ?? "Failed to extract data");
       }
       const data = (await response.json()) as ExtractResult;
-      // A PDF can show where each quote is: the quotes are located in it.
-      if (
-        data.sources &&
-        inputMode === "file" &&
-        file?.name.toLowerCase().endsWith(".pdf") &&
-        data.raw_sources?.[0]
-      ) {
-        data.sources = (await traceInPdf(file, data)) ?? data.sources;
+      // A PDF can show where each quote is: each document's quotes are located in it.
+      if (data.sources || data.document_sources) {
+        const perDocument = data.document_sources ?? [data.sources ?? null];
+        data.document_sources = await Promise.all(
+          perDocument.map(async (checked, index) => {
+            const pdf = inputMode === "file" ? files[index] : undefined;
+            const raw = data.raw_sources?.[index];
+            if (!pdf || !pdf.name.toLowerCase().endsWith(".pdf") || !raw) {
+              return checked;
+            }
+            const located = await traceInPdf(
+              pdf,
+              raw,
+              data.results[index] ?? {},
+            );
+            return located ?? checked;
+          }),
+        );
+        data.sources = data.document_sources[0] ?? data.sources;
       }
       setResult(data);
+      setResultNames(names);
       setResultSchema(usedSchema);
       setSeconds((performance.now() - started) / 1000);
       posthog.capture("data_extracted", {
         input_mode: inputMode,
         extraction_mode: mode,
         parser: inputMode === "file" ? parserType : null,
+        documents_count: texts.length,
         example: exampleId,
         results_count: data.results?.length || 0,
       });
@@ -521,9 +600,10 @@ export default function ExtractorPage() {
         <div className="grid items-start gap-6 md:gap-8 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>1. The document</CardTitle>
+              <CardTitle>1. The documents</CardTitle>
               <CardDescription>
-                Upload a file and choose how it is read, or paste the text.
+                Upload one or several files and choose how they are read, or
+                paste the text of one document.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -548,15 +628,12 @@ export default function ExtractorPage() {
                   />
                 </TabsContent>
                 <TabsContent value="file" className="space-y-4">
-                  <FileUpload
-                    accept={ACCEPTED_FILES}
-                    maxSize={20}
-                    file={file}
-                    onFileSelect={(next) => {
-                      setFile(next);
+                  <DocumentUpload
+                    files={files}
+                    onChange={(next) => {
+                      setFiles(next);
                       setExampleId(null);
                     }}
-                    onFileRemove={() => setFile(null)}
                     disabled={busy}
                   />
 
@@ -757,7 +834,7 @@ export default function ExtractorPage() {
                   <Sparkles className="mr-2 h-4 w-4" />
                 )}
                 {isParsing
-                  ? "Reading the document…"
+                  ? readingMessage
                   : isLoading
                     ? phase === "schema"
                       ? "Generating schema…"
@@ -813,7 +890,7 @@ export default function ExtractorPage() {
             <LoadingCard
               message={
                 isParsing
-                  ? "Reading the document…"
+                  ? readingMessage
                   : phase === "schema"
                     ? "Designing the extraction schema…"
                     : "Extracting data…"
@@ -831,14 +908,24 @@ export default function ExtractorPage() {
               results={result.results}
               documentCount={result.document_count}
               seconds={seconds}
+              labels={resultNames.length > 1 ? resultNames : undefined}
               defaultTab={result.sources ? "sources" : "readable"}
               extraTabs={[
-                ...(result.sources
+                ...(result.document_sources || result.sources
                   ? [
                       {
                         value: "sources",
                         label: "Sources",
-                        content: <SourcesView result={result.sources} />,
+                        content: (
+                          <DocumentSources
+                            names={resultNames}
+                            sources={
+                              result.document_sources ?? [
+                                result.sources ?? null,
+                              ]
+                            }
+                          />
+                        ),
                       },
                     ]
                   : []),

@@ -175,3 +175,49 @@ export function cellText(value: unknown): string {
   if (isRecord(value)) return JSON.stringify(value);
   return String(value);
 }
+
+// ---------------------------------------------------------------------------
+// Several documents
+// ---------------------------------------------------------------------------
+
+/** How many documents one extraction reads, and how large each may be. */
+export const MAX_DOCUMENTS = 5;
+export const MAX_DOCUMENT_MB = 20;
+
+const sameFile = (a: File, b: File) =>
+  a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
+
+/**
+ * Adds chosen files to those already in the list. A file of another type, a file that is
+ * too large, one that is already there, and those beyond the limit are left out; each is
+ * named in `rejected`, so the person can see why.
+ */
+export function addDocuments(
+  current: File[],
+  incoming: File[],
+  options: { accept?: string; maxFiles?: number; maxMb?: number } = {},
+): { files: File[]; rejected: string[] } {
+  const {
+    accept = ACCEPTED_FILES,
+    maxFiles = MAX_DOCUMENTS,
+    maxMb = MAX_DOCUMENT_MB,
+  } = options;
+  const types = accept.split(",").map((type) => type.trim().toLowerCase());
+  const files = [...current];
+  const rejected: string[] = [];
+  for (const file of incoming) {
+    const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
+    if (!types.includes(extension)) {
+      rejected.push(`${file.name}: this file type is not supported`);
+    } else if (file.size > maxMb * 1024 * 1024) {
+      rejected.push(`${file.name}: larger than ${maxMb} MB`);
+    } else if (files.some((existing) => sameFile(existing, file))) {
+      rejected.push(`${file.name}: already added`);
+    } else if (files.length >= maxFiles) {
+      rejected.push(`${file.name}: at most ${maxFiles} documents`);
+    } else {
+      files.push(file);
+    }
+  }
+  return { files, rejected };
+}

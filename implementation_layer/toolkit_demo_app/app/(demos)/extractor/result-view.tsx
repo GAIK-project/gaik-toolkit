@@ -264,6 +264,7 @@ export function ResultView({
   noun = "document",
   extraTabs = [],
   defaultTab = "readable",
+  labels,
   children,
 }: {
   results: Record<string, unknown>[];
@@ -279,6 +280,8 @@ export function ResultView({
   extraTabs?: ExtraTab[];
   /** The tab open first: "readable", "json" or the value of an extra tab. */
   defaultTab?: string;
+  /** The title of each result, for example the name of the document it was read from. */
+  labels?: string[];
   /** Shown under the summary bar, for example the token usage. */
   children?: ReactNode;
 }) {
@@ -379,9 +382,10 @@ export function ResultView({
                 <Card key={index} className="overflow-hidden shadow-sm">
                   <CardHeader className="bg-muted/40 flex flex-row items-center gap-2 space-y-0 border-b px-5 py-3">
                     <CardTitle className="text-base">
-                      {results.length > 1
-                        ? `Result ${index + 1}`
-                        : "Extracted data"}
+                      {labels?.[index] ??
+                        (results.length > 1
+                          ? `Result ${index + 1}`
+                          : "Extracted data")}
                     </CardTitle>
                     <span className="text-muted-foreground ml-auto text-xs">
                       {found} of {total} fields found
