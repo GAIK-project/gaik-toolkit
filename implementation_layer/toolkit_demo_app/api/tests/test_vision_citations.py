@@ -25,7 +25,8 @@ EXAMPLES = Path(__file__).parent.parent.parent / "public" / "vision-extractor-ex
         (1234, "Total: 1 234 EUR", "match"),
         ("010", "010 6061-T6 Aluminium Alloy Round Bar", "match"),
         (6061, "010 6061-T6 Aluminium Alloy Round Bar", "match"),
-        ("7200-4453-21", "PURCHASE NO: 7200445321", "mismatch"),
+        ("7200-4453-21", "PURCHASE NO: 7200445321", "match"),
+        ("7200-4453-22", "PURCHASE NO: 7200445321", "mismatch"),
         ("2025-10-12", "PO Date: October 12, 2025", "match"),
         ("2025-04-11", "11.04.2025", "match"),
         ("2025-04-12", "11.04.2025", "mismatch"),
@@ -207,6 +208,87 @@ async def test_text_extraction_with_sources_asks_for_them_and_checks_the_text() 
     assert response.results == [{"total": 1234.5}]
     assert response.sources["sources"][0]["status"] == "found"
     assert response.raw_sources[0]["items"][0]["quote"] == "Total: 1.234,50"
+
+
+def test_a_formatted_identifier_matches_the_document_s_own_spelling() -> None:
+    # The task asked for 7200-4453-21; the document, and so the quote, has 7200445321.
+    assert citations.value_status("7200-4453-21", "PURCHASE NO: 7200445321") == "match"
+    assert citations.value_status("7200-4453-21", "PURCHASE NO: 7200445322") == "mismatch"
+    # A prefix or a piece of the identifier is another value, not a formatting of it.
+    assert citations.value_status("7200-4453", "PURCHASE NO: 7200445321") == "mismatch"
+    assert citations.value_status("4453-21", "PURCHASE NO: 7200445321") == "mismatch"
+    # Several words of the quote can spell the value: 7200 4453 21 for 7200445321.
+    assert citations.value_status("7200445321", "PO 7200 4453 21") == "match"
+    # Three groups of digits are a date only when they can be a year, a month and a day.
+    assert citations.value_status("2025-04-11", "Date 11.04.2025") == "match"
+    assert citations.value_status("2025-04-11", "Date 12.04.2025") == "mismatch"
+
+
+def test_a_value_longer_than_its_quote_is_checked_against_the_page_text() -> None:
+    page = "010 6061-T6 Aluminium Alloy Round Bar O 12.700 (+/- 0.038) x 3658 mm Mill Length"
+    data = {"description": "6061-T6 Aluminium Alloy Round Bar; O 12.700 (+/- 0.038) x 3658 mm"}
+    raw = {
+        "items": [
+            {
+                "field": "description",
+                "document": 1,
+                "page": 1,
+                "quote": "6061-T6 Aluminium Alloy Round Bar",
+            }
+        ]
+    }
+    result = citations.check_text_sources(raw, data, page)
+    assert result["sources"][0]["value_status"] == "match"
+
+    wrong = {"description": "6061-T6 Aluminium Alloy Round Bar; O 99.000 mm"}
+    result = citations.check_text_sources(raw, wrong, page)
+    assert result["sources"][0]["value_status"] == "mismatch"
+
+    # The value's words elsewhere on the page are not evidence for it: it must run through
+    # the quote.
+    elsewhere = page + " Note Special Handling Required"
+    other = {"description": "Special Handling Required"}
+    result = citations.check_text_sources(raw, other, elsewhere)
+    assert result["sources"][0]["value_status"] == "mismatch"
+
+
+def test_a_value_longer_than_its_quote_is_located_in_the_pdf(tmp_path) -> None:
+    import fitz
+
+    pdf = fitz.open()
+    sheet = pdf.new_page()
+    sheet.insert_text((72, 72), "6061-T6 Aluminium Alloy Round Bar")
+    sheet.insert_text((72, 90), "O 12.700 mm Mill Length")
+    path = tmp_path / "po.pdf"
+    pdf.save(path)
+    raw = {
+        "items": [
+            {
+                "field": "description",
+                "document": 1,
+                "page": 1,
+                "quote": "6061-T6 Aluminium Alloy Round Bar",
+            }
+        ]
+    }
+    data = {"description": "6061-T6 Aluminium Alloy Round Bar; O 12.700 mm"}
+
+    result = citations.check_sources(
+        raw, data, [citations.UploadedDocument("po.pdf", path)], cited_pages=False
+    )
+    source = result["sources"][0]
+    assert source["status"] == "found" and source["value_status"] == "match"
+    assert len(source["value_rects"]) >= 2
+
+    sheet.insert_text((72, 140), "Note Special Handling Required")
+    pdf.save(path)
+    result = citations.check_sources(
+        raw,
+        {"description": "Special Handling Required"},
+        [citations.UploadedDocument("po.pdf", path)],
+        cited_pages=False,
+    )
+    assert result["sources"][0]["value_status"] == "mismatch"
 
 
 @pytest.mark.asyncio

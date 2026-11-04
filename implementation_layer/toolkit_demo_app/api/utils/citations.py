@@ -154,12 +154,29 @@ def _as_number(value: Any) -> float | None:
     return None
 
 
+def _plausible_date(parts: list[int]) -> bool:
+    """Whether three numbers can be a year, a month and a day, in any order."""
+    for year in range(3):
+        month, day = (parts[i] for i in range(3) if i != year)
+        if not (1000 <= parts[year] <= 2999 or parts[year] < 100):
+            continue
+        # Day and month may come in either order: both fit in 1-31 and one is a month.
+        if 1 <= month <= 31 and 1 <= day <= 31 and min(month, day) <= 12:
+            return True
+    return False
+
+
 def _date_parts(value: str) -> list[int] | None:
-    """Year, month and day of a date-like value such as 2025-04-11 or 04/11/2025."""
+    """Year, month and day of a date-like value such as 2025-04-11 or 04/11/2025.
+
+    Three groups of digits with separators are not always a date: a purchase order number
+    formatted as 7200-4453-21 is not, and is compared as text instead.
+    """
     parts = _DATE_PARTS.findall(value)
     if len(parts) != 3 or not re.fullmatch(r"[\d\s./-]+", value.strip()):
         return None
-    return [int(part) for part in parts]
+    numbers = [int(part) for part in parts]
+    return numbers if _plausible_date(numbers) else None
 
 
 ValueStatus = Literal["match", "mismatch", "unchecked"]
@@ -185,7 +202,27 @@ def value_status(value: Any, quote: str) -> ValueStatus:
         return "unchecked"
     if _find(tokens(quote), wanted) is not None:
         return "match"
+    # The same characters with other separators: an identifier the task asked to format
+    # (7200-4453-21 for 7200445321). The quote holds the document's own spelling.
+    # It must equal whole words of the quote: a prefix of an identifier is another value.
+    if _spells(tokens(quote), "".join(wanted)):
+        return "match"
     return "unchecked" if _CODE.fullmatch(text) else "mismatch"
+
+
+def _spells(words: list[str], squeezed: str) -> bool:
+    """Whether a run of whole words, joined without separators, is exactly ``squeezed``."""
+    if len(squeezed) < 4:
+        return False
+    for start in range(len(words)):
+        joined = ""
+        for word in words[start:]:
+            joined += word
+            if joined == squeezed:
+                return True
+            if not squeezed.startswith(joined):
+                break
+    return False
 
 
 def _find(haystack: list[str], needle: list[str]) -> int | None:
@@ -262,6 +299,30 @@ def _value_span(page: _Page, start: int, length: int, value: Any) -> tuple[int, 
     if offset is None or len(wanted) >= length:
         return None
     return start + offset, len(wanted)
+
+
+def _value_around_quote(
+    haystack: list[str], value: Any, quote: list[str]
+) -> tuple[int, int] | None:
+    """Where a text value sits in the words of a page when it runs through its quote.
+
+    The model is asked for a short quote, so a value that spans several lines (a complete
+    description) is never inside it. It is still the document's own text when its words
+    follow each other on the page and take in the quote: the quote is then the evidence
+    for part of the value. The same words elsewhere on the page are not evidence for it.
+    """
+    if value is None or isinstance(value, bool | int | float | dict | list):
+        return None
+    wanted = tokens(str(value))
+    quoted = _find(haystack, quote)
+    if not wanted or quoted is None:
+        return None
+    for start in range(len(haystack) - len(wanted) + 1):
+        if haystack[start : start + len(wanted)] != wanted:
+            continue
+        if start < quoted + len(quote) and quoted < start + len(wanted):
+            return start, len(wanted)
+    return None
 
 
 def value_at(data: dict, path: str) -> Any:
@@ -365,6 +426,14 @@ def check_sources(
                 span = _value_span(target, start, len(needle), value)
                 if span is not None:
                     result["value_rects"] = _rects(target, *span)
+                elif result["value_status"] == "mismatch":
+                    # A value longer than its quote: it must run through the quote.
+                    for reading in pages[page_number - 1]:
+                        wide = _value_around_quote(reading.tokens, value, needle)
+                        if wide is not None:
+                            result["value_status"] = "match"
+                            result["value_rects"] = _rects(reading, *wide)
+                            break
                 break
             if result["status"] != "not_found":
                 if not cited_pages:
@@ -453,6 +522,9 @@ def check_text_sources(raw: Any, data: dict, text: str) -> dict:
             continue
         value = value_at(data, field)
         found = _find(haystack, tokens(quote)) is not None
+        status = value_status(value, quote)
+        if status == "mismatch" and _value_around_quote(haystack, value, tokens(quote)) is not None:
+            status = "match"
         checked.append(
             {
                 "field": field,
@@ -462,7 +534,7 @@ def check_text_sources(raw: Any, data: dict, text: str) -> dict:
                 "quote": quote,
                 "value": value,
                 "status": "found" if found else "not_found",
-                "value_status": value_status(value, quote),
+                "value_status": status,
                 "rects": [],
                 "value_rects": [],
             }
