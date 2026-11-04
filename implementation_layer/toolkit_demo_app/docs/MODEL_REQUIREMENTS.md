@@ -25,7 +25,9 @@ output.
 
 ## What each demo calls today
 
-The server default is Azure OpenAI deployment `gpt-6.1-sol`.
+The server default is Azure OpenAI deployment `gpt-6-luna` (`AZURE_DEPLOYMENT`). A
+signed-in user can switch the demos marked "own key works" below to another server model
+from the model menu; see the README for the list and who may use the team-only models.
 
 | Demo | Models it calls |
 | --- | --- |
@@ -33,11 +35,11 @@ The server default is Azure OpenAI deployment `gpt-6.1-sol`.
 | Parser | Vision with the default model. Some options use the HH Docling API |
 | Vision extractor | Server: a menu of GPT-6 models (Responses API), Claude Sonnet and Gemini. Own key: one model, pages sent as images |
 | Luvata order | Structured output, Docling API for parsing |
-| Audio / Incident report / Diary | Speech to text (local Whisper if configured, else `gpt-4o-transcribe`), then structured output. Documents use vision |
+| Audio / Incident report / Diary | Speech to text (HH's local Whisper server first, `Finnish-NLP/whisper-large-finnish-v3` for Finnish, else `gpt-4o-transcribe`), then structured output with the picked model. Documents use vision. The result names both models |
 | Document structured | Parser (vision or Docling) then structured output |
 | Transcriber | Speech to text, Azure only (local Whisper first when configured) |
 | Dental transcription | Local Whisper service only, no LLM |
-| Text to speech | `tts-hd` on Azure |
+| Text to speech | `tts-hd` on Azure. The Nova voice is left out: the deployment answers it with HTTP 429 (2026-11-04) |
 | RAG | Embeddings `text-embedding-3-large` (the bundled example index is built with it) and plain chat |
 | Video search | Embeddings `text-embedding-3-small`, 1536 dimensions, stored in pgvector. No chat |
 | Postgres agent, Table agent | Structured output. They use Azure or OpenAI directly |

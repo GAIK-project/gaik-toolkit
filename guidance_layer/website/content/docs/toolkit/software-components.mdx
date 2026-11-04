@@ -224,7 +224,7 @@ flowchart TD
     end
 
     VE --> C("✅ Structured Data")
-    VE --> D("🔍 Optional per-field<br/>confidence scores")
+    VE --> D("🔍 Optional per-field<br/>confidence + text-layer check")
 
     style A fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
     style B fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
@@ -238,7 +238,7 @@ flowchart TD
 - Multi-document calls: align line items in a PO with quantities in a BOM in one request
 - Multi-provider: OpenAI / Azure, Anthropic Claude (Foundry), Google Gemini (Vertex AI or direct), plus CSC Aitta, OpenAI-compatible servers or optional LiteLLM through a shared `get_llm_config()` config
 - Reuses generated Pydantic schemas across runs via `schema_dir` persistence
-- Optional per-field verification: confidence score + reasoning for every scalar field
+- Optional per-field verification (`include_verification=True`): the model's own confidence score and reasoning, plus `found_in_text` and `page` from a lookup of the value in the PDF text layer. Flag values for review on `found_in_text`, not on the score: a misread value can still score 1.0
 
 **Potential applications:**
 - Purchase order processing with bill-of-materials cross-referencing
