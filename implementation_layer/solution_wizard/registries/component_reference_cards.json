@@ -1685,6 +1685,14 @@
         "effect": "Separate chat provider/model for AnswerGenerator. If omitted, the module falls back to api_config; supplying every stage avoids the legacy Azure default.",
         "selection_relevant": true,
         "infer_from": "Choose this stage from blueprint.models; credentials are read from that provider's environment at runtime."
+      },
+      {
+        "name": "parser",
+        "type": "'vision' | 'text'",
+        "default": "vision",
+        "effect": "'vision' parses PDFs with Docling and a vision model that describes images (needs gaik[rag-workflow]: docling, torch). 'text' (gaik>=0.8.10) reads the text layer of PDFs, .docx, .txt and .md with no Docling or vision model (gaik[rag-workflow-text]) and raises ValueError for a scan without a text layer.",
+        "selection_relevant": true,
+        "infer_from": "scans, figures or diagrams must be understood -> 'vision'; text-based documents -> 'text' with gaik[rag-workflow-text] in requirements"
       }
     ],
     "note": "End-to-end module: embeds, stores in an internal Chroma VectorStore, retrieves, and answers. Do NOT also add Embedder / Retriever / AnswerGenerator as separate steps. PgVectorStore is a separate PostgreSQL component and is not subsumed by this module."

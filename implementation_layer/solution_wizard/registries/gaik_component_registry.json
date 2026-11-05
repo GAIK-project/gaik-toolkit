@@ -247,7 +247,8 @@
       "use_azure",
       "parser_config",
       "embedding_config",
-      "answer_config"
+      "answer_config",
+      "parser"
     ],
     "supported_providers": [
       "openai",
@@ -277,7 +278,7 @@
       "Initial indexing required before querying",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "Select an available embedding model/deployment separately from the chat model. Anthropic/Foundry has no native embeddings API; Aitta, compatible endpoints and LiteLLM require an explicit embedding model. Rebuild the index after changing provider, model or vector dimensions.",
-      "Always parses with VisionRagParser (Docling layout + a vision model for images; the rag-workflow extra pulls docling and torch) and takes no other parser. Choose it only when image-aware parsing (scans, figures, diagrams) is required; for text-layer PDFs compose a text parser such as PyMuPDFParser with Embedder, Retriever and AnswerGenerator instead."
+      "The default parser='vision' parses PDFs with VisionRagParser (Docling layout + a vision model for images; the rag-workflow extra pulls docling and torch). parser='text' (gaik>=0.8.10, extra rag-workflow-text) reads the text layer without them, but the wizard's RAG template and install_extra use the vision default: choose RAGWorkflow only when image-aware parsing (scans, figures, diagrams) is required, and for text-layer PDFs compose a text parser such as PyMuPDFParser with Embedder, Retriever and AnswerGenerator."
     ],
     "best_for": [
       "document_qa",
