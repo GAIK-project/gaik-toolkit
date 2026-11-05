@@ -1,5 +1,8 @@
 """
-RAG workflow: vision parser -> embedder -> vector store -> retriever -> answer generator.
+RAG workflow: parser -> embedder -> vector store -> retriever -> answer generator.
+
+The parser is ``"vision"`` (default: Docling layout plus a vision model for images) or
+``"text"`` (the document's own text layer, with no Docling and no vision model).
 """
 
 from __future__ import annotations
@@ -7,11 +10,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.RAG.answer_generator import AnswerGenerator
 from gaik.software_components.RAG.embedder import Embedder
-from gaik.software_components.RAG.rag_parser_vision import VisionRagParser
 from gaik.software_components.RAG.retriever import Retriever
 from gaik.software_components.RAG.vector_store import VectorStore
 
@@ -19,6 +22,16 @@ try:
     from langchain_core.documents import Document
 except ImportError:  # pragma: no cover - optional dependency
     Document = None  # type: ignore[assignment]
+
+# The vision parser needs Docling, torch and transformers, which a text-only install
+# (gaik[rag-workflow-text]) lacks. Any failure to import them (a missing package, or a
+# torch DLL that does not load) leaves parser="text" usable and is reported on use.
+_vision_import_error: Exception | None = None
+try:
+    from gaik.software_components.RAG.rag_parser_vision import VisionRagParser
+except Exception as exc:  # noqa: BLE001  # pragma: no cover - depends on the environment
+    VisionRagParser = None  # type: ignore[assignment,misc]
+    _vision_import_error = exc
 
 
 @dataclass
@@ -35,13 +48,14 @@ class RAGWorkflowResult:
 
 
 class RAGWorkflow:
-    """End-to-end RAG workflow using vision parsing and re-ranked retrieval."""
+    """End-to-end RAG workflow: parse, embed, store, retrieve and answer."""
 
     def __init__(
         self,
         *,
         api_config: dict | None = None,
         use_azure: bool = True,
+        parser: Literal["vision", "text"] = "vision",
         parser_config: dict | None = None,
         embedding_config: dict | None = None,
         answer_config: dict | None = None,
@@ -64,7 +78,14 @@ class RAGWorkflow:
         Args:
             api_config: OpenAI/Azure config. If None, built via get_openai_config(use_azure).
             use_azure: Whether to build default config for Azure (ignored if api_config supplied).
-            parser_config: Optional separate config for the vision model.
+            parser: How documents become chunks. ``"vision"`` (default) parses PDFs with
+                VisionRagParser: Docling layout plus a vision model that describes
+                images; it needs the ``rag-workflow`` extra (Docling, torch).
+                ``"text"`` reads the text layer of PDFs, and Word, text and Markdown
+                files, with no Docling and no vision model (``rag-workflow-text``
+                extra); a scanned PDF without a text layer raises ValueError.
+            parser_config: Optional separate config for the vision model (``parser="vision"``
+                only).
             embedding_config: Optional separate config for the embedding provider.
             answer_config: Optional separate config for the answer generation provider.
             persist: If True, use persistent Chroma vector store.
@@ -80,10 +101,14 @@ class RAGWorkflow:
             conversation_history: Maintain last n Q/A pairs.
             last_n: Number of Q/A pairs to keep if conversation_history is True.
         """
+        if parser not in ("vision", "text"):
+            raise ValueError(f"parser must be 'vision' or 'text', not {parser!r}")
+        self.parser_kind = parser
         self.api_config = api_config
-        if self.api_config is None and any(
-            config is None for config in (parser_config, embedding_config, answer_config)
-        ):
+        stage_configs = (embedding_config, answer_config)
+        if parser == "vision":
+            stage_configs += (parser_config,)
+        if self.api_config is None and any(config is None for config in stage_configs):
             self.api_config = get_openai_config(use_azure=use_azure)
         self.parser_config = parser_config if parser_config is not None else self.api_config
         self.embedding_config = (
@@ -91,7 +116,17 @@ class RAGWorkflow:
         )
         self.answer_config = answer_config if answer_config is not None else self.api_config
 
-        self.parser = VisionRagParser(vision_config=self.parser_config)
+        if parser == "text":
+            from .text_parser import TextRagParser
+
+            self.parser = TextRagParser()
+        else:
+            if VisionRagParser is None:
+                raise ImportError(
+                    "parser='vision' needs pip install 'gaik[rag-workflow]'; "
+                    "parser='text' needs only 'gaik[rag-workflow-text]'"
+                ) from _vision_import_error
+            self.parser = VisionRagParser(vision_config=self.parser_config)
         self.embedder = Embedder(config=self.embedding_config, model=embedding_model)
         self.vector_store = VectorStore(
             persist=persist,
@@ -123,7 +158,8 @@ class RAGWorkflow:
         """Parse and index documents into the vector store.
 
         Args:
-            file_paths: List of paths to PDF files to index.
+            file_paths: Paths to the files to index: PDFs, or with ``parser="text"``
+                also Word (.docx), text and Markdown files.
             filenames: Optional list of original filenames (same order as file_paths).
                        If provided, these names are used instead of extracting from paths.
         """
@@ -131,9 +167,12 @@ class RAGWorkflow:
 
         for i, file_path in enumerate(file_paths):
             doc_name = filenames[i] if filenames and i < len(filenames) else None
-            chunks = self.parser.convert_doc_to_chunks_with_vision(
-                str(file_path), document_name=doc_name
-            )
+            if self.parser_kind == "text":
+                chunks = self.parser.convert_doc_to_chunks(file_path, document_name=doc_name)
+            else:
+                chunks = self.parser.convert_doc_to_chunks_with_vision(
+                    str(file_path), document_name=doc_name
+                )
             all_chunks.extend(chunks)
 
         embeddings, documents = self.embedder.embed(all_chunks)

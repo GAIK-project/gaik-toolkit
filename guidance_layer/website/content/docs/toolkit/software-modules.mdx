@@ -180,7 +180,7 @@ flowchart TD
 
         subgraph IDX["Phase 1 · Indexing"]
             direction LR
-            P["RAG Parser<br/>Vision-based"] --> E["Embedder<br/>Generate vectors"] --> V["Vector Store<br/>ChromaDB"]
+            P["RAG Parser<br/>Vision or text"] --> E["Embedder<br/>Generate vectors"] --> V["Vector Store<br/>ChromaDB"]
         end
 
         subgraph QRY["Phase 2 · Query & Answer"]
@@ -221,6 +221,7 @@ flowchart TD
 
 **Key features:**
 - Two-phase workflow: index once, query many times
+- Two parsers: `parser="vision"` (default) uses Docling layout and a vision model for scans, figures and diagrams; `parser="text"` reads the text layer of PDFs, Word, text and Markdown files with no Docling or vision model (`pip install "gaik[rag-workflow-text]"`)
 - Persistent vector store — indexed data reused across sessions
 - Configurable retrieval: top-k, score threshold, hybrid search, reranking
 - Citation support — every answer references source documents and pages

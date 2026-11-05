@@ -150,6 +150,15 @@ rag-workflow = [
     "gaik[answer-generator]",
 ]
 
+# RAG workflow with RAGWorkflow(parser="text"): the documents' own text layer,
+# without Docling, torch or a vision model. parser="vision" needs rag-workflow.
+rag-workflow-text = [
+    "gaik[parser-cpu]",
+    "gaik[embedder]",
+    "gaik[vector-store]",
+    "gaik[answer-generator]",
+]
+
 # Audio/video transcription (sequential, PyDub-based)
 transcriber = [
     "pydub>=0.25.1",

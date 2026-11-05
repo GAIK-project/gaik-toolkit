@@ -1,15 +1,26 @@
 # RAG Workflow
 
 End-to-end RAG workflow:
-vision parser -> embedder -> vector store -> retriever -> answer generator.
+parser -> embedder -> vector store -> retriever -> answer generator.
 
 ## Installation
 
 ```bash
-pip install gaik[rag-workflow]
+pip install gaik[rag-workflow]        # parser="vision" (default): Docling + a vision model
+pip install gaik[rag-workflow-text]   # parser="text": the text layer only, no Docling or torch
 ```
 
-**Note:** Requires a vision model, an embedding provider, a chat model, and Chroma for persistence. These stages can use different providers.
+**Note:** Requires an embedding provider, a chat model, and Chroma for persistence, plus a vision model with the default parser. These stages can use different providers.
+
+## Choosing the parser
+
+| `parser` | Reads | Needs | Use when |
+|---|---|---|---|
+| `"vision"` (default) | PDFs, with Docling layout and a vision model describing images and figures | `gaik[rag-workflow]` (Docling, torch) and a vision-capable model | Scans, figures, diagrams or charts must be understood |
+| `"text"` | The text layer of PDFs, and Word (.docx), text and Markdown files | `gaik[rag-workflow-text]` | Text-based documents; faster, cheaper and no model call while indexing |
+
+`parser="text"` keeps the page number of each PDF chunk for citations and raises a
+`ValueError` for a PDF without a text layer (a scan): use `parser="vision"` there.
 
 ---
 
@@ -18,7 +29,7 @@ pip install gaik[rag-workflow]
 ```python
 from gaik.software_modules.RAG_workflow import RAGWorkflow
 
-workflow = RAGWorkflow()
+workflow = RAGWorkflow()                 # or RAGWorkflow(parser="text")
 workflow.index_documents(["document.pdf"])
 
 result = workflow.ask("What is the total amount?", stream=False)
@@ -29,7 +40,8 @@ print(result.answer)
 
 ## Features
 
-- **Vision Parsing** - Extracts text and image descriptions
+- **Vision Parsing** - Extracts text and image descriptions (default)
+- **Text Parsing** - `parser="text"` reads the text layer without Docling or a vision model
 - **Persistent Vector Store** - Chroma-backed storage
 - **Re-ranked Retrieval** - Optional cross-encoder reranking
 - **Citations** - Optional citation formatting
@@ -45,6 +57,7 @@ print(result.answer)
 workflow = RAGWorkflow(
     api_config: dict | None = None,
     use_azure: bool = True,
+    parser: Literal["vision", "text"] = "vision",
     parser_config: dict | None = None,
     embedding_config: dict | None = None,
     answer_config: dict | None = None,
