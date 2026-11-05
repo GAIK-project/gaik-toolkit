@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from gaik.software_components.source_normalizer.models import NormalizedSources
 
 from .models import SectionSpec
@@ -103,15 +105,30 @@ Extract the fact units of the section "{section.title}" from the sources above, 
 the required items that no source covers, and record the conflicts between sources."""
 
 
-def build_retry_prompt(failures: list[str]) -> str:
-    """Return the feedback that asks again for a section whose quotes failed the check."""
-    listed = "\n".join(f"- {failure}" for failure in failures)
-    return f"""These units failed the quote check:
+def build_retry_prompt(failures: list[str], conflict_failures: Sequence[str] = ()) -> str:
+    """Return the feedback that asks again for a section whose quotes or conflicts failed
+    the check."""
+    parts = []
+    if failures:
+        listed = "\n".join(f"- {failure}" for failure in failures)
+        parts.append(f"""These units failed the quote check:
 {listed}
 
 Quotes must be copied verbatim, letter for letter, from the cited source, and \
-source.file must be the file attribute of that source exactly. Return the whole section \
-again. Fix each failing unit by copying the exact words from its source; drop a unit only \
-if no exact words support it, and then list its required item as missing if no other \
-unit covers it. Keep the other units, and update the conflict positions to match the new \
-list of units."""
+source.file must be the file attribute of that source exactly. Fix each failing unit by \
+copying the exact words from its source; drop a unit only if no exact words support it, \
+and then list its required item as missing if no other unit covers it.""")
+    if conflict_failures:
+        listed = "\n".join(f"- {failure}" for failure in conflict_failures)
+        parts.append(f"""These conflicts refer to units that do not exist:
+{listed}
+
+A conflict lists its units by their 1-based position in units, and every position must \
+be a unit. Fix each failing conflict so that it lists the units that state each side. If \
+a side has no unit, add one quoting its source exactly, or remove the conflict if no \
+source states that side.""")
+    parts.append(
+        "Return the whole section again. Keep the other units, and update the conflict "
+        "positions to match the new list of units."
+    )
+    return "\n\n".join(parts)

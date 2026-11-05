@@ -145,7 +145,11 @@ for unit in knowledge.dropped:  # DroppedUnit: section_id, topic, summary, quote
 - `KnowledgeCurator(config, drop_unverified=False)` restores the strict behaviour:
   `curate()` raises `ValueError` naming the section and the quotes.
 
-A conflict that refers to a unit that does not exist always raises `ValueError`.
+A conflict that refers to a unit that does not exist is part of the same retry, with the
+bad positions as feedback. If it still does after the retry, the bad positions are left
+out and the conflict is removed if fewer than two units are left; the change is logged as
+a warning and reported to `progress_callback`. With `drop_unverified=False`, `curate()`
+raises `ValueError` instead.
 
 ## Editing knowledge files
 
