@@ -2268,7 +2268,7 @@
         "name": "drop_unverified",
         "type": "bool",
         "default": true,
-        "effect": "What happens when a fact's quote still is not in its cited source after the one retry. True: the failing facts are dropped, the rest of the section is kept and the drops are listed in KnowledgeBase.dropped. False: curate() raises ValueError naming the section and the quotes. A dropped fact can be a true one whose quote was copied wrongly, so the knowledge can be smaller than the sources support.",
+        "effect": "What happens when a fact's quote still is not in its cited source after the one retry. True: the failing facts are dropped, the rest of the section is kept and the drops are listed in KnowledgeBase.dropped. A conflict that still points at a unit that does not exist after the retry loses that reference, and is removed if fewer than two units are left. False: curate() raises ValueError naming the section and the quotes or the bad conflict positions. A dropped fact can be a true one whose quote was copied wrongly, so the knowledge can be smaller than the sources support.",
         "selection_relevant": true,
         "infer_from": "requirements say every fact must be verified and an incomplete result is worse than a failed run (audit, legal, due diligence) -> False; otherwise leave True and have the PoC report knowledge.dropped"
       },

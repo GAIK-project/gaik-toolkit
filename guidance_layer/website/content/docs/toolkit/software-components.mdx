@@ -908,7 +908,7 @@ flowchart TD
 **Key features:**
 - `KnowledgeCurator(config, model=None, *, max_workers=4, chat_options=None, drop_unverified=True)` and `curate(sources, sections, *, instructions="")`: one structured-output call per section, run in parallel
 - Sections are `SectionSpec` objects with an id, a title, instructions and required items. Sections with `depends_on` are derived and are not curated
-- Verified quotes: a quote must occur in its cited source, and only whitespace may differ. A failing section is requested again once with the failing quotes as feedback; if a quote still fails, that fact is dropped, the rest of the section is kept and the dropped facts are listed in `KnowledgeBase.dropped`. With `drop_unverified=False`, `curate()` raises `ValueError` instead
+- Verified quotes: a quote must occur in its cited source, and only whitespace may differ. A failing section is requested again once with the failing quotes as feedback; if a quote still fails, that fact is dropped, the rest of the section is kept and the dropped facts are listed in `KnowledgeBase.dropped`. A conflict that refers to a unit that does not exist gets the same retry; if it still does, the bad reference is left out and a conflict left with fewer than two units is removed. With `drop_unverified=False`, `curate()` raises `ValueError` instead
 - Locators: `page N` for PDFs, `sheet <name>, row <n>` for spreadsheets, the nearest heading for other structured documents, and null for recordings and plain text
 - Editable output: `save()` writes one JSON file per section. `KnowledgeBase.load()` validates edited files and `verify_quotes(sources)` checks the quotes again
 - Texts that already exist can be wrapped with `NormalizedSources.from_texts(...)`, so the Source Normalizer is optional

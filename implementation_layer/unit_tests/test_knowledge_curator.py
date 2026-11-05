@@ -302,17 +302,25 @@ def test_a_retry_that_fixes_the_quotes_drops_nothing(fake):
     assert _curate([SectionSpec(id="a", title="A")]).dropped == []
 
 
-def test_dropping_still_rejects_an_out_of_range_conflict(fake):
+def test_dropping_ignores_an_out_of_range_conflict_reference(fake):
     conflict = kc.CuratedConflict(
-        topic="t", description="d", status="unresolved", unit_numbers=[1, 3]
+        topic="t", description="d", status="unresolved", unit_numbers=[2, 3, 4]
     )
     bad = _answer(
-        _unit("The unit shakes"), _unit("The supply-air unit vibrates"), conflicts=[conflict]
+        _unit("The unit shakes"),
+        _unit("The supply-air unit vibrates"),
+        _unit("Mechanical ventilation installed in 1998.", file="report.pdf"),
+        conflicts=[conflict],
     )
-    fake({"a": [bad, bad]})
+    client = fake({"a": [bad, bad]})
 
-    with pytest.raises(ValueError, match=r"'a'.*\[3\]"):
-        _curate([SectionSpec(id="a", title="A")])
+    knowledge = _curate([SectionSpec(id="a", title="A")])
+
+    assert len(client.calls) == 2
+    assert "The unit shakes" in client.calls[1][1][-1]["content"]
+    assert "[4]" in client.calls[1][1][-1]["content"]
+    assert [c.unit_ids for c in knowledge.get("a").conflicts] == [["a-01", "a-02"]]
+    assert len(knowledge.dropped) == 1
 
 
 def test_dropped_units_are_not_saved(fake, tmp_path):
@@ -326,13 +334,60 @@ def test_dropped_units_are_not_saved(fake, tmp_path):
     assert "dropped" not in (tmp_path / "a.json").read_text(encoding="utf-8")
 
 
-def test_out_of_range_conflict_index_raises(fake):
-    conflict = kc.CuratedConflict(
-        topic="t", description="d", status="unresolved", unit_numbers=[1, 2]
+TWO_SIDES = (
+    _unit("The supply-air unit vibrates"),
+    _unit("Mechanical ventilation installed in 1998.", file="report.pdf"),
+)
+
+
+def _conflict(*numbers: int) -> kc.CuratedConflict:
+    return kc.CuratedConflict(
+        topic="supplier spend", description="d", status="unresolved", unit_numbers=list(numbers)
     )
-    fake({"a": [_answer(_unit("The supply-air unit vibrates"), conflicts=[conflict])]})
-    with pytest.raises(ValueError, match=r"'a'.*\[2\]"):
-        _curate([SectionSpec(id="a", title="A")])
+
+
+def test_out_of_range_conflict_is_retried_with_feedback(fake):
+    bad = _answer(*TWO_SIDES, conflicts=[_conflict(1, 3)])
+    fixed = _answer(*TWO_SIDES, conflicts=[_conflict(1, 2)])
+    client = fake({"a": [bad, fixed]})
+
+    knowledge = _curate([SectionSpec(id="a", title="A")])
+
+    assert len(client.calls) == 2
+    retry = client.calls[1][1][-1]["content"]
+    assert 'conflict "supplier spend" refers to unit positions [3]' in retry
+    assert "1-based position" in retry
+    assert "quote check" not in retry
+    assert knowledge.get("a").conflicts[0].unit_ids == ["a-01", "a-02"]
+    assert knowledge.dropped == []
+
+
+def test_out_of_range_reference_is_removed_after_the_retry(fake):
+    # The UC04 failure: one conflict cites a position past the last unit.
+    bad = _answer(*TWO_SIDES, conflicts=[_conflict(1, 2, 3), _conflict(2, 22), _conflict(0)])
+    client = fake({"a": [bad, bad], "b": [GOOD]})
+    messages: list[str] = []
+
+    knowledge = _curate(
+        [SectionSpec(id="a", title="Alpha"), SectionSpec(id="b", title="B")],
+        progress_callback=messages.append,
+    )
+
+    assert len(client.calls) == 3  # one retry, no third attempt
+    a = knowledge.get("a")
+    assert [u.id for u in a.units] == ["a-01", "a-02"]
+    assert [c.unit_ids for c in a.conflicts] == [["a-01", "a-02"]]
+    assert knowledge.get("b").units[0].quote == GOOD.units[0].quote
+    assert knowledge.dropped == []
+    assert "Removed references to missing units from 3 conflict(s) of Alpha" in messages
+
+
+def test_out_of_range_conflict_raises_after_the_retry_when_not_dropping(fake):
+    bad = _answer(*TWO_SIDES, conflicts=[_conflict(1, 22)])
+    client = fake({"a": [bad, bad]})
+    with pytest.raises(ValueError, match=r"'a'.*\[22\].*2 units"):
+        _curate([SectionSpec(id="a", title="A")], drop_unverified=False)
+    assert len(client.calls) == 2
 
 
 def test_client_exception_propagates(fake):

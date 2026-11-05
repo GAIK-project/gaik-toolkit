@@ -108,22 +108,33 @@ def _failing_units(
     return failures
 
 
+def _failing_conflicts(answer: CurationResponse) -> list[str]:
+    """A message for every conflict that refers to a unit position that does not exist."""
+    count = len(answer.units)
+    failures = []
+    for c in answer.conflicts:
+        bad = [n for n in c.unit_numbers if not 1 <= n <= count]
+        if bad:
+            failures.append(
+                f'conflict "{c.topic}" refers to unit positions {bad}, '
+                f"but the section has {count} units"
+            )
+    return failures
+
+
 def _check_conflicts(section: SectionSpec, answer: CurationResponse) -> None:
     """Raise ``ValueError`` if a conflict refers to a unit position that does not exist."""
-    for c in answer.conflicts:
-        bad = [n for n in c.unit_numbers if not 1 <= n <= len(answer.units)]
-        if bad:
-            raise ValueError(
-                f"Section {section.id!r}: conflict {c.topic!r} refers to unit positions {bad}, "
-                f"but the section has {len(answer.units)} units"
-            )
+    failures = _failing_conflicts(answer)
+    if failures:
+        raise ValueError(f"Section {section.id!r}: {'; '.join(failures)}")
 
 
 def _without_units(answer: CurationResponse, dropped: set[int]) -> CurationResponse:
     """The answer without the units at the 1-based positions ``dropped``.
 
-    Conflicts are renumbered to the remaining units; a conflict left with fewer than two
-    units has no two sides any more and is removed. Positions must have been checked.
+    Conflicts are renumbered to the remaining units, and positions that are not a unit are
+    left out; a conflict left with fewer than two units has no two sides any more and is
+    removed.
     """
     kept = [n for n in range(1, len(answer.units) + 1) if n not in dropped]
     renumber = {old: new for new, old in enumerate(kept, start=1)}
@@ -182,7 +193,9 @@ class KnowledgeCurator:
                 `reasoning_effort` or `temperature`.
             drop_unverified: If a quote still fails the check after the retry, drop the
                 failing facts, keep the rest of the section and list them in
-                `KnowledgeBase.dropped`. With `False`, `curate()` raises `ValueError`.
+                `KnowledgeBase.dropped`. A conflict that still refers to a unit that does
+                not exist loses that reference, and is removed if fewer than two units are
+                left. With `False`, `curate()` raises `ValueError` in both cases.
         """
         self.max_workers = max_workers
         self.drop_unverified = drop_unverified
@@ -207,9 +220,9 @@ class KnowledgeCurator:
                 possibly from a worker thread. An exception it raises stops the run.
 
         Raises:
-            ValueError: If there are no sources or no section to curate, a conflict
-                refers to a unit that does not exist, or, with `drop_unverified=False`,
-                a quote still fails the check after one retry.
+            ValueError: If there are no sources or no section to curate, or, with
+                `drop_unverified=False`, a quote still fails the check or a conflict still
+                refers to a unit that does not exist after one retry.
         """
         check_sections(sections)
         if not sources.sources:
@@ -250,27 +263,43 @@ class KnowledgeCurator:
             messages, response_format=CurationResponse, **self.chat_options
         )
         failing = _failing_units(answer, sources)
-        if failing:
+        bad_conflicts = _failing_conflicts(answer)
+        if failing or bad_conflicts:
             failures = [message for _, _, message in failing]
-            logger.warning("Section %r: retrying after quote failures %s", section.id, failures)
+            logger.warning(
+                "Section %r: retrying after failures %s", section.id, failures + bad_conflicts
+            )
             messages = [
                 *messages,
                 {"role": "assistant", "content": answer.model_dump_json()},
-                {"role": "user", "content": build_retry_prompt(failures)},
+                {"role": "user", "content": build_retry_prompt(failures, bad_conflicts)},
             ]
             answer = self.client.chat_parsed(
                 messages, response_format=CurationResponse, **self.chat_options
             )
             failing = _failing_units(answer, sources)
-            if failing and not self.drop_unverified:
-                raise ValueError(
-                    f"Section {section.id!r}: quotes not found in their sources after one "
-                    f"retry: {[message for _, _, message in failing]}"
+            bad_conflicts = _failing_conflicts(answer)
+            if not self.drop_unverified:
+                if failing:
+                    raise ValueError(
+                        f"Section {section.id!r}: quotes not found in their sources after one "
+                        f"retry: {[message for _, _, message in failing]}"
+                    )
+                _check_conflicts(section, answer)
+        if bad_conflicts:
+            logger.warning(
+                "Section %r: removed conflict references to units that do not exist after "
+                "the retry: %s",
+                section.id,
+                bad_conflicts,
+            )
+            if progress_callback:
+                progress_callback(
+                    f"Removed references to missing units from {len(bad_conflicts)} "
+                    f"conflict(s) of {section.title}"
                 )
         dropped: list[DroppedUnit] = []
         if failing:
-            # Range-check before the positions change, so a bad conflict still raises.
-            _check_conflicts(section, answer)
             dropped = [
                 DroppedUnit(
                     section_id=section.id,
@@ -288,12 +317,13 @@ class KnowledgeCurator:
                 len(dropped),
                 [message for _, _, message in failing],
             )
-            answer = _without_units(answer, {n for n, _, _ in failing})
             if progress_callback:
                 progress_callback(
                     f"Dropped {len(dropped)} fact(s) of {section.title}: "
                     "the quote is not in its source"
                 )
+        if failing or bad_conflicts:
+            answer = _without_units(answer, {n for n, _, _ in failing})
         knowledge = _to_knowledge(section, answer, sources)
         if progress_callback:
             progress_callback(
