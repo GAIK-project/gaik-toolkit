@@ -2835,22 +2835,6 @@
         "effect": "'precision' keeps only the main text, 'recall' keeps more blocks (home pages of short cards), 'balanced' sits between.",
         "selection_relevant": false,
         "infer_from": "facts listed on overview pages of short cards -> 'recall'"
-      },
-      {
-        "name": "respect_robots",
-        "type": "bool",
-        "default": true,
-        "effect": "Obey robots.txt (RFC 9309). Turn off only for a site you own.",
-        "selection_relevant": false,
-        "infer_from": "keep True"
-      },
-      {
-        "name": "delay_seconds",
-        "type": "float",
-        "default": 0.5,
-        "effect": "Least time between requests to one host; a robots.txt Crawl-delay lengthens it.",
-        "selection_relevant": false,
-        "infer_from": "keep the default"
       }
     ],
     "note": "Makes no LLM calls. To extract structured data from a site, feed result.to_markdown() to SchemaGenerator + DataExtractor as one document and ask for the source page URL from the 'Source:' lines; to answer questions, index the pages in a RAG store. For PDFs linked from the site, download them and use a parser step."
