@@ -352,7 +352,7 @@ Check whether a single GAIK software module covers the use case end-to-end:
 |---------|-------------------|
 | Audio/video → structured JSON | `AudioToStructuredData` (subject to provenance override above) |
 | PDF/DOCX → structured JSON | `DocumentsToStructuredData` (subject to accuracy override above) |
-| Document collection → answer | `RAGWorkflow` |
+| Document collection → answer | `RAGWorkflow` only when image-aware parsing (scans, figures) is required: it always parses with `VisionRagParser` (Docling + a vision model). Otherwise compose a text parser such as `PyMuPDFParser` with the RAG components |
 | Any mix of audio, documents, images, or text → narrative report (not structured JSON) | `ReportWriter` (subject to the report-writer rule below) |
 
 **Report-writer rule.** `ReportWriter` (report writer v2, CURACT) is the default for `multi_source_report`: it curates section-bound fact units with verified verbatim quotes, marks uncovered required items as `(missing: …)`, applies a primary/secondary source hierarchy, reviews every section with a separate `DraftReviewer` call, and saves every stage as editable files so a human can correct `knowledge/*.json` or `report/sections/*.md` and rerun only the later stages. `module_for_pattern` may still return the legacy `multi_source_report_generator`; override it with this rule. Fall back to the legacy `MultiSourceReportGenerator` only when a `ReportWriter` limitation blocks the use case:

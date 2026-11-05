@@ -325,7 +325,7 @@
   "VisionExtractor": {
     "import": "from gaik.software_components.vision_extractor import VisionExtractor",
     "construct": "extractor = VisionExtractor(api_config=get_stage_config(config, 'extraction'), include_verification=False)",
-    "call": "vr = extractor.extract(file_paths=[input_path], user_requirements=user_requirements)\n    extracted_fields = vr.data",
+    "call": "schema, requirements = _load_output_schema(schema_dir)\n    vr = extractor.extract(file_paths=[input_path], user_requirements=user_requirements, extraction_model=schema, requirements=requirements)\n    extracted_fields = vr.data",
     "returns": "VisionExtractionResult(.data dict, .model, .documents_processed)",
     "install_extra": "vision-extract",
     "options": [
