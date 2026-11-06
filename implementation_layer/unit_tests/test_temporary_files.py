@@ -83,7 +83,9 @@ def whisper_local(monkeypatch):
     return module
 
 
-def test_extracted_audio_is_not_written_beside_the_video(whisper_local, temp_root, tmp_path):
+def test_extracted_audio_is_not_written_beside_the_video(
+    whisper_local, temp_root, tmp_path, monkeypatch
+):
     video = tmp_path / "meeting.mp4"
     video.write_bytes(b"video")
     seen = {}
@@ -93,7 +95,7 @@ def test_extracted_audio_is_not_written_beside_the_video(whisper_local, temp_roo
         seen["dir"] = Path(files["file"][1].name).parent
         return _Response({"text": "hello", "segments": []})
 
-    whisper_local.requests.post = post
+    monkeypatch.setattr(whisper_local.requests, "post", post)
     result = whisper_local.transcribe(video, api_base="http://local.test", key="k")
 
     assert result["text"] == "hello"
@@ -103,14 +105,16 @@ def test_extracted_audio_is_not_written_beside_the_video(whisper_local, temp_roo
     assert list(temp_root.iterdir()) == []
 
 
-def test_extracted_audio_is_removed_when_the_request_fails(whisper_local, temp_root, tmp_path):
+def test_extracted_audio_is_removed_when_the_request_fails(
+    whisper_local, temp_root, tmp_path, monkeypatch
+):
     video = tmp_path / "meeting.mp4"
     video.write_bytes(b"video")
 
     def post(*_args, **_kwargs):
         raise ConnectionError("server went away")
 
-    whisper_local.requests.post = post
+    monkeypatch.setattr(whisper_local.requests, "post", post)
     with pytest.raises(ConnectionError):
         whisper_local.transcribe(video, api_base="http://local.test", key="k")
 
@@ -118,7 +122,7 @@ def test_extracted_audio_is_removed_when_the_request_fails(whisper_local, temp_r
     assert list(temp_root.iterdir()) == []
 
 
-def test_audio_input_is_sent_as_it_is(whisper_local, temp_root, tmp_path):
+def test_audio_input_is_sent_as_it_is(whisper_local, temp_root, tmp_path, monkeypatch):
     audio = tmp_path / "call.wav"
     audio.write_bytes(b"RIFF")
     seen = {}
@@ -127,7 +131,7 @@ def test_audio_input_is_sent_as_it_is(whisper_local, temp_root, tmp_path):
         seen["path"] = Path(files["file"][1].name)
         return _Response({"text": "hi", "segments": []})
 
-    whisper_local.requests.post = post
+    monkeypatch.setattr(whisper_local.requests, "post", post)
     whisper_local.transcribe(audio, api_base="http://local.test", key="k")
 
     assert seen["path"] == audio
