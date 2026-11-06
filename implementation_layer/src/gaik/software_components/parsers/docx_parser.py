@@ -7,6 +7,7 @@ requiring external APIs or heavy ML models.
 
 import logging
 import os
+import zipfile
 from typing import Any
 
 try:
@@ -17,8 +18,6 @@ try:
 except ImportError:
     DOCX_AVAILABLE = False
     print("Warning: python-docx not available. Please install: pip install python-docx")
-
-from ._file_signature import ensure_docx_content
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -77,7 +76,10 @@ class DocxParser:
             raise FileNotFoundError(f"File not found: {file_path}")
         if keep_structure and not use_markdown:
             raise ValueError("keep_structure needs use_markdown=True")
-        ensure_docx_content(file_path)
+        # A DOCX is a ZIP container; python-docx reads it with zipfile, so the
+        # same test decides here whether the content can be one at all.
+        if not zipfile.is_zipfile(file_path):
+            raise ValueError(f"The content of '{file_path}' is not a DOCX document.")
 
         try:
             doc = Document(file_path)
