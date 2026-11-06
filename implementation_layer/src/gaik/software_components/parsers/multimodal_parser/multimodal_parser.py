@@ -393,11 +393,12 @@ class MultimodalParser:
         else:
             api_key = self.config["api_key"]
             model = self.config["model"]
-            url = (
-                f"https://generativelanguage.googleapis.com/v1beta/"
-                f"models/{model}:generateContent?key={api_key}"
-            )
-            headers = {"Content-Type": "application/json; charset=utf-8"}
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            # The key travels in a header: a URL ends up in error messages and logs.
+            headers = {
+                "x-goog-api-key": api_key,
+                "Content-Type": "application/json; charset=utf-8",
+            }
 
         response = requests.post(url, headers=headers, json=body, timeout=(30, 300))
         response.raise_for_status()
