@@ -473,7 +473,8 @@ def _save_schema_to_python(model: type[BaseModel], path: Path) -> None:
         lines: list[str] = [f"class {m.__name__}(BaseModel):"]
         doc = (m.__doc__ or "").strip()
         if doc:
-            lines.append(f'    """{doc}"""')
+            # repr() keeps the description a single string literal whatever it contains.
+            lines.append(f"    {doc!r}")
         lines.append("    model_config = ConfigDict(extra='forbid')")
         lines.append("")
         for fname, finfo in m.model_fields.items():
