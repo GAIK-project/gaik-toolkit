@@ -1111,9 +1111,13 @@ class VisionExtractor:
             api_key = self.config["api_key"]
             url = (
                 f"https://generativelanguage.googleapis.com/v1beta/"
-                f"models/{self.model}:generateContent?key={api_key}"
+                f"models/{self.model}:generateContent"
             )
-            headers = {"Content-Type": "application/json; charset=utf-8"}
+            # The key travels in a header: a URL ends up in error messages and logs.
+            headers = {
+                "x-goog-api-key": api_key,
+                "Content-Type": "application/json; charset=utf-8",
+            }
 
         t0 = time.perf_counter()
         resp = requests.post(url, headers=headers, json=body, timeout=(30, 300))
