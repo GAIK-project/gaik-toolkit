@@ -20,6 +20,8 @@ except ImportError as exc:
         "Install extras with 'pip install gaik[parser]'"
     ) from exc
 
+from ._file_signature import ensure_pdf_content
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -63,13 +65,15 @@ class PyMuPDFParser:
 
         Raises:
             FileNotFoundError: If file does not exist
-            ValueError: If page_markers is used with structured text
+            ValueError: If page_markers is used with structured text, or the
+                file's content is not a PDF
             Exception: If PDF parsing fails
         """  # noqa: E501
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
         if page_markers and not use_markdown:
             raise ValueError("page_markers needs use_markdown=True")
+        ensure_pdf_content(file_path)
 
         try:
             doc = fitz.open(file_path)

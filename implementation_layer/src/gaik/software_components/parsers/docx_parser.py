@@ -18,6 +18,8 @@ except ImportError:
     DOCX_AVAILABLE = False
     print("Warning: python-docx not available. Please install: pip install python-docx")
 
+from ._file_signature import ensure_docx_content
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -67,13 +69,15 @@ class DocxParser:
 
         Raises:
             FileNotFoundError: If file does not exist
-            ValueError: If keep_structure is used with structured text
+            ValueError: If keep_structure is used with structured text, or the
+                file's content is not a DOCX
             Exception: If DOCX parsing fails
         """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
         if keep_structure and not use_markdown:
             raise ValueError("keep_structure needs use_markdown=True")
+        ensure_docx_content(file_path)
 
         try:
             doc = Document(file_path)
