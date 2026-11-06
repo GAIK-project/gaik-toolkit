@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -12,13 +13,19 @@ def is_video_file(file_path: Path) -> bool:
     return file_path.suffix.lower() in VIDEO_EXTENSIONS
 
 
-def extract_audio_from_video(video_path: Path) -> Path:
+def extract_audio_from_video(video_path: Path, output_dir: Path | None = None) -> Path:
+    """Extract a mono 16 kHz WAV from a video file and return its path.
+
+    The WAV is written into ``output_dir`` when one is given, otherwise beside
+    the video. The caller removes it.
+    """
     if shutil.which("ffmpeg") is None:
         raise RuntimeError(
             "ffmpeg is required to extract audio from video files, but it was not found in PATH."
         )
 
-    output_audio = video_path.with_name(f"{video_path.stem}_extracted.wav")
+    output_name = f"{video_path.stem}_extracted.wav"
+    output_audio = output_dir / output_name if output_dir else video_path.with_name(output_name)
     cmd = [
         "ffmpeg",
         "-y",
@@ -62,56 +69,59 @@ def transcribe(
         raise FileNotFoundError(f"Audio/Video file not found: {input_file}")
 
     upload_file = input_file
-    temp_extracted_audio: Path | None = None
-    if is_video_file(input_file):
-        print(f"Detected video file: {input_file.name}")
-        print("Extracting audio with ffmpeg...")
-        upload_file = extract_audio_from_video(input_file)
-        temp_extracted_audio = upload_file
-        print(f"Audio extracted: {upload_file.name}")
+    # Extracted audio lives in a directory of its own, removed whether the
+    # transcription succeeds, fails or is cancelled.
+    temp_dir: str | None = None
+    try:
+        if is_video_file(input_file):
+            print(f"Detected video file: {input_file.name}")
+            print("Extracting audio with ffmpeg...")
+            temp_dir = tempfile.mkdtemp(prefix="gaik_whisper_local_")
+            upload_file = extract_audio_from_video(input_file, Path(temp_dir))
+            print(f"Audio extracted: {upload_file.name}")
 
-    print(f"Sending: {upload_file.name} ...")
+        print(f"Sending: {upload_file.name} ...")
 
-    # Health check
-    r = requests.get(f"{api_base}/health", timeout=30)
-    r.raise_for_status()
-    print(f"Server OK - {r.json()}")
-
-    # Send transcription request
-    with open(upload_file, "rb") as f:
-        payload = {
-            "language": language,
-            "diarization": diarization,
-            "min_speakers": min_speakers,
-            "max_speakers": max_speakers,
-            "speaker_count": speaker_count,
-            "initial_prompt": initial_prompt,
-            "include_words": True,
-        }
-        files = {"file": (upload_file.name, f)}
-        print("Transcribing... (this may take a while)")
-        r = requests.post(
-            f"{api_base}/transcribe",
-            data=payload,
-            files=files,
-            headers={"key": key},
-            timeout=60 * 30,
-        )
+        # Health check
+        r = requests.get(f"{api_base}/health", timeout=30)
         r.raise_for_status()
+        print(f"Server OK - {r.json()}")
 
-    result = r.json()
-    segments = result.get("segments", [])
+        # Send transcription request
+        with open(upload_file, "rb") as f:
+            payload = {
+                "language": language,
+                "diarization": diarization,
+                "min_speakers": min_speakers,
+                "max_speakers": max_speakers,
+                "speaker_count": speaker_count,
+                "initial_prompt": initial_prompt,
+                "include_words": True,
+            }
+            files = {"file": (upload_file.name, f)}
+            print("Transcribing... (this may take a while)")
+            r = requests.post(
+                f"{api_base}/transcribe",
+                data=payload,
+                files=files,
+                headers={"key": key},
+                timeout=60 * 30,
+            )
+            r.raise_for_status()
 
-    if not diarization:
-        plain_text = (result.get("text") or "").strip()
-        if not plain_text and segments:
-            plain_text = " ".join(
-                seg.get("text", "").strip() for seg in segments if seg.get("text")
-            ).strip()
-    elapsed_seconds = time.perf_counter() - start_time
-    print(f"Time taken for transcription: {elapsed_seconds:.2f} seconds")
+        result = r.json()
+        segments = result.get("segments", [])
 
-    if temp_extracted_audio is not None:
-        temp_extracted_audio.unlink(missing_ok=True)
+        if not diarization:
+            plain_text = (result.get("text") or "").strip()
+            if not plain_text and segments:
+                plain_text = " ".join(
+                    seg.get("text", "").strip() for seg in segments if seg.get("text")
+                ).strip()
+        elapsed_seconds = time.perf_counter() - start_time
+        print(f"Time taken for transcription: {elapsed_seconds:.2f} seconds")
 
-    return result
+        return result
+    finally:
+        if temp_dir is not None:
+            shutil.rmtree(temp_dir, ignore_errors=True)
