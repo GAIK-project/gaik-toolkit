@@ -1966,9 +1966,10 @@ def _print_single_model(model: type[BaseModel]) -> None:
     # Class definition
     print(f"class {model.__name__}(BaseModel):")
 
-    # Docstring
+    # Docstring. The pipelines save this output as a Python module, so texts
+    # are written with repr(): one string literal whatever they contain.
     if model.__doc__:
-        print(f'    """{model.__doc__}"""')
+        print(f"    {model.__doc__!r}")
 
     # Config
     if hasattr(model, "model_config"):
@@ -1997,7 +1998,7 @@ def _print_single_model(model: type[BaseModel]) -> None:
         default = field_info.default
         if is_required:
             if description:
-                print(f'    {field_name}: {type_str} = Field(description="{description}")')
+                print(f"    {field_name}: {type_str} = Field(description={description!r})")
             else:
                 print(f"    {field_name}: {type_str}")
         else:
@@ -2010,7 +2011,7 @@ def _print_single_model(model: type[BaseModel]) -> None:
             if description:
                 print(
                     f"    {field_name}: {type_str} = "
-                    f'Field(default={default_repr}, description="{description}")'
+                    f"Field(default={default_repr}, description={description!r})"
                 )
             else:
                 print(f"    {field_name}: {type_str} = {default_repr}")

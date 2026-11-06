@@ -7,6 +7,12 @@ from pydantic import BaseModel, Field
 
 pytest.importorskip("fitz")
 
+from gaik.software_components.extractor.schema import (  # noqa: E402
+    ExtractionRequirements,
+    FieldSpec,
+    create_extraction_model,
+    print_pydantic_schema,
+)
 from gaik.software_components.vision_extractor.vision_extractor import (  # noqa: E402
     _load_saved_schema,
     _save_schema_to_python,
@@ -78,3 +84,53 @@ def test_class_description_round_trips_as_text(description, tmp_path):
     assert list(loaded.model_fields) == ["number"]
     # Nothing in the description became a statement of the saved module.
     assert "marker = 1" not in [line.strip() for line in path.read_text("utf-8").splitlines()]
+
+
+# --- the pipelines save what print_pydantic_schema prints --------------------
+
+TEXTS = [
+    'Weight as printed, e.g., "8.600 LB"',
+    'Ends the text early: """ and continues with\nmarker = 1',
+    "Backslashes \\ and 'single' and \"double\" quotes",
+]
+
+
+def _requirements(text):
+    return ExtractionRequirements(
+        use_case_name="orders",
+        fields=[
+            FieldSpec(field_name="number", field_type="str", description=text),
+            FieldSpec(
+                field_name="note",
+                field_type="str",
+                description=text,
+                required_in_output=False,
+                nullable=True,
+            ),
+        ],
+    )
+
+
+@pytest.mark.parametrize("pipeline", [AudioToStructuredData, DocumentsToStructuredData])
+@pytest.mark.parametrize("text", TEXTS)
+def test_pipeline_schema_round_trips_with_any_description(pipeline, text, tmp_path):
+    requirements = _requirements(text)
+    model = create_extraction_model(requirements)
+    model.__doc__ = text
+    instance = object.__new__(pipeline)
+
+    instance.save_schema(model, requirements, tmp_path, "orders")
+    loaded, loaded_requirements = instance.load_schema(tmp_path, "orders")
+
+    assert loaded.__doc__ == text
+    assert loaded.model_fields["number"].description == text
+    assert loaded.model_fields["note"].description == text
+    assert loaded_requirements == requirements
+    source = (tmp_path / "orders.py").read_text(encoding="utf-8")
+    assert "marker = 1" not in [line.strip() for line in source.splitlines()]
+
+
+def test_printed_schema_keeps_plain_descriptions_readable(capsys):
+    model = create_extraction_model(_requirements("Order number"))
+    print_pydantic_schema(model, title="Schema")
+    assert "Field(description='Order number')" in capsys.readouterr().out
