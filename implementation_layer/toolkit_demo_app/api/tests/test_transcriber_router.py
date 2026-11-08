@@ -51,7 +51,7 @@ def client(monkeypatch) -> TestClient:
 def _post(client: TestClient, local: bool):
     return client.post(
         "/transcribe",
-        files={"file": ("a.mp3", b"audio", "audio/mpeg")},
+        files={"file": ("a.mp3", b"ID3audio", "audio/mpeg")},
         data={"prefer_local_first": str(local).lower(), "diarization": "false"},
     )
 

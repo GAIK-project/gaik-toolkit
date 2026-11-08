@@ -90,6 +90,11 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
 router = APIRouter()
 
 PDF_CLEANUP_AFTER_HOURS = 1
@@ -299,6 +304,8 @@ async def audio_pipeline(
 
     # Validate file size and save temporarily
     content = await validate_audio_file_size(file)
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+        raise HTTPException(status_code=415, detail=mismatch)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
@@ -461,6 +468,8 @@ async def document_pipeline(
 
     # Validate file size and save temporarily
     content = await validate_file_size(file)
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+        raise HTTPException(status_code=415, detail=mismatch)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
@@ -726,6 +735,13 @@ async def audio_pipeline_stream(
 
         async def error_gen() -> AsyncGenerator[str, None]:
             yield sse_event("error", {"message": AUDIO_TOO_LARGE_DETAIL})
+
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+
+        async def error_gen() -> AsyncGenerator[str, None]:
+            yield sse_event("error", {"message": mismatch})
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
@@ -1202,6 +1218,13 @@ async def document_pipeline_stream(
             yield sse_event(
                 "error", {"message": f"File too large. Maximum size is {MAX_FILE_SIZE_MB}MB"}
             )
+
+        return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+
+        async def error_gen() -> AsyncGenerator[str, None]:
+            yield sse_event("error", {"message": mismatch})
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 

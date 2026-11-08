@@ -28,6 +28,11 @@ except ImportError:
     from api.utils.config import get_model_options
     from api.utils.model_settings import get_request_api_config
 
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
 router = APIRouter()
 
 
@@ -203,6 +208,8 @@ async def parse_document(
 
     # Validate file size and save temporarily
     content = await validate_file_size(file)
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+        raise HTTPException(status_code=415, detail=mismatch)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name

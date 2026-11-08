@@ -25,6 +25,11 @@ try:
 except ImportError:
     from api.utils.model_settings import get_request_api_config, provider_error_detail
 
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -253,6 +258,8 @@ async def validate_pdf(
     rubric_payload.setdefault("scoring_mode", scoring_mode)
 
     content = await validate_file_size(pdf)
+    if (mismatch := content_mismatch(".pdf", content)) is not None:
+        raise HTTPException(status_code=415, detail=mismatch)
     tmp_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:

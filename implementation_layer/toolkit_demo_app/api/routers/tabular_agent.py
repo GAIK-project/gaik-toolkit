@@ -30,6 +30,11 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
 router = APIRouter()
 
 ALLOWED_EXTENSIONS = {".csv", ".tsv", ".txt", ".xlsx", ".xlsm", ".xls", ".parquet", ".json"}
@@ -198,6 +203,8 @@ async def upload_file(
         )
 
     content = await validate_file_size(file)
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+        raise HTTPException(status_code=415, detail=mismatch)
     await _evict_stale()
 
     # Keep the original filename: it becomes the table name the user sees.
