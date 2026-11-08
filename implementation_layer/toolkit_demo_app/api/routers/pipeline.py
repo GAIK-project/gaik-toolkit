@@ -94,9 +94,19 @@ router = APIRouter()
 
 PDF_CLEANUP_AFTER_HOURS = 1
 
+# Generated PDFs live in their own folder, so a file left by an earlier process
+# (the maps below start empty after a restart) is still found and removed.
+PDF_DIR = Path(tempfile.gettempdir()) / "gaik-demo-pipeline-pdfs"
+
 # Temporary storage for generated PDFs (path and creation time)
 PDF_STORAGE: dict[str, Path] = {}
 PDF_TIMESTAMPS: dict[str, datetime] = {}
+
+
+def _pdf_path(job_id: str) -> Path:
+    """Where the PDF of one job is written."""
+    PDF_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    return PDF_DIR / f"{job_id}.pdf"
 
 
 def _parse_document_content(tmp_path: str, suffix: str, parser_type: str, config: dict):
@@ -189,22 +199,38 @@ def _get_or_create_schema(
     return wrap_schema_with_numeric_normalizers(schema), requirements, True
 
 
-async def cleanup_old_pdfs():
-    """Background task to clean up old PDFs."""
-    while True:
-        await asyncio.sleep(3600)  # Check every hour
-        cutoff = datetime.now() - timedelta(hours=PDF_CLEANUP_AFTER_HOURS)
-        jobs_to_delete = []
-        for job_id, timestamp in list(PDF_TIMESTAMPS.items()):
-            if timestamp < cutoff:
-                jobs_to_delete.append(job_id)
-        for job_id in jobs_to_delete:
-            if job_id in PDF_STORAGE:
-                path = PDF_STORAGE[job_id]
+def remove_expired_pdfs(now: datetime | None = None) -> int:
+    """Remove PDFs older than PDF_CLEANUP_AFTER_HOURS; returns how many files went."""
+    cutoff = (now or datetime.now()) - timedelta(hours=PDF_CLEANUP_AFTER_HOURS)
+    removed = 0
+    for job_id, timestamp in list(PDF_TIMESTAMPS.items()):
+        if timestamp < cutoff:
+            path = PDF_STORAGE.pop(job_id, None)
+            if path is not None and path.exists():
                 path.unlink(missing_ok=True)
-                del PDF_STORAGE[job_id]
-            if job_id in PDF_TIMESTAMPS:
-                del PDF_TIMESTAMPS[job_id]
+                removed += 1
+            PDF_TIMESTAMPS.pop(job_id, None)
+    if PDF_DIR.is_dir():
+        for path in PDF_DIR.glob("*.pdf"):
+            try:
+                if datetime.fromtimestamp(path.stat().st_mtime) < cutoff:
+                    path.unlink(missing_ok=True)
+                    removed += 1
+            except FileNotFoundError:
+                pass
+    return removed
+
+
+async def cleanup_old_pdfs():
+    """Background task (started in main.py): remove expired PDFs at start and hourly."""
+    while True:
+        try:
+            removed = remove_expired_pdfs()
+            if removed:
+                logger.info("Removed %d expired pipeline PDFs", removed)
+        except Exception:  # noqa: BLE001 - the loop must outlive one failed pass
+            logger.exception("Pipeline PDF cleanup failed")
+        await asyncio.sleep(3600)
 
 
 # Logo path for PDF generation (letter-only logo works better for PDF headers)
@@ -357,7 +383,7 @@ async def audio_pipeline(
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                pdf_path = _pdf_path(job_id)
 
                 # Use extracted_fields if available, otherwise create from transcript
                 if result.extracted_fields:
@@ -516,7 +542,7 @@ async def document_pipeline(
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                pdf_path = _pdf_path(job_id)
 
                 # Use extracted_data if available, otherwise create from parsed content
                 pdf_data = (
@@ -637,7 +663,7 @@ async def text_pipeline(
 
                 logo = LOGO_PATH if LOGO_PATH.exists() else None
                 pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                pdf_path = _pdf_path(job_id)
 
                 # Use extracted_data if available, otherwise create from input text
                 pdf_data = extracted_data if extracted_data else [{"input_text": text}]
@@ -912,7 +938,7 @@ async def audio_pipeline_stream(
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                    pdf_path = _pdf_path(job_id)
 
                     if extracted_data:
                         pdf_data = extracted_data
@@ -1091,7 +1117,7 @@ async def text_pipeline_stream(
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                    pdf_path = _pdf_path(job_id)
 
                     # Use extracted_data if available, otherwise create from input text
                     pdf_data = extracted_data if extracted_data else [{"input_text": text}]
@@ -1334,7 +1360,7 @@ async def document_pipeline_stream(
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title=pdf_title, logo_path=logo)
-                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                    pdf_path = _pdf_path(job_id)
 
                     pdf_data = (
                         extracted_data
