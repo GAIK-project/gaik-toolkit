@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { clientIp } from "@/lib/client-ip";
 import { ratelimit } from "@/lib/rate-limit";
 import {
   pickUsageFromEvents,
@@ -17,14 +18,7 @@ export interface AccessRow {
   report_limit_override: number | null;
 }
 
-/** First hop of x-forwarded-for, then x-real-ip, else "anonymous". */
-export function clientIp(headers: Headers): string {
-  return (
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    headers.get("x-real-ip") ??
-    "anonymous"
-  );
-}
+export { clientIp };
 
 /**
  * The 403 body for a user who is not approved or has used up their reports,

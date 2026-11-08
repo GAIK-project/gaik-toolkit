@@ -9,6 +9,7 @@ import {
   OWN_ID,
   parseOwnKnowledge,
 } from "@/lib/helpdesk-chatbot/own-knowledge";
+import { clientIp } from "@/lib/client-ip";
 import { ratelimit } from "@/lib/rate-limit";
 import { getAccessState } from "@/lib/supabase/proxy";
 import { accessRefusal } from "@/lib/api-access";
@@ -26,17 +27,6 @@ const MAX_MESSAGES = 40;
 // A request about the user's own documents carries them too (up to 150,000
 // characters of text), so it may be larger than one about an example.
 const MAX_BODY_BYTES = 400_000;
-
-// The router appends the real client address last; earlier entries are
-// whatever the client sent.
-function clientIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  return (
-    forwarded?.split(",").at(-1)?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "anonymous"
-  );
-}
 
 export async function POST(request: NextRequest) {
   const refusal = await accessRefusal(
@@ -59,7 +49,7 @@ export async function POST(request: NextRequest) {
   if (ratelimit) {
     try {
       const { success } = await ratelimit.limit(
-        `helpdesk:${clientIp(request)}`,
+        `helpdesk:${clientIp(request.headers)}`,
       );
       if (!success) {
         return NextResponse.json(

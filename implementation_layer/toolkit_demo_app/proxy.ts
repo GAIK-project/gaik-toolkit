@@ -16,6 +16,7 @@ import {
   MODEL_TIER_HEADER,
   isModelStaff,
 } from "@/lib/model-tier";
+import { clientIp } from "@/lib/client-ip";
 import { ratelimit } from "@/lib/rate-limit";
 import {
   type AccessState,
@@ -122,10 +123,7 @@ export default async function proxy(request: NextRequest) {
     // Rate limit requests that change state (heavy processing, deletes)
     if (ratelimit && isStateChanging(request.method)) {
       try {
-        const ip =
-          request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-          request.headers.get("x-real-ip") ??
-          "anonymous";
+        const ip = clientIp(request.headers);
 
         const { success, limit, remaining, reset } = await ratelimit.limit(ip);
 
