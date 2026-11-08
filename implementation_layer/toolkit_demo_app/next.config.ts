@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { securityHeaders } from "./lib/security-headers";
 
 const nextConfig: NextConfig = {
   // SSE Streaming Fix for OpenShift/Rahti:
@@ -18,6 +19,10 @@ const nextConfig: NextConfig = {
   experimental: {
     // Include multipart metadata and config above the 100 MiB file budget.
     proxyClientMaxBodySize: "128mb",
+  },
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
   },
   async rewrites() {
     return [
