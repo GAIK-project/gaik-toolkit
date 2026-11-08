@@ -5,8 +5,8 @@ const OG_DESCRIPTION_REGEX =
   /<meta[^>]*property="og:description"[^>]*content="([^"]+)"/;
 const OG_IMAGE_REGEX = /<meta[^>]*property="og:image"[^>]*content="([^"]+)"/;
 
-export const glimpse = async (url: string) => {
-  const response = await fetch(url);
+export const glimpse = async (url: string, init?: RequestInit) => {
+  const response = await fetch(url, init);
   const data = await response.text();
   const titleMatch = data.match(TITLE_REGEX) || data.match(OG_TITLE_REGEX);
   const descriptionMatch =
