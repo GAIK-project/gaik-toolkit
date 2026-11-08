@@ -637,7 +637,7 @@ def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        logger.warning("Could not decode judge response as JSON; first 200 chars: %s", text[:200])
+        logger.warning("Could not decode judge response as JSON (%d characters)", len(text))
         return []
 
     flags = data.get("flags") if isinstance(data, dict) else data

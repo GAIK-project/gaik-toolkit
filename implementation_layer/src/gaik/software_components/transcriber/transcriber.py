@@ -205,14 +205,14 @@ class Transcriber:
         job_id = self._generate_job_id(input_path)
 
         print("=" * 80)
-        print(f"Transcribing file: {input_path}")
+        print(f"Transcribing job {job_id} ({input_path.suffix.lower() or 'no extension'})")
         if use_case_name:
             print(f"Use case: {use_case_name}")
         print("=" * 80)
 
         # IMPORTANT: do NOT mutate self.default_prompt across calls.
         prompt = self.default_prompt + (("\n" + custom_context) if custom_context else "")
-        print(f"Transcribing prompt: {prompt}")
+        print(f"Transcription prompt: {len(prompt)} characters")
 
         effective_model = self._resolve_transcription_model()
         self._warn_ignored_local_options(effective_model)
