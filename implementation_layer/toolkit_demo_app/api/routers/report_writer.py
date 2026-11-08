@@ -85,6 +85,72 @@ _SUPPORTED_EXTS = {
 
 
 # ---------------------------------------------------------------------------
+# Upload names and run options
+# ---------------------------------------------------------------------------
+
+# The option keys the report writer page sets. Anything else in the posted
+# config (folders, endpoints, other constructor arguments) is not passed on.
+_OPTION_KEYS: dict[str, frozenset[str]] = {
+    "image_options": frozenset({"mode", "user_requirements"}),
+    "writer_options": frozenset({"model", "temperature", "reasoning_effort"}),
+    "review_options": frozenset({"model"}),
+}
+_TRANSCRIBER_CTOR_KEYS = frozenset(
+    {
+        "transcription_model",
+        "language",
+        "enhanced_transcript",
+        "diarization",
+        "speaker_count",
+        "initial_prompt",
+    }
+)
+
+
+def _upload_name(filename: str, used: set[str]) -> str:
+    """The client's file name reduced to a plain name inside the run folder.
+
+    The name is kept (the report cites its sources by it), but only its last
+    part: no folders, no drive, nothing that leaves the folder. A repeated
+    name gets a number so one upload does not replace another.
+    """
+    name = filename.replace("\\", "/").rsplit("/", 1)[-1].strip().lstrip(".")
+    if not name or ":" in name or "\x00" in name:
+        name = "upload"
+    stem, dot, suffix = name.rpartition(".")
+    if not dot:
+        stem, suffix = name, ""
+    candidate, number = name, 1
+    while candidate.lower() in used:
+        number += 1
+        candidate = f"{stem}-{number}.{suffix}" if suffix else f"{stem}-{number}"
+    used.add(candidate.lower())
+    return candidate
+
+
+def _run_options(run_config: dict, work_dir: Path) -> dict:
+    """The component options for one run: only the keys the page sets."""
+    options: dict = {"parser_options": {}}
+    for key, allowed in _OPTION_KEYS.items():
+        given = run_config.get(key)
+        options[key] = (
+            {k: v for k, v in given.items() if k in allowed} if isinstance(given, dict) else {}
+        )
+    if not options["review_options"]:
+        options["review_options"] = None
+    given = run_config.get("transcriber_options")
+    ctor = given.get("ctor") if isinstance(given, dict) else None
+    ctor = (
+        {k: v for k, v in ctor.items() if k in _TRANSCRIBER_CTOR_KEYS}
+        if isinstance(ctor, dict)
+        else {}
+    )
+    ctor["output_dir"] = str(work_dir / "transcripts")
+    options["transcriber_options"] = {"ctor": ctor}
+    return options
+
+
+# ---------------------------------------------------------------------------
 # Example endpoints
 # ---------------------------------------------------------------------------
 
@@ -121,7 +187,7 @@ async def list_example_files():
 async def get_example_file(filename: str):
     """Serve one example input file."""
     path = _EXAMPLE_INPUTS / filename
-    if not path.exists() or not path.is_file():
+    if path.resolve().parent != _EXAMPLE_INPUTS.resolve() or not path.is_file():
         raise HTTPException(status_code=404, detail=f"Example file not found: {filename}")
     return FileResponse(str(path), filename=filename)
 
@@ -162,16 +228,17 @@ async def generate_report(
     input_paths: list[str] = []
     sample_path: str | None = None
 
+    used_names: set[str] = {"output", "transcripts"}
     try:
         for uf in files:
             if not uf.filename:
                 continue
-            dest = tmp_dir / uf.filename
+            dest = tmp_dir / _upload_name(uf.filename, used_names)
             dest.write_bytes(await uf.read())
             input_paths.append(str(dest))
 
         if sample_report and sample_report.filename:
-            dest = tmp_dir / sample_report.filename
+            dest = tmp_dir / _upload_name(sample_report.filename, used_names)
             dest.write_bytes(await sample_report.read())
             sample_path = str(dest)
     except Exception as exc:
@@ -200,6 +267,7 @@ async def generate_report(
 
             output_dir = tmp_dir / "output"
             output_dir.mkdir(exist_ok=True)
+            options = _run_options(run_config, tmp_dir)
 
             result = gen.run(
                 input_paths=input_paths,
@@ -214,12 +282,8 @@ async def generate_report(
                 include_source_references=run_config.get("include_source_references", True),
                 max_evidence_chars=run_config.get("max_evidence_chars"),
                 parser_choice=run_config.get("parser_choice", "auto"),
-                parser_options=run_config.get("parser_options") or {},
-                transcriber_options=run_config.get("transcriber_options") or {},
-                image_options=run_config.get("image_options") or {},
-                writer_options=run_config.get("writer_options") or {},
+                **options,
                 agentic=run_config.get("agentic", False),
-                review_options=run_config.get("review_options"),
                 polish=run_config.get("polish", False),
                 # strict_review would raise before result; surface as warnings instead
                 strict_review=False,
