@@ -107,19 +107,36 @@ _TRANSCRIBER_CTOR_KEYS = frozenset(
 )
 
 
+# Control characters, and the bidi controls that can make "x.exe.md" read as
+# "x.dm.exe", have no place in a name the report quotes.
+_NAME_DROP = (
+    {chr(c) for c in range(32)}
+    | {"\x7f"}
+    | {chr(c) for c in (*range(0x202A, 0x202F), *range(0x2066, 0x206A))}
+)
+_NAME_MAX = 150
+
+
 def _upload_name(filename: str, used: set[str]) -> str:
     """The client's file name reduced to a plain name inside the run folder.
 
     The name is kept (the report cites its sources by it), but only its last
-    part: no folders, no drive, nothing that leaves the folder. A repeated
-    name gets a number so one upload does not replace another.
+    part: no folders, no drive, nothing that leaves the folder. A colon becomes
+    "_" rather than costing the name its suffix ("Meeting: notes.pdf" is still
+    a PDF), control characters go, and a long name is cut before its suffix. A
+    repeated name gets a number so one upload does not replace another.
     """
-    name = filename.replace("\\", "/").rsplit("/", 1)[-1].strip().lstrip(".")
-    if not name or ":" in name or "\x00" in name:
+    name = filename.replace("\\", "/").rsplit("/", 1)[-1]
+    name = "".join(ch for ch in name if ch not in _NAME_DROP).replace(":", "_")
+    name = name.strip().lstrip(".")
+    if not name:
         name = "upload"
     stem, dot, suffix = name.rpartition(".")
     if not dot:
         stem, suffix = name, ""
+    if len(name) > _NAME_MAX:
+        stem = stem[: _NAME_MAX - len(suffix) - 1].rstrip() or "upload"
+        name = f"{stem}.{suffix}" if suffix else stem
     candidate, number = name, 1
     while candidate.lower() in used:
         number += 1

@@ -18,10 +18,20 @@ from fastapi import HTTPException
         ("..", "upload"),
         ("", "upload"),
         (".env", "env"),
+        ("Meeting: notes.pdf", "Meeting_ notes.pdf"),
+        ("C:notes.md", "C_notes.md"),
+        ("a\x00b.md", "ab.md"),
+        ("line\nbreak.md", "linebreak.md"),
+        ("x\u202egnp.exe.md", "xgnp.exe.md"),
     ],
 )
 def test_an_upload_name_is_a_plain_name(given, expected):
     assert report_writer._upload_name(given, set()) == expected
+
+
+def test_a_long_name_is_cut_before_its_suffix():
+    name = report_writer._upload_name("a" * 300 + ".pdf", set())
+    assert len(name) == 150 and name.endswith(".pdf")
 
 
 def test_a_repeated_name_does_not_replace_the_first_upload():
