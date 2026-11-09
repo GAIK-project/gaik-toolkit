@@ -43,6 +43,14 @@ dependencies = [
 # Data extraction with LLM providers (core deps provide openai, pydantic, python-dotenv)
 extract = []
 
+# OpenTelemetry spans for LLM calls, sent over OTLP/HTTP. Off unless
+# OTEL_EXPORTER_OTLP_ENDPOINT is set (see gaik.observability.tracing).
+otel = [
+    "opentelemetry-api==1.45.2",
+    "opentelemetry-sdk==1.45.2",
+    "opentelemetry-exporter-otlp-proto-http==1.45.2",
+]
+
 # Text embeddings
 embedder = [
     "openai>=1.58.0",
@@ -279,6 +287,7 @@ rag-response-evaluator = [
 # All features
 all = [
     "gaik[extract]",
+    "gaik[otel]",
     "gaik[parser]",
     "gaik[transcriber]",
     "gaik[enhance-transcript]",
@@ -414,6 +423,7 @@ documents-to-structured-data-cpu = [
 
 all-cpu = [
     "gaik[extract]",
+    "gaik[otel]",
     "gaik[parser-cpu]",
     "gaik[transcriber]",
     "gaik[enhance-transcript]",
