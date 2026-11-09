@@ -16,6 +16,7 @@ import {
   MODEL_TIER_HEADER,
   isModelStaff,
 } from "@/lib/model-tier";
+import { backendTarget, isApiPath } from "@/lib/backend-target";
 import { clientIp } from "@/lib/client-ip";
 import { ratelimit } from "@/lib/rate-limit";
 import {
@@ -119,7 +120,7 @@ export default async function proxy(request: NextRequest) {
     pathname === "/api/knowledge-curator/run" || // likewise
     pathname === "/api/knowledge-synthesis/run" || // likewise
     pathname === "/api/helpdesk-chat"; // runs its model in Next.js
-  if (pathname.startsWith("/api") && !isNextApiRoute) {
+  if (isApiPath(pathname) && !isNextApiRoute) {
     // Rate limit requests that change state (heavy processing, deletes)
     if (ratelimit && isStateChanging(request.method)) {
       try {
@@ -173,8 +174,16 @@ export default async function proxy(request: NextRequest) {
       }
     }
 
-    const backendPath = pathname.replace(/^\/api/, "");
-    const targetUrl = `${BACKEND_URL}${backendPath}${request.nextUrl.search}`;
+    const backendPath = pathname.slice("/api".length);
+    // Null when the URL would not be on the backend's own origin.
+    const targetUrl = backendTarget(
+      BACKEND_URL,
+      pathname,
+      request.nextUrl.search,
+    );
+    if (!targetUrl) {
+      return reply(NextResponse.json({ error: "Not found" }, { status: 404 }));
+    }
 
     const headers = new Headers();
     const contentType = request.headers.get("content-type");
