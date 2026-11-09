@@ -25,9 +25,17 @@ def _slug(text: str, *, max_len: int = 40) -> str:
     return s.strip("_")[:max_len] or "section"
 
 
+# Characters a file name cannot hold on every platform, and "%" itself.
+_NOT_IN_A_FILE_NAME = re.compile(r'[<>:"/\\|?*%\x00-\x1f]')
+
+
 def _file_stem(section_id: str) -> str:
-    """A section id as a file name: no path separators, so it stays in its folder."""
-    return re.sub(r"[^\w.-]", "_", section_id).strip(".")
+    """A section id as a file name.
+
+    A character that cannot be in a file name is written as ``%XX``, so the file
+    stays in its folder and two different ids never share a file.
+    """
+    return _NOT_IN_A_FILE_NAME.sub(lambda match: f"%{ord(match.group()):02X}", section_id)
 
 
 def _usage_of(response: Any) -> dict:
