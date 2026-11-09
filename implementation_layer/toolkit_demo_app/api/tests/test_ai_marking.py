@@ -65,6 +65,17 @@ def test_mp3_gets_an_id3_tag_in_front_of_the_audio():
     assert marked[10 + size :] == audio
 
 
+def test_the_mp3_marks_use_a_text_encoding_id3v23_defines():
+    marked = ai_marking.mark_mp3(b"\xff\xfb\x90\x00")
+    size = sum((b & 0x7F) << s for b, s in zip(marked[6:10], (21, 14, 7, 0), strict=True))
+    tag, encodings = marked[10 : 10 + size], []
+    while tag[:4] == b"TXXX":
+        frame_size = struct.unpack(">I", tag[4:8])[0]
+        encodings.append(tag[10])
+        tag = tag[10 + frame_size :]
+    assert encodings == [0, 0, 0]
+
+
 def test_wav_gets_an_info_chunk_and_a_right_riff_size():
     fmt = b"fmt " + struct.pack("<IHHIIHH", 16, 1, 1, 8000, 8000, 1, 8)
     data = b"data" + struct.pack("<I", 3) + b"\x80\x80\x80"

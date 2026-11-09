@@ -77,7 +77,10 @@ def _syncsafe(size: int) -> bytes:
 
 
 def _txxx(description: str, value: str) -> bytes:
-    body = b"\x03" + description.encode() + b"\x00" + value.encode()  # 0x03 = UTF-8
+    # Encoding 0 (ISO-8859-1): ID3v2.3 defines only 0 and 1 (UTF-16), so a
+    # strict reader drops a frame marked 3 (UTF-8). The marks are ASCII.
+    text = description.encode("latin-1", "replace") + b"\x00" + value.encode("latin-1", "replace")
+    body = b"\x00" + text
     return b"TXXX" + struct.pack(">I", len(body)) + b"\x00\x00" + body
 
 
