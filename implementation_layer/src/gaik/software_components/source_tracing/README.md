@@ -319,6 +319,23 @@ the quote exactly.
 - The demo app has its own copy of this logic for its Extractor and incident reporting pages.
   It is not changed by this component.
 
+## Examples
+
+Runnable examples are in the
+[examples folder](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/source_tracing).
+They run a real extractor with source tracing on the sample purchase orders `PO.pdf` and `PO2.pdf`
+(or a sample recording) and print what the check found. They need model credentials in `.env`.
+
+| Example | What it does |
+|---|---|
+| `source_tracing_example.py` | `VisionExtractor` on a PDF, then `check_pdf`: a verdict per value and the page box of each quote |
+| `source_tracing_data_extractor_example.py` | `DataExtractor` on the PDF's text, then `check_text`: a verdict per value and where each quote sits in the text |
+| `source_tracing_documents_example.py` | `DocumentsToStructuredData` with a supplied schema, checked against the parsed text |
+| `source_tracing_audio_example.py` | `AudioToStructuredData` on a sample recording, checked against the transcript it read (`transcript_used`) |
+| `source_tracing_viewer_example.py` | `VisionExtractor` with source tracing, then one self-contained HTML page (`output/trace_view.html`) that shows every quote outlined on the PDF page, a verdict and an explanation per value, and the function that draws the boxes. Three extra fields make all four verdicts appear. `trace_viewer.py` builds the page |
+
+`po_schema.py` holds the schema the examples extract.
+
 ## License
 
 MIT - see [LICENSE](../../../../../LICENSE)
