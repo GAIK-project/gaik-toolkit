@@ -30,10 +30,12 @@ from gaik import __version__ as gaik_version  # noqa: E402
 
 try:
     from routers import model_settings
+    from utils.ai_marking import AIMarkMiddleware
     from utils.model_settings import ModelSettingsMiddleware
     from utils.ops import OpsMiddleware
 except ImportError:
     from api.routers import model_settings
+    from api.utils.ai_marking import AIMarkMiddleware
     from api.utils.model_settings import ModelSettingsMiddleware
     from api.utils.ops import OpsMiddleware
 
@@ -144,6 +146,8 @@ app.add_middleware(
 )
 app.add_middleware(ModelSettingsMiddleware)
 app.add_middleware(OpsMiddleware)
+# Marks the generated-file downloads as AI-generated (utils/ai_marking.py).
+app.add_middleware(AIMarkMiddleware)
 
 
 @app.exception_handler(Exception)

@@ -7,7 +7,9 @@ import {
   estimateSeconds,
   formatDuration,
   joinBytes,
+  joinMp3,
   splitForSpeech,
+  withoutId3,
   wordCount,
 } from "./tts-data";
 
@@ -65,4 +67,20 @@ test("joinBytes puts the parts one after the other", () => {
   expect([...joinBytes([new Uint8Array([1, 2]), new Uint8Array([3])])]).toEqual(
     [1, 2, 3],
   );
+});
+
+// An ID3v2.3 header with a 4-byte body, then two bytes of audio.
+const tagged = new Uint8Array([
+  0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 4, 9, 9, 9, 9, 0xff, 0xfb,
+]);
+
+test("withoutId3 drops a leading tag and leaves untagged audio alone", () => {
+  expect([...withoutId3(tagged)]).toEqual([0xff, 0xfb]);
+  expect([...withoutId3(new Uint8Array([0xff, 0xfb, 1]))]).toEqual([
+    0xff, 0xfb, 1,
+  ]);
+});
+
+test("joinMp3 keeps the first part's tag and drops the others'", () => {
+  expect([...joinMp3([tagged, tagged])]).toEqual([...tagged, 0xff, 0xfb]);
 });

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AiNotice } from "@/components/ai-notice";
 import { FooterServer } from "@/components/layout/footer-server";
 import { SiteNavServer } from "@/components/layout/site-nav-server";
 import { AccessNotice, ModelSettingsNotice } from "@/components/model-settings";
@@ -11,6 +12,8 @@ interface MainLayoutProps {
   contentWrapper?: "default" | "spaced";
   /** Demo pages explain how to run when the visitor is not signed in or approved. */
   accessNotice?: boolean;
+  /** Demo pages say that their results are AI-generated. */
+  aiNotice?: boolean;
 }
 
 /**
@@ -21,6 +24,7 @@ export async function MainLayout({
   children,
   contentWrapper = "default",
   accessNotice = false,
+  aiNotice = false,
 }: MainLayoutProps) {
   let access = null;
   if (accessNotice) {
@@ -47,6 +51,7 @@ export async function MainLayout({
           />
         )}
         <ModelSettingsNotice />
+        {aiNotice && <AiNotice />}
         {contentWrapper === "spaced" ? (
           <div className="space-y-6">{children}</div>
         ) : (
