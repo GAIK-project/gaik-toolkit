@@ -7,6 +7,8 @@ monkeypatching ``pipeline.create_llm_client``. The fake exposes both ``chat``
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 pytest.importorskip("langgraph")
@@ -520,13 +522,17 @@ def test_curated_brief_filename_uses_id(tmp_path, patch_llm):
     assert (curated / "risk_biz.md").exists()
 
 
-def test_langgraph_missing_raises_or_skip():
-    try:
-        import langgraph  # noqa: F401
-    except ImportError:  # pragma: no cover
-        with pytest.raises(ImportError):
-            from gaik.software_modules.multi_source_report_generator.agentic import (  # noqa: F401
-                run_agentic_report,
-            )
-    else:
-        pytest.skip("langgraph is installed; import-error path not exercised")
+def test_without_langgraph_the_agentic_run_says_how_to_install_it(tmp_path, patch_llm, monkeypatch):
+    patch_llm(_FakeClient(review_mode="none"))
+    (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
+    # Hide langgraph: importing it now fails as it does when the extra is missing.
+    monkeypatch.setitem(sys.modules, "langgraph", None)
+    monkeypatch.setitem(sys.modules, "langgraph.graph", None)
+
+    with pytest.raises(ImportError, match="multi-source-report-generator-agentic"):
+        _gen().run(
+            input_paths=[tmp_path / "src.txt"],
+            sections=[{"id": "summary", "title": "Summary", "instructions": "Summarize."}],
+            output_dir=tmp_path / "out",
+            agentic=True,
+        )
