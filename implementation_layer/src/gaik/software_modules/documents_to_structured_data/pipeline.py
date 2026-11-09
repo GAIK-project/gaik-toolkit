@@ -41,6 +41,21 @@ class PipelineResult:
     requirements: ExtractionRequirements | CompositeExtractionRequirements
 
 
+def _schema_file_stem(schema_name: str) -> str:
+    """Return ``schema_name`` if it is usable as a file name inside ``schema_dir``.
+
+    The name becomes ``<schema_dir>/<name>.py``, so a name with a path separator
+    or a parent reference would place the schema outside that directory.
+    """
+    name = str(schema_name)
+    if not name or name in {".", ".."} or any(ch in name for ch in ("/", "\\", "\x00")):
+        raise ValueError(
+            f"Invalid schema_name {schema_name!r}: it must be a plain file name "
+            "without path separators."
+        )
+    return name
+
+
 class DocumentsToStructuredData:
     """End-to-end workflow: parse document(s) -> structured extraction."""
 
@@ -198,9 +213,10 @@ class DocumentsToStructuredData:
         schema_dir: Path,
         schema_name: str,
     ) -> None:
+        stem = _schema_file_stem(schema_name)
         schema_dir.mkdir(parents=True, exist_ok=True)
-        schema_path = schema_dir / f"{schema_name}.py"
-        req_path = schema_dir / f"{schema_name}_requirements.json"
+        schema_path = schema_dir / f"{stem}.py"
+        req_path = schema_dir / f"{stem}_requirements.json"
 
         buffer = io.StringIO()
         with redirect_stdout(buffer):
@@ -230,8 +246,9 @@ from pydantic import BaseModel, Field, ConfigDict
     def load_schema(
         self, schema_dir: Path, schema_name: str
     ) -> tuple[type, ExtractionRequirements | CompositeExtractionRequirements] | None:
-        schema_path = schema_dir / f"{schema_name}.py"
-        req_path = schema_dir / f"{schema_name}_requirements.json"
+        stem = _schema_file_stem(schema_name)
+        schema_path = schema_dir / f"{stem}.py"
+        req_path = schema_dir / f"{stem}_requirements.json"
         if not (schema_path.exists() and req_path.exists()):
             return None
 
