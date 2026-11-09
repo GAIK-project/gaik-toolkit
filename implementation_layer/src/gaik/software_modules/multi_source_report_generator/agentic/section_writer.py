@@ -33,9 +33,11 @@ def _file_stem(section_id: str) -> str:
     """A section id as a file name.
 
     A character that cannot be in a file name is written as ``%XX``, so the file
-    stays in its folder and two different ids never share a file.
+    stays in its folder and two different ids never share a file. Empty for an
+    id of spaces only; cut at 150 characters, which a file name can always hold.
     """
-    return _NOT_IN_A_FILE_NAME.sub(lambda match: f"%{ord(match.group()):02X}", section_id)
+    name = _NOT_IN_A_FILE_NAME.sub(lambda match: f"%{ord(match.group()):02X}", section_id)
+    return name.strip()[:150]
 
 
 def _usage_of(response: Any) -> dict:

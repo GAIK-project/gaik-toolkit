@@ -1460,11 +1460,11 @@ def _init_pairwise_df(
                 "_resp_b": row[b],
                 **{ac: pd.NA for ac in aspect_cols},
             }
-            # A question read back from a saved CSV is in the form _write_csv gave it.
+            # A row read back from a saved CSV is in the form _write_csv gave it.
             key = next(
                 (
                     k
-                    for k in ((q, a, b), (_csv_cell(q), a, b))
+                    for k in ((q, a, b), (_csv_cell(q), _csv_cell(a), _csv_cell(b)))
                     if prior is not None and k in prior.index
                 ),
                 None,

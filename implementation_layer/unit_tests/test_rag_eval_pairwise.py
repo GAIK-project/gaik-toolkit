@@ -78,3 +78,18 @@ def test_a_saved_table_resumes_without_judging_again(tmp_path):
     assert len(judge.shown) == calls
     assert resumed.comparisons_df["question"].tolist() == frame["question"].tolist()
     assert resumed.comparisons_df["winner"].tolist() == ["tie"] * 3
+
+
+def test_a_saved_table_resumes_when_a_system_name_starts_like_a_formula(tmp_path):
+    frame = _frame().rename(
+        columns={"x_response": "-base_response", "y_response": "+rerank_response"}
+    )
+    judge = _Judge(winner="tie")
+    evaluator = RAGResponseEvaluator(judge, max_concurrency=1)
+    evaluator.save(evaluator.evaluate_pairwise(frame, random_seed=1), tmp_path, write_plots=False)
+    calls = len(judge.shown)
+
+    saved = pd.read_csv(tmp_path / "rag_eval_pairwise.csv")
+    evaluator.evaluate_pairwise(frame, resume_from=saved, random_seed=1)
+
+    assert len(judge.shown) == calls

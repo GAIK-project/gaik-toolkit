@@ -93,6 +93,18 @@ def parse_srt_content(srt_content: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+def _first_own_start(srt_content: str, overlap_start: float) -> float | None:
+    """Seconds from a chunk's own start to its first subtitle that is not all overlap.
+
+    ``0.0`` when that subtitle began in the leading overlap; ``None`` when the
+    chunk has no subtitle past its leading overlap.
+    """
+    for subtitle in parse_srt_content(srt_content):
+        if subtitle["end_seconds"] > overlap_start:
+            return max(0.0, subtitle["start_seconds"] - overlap_start)
+    return None
+
+
 def combine_srt_chunks(
     srt_transcriptions: list[str],
     chunk_metadata: list[dict] | None = None,
@@ -103,9 +115,9 @@ def combine_srt_chunks(
     absolute position.  When *chunk_metadata* is provided (from overlap-based
     splitting), the overlap between two chunks is taken from one of them: a
     subtitle that ends before a chunk's own start belongs to the chunk before,
-    and one that starts after a chunk's own end belongs to the chunk after. A
-    subtitle that crosses the boundary is kept from both, and the same text
-    repeated right at the boundary is dropped.
+    and one that starts in a chunk's trailing overlap belongs to the chunk
+    after, from that chunk's first subtitle on. A subtitle that crosses the
+    boundary is kept from both, unless both chunks give it the same text.
 
     Args:
         srt_transcriptions: List of SRT content strings (one per chunk).
@@ -153,21 +165,30 @@ def combine_srt_chunks(
             if chunk_index > 0:
                 time_offset = overlap_info[chunk_index]["nominal_start"]
 
-        # Where this chunk's own part ends, in the chunk's own time. What starts
-        # later is the overlap with the next chunk, which transcribes it too. No
-        # cut when nothing follows: then this chunk is the only one holding it.
+        # Where the next chunk takes over, in this chunk's own time: at the
+        # next chunk's first subtitle of its own. What starts later in this
+        # chunk's trailing overlap is in the next chunk too. No cut when the
+        # next chunk has no subtitle of its own: then only this chunk holds it.
         chunk_cut: float | None = None
         next_index = chunk_index + 1
         if (
             next_index < len(overlap_info)
             and next_index < len(srt_transcriptions)
-            and srt_transcriptions[next_index].strip()
             and overlap_info[chunk_index]["overlap_end"] > 0
         ):
-            chunk_cut = chunk_overlap_start + (
-                overlap_info[next_index]["nominal_start"]
-                - overlap_info[chunk_index]["nominal_start"]
+            next_start = _first_own_start(
+                srt_transcriptions[next_index], overlap_info[next_index]["overlap_start"]
             )
+            if next_start is not None:
+                chunk_cut = (
+                    chunk_overlap_start
+                    + overlap_info[next_index]["nominal_start"]
+                    - overlap_info[chunk_index]["nominal_start"]
+                    + next_start
+                )
+
+        # Texts of the chunks before this one, for the duplicate check below.
+        earlier_texts = dict(recent_texts)
 
         for block in blocks:
             lines = block.strip().split("\n")
@@ -201,15 +222,17 @@ def combine_srt_chunks(
 
             subtitle_text = "\n".join(lines[2:])
 
-            # Text-based duplicate detection, at the start of a chunk only: the
-            # same words said again later in the chunk are not a duplicate.
+            # Text-based duplicate detection. With overlap metadata a duplicate
+            # is the same text from an earlier chunk that was still running when
+            # this subtitle starts: both chunks transcribed the same speech. The
+            # same words said again after that one ended are kept.
             normalized_text = _normalize_text_for_comparison(subtitle_text)
-            near_boundary = not overlap_info or (
-                start_seconds - time_offset < chunk_overlap_start + 5
-            )
-            if chunk_index > 0 and near_boundary and normalized_text in recent_texts:
-                prev_end = recent_texts[normalized_text]
-                if abs(start_seconds - prev_end) < chunk_overlap_start + 5:
+            if chunk_index > 0 and overlap_info:
+                earlier_end = earlier_texts.get(normalized_text)
+                if earlier_end is not None and start_seconds < earlier_end:
+                    continue
+            elif chunk_index > 0 and normalized_text in recent_texts:
+                if abs(start_seconds - recent_texts[normalized_text]) < 5:
                     continue
 
             new_start = seconds_to_time(start_seconds)

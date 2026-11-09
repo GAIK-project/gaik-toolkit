@@ -513,6 +513,8 @@ def test_curated_brief_stays_in_its_folder_whatever_the_section_id(tmp_path, pat
             {"id": "costs 2026", "title": "Costs 2026", "instructions": "Costs."},
             {"id": "costs_2026", "title": "Costs, 2026", "instructions": "Costs."},
             {"id": "a%2Fb", "title": "Other costs", "instructions": "Costs."},
+            # An id of spaces only falls back to the title.
+            {"id": "   ", "title": "Blank id", "instructions": "Costs."},
         ],
         output_dir=out,
         agentic=True,
@@ -524,6 +526,7 @@ def test_curated_brief_stays_in_its_folder_whatever_the_section_id(tmp_path, pat
         "..%2F..%2F..%2Fescaped.md",
         "a%252Fb.md",
         "a%2Fb.md",
+        "blank_id.md",
         "costs 2026.md",
         "costs_2026.md",
     ]

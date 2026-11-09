@@ -73,6 +73,33 @@ def test_a_subtitle_both_chunks_place_at_the_boundary_is_kept_once():
     assert [text for _, text in _merged(first, second)] == ["Same words", "next"]
 
 
+def test_the_same_words_right_after_a_boundary_are_kept():
+    # Said before the boundary, and twice more after it: three utterances.
+    first = _srt((1195, 1196, "Kyllä."))
+    second = _srt((10, 11, "Kyllä."), (18, 19, "Kyllä."), (21, 22, "Kyllä."))  # 1195, 1203, 1206 s
+
+    assert _merged(first, second) == [(1195.0, "Kyllä."), (1203.0, "Kyllä."), (1206.0, "Kyllä.")]
+
+
+def test_the_later_chunk_takes_over_at_its_first_subtitle():
+    first = _srt((1190, 1195, "before"), (1202, 1204, "only in the first"), (1207, 1210, "both"))
+    # The later chunk heard nothing between 1200 and 1205 s.
+    second = _srt((5, 10, "before"), (20, 25, "both, split differently"))
+
+    assert [text for _, text in _merged(first, second)] == [
+        "before",
+        "only in the first",
+        "both, split differently",
+    ]
+
+
+def test_the_trailing_overlap_is_kept_when_the_later_chunk_stops_before_it():
+    first = _srt((1190, 1195, "before"), (1202, 1206, "only this chunk has it"))
+    second = _srt((5, 10, "before"))  # nothing past its leading overlap
+
+    assert [text for _, text in _merged(first, second)] == ["before", "only this chunk has it"]
+
+
 def test_the_trailing_overlap_is_kept_when_no_chunk_follows_it():
     first = _srt((1190, 1195, "before"), (1205, 1210, "only this chunk has it"))
 
