@@ -7,6 +7,7 @@ using pre-generated Pydantic models.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 
@@ -19,7 +20,6 @@ from gaik.observability import (
     measure_duration,
     openai_usage_to_dict,
 )
-from gaik.software_components.llm.base import UsageCounter, usage_since
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.providers import resolve_provider
 
@@ -33,6 +33,10 @@ from .schema import (
     normalize_composite_extracted_data,
     normalize_extracted_data,
 )
+
+
+#: Changes when the extractor's system prompt changes; part of its spans' config version.
+_PROMPT_VERSION = hashlib.sha256(SYSTEM_PARSER.encode("utf-8")).hexdigest()[:12]
 
 
 @dataclass
@@ -163,15 +167,12 @@ class DataExtractor:
             },
         ]
 
-        provider = _provider_name(getattr(self, "config", None) or {})
-        counter = getattr(self.client, "usage", None)
-        before = counter.snapshot() if isinstance(counter, UsageCounter) else None
         with llm_span(
             "DataExtractor",
-            provider=provider,
+            provider=_provider_name(getattr(self, "config", None) or {}),
             model=self.model,
             settings={"temperature": self.temperature, "reasoning_effort": self.reasoning_effort},
-            input_length=sum(len(m["content"]) for m in messages),
+            prompt_version=_PROMPT_VERSION,
         ) as call:
             with measure_duration() as elapsed:
                 resp = _parse_with(
@@ -193,10 +194,15 @@ class DataExtractor:
             )
 
             parsed = resp.choices[0].message.parsed
-            call.record(
-                usage or _adapter_usage(counter, before, provider, self.model, duration_s),
-                output_length=_output_length(parsed),
-            )
+            if call.recording:
+                # Tokens reach the span on the OpenAI/Azure path; the other
+                # adapters return no per-call usage here.
+                call.record(
+                    usage,
+                    input_length=sum(len(m["content"]) for m in messages),
+                    output_length=_output_length(parsed),
+                    response_model=getattr(resp, "model", None),
+                )
         result_dict = parsed.model_dump()
 
         if isinstance(result_dict, dict) and isinstance(
@@ -351,31 +357,5 @@ def _output_length(parsed: BaseModel | None) -> int | None:
     """Length of the parsed record as JSON, for the span; never its content."""
     try:
         return len(parsed.model_dump_json()) if parsed is not None else None
-    except Exception:
-        return None
-
-
-def _adapter_usage(
-    counter: UsageCounter | None,
-    before: dict[str, int] | None,
-    provider: str,
-    model: str,
-    duration_s: float,
-) -> UsageRecord | None:
-    """Tokens a ProviderClient counted for this call, for the span only.
-
-    The non-OpenAI adapters return the parsed model without a usage payload,
-    so the call's tokens are read from the client's running counter instead.
-    """
-    if counter is None or before is None:
-        return None
-    try:
-        tokens = usage_since(before, counter.snapshot())
-        if not tokens:
-            return None
-        # The adapters count in the chat-completions names.
-        tokens.setdefault("input_tokens", tokens.get("prompt_tokens", 0))
-        tokens.setdefault("output_tokens", tokens.get("completion_tokens", 0))
-        return build_usage_record(provider, model, tokens, duration_s)
     except Exception:
         return None

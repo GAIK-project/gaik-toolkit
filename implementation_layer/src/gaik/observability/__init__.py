@@ -23,8 +23,8 @@ from .usage import UsageRecord, build_usage_record
 
 __all__ = [
     "ANTHROPIC_PRICING_PER_M",
-    "LLMCallSpan",
     "GEMINI_PRICING_PER_M",
+    "LLMCallSpan",
     "OPENAI_PRICING_PER_M",
     "Provider",
     "UsageRecord",

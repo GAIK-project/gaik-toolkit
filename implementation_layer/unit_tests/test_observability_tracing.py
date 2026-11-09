@@ -57,36 +57,79 @@ def test_without_the_extra_a_call_runs_as_before(monkeypatch, off):
     assert tracing._get_tracer() is None
 
 
-def test_without_an_endpoint_or_an_application_provider_nothing_is_set_up(monkeypatch, off):
+def test_without_an_endpoint_gaik_follows_the_application_s_provider(monkeypatch, off):
+    # The API's tracer, not a decision made once: it follows a provider the
+    # application sets later, and records nothing until then.
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
-    monkeypatch.setattr(trace, "get_tracer_provider", trace.ProxyTracerProvider)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
+    sentinel = object()
+    monkeypatch.setattr(trace, "get_tracer", lambda *args, **kwargs: sentinel)
+    assert tracing._resolve_tracer() is sentinel
+
+
+def test_with_an_endpoint_gaik_exports_by_itself_and_leaves_the_global_provider_alone(
+    monkeypatch, off
+):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setenv("OTEL_SERVICE_NAME", "gaik-test")
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "gaik.run.id=run-1")
+    before = trace.get_tracer_provider()
+
+    tracer = tracing._resolve_tracer()
+
+    assert tracer is not None
+    assert trace.get_tracer_provider() is before
+    resource = tracing._provider.resource.attributes
+    assert resource["service.name"] == "gaik-test"
+    assert resource["gaik.run.id"] == "run-1"
+    tracing._provider.shutdown()
+
+
+def test_otel_sdk_disabled_turns_gaik_s_spans_off(monkeypatch, off):
+    monkeypatch.setenv("OTEL_SDK_DISABLED", "true")
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9")
     assert tracing._resolve_tracer() is None
+
+
+def test_without_a_recording_tracer_the_call_skips_the_span_s_work(monkeypatch, off):
+    monkeypatch.setattr(tracing, "_get_tracer", lambda: trace.NoOpTracer())
+    with llm_span("DataExtractor", provider="openai", model="m") as call:
+        assert call.recording is False
+        call.record(None, output_length=1)
 
 
 def test_a_call_becomes_one_span_with_its_usage_and_no_text(spans):
     usage = build_usage_record(
         "openai",
-        "gpt-4.1",
+        "gpt-6-luna",
         {"input_tokens": 2104, "output_tokens": 423, "thinking_tokens": 0},
         6.1,
     )
     with llm_span(
         "DataExtractor",
         provider="azure",
-        model="gpt-4.1",
+        model="gpt-6-luna",
         settings={"temperature": 0.0, "reasoning_effort": None},
-        input_length=len("Salainen dokumentti"),
+        prompt_version="p1",
     ) as call:
-        call.record(usage, output_length=len('{"reporter": "Matti"}'))
+        call.record(
+            usage,
+            input_length=len("Salainen dokumentti"),
+            output_length=len('{"reporter": "Matti"}'),
+            response_model="gpt-6-luna-2026-05-01",
+        )
 
     (span,) = spans()
-    assert span.name == "chat gpt-4.1"
+    assert span.name == "chat gpt-6-luna"
     assert span.kind == trace.SpanKind.CLIENT
     a = span.attributes
     assert a["gaik.event.class"] == "llm_call"
     assert a["gen_ai.operation.name"] == "chat"
-    assert a["gen_ai.provider.name"] == "azure"
-    assert a["gen_ai.request.model"] == "gpt-4.1"
+    assert a["gen_ai.provider.name"] == "azure.ai.openai"
+    assert a["gaik.provider.name"] == "azure"
+    assert a["gen_ai.request.model"] == "gpt-6-luna"
+    assert a["gen_ai.response.model"] == "gpt-6-luna-2026-05-01"
+    assert a["gaik.prompt.version"] == "p1"
     assert a["gen_ai.request.temperature"] == 0.0
     assert "gaik.request.reasoning_effort" not in a
     assert a["gen_ai.usage.input_tokens"] == 2104
@@ -99,6 +142,27 @@ def test_a_call_becomes_one_span_with_its_usage_and_no_text(spans):
     assert len(a["gaik.config.version"]) == 16
     assert "Salainen" not in _values(span)
     assert "Matti" not in _values(span)
+
+
+def test_a_model_without_a_known_price_gets_no_cost(spans):
+    usage = build_usage_record(
+        "openai", "custom-model", {"input_tokens": 10, "output_tokens": 5}, 1
+    )
+    with llm_span("DataExtractor", provider="openai", model="custom-model") as call:
+        call.record(usage)
+    (span,) = spans()
+    assert span.attributes["gen_ai.usage.input_tokens"] == 10
+    assert "gaik.cost.usd" not in span.attributes
+
+
+def test_spans_made_during_the_call_nest_under_it(spans):
+    tracer = trace.get_tracer("test")
+    with llm_span("DataExtractor", provider="openai", model="m"):
+        with tracer.start_as_current_span("http POST"):
+            pass
+    by_name = {s.name: s for s in spans()}
+    http, llm = by_name["http POST"], by_name["chat m"]
+    assert http.parent.span_id == llm.context.span_id
 
 
 def test_the_call_s_error_passes_through_and_the_span_keeps_only_its_type(spans):
@@ -208,46 +272,5 @@ def test_the_extractor_s_error_is_unchanged_and_marks_the_span(spans):
 
     (span,) = spans()
     assert span.status.status_code == trace.StatusCode.ERROR
-    assert span.attributes["error.type"] == "ValueError"
+    assert span.attributes["error.type"] == "builtins.ValueError"
     assert "document text" not in _values(span)
-
-
-class _FakeAdapter:
-    """A ProviderClient (non-OpenAI path): returns the parsed model, counts usage itself."""
-
-    provider = "anthropic_foundry"
-    model = "claude-test"
-    raw = None
-
-    def __init__(self) -> None:
-        from gaik.software_components.llm.base import UsageCounter
-
-        self.usage = UsageCounter()
-
-    def chat(self, messages, **kwargs):  # pragma: no cover - not used
-        raise NotImplementedError
-
-    def chat_parsed(self, messages, response_format, **kwargs):
-        self.usage.add({"prompt_tokens": 210, "completion_tokens": 18})
-        return response_format(reporter="Matti Virtanen")
-
-    def chat_stream(self, messages, **kwargs):  # pragma: no cover - not used
-        raise NotImplementedError
-
-    def embed(self, texts, **kwargs):  # pragma: no cover - not used
-        raise NotImplementedError
-
-
-def test_an_adapter_call_s_tokens_reach_the_span_and_the_return_value_is_unchanged(spans):
-    extractor = _extractor(_FakeAdapter())
-    extractor.config = {"provider": "anthropic_foundry", "api_key": "test", "model": "claude-test"}
-    extractor.model = "claude-test"
-
-    record, usage = extractor._extract_one("doc", _Record, _requirements(), "Extract")
-
-    assert record["reporter"] == "Matti Virtanen"
-    assert usage is None  # as before: the extractor reports usage on the OpenAI path only
-    (span,) = spans()
-    assert span.attributes["gen_ai.provider.name"] == "anthropic_foundry"
-    assert span.attributes["gen_ai.usage.input_tokens"] == 210
-    assert span.attributes["gen_ai.usage.output_tokens"] == 18
