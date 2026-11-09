@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+import re
 import shutil
 import tempfile
 import threading
@@ -39,6 +40,9 @@ from .models import TranscriptionModel, TranscriptionResult
 from .srt import combine_srt_chunks, extract_text_from_srt, seconds_to_time
 
 logger = logging.getLogger(__name__)
+
+# An SRT timestamp, "HH:MM:SS,mmm"; WebVTT writes the same with a dot.
+_SRT_TIMESTAMP = re.compile(r"(\d{2}:\d{2}:\d{2}),(\d{3})")
 
 # GPT-4o Transcribe refuses any request whose audio is longer than 1400 s
 # ("audio duration ... is longer than 1400 seconds which is the maximum for
@@ -135,7 +139,7 @@ class ParallelTranscriber:
         cfg = self._config
         model = cfg.model
         audio_path: Path | None = None
-        temp_audio: Path | None = None  # track extracted audio for cleanup
+        temp_dir: Path | None = None  # holds the extracted audio; removed at the end
 
         # Fail fast if the file is a video without an audio stream
         if has_video_stream(file_path) and not has_audio_stream(file_path):
@@ -151,7 +155,7 @@ class ParallelTranscriber:
 
                 temp_dir = Path(tempfile.mkdtemp(prefix="parallel_transcriber_"))
                 audio_path = temp_dir / f"{file_path.stem}.mp3"
-                temp_audio = extract_audio(file_path, audio_path, config=cfg)
+                extract_audio(file_path, audio_path, config=cfg)
 
                 if progress_callback:
                     progress_callback("extracting", 1, 1, "Audio extracted")
@@ -288,9 +292,8 @@ class ParallelTranscriber:
             )
 
         finally:
-            # Clean up extracted audio temp dir
-            if temp_audio is not None:
-                temp_dir = temp_audio.parent
+            # Remove the extracted audio's temp dir, also when the extraction failed
+            if temp_dir is not None:
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
     # ------------------------------------------------------------------
@@ -797,7 +800,8 @@ class ParallelTranscriber:
         if fmt == "text":
             return extract_text_from_srt(srt_content)
         if fmt == "vtt":
-            return "WEBVTT\n\n" + srt_content.replace(",", ".")
+            # Only the timestamps change their separator; the text keeps its commas.
+            return "WEBVTT\n\n" + _SRT_TIMESTAMP.sub(r"\1.\2", srt_content)
         # json / verbose_json — return SRT as-is (no structured data available)
         return srt_content
 

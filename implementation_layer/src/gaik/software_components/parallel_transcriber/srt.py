@@ -33,10 +33,13 @@ def time_to_seconds(time_str: str) -> float:
 
 def seconds_to_time(seconds: float) -> str:
     """Convert seconds to SRT timestamp format (``HH:MM:SS,mmm``)."""
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    secs = seconds % 60
-    return f"{hours:02d}:{minutes:02d}:{secs:06.3f}".replace(".", ",")
+    # Whole milliseconds first: formatting 59.9996 s on its own rounds the
+    # seconds field up to "60,000".
+    total_ms = max(0, round(seconds * 1000))
+    hours, rest = divmod(total_ms, 3_600_000)
+    minutes, rest = divmod(rest, 60_000)
+    secs, millis = divmod(rest, 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
 
 # ---------------------------------------------------------------------------
@@ -98,8 +101,11 @@ def combine_srt_chunks(
 
     Timestamps are adjusted so each chunk continues from the correct
     absolute position.  When *chunk_metadata* is provided (from overlap-based
-    splitting), subtitles in the overlap region are deduplicated using both
-    time-based skipping and text-based similarity comparison.
+    splitting), the overlap between two chunks is taken from one of them: a
+    subtitle that ends before a chunk's own start belongs to the chunk before,
+    and one that starts after a chunk's own end belongs to the chunk after. A
+    subtitle that crosses the boundary is kept from both, and the same text
+    repeated right at the boundary is dropped.
 
     Args:
         srt_transcriptions: List of SRT content strings (one per chunk).
@@ -147,6 +153,22 @@ def combine_srt_chunks(
             if chunk_index > 0:
                 time_offset = overlap_info[chunk_index]["nominal_start"]
 
+        # Where this chunk's own part ends, in the chunk's own time. What starts
+        # later is the overlap with the next chunk, which transcribes it too. No
+        # cut when nothing follows: then this chunk is the only one holding it.
+        chunk_cut: float | None = None
+        next_index = chunk_index + 1
+        if (
+            next_index < len(overlap_info)
+            and next_index < len(srt_transcriptions)
+            and srt_transcriptions[next_index].strip()
+            and overlap_info[chunk_index]["overlap_end"] > 0
+        ):
+            chunk_cut = chunk_overlap_start + (
+                overlap_info[next_index]["nominal_start"]
+                - overlap_info[chunk_index]["nominal_start"]
+            )
+
         for block in blocks:
             lines = block.strip().split("\n")
             if len(lines) < 3:
@@ -155,6 +177,10 @@ def combine_srt_chunks(
             start_time, end_time = lines[1].split(" --> ")
             original_start = time_to_seconds(start_time)
             original_end = time_to_seconds(end_time)
+
+            # Skip subtitles that start in the overlap with the next chunk
+            if chunk_cut is not None and original_start >= chunk_cut:
+                continue
 
             # Skip subtitles entirely within the overlap region (already in prev chunk)
             if chunk_index > 0 and chunk_overlap_start > 0:
@@ -175,9 +201,13 @@ def combine_srt_chunks(
 
             subtitle_text = "\n".join(lines[2:])
 
-            # Text-based duplicate detection
+            # Text-based duplicate detection, at the start of a chunk only: the
+            # same words said again later in the chunk are not a duplicate.
             normalized_text = _normalize_text_for_comparison(subtitle_text)
-            if chunk_index > 0 and normalized_text in recent_texts:
+            near_boundary = not overlap_info or (
+                start_seconds - time_offset < chunk_overlap_start + 5
+            )
+            if chunk_index > 0 and near_boundary and normalized_text in recent_texts:
                 prev_end = recent_texts[normalized_text]
                 if abs(start_seconds - prev_end) < chunk_overlap_start + 5:
                     continue
