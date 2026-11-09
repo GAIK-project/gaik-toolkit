@@ -29,6 +29,10 @@ except ImportError:
         save_schema,
         sse_event,
     )
+try:
+    from routers.pipeline import _pdf_path
+except ImportError:
+    from api.routers.pipeline import _pdf_path
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
@@ -227,7 +231,9 @@ async def diary_audio_pipeline_stream(
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title="Construction Diary", logo_path=logo)
-                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                    # In the pipeline's PDF folder, so its sweep removes
+                    # this one too after an hour (main.py starts it).
+                    pdf_path = _pdf_path(job_id)
 
                     if extracted_data:
                         pdf_data = extracted_data
@@ -390,7 +396,9 @@ async def diary_text_pipeline_stream(
 
                     logo = LOGO_PATH if LOGO_PATH.exists() else None
                     pdf_generator = StructuredDataToPDF(title="Construction Diary", logo_path=logo)
-                    pdf_path = Path(tempfile.gettempdir()) / f"{job_id}.pdf"
+                    # In the pipeline's PDF folder, so its sweep removes
+                    # this one too after an hour (main.py starts it).
+                    pdf_path = _pdf_path(job_id)
 
                     pdf_data = extracted_data if extracted_data else [{"input_text": text}]
                     pdf_generator.run(pdf_data, pdf_path)

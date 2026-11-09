@@ -64,6 +64,38 @@ def test_a_pdf_left_by_an_earlier_process_is_removed(tmp_path, monkeypatch):
     assert not leftover.exists() and recent.exists()
 
 
+def test_one_file_that_cannot_go_does_not_end_the_pass(tmp_path, monkeypatch):
+    import os
+    from datetime import datetime, timedelta
+    from pathlib import Path
+
+    monkeypatch.setattr(pipeline, "PDF_DIR", tmp_path)
+    monkeypatch.setattr(pipeline, "PDF_STORAGE", {})
+    monkeypatch.setattr(pipeline, "PDF_TIMESTAMPS", {})
+    two_hours_ago = (datetime.now() - timedelta(hours=2)).timestamp()
+    held, other = tmp_path / "held.pdf", tmp_path / "other.pdf"
+    for pdf in (held, other):
+        pdf.write_bytes(b"%PDF-1.4\n")
+        os.utime(pdf, (two_hours_ago, two_hours_ago))
+    real_unlink = Path.unlink
+
+    def unlink(self, missing_ok=False):
+        if self.name == "held.pdf":
+            raise PermissionError("held open")
+        real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+
+    assert pipeline.remove_expired_pdfs() == 1
+    assert held.exists() and not other.exists()
+
+
+def test_diary_pdfs_go_to_the_swept_folder():
+    from api.routers import diary
+
+    assert diary._pdf_path is pipeline._pdf_path
+
+
 def test_the_api_starts_the_pdf_cleanup(monkeypatch):
     from api import main
     from fastapi.testclient import TestClient

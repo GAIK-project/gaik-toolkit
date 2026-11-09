@@ -93,6 +93,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 PDF_CLEANUP_AFTER_HOURS = 1
+# A sweep every ten minutes keeps a PDF at most 70 minutes; an hourly one let
+# a PDF made just after a pass live almost two hours.
+PDF_SWEEP_SECONDS = 600
 
 # Generated PDFs live in their own folder, so a file left by an earlier process
 # (the maps below start empty after a restart) is still found and removed.
@@ -206,23 +209,30 @@ def remove_expired_pdfs(now: datetime | None = None) -> int:
     for job_id, timestamp in list(PDF_TIMESTAMPS.items()):
         if timestamp < cutoff:
             path = PDF_STORAGE.pop(job_id, None)
-            if path is not None and path.exists():
-                path.unlink(missing_ok=True)
-                removed += 1
             PDF_TIMESTAMPS.pop(job_id, None)
+            # One file that cannot go (held open, say) must not end the pass;
+            # the folder sweep below tries it again next time.
+            try:
+                if path is not None and path.exists():
+                    path.unlink(missing_ok=True)
+                    removed += 1
+            except OSError:
+                logger.warning("Could not remove an expired pipeline PDF")
     if PDF_DIR.is_dir():
         for path in PDF_DIR.glob("*.pdf"):
             try:
                 if datetime.fromtimestamp(path.stat().st_mtime) < cutoff:
                     path.unlink(missing_ok=True)
                     removed += 1
-            except FileNotFoundError:
-                pass
+                    PDF_STORAGE.pop(path.stem, None)
+                    PDF_TIMESTAMPS.pop(path.stem, None)
+            except OSError:
+                logger.warning("Could not remove an expired pipeline PDF")
     return removed
 
 
 async def cleanup_old_pdfs():
-    """Background task (started in main.py): remove expired PDFs at start and hourly."""
+    """Background task (started in main.py): remove expired PDFs at start and every ten minutes."""
     while True:
         try:
             removed = remove_expired_pdfs()
@@ -230,7 +240,7 @@ async def cleanup_old_pdfs():
                 logger.info("Removed %d expired pipeline PDFs", removed)
         except Exception:  # noqa: BLE001 - the loop must outlive one failed pass
             logger.exception("Pipeline PDF cleanup failed")
-        await asyncio.sleep(3600)
+        await asyncio.sleep(PDF_SWEEP_SECONDS)
 
 
 # Logo path for PDF generation (letter-only logo works better for PDF headers)
