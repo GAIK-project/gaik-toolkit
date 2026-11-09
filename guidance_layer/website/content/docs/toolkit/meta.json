@@ -2,6 +2,7 @@
   "title": "Implementation Layer",
   "pages": [
     "software-components",
+    "source-tracing",
     "hybrid-search",
     "multi-provider-llm",
     "software-modules",

@@ -311,6 +311,7 @@ all = [
     "gaik[source-normalizer]",
     "gaik[knowledge-curator]",
     "gaik[draft-reviewer]",
+    "gaik[source-tracing]",
     "gaik[report-synthesizer]",
     "gaik[report-writer]",
     "gaik[web-scraper]",
@@ -366,6 +367,11 @@ knowledge-curator = []
 
 # Exact search-and-replace fact check of generated text (core deps only).
 draft-reviewer = []
+
+# Evidence quotes for extracted values, checked against the source. PyMuPDF is for PDFs only.
+source-tracing = [
+    "PyMuPDF>=1.26.0",
+]
 
 # Governed report writing from curated knowledge. DOCX export needs the Pandoc
 # system binary (https://pandoc.org/installing.html).
@@ -435,6 +441,7 @@ all-cpu = [
     "gaik[source-normalizer]",
     "gaik[knowledge-curator]",
     "gaik[draft-reviewer]",
+    "gaik[source-tracing]",
     "gaik[report-synthesizer]",
     "gaik[report-writer]",
     "gaik[web-scraper]",

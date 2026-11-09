@@ -93,6 +93,9 @@ pip install "gaik[knowledge-curator]"
 pip install "gaik[draft-reviewer]"
 pip install "gaik[report-synthesizer]"
 
+# Evidence quotes for extracted values, checked against the source
+pip install "gaik[source-tracing]"
+
 # Web pages and sites -> Markdown (allowlisted, robots.txt-aware crawler)
 pip install "gaik[web-scraper]"
 
