@@ -51,6 +51,8 @@ _FAMILY_BY_EXTENSION = {
 _ISO_ATOMS = (b"ftyp", b"moov", b"mdat", b"wide", b"free", b"skip")
 
 # Signatures that are never text, so a renamed binary is not taken as CSV.
+# Executables ("MZ") and Parquet ("PAR1") are left to the NUL check: both hold
+# zero bytes early on, while a CSV may well start with a column named "MZ".
 _BINARY_PREFIXES = (
     b"%PDF-",
     b"\x89PNG",
@@ -63,8 +65,6 @@ _BINARY_PREFIXES = (
     b"7z\xbc\xaf\x27\x1c",
     b"Rar!\x1a\x07",
     b"\x7fELF",
-    b"MZ",
-    b"PAR1",
 )
 
 _TEXT_PROBE_BYTES = 64 * 1024
@@ -73,8 +73,15 @@ _TEXT_PROBE_BYTES = 64 * 1024
 def _is_mpeg_audio(data: bytes) -> bool:
     if data.startswith(b"ID3"):
         return True
-    # A bare MPEG audio or ADTS frame: 12 sync bits.
-    return len(data) >= 2 and data[0] == 0xFF and (data[1] & 0xF0) == 0xF0
+    # A bare MPEG audio frame has 11 sync bits, then a version (01 is reserved,
+    # 00 is MPEG-2.5, common for low-rate voice) and a layer (00 is reserved).
+    # An ADTS (AAC) frame has 12 sync bits and layer 00.
+    if len(data) < 2 or data[0] != 0xFF or (data[1] & 0xE0) != 0xE0:
+        return False
+    version = (data[1] >> 3) & 0b11
+    layer = (data[1] >> 1) & 0b11
+    adts = (data[1] & 0xF0) == 0xF0 and layer == 0
+    return adts or (version != 0b01 and layer != 0)
 
 
 def _zip_names(data: bytes) -> set[str]:
@@ -125,7 +132,11 @@ def _matches(family: str, data: bytes) -> bool:
         return "[Content_Types].xml" in names and "xl/workbook.xml" in names
     if family == "text":
         head = data[:_TEXT_PROBE_BYTES]
-        return not head.startswith(_BINARY_PREFIXES) and b"\x00" not in head
+        # Whitespace first does not make a binary text, and a PDF reader takes
+        # a header anywhere in the first kilobyte (see "pdf" above).
+        if head.lstrip(b" \t\r\n\f\v").startswith(_BINARY_PREFIXES) or b"%PDF-" in head[:1024]:
+            return False
+        return b"\x00" not in head
     return False
 
 
