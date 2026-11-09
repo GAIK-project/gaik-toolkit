@@ -20,6 +20,9 @@ _WORD = re.compile(r"[^\W_]+", re.UNICODE)
 # it, so it is not printed in the document and cannot be compared with the quote.
 _CODE = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
 _NUMBER = re.compile(r"\d(?:[\d\s.,'’]*\d)?")
+# Digits grouped in threes by one kind of separator, as thousands are written:
+# 3.000 or 1,234,567.
+_THOUSANDS = re.compile(r"[1-9]\d{0,2}(?:(?:\.\d{3})+|(?:,\d{3})+)")
 _DATE_PARTS = re.compile(r"\d+")
 # English month names by their first three letters, for dates such as "October 12, 2025".
 _MONTHS = {
@@ -60,7 +63,13 @@ def _numbers_in(text: str) -> list[float]:
 
 def _readings_of(number: str) -> list[float]:
     raw = re.sub(r"[\s'’]", "", number)
-    candidates = {raw.replace(",", "").replace(".", "")}
+    candidates: set[str] = set()
+    if "," not in raw and "." not in raw:
+        candidates.add(raw)
+    elif _THOUSANDS.fullmatch(raw):
+        # Separators that group thousands can be left out. Any other separator is
+        # a decimal point: leaving it out would read 12.5 as 125.
+        candidates.add(raw.replace(",", "").replace(".", ""))
     if "," in raw and "." in raw:
         decimal = "," if raw.rfind(",") > raw.rfind(".") else "."
         group = "." if decimal == "," else ","
