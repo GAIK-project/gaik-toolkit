@@ -45,6 +45,7 @@ def _cite(field: str, quote: str, document: int = 1, page: int = 1) -> dict:
         (1234567, "Population: 1.234.567", "match"),
         (1234567, "Population: 1,234,567", "match"),
         (1234567.5, "Total: 1,234,567.50", "match"),
+        (100000, "Rs 1,00,000", "match"),
         (1234, "Total: 1 234 EUR", "match"),
         (-1014.5, "Discount (5%) - EUR 1,014.50", "match"),
         (-1014.5, "Discount (5%) EUR 1,014.50", "mismatch"),

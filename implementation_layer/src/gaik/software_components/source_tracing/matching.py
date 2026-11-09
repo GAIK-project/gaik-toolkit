@@ -64,11 +64,16 @@ def _numbers_in(text: str) -> list[float]:
 def _readings_of(number: str) -> list[float]:
     raw = re.sub(r"[\s'’]", "", number)
     candidates: set[str] = set()
-    if "," not in raw and "." not in raw:
+    separators = {char for char in raw if char in ",."}
+    if not separators:
         candidates.add(raw)
-    elif _THOUSANDS.fullmatch(raw):
-        # Separators that group thousands can be left out. Any other separator is
-        # a decimal point: leaving it out would read 12.5 as 125.
+    elif len(separators) == 1 and (
+        _THOUSANDS.fullmatch(raw) or raw.count(next(iter(separators))) > 1
+    ):
+        # Separators that group digits can be left out: groups of three (3.000),
+        # or one separator used more than once (1,00,000). A single separator
+        # before any other number of digits is a decimal point, and leaving it
+        # out would read 12.5 as 125.
         candidates.add(raw.replace(",", "").replace(".", ""))
     if "," in raw and "." in raw:
         decimal = "," if raw.rfind(",") > raw.rfind(".") else "."
