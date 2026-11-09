@@ -161,3 +161,5 @@ expected.
   on that complete workflow succeeding. Do not tag, upload to PyPI, or deploy the
   demo until the applicable certification passes. Keep credentials, raw provider
   errors, and personal documents out of reports; use the synthetic fixtures.
+- Once a release is on PyPI, offer to take it into the Solution Wizard v2 fork with the
+  `wizard-upstream-sync` skill: one checked pull request to the fork's `develop`.
