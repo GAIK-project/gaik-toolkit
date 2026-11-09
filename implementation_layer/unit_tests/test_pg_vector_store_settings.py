@@ -21,12 +21,17 @@ def test_anything_else_is_refused_before_any_sql(language):
         PgVectorStore("postgresql://unused", fts_language=language)
 
 
-@pytest.mark.parametrize("value", [None, 40, 200])
+@pytest.mark.parametrize("value", [None, 1, 40, 200, 1000])
 def test_an_integer_ef_search_is_accepted(value):
     assert PgVectorStore("postgresql://unused", hnsw_ef_search=value).hnsw_ef_search == value
 
 
-@pytest.mark.parametrize("value", ["100", "100; RESET ALL", 1.5, True])
+@pytest.mark.parametrize("value", ["100", "100; RESET ALL", 1.5, True, 0, -1, 1001])
 def test_a_non_integer_ef_search_is_refused(value):
     with pytest.raises(ValueError, match="Invalid hnsw_ef_search"):
         PgVectorStore("postgresql://unused", hnsw_ef_search=value)
+
+
+def test_a_string_ef_search_says_how_to_fix_it():
+    with pytest.raises(ValueError, match=r"int\(\)"):
+        PgVectorStore("postgresql://unused", hnsw_ef_search="100")

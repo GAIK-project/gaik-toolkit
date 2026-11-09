@@ -228,10 +228,21 @@ class PgVectorStore:
                 f"Invalid fts_language {fts_language!r}: must be a text search "
                 "configuration name (letters, digits, underscores, one optional schema prefix)"
             )
-        if hnsw_ef_search is not None and (
-            isinstance(hnsw_ef_search, bool) or not isinstance(hnsw_ef_search, int)
-        ):
-            raise ValueError(f"Invalid hnsw_ef_search {hnsw_ef_search!r}: must be an integer")
+        if hnsw_ef_search is not None:
+            if isinstance(hnsw_ef_search, bool) or not isinstance(hnsw_ef_search, int):
+                hint = (
+                    " (convert a value read from the environment with int())"
+                    if isinstance(hnsw_ef_search, str)
+                    else ""
+                )
+                raise ValueError(
+                    f"Invalid hnsw_ef_search {hnsw_ef_search!r}: must be an integer{hint}"
+                )
+            # pgvector accepts 1-1000 and otherwise only warns at query time.
+            if not 1 <= hnsw_ef_search <= 1000:
+                raise ValueError(
+                    f"Invalid hnsw_ef_search {hnsw_ef_search!r}: must be between 1 and 1000"
+                )
         if tsquery_mode not in _TSQUERY_MODES:
             raise ValueError(
                 f"Invalid tsquery_mode {tsquery_mode!r}: expected one of "
