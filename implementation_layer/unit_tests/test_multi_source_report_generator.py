@@ -68,11 +68,6 @@ def _gen() -> MultiSourceReportGenerator:
 # ---------------------------------------------------------------------------
 
 
-def test_pipeline_import_and_construct():
-    gen = MultiSourceReportGenerator(api_config={"use_azure": False, "api_key": "x", "model": "m"})
-    assert gen is not None
-
-
 def test_constructor_follows_gaik_convention():
     params = inspect.signature(MultiSourceReportGenerator.__init__).parameters
     assert set(params) - {"self"} == {"api_config", "use_azure"}

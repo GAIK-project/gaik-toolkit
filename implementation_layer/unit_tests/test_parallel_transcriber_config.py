@@ -40,8 +40,13 @@ def test_from_env_azure_alias_override(monkeypatch):
 
 
 def test_bare_legacy_config_is_openai_whatever_llm_provider_says(monkeypatch):
+    from openai import AzureOpenAI, OpenAI
+
     monkeypatch.setenv("LLM_PROVIDER", "aitta")
-    ParallelTranscriber({"api_key": "test"})
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    client = ParallelTranscriber({"api_key": "test"})._make_whisper_client()
+    assert isinstance(client, OpenAI) and not isinstance(client, AzureOpenAI)
+    assert str(client.base_url).startswith("https://api.openai.com/")
 
 
 def test_explicit_non_audio_provider_is_rejected():
