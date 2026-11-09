@@ -2,6 +2,48 @@
 
 This repo is public: never commit machine-local paths, usernames or secret-store locations.
 
+## layout
+
+- `implementation_layer/src/gaik/`: the gaik library, published to PyPI; tests in
+  `implementation_layer/unit_tests/`.
+- `implementation_layer/solution_wizard/`: the Solution Wizard, which mirrors gaik's API
+  (see gaik-sync below).
+- `implementation_layer/toolkit_demo_app/`: the demo, Next.js on bun with a FastAPI
+  backend in `api/`, deployed on Rahti.
+- `guidance_layer/website/`: the docs site.
+
+## checks
+
+- Library: `uv run pytest -m "not llm"`. Tests marked `llm` make real provider calls
+  and need keys.
+- Demo API, from `implementation_layer/toolkit_demo_app/`:
+  `uv run --python 3.11 --with pytest --with pytest-asyncio python -m pytest api/tests -o addopts="" -q`
+  (`python -m` puts the demo folder on `sys.path`, so `import api` works).
+- Demo front end, from the same folder: `bun test`, `bunx tsc --noEmit` and
+  `bun run lint`. CI runs none of these, so run them for a front-end change.
+
+## Code Review Rules
+
+- Important here: a change to gaik's public names, parameters, return shapes or extras
+  without the matching Solution Wizard registry or agent-skill update; an optional
+  dependency whose absence now hides a class silently; a provider or model default
+  changed without the release certification below. In the demo: a request past
+  `proxy.ts` without its sign-in, approval or trial check; a model, transcription or
+  parser call outside the rate limits; an upload that reaches a parser or a model before
+  its content and size are checked; personal data kept past its cleanup; AI output
+  without its AI notice. Anywhere: a secret, real customer document or machine-local
+  path; a test that does not check what its name says; a CI or release check made to
+  pass by skipping it.
+- Give the file and line for each finding and the case where it goes wrong. Report a
+  missing check only after naming the code path that lacks it.
+- When a change leaves a weakness unfixed, name the area and say the details go to the
+  maintainers; never describe how to exploit it in a public issue or comment.
+- At most three nits, none about formatting (ruff owns it). Skip generated files unless
+  the change is about them: `graphify-out/`, the demo's `lib/no-code/catalog.generated.json`
+  and `public/downloads/skills/`, lockfiles and `evaluation_layer/**/runs/`.
+- Start the summary with the number of findings by severity, or say in one line that
+  there is nothing to fix.
+
 ## software components and modules (ask first)
 
 Do not change the toolkit's software components or modules (`implementation_layer/src/gaik/`,
@@ -119,3 +161,5 @@ expected.
   on that complete workflow succeeding. Do not tag, upload to PyPI, or deploy the
   demo until the applicable certification passes. Keep credentials, raw provider
   errors, and personal documents out of reports; use the synthetic fixtures.
+- Once a release is on PyPI, offer to take it into the Solution Wizard v2 fork with the
+  `wizard-upstream-sync` skill: one checked pull request to the fork's `develop`.

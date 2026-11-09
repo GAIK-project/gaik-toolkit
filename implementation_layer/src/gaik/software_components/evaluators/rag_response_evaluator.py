@@ -1073,11 +1073,11 @@ class RAGResponseEvaluator:
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
         if isinstance(result, RAGResponseEvalResult):
-            result.scored_df.to_csv(out / "rag_eval_scored.csv", index=False)
-            _summary_referenced_csv(result).to_csv(out / "rag_eval_summary.csv", index=False)
+            _write_csv(result.scored_df, out / "rag_eval_scored.csv")
+            _write_csv(_summary_referenced_csv(result), out / "rag_eval_summary.csv")
         else:
-            result.comparisons_df.to_csv(out / "rag_eval_pairwise.csv", index=False)
-            _summary_pairwise_csv(result).to_csv(out / "rag_eval_pairwise_ranking.csv", index=False)
+            _write_csv(result.comparisons_df, out / "rag_eval_pairwise.csv")
+            _write_csv(_summary_pairwise_csv(result), out / "rag_eval_pairwise_ranking.csv")
         if write_plots:
             figs = self.plots(result)
             for name, fig in figs.items():
@@ -1353,6 +1353,28 @@ def _count_constraint_violations(sub: pd.DataFrame, col: str, spec: ScoringSpec)
             sub.at[idx, ov_col],
         )
     return violations
+
+
+# A spreadsheet reads a cell that starts with one of these as a formula. The
+# scored and pairwise tables hold questions, answers and judge rationales, all
+# text from a model or a dataset, so such a cell is written with a leading
+# apostrophe and opens as the text it is.
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_cell(value: Any) -> Any:
+    if isinstance(value, str) and value.startswith(_FORMULA_PREFIXES):
+        return "'" + value
+    return value
+
+
+def _write_csv(df: pd.DataFrame, path: Path) -> None:
+    """Write ``df`` as CSV with text cells that a spreadsheet opens as text."""
+    safe = df.copy()
+    for column in safe.columns:
+        if safe[column].dtype == object or pd.api.types.is_string_dtype(safe[column]):
+            safe[column] = safe[column].map(_csv_cell)
+    safe.to_csv(path, index=False)
 
 
 def _summary_referenced_csv(result: RAGResponseEvalResult) -> pd.DataFrame:

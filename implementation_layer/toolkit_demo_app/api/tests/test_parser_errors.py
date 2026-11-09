@@ -32,6 +32,18 @@ def _pdf(pages: int) -> bytes:
     return document.tobytes()
 
 
+def _minimal_docx() -> bytes:
+    """The two parts a DOCX's content check looks for; no parser opens it here."""
+    import io
+    import zipfile
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("[Content_Types].xml", "<Types/>")
+        archive.writestr("word/document.xml", "<document/>")
+    return buffer.getvalue()
+
+
 def _post(client: TestClient, name: str, content: bytes, mime: str, parser_type: str):
     return client.post(
         "/parse",
@@ -61,7 +73,7 @@ def test_docx_the_hh_parser_rejects_is_not_handed_to_pymupdf(
     monkeypatch.setenv("DOCLING_API_PASSWORD", "unused")
     monkeypatch.setattr(docling_api_client, "DoclingApiClientParser", Failing)
 
-    response = _post(client, "a.docx", b"docx bytes", DOCX_MIME, "docling_api")
+    response = _post(client, "a.docx", _minimal_docx(), DOCX_MIME, "docling_api")
 
     assert response.status_code == 502
     assert "MarkItDown conversion failed" in response.json()["detail"]
@@ -73,7 +85,7 @@ def test_docx_without_the_hh_parser_says_so(
     monkeypatch.delenv("DOCLING_API_BASE", raising=False)
     monkeypatch.delenv("DOCLING_API_PASSWORD", raising=False)
 
-    response = _post(client, "a.docx", b"docx bytes", DOCX_MIME, "docling_api")
+    response = _post(client, "a.docx", _minimal_docx(), DOCX_MIME, "docling_api")
 
     assert response.status_code == 503
 

@@ -81,6 +81,11 @@ from gaik.software_components.parsers import PyMuPDFParser
 from gaik.software_components.parsers.docling_api_client import DoclingApiClientParser
 
 logger = logging.getLogger(__name__)
+try:
+    from utils.ai_marking import mark_pdf
+except ImportError:
+    from api.utils.ai_marking import mark_pdf
+
 router = APIRouter(prefix="/luvata-order", tags=["luvata-order"])
 # Schema directory
 SCHEMA_DIR = Path(__file__).parent.parent / "schemas"
@@ -646,6 +651,7 @@ def generate_pdf(
         return box_height
 
     pdf = FPDF()
+    mark_pdf(pdf)
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.add_page()
     page_left = 12

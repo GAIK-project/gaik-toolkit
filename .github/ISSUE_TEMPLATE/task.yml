@@ -1,0 +1,26 @@
+name: Task
+description: A change or an addition to make.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should change and why.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: >-
+        The checks that show the task is finished, one per line. For example
+        "the extractor accepts a Pydantic model", "the README shows the new option",
+        "a test covers an empty file".
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Links, constraints or anything else that helps.

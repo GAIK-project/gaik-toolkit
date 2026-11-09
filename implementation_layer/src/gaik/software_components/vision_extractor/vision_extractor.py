@@ -473,7 +473,8 @@ def _save_schema_to_python(model: type[BaseModel], path: Path) -> None:
         lines: list[str] = [f"class {m.__name__}(BaseModel):"]
         doc = (m.__doc__ or "").strip()
         if doc:
-            lines.append(f'    """{doc}"""')
+            # repr() keeps the description a single string literal whatever it contains.
+            lines.append(f"    {doc!r}")
         lines.append("    model_config = ConfigDict(extra='forbid')")
         lines.append("")
         for fname, finfo in m.model_fields.items():
@@ -1111,9 +1112,13 @@ class VisionExtractor:
             api_key = self.config["api_key"]
             url = (
                 f"https://generativelanguage.googleapis.com/v1beta/"
-                f"models/{self.model}:generateContent?key={api_key}"
+                f"models/{self.model}:generateContent"
             )
-            headers = {"Content-Type": "application/json; charset=utf-8"}
+            # The key travels in a header: a URL ends up in error messages and logs.
+            headers = {
+                "x-goog-api-key": api_key,
+                "Content-Type": "application/json; charset=utf-8",
+            }
 
         t0 = time.perf_counter()
         resp = requests.post(url, headers=headers, json=body, timeout=(30, 300))

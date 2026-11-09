@@ -28,4 +28,5 @@ __all__ = [
     "draft_reviewer",
     "report_synthesizer",
     "web_scraper",
+    "source_tracing",
 ]

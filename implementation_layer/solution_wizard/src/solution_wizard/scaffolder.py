@@ -380,10 +380,20 @@ def _derive_pattern_key(blueprint: Blueprint) -> str:
     return f"hybrid_{prefix}_{short_hash}"
 
 
+# Blocks a fixed template injects itself, besides the module's own components: the judge
+# (${llm_judge_section}) in all three, and source tracing (${source_tracing_setup} and
+# ${source_tracing_section}) in the two extraction templates. RAG has no extraction step.
+_INJECTED_BLOCKS = {
+    "audio_to_structured_data": {"LLMJudge", "SourceTracing"},
+    "documents_to_structured_data": {"LLMJudge", "SourceTracing"},
+}
+
+
 def _module_covers_all_blocks(module_id: str, building_blocks: set) -> bool:
     """Return True if all selected building blocks are covered by the given module.
 
-    LLMJudge is excluded — it is injected separately via ${llm_judge_section}.
+    LLMJudge is excluded -- it is injected separately via ${llm_judge_section}. So is
+    SourceTracing in the audio and document templates (see ``_INJECTED_BLOCKS``).
 
     A building block is "covered" if:
       (a) it appears directly in the module's uses_components, OR
@@ -396,7 +406,7 @@ def _module_covers_all_blocks(module_id: str, building_blocks: set) -> bool:
     to dynamic/generic so those extra steps are not silently dropped.
     """
     registry = get_registry()
-    extra_blocks = building_blocks - {"LLMJudge"}
+    extra_blocks = building_blocks - _INJECTED_BLOCKS.get(module_id, {"LLMJudge"})
     if not extra_blocks:
         return True
 
@@ -606,6 +616,75 @@ def _build_generic_judge_section(has_llm_judge: bool) -> str:
             print(f"LLMJudge warning: {_judge_exc}")"""
 
 
+def _build_source_tracing_setup(has_source_tracing: bool) -> str:
+    """Code injected before ``pipeline.run`` in the audio and document templates.
+
+    Asks the extractor for one quote per value by adding the evidence request to the schema
+    and the task. It needs the schema before the run: on the first run the pipeline generates
+    it, so tracing starts from the second run, once the schema file exists.
+    Empty when SourceTracing is not in the blueprint, so other PoCs are unchanged.
+    """
+    if not has_source_tracing:
+        return ""
+    return """\
+    # -- SourceTracing: ask the extractor for one verbatim quote per value (from blueprint) --
+    # The evidence request is added to the schema and the task; the pipeline is unchanged.
+    # It needs the schema before the run, so it starts once the schema file exists.
+    tracing = None
+    if schema is not None:
+        from gaik.software_components.source_tracing import SourceTracing
+        tracing = SourceTracing()
+        _traced_task = tracing.augment(schema, user_requirements, source="text")
+        schema, user_requirements = _traced_task.model, _traced_task.prompt
+    else:
+        print("SourceTracing: the schema is generated in this run, so values are not traced yet. "
+              "Run the PoC again to trace them.")
+"""
+
+
+def _build_source_tracing_section(has_source_tracing: bool, pattern: str) -> str:
+    """Code injected after the run and before the judge in the audio and document templates.
+
+    Removes the evidence from the results, checks each value against its quote in the text the
+    extractor read, writes the report, and prints the values a reviewer should look at.
+    """
+    if not has_source_tracing:
+        return ""
+    if pattern == "audio_to_structured":
+        source = "transcript_used(result)"
+        import_line = (
+            "        from gaik.software_components.source_tracing import transcript_used\n"
+        )
+    else:
+        source = "result.parsed_documents"
+        import_line = ""
+    return (
+        "    # -- SourceTracing: check each value against its quote in the source (from blueprint) --\n"
+        "    if tracing is not None:\n"
+        + import_line
+        + "        clean_fields, trace_report = tracing.check_text(\n"
+        f"            result.extracted_fields, {source}\n"
+        "        )\n"
+        "        result.extracted_fields = clean_fields  # the evidence is not part of the output\n"
+        '        trace_path = output_dir / f"{input_file.stem}_source_trace.json"\n'
+        "        trace_path.write_text(\n"
+        "            json.dumps(trace_report.to_dict(), indent=2, ensure_ascii=False, default=str),\n"
+        '            encoding="utf-8",\n'
+        "        )\n"
+        "        summary = trace_report.summary()\n"
+        '        coverage = summary["coverage"]\n'
+        "        print(\n"
+        "            f\"SourceTracing: {summary['verified']} verified, {summary['check']} to check, \"\n"
+        "            f\"{summary['reworded']} reworded, {summary['unchecked']} unchecked\"\n"
+        '            + (f"; evidence for {coverage:.0%} of the values" if coverage is not None else "")\n'
+        "        )\n"
+        "        for item in trace_report.items:\n"
+        '            if item.verdict != "verified":\n'
+        '                print(f"  {item.verdict:<9} {item.field}: {item.value!r}  quote: {item.quote!r}")\n'
+        '        print(f"Source trace report: {trace_path}")\n'
+    )
+
+
 def _wants_pdf(blueprint: Blueprint) -> bool:
     """True when the blueprint requests a PDF report of the PoC output.
 
@@ -698,6 +777,9 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         m.name if hasattr(m, "name") else m.get("name", "") for m in bc.components.selected_modules
     ] + bc.components.selected_building_blocks
     has_llm_judge = "LLMJudge" in all_components
+    has_source_tracing = "SourceTracing" in all_components or any(
+        s.component == "SourceTracing" for s in bc.workflow.steps
+    )
 
     if has_llm_judge:
         llm_judge_section = """\
@@ -779,6 +861,8 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         "stage_settings": stages,
         "language": language,
         "llm_judge_section": llm_judge_section,
+        "source_tracing_setup": _build_source_tracing_setup(has_source_tracing),
+        "source_tracing_section": _build_source_tracing_section(has_source_tracing, pattern),
         "eval_framework": bc.evaluation.get("eval_framework", "extraction_eval")
         if isinstance(bc.evaluation, dict)
         else "extraction_eval",

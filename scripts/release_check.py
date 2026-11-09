@@ -38,6 +38,7 @@ REQUIRED_CHECKS = {
     "stream",
     "schema_generator",
     "data_extractor",
+    "source_tracing",
     "answer_generator",
     "document_classifier",
     "report_writing",

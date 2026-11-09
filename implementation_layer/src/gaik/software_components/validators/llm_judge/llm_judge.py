@@ -637,7 +637,7 @@ def parse_judge_flags(raw_text: str) -> list[ValidationFlag]:
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        logger.warning("Could not decode judge response as JSON; first 200 chars: %s", text[:200])
+        logger.warning("Could not decode judge response as JSON (%d characters)", len(text))
         return []
 
     flags = data.get("flags") if isinstance(data, dict) else data
@@ -683,10 +683,8 @@ def parse_hallucination_flags(raw_text: str) -> list[HallucinationFlag]:
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        snippet = text[:200].replace("\n", " ")
         logger.warning(
-            "Could not decode hallucination judge response as JSON; first 200 chars: %s",
-            snippet,
+            "Could not decode hallucination judge response as JSON (%d characters)", len(text)
         )
         return []
 
@@ -725,19 +723,18 @@ def parse_text_judgement(raw_text: str) -> tuple[bool, Severity, int, str]:
 
     Returns ``(equivalent, severity, score, reason)``. Tolerant of stray
     markdown fences and minor JSON-shape variation. Falls back to
-    ``(False, "wrong", 0, "<unparseable: ...>")`` when the response cannot
-    be parsed — callers that want strictness can check ``score == 0``.
+    ``(False, "wrong", 0, "<unparseable: N characters>")`` when the response
+    cannot be parsed — callers that want strictness can check ``score == 0``.
+    The reason gives the size only: the answer can quote the judged text.
     """
     text = _strip_json_fences(raw_text)
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        snippet = text[:200].replace("\n", " ")
         logger.warning(
-            "Could not decode text-pair judge response as JSON; first 200 chars: %s",
-            snippet,
+            "Could not decode text-pair judge response as JSON (%d characters)", len(text)
         )
-        return False, "wrong", 0, f"<unparseable: {snippet}>"
+        return False, "wrong", 0, f"<unparseable: {len(text)} characters>"
 
     if not isinstance(data, dict):
         return False, "wrong", 0, "<judge response was not a JSON object>"

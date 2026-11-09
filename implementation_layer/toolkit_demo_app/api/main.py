@@ -30,10 +30,12 @@ from gaik import __version__ as gaik_version  # noqa: E402
 
 try:
     from routers import model_settings
+    from utils.ai_marking import AIMarkMiddleware
     from utils.model_settings import ModelSettingsMiddleware
     from utils.ops import OpsMiddleware
 except ImportError:
     from api.routers import model_settings
+    from api.utils.ai_marking import AIMarkMiddleware
     from api.utils.model_settings import ModelSettingsMiddleware
     from api.utils.ops import OpsMiddleware
 
@@ -111,6 +113,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("GAIK Demo API starting...")
     cleanup_task = asyncio.create_task(dental_transcription._cleanup_old_subtitles())
+    pdf_cleanup_task = asyncio.create_task(pipeline.cleanup_old_pdfs())
     wizard_cleanup_task = (
         asyncio.create_task(solution_wizard.cleanup_idle_sessions())
         if solution_wizard is not None
@@ -119,6 +122,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     cleanup_task.cancel()
+    pdf_cleanup_task.cancel()
     if wizard_cleanup_task is not None:
         wizard_cleanup_task.cancel()
     logger.info("GAIK Demo API shutting down...")
@@ -142,6 +146,8 @@ app.add_middleware(
 )
 app.add_middleware(ModelSettingsMiddleware)
 app.add_middleware(OpsMiddleware)
+# Marks the generated-file downloads as AI-generated (utils/ai_marking.py).
+app.add_middleware(AIMarkMiddleware)
 
 
 @app.exception_handler(Exception)

@@ -74,13 +74,13 @@ def transcribe(
     temp_dir: str | None = None
     try:
         if is_video_file(input_file):
-            print(f"Detected video file: {input_file.name}")
+            print(f"Detected a video file ({input_file.suffix.lower()})")
             print("Extracting audio with ffmpeg...")
             temp_dir = tempfile.mkdtemp(prefix="gaik_whisper_local_")
             upload_file = extract_audio_from_video(input_file, Path(temp_dir))
-            print(f"Audio extracted: {upload_file.name}")
+            print("Audio extracted")
 
-        print(f"Sending: {upload_file.name} ...")
+        print(f"Sending the audio ({upload_file.suffix.lower()}) ...")
 
         # Health check
         r = requests.get(f"{api_base}/health", timeout=30)

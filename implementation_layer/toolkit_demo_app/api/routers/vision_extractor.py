@@ -62,6 +62,11 @@ except ImportError:
     from api.utils.schema import SCHEMA_FORMAT_VERSION
     from api.utils.schema_view import describe_fields, specs_by_name, structure_of
 
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -519,6 +524,8 @@ async def extract_vision(
         for uploaded_file in files:
             content = await validate_file_size(uploaded_file)
             suffix = Path(uploaded_file.filename or "").suffix.lower()
+            if (mismatch := content_mismatch(suffix, content)) is not None:
+                raise HTTPException(status_code=415, detail=mismatch)
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(content)
                 temp_paths.append(Path(tmp.name))
