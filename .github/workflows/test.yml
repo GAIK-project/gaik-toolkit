@@ -155,6 +155,20 @@ jobs:
     - name: Install package
       run: uv pip install --system ".[all,dev]"
 
+    # The live tests skip without credentials, so that a clone without keys can
+    # run the suite. In this job a missing secret must fail, not skip the tests.
+    - name: Check the Azure secrets are set
+      env:
+        AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
+        AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+      run: |
+        for name in AZURE_API_KEY AZURE_ENDPOINT; do
+          if [ -z "${!name}" ]; then
+            echo "::error::$name is not set, so the live tests would be skipped."
+            exit 1
+          fi
+        done
+
     - name: Run live LLM tests
       env:
         AZURE_API_KEY: ${{ secrets.AZURE_API_KEY }}
