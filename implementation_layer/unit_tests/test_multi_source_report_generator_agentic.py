@@ -528,6 +528,14 @@ def test_without_langgraph_the_agentic_run_says_how_to_install_it(tmp_path, patc
     # Hide langgraph: importing it now fails as it does when the extra is missing.
     monkeypatch.setitem(sys.modules, "langgraph", None)
     monkeypatch.setitem(sys.modules, "langgraph.graph", None)
+    # Import the agentic package again without it, so a module-level langgraph import fails
+    # here too; monkeypatch puts the original modules back afterwards.
+    import gaik.software_modules.multi_source_report_generator as package
+
+    monkeypatch.setattr(package, "agentic", package.agentic)
+    prefix = f"{package.__name__}.agentic"
+    for name in [n for n in sys.modules if n == prefix or n.startswith(prefix + ".")]:
+        monkeypatch.delitem(sys.modules, name)
 
     with pytest.raises(ImportError, match="multi-source-report-generator-agentic"):
         _gen().run(

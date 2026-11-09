@@ -58,13 +58,13 @@ jobs:
     # test_pg_vector_store_health.py); they skip when GAIK_TEST_PG_URL is unset.
     services:
       postgres:
-        image: pgvector/pgvector:pg17
+        image: pgvector/pgvector:0.8.7-pg17
         env:
           POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -U postgres -h localhost"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
