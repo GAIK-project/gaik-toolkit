@@ -35,6 +35,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
+from starlette.background import BackgroundTask
 
 try:
     from utils import get_api_config, get_model_options, sse_event
@@ -105,6 +106,8 @@ REQUIRED_FOUNDRY_VARS = [
 ]
 DEFAULT_MODEL = "claude-sonnet-5-5"
 SESSION_IDLE_SECONDS = 30 * 60  # reap sessions idle longer than this
+# Download archives, named <session_id>-<random>.zip so a session's own can be found.
+ZIP_DIR = Path(tempfile.gettempdir()) / "gaik-wizard-downloads"
 
 # ---------------------------------------------------------------------------
 # Session store
@@ -671,14 +674,31 @@ async def download_zip(session_id: str) -> FileResponse:
     root: Path = session["output_dir"]
     if not any(root.rglob("*")):
         raise HTTPException(status_code=404, detail="No files generated yet.")
-    # Build the archive in a temp location (not inside the watched workspace).
-    archive_base = Path(tempfile.gettempdir()) / f"gaik_wizard_{session_id}"
-    zip_path = shutil.make_archive(str(archive_base), "zip", root_dir=str(root))
+    # Build the archive in a temp location (not inside the watched workspace), under a
+    # name of its own so two downloads of one session do not write the same file.
+    ZIP_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    archive_base = ZIP_DIR / f"{session_id}-{uuid.uuid4().hex}"
+    zip_path = await run_in_threadpool(
+        shutil.make_archive, str(archive_base), "zip", root_dir=str(root)
+    )
+    # Removed once it is sent. A download that breaks off skips that step, so ending
+    # the session (or its idle cleanup) removes whatever is left.
     return FileResponse(
         zip_path,
         media_type="application/zip",
         filename="solution_package.zip",
+        background=BackgroundTask(Path(zip_path).unlink, missing_ok=True),
     )
+
+
+def _remove_session_files(session_id: str, session: dict) -> None:
+    """Delete a session's workspace and any download archives built from it."""
+    shutil.rmtree(session["output_dir"], ignore_errors=True)
+    for archive in ZIP_DIR.glob(f"{session_id}-*.zip"):
+        try:
+            archive.unlink(missing_ok=True)
+        except OSError:
+            logger.warning("Could not remove a wizard download archive")
 
 
 @router.delete("/end/{session_id}")
@@ -691,7 +711,7 @@ async def end_session(session_id: str) -> dict:
         await session["client"].disconnect()
     except Exception:  # noqa: BLE001
         pass
-    shutil.rmtree(session["output_dir"], ignore_errors=True)
+    _remove_session_files(session_id, session)
     return {"status": "ended"}
 
 
@@ -714,4 +734,4 @@ async def cleanup_idle_sessions() -> None:
                 await session["client"].disconnect()
             except Exception:  # noqa: BLE001
                 pass
-            shutil.rmtree(session["output_dir"], ignore_errors=True)
+            _remove_session_files(sid, session)

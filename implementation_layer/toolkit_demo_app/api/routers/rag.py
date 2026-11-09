@@ -1,6 +1,8 @@
 """RAG router - RAG pipeline endpoints for document indexing and Q&A."""
 
 import asyncio
+import contextlib
+import logging
 import os
 import re
 import tempfile
@@ -15,7 +17,7 @@ try:
 except ImportError:
     from api.utils import get_api_config, sse_event
 import requests
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from langchain_core.documents import Document
 from pydantic import BaseModel
@@ -26,10 +28,23 @@ except ImportError:
     from api.utils.file_content import content_mismatch
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
-# In-memory storage for RAG workflow instances (keyed by collection_id)
+# In-memory storage for RAG workflow instances (keyed by collection_id). The id is the
+# only thing that separates one visitor's documents from another's, so it is a full
+# random UUID: whoever holds it can query the collection, nobody else can guess it.
 RAG_INSTANCES: dict[str, object] = {}
+
+# collection_id -> [last use (time.monotonic()), requests in flight]
+_USAGE: dict[str, list] = {}
+
+# A collection holds every chunk and its embedding in memory, and the page only clears it
+# when the visitor asks. One left behind goes after an hour without use, and the number
+# kept is capped, so the pod's memory stays bounded.
+COLLECTION_IDLE_SECONDS = 60 * 60
+MAX_COLLECTIONS = 40
+COLLECTION_SWEEP_SECONDS = 600
 
 # Concurrency control: per-collection locks to prevent race conditions
 _collection_locks: dict[str, asyncio.Lock] = {}
@@ -42,6 +57,9 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 # Page limit for demo (CPU environment in CSC Rahti)
 MAX_PAGES_VISION_PLUS_DEMO = 10
 MAX_PAGES_OTHER_PARSERS_DEMO = 200
+
+# Marks the end of a streamed answer read chunk by chunk in a worker thread.
+_END = object()
 
 NO_RESULTS_MESSAGE = (
     "I couldn't find any relevant information in the indexed documents "
@@ -150,6 +168,72 @@ async def _get_collection_lock(collection_id: str) -> asyncio.Lock:
         if collection_id not in _collection_locks:
             _collection_locks[collection_id] = asyncio.Lock()
         return _collection_locks[collection_id]
+
+
+def _usage(collection_id: str) -> list:
+    return _USAGE.setdefault(collection_id, [time.monotonic(), 0])
+
+
+@contextlib.contextmanager
+def _in_use(collection_id: str):
+    """Marks a collection as in use by one request, so eviction leaves it alone."""
+    usage = _usage(collection_id)
+    usage[1] += 1
+    try:
+        yield
+    finally:
+        usage[1] -= 1
+        usage[0] = time.monotonic()
+
+
+def _is_busy(collection_id: str) -> bool:
+    lock = _collection_locks.get(collection_id)
+    return _usage(collection_id)[1] > 0 or (lock is not None and lock.locked())
+
+
+def _drop_collection(collection_id: str) -> None:
+    RAG_INSTANCES.pop(collection_id, None)
+    _USAGE.pop(collection_id, None)
+    _collection_locks.pop(collection_id, None)
+
+
+def _is_shared_example(collection_id: str) -> bool:
+    """The example collections have fixed ids and serve every visitor."""
+    return collection_id.startswith(f"{EXAMPLE_COLLECTION_PREFIX}-")
+
+
+def evict_collections(now: float | None = None, *, make_room: bool = False) -> int:
+    """Drop collections idle past the limit; returns how many went.
+
+    With ``make_room`` the least recently used ones go too until one more fits under the
+    cap. A collection with a request in flight is never dropped.
+    """
+    now = time.monotonic() if now is None else now
+    evicted = 0
+    for collection_id in list(RAG_INSTANCES):
+        idle = now - _usage(collection_id)[0]
+        if idle > COLLECTION_IDLE_SECONDS and not _is_busy(collection_id):
+            _drop_collection(collection_id)
+            evicted += 1
+    while make_room and len(RAG_INSTANCES) >= MAX_COLLECTIONS:
+        idle_ids = [cid for cid in RAG_INSTANCES if not _is_busy(cid)]
+        if not idle_ids:
+            break
+        _drop_collection(min(idle_ids, key=lambda cid: _usage(cid)[0]))
+        evicted += 1
+    return evicted
+
+
+async def cleanup_idle_collections() -> None:
+    """Background task (started in main.py): evict idle collections every ten minutes."""
+    while True:
+        await asyncio.sleep(COLLECTION_SWEEP_SECONDS)
+        try:
+            evicted = evict_collections()
+            if evicted:
+                logger.info("Evicted %d idle RAG collections", evicted)
+        except Exception:  # noqa: BLE001 - the loop must outlive one failed pass
+            logger.exception("RAG collection cleanup failed")
 
 
 class DoclingRagApiClient:
@@ -378,16 +462,55 @@ class StatusResponse(BaseModel):
     is_ready: bool
 
 
-def _get_or_create_workflow(collection_id: str | None = None):
-    """Get existing demo RAG workflow or create a new one."""
-    if collection_id and collection_id in RAG_INSTANCES:
-        return RAG_INSTANCES[collection_id], collection_id
+def _index_file(workflow, tmp_path: str, filename: str, parser_choice: str) -> int:
+    """Check the page limit, then parse and embed one saved PDF; returns its chunk count.
 
-    new_id = str(uuid.uuid4())[:8]
-    config = get_api_config()
-    workflow = _build_demo_workflow(config, new_id)
-    RAG_INSTANCES[new_id] = workflow
-    return workflow, new_id
+    Blocking (parsing and embedding take from seconds to minutes): the handler runs it in
+    a worker thread.
+    """
+    import fitz  # PyMuPDF - already available via docling
+
+    doc = fitz.open(tmp_path)
+    try:
+        page_count = doc.page_count
+    finally:
+        doc.close()
+
+    max_pages = (
+        MAX_PAGES_VISION_PLUS_DEMO
+        if parser_choice == "vision_plus"
+        else MAX_PAGES_OTHER_PARSERS_DEMO
+    )
+    if page_count > max_pages:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"PDF has {page_count} pages. "
+                f"Maximum {max_pages} pages allowed for parser '{parser_choice}'. "
+                f"Try a smaller document or switch parser."
+            ),
+        )
+
+    print(f"[RAG] Starting {filename} ({page_count} pages, parser={parser_choice})")
+
+    parse_start = time.perf_counter()
+    chunks, parser_used = _parse_document_to_chunks(
+        tmp_path,
+        document_name=Path(filename).stem,
+        parser_choice=parser_choice,
+        config=workflow.api_config,
+    )
+    parse_duration = time.perf_counter() - parse_start
+    print(
+        f"[RAG] Parsed {filename}: {len(chunks)} chunks"
+        f" in {parse_duration:.1f}s (parser={parser_used})"
+    )
+
+    embed_start = time.perf_counter()
+    num_chunks = workflow.index_chunk_documents(chunks)
+    embed_duration = time.perf_counter() - embed_start
+    print(f"[RAG] Embedded {filename}: {num_chunks} chunks in {embed_duration:.1f}s")
+    return num_chunks
 
 
 @router.post("/index", response_model=IndexResponse)
@@ -425,124 +548,86 @@ async def index_documents(
                 detail=f"File '{file.filename}' exceeds maximum size of {MAX_FILE_SIZE_MB}MB",
             )
 
-    # Determine target collection ID for locking
-    target_coll_id = collection_id or str(uuid.uuid4())[:8]
+    # An id the server does not know (a cleared or evicted collection, or one the client
+    # made up) starts a new collection under an id made here. The shared example
+    # collections take no uploads.
+    if collection_id and collection_id in RAG_INSTANCES and not _is_shared_example(collection_id):
+        coll_id = collection_id
+    else:
+        evict_collections(make_room=True)
+        if len(RAG_INSTANCES) >= MAX_COLLECTIONS:
+            raise HTTPException(
+                status_code=503,
+                detail="The demo is holding as many document collections as it can. "
+                "Try again in a few minutes.",
+            )
+        coll_id = uuid.uuid4().hex
 
     # Acquire lock for this collection to prevent concurrent modifications
-    lock = await _get_collection_lock(target_coll_id)
+    lock = await _get_collection_lock(coll_id)
 
     try:
         async with lock:
-            request_start = time.perf_counter()
-            workflow, coll_id = _get_or_create_workflow(
-                collection_id if collection_id else target_coll_id
-            )
-            indexed_docs: list[IndexedDocument] = []
-            total_chunks = 0
+            with _in_use(coll_id):
+                request_start = time.perf_counter()
+                workflow = RAG_INSTANCES.get(coll_id)
+                if workflow is None:
+                    workflow = _build_demo_workflow(get_api_config(), coll_id)
+                    RAG_INSTANCES[coll_id] = workflow
+                indexed_docs: list[IndexedDocument] = []
+                total_chunks = 0
 
-            for file in files:
-                # Save uploaded file temporarily
-                suffix = Path(file.filename).suffix.lower()
-                content = await file.read()
-                if (mismatch := content_mismatch(suffix, content)) is not None:
-                    raise HTTPException(status_code=415, detail=mismatch)
-                with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                    tmp.write(content)
-                    tmp_path = tmp.name
+                for file in files:
+                    # Save uploaded file temporarily
+                    suffix = Path(file.filename).suffix.lower()
+                    content = await file.read()
+                    if (mismatch := content_mismatch(suffix, content)) is not None:
+                        raise HTTPException(status_code=415, detail=mismatch)
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                        tmp.write(content)
+                        tmp_path = tmp.name
 
-                try:
-                    # Check page count for PDF files (demo limit)
-                    page_count = 0
-                    if suffix == ".pdf":
-                        import fitz  # PyMuPDF - already available via docling
-
-                        doc = fitz.open(tmp_path)
-                        page_count = doc.page_count
-                        doc.close()
-
-                        max_pages = (
-                            MAX_PAGES_VISION_PLUS_DEMO
-                            if parser_choice == "vision_plus"
-                            else MAX_PAGES_OTHER_PARSERS_DEMO
+                    try:
+                        num_chunks = await asyncio.to_thread(
+                            _index_file, workflow, tmp_path, file.filename, parser_choice
                         )
-                        if page_count > max_pages:
-                            Path(tmp_path).unlink(missing_ok=True)
-                            raise HTTPException(
-                                status_code=400,
-                                detail=(
-                                    f"PDF has {page_count} pages. "
-                                    f"Maximum {max_pages} pages allowed for parser '{parser_choice}'. "
-                                    f"Try a smaller document or switch parser."
-                                ),
+                        total_chunks += num_chunks
+                        indexed_docs.append(
+                            IndexedDocument(
+                                filename=file.filename,
+                                chunk_count=num_chunks,
+                                status="indexed",
                             )
-
-                    print(
-                        f"[RAG] Starting {file.filename}"
-                        f" ({page_count} pages, parser={parser_choice})"
-                    )
-
-                    # Parse the document with the selected parser
-                    parse_start = time.perf_counter()
-                    original_name = Path(file.filename).stem
-                    chunks, parser_used = _parse_document_to_chunks(
-                        tmp_path,
-                        document_name=original_name,
-                        parser_choice=parser_choice,
-                        config=workflow.api_config,
-                    )
-                    parse_duration = time.perf_counter() - parse_start
-                    print(
-                        f"[RAG] Parsed {file.filename}: {len(chunks)} chunks"
-                        f" in {parse_duration:.1f}s (parser={parser_used})"
-                    )
-
-                    # Embed and index chunks
-                    embed_start = time.perf_counter()
-                    num_chunks = workflow.index_chunk_documents(chunks)
-                    embed_duration = time.perf_counter() - embed_start
-                    print(
-                        f"[RAG] Embedded {file.filename}:"
-                        f" {num_chunks} chunks in {embed_duration:.1f}s"
-                    )
-
-                    total_chunks += num_chunks
-
-                    indexed_docs.append(
-                        IndexedDocument(
-                            filename=file.filename,
-                            chunk_count=num_chunks,
-                            status="indexed",
                         )
-                    )
-                except HTTPException:
-                    raise
-                except Exception as e:
-                    error_msg = str(e)
-                    indexed_docs.append(
-                        IndexedDocument(
-                            filename=file.filename,
-                            chunk_count=0,
-                            status="error",
-                            error=error_msg,
+                    except HTTPException:
+                        raise
+                    except Exception as e:
+                        error_msg = str(e)
+                        indexed_docs.append(
+                            IndexedDocument(
+                                filename=file.filename,
+                                chunk_count=0,
+                                status="error",
+                                error=error_msg,
+                            )
                         )
-                    )
-                    print(f"[RAG] Error indexing {file.filename}: {e}")
-                finally:
-                    Path(tmp_path).unlink(missing_ok=True)
+                        print(f"[RAG] Error indexing {file.filename}: {e}")
+                    finally:
+                        Path(tmp_path).unlink(missing_ok=True)
 
-            total_duration = time.perf_counter() - request_start
-            print(
-                f"[RAG] Index request completed: {len(files)} file(s),"
-                f" {total_chunks} total chunks in {total_duration:.1f}s"
-            )
+                total_duration = time.perf_counter() - request_start
+                print(
+                    f"[RAG] Index request completed: {len(files)} file(s),"
+                    f" {total_chunks} total chunks in {total_duration:.1f}s"
+                )
 
-            return IndexResponse(
-                collection_id=coll_id,
-                document_count=len(files),
-                chunk_count=total_chunks,
-                documents=indexed_docs,
-                status="success" if total_chunks > 0 else "error",
-            )
+                return IndexResponse(
+                    collection_id=coll_id,
+                    document_count=len(files),
+                    chunk_count=total_chunks,
+                    documents=indexed_docs,
+                    status="success" if total_chunks > 0 else "error",
+                )
 
     except HTTPException:
         raise
@@ -559,7 +644,6 @@ async def query_rag(
     question: str = Form(...),
     collection_id: str = Form(...),
     top_k: int = Form(5),
-    search_type: Literal["semantic", "hybrid"] = Form("semantic"),
 ):
     """
     Query the RAG system with a question.
@@ -567,25 +651,21 @@ async def query_rag(
     - **question**: The question to answer
     - **collection_id**: The collection to query
     - **top_k**: Number of chunks to retrieve
-    - **search_type**: Type of search (semantic or hybrid)
     """
     if not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    if collection_id not in RAG_INSTANCES:
+    workflow = RAG_INSTANCES.get(collection_id)
+    if workflow is None:
         raise HTTPException(
             status_code=404, detail="Collection not found. Please index documents first."
         )
 
     try:
-        workflow = RAG_INSTANCES[collection_id]
-
-        # Query with non-streaming for simple response
-        result = workflow.ask(
-            question,
-            top_k=top_k,
-            stream=False,
-        )
+        # Query with non-streaming for simple response. Embedding the question and
+        # generating the answer block, so they run in a worker thread.
+        with _in_use(collection_id):
+            result = await asyncio.to_thread(workflow.ask, question, top_k=top_k, stream=False)
 
         # Handle empty results gracefully
         if not result.documents:
@@ -621,7 +701,6 @@ async def query_rag_stream(
     question: str = Form(...),
     collection_id: str = Form(...),
     top_k: int = Form(5),
-    search_type: Literal["semantic", "hybrid"] = Form("semantic"),
 ):
     """
     Query the RAG system with SSE streaming response.
@@ -631,7 +710,8 @@ async def query_rag_stream(
     if not question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
-    if collection_id not in RAG_INSTANCES:
+    workflow = RAG_INSTANCES.get(collection_id)
+    if workflow is None:
         raise HTTPException(
             status_code=404, detail="Collection not found. Please index documents first."
         )
@@ -644,8 +724,9 @@ async def query_rag_stream(
 
         yield sse_event("steps", {"steps": steps})
 
+        in_use = contextlib.ExitStack()
         try:
-            workflow = RAG_INSTANCES[collection_id]
+            in_use.enter_context(_in_use(collection_id))
 
             # Step 1: Retrieve documents
             steps[0]["status"] = "in_progress"
@@ -654,9 +735,11 @@ async def query_rag_stream(
             # Get the retriever to search
             # Check if query contains page number reference (e.g., "page 2", "sivu 3")
             page_filter = extract_page_filter(question)
-            query_embedding = workflow.embedder.embed_query(question)
-            results = workflow.vector_store.search(
-                query_embedding, top_k=top_k, filters=page_filter
+            # The embedding, the search and each chunk of the answer block on the model
+            # or on CPU work, so they run in a worker thread.
+            query_embedding = await asyncio.to_thread(workflow.embedder.embed_query, question)
+            results = await asyncio.to_thread(
+                workflow.vector_store.search, query_embedding, top_k=top_k, filters=page_filter
             )
 
             # Convert to documents with optional hybrid/rerank
@@ -697,10 +780,14 @@ async def query_rag_stream(
             yield sse_event("step_update", steps[1])
 
             # Stream the answer
-            answer_gen = workflow.answer_generator.generate(question, documents, stream=True)
+            answer_gen = iter(
+                await asyncio.to_thread(
+                    workflow.answer_generator.generate, question, documents, stream=True
+                )
+            )
 
             collected_answer = []
-            for chunk in answer_gen:
+            while (chunk := await asyncio.to_thread(next, answer_gen, _END)) is not _END:
                 collected_answer.append(chunk)
                 yield sse_event("answer_chunk", {"chunk": chunk})
 
@@ -729,6 +816,8 @@ async def query_rag_stream(
                     yield sse_event("step_update", step)
                     break
             yield sse_event("error", {"message": str(e)})
+        finally:
+            in_use.close()
 
     return StreamingResponse(
         event_generator(),
@@ -757,6 +846,8 @@ async def get_status(collection_id: str):
         )
 
     workflow = RAG_INSTANCES[collection_id]
+    # The page asks this when it opens: that counts as use.
+    _usage(collection_id)[0] = time.monotonic()
     chunk_count = workflow.vector_store.count()
 
     return StatusResponse(
@@ -767,37 +858,6 @@ async def get_status(collection_id: str):
     )
 
 
-@router.get("/debug/{collection_id}")
-async def debug_collection(collection_id: str, page: int = 1, per_page: int = 20):
-    """Return paginated chunk details for debugging."""
-    if collection_id not in RAG_INSTANCES:
-        raise HTTPException(status_code=404, detail="Collection not found")
-
-    workflow = RAG_INSTANCES[collection_id]
-    # Access in-memory documents (persist=False uses _documents list)
-    all_docs = getattr(workflow.vector_store, "_documents", [])
-
-    total = len(all_docs)
-    start = (page - 1) * per_page
-    end = start + per_page
-    page_docs = all_docs[start:end]
-
-    return {
-        "collection_id": collection_id,
-        "total_chunks": total,
-        "page": page,
-        "per_page": per_page,
-        "chunks": [
-            {
-                "index": start + i,
-                "content": doc.page_content[:500],
-                "metadata": doc.metadata,
-            }
-            for i, doc in enumerate(page_docs)
-        ],
-    }
-
-
 @router.delete("/clear/{collection_id}")
 async def clear_collection(collection_id: str):
     """
@@ -805,27 +865,27 @@ async def clear_collection(collection_id: str):
 
     Idempotent: returns success even if collection doesn't exist
     (e.g., after server restart when client still has old collection ID).
+    The shared example collections stay: other visitors are using them, and
+    they go on their own once idle.
 
     - **collection_id**: The collection to clear
     """
-    if collection_id in RAG_INSTANCES:
-        del RAG_INSTANCES[collection_id]
-
-    # Clean up the lock for this collection
-    if collection_id in _collection_locks:
-        del _collection_locks[collection_id]
+    if not _is_shared_example(collection_id):
+        _drop_collection(collection_id)
 
     return {"status": "success", "message": f"Collection {collection_id} cleared"}
 
 
 @router.delete("/clear")
-async def clear_all_collections():
-    """Clear all RAG collections."""
-    count = len(RAG_INSTANCES)
-    RAG_INSTANCES.clear()
-    _collection_locks.clear()
+async def clear_collections(collection_ids: list[str] = Query(..., min_length=1)):
+    """Clear the collections the caller names; nobody else's are touched."""
+    cleared = 0
+    for collection_id in set(collection_ids):
+        if collection_id in RAG_INSTANCES and not _is_shared_example(collection_id):
+            _drop_collection(collection_id)
+            cleared += 1
 
-    return {"status": "success", "message": f"Cleared {count} collections"}
+    return {"status": "success", "message": f"Cleared {cleared} collections"}
 
 
 def _example_index_response(collection_id: str, chunk_counts: dict[str, int]) -> IndexResponse:
@@ -868,6 +928,7 @@ async def load_example_document(
     # If already loaded, return existing collection
     if example_collection_id in RAG_INSTANCES:
         workflow = RAG_INSTANCES[example_collection_id]
+        _usage(example_collection_id)[0] = time.monotonic()
         return _example_index_response(example_collection_id, _loaded_example_counts(workflow))
 
     # Acquire lock
@@ -891,6 +952,7 @@ async def load_example_document(
                     detail="Example documents not found. Please contact administrator.",
                 )
 
+            evict_collections(make_room=True)
             config = get_api_config()
             workflow = _build_demo_workflow(config, example_collection_id)
 
@@ -909,6 +971,7 @@ async def load_example_document(
                 print(f"Loaded example {document['filename']} using parser: {parser_used}")
 
             RAG_INSTANCES[example_collection_id] = workflow
+            _usage(example_collection_id)[0] = time.monotonic()
 
             return _example_index_response(example_collection_id, chunk_counts)
 

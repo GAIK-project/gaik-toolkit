@@ -1,5 +1,6 @@
 """Transcriber router - Audio/video transcription endpoints"""
 
+import asyncio
 import os
 import tempfile
 from difflib import SequenceMatcher
@@ -128,35 +129,49 @@ async def transcribe_audio(
             "local_api_key": local_api_key,
         }
 
-        used_fallback = False
-        fallback_reason = None
         cloud_model = config.get("transcription_model", "whisper")
 
-        if prefer_local_first and local_api_base and local_api_key:
-            try:
-                transcriber = Transcriber(
-                    **transcriber_kwargs,
-                    transcription_model="whisper_local",
-                )
-                result = transcriber.transcribe(file_path=tmp_path, custom_context=custom_context)
-                transcription_model_used = "whisper_local"
-            except Exception as exc:
-                print(f"Local transcription failed: {exc}")
-                print("Falling back to configured transcription model.")
-                used_fallback = True
-                fallback_reason = _categorize_fallback_reason(exc)
-                transcriber = Transcriber(**transcriber_kwargs)
-                result = transcriber.transcribe(file_path=tmp_path, custom_context=custom_context)
-                transcription_model_used = cloud_model
-        else:
-            if prefer_local_first and not (local_api_base and local_api_key):
+        def transcribe():
+            """The result, the model that made it, and why the local one was not used.
+
+            Blocking (minutes for a long recording): runs in a worker thread, so the
+            event loop keeps serving every other request meanwhile.
+            """
+            if prefer_local_first and local_api_base and local_api_key:
+                try:
+                    transcriber = Transcriber(
+                        **transcriber_kwargs,
+                        transcription_model="whisper_local",
+                    )
+                    return (
+                        transcriber.transcribe(file_path=tmp_path, custom_context=custom_context),
+                        "whisper_local",
+                        None,
+                    )
+                except Exception as exc:
+                    print(f"Local transcription failed: {exc}")
+                    print("Falling back to configured transcription model.")
+                    reason = _categorize_fallback_reason(exc)
+                    transcriber = Transcriber(**transcriber_kwargs)
+                    return (
+                        transcriber.transcribe(file_path=tmp_path, custom_context=custom_context),
+                        cloud_model,
+                        reason,
+                    )
+            if prefer_local_first:
                 print(
                     "prefer_local_first=True but local_api_base/local_api_key are not configured; "
                     "using configured transcription model instead."
                 )
             transcriber = Transcriber(**transcriber_kwargs)
-            result = transcriber.transcribe(file_path=tmp_path, custom_context=custom_context)
-            transcription_model_used = cloud_model
+            return (
+                transcriber.transcribe(file_path=tmp_path, custom_context=custom_context),
+                cloud_model,
+                None,
+            )
+
+        result, transcription_model_used, fallback_reason = await asyncio.to_thread(transcribe)
+        used_fallback = fallback_reason is not None
 
         corrected_transcript = None
         correction_summary = None

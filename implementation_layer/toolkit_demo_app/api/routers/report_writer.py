@@ -269,11 +269,17 @@ async def generate_report(
     msg_queue: queue.Queue[str] = queue.Queue()
     result_holder: dict = {}
     done_event = threading.Event()
+    cancelled = threading.Event()
 
     def progress_cb(msg: str) -> None:
+        if cancelled.is_set():
+            raise RuntimeError("Cancelled by the client")
         msg_queue.put(msg)
 
     def run_report() -> None:
+        # The worker owns the run folder: it reads the inputs and writes the output
+        # there until it ends, so only it removes the folder. A disconnect sets
+        # ``cancelled`` and the run stops at its next progress message.
         try:
             from gaik.software_modules.multi_source_report_generator import (
                 MultiSourceReportGenerator,
@@ -308,66 +314,62 @@ async def generate_report(
                 verbose=False,
                 progress_callback=progress_cb,
             )
-            result_holder["result"] = result
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Report generation failed")
-            result_holder["error"] = str(exc)
-        finally:
-            done_event.set()
-
-    thread = threading.Thread(target=run_report, daemon=True)
-    thread.start()
-
-    async def event_stream():
-        last_heartbeat = asyncio.get_event_loop().time()
-        try:
-            while not done_event.is_set() or not msg_queue.empty():
-                drained = False
-                while not msg_queue.empty():
-                    try:
-                        msg = msg_queue.get_nowait()
-                        yield sse_event("progress", {"message": msg})
-                        drained = True
-                    except queue.Empty:
-                        break
-                if not drained:
-                    await asyncio.sleep(0.1)
-                    now = asyncio.get_event_loop().time()
-                    if now - last_heartbeat > 15:
-                        # SSE comment — keeps proxy connections alive
-                        yield ": heartbeat\n\n"
-                        last_heartbeat = now
-
-            thread.join(timeout=10)
-
-            if "error" in result_holder:
-                yield sse_event("error", {"message": result_holder["error"]})
-            elif "result" in result_holder:
-                result = result_holder["result"]
-                docx_b64: str | None = None
-                if result.docx_path and Path(result.docx_path).exists():
-                    docx_b64 = base64.b64encode(Path(result.docx_path).read_bytes()).decode()
-                sections_data = [
+            # Read the Word file here, while the folder still exists.
+            docx_b64: str | None = None
+            if result.docx_path and Path(result.docx_path).exists():
+                docx_b64 = base64.b64encode(Path(result.docx_path).read_bytes()).decode()
+            result_holder["result"] = {
+                "markdown": result.markdown,
+                "sections": [
                     {
                         "title": s.title,
                         "content_markdown": s.content_markdown,
                         "revision_warnings": s.revision_warnings,
                     }
                     for s in result.sections
-                ]
-                yield sse_event(
-                    "result",
-                    {
-                        "markdown": result.markdown,
-                        "sections": sections_data,
-                        "usage": result.usage or {},
-                        "docx_b64": docx_b64,
-                    },
-                )
+                ],
+                "usage": result.usage or {},
+                "docx_b64": docx_b64,
+            }
+        except Exception as exc:  # noqa: BLE001
+            if cancelled.is_set():
+                logger.info("Report generation stopped: the client left")
+            else:
+                logger.exception("Report generation failed")
+            result_holder["error"] = str(exc)
+        finally:
+            try:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            finally:
+                done_event.set()
+
+    threading.Thread(target=run_report, daemon=True).start()
+
+    async def event_stream():
+        loop = asyncio.get_running_loop()
+        last_heartbeat = loop.time()
+        try:
+            while not done_event.is_set() or not msg_queue.empty():
+                try:
+                    msg = msg_queue.get_nowait()
+                except queue.Empty:
+                    await asyncio.sleep(0.1)
+                    if loop.time() - last_heartbeat > 15:
+                        # SSE comment — keeps proxy connections alive
+                        yield ": heartbeat\n\n"
+                        last_heartbeat = loop.time()
+                    continue
+                yield sse_event("progress", {"message": msg})
+
+            if "error" in result_holder:
+                yield sse_event("error", {"message": result_holder["error"]})
+            elif "result" in result_holder:
+                yield sse_event("result", result_holder["result"])
             else:
                 yield sse_event("error", {"message": "No result produced"})
         finally:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
+            # A closed or cancelled stream means the client left: stop at the next message.
+            cancelled.set()
 
     return StreamingResponse(
         event_stream(),
