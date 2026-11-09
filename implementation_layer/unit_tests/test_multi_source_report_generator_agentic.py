@@ -499,6 +499,27 @@ def test_reviewer_of_dependent_section_gets_dependency_grounding(tmp_path, patch
     assert any("Draft body for Technical Analysis" in p for p in dep_reviews)
 
 
+def test_curated_brief_stays_in_its_folder_whatever_the_section_id(tmp_path, patch_llm):
+    patch_llm(_FakeClient(review_mode="none"))
+    (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
+    out = tmp_path / "deep" / "out"
+
+    _gen().run(
+        input_paths=[tmp_path / "src.txt"],
+        sections=[
+            {"id": "../../../escaped", "title": "Risks", "instructions": "Technical risks."},
+            {"id": "a/b", "title": "Costs", "instructions": "Costs."},
+        ],
+        output_dir=out,
+        agentic=True,
+        curate_evidence=True,
+    )
+
+    curated = out / "evidence" / "curated_sections"
+    assert len(list(curated.glob("*.md"))) == 2
+    assert not list(tmp_path.rglob("escaped.md"))
+
+
 def test_curated_brief_filename_uses_id(tmp_path, patch_llm):
     patch_llm(_FakeClient(review_mode="none"))
     (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")

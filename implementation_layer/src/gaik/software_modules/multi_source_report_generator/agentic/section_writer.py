@@ -8,6 +8,7 @@ then mandatorily reviewed/repaired by the diff editor.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,11 @@ def _slug(text: str, *, max_len: int = 40) -> str:
     while "__" in s:
         s = s.replace("__", "_")
     return s.strip("_")[:max_len] or "section"
+
+
+def _file_stem(section_id: str) -> str:
+    """A section id as a file name: no path separators, so it stays in its folder."""
+    return re.sub(r"[^\w.-]", "_", section_id).strip(".")
 
 
 def _usage_of(response: Any) -> dict:
@@ -96,7 +102,7 @@ def create_section_writer_graph(
         if out_dir and brief:
             curated_dir = Path(out_dir) / "evidence" / "curated_sections"
             curated_dir.mkdir(parents=True, exist_ok=True)
-            name = state.get("section_id") or _slug(title)
+            name = _file_stem(state.get("section_id") or "") or _slug(title)
             (curated_dir / f"{name}.md").write_text(brief, encoding="utf-8")
 
         reporter.emit(f"[{title}] curated evidence -> drafting")
