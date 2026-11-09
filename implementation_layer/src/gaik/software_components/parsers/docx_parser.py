@@ -7,6 +7,7 @@ requiring external APIs or heavy ML models.
 
 import logging
 import os
+import zipfile
 from typing import Any
 
 try:
@@ -67,13 +68,18 @@ class DocxParser:
 
         Raises:
             FileNotFoundError: If file does not exist
-            ValueError: If keep_structure is used with structured text
+            ValueError: If keep_structure is used with structured text, or the
+                file's content is not a DOCX
             Exception: If DOCX parsing fails
         """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
         if keep_structure and not use_markdown:
             raise ValueError("keep_structure needs use_markdown=True")
+        # A DOCX is a ZIP container; python-docx reads it with zipfile, so the
+        # same test decides here whether the content can be one at all.
+        if not zipfile.is_zipfile(file_path):
+            raise ValueError(f"The content of '{file_path}' is not a DOCX document.")
 
         try:
             doc = Document(file_path)
