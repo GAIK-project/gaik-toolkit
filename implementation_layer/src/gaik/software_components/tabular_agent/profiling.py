@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from .loader import quote_identifier
 from .models import ColumnProfile, TableProfile, TabularSchema
 
 logger = logging.getLogger(__name__)
@@ -115,7 +116,7 @@ def _profile_column(
     sample_values: int,
 ) -> ColumnProfile:
     """Gather counts, range and representative values for a single column."""
-    quoted = f'"{table}"."{column}"'
+    quoted = f'"{table}".{quote_identifier(column)}'
     non_null, distinct = con.execute(
         f'SELECT count({quoted}), count(DISTINCT {quoted}) FROM "{table}"'
     ).fetchone()
