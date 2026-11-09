@@ -97,6 +97,18 @@ def test_success_requires_real_authentication_and_all_components():
     assert not gate.validate_live_result(result, target, 0)
 
 
+def test_source_tracing_is_a_required_live_check():
+    target = {"provider": "azure", "model": "release-model"}
+    assert "source_tracing" in gate.REQUIRED_CHECKS
+    assert "source_tracing" in smoke.REQUIRED_CHECKS
+    result = _passed_result()
+    assert gate.validate_live_result(result, target, 0)
+    del result["checks"]["source_tracing"]
+    assert not gate.validate_live_result(result, target, 0)
+    result["checks"]["source_tracing"] = {"ok": False}
+    assert not gate.validate_live_result(result, target, 0)
+
+
 def test_failed_process_or_wrong_model_cannot_claim_success():
     target = {"provider": "azure", "model": "release-model"}
     assert not gate.validate_live_result(_passed_result(), target, 1)

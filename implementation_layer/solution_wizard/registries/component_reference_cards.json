@@ -2846,5 +2846,35 @@
       }
     ],
     "note": "Makes no LLM calls. To extract structured data from a site, feed result.to_markdown() to SchemaGenerator + DataExtractor as one document and ask for the source page URL from the 'Source:' lines; to answer questions, index the pages in a RAG store. For PDFs linked from the site, download them and use a parser step."
+  },
+  "SourceTracing": {
+    "import": "from gaik.software_components.source_tracing import SourceTracing, transcript_used",
+    "construct": "tracing = SourceTracing()",
+    "call": "task = tracing.augment(extraction_model, user_requirements, source='text')\n    # Call the extractor as usual, with extraction_model=task.model and user_requirements=task.prompt\n    # (keep the same requirements). Then check the results against the source the extractor read:\n    clean_results, report = tracing.check_text(extracted_fields, [source_text])\n    # PDFs read by VisionExtractor: source='files', then\n    # clean_data, report = tracing.check_pdf(result.data, file_paths)\n    # DocumentsToStructuredData.run(schema=task.model, requirements=requirements, user_requirements=task.prompt):\n    # clean_fields, report = tracing.check_text(result.extracted_fields, result.parsed_documents)\n    # AudioToStructuredData.run(...) the same way: tracing.check_text(result.extracted_fields, transcript_used(result))",
+    "returns": "(clean_results, TraceReport). clean_results is the extractor output without the evidence field, in the same shape. report.items is a list of TracedValue(.field, .value, .quote, .verdict in verified|check|reworded|unchecked, .status, .document, .page, .rects/.value_rects (PDF boxes as fractions of the page), .span (text offsets), .occurrences, .record); report.summary() gives counts per verdict and coverage; report.to_dict() is JSON for a user interface",
+    "install_extra": "source-tracing",
+    "options": [
+      {
+        "name": "source",
+        "type": "enum",
+        "values": [
+          "text",
+          "files"
+        ],
+        "default": "text",
+        "effect": "augment() argument that chooses the evidence instruction. 'text': the extractor reads text (Extractor/DataExtractor, DocumentsToStructuredData, AudioToStructuredData) and the quotes are checked with check_text against the text it read. 'files': the extractor reads the files itself (VisionExtractor), the model names the file and page, and the quotes are checked with check_pdf, which also gives word boxes on the page.",
+        "selection_relevant": true,
+        "infer_from": "VisionExtractor reading PDFs or images directly -> 'files' (check_pdf); every extractor or module that works on text or a transcript -> 'text' (check_text)"
+      },
+      {
+        "name": "policy",
+        "type": "TracePolicy | None",
+        "default": null,
+        "effect": "The judgment calls of the check: number tolerance, matching of reformatted identifiers, treating 'reworded' as a problem (reworded_is_problem), the shortest acceptable quote (min_quote_words) and treating a quote that occurs more than once as a problem (ambiguous_quote_is_check).",
+        "selection_relevant": false,
+        "infer_from": "leave at the default; set reworded_is_problem=True only when the values must be copied word for word from the document"
+      }
+    ],
+    "note": "Evidence for extracted values: asks the extractor for one verbatim quote per value, then finds each quote in the source and compares the value with it with plain code (no model call), giving a verdict per value (verified / check / reworded / unchecked) and, for PDFs, the position of the quote on the page. It works AROUND an extractor and changes none: it does not replace the extractor step and is never a subsumed component. Add it after the extraction step and before an LLMJudge step. For AudioToStructuredData and DocumentsToStructuredData pass your own schema= and requirements= to run() so that the evidence request reaches only the extraction. It is not a confidence score (VisionExtractor.include_verification is the model's own rating) and does not replace a human reviewer or LLMJudge: a verified value matches its quote, which is not proof that the quote is the right place to read it. A scanned PDF has no text layer and is unchecked; a quote is not mapped to a time in a recording."
   }
 }

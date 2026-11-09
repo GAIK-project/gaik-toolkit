@@ -195,7 +195,7 @@ def main() -> None:
     if extraction_model:
         extractor_ctor["model"] = extraction_model
 
-    result = pipeline.run(
+${source_tracing_setup}    result = pipeline.run(
         file_path=input_file,
         user_requirements=user_requirements,
         parser_choice=parser_choice,
@@ -221,7 +221,7 @@ def main() -> None:
 
     output_dir = Path(__file__).parent / config.get("paths", {}).get("output", "output")
     output_dir.mkdir(parents=True, exist_ok=True)
-${llm_judge_section}
+${source_tracing_section}${llm_judge_section}
 
     output_path = output_dir / f"{input_file.stem}_result.json"
     output_path.write_text(

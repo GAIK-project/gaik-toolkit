@@ -100,6 +100,8 @@ The rule is a visual anchor: everything above it is context, everything the user
 
 **Round 2 — Technical (§8.2).** `input_types`, `input_formats`, `output_types`, `language`, `domain_vocabulary` (terms / codes / controlled lists — record `"none"` if not needed), `data_sources`, `model_provider` (or `"configurable"`), `model_preferences` (model names, temperature, reasoning_effort, embedding/transcription model), `security_constraints`, `integration_targets` (record `[]` if none), `human_review` (yes / no / conditional), `evaluation_requirements` (metrics, test data, thresholds), `runtime_interface`.
 
+When `human_review` is yes or conditional, record it here and do not ask which review aids (`SourceTracing`, `LLMJudge`) to add: that choice is made in Phase 5 Step 3, once the pipeline is known to have an extraction step.
+
 When discussing `output_types`, also ask whether the user wants a **formatted PDF report** of the result (in addition to the raw JSON/text). If yes, add `"pdf"` to `technical_spec.output_types` — the PoC will then render a titled PDF: structured output as key/value tables (nested objects as sub-tables), unstructured output as titled sections.
 
 **Round 3 — Target output (§8.3).** The content of this round depends on the pattern identified in Phase 1:
@@ -402,12 +404,28 @@ If no module covers the full chain, or the user needs to skip/add/reorder steps,
 - Mixed source files (PDF with a text layer, DOCX, XLSX/CSV, TXT/MD, recordings, images) → Markdown texts with per-file provenance and a primary/secondary class → `SourceNormalizer`. Normalized sources + section specs → section-bound fact units with verbatim quotes, missing required items and source conflicts (`structured_json`) → `KnowledgeCurator`. Curated knowledge → reviewed report sections, `report.md`/`report.docx` → `ReportSynthesizer`. These are the three stages `ReportWriter` runs; compose them yourself only when a stage must be skipped or replaced (e.g. the curated knowledge itself is the deliverable, or the knowledge is written by hand).
 - Any generated text (summary, minutes, report section) must be fact-checked and **corrected** against reference material, with an auditable edit log → `DraftReviewer` (exact search-and-replace edits; returns the repaired text). Use `LLMJudge` instead when the goal is a score or pass/fail verdict rather than a corrected text. Do not add `DraftReviewer` after `ReportSynthesizer`/`ReportWriter`, which already use it.
 - Output validation required → `LLMJudge` (extraction patterns only — see Step 3)
+- Each extracted value must be shown with the quote it came from, so that a reviewer can check it quickly, or an audit trail of where each value came from → `SourceTracing` after the extraction step (extraction patterns only — see Step 3). It works around `Extractor`/`DataExtractor`, `VisionExtractor`, `DocumentsToStructuredData` and `AudioToStructuredData` and never replaces them.
 
-**Step 3 -- Add `LLMJudge` when appropriate**
+**Step 3 -- Add review aids when appropriate (`SourceTracing`, `LLMJudge`)**
 
-**Skip this step entirely when `pattern == multi_source_report`.** LLMJudge validates structured extraction output against a schema; it has no meaningful role when the output is a narrative report. Never include it in a report-writing pipeline. `ReportWriter` already fact-checks every section with its built-in `DraftReviewer`; for `human_review == yes` or accuracy-critical reports, tighten that review instead (`strict_review`, a separate `reviewer` model — see its card's `spec_settings`).
+**Skip this step entirely when `pattern == multi_source_report`.** `LLMJudge` validates structured extraction output against a schema, and `SourceTracing` links extracted values to quotes; neither has a meaningful role when the output is a narrative report. Never include them in a report-writing pipeline. `ReportWriter` already fact-checks every section with its built-in `DraftReviewer` and its curated facts carry verbatim quotes; for `human_review == yes` or accuracy-critical reports, tighten that review instead (`strict_review`, a separate `reviewer` model — see its card's `spec_settings`). RAG patterns are unchanged: answers cite their sources with `AnswerGenerator.citations`.
 
-For all other patterns: add `LLMJudge` if `human_review=yes` or the user explicitly wants output quality checking. Explain why: it pre-screens outputs before human review, reducing reviewer load. Note its limitation: it is not a substitute for human review in safety-critical workflows.
+For all other patterns, when the pipeline has an extraction step and `human_review` is yes or conditional, or the user wants output checking or evidence, there are two review aids, and they do different jobs:
+
+- **`SourceTracing`** links every extracted value to a short verbatim quote in the source (and, for PDFs, to its position on the page), then compares the value with the quote and gives a verdict (verified / check / reworded / unchecked). It is plain code: no second model call, only the quote tokens added to the extraction output. It needs the model to copy quotes, and it shows the reviewer where to look.
+- **`LLMJudge`** has a second model read the source and score each field. It costs one more model call, and it can catch a value that is in the text but wrong for the question. Note its limitation: it is not a substitute for human review in safety-critical workflows.
+
+Choose them like this:
+
+1. **Ask once**, with both recommended: "Which checks should help your reviewer? (a) Source tracing and LLM judge (recommended): every value links to its quote in the source, and a second model scores each field. (b) Source tracing only: cheap and deterministic. (c) LLM judge only: a second model flags values that look wrong. (d) Neither: the reviewer reads the output unaided." State the cost of each in plain words. Ask it with the other Step 4 questions, not as a separate round.
+2. **Do not ask** when the user has already said what they want: use that. When the requirements ask for evidence — for example "cite the source", "show where each value came from", "audit trail", "traceable to the document", a regulated or audited domain — add `SourceTracing`.
+3. **No user to answer** (the wizard runs unattended): add `LLMJudge` when `human_review == yes` (what this step has always done), and add `SourceTracing` as well when the requirements ask for evidence. When `human_review` is no, add `LLMJudge` only if the user explicitly wants output quality checking.
+
+Order in the workflow: extraction → `SourceTracing` → `LLMJudge` → the `human_review` step. Tracing comes first because it is cheap and needs no model, and the reviewer sees both sets of flags. Record the choice by the steps the blueprint contains; a `SourceTracing` step takes `source_text` and `structured_json` and produces a `validation_report`, with `source = "text"` or `"files"` in its `parameters` (see its card). `SourceTracing` composes around the extraction step or module — keep that step, never replace it — and for `AudioToStructuredData` and `DocumentsToStructuredData` the PoC must pass the schema and requirements itself (see the card).
+
+The fixed PoC templates for audio and document extraction inject `SourceTracing` (like `LLMJudge`): the generated `run_poc.py` asks the extractor for the quotes before the run, checks the values against the text it read afterwards, writes `output/<input>_source_trace.json` and prints what a reviewer should look at. The schema must exist for that, so on the first run, when the pipeline generates the schema, tracing is skipped with a note; the next run traces. The RAG template has no extraction step and does not inject it. Any other block the fixed template does not cover (for example `DocumentClassifier` or `DraftReviewer`) still makes the scaffolder use the `_generic` template: the generated `run_poc.py` then has a labelled block per step with the card's reference calls, and you wire the evidence request on the extractor call and the check yourself from the card's recipe. Tell the user when that happens.
+
+`SourceTracing` is not a confidence score: `VisionExtractor.include_verification` is the model's own rating of a value, not evidence, and the two can be used together.
 
 **Step 4 -- Configure component options**
 
@@ -417,10 +435,10 @@ Every selected component exposes behaviour-changing options. Read each selected 
   - `language == Finnish` + audio → `Transcriber.enhanced_transcript = True`
   - timestamps or speaker labels required → `Transcriber.transcription_model = "whisper_local"` (+ `local_api_base`, `local_api_key`); timestamps alone are cheaper via `ParallelTranscriber.response_format = "srt"`
   - multiple speakers / meeting / interview **and** whisper_local selected → `Transcriber.diarization = True`, then ask for `speaker_count` (exact) or `min_speakers` + `max_speakers` (range)
-  - `human_review == yes` or `confidence_required` → `VisionExtractor.include_verification = True`
+  - `human_review == yes` or `confidence_required` → `VisionExtractor.include_verification = True` (a confidence rating, not evidence; evidence is `SourceTracing`, Step 3)
   - queries mix exact terms with concepts → `Retriever.hybrid_search = True`
   - results must be re-sortable by a business field (date, price, priority), or several ranked lists must be merged into one → add `Ranker` (`order_by(field=..., direction="asc"|"desc")`, `fuse(*lists, weights=...)`). Note `Ranker` returns `list[tuple(Document, float)]` while `Retriever` returns `list[Document]` — use `Ranker.to_documents()` when handing results to `AnswerGenerator`. Do **not** add `Ranker` merely to rank one list from `PgVectorStore.search_hybrid()`, which already fuses with RRF server-side
-  - citation/traceability requirement → `AnswerGenerator.citations = True` (or `RAGWorkflow.citations = True`)
+  - citation/traceability requirement on answers from retrieved documents → `AnswerGenerator.citations = True` (or `RAGWorkflow.citations = True`); on extracted field values (the user wants each value linked to its quote in the source) → add `SourceTracing` (Step 3), not a RAG option. The blueprint's `traceability` section is a different thing: it maps requirements to components
   - scanned/image PDFs → `DoclingParser.enable_ocr = True`, or `DocumentsToStructuredData.parser_choice = "docling"` (the accepted literals are `vision_parser`, `docling`, `pymupdf`, `docx` — only the first carries the `_parser` suffix; the registry component *ids* `docling_parser`/`pymupdf_parser`/`docx_parser` are a different namespace and raise `ValueError` if passed here)
   - access controls on a database → `PostgresAgent.table_allowlist = [...]`
   - source spreadsheets are human-facing reports (title rows, subtotals) → `TabularAgent.layout_inference = "auto"` (default; clean machine exports → `"never"` to skip the layout LLM call)
@@ -449,6 +467,7 @@ Selected:
   Module: AudioToStructuredData
     (contains, internally: Transcriber + TranscriptEnhancer + SchemaGenerator + DataExtractor)
     options: enhanced transcription is on (language is Finnish)
+  + SourceTracing  (reason: the supervisor sees the quote behind each value and where it sits in the source)
   + LLMJudge  (reason: human_review=yes; pre-screens output before supervisor review)
 
 Why not a separate TranscriptEnhancer step? The Transcriber/module already enhances Finnish audio internally.
@@ -861,6 +880,7 @@ Always tell the user about high-impact unconfirmed assumptions before Gate 2.
 | DocumentClassifier | component | document → classification | document routing |
 | PgVectorStore | component | text_chunks → vector_index | semantic search |
 | LLMJudge | component | text/json → validation_report | output quality validation |
+| SourceTracing | component | extracted values + source → trace report | evidence quote per value, page positions in PDFs |
 
 ---
 

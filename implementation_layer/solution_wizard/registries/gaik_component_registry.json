@@ -3470,5 +3470,77 @@
     "example_script_path": "implementation_layer/examples/software_components/web_scraper/web_scraper_example.py",
     "readme_path": "implementation_layer/src/gaik/software_components/web_scraper/README.md",
     "install_extra": "web-scraper"
+  },
+  {
+    "id": "source_tracing",
+    "name": "SourceTracing",
+    "type": "software_component",
+    "input_artifact_types": [
+      "structured_json",
+      "text",
+      "transcript",
+      "enhanced_transcript",
+      "parsed_text",
+      "pdf"
+    ],
+    "output_artifact_types": [
+      "structured_json",
+      "validation_report"
+    ],
+    "knowledge_processes": [
+      "knowledge_capture"
+    ],
+    "uses_components": [],
+    "required_parameters": [],
+    "optional_parameters": [
+      "policy",
+      "source"
+    ],
+    "cost_relevant_parameters": [],
+    "quality_tradeoffs": {
+      "speed_vs_accuracy": "A plain-code check with no model call; the extraction call returns extra output tokens for one quote per value",
+      "cost_sensitivity": "low -- no extra model call, only the quote tokens added to the extraction output",
+      "degrades_on": [
+        "scanned_pdfs_without_a_text_layer",
+        "models_that_do_not_copy_quotes_verbatim"
+      ]
+    },
+    "known_limitations": [
+      "Works around an extractor and changes none: the caller passes the augmented model and prompt to the extractor, then checks the results. It does not call the extractor itself.",
+      "The model must follow the instruction. A model that skips the quotes lowers coverage; one that paraphrases a quote shows as not found (verdict check).",
+      "A verified value matches its quote; it does not prove the quote is the right place to read the value. Use LLMJudge or a person for that.",
+      "A scan has no text layer, so its values are unchecked; an image file is reported as no_text_layer.",
+      "Positions are in the transcript text or on the PDF page. A quote is not mapped to a time in an audio or video recording.",
+      "A value in another format, such as a converted unit, is flagged check: the code cannot tell a correct conversion from a wrong number. A text value that is not in its quote is reported as reworded.",
+      "For AudioToStructuredData and DocumentsToStructuredData the caller must supply schema and requirements, so that the evidence request reaches only the extraction; check against result.parsed_documents, or against the transcript the pipeline extracted from (enhanced when present, else raw).",
+      "Adds output tokens to the extraction call. It is provider-agnostic: no LLM call of its own."
+    ],
+    "best_for": [
+      "human_review_support",
+      "linking_values_to_source_quotes",
+      "audit_trail_for_extracted_values",
+      "page_highlighting_of_pdf_evidence"
+    ],
+    "example_blueprint_steps": [
+      {
+        "id": "trace_sources",
+        "component": "SourceTracing",
+        "inputs": [
+          "source_text",
+          "structured_json"
+        ],
+        "outputs": [
+          "validation_report"
+        ],
+        "parameters": {
+          "source": "text"
+        }
+      }
+    ],
+    "source_path": "implementation_layer/src/gaik/software_components/source_tracing/",
+    "import_path": "gaik.software_components.source_tracing",
+    "example_script_path": "implementation_layer/examples/software_components/source_tracing/",
+    "readme_path": "implementation_layer/src/gaik/software_components/source_tracing/README.md",
+    "install_extra": "source-tracing"
   }
 ]

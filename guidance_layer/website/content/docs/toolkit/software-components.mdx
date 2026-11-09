@@ -974,6 +974,52 @@ flowchart LR
 
 ---
 
+### Source Tracing
+
+Source Tracing gives each extracted value its evidence, so that a human reviewer can check it in seconds. The extractor is asked for one short verbatim quote per value, with its document and page. Plain code, with no model call, then finds each quote in the source, compares the value with the quote, and gives a verdict: `verified`, `check`, `reworded` or `unchecked`. For PDFs it also returns the position of the quote on the page, taken from the PDF's own text layer, so an interface can highlight it. The component works around the extractor you call and changes none of them: it works with the Extractor, the Vision Extractor and the Documents and Audio to Structured Data modules.
+
+<Mermaid chart={`
+flowchart LR
+    T("📋 Schema + Task") --> A
+    subgraph ST["Source Tracing"]
+        direction TB
+        A["augment<br/>ask for a quote per value"]
+        C["check_text / check_pdf<br/>find quote · compare value · position"]
+    end
+    A --> E["Extractor<br/>(unchanged)"]
+    E --> C
+    S("📄 Source text / PDF") --> C
+    C --> O1("✅ Results without evidence")
+    C --> O2("🔎 Report: verdict per value")
+
+    style T fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style S fill:#dbeafe,stroke:#3b82f6,color:#1e3a5f
+    style O1 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style O2 fill:#dcfce7,stroke:#16a34a,color:#14532d
+    style ST fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
+`} />
+
+**Key features:**
+- `SourceTracing(policy=None)` with three steps: `augment(schema, user_requirements, source="text" | "files")` returns the schema and task to give the extractor, then `check_text(results, texts)` or `check_pdf(results, pdf_paths)` returns the results without the evidence and a `TraceReport`
+- Verdicts: `verified` (the quote is in the source and holds the value), `check` (the quote is not found, or holds another number or date), `reworded` (the text value is the model's own wording, as with a translation or a summary), `unchecked` (a list, a number written in words, a scan)
+- Tolerant comparison: case, punctuation and spacing are ignored; numbers and dates are compared as numbers and dates (`3.000 kg` holds `3000`, `11.04.2025` holds `2025-04-11`); a formatted identifier matches the document's own spelling. `TracePolicy` sets these judgment calls
+- A quote on another page or in another file than the model named is still found and reported as `moved`
+- `report.summary()` gives counts per verdict and the coverage (the share of values that came with evidence); `report.to_dict()` gives JSON for a user interface; each item has page boxes (PDF) or character offsets (text)
+- Install: `pip install "gaik[source-tracing]"` (adds PyMuPDF, which only the PDF check uses; text and transcript checks work without it)
+- Limits: the model must follow the instruction; a scan without a text layer cannot be checked; a quote is not mapped to a time in an audio recording; it checks that the evidence says what the value says, not that it is the right evidence
+
+**Potential applications:**
+- A review screen for extracted purchase orders or invoices, with the quote highlighted on the page
+- Incident reports from recordings, with each field linked to the sentence in the transcript
+- A cheap first check before an LLM judge, on the values a person has to approve
+- An audit trail: where each value in the database came from
+
+- **Full guide**: [Source Tracing](/toolkit/source-tracing)
+- **Implementation code**: [software_components/source_tracing](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/src/gaik/software_components/source_tracing)
+- **Usage examples**: [examples/source_tracing](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples/software_components/source_tracing)
+
+---
+
 ### Report Synthesizer
 
 The Report Synthesizer writes a governed report section by section from curated knowledge. Each technical section is written from its own knowledge only. Derived sections, such as recommendations and a summary, are written afterwards from the reviewed texts of the sections they depend on. A Draft Reviewer with its own model setting checks every draft, and a review log records the edits. The knowledge is plain data: it usually comes from the Knowledge Curator, but it can also be written by hand. It is the third stage of the Report-Writer module.
