@@ -104,6 +104,13 @@ function run(cookie: string) {
   return proxy(new NextRequest(RUN, { method: "POST", headers: { cookie } }));
 }
 
+test("a POST from a visitor who is not signed in is refused before the backend", async () => {
+  const response = await proxy(new NextRequest(RUN, { method: "POST" }));
+  expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ error: "Sign in to use this feature." });
+  expect(backendCalls).toBe(0);
+});
+
 test("a run on an expired session saves the refreshed session", async () => {
   const first = await run(sessionCookie("r1", expired()));
   expect(first.status).toBe(200);
