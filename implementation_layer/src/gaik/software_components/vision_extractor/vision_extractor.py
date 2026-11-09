@@ -24,6 +24,7 @@ from gaik.software_components.extractor import (
 from gaik.software_components.extractor.schema import (
     DECIMAL_PERSISTED_HELPER_SOURCE,
     NUMERIC_FIELD_TYPES,
+    _holds_items,
     apply_field_policies,
     decimal_field_repr,
     normalize_extracted_data,
@@ -359,7 +360,14 @@ def _strip_gemini_unsupported(schema: dict) -> dict:
             # apply_field_policies() will normalise any out-of-range values after
             # the call.
             continue
-        if isinstance(value, dict):
+        if key == "properties" and isinstance(value, dict):
+            # The keys here are field names, not schema keywords: a field named
+            # "title" or "pattern" stays, and only its own schema is stripped.
+            result[key] = {
+                name: _strip_gemini_unsupported(sub) if isinstance(sub, dict) else sub
+                for name, sub in value.items()
+            }
+        elif isinstance(value, dict):
             result[key] = _strip_gemini_unsupported(value)
         elif isinstance(value, list):
             result[key] = [
@@ -1176,7 +1184,7 @@ class VisionExtractor:
 
         has_nested = False
         for key, value in list(result_dict.items()):
-            if isinstance(value, list) and value and isinstance(value[0], dict):
+            if _holds_items(key, value, requirements):
                 has_nested = True
                 result_dict[key] = [apply_field_policies(item, requirements) for item in value]
         if not has_nested:
