@@ -24,6 +24,7 @@ from .schema import (
     SYSTEM_PARSER,
     CompositeExtractionRequirements,
     ExtractionRequirements,
+    _holds_items,
     _parse_with,
     apply_composite_field_policies,
     apply_field_policies,
@@ -197,7 +198,7 @@ class DataExtractor:
         if isinstance(result_dict, dict):
             has_nested = False
             for key, value in list(result_dict.items()):
-                if isinstance(value, list) and value and isinstance(value[0], dict):
+                if _holds_items(key, value, requirements):
                     has_nested = True
                     result_dict[key] = [apply_field_policies(item, requirements) for item in value]
             if not has_nested:

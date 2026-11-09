@@ -1212,10 +1212,13 @@ def save_report_config(
     def _to_rel(p: str | Path | None) -> str | None:
         if p is None:
             return None
+        # Resolved first: a relative path is relative to the working directory
+        # here, while load_report_config reads it relative to the config file.
+        absolute = Path(p).resolve()
         try:
-            return str(Path(p).relative_to(base.resolve()))
+            return str(absolute.relative_to(base.resolve()))
         except ValueError:
-            return str(p)  # already absolute or on a different drive
+            return str(absolute)  # outside the config's folder or on a different drive
 
     # Normalise sections: dataclasses → plain dicts, preserve all fields.
     section_dicts: list[dict[str, Any]] = []

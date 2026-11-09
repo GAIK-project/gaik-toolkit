@@ -56,6 +56,17 @@ def _schema_file_stem(schema_name: str) -> str:
     return name
 
 
+def _text_of(parsed: Any) -> str:
+    """The document's text from what ``parse_document`` returned.
+
+    The Docling and DOCX parsers return a dict with the text under ``text_content``
+    next to the file's path and metadata; the extractor reads the text only.
+    """
+    if isinstance(parsed, dict):
+        return str(parsed.get("text_content") or "")
+    return str(parsed)
+
+
 class DocumentsToStructuredData:
     """End-to-end workflow: parse document(s) -> structured extraction."""
 
@@ -181,13 +192,13 @@ class DocumentsToStructuredData:
             return pages if isinstance(pages, list) else [pages]
         if choice == "docling":
             parsed = parser.parse_document(str(file_path), **parse_options)
-            return [str(parsed)]
+            return [_text_of(parsed)]
         if choice == "pymupdf":
             text = parser.parse_pdf(str(file_path), **parse_options)
             return [text]
         if choice == "docx":
-            text = parser.parse_document(str(file_path), **parse_options)
-            return [text]
+            parsed = parser.parse_document(str(file_path), **parse_options)
+            return [_text_of(parsed)]
         raise ValueError(f"Unsupported parser_choice: {parser_choice}")
 
     # ------------------------------------------------------------------

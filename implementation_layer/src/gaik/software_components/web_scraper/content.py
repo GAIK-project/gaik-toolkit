@@ -163,6 +163,17 @@ def _meta(tree, *names: str) -> str | None:
     return None
 
 
+def _page_url(url: str, page_url: str) -> str | None:
+    """A URL the page states about itself (its base or canonical); None when malformed.
+
+    A page is still read when its ``<base>`` or canonical link is not a URL.
+    """
+    try:
+        return normalize_url(url, base=page_url)
+    except ValueError:
+        return None
+
+
 def read_page(
     html: str, page_url: str, policy: UrlPolicy, extraction: Extraction = "balanced"
 ) -> PageContent:
@@ -175,7 +186,7 @@ def read_page(
     # Read the links and JSON-LD first: trafilatura prunes the tree it is given, so
     # it gets the HTML text and parses its own copy.
     base = tree.xpath("//base/@href")
-    links = _links(tree, normalize_url(base[0], base=page_url) if base else page_url, policy)
+    links = _links(tree, (_page_url(base[0], page_url) if base else None) or page_url, policy)
     structured_data = _json_ld(tree)
     canonical = tree.xpath('//link[@rel="canonical"]/@href')
     language = _collapse(tree.get("lang")) or _meta(tree, "og:locale") or None
@@ -188,7 +199,7 @@ def read_page(
         description=(metadata.description if metadata else None) or description,
         language=language,
         published=metadata.date if metadata else None,
-        canonical_url=normalize_url(canonical[0], base=page_url) if canonical else None,
+        canonical_url=_page_url(canonical[0], page_url) if canonical else None,
         markdown=_markdown(html, page_url, extraction),
         links=links,
         structured_data=structured_data,

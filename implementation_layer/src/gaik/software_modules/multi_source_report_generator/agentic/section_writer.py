@@ -8,6 +8,7 @@ then mandatorily reviewed/repaired by the diff editor.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,21 @@ def _slug(text: str, *, max_len: int = 40) -> str:
     while "__" in s:
         s = s.replace("__", "_")
     return s.strip("_")[:max_len] or "section"
+
+
+# Characters a file name cannot hold on every platform, and "%" itself.
+_NOT_IN_A_FILE_NAME = re.compile(r'[<>:"/\\|?*%\x00-\x1f]')
+
+
+def _file_stem(section_id: str) -> str:
+    """A section id as a file name.
+
+    A character that cannot be in a file name is written as ``%XX``, so the file
+    stays in its folder and two different ids never share a file. Empty for an
+    id of spaces only; cut at 150 characters, which a file name can always hold.
+    """
+    name = _NOT_IN_A_FILE_NAME.sub(lambda match: f"%{ord(match.group()):02X}", section_id)
+    return name.strip()[:150]
 
 
 def _usage_of(response: Any) -> dict:
@@ -96,7 +112,7 @@ def create_section_writer_graph(
         if out_dir and brief:
             curated_dir = Path(out_dir) / "evidence" / "curated_sections"
             curated_dir.mkdir(parents=True, exist_ok=True)
-            name = state.get("section_id") or _slug(title)
+            name = _file_stem(state.get("section_id") or "") or _slug(title)
             (curated_dir / f"{name}.md").write_text(brief, encoding="utf-8")
 
         reporter.emit(f"[{title}] curated evidence -> drafting")

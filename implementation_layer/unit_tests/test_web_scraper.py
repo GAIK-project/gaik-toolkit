@@ -383,6 +383,48 @@ def test_crawl_result_markdown_and_save(tmp_path):
     assert all(path.read_bytes().count(b"\r\n") == 0 for path in written.values())
 
 
+def test_crawl_follows_links_on_the_host_the_start_page_redirected_to():
+    site = Site(
+        {
+            "https://example.test/": (301, {"location": "https://www.example.test/"}, ""),
+            "https://www.example.test/": (
+                200,
+                HTML,
+                html_page("Home", "<a href='/a'>A</a> <a href='https://example.test/b'>B</a>"),
+            ),
+            "https://www.example.test/a": (200, HTML, html_page("A", "")),
+            "https://example.test/b": (200, HTML, html_page("B", "")),
+        }
+    )
+    with scraper(site) as s:
+        result = s.crawl("https://example.test/", max_pages=5)
+
+    assert [page.title for page in result.pages] == ["Home", "A", "B"]
+
+
+@pytest.mark.parametrize(
+    "head",
+    [
+        '<link rel="canonical" href="http://[::1/">',
+        '<base href="http://x:abc/">',
+        '<base href="http://[bad/"><link rel="canonical" href="http://y:port/">',
+    ],
+)
+def test_a_malformed_base_or_canonical_link_does_not_stop_the_crawl(head):
+    page = f"<html><head><title>Home</title>{head}</head><body><p>{ARTICLE}</p>"
+    site = Site(
+        {
+            "https://example.test/": (200, HTML, page + "<a href='/a'>A</a></body></html>"),
+            "https://example.test/a": (200, HTML, html_page("A", "")),
+        }
+    )
+    with scraper(site) as s:
+        result = s.crawl("https://example.test/", max_pages=5)
+
+    assert [page.title for page in result.pages] == ["Home", "A"]
+    assert result.pages[0].canonical_url is None
+
+
 def test_stay_on_host_false_needs_an_allowlist():
     with WebScraper() as s, pytest.raises(ValueError):
         list(s.iter_crawl("https://example.test/", stay_on_host=False))
