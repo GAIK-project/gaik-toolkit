@@ -26,6 +26,7 @@ REQUIRED_CHECKS = (
     "stream",
     "schema_generator",
     "data_extractor",
+    "source_tracing",
     "answer_generator",
     "document_classifier",
     "report_writing",
@@ -257,6 +258,34 @@ def run_smoke(args) -> dict:
                 raise AssertionError("DataExtractor did not preserve the synthetic record")
 
         check("data_extractor", data_extractor)
+
+        def source_tracing():
+            from gaik.software_components.source_tracing import SourceTracing
+
+            document = "Project: GAIK. City: Helsinki."
+            tracing = SourceTracing()
+            task = tracing.augment(
+                generated["model"],
+                "Extract the project name and the city, exactly as written in the document.",
+                source="text",
+            )
+            records = bounded(DataExtractor(config)).extract(
+                extraction_model=task.model,
+                requirements=generator.item_requirements,
+                user_requirements=task.prompt,
+                documents=[document],
+            )
+            clean, report = tracing.check_text(records, [document])
+            summary = report.summary()
+            result["source_tracing_observation"] = {
+                key: summary[key] for key in ("verified", "check", "reworded", "unchecked", "total")
+            }
+            if clean != [{"project": "GAIK", "city": "Helsinki"}]:
+                raise AssertionError("Source tracing changed the extracted record")
+            if summary["verified"] != 2 or summary["total"] != 2 or summary["coverage"] != 1.0:
+                raise AssertionError("The extractor did not return verifiable evidence")
+
+        check("source_tracing", source_tracing)
 
         def answer_generator():
             from gaik.software_components.RAG.answer_generator import AnswerGenerator
