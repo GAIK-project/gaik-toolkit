@@ -108,6 +108,19 @@ def _failing_units(
     return failures
 
 
+def _log_summary(failing: list[tuple[int, str, str]], bad_conflicts: list[str]) -> list[str]:
+    """What a log line says about failures: unit positions and reasons, no source text.
+
+    The full messages quote the sources and name the conflicts' topics; they
+    go back to the model in the retry prompt and into the raised error, not
+    into the log.
+    """
+    summary = [f"unit {n}: {reason}" for n, reason, _ in failing]
+    if bad_conflicts:
+        summary.append(f"{len(bad_conflicts)} conflict(s) refer to missing units")
+    return summary
+
+
 def _failing_conflicts(answer: CurationResponse) -> list[str]:
     """A message for every conflict that refers to a unit position that does not exist."""
     count = len(answer.units)
@@ -267,7 +280,9 @@ class KnowledgeCurator:
         if failing or bad_conflicts:
             failures = [message for _, _, message in failing]
             logger.warning(
-                "Section %r: retrying after failures %s", section.id, failures + bad_conflicts
+                "Section %r: retrying after failures %s",
+                section.id,
+                _log_summary(failing, bad_conflicts),
             )
             messages = [
                 *messages,
@@ -289,9 +304,9 @@ class KnowledgeCurator:
         if bad_conflicts:
             logger.warning(
                 "Section %r: removed conflict references to units that do not exist after "
-                "the retry: %s",
+                "the retry: %d conflict(s)",
                 section.id,
-                bad_conflicts,
+                len(bad_conflicts),
             )
             if progress_callback:
                 progress_callback(
@@ -315,7 +330,7 @@ class KnowledgeCurator:
                 "Section %r: dropped %d unit(s) whose quote failed the check after the retry: %s",
                 section.id,
                 len(dropped),
-                [message for _, _, message in failing],
+                _log_summary(failing, []),
             )
             if progress_callback:
                 progress_callback(
