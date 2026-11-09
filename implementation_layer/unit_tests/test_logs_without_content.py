@@ -3,7 +3,11 @@
 import logging
 
 from gaik.software_components.knowledge_curator.knowledge_curator import _log_summary
-from gaik.software_components.validators.llm_judge.llm_judge import parse_judge_flags
+from gaik.software_components.validators.llm_judge.llm_judge import (
+    parse_hallucination_flags,
+    parse_judge_flags,
+    parse_text_judgement,
+)
 from gaik.software_components.validators.llm_judge.pairwise import _parse_pairwise
 
 PRIVATE = "SOURCE-TEXT-THAT-MUST-NOT-BE-LOGGED"
@@ -21,6 +25,21 @@ def test_an_unreadable_pairwise_answer_is_logged_by_size(caplog):
         assert _parse_pairwise(f"not json: {PRIVATE}") == ("tie", 0, 0, "")
     assert PRIVATE not in caplog.text
     assert "characters" in caplog.text
+
+
+def test_an_unreadable_hallucination_answer_is_logged_by_size(caplog):
+    with caplog.at_level(logging.WARNING):
+        assert parse_hallucination_flags(f"not json: {PRIVATE}") == []
+    assert PRIVATE not in caplog.text
+    assert "characters" in caplog.text
+
+
+def test_an_unreadable_text_pair_answer_is_logged_and_returned_by_size(caplog):
+    with caplog.at_level(logging.WARNING):
+        equivalent, severity, score, reason = parse_text_judgement(f"not json: {PRIVATE}")
+    assert (equivalent, severity, score) == (False, "wrong", 0)
+    assert PRIVATE not in caplog.text and PRIVATE not in reason
+    assert reason.startswith("<unparseable") and "characters" in reason
 
 
 def test_the_curator_log_summary_has_no_quotes_or_topics():
