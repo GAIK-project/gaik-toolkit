@@ -14,9 +14,13 @@ retries (a lightweight agentic loop).
 connector:
 
 - **Read-only.** Only `SELECT` / `WITH ... SELECT` queries. No
-  `INSERT`/`UPDATE`/`DELETE`, no DDL, no data import.
+  `INSERT`/`UPDATE`/`DELETE`, no DDL, no data import, no `FOR UPDATE`.
 - **One schema.** The agent operates on a single schema (`schema_name`).
-  Cross-schema and cross-database references are rejected.
+  Cross-schema and cross-database references are rejected, and unqualified
+  table names are read from that schema only.
+- **Standard functions only.** Text, number, date, JSON, array, aggregate and
+  window functions work. Other functions, including your own and those of
+  extensions, are rejected (see [Security model](#security-model)).
 - **Relational tables only.** Not a CSV importer or an ETL tool.
 - **Best for small / medium schemas.** The whole schema is placed in the LLM
   prompt. For very large databases, narrow it with `table_allowlist`.
@@ -46,12 +50,40 @@ created lazily.
 
 ## Security model
 
-The agent executes LLM-generated SQL. It is validated first
-(`sqlglot`-based parsing rejects non-`SELECT` statements, multi-statements,
-DDL/DML, and cross-schema references), and every connection is opened with
-`default_transaction_read_only=on` plus a `statement_timeout`.
+The agent executes LLM-generated SQL. Three layers limit what it can do:
+
+1. **Validation** (`validate_read_only`, `sqlglot`-based) before anything is
+   sent to the database. A query is rejected unless it is a single `SELECT` /
+   `WITH ... SELECT` and passes these checks:
+   - no DDL/DML, no `SELECT ... INTO`, no row locks (`FOR UPDATE`, `FOR SHARE`);
+   - **functions come from an allowlist**: the ones `sqlglot` models as
+     standard SQL plus the names in `sql_safety.SAFE_FUNCTIONS`. Functions
+     that run SQL text, change settings, read files or sequences, or sleep are
+     not on it, and neither are your own functions or extension functions.
+     Schema-qualified function calls are rejected;
+   - tables are in `schema_name` and, when `table_allowlist` is given, on it.
+     Unqualified table names are rewritten to `schema.table`, so a name cannot
+     resolve to a system catalog or another schema on the search path. The
+     SQL that runs is this rewritten form; `QueryResult.sql` keeps the query
+     as the LLM wrote it;
+   - a CTE name counts as a CTE only where that CTE is in scope. Inside its
+     own body (without `RECURSIVE`) or in an earlier CTE the name is a table
+     and is checked like one;
+   - identifiers are compared as PostgreSQL does: unquoted names fold to
+     lower case, quoted names keep their case. `"Users"` and `users` are two
+     tables.
+2. **A read-only transaction per query.** `run_sql()` runs each query in its
+   own transaction, started `READ ONLY` and always rolled back, with a
+   `statement_timeout`. A write fails in PostgreSQL, and a session setting
+   changed inside a query does not outlive it. The connection also sets
+   `default_transaction_read_only=on`.
+3. **The database role** the agent connects with.
 
 **Validation is best-effort. The real guarantee is a read-only database role.**
+A read-only transaction stops writes to tables, but not everything a
+privileged role can do through functions, so do not give the agent a
+superuser or the role that owns the schema.
+Create one and connect with it:
 Create one and connect with it:
 
 ```sql
@@ -73,6 +105,10 @@ with PostgresAgent(
 ```
 
 A query that touches any table outside the allowlist is rejected before it runs.
+
+Allowlist entries are table names as PostgreSQL stores them, so they are
+case-sensitive: write `customers` for a table created as `customers` or
+`Customers`, and `Users` only for one created as `"Users"`.
 
 ## API
 

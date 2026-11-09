@@ -143,6 +143,10 @@ table functions, `ATTACH` / `INSTALL` / `PRAGMA` / `COPY`, and **any function
 denylist, which is what makes it hold for DuckDB extension functions that do
 not exist yet.
 
+Queries may only read the loaded tables. A CTE name counts as a CTE only where
+that CTE is in scope; inside its own body (without `RECURSIVE`) or in an
+earlier CTE the name is a table and must be one of the loaded ones.
+
 **2. A locked-down engine.** External access is enabled only while *our own*
 loader reads the paths you passed in. Before a single generated query runs, the
 connection is closed off permanently:
