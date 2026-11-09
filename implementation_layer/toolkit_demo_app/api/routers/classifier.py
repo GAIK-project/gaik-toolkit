@@ -16,6 +16,11 @@ try:
 except ImportError:
     from api.utils.model_settings import provider_error_detail
 
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
 router = APIRouter()
 
 
@@ -45,6 +50,8 @@ async def classify_document(
 
     # Validate file size and save temporarily
     content = await validate_file_size(file)
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+        raise HTTPException(status_code=415, detail=mismatch)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name

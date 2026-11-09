@@ -56,6 +56,11 @@ except ImportError:
     from api.utils.model_settings import provider_error_detail
     from api.utils.schema_view import describe_fields, specs_by_name, structure_of
 
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -386,6 +391,8 @@ async def trace_sources(
         raise HTTPException(status_code=400, detail="sources and data must be JSON") from exc
 
     contents = [await validate_file_size(f) for f in file]
+    if any(content_mismatch(".pdf", content) for content in contents):
+        raise HTTPException(status_code=415, detail="The file's content is not a .pdf file.")
     with tempfile.TemporaryDirectory() as folder:
         documents = []
         for number, (upload, content) in enumerate(zip(file, contents, strict=True), start=1):

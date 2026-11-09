@@ -20,6 +20,11 @@ from fastapi.responses import StreamingResponse
 from langchain_core.documents import Document
 from pydantic import BaseModel
 
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
 router = APIRouter()
 
 
@@ -438,8 +443,10 @@ async def index_documents(
             for file in files:
                 # Save uploaded file temporarily
                 suffix = Path(file.filename).suffix.lower()
+                content = await file.read()
+                if (mismatch := content_mismatch(suffix, content)) is not None:
+                    raise HTTPException(status_code=415, detail=mismatch)
                 with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                    content = await file.read()
                     tmp.write(content)
                     tmp_path = tmp.name
 

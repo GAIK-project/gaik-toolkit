@@ -37,6 +37,11 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 
 logger = logging.getLogger(__name__)
+try:
+    from utils.file_content import content_mismatch
+except ImportError:
+    from api.utils.file_content import content_mismatch
+
 router = APIRouter()
 
 # Temporary storage for generated PDFs
@@ -125,6 +130,8 @@ async def diary_audio_pipeline_stream(
     content = await file.read()
     if len(content) > MAX_AUDIO_FILE_SIZE_BYTES:
         raise HTTPException(status_code=413, detail=AUDIO_TOO_LARGE_DETAIL)
+    if (mismatch := content_mismatch(suffix, content)) is not None:
+        raise HTTPException(status_code=415, detail=mismatch)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
