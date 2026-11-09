@@ -51,6 +51,14 @@ _tracer: Any = None
 _provider: Any = None  # gaik's own provider, when it exports by itself
 _resolved = False
 
+#: The request settings a span records, by attribute name; any other key is left out.
+_SETTINGS = {
+    "temperature": "gen_ai.request.temperature",
+    "max_tokens": "gen_ai.request.max_tokens",
+    "top_p": "gen_ai.request.top_p",
+    "reasoning_effort": "gaik.request.reasoning_effort",
+}
+
 #: gaik's provider names mapped to the GenAI convention's well-known values.
 _GEN_AI_PROVIDER = {
     "openai": "openai",
@@ -189,10 +197,11 @@ def llm_span(
 ) -> Iterator[LLMCallSpan]:
     """Wrap one model call in a ``chat <model>`` span, the current span inside the block.
 
-    ``provider`` is gaik's provider name. ``settings`` are the request's sampling
-    options (``temperature``, ``max_tokens``, ``reasoning_effort`` ...); ``None``
-    values are left out. The call's own exception passes through unchanged; the
-    span records only its type.
+    ``provider`` is gaik's provider name. ``settings`` are the sampling options
+    the request actually sends; only ``temperature``, ``max_tokens``, ``top_p``
+    and ``reasoning_effort`` are recorded, and ``None`` values are left out.
+    The call's own exception passes through unchanged; the span records only
+    its type.
     """
     span = _start(component, provider, model, settings or {}, prompt_version)
     handle = LLMCallSpan(span)
@@ -232,13 +241,18 @@ def _start(
     tracer = _get_tracer()
     if tracer is None:
         return None
+    span = None
     try:
         from opentelemetry.trace import SpanKind
 
         span = tracer.start_span(f"chat {model}", kind=SpanKind.CLIENT)
         if not span.is_recording():
             return span
-        settings = {k: v for k, v in settings.items() if v is not None}
+        settings = {
+            k: v
+            for k, v in settings.items()
+            if k in _SETTINGS and isinstance(v, (bool, int, float, str))
+        }
         version = _gaik_version()
         attributes: dict[str, Any] = {
             "gaik.event.class": "llm_call",
@@ -259,16 +273,12 @@ def _start(
             ),
         }
         for key, value in settings.items():
-            name = {
-                "temperature": "gen_ai.request.temperature",
-                "max_tokens": "gen_ai.request.max_tokens",
-                "top_p": "gen_ai.request.top_p",
-            }.get(key, f"gaik.request.{key}")
-            attributes[name] = value if isinstance(value, (bool, int, float, str)) else str(value)
+            attributes[_SETTINGS[key]] = value
         span.set_attributes({k: v for k, v in attributes.items() if v is not None})
         return span
     except Exception:
         logger.debug("gaik tracing could not start a span", exc_info=True)
+        _end(span)  # a span started before the fault would otherwise stay open
         return None
 
 

@@ -12,19 +12,31 @@ import pytest
 from gaik.observability import build_usage_record, config_version, llm_span, tracing
 from pydantic import BaseModel
 
-trace = pytest.importorskip("opentelemetry.trace")
-from opentelemetry.sdk.trace import TracerProvider  # noqa: E402
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor  # noqa: E402
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import (  # noqa: E402
-    InMemorySpanExporter,
-)
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-_EXPORTER = InMemorySpanExporter()
+    _EXPORTER = InMemorySpanExporter()
+except ImportError:  # the extra is not installed: only the no-extra test runs
+    trace = None
+
+needs_otel = pytest.mark.skipif(trace is None, reason="needs the gaik[otel] extra")
 
 
 @pytest.fixture
-def spans():
+def spans(monkeypatch):
     """Spans recorded during the test, through an application-set provider."""
+    if trace is None:
+        pytest.skip("needs the gaik[otel] extra")
+    # A developer's own OTEL_* settings would send gaik's spans elsewhere.
+    for name in (
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_SDK_DISABLED",
+    ):
+        monkeypatch.delenv(name, raising=False)
     if not isinstance(trace.get_tracer_provider(), TracerProvider):
         provider = TracerProvider()
         provider.add_span_processor(SimpleSpanProcessor(_EXPORTER))
@@ -57,6 +69,7 @@ def test_without_the_extra_a_call_runs_as_before(monkeypatch, off):
     assert tracing._get_tracer() is None
 
 
+@needs_otel
 def test_without_an_endpoint_gaik_follows_the_application_s_provider(monkeypatch, off):
     # The API's tracer, not a decision made once: it follows a provider the
     # application sets later, and records nothing until then.
@@ -67,6 +80,7 @@ def test_without_an_endpoint_gaik_follows_the_application_s_provider(monkeypatch
     assert tracing._resolve_tracer() is sentinel
 
 
+@needs_otel
 def test_with_an_endpoint_gaik_exports_by_itself_and_leaves_the_global_provider_alone(
     monkeypatch, off
 ):
@@ -85,12 +99,14 @@ def test_with_an_endpoint_gaik_exports_by_itself_and_leaves_the_global_provider_
     tracing._provider.shutdown()
 
 
+@needs_otel
 def test_otel_sdk_disabled_turns_gaik_s_spans_off(monkeypatch, off):
     monkeypatch.setenv("OTEL_SDK_DISABLED", "true")
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9")
     assert tracing._resolve_tracer() is None
 
 
+@needs_otel
 def test_without_a_recording_tracer_the_call_skips_the_span_s_work(monkeypatch, off):
     monkeypatch.setattr(tracing, "_get_tracer", lambda: trace.NoOpTracer())
     with llm_span("DataExtractor", provider="openai", model="m") as call:
@@ -192,6 +208,44 @@ def test_a_fault_in_the_instrumentation_never_reaches_the_caller(spans, monkeypa
     assert result == "done"
 
 
+def test_only_known_settings_are_recorded(spans):
+    with llm_span(
+        "DataExtractor",
+        provider="openai",
+        model="m",
+        settings={"top_p": 1.0, "reasoning_effort": "low", "api_key": "sk-x", "stop": ["a"]},
+    ):
+        pass
+    (span,) = spans()
+    assert span.attributes["gen_ai.request.top_p"] == 1.0
+    assert span.attributes["gaik.request.reasoning_effort"] == "low"
+    assert not any("api_key" in k or "stop" in k for k in span.attributes)
+    assert "sk-x" not in _values(span)
+
+
+def test_a_span_started_before_a_fault_is_still_ended(spans, monkeypatch):
+    ended = []
+
+    class _Span:
+        def is_recording(self):
+            return True
+
+        def set_attributes(self, attributes):
+            raise RuntimeError("bad attribute")
+
+        def end(self):
+            ended.append(True)
+
+    class _Tracer:
+        def start_span(self, *args, **kwargs):
+            return _Span()
+
+    monkeypatch.setattr(tracing, "_get_tracer", lambda: _Tracer())
+    with llm_span("DataExtractor", provider="openai", model="m") as call:
+        assert call.recording is False
+    assert ended == [True]
+
+
 def test_the_config_version_is_stable_and_follows_the_settings():
     base = {"component": "DataExtractor", "provider": "azure", "model": "gpt-4.1"}
     first = config_version(**base, settings={"temperature": 0.0})
@@ -258,10 +312,30 @@ def test_the_extractor_s_call_is_one_span_without_the_document_or_the_record(spa
     assert a["gen_ai.request.model"] == "gpt-4.1"
     assert a["gen_ai.usage.input_tokens"] == 120 == usage.input_tokens
     assert a["gen_ai.usage.output_tokens"] == 30
+    assert a["gen_ai.request.temperature"] == 0.0
+    assert a["gen_ai.request.top_p"] == 1.0  # sent by _parse_with, not an argument
     assert a["gaik.input.length"] > len("Raportoija Matti Virtanen, pumppu P17")
     assert a["gaik.output.length"] == len(_Record(reporter="Matti Virtanen").model_dump_json())
     assert "Matti" not in _values(span)
     assert "P17" not in _values(span)
+
+
+def test_the_extractor_records_the_settings_it_sends_not_its_arguments(spans):
+    from gaik.software_components.extractor.extractor import DataExtractor
+
+    extractor = DataExtractor(
+        {"use_azure": False, "api_key": "test", "model": "gpt-6-luna", "reasoning_effort": "high"}
+    )
+    extractor.client = _FakeClient()
+
+    extractor._extract_one("doc", _Record, _requirements(), "Extract")
+
+    (span,) = spans()
+    # GPT-6 with reasoning on: temperature and top_p are dropped from the request,
+    # and the effort comes from the config.
+    assert "gen_ai.request.temperature" not in span.attributes
+    assert "gen_ai.request.top_p" not in span.attributes
+    assert span.attributes["gaik.request.reasoning_effort"] == "high"
 
 
 def test_the_extractor_s_error_is_unchanged_and_marks_the_span(spans):

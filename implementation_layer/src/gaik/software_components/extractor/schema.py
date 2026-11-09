@@ -166,6 +166,36 @@ def _parse_with(
             explicit temperature to keep determinism, or pass an active effort
             with ``temperature=None``.
     """
+    sampling = _request_settings(client, model, temperature, reasoning_effort, config)
+    if isinstance(client, ProviderClient):
+        parsed = _with_retries(
+            lambda: client.chat_parsed(
+                messages=messages,
+                response_format=response_format,
+                model=model,
+                **sampling,
+            )
+        )
+        return _ParsedShim(parsed)
+    return _with_retries(
+        lambda: client.beta.chat.completions.parse(
+            model=model,
+            messages=messages,
+            response_format=response_format,
+            timeout=(config or {}).get("timeout", 30),
+            **sampling,
+        )
+    )
+
+
+def _request_settings(
+    client,
+    model: str,
+    temperature: float | None,
+    reasoning_effort: str | None,
+    config: dict | None,
+) -> dict:
+    """The sampling options ``_parse_with`` sends for this client and model."""
     if isinstance(client, ProviderClient):
         # Temperature is shared by the text adapters. Reasoning effort reaches
         # the OpenAI-shaped ones and Anthropic, whose adapter maps it to
@@ -184,27 +214,9 @@ def _parse_with(
             }
             else None
         )
-        sampling = _sampling_kwargs(temperature, provider_effort)
-        parsed = _with_retries(
-            lambda: client.chat_parsed(
-                messages=messages,
-                response_format=response_format,
-                model=model,
-                **sampling,
-            )
-        )
-        return _ParsedShim(parsed)
+        return _sampling_kwargs(temperature, provider_effort)
     sampling = _sampling_kwargs(temperature, reasoning_effort)
-    sampling = normalize_chat_kwargs(model, {"top_p": 1.0, **sampling}, config=config)
-    return _with_retries(
-        lambda: client.beta.chat.completions.parse(
-            model=model,
-            messages=messages,
-            response_format=response_format,
-            timeout=(config or {}).get("timeout", 30),
-            **sampling,
-        )
-    )
+    return normalize_chat_kwargs(model, {"top_p": 1.0, **sampling}, config=config)
 
 
 # -----------------------------------------------------------------------------

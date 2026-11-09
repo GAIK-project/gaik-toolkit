@@ -46,9 +46,9 @@ extract = []
 # OpenTelemetry spans for LLM calls, sent over OTLP/HTTP. Off unless
 # OTEL_EXPORTER_OTLP_ENDPOINT is set (see gaik.observability.tracing).
 otel = [
-    "opentelemetry-api==1.45.2",
-    "opentelemetry-sdk==1.45.2",
-    "opentelemetry-exporter-otlp-proto-http==1.45.2",
+    "opentelemetry-api>=1.40,<2",
+    "opentelemetry-sdk>=1.40,<2",
+    "opentelemetry-exporter-otlp-proto-http>=1.40,<2",
 ]
 
 # Text embeddings
