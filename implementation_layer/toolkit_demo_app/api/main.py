@@ -111,6 +111,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("GAIK Demo API starting...")
     cleanup_task = asyncio.create_task(dental_transcription._cleanup_old_subtitles())
+    pdf_cleanup_task = asyncio.create_task(pipeline.cleanup_old_pdfs())
     wizard_cleanup_task = (
         asyncio.create_task(solution_wizard.cleanup_idle_sessions())
         if solution_wizard is not None
@@ -119,6 +120,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     cleanup_task.cancel()
+    pdf_cleanup_task.cancel()
     if wizard_cleanup_task is not None:
         wizard_cleanup_task.cancel()
     logger.info("GAIK Demo API shutting down...")
