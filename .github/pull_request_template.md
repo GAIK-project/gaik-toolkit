@@ -4,7 +4,8 @@
 
 ## Testing
 
-<!-- Commands you ran and what you checked by hand. If this closes an issue, say how
+<!-- Commands you ran and what they returned (for example "pytest: 475 passed"), and
+what you checked by hand. Say what you did not check. If this closes an issue, say how
 each "Done when" item was checked. -->
 
 ## Risk

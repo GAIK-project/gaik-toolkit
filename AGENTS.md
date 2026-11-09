@@ -22,6 +22,18 @@ This repo is public: never commit machine-local paths, usernames or secret-store
 - Demo front end, from the same folder: `bun test`, `bunx tsc --noEmit` and
   `bun run lint`. CI runs none of these, so run them for a front-end change.
 
+## who owns a change
+
+The person who asked for a change owns it, also when an agent wrote it. They read the
+diff before it reaches `main`, by pull request or by direct push, and answer for it
+afterwards. An agent's review helps; it is never the approval.
+
+- An agent ends its work with the commands it ran and what they returned, what it did
+  not check, and what the owner should look at first.
+- CI checks a direct push to `main` only after it has landed, so run the checks above
+  before pushing. Open a pull request instead for the paths in `.github/CODEOWNERS`
+  and for anything the pull request template calls high risk.
+
 ## Code Review Rules
 
 - Important here: a change to gaik's public names, parameters, return shapes or extras
