@@ -1192,6 +1192,10 @@ def sync_merge(wt, base):
     return None, None
 
 
+# The check steps that run in the environment `uv sync` builds.
+NEEDS_ENV = ("audit", "solution-wizard", "image-pins", "unit-tests", "wizard-api")
+
+
 def cmd_checks(args):
     wt = Path(args.worktree).resolve()
     out_dir = notes_dir(args, wt)
@@ -1226,7 +1230,15 @@ def cmd_checks(args):
     if not changed_py:
         skips["ruff-format"] = ("no Python files changed by this PR", "")
     steps = [
-        ("uv-sync", "uv sync --all-extras", ["uv", "sync", "--all-extras"], ".", 2400),
+        # A fixed Python: left to uv, a machine's newest interpreter is used, and an extra
+        # without a wheel for it yet is then built from source or fails.
+        (
+            "uv-sync",
+            f"uv sync --all-extras (Python {args.python})",
+            ["uv", "sync", "--all-extras", "--python", args.python],
+            ".",
+            2400,
+        ),
         ("audit", "gaik-sync audit", ["uv", "run", "python", AUDIT, "--json"], ".", 900),
         # -m "not llm": tests marked llm make real, paid API calls (as in upstream's CI).
         (
@@ -1330,6 +1342,23 @@ def cmd_checks(args):
     results = []
     for key, label, cmd, cwd, timeout in steps:
         if only and key not in only:
+            continue
+        if key in NEEDS_ENV and any(
+            r["key"] == "uv-sync" and r["status"] != "pass" for r in results
+        ):
+            # Without the environment the audit reports components as removed and the
+            # tests fail on a missing pytest: neither says anything about the sync.
+            res = {
+                "key": key,
+                "label": label,
+                "command": " ".join(cmd),
+                "cwd": cwd,
+                "status": "error",
+                "summary": "not run: uv sync failed, so the environment is incomplete",
+                "seconds": 0,
+            }
+            results.append(res)
+            print(f"[{datetime.now():%H:%M:%S}] {label}: {res['summary']}", flush=True)
             continue
         if (args.skip_sync and key == "uv-sync") or (key == "unit-tests" and not unit):
             continue
@@ -1666,6 +1695,11 @@ def main(argv=None):
         "wizard-api,ruff-format,ruff-check",
     )
     p.add_argument("--skip-sync", action="store_true")
+    p.add_argument(
+        "--python",
+        default="3.11",
+        help="Python for the worktree's environment (default: 3.11, as in CI and the images)",
+    )
     p.set_defaults(func=cmd_checks)
 
     p = sub.add_parser("pr-body", help="render the PR title, body and Slack note")
