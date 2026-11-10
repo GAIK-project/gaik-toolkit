@@ -2,6 +2,7 @@
 
 import ast
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -12,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from solution_wizard.blueprint import Blueprint
 from solution_wizard.registry import get_registry
 from solution_wizard.scaffolder import (
+    _EVAL_BODIES,
     _determine_pattern,
     _write_requirements_txt,
     scaffold_poc,
@@ -106,6 +108,44 @@ def test_run_poc_is_valid_python(tmp_path, filename):
     result = scaffold_poc(bp, tmp_path)
     err = validate_generated_python(result["poc_dir"])
     assert err is None, f"run_poc.py syntax error: {err}"
+
+
+# ---------------------------------------------------------------------------
+# evals/run_basic_eval.py
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("framework", [*sorted(_EVAL_BODIES), "not_a_known_framework", None])
+def test_eval_script_is_valid_python(tmp_path, framework):
+    """Each framework's body carries its own indentation, as the judge section does."""
+    bp = _load_example("document_extraction_blueprint.json")
+    if framework is None:
+        bp.evaluation = {}
+    else:
+        bp.evaluation["eval_framework"] = framework
+    poc_dir = scaffold_poc(bp, tmp_path)["poc_dir"]
+    source = (poc_dir / "evals" / "run_basic_eval.py").read_text(encoding="utf-8")
+    compile(source, "run_basic_eval.py", "exec")
+
+
+def test_eval_script_compares_output_with_ground_truth(tmp_path):
+    bp = _load_example("document_extraction_blueprint.json")
+    poc_dir = scaffold_poc(bp, tmp_path)["poc_dir"]
+    (poc_dir / "output" / "invoice_result.json").write_text(
+        json.dumps({"vendor": "Acme", "total": "120.00"}), encoding="utf-8"
+    )
+    (poc_dir / "evals" / "ground_truth" / "invoice_result.json").write_text(
+        json.dumps({"vendor": "acme", "total": "125.00"}), encoding="utf-8"
+    )
+    run = subprocess.run(
+        [sys.executable, str(poc_dir / "evals" / "run_basic_eval.py")],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert run.returncode == 0, run.stderr
+    assert "Field exact-match rate: 1/2 (50.0%)" in run.stdout
+    assert "Field completeness:     2/2 (100.0%)" in run.stdout
 
 
 # ---------------------------------------------------------------------------
