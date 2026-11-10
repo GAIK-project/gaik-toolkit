@@ -7,6 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from gaik.observability.tracing import record_request
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
@@ -43,6 +44,7 @@ class OpenAIProvider:
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         model = kwargs.pop("model", self.model)
         kwargs = normalize_chat_kwargs(model, kwargs, config=self._config)
+        record_request(kwargs)
         completion = self.raw.chat.completions.create(
             model=model,
             messages=messages,
@@ -67,6 +69,7 @@ class OpenAIProvider:
     ) -> BaseModel:
         model = kwargs.pop("model", self.model)
         kwargs = normalize_chat_kwargs(model, kwargs, config=self._config)
+        record_request(kwargs)
         completion = self.raw.beta.chat.completions.parse(
             model=model,
             messages=messages,

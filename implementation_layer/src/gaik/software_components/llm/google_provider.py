@@ -11,6 +11,7 @@ from google import genai
 from google.genai import types as genai_types
 from pydantic import BaseModel
 
+from gaik.observability.tracing import record_request
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.content import image_data
 
@@ -161,10 +162,12 @@ class GoogleProvider:
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         system, rest = self._split_system(messages)
         model = kwargs.pop("model", self.model)
+        config = self._config_for(system, kwargs or None)
+        record_request(config.model_dump(exclude_none=True))
         response = self.raw.models.generate_content(
             model=model,
             contents=self._to_contents(rest),
-            config=self._config_for(system, kwargs or None),
+            config=config,
         )
         usage = _usage(response)
         self.usage.add(usage)
@@ -235,6 +238,7 @@ class GoogleProvider:
                 **kwargs,
             },
         )
+        record_request(config.model_dump(exclude_none=True))
         response = self.raw.models.generate_content(
             model=model,
             contents=self._to_contents(rest),

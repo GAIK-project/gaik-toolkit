@@ -3,9 +3,11 @@
 Each instrumented model call becomes one ``chat <model>`` span with the
 OpenTelemetry GenAI names (``gen_ai.*``) and gaik's own (``gaik.*``): which
 component made the call, the provider, model and settings, tokens, an estimated
-cost and a configuration version. Only lengths of the input and output are
-recorded, never their text, and an error is recorded by its type, never its
-message.
+cost and a configuration version. The settings are the ones the request carries:
+the code that sends it reports them with ``record_request``, after the
+provider's own adjustments (a temperature a reasoning model drops is left out).
+Only lengths of the input and output are recorded, never their text, and an
+error is recorded by its type, never its message.
 
 Enabled by the standard environment variables:
 
@@ -37,8 +39,9 @@ import json
 import logging
 import os
 import threading
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager, nullcontext
+from contextvars import ContextVar
 from typing import Any
 
 from .pricing import lookup_price
@@ -52,12 +55,19 @@ _provider: Any = None  # gaik's own provider, when it exports by itself
 _resolved = False
 
 #: The request settings a span records, by attribute name; any other key is left out.
+#: Providers name the token limit differently; all three are the same setting.
 _SETTINGS = {
     "temperature": "gen_ai.request.temperature",
-    "max_tokens": "gen_ai.request.max_tokens",
     "top_p": "gen_ai.request.top_p",
+    "top_k": "gen_ai.request.top_k",
+    "max_tokens": "gen_ai.request.max_tokens",
+    "max_completion_tokens": "gen_ai.request.max_tokens",
+    "max_output_tokens": "gen_ai.request.max_tokens",
     "reasoning_effort": "gaik.request.reasoning_effort",
 }
+
+#: The open ``llm_span`` of this thread or task, for ``record_request``.
+_current_call: ContextVar[LLMCallSpan | None] = ContextVar("gaik_llm_call", default=None)
 
 #: gaik's provider names mapped to the GenAI convention's well-known values.
 _GEN_AI_PROVIDER = {
@@ -111,10 +121,19 @@ def _resolve_tracer() -> Any:
         # The API's tracer follows whatever provider the application sets, even
         # later, and records nothing until then.
         return trace.get_tracer("gaik", _gaik_version())
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    try:
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    except ImportError:
+        # The API alone comes with other packages (chromadb, for one); the
+        # exporter only with the extra. Say why no spans arrive.
+        logger.warning(
+            "An OTLP endpoint is set but the OTLP exporter is not installed, so gaik "
+            "sends no spans. Install gaik[otel]."
+        )
+        return None
 
     # Resource.create() reads OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES, and
     # the exporter its endpoint, itself. The provider flushes on interpreter exit.
@@ -139,8 +158,9 @@ def config_version(**fields: Any) -> str:
 class LLMCallSpan:
     """Handle for an open ``llm_span``; ``record`` adds the call's result."""
 
-    def __init__(self, span: Any) -> None:
+    def __init__(self, span: Any, identity: dict[str, Any] | None = None) -> None:
         self._span = span
+        self._identity = identity or {}
 
     @property
     def recording(self) -> bool:
@@ -149,6 +169,22 @@ class LLMCallSpan:
             return self._span is not None and self._span.is_recording()
         except Exception:
             return False
+
+    def record_request(self, settings: Mapping[str, Any]) -> None:
+        """Add the settings the request carries, and the config version they give.
+
+        Only the known sampling options are kept (see ``_SETTINGS``); ``None``
+        values are left out. Never raises.
+        """
+        if not self.recording:
+            return
+        try:
+            kept = _known_settings(settings)
+            attributes: dict[str, Any] = {_SETTINGS[k]: v for k, v in kept.items()}
+            attributes["gaik.config.version"] = config_version(**self._identity, settings=kept)
+            self._span.set_attributes(attributes)
+        except Exception:
+            logger.debug("gaik tracing could not record the request", exc_info=True)
 
     def record(
         self,
@@ -192,19 +228,24 @@ def llm_span(
     *,
     provider: str,
     model: str,
-    settings: dict[str, Any] | None = None,
     prompt_version: str | None = None,
 ) -> Iterator[LLMCallSpan]:
     """Wrap one model call in a ``chat <model>`` span, the current span inside the block.
 
-    ``provider`` is gaik's provider name. ``settings`` are the sampling options
-    the request actually sends; only ``temperature``, ``max_tokens``, ``top_p``
-    and ``reasoning_effort`` are recorded, and ``None`` values are left out.
-    The call's own exception passes through unchanged; the span records only
-    its type.
+    ``provider`` is gaik's provider name. The request's settings are added by
+    ``record_request``, called where the request is sent. The call's own
+    exception passes through unchanged; the span records only its type.
     """
-    span = _start(component, provider, model, settings or {}, prompt_version)
-    handle = LLMCallSpan(span)
+    identity = {
+        "component": component,
+        "version": _gaik_version(),
+        "provider": provider,
+        "model": model,
+        "prompt_version": prompt_version,
+    }
+    span = _start(identity)
+    handle = LLMCallSpan(span, identity)
+    token = _current_call.set(handle)
     try:
         with _current(span):
             yield handle
@@ -212,7 +253,30 @@ def llm_span(
         _fail(span, exc)
         raise
     finally:
+        _current_call.reset(token)
         _end(span)
+
+
+def record_request(settings: Mapping[str, Any]) -> None:
+    """Record the settings a model request carries on the open ``llm_span``, if any.
+
+    Call it where the request is sent, with the options as sent, so the span
+    shows what the provider received. Outside an ``llm_span`` it does nothing;
+    so it does in a thread started inside one, or in a generator consumed after
+    the span has closed, which is why the adapters' streaming calls do not
+    record (no component streams inside a span).
+    """
+    call = _current_call.get()
+    if call is not None:
+        call.record_request(settings)
+
+
+def _known_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        k: v
+        for k, v in settings.items()
+        if k in _SETTINGS and isinstance(v, (bool, int, float, str))
+    }
 
 
 def _current(span: Any) -> Any:
@@ -231,13 +295,7 @@ def _current(span: Any) -> Any:
         return nullcontext()
 
 
-def _start(
-    component: str,
-    provider: str,
-    model: str,
-    settings: dict[str, Any],
-    prompt_version: str | None,
-) -> Any:
+def _start(identity: dict[str, Any]) -> Any:
     tracer = _get_tracer()
     if tracer is None:
         return None
@@ -245,35 +303,22 @@ def _start(
     try:
         from opentelemetry.trace import SpanKind
 
-        span = tracer.start_span(f"chat {model}", kind=SpanKind.CLIENT)
+        span = tracer.start_span(f"chat {identity['model']}", kind=SpanKind.CLIENT)
         if not span.is_recording():
             return span
-        settings = {
-            k: v
-            for k, v in settings.items()
-            if k in _SETTINGS and isinstance(v, (bool, int, float, str))
-        }
-        version = _gaik_version()
+        provider = identity["provider"]
         attributes: dict[str, Any] = {
             "gaik.event.class": "llm_call",
             "gen_ai.operation.name": "chat",
             "gen_ai.provider.name": _GEN_AI_PROVIDER.get(provider, provider),
-            "gen_ai.request.model": model,
+            "gen_ai.request.model": identity["model"],
             "gaik.provider.name": provider,
-            "gaik.component.name": component,
-            "gaik.component.version": version,
-            "gaik.prompt.version": prompt_version,
-            "gaik.config.version": config_version(
-                component=component,
-                version=version,
-                provider=provider,
-                model=model,
-                settings=settings,
-                prompt_version=prompt_version,
-            ),
+            "gaik.component.name": identity["component"],
+            "gaik.component.version": identity["version"],
+            "gaik.prompt.version": identity["prompt_version"],
+            # Replaced by record_request with the request's settings included.
+            "gaik.config.version": config_version(**identity),
         }
-        for key, value in settings.items():
-            attributes[_SETTINGS[key]] = value
         span.set_attributes({k: v for k, v in attributes.items() if v is not None})
         return span
     except Exception:

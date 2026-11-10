@@ -28,7 +28,6 @@ from .schema import (
     CompositeExtractionRequirements,
     ExtractionRequirements,
     _parse_with,
-    _request_settings,
     apply_composite_field_policies,
     apply_field_policies,
     normalize_composite_extracted_data,
@@ -167,16 +166,12 @@ class DataExtractor:
             },
         ]
 
-        # What the request actually carries, after the model's own rules
-        # (e.g. temperature dropped on a reasoning model), not the arguments.
-        sent = _request_settings(
-            self.client, self.model, self.temperature, self.reasoning_effort, self.config
-        )
+        # The settings reach the span from where the request is sent
+        # (record_request), after the provider's own adjustments.
         with llm_span(
             "DataExtractor",
             provider=_provider_name(getattr(self, "config", None) or {}),
             model=self.model,
-            settings=sent,
             prompt_version=_PROMPT_VERSION,
         ) as call:
             with measure_duration() as elapsed:

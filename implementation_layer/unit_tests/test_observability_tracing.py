@@ -9,7 +9,13 @@ from __future__ import annotations
 import sys
 
 import pytest
-from gaik.observability import build_usage_record, config_version, llm_span, tracing
+from gaik.observability import (
+    build_usage_record,
+    config_version,
+    llm_span,
+    record_request,
+    tracing,
+)
 from pydantic import BaseModel
 
 try:
@@ -22,7 +28,23 @@ try:
 except ImportError:  # the extra is not installed: only the no-extra test runs
     trace = None
 
+try:  # other packages (chromadb) bring the API and SDK, only the extra the exporter
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # noqa: F401
+
+    _HAS_EXPORTER = True
+except ImportError:
+    _HAS_EXPORTER = False
+
 needs_otel = pytest.mark.skipif(trace is None, reason="needs the gaik[otel] extra")
+needs_exporter = pytest.mark.skipif(
+    trace is None or not _HAS_EXPORTER, reason="needs the gaik[otel] extra"
+)
+
+_OTEL_ENV = (
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "OTEL_SDK_DISABLED",
+)
 
 
 @pytest.fixture
@@ -31,11 +53,7 @@ def spans(monkeypatch):
     if trace is None:
         pytest.skip("needs the gaik[otel] extra")
     # A developer's own OTEL_* settings would send gaik's spans elsewhere.
-    for name in (
-        "OTEL_EXPORTER_OTLP_ENDPOINT",
-        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
-        "OTEL_SDK_DISABLED",
-    ):
+    for name in _OTEL_ENV:
         monkeypatch.delenv(name, raising=False)
     if not isinstance(trace.get_tracer_provider(), TracerProvider):
         provider = TracerProvider()
@@ -49,8 +67,10 @@ def spans(monkeypatch):
 
 
 @pytest.fixture
-def off():
+def off(monkeypatch):
     """Tracing resolved again from scratch, and forgotten after the test."""
+    for name in _OTEL_ENV:
+        monkeypatch.delenv(name, raising=False)
     tracing._reset_for_tests()
     yield
     tracing._reset_for_tests()
@@ -80,7 +100,7 @@ def test_without_an_endpoint_gaik_follows_the_application_s_provider(monkeypatch
     assert tracing._resolve_tracer() is sentinel
 
 
-@needs_otel
+@needs_exporter
 def test_with_an_endpoint_gaik_exports_by_itself_and_leaves_the_global_provider_alone(
     monkeypatch, off
 ):
@@ -97,6 +117,19 @@ def test_with_an_endpoint_gaik_exports_by_itself_and_leaves_the_global_provider_
     assert resource["service.name"] == "gaik-test"
     assert resource["gaik.run.id"] == "run-1"
     tracing._provider.shutdown()
+
+
+@needs_otel
+def test_an_endpoint_without_the_exporter_warns_and_sends_nothing(monkeypatch, off, caplog):
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:9")
+    monkeypatch.setitem(sys.modules, "opentelemetry.exporter.otlp.proto.http.trace_exporter", None)
+    with caplog.at_level("WARNING", logger=tracing.__name__):
+        assert tracing._resolve_tracer() is None
+    assert "Install gaik[otel]" in caplog.text
+    monkeypatch.setattr(tracing, "_get_tracer", tracing._resolve_tracer)
+    with llm_span("DataExtractor", provider="openai", model="m") as call:
+        assert call.recording is False
+        call.record(None, output_length=1)
 
 
 @needs_otel
@@ -125,9 +158,9 @@ def test_a_call_becomes_one_span_with_its_usage_and_no_text(spans):
         "DataExtractor",
         provider="azure",
         model="gpt-6-luna",
-        settings={"temperature": 0.0, "reasoning_effort": None},
         prompt_version="p1",
     ) as call:
+        record_request({"temperature": 0.0, "reasoning_effort": None})
         call.record(
             usage,
             input_length=len("Salainen dokumentti"),
@@ -209,18 +242,36 @@ def test_a_fault_in_the_instrumentation_never_reaches_the_caller(spans, monkeypa
 
 
 def test_only_known_settings_are_recorded(spans):
-    with llm_span(
-        "DataExtractor",
-        provider="openai",
-        model="m",
-        settings={"top_p": 1.0, "reasoning_effort": "low", "api_key": "sk-x", "stop": ["a"]},
-    ):
-        pass
+    with llm_span("DataExtractor", provider="openai", model="m"):
+        record_request(
+            {"top_p": 1.0, "reasoning_effort": "low", "api_key": "sk-x", "stop": ["a"], "seed": 1}
+        )
     (span,) = spans()
     assert span.attributes["gen_ai.request.top_p"] == 1.0
     assert span.attributes["gaik.request.reasoning_effort"] == "low"
-    assert not any("api_key" in k or "stop" in k for k in span.attributes)
+    assert not any(word in k for k in span.attributes for word in ("api_key", "stop", "seed"))
     assert "sk-x" not in _values(span)
+
+
+@pytest.mark.parametrize("key", ["max_tokens", "max_completion_tokens", "max_output_tokens"])
+def test_every_name_of_the_token_limit_is_recorded_as_max_tokens(spans, key):
+    with llm_span("DataExtractor", provider="openai", model="m"):
+        record_request({key: 512})
+    (span,) = spans()
+    assert span.attributes["gen_ai.request.max_tokens"] == 512
+
+
+def test_the_config_version_follows_the_recorded_settings(spans):
+    for effort in ("low", "high"):
+        with llm_span("DataExtractor", provider="aitta", model="m", prompt_version="p"):
+            record_request({"reasoning_effort": effort})
+    low, high = spans()
+    assert low.attributes["gaik.config.version"] != high.attributes["gaik.config.version"]
+
+
+def test_record_request_outside_a_span_does_nothing(spans):
+    record_request({"temperature": 0.0})
+    assert spans() == ()
 
 
 def test_a_span_started_before_a_fault_is_still_ended(spans, monkeypatch):
@@ -336,6 +387,166 @@ def test_the_extractor_records_the_settings_it_sends_not_its_arguments(spans):
     assert "gen_ai.request.temperature" not in span.attributes
     assert "gen_ai.request.top_p" not in span.attributes
     assert span.attributes["gaik.request.reasoning_effort"] == "high"
+
+
+class _Recorder:
+    """Captures the keyword arguments a fake SDK call receives."""
+
+    def __init__(self, result):
+        self.kwargs: dict = {}
+        self._result = result
+
+    def __call__(self, **kwargs):
+        self.kwargs = kwargs
+        return self._result
+
+
+def _openai_adapter(monkeypatch, config):
+    from gaik.software_components.llm.openai_provider import OpenAIProvider
+
+    message = type("M", (), {"parsed": _Record(reporter="x")})()
+    completion = type("R", (), {"choices": [type("C", (), {"message": message})()], "usage": None})
+    parse = _Recorder(completion())
+    raw = type("Raw", (), {})()
+    raw.beta = type("B", (), {"chat": type("Ch", (), {"completions": type("Co", (), {})()})()})()
+    raw.beta.chat.completions.parse = parse
+    monkeypatch.setattr(OpenAIProvider, "_build_client", staticmethod(lambda config: raw))
+    return OpenAIProvider(config), parse
+
+
+def _extract_with(adapter, config):
+    from gaik.software_components.extractor.extractor import DataExtractor
+
+    extractor = DataExtractor.__new__(DataExtractor)
+    extractor.config, extractor.model, extractor.client = config, config["model"], adapter
+    extractor.temperature, extractor.reasoning_effort = 0.0, None
+    extractor._extract_one("doc", _Record, _requirements(), "Extract")
+
+
+@pytest.mark.parametrize("provider", ["aitta", "openai_compatible"])
+def test_an_openai_shaped_adapter_s_span_matches_what_it_sends(spans, monkeypatch, provider):
+    # GPT-6 with the config's effort: the adapter adds the effort and drops the
+    # temperature, so the span must too, and low and high must differ.
+    sent = {}
+    for effort in ("low", "high"):
+        config = {
+            "provider": provider,
+            "model": "gpt-6-luna",
+            "api_key": "test",
+            "base_url": "http://127.0.0.1:9/v1",
+            "reasoning_effort": effort,
+        }
+        adapter, parse = _openai_adapter(monkeypatch, config)
+        _extract_with(adapter, config)
+        sent[effort] = parse.kwargs
+    low, high = spans()
+    for span, effort in ((low, "low"), (high, "high")):
+        assert "temperature" not in sent[effort]
+        assert "gen_ai.request.temperature" not in span.attributes
+        assert sent[effort]["reasoning_effort"] == effort
+        assert span.attributes["gaik.request.reasoning_effort"] == effort
+    assert low.attributes["gaik.config.version"] != high.attributes["gaik.config.version"]
+
+
+def test_the_litellm_adapter_s_span_matches_what_it_sends(spans, monkeypatch):
+    pytest.importorskip("litellm")
+    from gaik.software_components.llm import litellm_provider
+
+    message = type("M", (), {"content": '{"reporter": "x"}'})()
+    response = type(
+        "R", (), {"choices": [type("C", (), {"message": message})()], "usage": None, "model": "m"}
+    )()
+    completion = _Recorder(response)
+    monkeypatch.setattr(litellm_provider.litellm, "completion", completion)
+    config = {"provider": "litellm", "model": "azure/gpt-6-luna", "reasoning_effort": "high"}
+
+    _extract_with(litellm_provider.LiteLLMProvider(config), config)
+
+    (span,) = spans()
+    assert "temperature" not in completion.kwargs
+    assert "gen_ai.request.temperature" not in span.attributes
+    assert completion.kwargs["reasoning_effort"] == "high"
+    assert span.attributes["gaik.request.reasoning_effort"] == "high"
+
+
+def test_the_anthropic_adapter_records_effort_and_the_token_limit_it_sends(spans, monkeypatch):
+    pytest.importorskip("anthropic")
+    from gaik.software_components.llm.anthropic_provider import AnthropicProvider
+
+    block = type("T", (), {"type": "tool_use", "name": "_Record", "input": {"reporter": "x"}})()
+    response = type("R", (), {"content": [block], "stop_reason": "tool_use", "usage": None})()
+    create = _Recorder(response)
+    raw = type("Raw", (), {"messages": type("Ms", (), {"create": staticmethod(create)})()})()
+    monkeypatch.setattr(AnthropicProvider, "_build_client", staticmethod(lambda config: raw))
+    config = {"provider": "anthropic", "model": "claude-sonnet-5-5", "max_tokens": 1024}
+    adapter = AnthropicProvider(config)
+
+    from gaik.software_components.extractor.extractor import DataExtractor
+
+    extractor = DataExtractor.__new__(DataExtractor)
+    extractor.config, extractor.model, extractor.client = config, config["model"], adapter
+    extractor.temperature, extractor.reasoning_effort = 0.0, "high"
+    extractor._extract_one("doc", _Record, _requirements(), "Extract")
+
+    (span,) = spans()
+    a = span.attributes
+    # Sonnet 5.5 takes no temperature, and takes effort as output_config.effort.
+    assert "temperature" not in create.kwargs
+    assert "gen_ai.request.temperature" not in a
+    assert create.kwargs["output_config"] == {"effort": "high"}
+    assert a["gaik.request.reasoning_effort"] == "high"
+    assert a["gen_ai.request.max_tokens"] == create.kwargs["max_tokens"] == 1024
+
+
+def test_the_google_adapter_s_span_matches_what_it_sends(spans):
+    pytest.importorskip("google.genai")
+    from gaik.software_components.llm.base import UsageCounter
+    from gaik.software_components.llm.google_provider import GoogleProvider
+
+    response = type("R", (), {"parsed": {"reporter": "x"}, "usage_metadata": None, "text": ""})()
+    generate = _Recorder(response)
+    adapter = GoogleProvider.__new__(GoogleProvider)
+    adapter.provider, adapter.model, adapter.usage = "google", "gemini-3-flash", UsageCounter()
+    adapter.raw = type("Raw", (), {"models": type("Ms", (), {"generate_content": generate})()})()
+    config = {"provider": "google", "model": "gemini-3-flash"}
+
+    _extract_with(adapter, config)
+
+    (span,) = spans()
+    sent = generate.kwargs["config"]
+    # Google drops reasoning_effort; the temperature reaches the request and the span.
+    assert sent.temperature == 0.0
+    assert span.attributes["gen_ai.request.temperature"] == 0.0
+    assert "gaik.request.reasoning_effort" not in span.attributes
+
+
+def test_a_stream_records_nothing_on_a_span_it_outlives(spans, monkeypatch):
+    config = {"provider": "aitta", "model": "m", "api_key": "test", "base_url": "http://x/v1"}
+    adapter, _ = _openai_adapter(monkeypatch, config)
+    adapter.raw.chat = type("Ch", (), {"completions": type("Co", (), {})()})()
+    adapter.raw.chat.completions.create = _Recorder(iter(()))
+    with llm_span("DataExtractor", provider="aitta", model="m"):
+        stream = adapter.chat_stream([{"role": "user", "content": "hi"}], temperature=0.3)
+    with llm_span("Other", provider="aitta", model="m"):
+        list(stream)
+    assert not any("gen_ai.request.temperature" in s.attributes for s in spans())
+
+
+def test_a_setting_the_model_rejects_still_leaves_an_error_span(spans):
+    from gaik.software_components.extractor.extractor import DataExtractor
+
+    extractor = DataExtractor(
+        {"use_azure": False, "api_key": "test", "model": "gpt-6-astra"},
+        reasoning_effort="none",
+    )
+    extractor.client = _FakeClient()
+
+    with pytest.raises(ValueError, match="reasoning_effort"):
+        extractor._extract_one("doc", _Record, _requirements(), "Extract")
+
+    (span,) = spans()
+    assert span.status.status_code == trace.StatusCode.ERROR
+    assert span.attributes["error.type"] == "builtins.ValueError"
 
 
 def test_the_extractor_s_error_is_unchanged_and_marks_the_span(spans):
