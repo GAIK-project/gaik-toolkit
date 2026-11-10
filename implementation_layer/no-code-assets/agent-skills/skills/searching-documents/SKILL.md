@@ -18,8 +18,8 @@ description: >-
 # Searching documents with gaik
 
 ```bash
-pip install "gaik[pg-vector-store,embedder,ranker]==0.8.11"
-pip install "gaik[finnish-rag]==0.8.11"   # Finnish lemmatization
+pip install "gaik[pg-vector-store,embedder,ranker]==0.8.12"
+pip install "gaik[finnish-rag]==0.8.12"   # Finnish lemmatization
 ```
 
 Hybrid search runs two arms that fail differently. The vector arm finds passages that
