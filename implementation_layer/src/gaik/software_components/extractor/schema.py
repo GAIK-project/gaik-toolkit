@@ -46,6 +46,7 @@ from gaik.observability import (
     measure_duration,
     openai_usage_to_dict,
 )
+from gaik.observability.tracing import record_request
 
 # Import shared configuration
 from gaik.software_components.config import get_openai_config
@@ -196,6 +197,7 @@ def _parse_with(
         return _ParsedShim(parsed)
     sampling = _sampling_kwargs(temperature, reasoning_effort)
     sampling = normalize_chat_kwargs(model, {"top_p": 1.0, **sampling}, config=config)
+    record_request(sampling)
     return _with_retries(
         lambda: client.beta.chat.completions.parse(
             model=model,

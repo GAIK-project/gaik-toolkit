@@ -14,6 +14,7 @@ from typing import Any
 import anthropic
 from pydantic import BaseModel
 
+from gaik.observability.tracing import record_request
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.content import image_data
 
@@ -45,6 +46,12 @@ def _is_family(model: str, prefixes: tuple[str, ...]) -> bool:
 def _accepts_effort(model: str, effort: object) -> bool:
     levels = next((v for k, v in _EFFORT_BY_MODEL.items() if _is_family(model, (k,))), ())
     return effort in levels
+
+
+def _record_request(params: dict[str, Any]) -> None:
+    """Report the request's settings to an open gaik span; effort is in ``output_config``."""
+    effort = (params.get("output_config") or {}).get("effort")
+    record_request({**params, "reasoning_effort": effort})
 
 
 # Models that answer 400 to `temperature`, `top_p` or `top_k` ("deprecated for
@@ -244,6 +251,7 @@ class AnthropicProvider:
         if system is not None:
             params["system"] = system
         params.update(kwargs)
+        _record_request(params)
         response = self.raw.messages.create(**params)
         text_blocks = [b.text for b in response.content if getattr(b, "type", None) == "text"]
         usage = _usage(response)
@@ -296,6 +304,7 @@ class AnthropicProvider:
         if system is not None:
             params["system"] = system
         params.update(kwargs)
+        _record_request(params)
         try:
             response = self.raw.messages.create(**params)
         except anthropic.BadRequestError as error:

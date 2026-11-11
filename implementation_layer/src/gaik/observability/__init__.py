@@ -4,7 +4,8 @@ Exposes a uniform ``UsageRecord`` (tokens, duration, derived cost) plus
 provider-specific normalizers and a small timing helper. Components
 that call an LLM should report results via these types so downstream
 consumers (logging, dashboards, compliance pipelines) get a consistent
-shape regardless of which component produced the call.
+shape regardless of which component produced the call. ``llm_span`` turns a
+call into an OpenTelemetry span when the ``gaik[otel]`` extra is configured.
 """
 
 from .pricing import (
@@ -17,17 +18,22 @@ from .pricing import (
 )
 from .providers import openai_usage_to_dict
 from .timing import measure_duration
+from .tracing import LLMCallSpan, config_version, llm_span, record_request
 from .usage import UsageRecord, build_usage_record
 
 __all__ = [
     "ANTHROPIC_PRICING_PER_M",
     "GEMINI_PRICING_PER_M",
+    "LLMCallSpan",
     "OPENAI_PRICING_PER_M",
     "Provider",
     "UsageRecord",
     "build_usage_record",
     "compute_cost_usd",
+    "config_version",
+    "llm_span",
     "lookup_price",
     "measure_duration",
     "openai_usage_to_dict",
+    "record_request",
 ]

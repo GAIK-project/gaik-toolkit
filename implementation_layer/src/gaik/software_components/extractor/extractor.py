@@ -7,6 +7,7 @@ using pre-generated Pydantic models.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 
@@ -15,10 +16,12 @@ from pydantic import BaseModel
 from gaik.observability import (
     UsageRecord,
     build_usage_record,
+    llm_span,
     measure_duration,
     openai_usage_to_dict,
 )
 from gaik.software_components.llm.factory import build_compat_client
+from gaik.software_components.llm.providers import resolve_provider
 
 from .schema import (
     SYSTEM_PARSER,
@@ -30,6 +33,9 @@ from .schema import (
     normalize_composite_extracted_data,
     normalize_extracted_data,
 )
+
+#: Changes when the extractor's system prompt changes; part of its spans' config version.
+_PROMPT_VERSION = hashlib.sha256(SYSTEM_PARSER.encode("utf-8")).hexdigest()[:12]
 
 
 @dataclass
@@ -160,26 +166,43 @@ class DataExtractor:
             },
         ]
 
-        with measure_duration() as elapsed:
-            resp = _parse_with(
-                client=self.client,
-                config=self.config,
-                model=self.model,
-                messages=messages,
-                response_format=extraction_model,
-                temperature=self.temperature,
-                reasoning_effort=self.reasoning_effort,
+        # The settings reach the span from where the request is sent
+        # (record_request), after the provider's own adjustments.
+        with llm_span(
+            "DataExtractor",
+            provider=_provider_name(getattr(self, "config", None) or {}),
+            model=self.model,
+            prompt_version=_PROMPT_VERSION,
+        ) as call:
+            with measure_duration() as elapsed:
+                resp = _parse_with(
+                    client=self.client,
+                    config=self.config,
+                    model=self.model,
+                    messages=messages,
+                    response_format=extraction_model,
+                    temperature=self.temperature,
+                    reasoning_effort=self.reasoning_effort,
+                )
+            duration_s = elapsed()
+
+            usage_dict = openai_usage_to_dict(resp)
+            usage = (
+                build_usage_record("openai", self.model, usage_dict, duration_s)
+                if usage_dict["total_tokens"] > 0
+                else None
             )
-        duration_s = elapsed()
 
-        usage_dict = openai_usage_to_dict(resp)
-        usage = (
-            build_usage_record("openai", self.model, usage_dict, duration_s)
-            if usage_dict["total_tokens"] > 0
-            else None
-        )
-
-        parsed = resp.choices[0].message.parsed
+            parsed = resp.choices[0].message.parsed
+            if call.recording:
+                # Tokens reach the span on the OpenAI/Azure path; the other
+                # adapters return no per-call usage here.
+                call.record(
+                    usage,
+                    input_length=sum(len(m["content"]) for m in messages),
+                    output_length=_output_length(parsed),
+                    response_model=getattr(resp, "model", None),
+                )
         result_dict = parsed.model_dump()
 
         if isinstance(result_dict, dict) and isinstance(
@@ -319,3 +342,20 @@ class DataExtractor:
             model=self.model,
             documents_processed=len(results),
         )
+
+
+def _provider_name(config: dict) -> str:
+    """The provider the extractor's client talks to, as named in its span."""
+    try:
+        # A bare legacy config means standard OpenAI, as in build_compat_client().
+        return resolve_provider(config={"use_azure": False, **config})
+    except ValueError:
+        return "unknown"
+
+
+def _output_length(parsed: BaseModel | None) -> int | None:
+    """Length of the parsed record as JSON, for the span; never its content."""
+    try:
+        return len(parsed.model_dump_json()) if parsed is not None else None
+    except Exception:
+        return None

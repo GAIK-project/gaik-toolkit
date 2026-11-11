@@ -8,6 +8,7 @@ from typing import Any
 import litellm
 from pydantic import BaseModel
 
+from gaik.observability.tracing import record_request
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
@@ -52,6 +53,7 @@ class LiteLLMProvider:
 
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         options = self._options(kwargs)
+        record_request(options)
         response = litellm.completion(
             model=options.pop("model", self.model), messages=messages, **options
         )
