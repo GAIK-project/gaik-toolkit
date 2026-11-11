@@ -34,27 +34,10 @@ afterwards. An agent's review helps; it is never the approval.
   before pushing. Open a pull request instead for the paths in `.github/CODEOWNERS`
   and for anything the pull request template calls high risk.
 
-## Code Review Rules
+## reviewing a change
 
-- Important here: a change to gaik's public names, parameters, return shapes or extras
-  without the matching Solution Wizard registry or agent-skill update; an optional
-  dependency whose absence now hides a class silently; a provider or model default
-  changed without the release certification below. In the demo: a request past
-  `proxy.ts` without its sign-in, approval or trial check; a model, transcription or
-  parser call outside the rate limits; an upload that reaches a parser or a model before
-  its content and size are checked; personal data kept past its cleanup; AI output
-  without its AI notice. Anywhere: a secret, real customer document or machine-local
-  path; a test that does not check what its name says; a CI or release check made to
-  pass by skipping it.
-- Give the file and line for each finding and the case where it goes wrong. Report a
-  missing check only after naming the code path that lacks it.
-- When a change leaves a weakness unfixed, name the area and say the details go to the
-  maintainers; never describe how to exploit it in a public issue or comment.
-- At most three nits, none about formatting (ruff owns it). Skip generated files unless
-  the change is about them: `graphify-out/`, the demo's `lib/no-code/catalog.generated.json`
-  and `public/downloads/skills/`, lockfiles and `evaluation_layer/**/runs/`.
-- Start the summary with the number of findings by severity, or say in one line that
-  there is nothing to fix.
+Read `REVIEW.md` before reviewing a pull request or a diff here: what matters in this
+repository, how a finding is reported, and which findings hold a merge.
 
 ## software components and modules (ask first)
 
