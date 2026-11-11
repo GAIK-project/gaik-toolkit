@@ -223,6 +223,9 @@ class PostgresAgent:
                 raise psycopg.OperationalError(
                     f"Could not connect to {_redact(self.connection_string)}: {exc}"
                 ) from None
+            # Transactions opened on this connection start as BEGIN READ ONLY,
+            # whatever the session default is by then.
+            self._conn.read_only = True
         return self._conn
 
     def close(self) -> None:
@@ -350,8 +353,10 @@ class PostgresAgent:
     def run_sql(self, sql: str) -> list[dict]:
         """Validate ``sql`` as read-only and execute it.
 
-        The query is wrapped so at most ``max_rows`` rows are returned. The
-        connection is read-only, so any write is rejected by PostgreSQL.
+        The query is wrapped so at most ``max_rows`` rows are returned. It runs
+        in its own transaction, started ``READ ONLY`` and always rolled back,
+        so PostgreSQL rejects any write and no session setting changed by a
+        query outlives it.
 
         Args:
             sql: A single read-only SQL query.
@@ -368,7 +373,8 @@ class PostgresAgent:
         )
         wrapped = f"SELECT * FROM (\n{validated}\n) AS gaik_query LIMIT {self.max_rows}"
         conn = self._get_conn()
-        rows = conn.execute(wrapped).fetchall()
+        with conn.transaction(force_rollback=True):
+            rows = conn.execute(wrapped).fetchall()
         return [dict(row) for row in rows]
 
     def query(self, question: str) -> QueryResult:

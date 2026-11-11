@@ -24,6 +24,8 @@ false`` and ``lock_configuration = true`` before any generated SQL runs -- see
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 try:
     import sqlglot
     from sqlglot import exp
@@ -74,7 +76,9 @@ def validate_read_only(sql: str, *, allowed_tables: list[str] | None = None) -> 
     Args:
         sql: The SQL string to validate.
         allowed_tables: When given, the query may only touch these tables.
-            CTE names defined within the query are always allowed.
+            A CTE name is allowed where that CTE is in scope; inside its own
+            body (without ``RECURSIVE``) or in an earlier CTE the name is an
+            ordinary table and is checked like one.
 
     Returns:
         The re-rendered (normalized, semicolon-free) SQL -- exactly what should
@@ -127,20 +131,51 @@ def validate_read_only(sql: str, *, allowed_tables: list[str] | None = None) -> 
             "Use standard SQL functions only."
         )
 
+    # DuckDB identifiers are case-insensitive, quoted or not, so names compare
+    # in lower case.
     allowed = {t.lower() for t in allowed_tables} if allowed_tables is not None else None
-    cte_names = {cte.alias.lower() for cte in statement.find_all(exp.CTE) if cte.alias}
 
-    for table in statement.find_all(exp.Table):
+    def check_table(table: exp.Table, visible_ctes: frozenset[str]) -> None:
         name = (table.name or "").lower()
         schema = table.db or ""
         catalog = table.catalog or ""
         if catalog:
             raise UnsafeSQLError(f"Cross-database references are not allowed ('{catalog}').")
-        if not schema and name in cte_names:
-            continue
+        if not schema and name in visible_ctes:
+            return
         if schema and schema.lower() not in ("main", "temp"):
             raise UnsafeSQLError(f"Cross-schema reference is not allowed: '{schema}.{name}'.")
         if allowed is not None and name and name not in allowed:
             raise UnsafeSQLError(f"Table '{name}' is not in the allowed table list.")
 
+    _walk_tables(statement, frozenset(), check_table)
+
     return statement.sql(dialect="duckdb")
+
+
+def _walk_tables(
+    node: exp.Expression,
+    visible_ctes: frozenset[str],
+    check: Callable[[exp.Table, frozenset[str]], None],
+) -> None:
+    """Call ``check`` on every table with the CTE names in scope at that point.
+
+    A CTE is visible to the CTEs after it in the same ``WITH`` and to the query
+    the ``WITH`` belongs to. It is visible inside its own body only under
+    ``WITH RECURSIVE``. Everywhere else the same name is an ordinary table.
+    """
+    # sqlglot renamed this argument from "with" to "with_".
+    with_ = node.args.get("with_") or node.args.get("with")
+    if isinstance(with_, exp.With):
+        recursive = bool(with_.args.get("recursive"))
+        for cte in with_.expressions:
+            name = (cte.alias or "").lower()
+            in_body = visible_ctes | {name} if recursive and name else visible_ctes
+            _walk_tables(cte, in_body, check)
+            if name:
+                visible_ctes = visible_ctes | {name}
+    if isinstance(node, exp.Table):
+        check(node, visible_ctes)
+    for child in node.iter_expressions():
+        if child is not with_:
+            _walk_tables(child, visible_ctes, check)

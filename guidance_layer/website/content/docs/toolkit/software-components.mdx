@@ -720,7 +720,7 @@ flowchart LR
 **Key features:**
 - Natural language → validated, read-only SQL → natural-language answer in one `ask()` call
 - Agentic retry loop: SQL errors (including statement timeouts) are fed back to the LLM for correction
-- Defense in depth: `sqlglot` validation rejecting non-`SELECT`, multi-statement, DDL/DML, and cross-schema queries, plus a read-only transaction, `statement_timeout`, and row cap — backed by a read-only DB role
+- Defense in depth: `sqlglot` validation rejecting non-`SELECT`, multi-statement, DDL/DML, row-locking and cross-schema queries and functions outside an allowlist, plus a read-only transaction per query, `statement_timeout`, and row cap — backed by a read-only DB role
 - `table_allowlist` narrows the agent to specific tables; queries touching anything else are rejected before running
 - `extra_instructions` injects a domain glossary or example question→SQL pairs; `answer_language` localises the answer (en, fi, sv, de, fr, es, no, da)
 - Multi-provider LLM (OpenAI / Azure / Anthropic / Google / CSC Aitta / OpenAI-compatible servers / optional LiteLLM, via `get_llm_config()`); `get_schema()` and `run_sql()` work without LLM credentials, so they double as tools for an external agent framework

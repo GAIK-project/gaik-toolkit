@@ -44,7 +44,8 @@ def introspect_schema(
     Returns:
         A ``SchemaInfo`` describing every (allowed) base table and view.
     """
-    allowed = {t.lower() for t in allowlist} if allowlist else None
+    # Exact names, as the SQL validator compares them: "Users" is not "users".
+    allowed = set(allowlist) if allowlist else None
 
     table_rows = conn.execute(
         """
@@ -56,7 +57,7 @@ def introspect_schema(
         (schema_name,),
     ).fetchall()
     table_names = [
-        r["table_name"] for r in table_rows if allowed is None or r["table_name"].lower() in allowed
+        r["table_name"] for r in table_rows if allowed is None or r["table_name"] in allowed
     ]
 
     column_rows = conn.execute(
