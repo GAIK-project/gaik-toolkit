@@ -84,7 +84,6 @@ A read-only transaction stops writes to tables, but not everything a
 privileged role can do through functions, so do not give the agent a
 superuser or the role that owns the schema.
 Create one and connect with it:
-Create one and connect with it:
 
 ```sql
 CREATE ROLE gaik_readonly LOGIN PASSWORD 'choose-a-strong-password';
