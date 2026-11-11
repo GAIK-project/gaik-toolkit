@@ -114,7 +114,8 @@ SYNC checks --worktree <worktree> --plan <notes>/plan-X.Y.Z.json
 ```
 
 Takes a few minutes, so run it in the background. In the worktree it runs:
-`uv sync --all-extras`; the gaik-sync audit; the solution_wizard tests with gaik installed;
+`uv sync --all-extras` on Python 3.11, as CI and the images use (`--python` picks another);
+the gaik-sync audit; the solution_wizard tests with gaik installed;
 the image pin tests of `test_deploy_instances.py`; the unit tests for the agent plugin, the
 no-code catalog, the fork's VisionExtractor edit and each changed component; the wizard_api
 tests (its Postgres tests skip without a database); `ruff format --check` on the Python files
@@ -134,6 +135,10 @@ bump touches `implementation_layer/wizard_api/` and `implementation_layer/deploy
 
 Reading the results:
 
+- `uv sync` failed: the audit and the tests are reported as not run, since without the
+  environment they would only show missing components and a missing pytest. Read
+  `uv-sync.log`, fix the environment and run the checks again. A build error for one
+  package usually means the Python has no wheel for it.
 - Audit findings other than `version` (`removed`, `api_drift`, `options`, `parity`, `new`):
   follow the gaik-sync skill (`.claude/skills/gaik-sync/SKILL.md` in the worktree) with its
   approval gate, and commit approved fixes separately in this PR. A `version` finding with
@@ -182,6 +187,15 @@ what the machine could not (wizard_api with Postgres, the deploy manifests, the 
 security audit) before anyone is asked to review. When CI is green, tick those lines in the
 PR body, run `gh pr ready`, and post the note in the team's review channel:
 "Review: <link>" and one to three plain lines.
+
+## Upstream moved while the PR is open
+
+When upstream gets changes the open sync PR should carry too, add them to the same PR
+instead of opening a second one. In the sync's worktree (make one from the PR's branch if
+this machine has none), merge the target again with `--no-ff` and the same message form,
+run the checks again, and update the numbers in the PR body: the commit the sync stands
+on, the count of upstream changes and commits, the table row for each new change, and the
+Testing lines that changed. Push the branch; CI runs again on the PR.
 
 ## What keeps the PR easy to review
 
