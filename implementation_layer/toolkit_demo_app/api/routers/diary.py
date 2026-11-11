@@ -1,5 +1,6 @@
 """Diary router - Construction diary (Työmaapäiväkirja) workflow endpoints."""
 
+import asyncio
 import io
 import logging
 import tempfile
@@ -166,7 +167,9 @@ async def diary_audio_pipeline_stream(
                 enhanced_transcript=enhanced,
                 compress_audio=compress_audio,
             )
-            transcription = transcriber.transcribe(file_path=tmp_path)
+            # Every model call below is blocking, so each runs in a worker thread:
+            # the event loop stays free for the other requests of this one-pod API.
+            transcription = await asyncio.to_thread(transcriber.transcribe, file_path=tmp_path)
 
             steps[0]["status"] = "completed"
             steps[0]["message"] = "Transcription complete"
@@ -177,7 +180,8 @@ async def diary_audio_pipeline_stream(
             steps[1]["message"] = "Analyzing requirements..."
             yield sse_event("step_update", steps[1])
 
-            extraction_model, requirements, generated_new_schema = _get_or_create_schema(
+            extraction_model, requirements, generated_new_schema = await asyncio.to_thread(
+                _get_or_create_schema,
                 config=config,
                 user_requirements=user_requirements,
                 schema_key="construction_diary",
@@ -200,7 +204,8 @@ async def diary_audio_pipeline_stream(
             extractor = DataExtractor(
                 config=config, model=config["model"], **get_model_options(config)
             )
-            extracted_data = extractor.extract(
+            extracted_data = await asyncio.to_thread(
+                extractor.extract,
                 extraction_model=extraction_model,
                 requirements=requirements,
                 user_requirements=user_requirements,
@@ -249,7 +254,7 @@ async def diary_audio_pipeline_stream(
                             transcription.enhanced_transcript or transcription.raw_transcript
                         )
                         pdf_data = [{"transcript": transcript}]
-                    pdf_generator.run(pdf_data, pdf_path)
+                    await asyncio.to_thread(pdf_generator.run, pdf_data, pdf_path)
 
                     PDF_STORAGE[job_id] = pdf_path
                     PDF_TIMESTAMPS[job_id] = datetime.now()
@@ -346,7 +351,8 @@ async def diary_text_pipeline_stream(
             steps[1]["status"] = "in_progress"
             yield sse_event("step_update", steps[1])
 
-            extraction_model, requirements, generated_new_schema = _get_or_create_schema(
+            extraction_model, requirements, generated_new_schema = await asyncio.to_thread(
+                _get_or_create_schema,
                 config=config,
                 user_requirements=user_requirements,
                 schema_key="construction_diary",
@@ -377,7 +383,8 @@ async def diary_text_pipeline_stream(
             extractor = DataExtractor(
                 config=config, model=config["model"], **get_model_options(config)
             )
-            extracted_data = extractor.extract(
+            extracted_data = await asyncio.to_thread(
+                extractor.extract,
                 extraction_model=extraction_model,
                 requirements=requirements,
                 user_requirements=user_requirements,
@@ -408,7 +415,7 @@ async def diary_text_pipeline_stream(
                     pdf_path = _pdf_path(job_id)
 
                     pdf_data = extracted_data if extracted_data else [{"input_text": text}]
-                    pdf_generator.run(pdf_data, pdf_path)
+                    await asyncio.to_thread(pdf_generator.run, pdf_data, pdf_path)
 
                     PDF_STORAGE[job_id] = pdf_path
                     PDF_TIMESTAMPS[job_id] = datetime.now()

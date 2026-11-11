@@ -346,6 +346,37 @@ async def audio_pipeline(
         tmp.write(content)
         tmp_path = tmp.name
 
+    return await asyncio.to_thread(
+        _run_audio_pipeline,
+        job_id,
+        steps,
+        tmp_path,
+        user_requirements,
+        generate_pdf,
+        pdf_title,
+        enhanced,
+        compress_audio,
+        schema_key,
+        regenerate_schema,
+    )
+
+
+def _run_audio_pipeline(
+    job_id: str,
+    steps: list[PipelineStep],
+    tmp_path: str,
+    user_requirements: str,
+    generate_pdf: bool,
+    pdf_title: str,
+    enhanced: bool,
+    compress_audio: bool,
+    schema_key: str | None,
+    regenerate_schema: bool,
+) -> AudioPipelineResponse:
+    """Transcribe, extract and write the PDF, then remove the upload.
+
+    Blocking: the handler runs it in a worker thread.
+    """
     try:
         config = get_api_config()
 
@@ -510,6 +541,37 @@ async def document_pipeline(
         tmp.write(content)
         tmp_path = tmp.name
 
+    return await asyncio.to_thread(
+        _run_document_pipeline,
+        job_id,
+        steps,
+        tmp_path,
+        suffix,
+        parser_type,
+        user_requirements,
+        generate_pdf,
+        pdf_title,
+        schema_key,
+        regenerate_schema,
+    )
+
+
+def _run_document_pipeline(
+    job_id: str,
+    steps: list[PipelineStep],
+    tmp_path: str,
+    suffix: str,
+    parser_type: str,
+    user_requirements: str,
+    generate_pdf: bool,
+    pdf_title: str,
+    schema_key: str | None,
+    regenerate_schema: bool,
+) -> DocumentPipelineResponse:
+    """Parse, extract and write the PDF, then remove the upload.
+
+    Blocking: the handler runs it in a worker thread.
+    """
     try:
         config = get_api_config()
 
@@ -633,6 +695,33 @@ async def text_pipeline(
     if not text or not text.strip():
         raise HTTPException(status_code=400, detail="No text provided")
 
+    return await asyncio.to_thread(
+        _run_text_pipeline,
+        job_id,
+        steps,
+        text,
+        user_requirements,
+        generate_pdf,
+        pdf_title,
+        schema_key,
+        regenerate_schema,
+    )
+
+
+def _run_text_pipeline(
+    job_id: str,
+    steps: list[PipelineStep],
+    text: str,
+    user_requirements: str,
+    generate_pdf: bool,
+    pdf_title: str,
+    schema_key: str | None,
+    regenerate_schema: bool,
+) -> TextPipelineResponse:
+    """Extract and write the PDF.
+
+    Blocking: the handler runs it in a worker thread.
+    """
     try:
         config = get_api_config()
 

@@ -41,9 +41,15 @@ ALLOWED_EXTENSIONS = {".csv", ".tsv", ".txt", ".xlsx", ".xlsm", ".xls", ".parque
 # Uploads are throwaway. Keeping a handful alive is enough for the demo, and
 # bounding both count and age stops a public page from filling the pod's disk.
 MAX_SESSIONS = 20
+# Counted from the last question, not from the upload: a session in use stays.
 SESSION_TTL_SECONDS = 30 * 60
+SESSION_SWEEP_SECONDS = 300
+# The upload keeps its name on disk (it becomes the table name), cut to this many
+# UTF-8 bytes: a file system takes 255 at most.
+STORED_NAME_MAX_BYTES = 200
 
-# session_id -> {"agent", "dir", "created", "filename", "tables"}
+# session_id -> {"agent", "dir", "last_used", "busy", "closing", "filename", "tables"}
+# "busy" counts the questions in flight; a busy session is never closed under them.
 _SESSIONS: dict[str, dict] = {}
 _SESSIONS_LOCK = asyncio.Lock()
 
@@ -87,16 +93,53 @@ def _discard(session: dict) -> None:
     shutil.rmtree(session["dir"], ignore_errors=True)
 
 
-async def _evict_stale() -> None:
-    """Drop expired sessions, then the oldest ones over the cap."""
-    now = time.time()
-    async with _SESSIONS_LOCK:
-        expired = [sid for sid, s in _SESSIONS.items() if now - s["created"] > SESSION_TTL_SECONDS]
-        for sid in expired:
+def _evict_locked(now: float, *, make_room: bool = False) -> None:
+    """Drop idle sessions past their age; the caller holds ``_SESSIONS_LOCK``.
+
+    With ``make_room`` the least recently used idle ones go too, until one more
+    fits under the cap. A session with a question in flight is left alone.
+    """
+    for sid, session in list(_SESSIONS.items()):
+        if not session["busy"] and now - session["last_used"] > SESSION_TTL_SECONDS:
             _discard(_SESSIONS.pop(sid))
-        while len(_SESSIONS) >= MAX_SESSIONS:
-            oldest = min(_SESSIONS, key=lambda sid: _SESSIONS[sid]["created"])
-            _discard(_SESSIONS.pop(oldest))
+    while make_room and len(_SESSIONS) >= MAX_SESSIONS:
+        idle = [sid for sid, session in _SESSIONS.items() if not session["busy"]]
+        if not idle:
+            break
+        oldest = min(idle, key=lambda sid: _SESSIONS[sid]["last_used"])
+        _discard(_SESSIONS.pop(oldest))
+
+
+async def _evict_stale(*, make_room: bool = False) -> bool:
+    """Evict, and say whether a new session fits under the cap."""
+    async with _SESSIONS_LOCK:
+        _evict_locked(time.time(), make_room=make_room)
+        return len(_SESSIONS) < MAX_SESSIONS
+
+
+async def cleanup_idle_sessions() -> None:
+    """Background task (started in main.py): expire sessions when nobody uploads either."""
+    while True:
+        await asyncio.sleep(SESSION_SWEEP_SECONDS)
+        try:
+            await _evict_stale()
+        except Exception:  # noqa: BLE001 - the loop must outlive one failed pass
+            logger.exception("tabular_agent session cleanup failed")
+
+
+def _stored_name(filename: str) -> str:
+    """The upload's own name, without folders and short enough for the file system."""
+    name = filename.replace("\\", "/").rsplit("/", 1)[-1]
+    stem, suffix = Path(name).stem, Path(name).suffix
+    while stem and len((stem + suffix).encode("utf-8")) > STORED_NAME_MAX_BYTES:
+        stem = stem[:-1]
+    return (stem or "upload") + suffix
+
+
+_TOO_MANY_SESSIONS = HTTPException(
+    status_code=503,
+    detail="Too many files are being analysed right now. Try again in a few minutes.",
+)
 
 
 # ---------- Models ----------
@@ -205,12 +248,20 @@ async def upload_file(
     content = await validate_file_size(file)
     if (mismatch := content_mismatch(suffix, content)) is not None:
         raise HTTPException(status_code=415, detail=mismatch)
-    await _evict_stale()
+    if not await _evict_stale(make_room=True):
+        raise _TOO_MANY_SESSIONS
 
     # Keep the original filename: it becomes the table name the user sees.
     session_dir = tempfile.mkdtemp(prefix="gaik_tabular_")
-    stored = Path(session_dir) / Path(file.filename).name
-    stored.write_bytes(content)
+    stored = Path(session_dir) / _stored_name(file.filename)
+    try:
+        stored.write_bytes(content)
+    except OSError as e:
+        shutil.rmtree(session_dir, ignore_errors=True)
+        raise HTTPException(
+            status_code=400,
+            detail="The server cannot store a file with this name. Rename it and try again.",
+        ) from e
 
     try:
         agent, tables, schema_text = await asyncio.to_thread(_load_agent, stored, layout_inference)
@@ -225,15 +276,25 @@ async def upload_file(
         logger.error("tabular_agent upload failed: %s", e)
         raise HTTPException(status_code=400, detail=f"Could not read the file: {e}") from e
 
-    session_id = uuid.uuid4().hex[:12]
+    session_id = uuid.uuid4().hex
+    session = {
+        "agent": agent,
+        "dir": session_dir,
+        "last_used": time.time(),
+        "busy": 0,
+        "closing": False,
+        "filename": file.filename,
+        "tables": tables,
+    }
     async with _SESSIONS_LOCK:
-        _SESSIONS[session_id] = {
-            "agent": agent,
-            "dir": session_dir,
-            "created": time.time(),
-            "filename": file.filename,
-            "tables": tables,
-        }
+        # Uploads that loaded at the same time each passed the check above.
+        _evict_locked(time.time(), make_room=True)
+        fits = len(_SESSIONS) < MAX_SESSIONS
+        if fits:
+            _SESSIONS[session_id] = session
+    if not fits:
+        _discard(session)
+        raise _TOO_MANY_SESSIONS
     logger.info("tabular_agent session %s loaded %s", session_id, file.filename)
 
     return UploadResponse(
@@ -251,15 +312,20 @@ async def ask_question(req: AskRequest):
     if not question:
         raise HTTPException(status_code=400, detail="Question must not be empty.")
 
+    llm_configured = bool(os.getenv("AZURE_API_KEY") or os.getenv("OPENAI_API_KEY"))
     async with _SESSIONS_LOCK:
+        _evict_locked(time.time())
         session = _SESSIONS.get(req.session_id)
+        if session is not None and llm_configured:
+            # From here to the ``finally`` below the session cannot be evicted.
+            session["busy"] += 1
+            session["last_used"] = time.time()
     if session is None:
         raise HTTPException(
             status_code=404,
             detail="Session not found or expired. Please upload the file again.",
         )
-
-    if not (os.getenv("AZURE_API_KEY") or os.getenv("OPENAI_API_KEY")):
+    if not llm_configured:
         raise HTTPException(status_code=503, detail="No LLM API key configured on the server.")
 
     try:
@@ -267,6 +333,12 @@ async def ask_question(req: AskRequest):
     except Exception as e:
         logger.error("tabular_agent ask failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e)) from e
+    finally:
+        session["busy"] -= 1
+        session["last_used"] = time.time()
+        # The page ended the session while this question ran: close it now.
+        if session["closing"] and not session["busy"]:
+            _discard(session)
 
 
 @router.delete("/session/{session_id}")
@@ -276,7 +348,11 @@ async def end_session(session_id: str):
         session = _SESSIONS.pop(session_id, None)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found.")
-    _discard(session)
+    if session["busy"]:
+        # A question is still running on it; ``ask_question`` closes it when that ends.
+        session["closing"] = True
+    else:
+        _discard(session)
     return {"status": "closed"}
 
 
