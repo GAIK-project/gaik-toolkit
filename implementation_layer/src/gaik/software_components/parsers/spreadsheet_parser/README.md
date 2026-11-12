@@ -50,6 +50,9 @@ single table with no sheet heading.
   stays empty.
 - A date at midnight renders as an ISO date and other date-times as
   `YYYY-MM-DD HH:MM:SS`. A whole-number float such as `12.0` renders as `12`.
+- Cells with a non-General Excel number format include both the parsed value and the
+  format code, for example `0.25 (number format: 0%)` or
+  `1234.5 (number format: #,##0.00 "EUR")`.
 - Formula cells show the result stored in the file. A workbook whose formulas have no
   stored results (one written by a library such as openpyxl and never opened in Excel)
   raises `ValueError`; open and save it in Excel or LibreOffice first.

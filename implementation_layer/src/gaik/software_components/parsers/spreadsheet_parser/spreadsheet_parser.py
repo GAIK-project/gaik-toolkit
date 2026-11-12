@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from datetime import datetime, time
 from pathlib import Path
 from typing import Any
 
 
-def _cell(value: Any) -> str:
+def _cell(value: Any, number_format: str = "General") -> str:
     if value is None:
         return ""
     if isinstance(value, datetime):
@@ -18,14 +18,27 @@ def _cell(value: Any) -> str:
         text = str(int(value))
     else:
         text = str(value)
+    if number_format and number_format != "General":
+        text = f"{text} (number format: {number_format})"
     return " ".join(text.splitlines()).replace("|", "\\|")
 
 
-def _table(rows: Iterable[Iterable[Any]]) -> str | None:
+def _table(
+    rows: Iterable[Iterable[Any]],
+    number_formats: Sequence[Sequence[str]] | None = None,
+) -> str | None:
     """Render rows as a Markdown table with a leading ``Row`` column; None if all are empty."""
     kept = []
-    for number, row in enumerate(rows, start=1):
-        cells = [_cell(v) for v in row]
+    source_rows = (
+        zip(rows, number_formats) if number_formats is not None else ((row, None) for row in rows)
+    )
+    for number, (row, formats) in enumerate(source_rows, start=1):
+        cells = [
+            _cell(
+                value, formats[index] if formats is not None and index < len(formats) else "General"
+            )
+            for index, value in enumerate(row)
+        ]
         while cells and not cells[-1].strip():
             cells.pop()
         if cells:
@@ -47,10 +60,16 @@ def _xlsx_blocks(path: Path) -> list[str]:
     try:
         blocks, results = [], []
         for sheet, formula_sheet in zip(values.worksheets, formulas.worksheets):
-            rows = list(sheet.iter_rows(values_only=True))
-            for row, cells in zip(rows, formula_sheet.iter_rows()):
-                results += [v for v, c in zip(row, cells) if c.data_type == "f"]
-            if table := _table(rows):
+            rows, number_formats = [], []
+            for row, formula_cells in zip(sheet.iter_rows(), formula_sheet.iter_rows()):
+                rows.append([cell.value for cell in row])
+                number_formats.append([cell.number_format for cell in row])
+                results += [
+                    cell.value
+                    for cell, formula in zip(row, formula_cells)
+                    if formula.data_type == "f"
+                ]
+            if table := _table(rows, number_formats):
                 blocks.append(f"## Sheet: {sheet.title}\n\n{table}")
     finally:
         values.close()
