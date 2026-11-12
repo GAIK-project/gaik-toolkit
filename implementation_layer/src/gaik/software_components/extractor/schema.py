@@ -1396,13 +1396,15 @@ def _apply_type_overrides(requirements: ExtractionRequirements, original_text: s
                 continue
 
             field.field_type = "date"
-            # The field's own clause in the task text comes first; the parsed
-            # description is the fallback, since the parser is told to keep a
-            # field's own format there and never to copy a neighbour's.
-            detected_format = _detect_date_format(field_context) or _detect_date_format(
-                field.description
+            # The field's own clause in the task text comes first, then a
+            # format the task states for all dates. The parsed description is
+            # the last fallback: the parser is told to keep a field's own
+            # format there, but what it writes must not override the task.
+            field.format = (
+                _detect_date_format(field_context)
+                or global_date_format
+                or _detect_date_format(field.description)
             )
-            field.format = detected_format or global_date_format
             continue
 
         field.format = None
