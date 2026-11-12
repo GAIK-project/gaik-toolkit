@@ -19,6 +19,9 @@ This repo is public: never commit machine-local paths, usernames or secret-store
 - Demo API, from `implementation_layer/toolkit_demo_app/`:
   `uv run --python 3.11 --with pytest --with pytest-asyncio python -m pytest api/tests -o addopts="" -q`
   (`python -m` puts the demo folder on `sys.path`, so `import api` works).
+- Demo API live smoke, from the same folder with the provider keys set:
+  `python -m api.smoke`. One small real request per use case (`api/smoke.py`); add a
+  check there when the demo gets a new use case.
 - Demo front end, from the same folder: `bun test`, `bunx tsc --noEmit` and
   `bun run lint`. CI runs none of these, so run them for a front-end change.
 
@@ -102,6 +105,9 @@ commit `lib/no-code/catalog.generated.json` and `public/downloads/skills/`;
 - Deploy by pushing to the `deploy/demo-app` branch: `git push origin main:deploy/demo-app`.
   A GitHub webhook starts the BuildConfigs in `openshift/buildconfigs.yaml`, and the
   deployments roll out when the images land. `openshift/deploy.sh` is the local fallback.
+- After a rollout, run the live smoke test in the new API pod:
+  `oc exec -n <namespace> deployment/gaik-demo-api -- python smoke.py`. It exits 1
+  when a use case fails with the installed gaik and the configured model.
 - Keep `main` and `deploy/demo-app` level: land anything that reached the deploy branch in
   `main` by PR, so the push stays a fast-forward. Never force-push it; if it is ahead, merge it first.
 - Never `oc apply` the deployment manifests in `openshift/`: the live deployments carry
