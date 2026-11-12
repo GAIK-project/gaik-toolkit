@@ -7,7 +7,6 @@ import {
   processAnchor,
   processStyle,
 } from "@/lib/knowledge-processes";
-import { prompts, skills } from "@/lib/no-code/catalog";
 import { cn } from "@/lib/utils";
 import {
   ArrowUpRight,
@@ -128,24 +127,7 @@ function OpenMarker({ locked }: { locked: boolean }) {
   );
 }
 
-function FeatureChips({ demo }: { demo: Demo }) {
-  if (!demo.featureList) return null;
-  return (
-    <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
-      {demo.featureList.map((feature) => (
-        <span
-          key={feature.label}
-          className="bg-muted/70 text-foreground/75 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs"
-        >
-          <feature.icon className={cn("size-3", lookOf(demo).accent)} />
-          {feature.label}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/** The standard card: icon, title and description, with feature chips if it has any. */
+/** The standard card: icon, title and description. */
 function DemoCard({
   demo,
   isUnlocked,
@@ -179,7 +161,6 @@ function DemoCard({
       <p className="text-muted-foreground text-sm leading-relaxed">
         {demo.description}
       </p>
-      <FeatureChips demo={demo} />
     </Link>
   );
 }
@@ -220,7 +201,6 @@ function ImageCard({ demo, isUnlocked }: { demo: Demo; isUnlocked: boolean }) {
         <p className="text-muted-foreground text-sm leading-relaxed">
           {demo.description}
         </p>
-        <FeatureChips demo={demo} />
       </div>
     </Link>
   );
@@ -235,35 +215,22 @@ function ComingSoonLine({ items }: { items: ComingSoon[] }) {
   );
 }
 
-function SectionHeading({
-  title,
-  intro,
-  count,
-}: {
-  title: string;
-  intro: string;
-  count: string;
-}) {
+function SectionHeading({ title, intro }: { title: string; intro: string }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-1 border-b pb-3">
-      <div className="space-y-1">
-        <h2 className="font-serif text-2xl font-semibold tracking-tight">
-          {title}
-        </h2>
-        <p className="text-muted-foreground text-sm">{intro}</p>
-      </div>
-      <span className="text-muted-foreground text-sm">{count}</span>
+    <div className="space-y-1 border-b pb-3">
+      <h2 className="font-serif text-2xl font-semibold tracking-tight">
+        {title}
+      </h2>
+      <p className="text-muted-foreground text-sm">{intro}</p>
     </div>
   );
 }
 
 function ProcessHeading({
   process,
-  count,
   id,
 }: {
   process: KnowledgeProcess;
-  count: string;
   id?: string;
 }) {
   const style = processStyle(process);
@@ -274,7 +241,6 @@ function ProcessHeading({
     >
       <style.icon className={cn("size-4", style.accent)} />
       <h3 className={cn("font-semibold", style.accent)}>{style.name}</h3>
-      <span className="text-muted-foreground/70 text-xs">{count}</span>
       <span className="text-muted-foreground hidden md:inline">
         · {style.summary}
       </span>
@@ -282,13 +248,10 @@ function ProcessHeading({
   );
 }
 
-const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
-
 const noCodeLinks: {
   title: string;
   description: string;
   href: string;
-  count: number;
   icon: LucideIcon;
 }[] = [
   {
@@ -296,7 +259,6 @@ const noCodeLinks: {
     description:
       "Download a skill for Claude Desktop or install the plugin in a coding agent.",
     href: "/skills",
-    count: skills.length,
     icon: Wand2,
   },
   {
@@ -304,7 +266,6 @@ const noCodeLinks: {
     description:
       "Copy a prompt into ChatGPT or Claude to extract structured data. Nothing to install.",
     href: "/prompts",
-    count: prompts.length,
     icon: MessageSquare,
   },
 ];
@@ -343,7 +304,6 @@ function Sections({
         <SectionHeading
           title="Use Cases"
           intro="End-to-end applications for real business tasks, built from the modules and components below."
-          count={plural(featuredUseCases.length + useCases.length, "demo")}
         />
         <div className="grid gap-4 lg:grid-cols-2">
           {featuredUseCases.map((demo) => (
@@ -370,7 +330,6 @@ function Sections({
         <SectionHeading
           title="Software Modules"
           intro="Ready-made pipelines that combine several components into one workflow."
-          count={plural(modules.length, "module")}
         />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {modules.map((demo) => (
@@ -390,18 +349,13 @@ function Sections({
         <SectionHeading
           title="Software Components"
           intro="Single building blocks, each usable on its own from the gaik Python package."
-          count={plural(components.length, "component")}
         />
         {PROCESSES.map(({ name }) => {
           const demos = inProcess(components, name);
           if (demos.length === 0) return null;
           return (
             <div key={name} className="space-y-3">
-              <ProcessHeading
-                process={name}
-                count={plural(demos.length, "component")}
-                id={processAnchor(name)}
-              />
+              <ProcessHeading process={name} id={processAnchor(name)} />
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {demos.map((demo) => (
                   <Reveal key={demo.href} animated={animated}>
@@ -423,35 +377,29 @@ function Sections({
         <SectionHeading
           title="No-code Assets"
           intro="Use GAIK's extraction know-how without writing code."
-          count={plural(skills.length + prompts.length, "asset")}
         />
         <div className="grid gap-4 sm:grid-cols-2">
-          {noCodeLinks.map(
-            ({ title, description, href, count, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  cardClassName,
-                  "hover:border-primary/40 gap-2.5 p-4",
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <IconTile icon={Icon} tile={USE_CASE_LOOK.tile} />
-                  <h3 className="min-w-0 flex-1 text-[15px] font-semibold">
-                    {title}
-                  </h3>
-                  <span className="text-muted-foreground text-xs">
-                    {count} available
-                  </span>
-                  <OpenMarker locked={false} />
-                </div>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {description}
-                </p>
-              </Link>
-            ),
-          )}
+          {noCodeLinks.map(({ title, description, href, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className={cn(
+                cardClassName,
+                "hover:border-primary/40 gap-2.5 p-4",
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <IconTile icon={Icon} tile={USE_CASE_LOOK.tile} />
+                <h3 className="min-w-0 flex-1 text-[15px] font-semibold">
+                  {title}
+                </h3>
+                <OpenMarker locked={false} />
+              </div>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                {description}
+              </p>
+            </Link>
+          ))}
         </div>
       </Reveal>
     </>
