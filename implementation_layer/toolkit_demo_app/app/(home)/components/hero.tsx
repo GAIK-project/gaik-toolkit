@@ -33,7 +33,7 @@ export function Hero({
   );
 
   const newLinkClassName =
-    "text-primary font-medium underline underline-offset-4 hover:text-primary/80 transition-colors";
+    "text-foreground hover:text-primary font-medium underline-offset-4 transition-colors hover:underline";
 
   return (
     <PageTransition className="bg-card relative overflow-hidden rounded-2xl border p-6 shadow-sm md:p-10">

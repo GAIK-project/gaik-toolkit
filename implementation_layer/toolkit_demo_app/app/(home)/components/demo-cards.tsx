@@ -312,7 +312,7 @@ function Sections({
             </Reveal>
           ))}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {useCases.map((demo) => (
             <Reveal key={demo.href} animated={animated}>
               <DemoCard demo={demo} isUnlocked={isUnlocked} />
@@ -356,7 +356,7 @@ function Sections({
           return (
             <div key={name} className="space-y-3">
               <ProcessHeading process={name} id={processAnchor(name)} />
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {demos.map((demo) => (
                   <Reveal key={demo.href} animated={animated}>
                     <DemoCard demo={demo} isUnlocked={isUnlocked} />
