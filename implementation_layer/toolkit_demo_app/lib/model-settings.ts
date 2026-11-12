@@ -31,10 +31,8 @@ const SUPPORTED_PATHS = [
 
 export function supportsModelSettings(path: string, method = "POST"): boolean {
   if (method.toUpperCase() !== "POST") return false;
-  return (
-    SUPPORTED_PATHS.some(
-      (prefix) => path === prefix || path.startsWith(`${prefix}/`),
-    ) || path.startsWith("/api/wizard/message/")
+  return SUPPORTED_PATHS.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
   );
 }
 
@@ -51,7 +49,6 @@ export function pageUsesModelSettings(path: string): boolean {
     "/document-structured",
     "/audio-structured",
     "/diary",
-    "/solution-wizard",
     "/web-scraper",
   ].includes(path);
 }
