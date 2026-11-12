@@ -95,7 +95,8 @@ picked, the audio demos still transcribe on the server (local Whisper, else
 or CSC Aitta account. Enter the model/deployment and key; Azure also needs its public
 resource endpoint. **Test connection** makes one small chat request. **Use this key**
 activates it for this browser tab until refresh, navigation away or sign-out. **Clear
-own model** returns to the server models.
+own model** returns to the server models. A run on an own key needs a signed-in account,
+approved or pending; it spends no trial run.
 
 Own settings apply to Extractor, Schema Generator, Classifier, LLM-based Parser modes,
 Vision Extractor, PostgreSQL Agent questions, single LLM Judge tasks and Solution Wizard

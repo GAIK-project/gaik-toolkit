@@ -107,7 +107,9 @@ function run(cookie: string) {
 test("a POST from a visitor who is not signed in is refused before the backend", async () => {
   const response = await proxy(new NextRequest(RUN, { method: "POST" }));
   expect(response.status).toBe(401);
-  expect(await response.json()).toEqual({ error: "Sign in to use this feature." });
+  expect(await response.json()).toEqual({
+    error: "Sign in to use this feature.",
+  });
   expect(backendCalls).toBe(0);
 });
 
@@ -134,4 +136,53 @@ test("a spent refresh token is refused and the dead session cleared", async () =
   expect(await again.json()).toEqual({ error: "Sign in to use this feature." });
   expect(again.cookies.get(COOKIE)?.value).toBe("");
   expect(backendCalls).toBe(1);
+});
+
+// The access rules match the path the backend routes on, so an encoded letter
+// cannot move a request from one rule to another.
+
+const fresh = () => Math.floor(Date.now() / 1000) + 3600;
+
+function post(url: string, init: { cookie?: string; ownKey?: boolean } = {}) {
+  const headers = new Headers();
+  if (init.cookie) headers.set("cookie", init.cookie);
+  if (init.ownKey) headers.set("x-gaik-model-settings", "e30");
+  return proxy(new NextRequest(url, { method: "POST", headers }));
+}
+
+test("an encoded wizard path meets the wizard gate", async () => {
+  // Approved for the demos, but without wizard access.
+  const cookie = sessionCookie("r1", fresh());
+  for (const path of ["/api/wizard/start", "/api/%77izard/start"]) {
+    const response = await post(`https://demo.test${path}`, { cookie });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "Solution Wizard is not available yet.",
+    });
+  }
+  expect(backendCalls).toBe(0);
+});
+
+test("a path the rules cannot judge is not forwarded", async () => {
+  const cookie = sessionCookie("r1", fresh());
+  for (const path of ["/api//wizard/start", "/api/x%2F..%2Fwizard/start"]) {
+    const response = await post(`https://demo.test${path}`, { cookie });
+    expect(response.status).toBe(404);
+  }
+  expect(backendCalls).toBe(0);
+});
+
+test("a visitor with their own model key is asked to sign in", async () => {
+  for (const path of [
+    "/api/extract",
+    "/api/postgres-agent/ask",
+    "/api/%65xtract",
+  ]) {
+    const response = await post(`https://demo.test${path}`, { ownKey: true });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: "Sign in to use this feature.",
+    });
+  }
+  expect(backendCalls).toBe(0);
 });
