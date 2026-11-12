@@ -1,0 +1,10 @@
+name,category,price_eur,description,availability,suitable_for
+Basic service,Service,69,"Gears and brakes adjusted, chain cleaned and oiled, bolts checked",2 working days,all bikes
+Full service,Service,129,"Basic service plus wheels trued, bearings checked and worn cables replaced",3 working days,all bikes
+E-bike service,Service,149,"Full service with a battery health check and a software update",4 working days,electric bikes
+Puncture repair,Repair,19,"Inner tube replaced and tyre checked; the tube is included",while you wait,all bikes
+Brake pad replacement,Repair,29,"Pads for one wheel fitted and adjusted; the pads are included",same day,disc and rim brakes
+Chain and cassette replacement,Repair,45,"Worn chain and cassette replaced and gears adjusted; parts are charged separately",same day,all bikes
+Winter tyre change,Seasonal,25,"Studded tyres fitted to both wheels; tyres are not included",same day,all bikes
+Winter storage,Seasonal,89,"Indoor storage from November to March with a basic service before pick-up",book by the end of October,all bikes
+Replacement bike,Rental,10,"A city bike for the days your own bike is in the workshop; price per day",six bikes; reserve when booking,service customers
