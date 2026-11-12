@@ -74,6 +74,13 @@ answer = generator.generate(
 Without `config`, the generator uses `get_openai_config(use_azure)`. Pass
 `config=get_llm_config("aitta")` (or another provider) to use a different chat model.
 
+### Custom Prompt
+
+Custom prompts must include both `{query}` and `{context}`; a prompt missing either is
+rejected when `AnswerGenerator` is created. Only these placeholders are substituted; other
+braces remain literal, so JSON examples do not need escaping. Doubled braces (`{{` and `}}`)
+retain Python format-string escaping and become single braces.
+
 ---
 
 ## Environment Variables

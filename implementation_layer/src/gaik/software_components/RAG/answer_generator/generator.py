@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Iterable
 
@@ -35,6 +36,18 @@ DEFAULT_PROMPT_WITH_CITATIONS = (
 )
 
 
+_PROMPT_TOKEN = re.compile(r"\{\{|\}\}|\{query\}|\{context\}")
+
+
+def _validate_custom_prompt(prompt: str) -> None:
+    tokens = _PROMPT_TOKEN.findall(prompt)
+    matches = {token[1:-1] for token in tokens if token not in {"{{", "}}"}}
+    missing = sorted({"query", "context"} - matches)
+    if missing:
+        placeholders = ", ".join(f"{{{name}}}" for name in missing)
+        raise ValueError(f"Custom prompt is missing required placeholder(s): {placeholders}.")
+
+
 def _with_retries(call, *, tries: int = 4):
     for attempt in range(tries):
         try:
@@ -60,6 +73,8 @@ class AnswerGenerator:
         conversation_history: bool = False,
         last_n: int = 10,
     ) -> None:
+        if prompt:
+            _validate_custom_prompt(prompt)
         self.config = config or get_openai_config(use_azure=use_azure)
         self.model = model or self.config["model"]
         self.citations = citations
@@ -108,7 +123,14 @@ class AnswerGenerator:
 
     def _build_prompt(self, query: str, context_text: str) -> str:
         if self.prompt:
-            return self.prompt.format(query=query, context=context_text)
+            _validate_custom_prompt(self.prompt)
+            replacements = {
+                "{{": "{",
+                "}}": "}",
+                "{query}": query,
+                "{context}": context_text,
+            }
+            return _PROMPT_TOKEN.sub(lambda match: replacements[match.group()], self.prompt)
         template = DEFAULT_PROMPT_WITH_CITATIONS if self.citations else DEFAULT_PROMPT
         return template.format(query=query, context=context_text)
 
