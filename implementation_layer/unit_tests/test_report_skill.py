@@ -290,7 +290,7 @@ def test_a_successful_word_export_goes_through_rebuild(tmp_path, capsys, monkeyp
     monkeypatch.setattr(
         pypandoc,
         "convert_file",
-        lambda src, fmt, outputfile: Path(outputfile).write_bytes(b"docx"),
+        lambda src, fmt, outputfile, **kwargs: Path(outputfile).write_bytes(b"docx"),
     )
     spec, ws = write_spec(tmp_path, settings={"docx": True}), tmp_path / "ws"
     out = full_run(capsys, spec, ws)
