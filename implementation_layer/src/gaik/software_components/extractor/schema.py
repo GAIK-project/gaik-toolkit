@@ -1280,11 +1280,20 @@ _EXPLICIT_PATTERN_RE = re.compile(r"\b(?:regex|regular\s+expression|pattern)\b",
 _ITEM_START_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)]|#{1,6})\s+")
 # What may precede a field name that heads its own line: an optional list
 # marker or heading, then emphasis, backticks or quotes.
-_OWN_LINE_LEAD_RE = re.compile(r"\s*(?:(?:[-*+]|\d+[.)]|#{1,6})\s+)?[`*_\"'(]*")
-# What must follow that name: closing emphasis, then a colon, parenthesis,
-# equals sign or dash, or the end of the line. A comma there means the line
-# lists several fields ("Order date, delivery date (DD/MM/YYYY)").
-_OWN_LINE_TAIL_RE = re.compile(r"[`*_\"')]*\s*(?:[:(=\u2013\u2014-]|$)")
+_OWN_LINE_LEAD_RE = re.compile(r"^\s*(?:(?:[-*+]|\d+[.)]|#{1,6})\s+)?[`*_\"'(]*$")
+# What must follow that name, after closing emphasis and spaces: a colon,
+# parenthesis, equals sign or dash, or the end of the line. A comma there means
+# the line lists several fields ("Order date, delivery date (DD/MM/YYYY)").
+_OWN_LINE_CLOSING = "`*_\"')"
+_OWN_LINE_SEPARATORS = ":(=\u2013\u2014-"
+
+
+def _heads_own_line(line: str, start: int, end: int) -> bool:
+    """Whether the field name at ``line[start:end]`` heads its own line."""
+    if not _OWN_LINE_LEAD_RE.match(line[:start]):
+        return False
+    rest = line[end:].lstrip(_OWN_LINE_CLOSING).lstrip()
+    return not rest or rest[0] in _OWN_LINE_SEPARATORS
 
 
 def _field_specific_context(field: FieldSpec, original_text: str) -> str:
@@ -1310,9 +1319,7 @@ def _field_specific_context(field: FieldSpec, original_text: str) -> str:
         if not match:
             continue
 
-        if _OWN_LINE_LEAD_RE.fullmatch(line[: match.start()]) and _OWN_LINE_TAIL_RE.match(
-            line[match.end() :]
-        ):
+        if _heads_own_line(line, match.start(), match.end()):
             # The field heads its own bullet, numbered item or heading
             # ("- `delivery_date`: ..., formatted DD/MM/YYYY"), so the whole
             # line is about this field, commas included.
