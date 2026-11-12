@@ -1,6 +1,7 @@
 "use client";
 
 import { SectionGuide } from "@/components/demo/section-guide";
+import { RunBlockedButton, useRunAccess } from "@/components/run-access";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -70,6 +71,7 @@ export function ExtractionExampleSection({
   };
 
   const busy = pipeline.isLoading || loadingAudio;
+  const { blocked: runBlocked } = useRunAccess();
 
   return (
     <div className="space-y-6">
@@ -160,14 +162,18 @@ export function ExtractionExampleSection({
           </div>
 
           <div className="flex flex-wrap items-center gap-4 border-t pt-4">
-            <Button size="lg" onClick={process} disabled={busy}>
-              {busy ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Sparkles className="size-4" />
-              )}
-              {busy ? "Processing..." : "Process the example"}
-            </Button>
+            {runBlocked ? (
+              <RunBlockedButton />
+            ) : (
+              <Button size="lg" onClick={process} disabled={busy}>
+                {busy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Sparkles className="size-4" />
+                )}
+                {busy ? "Processing..." : "Process the example"}
+              </Button>
+            )}
             <button
               type="button"
               onClick={onCreate}

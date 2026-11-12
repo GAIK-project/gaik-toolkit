@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, failureMessage } from "@/lib/api-client";
 import { parseSSEEvents } from "@/lib/sse";
 import { cn } from "@/lib/utils";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
@@ -354,7 +354,10 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
         body: formData,
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error("Failed to process order");
+      if (!response.ok)
+        throw new Error(
+          await failureMessage(response, "Failed to process order"),
+        );
       const reader = response.body?.getReader();
       if (!reader) throw new Error("No response body");
 
