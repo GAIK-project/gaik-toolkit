@@ -2,6 +2,7 @@
 
 import { FileUpload } from "@/components/demo/file-upload";
 import { SectionGuide } from "@/components/demo/section-guide";
+import { RunBlockedButton, useRunAccess } from "@/components/run-access";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -161,6 +162,7 @@ export function ExtractionCreateSection({ demo }: { demo: ExtractionConfig }) {
 
   const busy = pipeline.isLoading;
   const working = busy || sessionSchema.isGenerating;
+  const { blocked: runBlocked } = useRunAccess();
   const hint = !promptReady
     ? "Choose at least one field, or write a prompt."
     : !sessionSchema.isCurrent
@@ -495,7 +497,7 @@ export function ExtractionCreateSection({ demo }: { demo: ExtractionConfig }) {
               <Button
                 variant={sessionSchema.isCurrent ? "outline" : "default"}
                 onClick={() => void sessionSchema.generate()}
-                disabled={working || !promptReady}
+                disabled={working || !promptReady || runBlocked}
               >
                 {sessionSchema.isGenerating ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -520,18 +522,22 @@ export function ExtractionCreateSection({ demo }: { demo: ExtractionConfig }) {
           </section>
 
           <div className="flex flex-wrap items-center gap-3 border-t pt-4">
-            <Button
-              size="lg"
-              onClick={extract}
-              disabled={working || !canExtract}
-            >
-              {busy ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Sparkles className="size-4" />
-              )}
-              {busy ? "Processing..." : "Extract"}
-            </Button>
+            {runBlocked ? (
+              <RunBlockedButton />
+            ) : (
+              <Button
+                size="lg"
+                onClick={extract}
+                disabled={working || !canExtract}
+              >
+                {busy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Sparkles className="size-4" />
+                )}
+                {busy ? "Processing..." : "Extract"}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="lg"

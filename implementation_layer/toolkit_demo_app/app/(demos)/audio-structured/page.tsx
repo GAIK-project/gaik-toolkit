@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { apiFetch, RateLimitError } from "@/lib/api-client";
+import { apiFetch, RateLimitError, failureMessage } from "@/lib/api-client";
 import { processSSEStream, type SSEStep } from "@/lib/sse";
 import { cn } from "@/lib/utils";
 import {
@@ -245,7 +245,10 @@ export default function AudioStructuredPage() {
         body: formData,
         signal: abortControllerRef.current.signal,
       });
-      if (!response.ok) throw new Error("Failed to process the recording");
+      if (!response.ok)
+        throw new Error(
+          await failureMessage(response, "Failed to process the recording"),
+        );
 
       let streamError: Error | null = null;
       await processSSEStream<AudioResult & { job_id: string }>(response, {
