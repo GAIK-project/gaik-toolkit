@@ -1368,12 +1368,44 @@ def _requests_text_representation(text: str) -> bool:
 
 # Keywords that are ordinary words in another language ("data" in English, "dato"
 # in Spanish, "jour" in "ordre du jour"). A field name is written in the task's
-# language, so they count there; a description is prose, where they do not.
+# language, so they count there. A description is prose, where they count only as
+# its first word ("Data di consegna", "Dato for levering").
 _AMBIGUOUS_DATE_KEYWORDS = frozenset({"data", "dato", "jour"})
 # Keywords that form compounds in their language ("Lieferdatum",
-# "toimituspäivämäärä", "teslimtarihi"), so they may be part of a longer word.
+# "toimituspäivämäärä", "teslimtarihi", "fechaentrega"), so they may be part of a
+# longer word.
 _COMPOUND_DATE_KEYWORDS = frozenset(
-    {"datum", "dátum", "päivämäärä", "paivamaara", "päiväys", "paivays", "tarih"}
+    {"datum", "dátum", "päivämäärä", "paivamaara", "päiväys", "paivays", "tarih", "fecha"}
+)
+# In a field name a word may also end in a keyword or start with "date":
+# "birthdate", "leveringsdato", and "duedate" and "dateofbirth", which is what
+# FieldSpec makes of "dueDate" and "dateOfBirth". This is the fallback for a date
+# the model typed as text, so it has to catch those names. The words below start
+# or end the same way without being dates.
+_DATE_NAME_SUFFIXES = ("date", "dato")
+_NOT_A_DATE_WORDS = frozenset(
+    {
+        "accommodate",
+        "antedate",
+        "backdate",
+        "candidate",
+        "candidato",
+        "consolidate",
+        "consolidato",
+        "dated",
+        "dates",
+        "invalidate",
+        "liquidate",
+        "mandate",
+        "mandato",
+        "postdate",
+        "predate",
+        "revalidate",
+        "soldato",
+        "update",
+        "validate",
+        "validato",
+    }
 )
 _LETTER_WORD_RE = re.compile(r"[^\W\d_]+")
 
@@ -1381,9 +1413,15 @@ _LETTER_WORD_RE = re.compile(r"[^\W\d_]+")
 def _has_date_keyword(text: str, *, in_name: bool) -> bool:
     """Whether ``text`` contains a date keyword as a word, not inside another word."""
     words = _LETTER_WORD_RE.findall(text.lower())
-    for word in words:
+    for position, word in enumerate(words):
+        if (
+            in_name
+            and (word.startswith("date") or word.endswith(_DATE_NAME_SUFFIXES))
+            and word not in _NOT_A_DATE_WORDS
+        ):
+            return True
         for keyword in DATE_KEYWORDS:
-            if keyword in _AMBIGUOUS_DATE_KEYWORDS and not in_name:
+            if keyword in _AMBIGUOUS_DATE_KEYWORDS and not in_name and position:
                 continue
             if word == keyword:
                 return True
