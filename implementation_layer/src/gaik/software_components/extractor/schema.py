@@ -1366,14 +1366,61 @@ def _requests_text_representation(text: str) -> bool:
     return bool(_TEXT_REPRESENTATION_RE.search(text))
 
 
-def _is_date_field(name: str, description: str) -> bool:
-    """Check if a field is a date field based on name or description (multilingual)."""
-    name_lower = name.lower()
-    desc_lower = description.lower()
-    for keyword in DATE_KEYWORDS:
-        if keyword in name_lower or keyword in desc_lower:
+# Keywords that are ordinary words in another language ("data" in English, "dato"
+# in Spanish, "jour" in "ordre du jour"). A field name is written in the task's
+# language, so they count there; a description is prose, where they do not.
+_AMBIGUOUS_DATE_KEYWORDS = frozenset({"data", "dato", "jour"})
+# Keywords that form compounds in their language ("Lieferdatum",
+# "toimituspäivämäärä", "teslimtarihi"), so they may be part of a longer word.
+_COMPOUND_DATE_KEYWORDS = frozenset(
+    {"datum", "dátum", "päivämäärä", "paivamaara", "päiväys", "paivays", "tarih"}
+)
+# A field name may run words together: FieldSpec lowercases "deliveryDate" to
+# "deliverydate", and "birthdate" is one word. So a name's word may end in "date",
+# unless it is one of the English words that do so without being a date.
+_NOT_A_DATE_WORDS = frozenset(
+    {
+        "accommodate",
+        "antedate",
+        "backdate",
+        "candidate",
+        "consolidate",
+        "invalidate",
+        "liquidate",
+        "mandate",
+        "postdate",
+        "predate",
+        "revalidate",
+        "update",
+        "validate",
+    }
+)
+_LETTER_WORD_RE = re.compile(r"[^\W\d_]+")
+
+
+def _has_date_keyword(text: str, *, in_name: bool) -> bool:
+    """Whether ``text`` contains a date keyword as a word, not inside another word."""
+    words = _LETTER_WORD_RE.findall(text.lower())
+    for word in words:
+        if in_name and word.endswith("date") and word not in _NOT_A_DATE_WORDS:
             return True
+        for keyword in DATE_KEYWORDS:
+            if keyword in _AMBIGUOUS_DATE_KEYWORDS and not in_name:
+                continue
+            if word == keyword:
+                return True
+            if keyword in _COMPOUND_DATE_KEYWORDS and keyword in word:
+                return True
     return False
+
+
+def _is_date_field(name: str, description: str) -> bool:
+    """Check if a field is a date field based on name or description (multilingual).
+
+    A keyword counts only as a whole word, so ``candidate_name``, ``update_notes``
+    and ``metadata`` are not dates.
+    """
+    return _has_date_keyword(name, in_name=True) or _has_date_keyword(description, in_name=False)
 
 
 def _apply_type_overrides(requirements: ExtractionRequirements, original_text: str = "") -> None:
